@@ -204,6 +204,18 @@
         const box = chatBox();
         if (!box) return null;
 
+        const cleanText = String(text || "").trim();
+
+        if (
+            cleanText.startsWith("Attachment analysis:") ||
+            cleanText.includes("This attachment appears to contain") ||
+            cleanText.includes("extracted image/PDF content") ||
+            cleanText.includes("[Attachment analysis failed:")
+        ) {
+            console.warn("[Nova Mobile] hidden noisy attachment analysis bubble");
+            return null;
+        }
+
         const bubble = document.createElement("div");
         bubble.dataset.role = role;
         bubble.style.margin = role === "user" ? "10px 0 10px auto" : "10px auto 10px 0";
@@ -423,35 +435,67 @@
         rec.start();
     }
 
-    function newChat(event) {
-        if (event) {
-            event.preventDefault();
-            event.stopPropagation();
-        }
+async function newChat(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
 
-        const currentSessionId = getSessionId();
-        const box = chatBox();
+    const currentSessionId = getSessionId();
+    const box = chatBox();
 
-        if (currentSessionId && box) {
-            state.cachedMessages[currentSessionId] = box.innerHTML;
-        }
+    if (currentSessionId && box) {
+        state.cachedMessages[currentSessionId] = box.innerHTML;
+    }
 
-        const id = "mobile_" + Date.now();
-        localStorage.setItem("nova_mobile_active_session_id", id);
-        state.sessionTitles[id] = "New Chat";
+    let id = "mobile_" + Date.now();
+    let title = "New Chat";
 
-        if (box) {
-            box.innerHTML = "";
-        }
-
-        updateActiveSessionTitle({
-            id: id,
-            title: "New Chat"
+    try {
+        const response = await fetch("/api/sessions/new", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                title: title
+            })
         });
 
-        addBubble("assistant", "New chat started. Send a message to save it.");
-        scrollBottom();
+        const data = await response.json();
+
+        id =
+            data?.session?.id ||
+            data?.id ||
+            data?.session_id ||
+            id;
+
+        title =
+            data?.session?.title ||
+            data?.title ||
+            title;
+    } catch (err) {
+        console.warn("[Nova Mobile] backend session create failed, using local session", err);
     }
+
+    localStorage.setItem("nova_mobile_active_session_id", id);
+    state.sessionTitles[id] = title;
+
+    if (box) {
+        box.innerHTML = "";
+    }
+
+    updateActiveSessionTitle({
+        id: id,
+        title: title
+    });
+
+    addBubble("assistant", "New chat started and saved to Sessions.");
+
+    scrollBottom();
+
+    console.log("[Nova Mobile] new session saved", id);
+}
 
     function ensureSessionsPanel() {
         let panel = $("nova-mobile-sessions-panel");

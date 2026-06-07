@@ -359,41 +359,7 @@
 
 </main>
 
-<script>
-window.NovaOpenMobileSessions = function () {
-    var panel = document.getElementById("nova-mobile-sessions-panel");
-
-    if (!panel) {
-        alert("Sessions panel not found.");
-        return;
-    }
-
-    panel.classList.remove("hidden");
-    panel.style.cssText =
-        "display:flex !important;" +
-        "position:fixed !important;" +
-        "left:10px !important;" +
-        "right:10px !important;" +
-        "top:76px !important;" +
-        "z-index:999999 !important;" +
-        "flex-direction:column !important;" +
-        "gap:10px !important;" +
-        "padding:14px !important;" +
-        "background:#111827 !important;" +
-        "border:1px solid rgba(255,255,255,.18) !important;" +
-        "border-radius:18px !important;" +
-        "box-shadow:0 24px 80px rgba(0,0,0,.55) !important;";
-};
-
-window.NovaCloseMobileSessions = function () {
-    var panel = document.getElementById("nova-mobile-sessions-panel");
-
-    if (!panel) return;
-
-    panel.classList.add("hidden");
-    panel.style.cssText = "display:none !important;";
-};
-</script>
+<!-- DISABLED_OLD_INLINE_SESSIONS_OPEN_CLOSE_20260606 -->
 
 <script>
 (function () {
@@ -955,7 +921,7 @@ window.NovaCloseMobileSessions = function () {
 <script src="/static/js/mobile/nova-mobile-message-actions.js?v=mobile-actions-fix-007"></script>
 <script src="/static/js/mobile/nova-mobile-webcards.js?v=mobile-webcards-dedupe-011"></script>
 <script src="/static/js/mobile/nova-mobile-upload.js?v=mobile-upload-rebind-012"></script>
-<script src="/static/js/mobile/nova-mobile-sessions.js?v=mobile-sessions-fix-20260527b"></script>
+<script src="/static/js/mobile/nova-mobile-sessions.js?v=sessions-module-20260606"></script>
 <script src="/static/js/mobile/nova-mobile-ui-utils.js?v=mobile-ui-utils-clean-quick-004"></script>
 <script src="/static/js/mobile/nova-mobile-voice.js?v=mobile-voice-endgame-002"></script>
 <script src="/static/js/mobile/nova-mobile-listeners.js?v=mobile-modular-001"></script>
@@ -963,7 +929,7 @@ window.NovaCloseMobileSessions = function () {
 <script src="/static/js/mobile/nova-mobile-storage.js?v=mobile-storage-003"></script>
 <script src="/static/js/mobile/nova-mobile-events.js?v=mobile-events-005"></script>
 <script src="/static/js/mobile/nova-mobile-state.js?v=mobile-state-002"></script>
-<script src="/static/js/nova-mobile-app.js?v=mobile-app-clean-quick-004"></script>
+<script src="/static/js/nova-mobile-app.js?v=mobile-new-session-save-20260606"></script>
 </body>
 </html>
 
@@ -975,6 +941,8 @@ window.NovaCloseMobileSessions = function () {
 
 
 <!-- FIX_MOBILE_SCRIPT_BLOCK_HARD_LOCK -->
+
+
 
 
 
