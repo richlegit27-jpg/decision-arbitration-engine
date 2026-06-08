@@ -9294,17 +9294,13 @@ if (not attachments) and (__name__ == "__main__"):
                     except Exception:
                         _nova_host = ""
 
-                    _nova_blob = " ".join([
-                        _nova_host,
-                        _nova_url.lower(),
-                        _nova_title,
-                        _nova_snippet,
-                    ])
-
+                    # NOVA_WEBFETCH_SITE_DOMAIN_STRICT_LOCK_20260607
+                    # For explicit site:domain searches, only the actual URL host counts.
+                    # Do not keep news.google.com or unrelated articles merely because
+                    # the snippet/title mentions the requested domain.
                     if (
                         _nova_host == _nova_site_domain
                         or _nova_host.endswith("." + _nova_site_domain)
-                        or _nova_site_domain in _nova_blob
                     ):
                         _nova_filtered_results.append(_nova_item)
 
@@ -20764,6 +20760,7 @@ for name in CHAT_SERVICE_METHODS:
         setattr(ChatService, name, obj)
 
 # MEMORY_ITEMS_NAMEERROR_SAFE_LOCK
+
 
 
 
