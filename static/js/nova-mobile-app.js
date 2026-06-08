@@ -2178,3 +2178,166 @@ sendText();
 
 
 
+
+// NOVA_MOBILE_SESSIONS_HARD_BUTTON_BRIDGE_20260607
+(function () {
+    "use strict";
+
+    function addSessionBubble(box, role, text) {
+        var bubble = document.createElement("div");
+        bubble.className = "nova-mobile-message nova-mobile-message-" + role;
+        bubble.setAttribute("data-role", role);
+        bubble.textContent = String(text || "");
+        bubble.style.padding = "10px";
+        bubble.style.margin = "8px";
+        bubble.style.borderRadius = "12px";
+        bubble.style.whiteSpace = "pre-wrap";
+        bubble.style.color = "#f8fafc";
+        bubble.style.background = role === "user" ? "rgba(124,92,255,.28)" : "rgba(255,255,255,.08)";
+        box.appendChild(bubble);
+    }
+
+    function openSessionsHard() {
+        var panel = document.getElementById("nova-mobile-sessions-panel");
+
+        if (!panel) {
+            panel = document.createElement("section");
+            panel.id = "nova-mobile-sessions-panel";
+            document.body.appendChild(panel);
+        }
+
+        panel.classList.remove("hidden");
+        panel.style.setProperty("display", "block", "important");
+        panel.style.setProperty("position", "fixed", "important");
+        panel.style.setProperty("z-index", "99999", "important");
+        panel.style.setProperty("inset", "70px 10px 90px 10px", "important");
+        panel.style.setProperty("overflow", "auto", "important");
+        panel.style.setProperty("background", "rgba(15,23,42,.98)", "important");
+        panel.style.setProperty("border", "1px solid rgba(255,255,255,.16)", "important");
+        panel.style.setProperty("border-radius", "16px", "important");
+        panel.style.setProperty("padding", "12px", "important");
+
+        panel.innerHTML = "";
+
+        var closeBtn = document.createElement("button");
+        closeBtn.type = "button";
+        closeBtn.className = "mobile-session-item";
+        closeBtn.textContent = "Close Sessions";
+        closeBtn.style.display = "block";
+        closeBtn.style.width = "100%";
+        closeBtn.style.marginBottom = "10px";
+        closeBtn.style.padding = "12px";
+        closeBtn.onclick = function () {
+            panel.classList.add("hidden");
+            panel.style.setProperty("display", "none", "important");
+        };
+        panel.appendChild(closeBtn);
+
+        fetch("/api/sessions")
+            .then(function (res) {
+                return res.json();
+            })
+            .then(function (data) {
+                var sessions = Array.isArray(data.sessions) ? data.sessions : [];
+
+                sessions = sessions
+                    .filter(function (session) {
+                        return session && session.id;
+                    })
+                    .sort(function (a, b) {
+                        var aTime = Date.parse(a.updated_at || a.created_at || "") || 0;
+                        var bTime = Date.parse(b.updated_at || b.created_at || "") || 0;
+                        return bTime - aTime;
+                    });
+
+                sessions.forEach(function (session) {
+                    var btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.className = "mobile-session-item";
+                    btn.textContent = (session.title || "New Chat") + " · " + String(session.id).slice(-6);
+                    btn.style.display = "block";
+                    btn.style.width = "100%";
+                    btn.style.marginTop = "8px";
+                    btn.style.padding = "12px";
+                    btn.style.borderRadius = "12px";
+                    btn.style.color = "#f8fafc";
+                    btn.style.background = "rgba(124,92,255,.24)";
+                    btn.style.border = "1px solid rgba(255,255,255,.16)";
+                    btn.style.textAlign = "left";
+
+                    btn.onclick = function () {
+                        localStorage.setItem("nova_mobile_active_session_id", session.id);
+
+                        fetch("/api/chat/" + encodeURIComponent(session.id))
+                            .then(function (res) {
+                                return res.json();
+                            })
+                            .then(function (sessionData) {
+                                var box =
+                                    document.getElementById("mobileChatMessages") ||
+                                    document.querySelector(".mobile-chat-container");
+
+                                if (!box) return;
+
+                                var messages =
+                                    Array.isArray(sessionData.messages) ? sessionData.messages :
+                                    Array.isArray(sessionData.session && sessionData.session.messages) ? sessionData.session.messages :
+                                    [];
+
+                                box.innerHTML = "";
+
+                                if (!messages.length) {
+                                    addSessionBubble(box, "assistant", "No saved messages found for this session.");
+                                } else {
+                                    messages.forEach(function (msg) {
+                                        var role = msg && msg.role === "user" ? "user" : "assistant";
+                                        var text = "";
+
+                                        if (typeof msg === "string") {
+                                            text = msg;
+                                        } else if (msg && typeof msg === "object") {
+                                            text = msg.text || msg.content || msg.message || msg.body || "";
+                                        }
+
+                                        text = String(text || "").trim();
+
+                                        if (text) {
+                                            addSessionBubble(box, role, text);
+                                        }
+                                    });
+                                }
+
+                                panel.classList.add("hidden");
+                                panel.style.setProperty("display", "none", "important");
+                                box.scrollTop = box.scrollHeight;
+                            })
+                            .catch(function (err) {
+                                console.error("[Nova Mobile Sessions Hard Bridge] session load failed", err);
+                            });
+                    };
+
+                    panel.appendChild(btn);
+                });
+            })
+            .catch(function (err) {
+                console.error("[Nova Mobile Sessions Hard Bridge] sessions fetch failed", err);
+            });
+    }
+
+    window.NovaOpenMobileSessions = openSessionsHard;
+    window.NovaMobileSessionsHardOpen = openSessionsHard;
+
+    document.addEventListener("click", function (event) {
+        var target = event.target && event.target.closest
+            ? event.target.closest("#nova-mobile-sessions-toggle, [data-mobile-sessions-toggle], [data-action='sessions']")
+            : null;
+
+        if (!target) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        openSessionsHard();
+    }, true);
+
+    console.log("[Nova Mobile Sessions Hard Bridge] ready");
+})();
