@@ -2183,17 +2183,42 @@ sendText();
 (function () {
     "use strict";
 
+    // NOVA_MOBILE_SESSIONS_CLEAN_RENDER_LOCK_20260607
     function addSessionBubble(box, role, text) {
         var bubble = document.createElement("div");
         bubble.className = "nova-mobile-message nova-mobile-message-" + role;
         bubble.setAttribute("data-role", role);
         bubble.textContent = String(text || "");
-        bubble.style.padding = "10px";
-        bubble.style.margin = "8px";
-        bubble.style.borderRadius = "12px";
-        bubble.style.whiteSpace = "pre-wrap";
-        bubble.style.color = "#f8fafc";
-        bubble.style.background = role === "user" ? "rgba(124,92,255,.28)" : "rgba(255,255,255,.08)";
+
+        bubble.style.setProperty("display", "block", "important");
+        bubble.style.setProperty("position", "relative", "important");
+        bubble.style.setProperty("clear", "both", "important");
+        bubble.style.setProperty("box-sizing", "border-box", "important");
+        bubble.style.setProperty("width", "fit-content", "important");
+        bubble.style.setProperty("max-width", "88%", "important");
+        bubble.style.setProperty("min-height", "auto", "important");
+        bubble.style.setProperty("height", "auto", "important");
+        bubble.style.setProperty("padding", "10px 12px", "important");
+        bubble.style.setProperty("margin", "10px 8px", "important");
+        bubble.style.setProperty("border-radius", "14px", "important");
+        bubble.style.setProperty("white-space", "pre-wrap", "important");
+        bubble.style.setProperty("overflow-wrap", "anywhere", "important");
+        bubble.style.setProperty("word-break", "break-word", "important");
+        bubble.style.setProperty("line-height", "1.45", "important");
+        bubble.style.setProperty("font-size", "15px", "important");
+        bubble.style.setProperty("color", "#f8fafc", "important");
+        bubble.style.setProperty("z-index", "1", "important");
+
+        if (role === "user") {
+            bubble.style.setProperty("margin-left", "auto", "important");
+            bubble.style.setProperty("margin-right", "8px", "important");
+            bubble.style.setProperty("background", "rgba(124,92,255,.35)", "important");
+        } else {
+            bubble.style.setProperty("margin-left", "8px", "important");
+            bubble.style.setProperty("margin-right", "auto", "important");
+            bubble.style.setProperty("background", "rgba(255,255,255,.09)", "important");
+        }
+
         box.appendChild(bubble);
     }
 
@@ -2341,3 +2366,4 @@ sendText();
 
     console.log("[Nova Mobile Sessions Hard Bridge] ready");
 })();
+
