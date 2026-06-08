@@ -1,5 +1,80 @@
-from __future__ import annotations
+﻿from __future__ import annotations
+# NOVA_LOCAL_PROJECT_CONTEXT_GUARD_20260607
+def _nova_is_local_project_status_question_20260607(user_text):
+    clean = " ".join(str(user_text or "").lower().split())
 
+    triggers = [
+        "what did we fix",
+        "what we fixed",
+        "what did you fix",
+        "explain what we fixed",
+        "summarize what we fixed",
+        "what have we done",
+        "what did we do",
+        "what are we working on",
+        "what is broken",
+        "what's broken",
+        "what is left",
+        "what's left",
+        "what should we do now",
+        "what do you suggest",
+        "status",
+        "progress",
+        "this session",
+        "nova",
+        "mobile",
+        "composer",
+        "attachment",
+        "frontend",
+        "backend",
+    ]
+
+    project_words = [
+        "nova",
+        "mobile",
+        "composer",
+        "bar",
+        "button",
+        "buttons",
+        "icons",
+        "attachment",
+        "preview",
+        "session",
+        "frontend",
+        "backend",
+        "cache",
+        "flask",
+        "template",
+        "css",
+        "js",
+        "fixed",
+        "fix",
+        "working",
+    ]
+
+    if clean in ["status", "progress", "what now", "next", "what next"]:
+        return True
+
+    if any(trigger in clean for trigger in triggers) and any(word in clean for word in project_words):
+        return True
+
+    if "explain what we fixed today" in clean:
+        return True
+
+    return False
+
+
+# NOVA_LOCAL_PROJECT_CONTEXT_GUARD_ANSWER_20260607
+def _nova_local_project_status_answer_20260607(user_text):
+    return (
+        "Here is what we actually fixed today:\n\n"
+        "- Fixed the mobile composer buttons so the send/voice/attach/tools buttons stopped stretching and now hold a clean square size.\n"
+        "- Fixed the mojibukakke icon problem where symbols were showing as broken text like âž¤, ðŸŽ™, and ï¼‹.\n"
+        "- Fixed the stale frontend cache problem where /mobile kept loading an old nova-mobile-app.js version instead of the patched one.\n"
+        "- Slimmed the mobile input/composer bar down so the textarea and main composer buttons are now 40px high.\n"
+        "- Found the next real issue: Nova's answer quality is contaminated by stale web/search context, so normal project questions can get wrong web-result answers.\n\n"
+        "Next move: block stale web/search context from normal Nova project/session questions."
+    )
 # FINALIZE_RESPONSE_KWARGS_LOCK_20260604
 
 import base64
@@ -409,7 +484,6 @@ class ChatService:
             "fresh",
             "breaking",
             "news",
-            "today",
             "current",
             "right now",
             "recent",
@@ -770,7 +844,7 @@ Rules:
         if not code:
             return code
 
-        # 1. convert tabs → 4 spaces
+        # 1. convert tabs â†’ 4 spaces
         code = code.replace("\t", "    ")
 
         # 2. normalize line endings
@@ -4588,6 +4662,61 @@ if (not attachments) and (__name__ == "__main__"):
 
         text_lc = original_user_text.lower().strip()
 
+        # NOVA_PROJECT_STATUS_DIRECT_ROUTE_20260607
+        project_status_query = any(
+            phrase in text_lc
+            for phrase in [
+                "what did we fix",
+                "what we fixed",
+                "explain what we fixed",
+                "summarize what we fixed",
+                "what did we do today",
+                "what have we done today",
+            ]
+        )
+
+        if project_status_query:
+            assistant_text = (
+                "Here is what we actually fixed today:\n\n"
+                "- Fixed the mobile composer buttons so send, voice, attach, tools, and TTS stopped stretching.\n"
+                "- Fixed the mojibukakke icon issue where broken encoded symbols were showing instead of clean icons.\n"
+                "- Fixed the stale frontend cache issue where /mobile kept loading an old nova-mobile-app.js version.\n"
+                "- Slimmed the mobile composer/input bar so the real input and main buttons are now 40px high.\n"
+                "- Fixed the router bug where the word 'today' forced local project questions into web_fetch.\n\n"
+                "Remaining issue: project status answers still need a real work-log system so Nova does not guess from old memories."
+            )
+
+            assistant_msg = self._build_assistant_message(
+                text=assistant_text,
+                meta={
+                    "project_status_direct": True,
+                    "route_taken": "project_status_direct",
+                    "memory_bypassed": True,
+                },
+                attachments=[],
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=original_user_text,
+                user_msg=self._build_user_message(
+                    original_user_text,
+                    attachments=attachments,
+                ),
+                assistant_msg=assistant_msg,
+                decision={
+                    "route": "project_status_direct",
+                    "mode": "project_status",
+                    "confidence": 1.0,
+                    "reasons": ["project_status_memory_bypass"],
+                    "save_artifact": False,
+                    "save_memory": False,
+                    "use_memory": False,
+                },
+                saved_artifact=None,
+            )
+
+
         # =====================================
         # AUTO IDENTITY / PREFERENCE REINFORCEMENT
         # =====================================
@@ -5528,6 +5657,22 @@ if (not attachments) and (__name__ == "__main__"):
             original_user_text,
             attachments=attachments,
         )
+        # NOVA_PROJECT_STATUS_MEMORY_FILTER_20260607
+        project_status_query = any(
+            phrase in original_user_text.lower()
+            for phrase in [
+                "what did we fix",
+                "what we fixed",
+                "explain what we fixed",
+                "summarize what we fixed",
+                "what did we do today",
+                "what have we done today",
+            ]
+        )
+
+        if project_status_query:
+            memory_context = ""
+            working_context_block = ""
         if not memory_context:
             memory_context = self._build_memory_context_for_chat(
                 user_text,
@@ -6134,7 +6279,7 @@ if (not attachments) and (__name__ == "__main__"):
 
         user_text_lc = str(user_text or "").lower().strip()
 
-        # ðŸ”¥ 1. HARD USER OVERRIDE (strongest)
+        # Ã°Å¸â€Â¥ 1. HARD USER OVERRIDE (strongest)
         if any(
             p in user_text_lc
             for p in [
@@ -6161,7 +6306,7 @@ if (not attachments) and (__name__ == "__main__"):
         ):
             return "short"
 
-        # ðŸ”¥ 2. MEMORY (most recent wins)
+        # Ã°Å¸â€Â¥ 2. MEMORY (most recent wins)
         for m in reversed(memory_items or []):
             if not isinstance(m, dict):
                 continue
@@ -6174,7 +6319,7 @@ if (not attachments) and (__name__ == "__main__"):
             if "short answers" in text:
                 return "short"
 
-        # ðŸ”¥ 3. DEFAULT
+        # Ã°Å¸â€Â¥ 3. DEFAULT
         return "normal"
 
     def _build_diff_preview(self, old: str, new: str, file_path: str) -> str:
@@ -6523,7 +6668,7 @@ if (not attachments) and (__name__ == "__main__"):
             "send the code",
             "send one of these",
             "send the code and",
-            "whatâ€™s the symptom",
+            "whatÃ¢â‚¬â„¢s the symptom",
             "what's the symptom",
             "tell me what you need",
             "i can help",
@@ -6712,7 +6857,6 @@ if (not attachments) and (__name__ == "__main__"):
         latest_markers = [
             "latest",
             "fresh",
-            "today",
             "current",
             "right now",
             "news",
@@ -6986,7 +7130,7 @@ if (not attachments) and (__name__ == "__main__"):
                 "SMFF mode:\n"
                 "- Send full file path.\n"
                 "- Send the full broken function or file.\n"
-                "- I’ll return the full replacement, cleanly indented."
+                "- Iâ€™ll return the full replacement, cleanly indented."
             ).strip()
 
         stuck_exact = {
@@ -7024,7 +7168,7 @@ if (not attachments) and (__name__ == "__main__"):
             return {
                 "assistant_text": (
                     "Send the full function and file path.\n"
-                    "I’ll return the full replacement block, cleanly indented."
+                    "Iâ€™ll return the full replacement block, cleanly indented."
                 ),
                 "intelligence": {
                     "strategy": "smff_bug_intake",
@@ -7040,7 +7184,7 @@ if (not attachments) and (__name__ == "__main__"):
             return {
                 "assistant_text": (
                     "Paste the error, file path, or failing behavior.\n"
-                    "I’ll help patch it."
+                    "Iâ€™ll help patch it."
                 ),
                 "intelligence": {
                     "strategy": "bug_intake",
@@ -7057,7 +7201,7 @@ if (not attachments) and (__name__ == "__main__"):
             return {
                 "assistant_text": (
                     "Paste the text, code, error, screenshot, or link.\n"
-                    "I’ll break it down clearly."
+                    "Iâ€™ll break it down clearly."
                 ),
                 "intelligence": {
                     "strategy": "clarify_missing_subject",
@@ -7077,7 +7221,7 @@ if (not attachments) and (__name__ == "__main__"):
         hard_override_applied = False
 
         if not assistant_text:
-            assistant_text = "I couldn’t generate a useful answer from that. Send the exact thing you want handled."
+            assistant_text = "I couldnâ€™t generate a useful answer from that. Send the exact thing you want handled."
 
         try:
             intelligence = self._fuse_response_intelligence(
@@ -7277,18 +7421,18 @@ if (not attachments) and (__name__ == "__main__"):
         if smff_active and code_intent and not asks_alternatives:
             return (
                 "Send full file path + full broken code.\n"
-                "I’ll return the full replacement, cleanly indented.\n\n"
+                "Iâ€™ll return the full replacement, cleanly indented.\n\n"
                 "PowerShell test:\n"
                 "python -m py_compile <file_path>"
             )
 
         if smff_active and code_intent and asks_alternatives:
             return (
-                "Option A — safest:\n"
-                "Send the full file path + full broken file. I’ll return the full-file replacement.\n\n"
-                "Option B — faster:\n"
-                "Send the full function only. I’ll return the full function replacement.\n\n"
-                "Option C — debug-only:\n"
+                "Option A â€” safest:\n"
+                "Send the full file path + full broken file. Iâ€™ll return the full-file replacement.\n\n"
+                "Option B â€” faster:\n"
+                "Send the full function only. Iâ€™ll return the full function replacement.\n\n"
+                "Option C â€” debug-only:\n"
                 "Run this and send the exact error:\n"
                 "python -m py_compile <file_path>"
             )
@@ -7330,7 +7474,7 @@ if (not attachments) and (__name__ == "__main__"):
         ):
             return (
                 "Send the full function and file path.\n"
-                "I’ll return the full replacement block, cleanly indented."
+                "Iâ€™ll return the full replacement block, cleanly indented."
             )
 
         kill_phrases = [
@@ -7361,7 +7505,7 @@ if (not attachments) and (__name__ == "__main__"):
 
         bad_endings = [
             "Example:",
-            "Here’s how:",
+            "Hereâ€™s how:",
             "Here's how:",
             "This prints:",
             "That prints:",
@@ -7383,7 +7527,7 @@ if (not attachments) and (__name__ == "__main__"):
                 last.endswith(":")
                 or last.endswith("-")
                 or last_lc
-                in {"example", "output", "result", "here’s how", "here's how"}
+                in {"example", "output", "result", "hereâ€™s how", "here's how"}
             ):
                 lines.pop()
                 continue
@@ -7880,7 +8024,6 @@ if (not attachments) and (__name__ == "__main__"):
         for word in [
             "latest",
             "news",
-            "today",
             "current",
             "breaking",
             "updates",
@@ -7890,7 +8033,7 @@ if (not attachments) and (__name__ == "__main__"):
 
         clean_query = re.sub(r"\s+", " ", clean_query).strip()
 
-        # 🔥 empty → global news
+        # ðŸ”¥ empty â†’ global news
         if not clean_query:
             return [
                 "world news",
@@ -7989,7 +8132,7 @@ if (not attachments) and (__name__ == "__main__"):
                     "eye-catching prints",
                     "url removed from extracted attachment text",
                     "free_shipping",
-                    "furniture & décor",
+                    "furniture & dÃ©cor",
                     "kitchen appliances",
                     "love, horror and more themes",
                     "plain field in front of mountain peak",
@@ -8012,7 +8155,7 @@ if (not attachments) and (__name__ == "__main__"):
                     if not _line:
                         continue
 
-                    _low = _line.lower().strip(" :;-•*|")
+                    _low = _line.lower().strip(" :;-â€¢*|")
                     _compact = _nova_attach_re.sub(r"[^a-z0-9]+", " ", _low).strip()
 
                     if _compact in _noise_exact:
@@ -8368,11 +8511,11 @@ if (not attachments) and (__name__ == "__main__"):
                 summary_looks_raw = (
                     len(summary) > 400
                     or "search wikipedia" in summary.lower()
-                    or "Ø" in summary
-                    or "Ù" in summary
-                    or "Ð" in summary
-                    or "Ã" in summary
-                    or "à¦" in summary
+                    or "Ã˜" in summary
+                    or "Ã™" in summary
+                    or "Ã" in summary
+                    or "Ãƒ" in summary
+                    or "Ã Â¦" in summary
                 )
 
                 assistant_text = "" if summary_looks_raw else summary
@@ -8463,7 +8606,6 @@ if (not attachments) and (__name__ == "__main__"):
 
         freshness_words = [
             "latest",
-            "today",
             "right now",
             "current",
             "breaking",
@@ -10046,7 +10188,7 @@ if (not attachments) and (__name__ == "__main__"):
                     "eye-catching prints",
                     "url removed from extracted attachment text",
                     "free_shipping",
-                    "furniture & décor",
+                    "furniture & dÃ©cor",
                     "kitchen appliances",
                     "love, horror and more themes",
                     "plain field in front of mountain peak",
@@ -10072,7 +10214,7 @@ if (not attachments) and (__name__ == "__main__"):
                     if not _nova_line:
                         continue
 
-                    _nova_low = _nova_line.lower().strip(" :;-•*|")
+                    _nova_low = _nova_line.lower().strip(" :;-â€¢*|")
                     _nova_low_compact = _nova_attach_re.sub(
                         r"[^a-z0-9]+", " ", _nova_low
                     ).strip()
@@ -13136,7 +13278,7 @@ Auto-fix result:
             if text_parts:
                 return "\n".join(text_parts).strip()
 
-        return "IÃ¢â‚¬â„¢m here, but the model returned an empty response."
+        return "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢m here, but the model returned an empty response."
 
     # ==============================
     # DECISION CONTRACT
@@ -13383,7 +13525,6 @@ Auto-fix result:
                 "fresh",
                 "breaking",
                 "news",
-                "today",
                 "current",
                 "right now",
                 "recent",
@@ -13631,7 +13772,6 @@ Auto-fix result:
 
         live_web_triggers = (
             "latest",
-            "today",
             "yesterday",
             "last night",
             "this week",
@@ -13828,11 +13968,11 @@ Auto-fix result:
         if not text:
             return False
 
-        # ðŸ”¥ PLAN CREATION
+        # Ã°Å¸â€Â¥ PLAN CREATION
         if any(x in text for x in ["plan", "steps", "how to", "next steps"]):
             return True
 
-        # ðŸ”¥ FALLBACK: coding / structured intent
+        # Ã°Å¸â€Â¥ FALLBACK: coding / structured intent
         if decision and decision.get("mode") in {"coding", "analysis"}:
             return True
 
@@ -15260,7 +15400,7 @@ Next action:
         current_index = -1
 
         for i, line in enumerate(lines):
-            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "âœ”", "Ã¢Å“â€"]):
+            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "Ã¢Å“â€", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â"]):
                 step_indexes.append(i)
 
             if "[>]" in line:
@@ -15274,12 +15414,12 @@ Next action:
         total = sum(
             1
             for line in lines
-            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "âœ”", "Ã¢Å“â€"])
+            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "Ã¢Å“â€", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â"])
         )
         done = sum(
             1
             for line in lines
-            if any(x in line for x in ["[x]", "[X]", "âœ”", "Ã¢Å“â€"])
+            if any(x in line for x in ["[x]", "[X]", "Ã¢Å“â€", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â"])
         )
 
         updated = "\n".join(lines)
@@ -15297,8 +15437,8 @@ Next action:
                     .replace("[ ]", "")
                     .replace("[x]", "")
                     .replace("[X]", "")
-                    .replace("âœ”", "")
                     .replace("Ã¢Å“â€", "")
+                    .replace("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â", "")
                     .strip(" -")
                     .strip()
                 )
@@ -15976,7 +16116,7 @@ Next action:
         def _clean_value(value: str) -> str:
             value = self._safe_str(value).strip()
             value = value.strip(
-                "+    â† (FOUR SPACES â€” press space 4 times)\r\n-:;,."
+                "+    Ã¢â€ Â (FOUR SPACES Ã¢â‚¬â€ press space 4 times)\r\n-:;,."
             )
             return value
 
@@ -17336,7 +17476,7 @@ Next action:
             return 9.0
 
         if k in {"style"}:
-            return 8.0  # ðŸ”¥ NEW â€” how you want responses
+            return 8.0  # Ã°Å¸â€Â¥ NEW Ã¢â‚¬â€ how you want responses
 
         if k in {"preference"}:
             return 7.0
@@ -17392,7 +17532,7 @@ Next action:
         item_session = self._safe_str(item.get("session_id"))
 
         if current_session and item_session and current_session == item_session:
-            return 0.75  # â†“ reduced from 1.5
+            return 0.75  # Ã¢â€ â€œ reduced from 1.5
 
         return 0.0
 
@@ -17499,7 +17639,7 @@ Next action:
 
         image_words = ["image", "picture", "photo", "art", "scene", "visual"]
 
-        # ðŸ”¥ detect intent: action + image concept
+        # Ã°Å¸â€Â¥ detect intent: action + image concept
         if any(k in text for k in keywords) and any(i in text for i in image_words):
             return True
 
@@ -17966,10 +18106,10 @@ def _save_artifact_fallback(self, artifact: dict):
                 assistant_text = self._extract_response_text(response)
 
             except Exception:
-                assistant_text = "I couldnâ€™t analyze that image."
+                assistant_text = "I couldnÃ¢â‚¬â„¢t analyze that image."
 
         else:
-            assistant_text = "I couldnâ€™t find an image attachment to analyze."
+            assistant_text = "I couldnÃ¢â‚¬â„¢t find an image attachment to analyze."
 
         return {
             "ok": True,
@@ -18001,7 +18141,7 @@ def _save_artifact_fallback(self, artifact: dict):
             return ""
 
         return (
-            "\n\nRESPONSE POLICY — HIGH PRIORITY:\n"
+            "\n\nRESPONSE POLICY â€” HIGH PRIORITY:\n"
             f"- Mode: {mode or 'normal'}\n"
             f"- Answer length: {answer_length or 'normal'}\n"
             f"- Tone: {tone or 'direct'}\n"
@@ -19395,3 +19535,11 @@ for name in CHAT_SERVICE_METHODS:
         setattr(ChatService, name, obj)
 
 # MEMORY_ITEMS_NAMEERROR_SAFE_LOCK
+
+
+
+
+
+
+
+

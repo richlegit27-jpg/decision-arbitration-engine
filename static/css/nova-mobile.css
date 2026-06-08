@@ -1,4 +1,4 @@
-/* =========================================================
+﻿/* =========================================================
    Nova Mobile CSS - Premium Final Polish
    Path: C:\Users\Owner\nova\static\css\nova-mobile.css
    Purpose: Mobile-only premium Nova chat UI.
@@ -1627,7 +1627,7 @@ body {
    ========================================================= */
 
 .mobile-thinking-bubble::after {
-    content: " ●";
+    content: " â—";
     animation: novaTypingDots 1s infinite;
 }
 
@@ -1987,7 +1987,7 @@ body {
 }
 
 .mobile-chat-message.system .mobile-message-content::before {
-    content: "•";
+    content: "â€¢";
     font-size: 18px;
     line-height: 1;
     animation: novaSystemPulse 1.1s infinite ease-in-out;
@@ -5964,7 +5964,7 @@ body::after {
 }
 
 .mobile-message-content pre::before {
-    content: "●  ●  ●";
+    content: "â—  â—  â—";
 
     position: absolute;
     top: 10px;
@@ -9312,4 +9312,1583 @@ body {
 button {
     position: relative !important;
     z-index: 20 !important;
+}
+
+/* MOBILE_SAFE_CLEAN_COMPOSER_20260605 */
+.mobile-composer {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 6px !important;
+    padding: 6px 8px !important;
+    box-sizing: border-box !important;
+}
+
+#nova-mobile-input {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    height: 44px !important;
+    max-height: 44px !important;
+    padding: 6px !important;
+    font-size: 16px !important;
+    border-radius: 10px !important;
+    box-sizing: border-box !important;
+}
+
+#nova-mobile-send,
+#nova-mobile-attach,
+#nova-mobile-voice,
+#nova-mobile-tts,
+#nova-mobile-stop-speech,
+#nova-mobile-stop-generation,
+#nova-mobile-tools-toggle {
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    max-width: 42px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 12px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 18px !important;
+    line-height: 1 !important;
+}
+
+#nova-mobile-send i,
+#nova-mobile-attach i,
+#nova-mobile-voice i,
+#nova-mobile-tts i,
+#nova-mobile-stop-speech i,
+#nova-mobile-stop-generation i,
+#nova-mobile-tools-toggle i {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important;
+    font-size: 20px !important;
+    line-height: 1 !important;
+}
+
+/* MOBILE_SAFE_BUTTON_ROW_FIX_20260605 */
+.mobile-composer {
+    display: flex !important;
+    flex-direction: row !important; /* ensure row layout */
+    align-items: center !important;
+    justify-content: flex-start !important; /* left-align buttons */
+    gap: 6px !important;
+    padding: 6px 8px !important;
+    box-sizing: border-box !important;
+    width: 100% !important; /* ensure full width */
+}
+
+#nova-mobile-input {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    height: 44px !important;
+    max-height: 44px !important;
+    padding: 6px !important;
+    font-size: 16px !important;
+    border-radius: 10px !important;
+    box-sizing: border-box !important;
+    margin-right: 6px !important;
+}
+
+#nova-mobile-send,
+#nova-mobile-attach,
+#nova-mobile-voice,
+#nova-mobile-tts,
+#nova-mobile-stop-speech,
+#nova-mobile-stop-generation,
+#nova-mobile-tools-toggle {
+    flex: 0 0 auto !important; /* prevent buttons from wrapping */
+    width: 42px !important;
+    height: 42px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 12px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 18px !important;
+    line-height: 1 !important;
+}
+/* NOVA_COMPOSER_INPUT_FIX_20260605 */
+#nova-mobile-composer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px;
+}
+
+#nova-mobile-input {
+    flex: 1 1 auto;
+    min-height: 36px;
+    font-size: 16px;
+    padding: 6px 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: #fff;
+    color: #000;
+    outline: none;
+    display: block;
+}
+
+#nova-mobile-send,
+#mobileAttachBtn {
+    flex: 0 0 auto;
+}
+
+/* NOVA_MOBILE_COMPOSER_POLISH_20260605 */
+#nova-mobile-quick-prompts {
+    display: flex;
+    gap: 6px;
+    padding: 6px 8px;
+    overflow-x: auto;
+}
+
+#nova-mobile-quick-prompts button {
+    flex: 0 0 auto;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+#nova-mobile-composer {
+    position: sticky;
+    bottom: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    background: var(--nova-mobile-bg, #0b0b10);
+}
+
+#nova-mobile-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 42px;
+    border-radius: 999px;
+    padding: 0 14px;
+}
+
+#mobileAttachBtn,
+#nova-mobile-send {
+    width: 42px;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+}
+
+/* NOVA_MOBILE_COMPOSER_STICKY_20260605 */
+#nova-mobile-composer {
+    position: sticky;
+    bottom: 0;
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    background: var(--nova-mobile-bg, #0b0b10);
+}
+
+body, html {
+    height: 100%;
+    overflow-y: auto;
+    padding-bottom: 70px; /* space for sticky composer */
+}
+
+.mobile-composer-btn,
+#nova-mobile-input {
+    box-sizing: border-box;
+}
+
+/* NOVA_MOBILE_COMPOSER_KEYBOARD_POLISH_20260605 */
+#nova-mobile-composer {
+    padding: 8px 10px;
+    max-height: 60px; /* ensure input/button visible */
+}
+
+body, html {
+    padding-bottom: 90px; /* enough space for sticky composer + keyboard */
+}
+
+#nova-mobile-quick-prompts {
+    margin-bottom: 6px;
+}
+
+#nova-mobile-input {
+    min-height: 42px;
+    line-height: 1.2;
+}
+
+#mobileAttachBtn,
+#nova-mobile-send {
+    width: 42px;
+    height: 42px;
+}
+
+/* NOVA_MOBILE_COMPOSER_FULL_HEIGHT_20260605 */
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+#nova-mobile-root {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+#nova-mobile-messages {
+    flex: 1 1 auto;
+    overflow-y: auto;
+}
+
+#nova-mobile-composer {
+    position: sticky;
+    bottom: 0;
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    background: var(--nova-mobile-bg, #0b0b10);
+}
+
+body, html {
+    padding-bottom: 100px; /* safe space for sticky composer + keyboard */
+}
+
+/* NOVA_MOBILE_COMPOSER_TEXT_COLOR_FIX_20260606 */
+#nova-mobile-input {
+    color: #f8fafc !important; /* light text */
+    background-color: #1f1f1f !important; /* dark input background */
+    caret-color: #f8fafc !important; /* cursor color */
+}
+
+#nova-mobile-input:focus {
+    background-color: #2a2a2a !important; /* slightly lighter dark when focused */
+    color: #f8fafc !important;
+}
+
+/* NOVA_MOBILE_COMPOSER_POLISH_20260607 */
+.nova-mobile-composer,
+.mobile-composer,
+#nova-mobile-composer {
+    position: sticky !important;
+    bottom: 0 !important;
+    z-index: 50 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 10px 10px calc(10px + env(safe-area-inset-bottom)) !important;
+    background: rgba(8, 8, 14, 0.96) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+    backdrop-filter: blur(14px) !important;
+}
+
+.nova-mobile-input-row,
+.mobile-input-row,
+.composer-row,
+#nova-mobile-input-row {
+    display: flex !important;
+    align-items: flex-end !important;
+    gap: 8px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+#nova-mobile-input,
+.nova-mobile-input,
+.mobile-input,
+textarea#nova-mobile-input {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    max-height: 120px !important;
+    min-height: 44px !important;
+    height: 44px !important;
+    resize: none !important;
+    box-sizing: border-box !important;
+    padding: 11px 12px !important;
+    border-radius: 16px !important;
+    line-height: 20px !important;
+    font-size: 15px !important;
+}
+
+#nova-mobile-send,
+#nova-mobile-attach,
+#nova-mobile-voice,
+#nova-mobile-stop,
+.nova-mobile-send,
+.nova-mobile-attach,
+.nova-mobile-voice,
+.nova-mobile-stop,
+.mobile-send,
+.mobile-attach,
+.mobile-voice,
+.mobile-stop {
+    flex: 0 0 44px !important;
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    padding: 0 !important;
+    border-radius: 14px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 16px !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+}
+
+#nova-mobile-send *,
+#nova-mobile-attach *,
+#nova-mobile-voice *,
+#nova-mobile-stop * {
+    pointer-events: none !important;
+}
+
+#nova-mobile-stop,
+.nova-mobile-stop,
+.mobile-stop {
+    display: none !important;
+}
+
+body.nova-generating #nova-mobile-stop,
+body.is-generating #nova-mobile-stop,
+.nova-generating #nova-mobile-stop,
+.is-generating #nova-mobile-stop {
+    display: inline-flex !important;
+}
+
+.nova-composer-inline-preview,
+#nova-composer-inline-preview,
+.mobile-attachment-preview,
+.attachment-preview {
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 0 8px 0 !important;
+    padding: 6px 8px !important;
+    border-radius: 14px !important;
+    background: rgba(255, 255, 255, 0.055) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    overflow: hidden !important;
+}
+
+.nova-composer-inline-preview img,
+#nova-composer-inline-preview img,
+.mobile-attachment-preview img,
+.attachment-preview img {
+    width: 42px !important;
+    height: 42px !important;
+    max-width: 42px !important;
+    max-height: 42px !important;
+    object-fit: cover !important;
+    border-radius: 10px !important;
+}
+
+.nova-composer-inline-preview button,
+#nova-composer-inline-preview button,
+.mobile-attachment-preview button,
+.attachment-preview button {
+    width: 30px !important;
+    min-width: 30px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    padding: 0 !important;
+    border-radius: 10px !important;
+}
+
+
+/* NOVA_MOBILE_EXECUTION_PANEL_CSS_20260607 */
+.nova-mobile-execution-panel {
+    margin: 10px;
+    padding: 10px;
+    border-radius: 16px;
+    background: rgba(18, 18, 28, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    color: #f5f5f7;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+}
+
+.nova-exec-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.nova-exec-label {
+    font-size: 12px;
+    opacity: 0.68;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.nova-exec-status {
+    margin-top: 2px;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.nova-exec-mini-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+    border: 0;
+    cursor: pointer;
+}
+
+.nova-exec-body {
+    margin-top: 10px;
+}
+
+.nova-mobile-execution-panel.is-collapsed .nova-exec-body {
+    display: none;
+}
+
+.nova-exec-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.nova-exec-key {
+    flex: 0 0 auto;
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.nova-exec-value {
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.nova-exec-detail {
+    min-height: 0;
+    margin: 6px 0 10px;
+    font-size: 12px;
+    line-height: 1.35;
+    opacity: 0.8;
+    white-space: pre-wrap;
+}
+
+.nova-exec-actions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.nova-exec-actions button {
+    min-height: 36px;
+    border-radius: 12px;
+    border: 0;
+    padding: 0 8px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+@media (max-width: 420px) {
+    .nova-exec-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+
+
+/* NOVA_MOBILE_ATTACHMENT_PREVIEW_VISIBLE_LOCK_20260607 */
+#nova-mobile-attachment-preview,
+.nova-mobile-attachment-preview,
+[data-attachment-preview] {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    width: 100%;
+    max-width: 100%;
+    padding: 8px 12px;
+    box-sizing: border-box;
+    z-index: 50;
+}
+
+.nova-mobile-attachment-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    max-width: 100%;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: inherit;
+    font-size: 13px;
+    line-height: 1.2;
+    overflow: hidden;
+}
+
+.nova-mobile-attachment-thumb {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    object-fit: cover;
+    flex: 0 0 auto;
+}
+
+.nova-mobile-attachment-icon {
+    flex: 0 0 auto;
+}
+
+.nova-mobile-attachment-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+/* NOVA_MOBILE_ATTACHMENT_REMOVE_BUTTON_LOCK_20260607 */
+.nova-mobile-attachment-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    padding: 0;
+    margin-left: 2px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(0, 0, 0, 0.28);
+    color: inherit;
+    font-size: 17px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.nova-mobile-attachment-remove:active {
+    transform: scale(0.94);
+}
+
+
+/* NOVA_MOBILE_ATTACHMENT_PREVIEW_BOTTOM_ONLY_CSS_20260607 */
+#nova-mobile-attachment-preview-bottom,
+.nova-mobile-attachment-preview-bottom {
+    position: relative !important;
+    top: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    right: auto !important;
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    gap: 8px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 6px 4px 8px 4px;
+    margin: 0 0 6px 0;
+    box-sizing: border-box;
+    z-index: 5;
+}
+
+#nova-mobile-attachment-preview,
+.nova-mobile-attachment-preview:not(.nova-mobile-attachment-preview-bottom) {
+    position: relative !important;
+    top: auto !important;
+    bottom: auto !important;
+}
+
+.nova-mobile-attachment-chip {
+    flex: 0 0 auto;
+}
+
+
+/* NOVA_MOBILE_UI_MESS_GUARD_20260607 */
+.nova-mobile-message img,
+.mobile-message img,
+.message img,
+.chat-message img,
+.assistant-message img,
+.user-message img {
+    max-width: min(100%, 340px) !important;
+    max-height: 280px !important;
+    object-fit: contain !important;
+    border-radius: 14px !important;
+    display: block !important;
+    overflow: hidden !important;
+}
+
+.nova-mobile-message iframe,
+.mobile-message iframe,
+.message iframe,
+.chat-message iframe,
+.assistant-message iframe,
+.user-message iframe,
+.nova-mobile-message video,
+.mobile-message video,
+.message video,
+.chat-message video,
+.assistant-message video,
+.user-message video {
+    max-width: min(100%, 340px) !important;
+    max-height: 280px !important;
+    border-radius: 14px !important;
+    overflow: hidden !important;
+}
+
+.nova-mobile-attachment-preview,
+#nova-mobile-attachment-preview,
+#nova-mobile-attachment-preview-bottom,
+[data-attachment-preview],
+[data-attachment-preview-bottom] {
+    max-height: 92px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+}
+
+.nova-mobile-attachment-chip {
+    max-width: 260px !important;
+    min-height: 38px !important;
+}
+
+.nova-mobile-attachment-thumb {
+    width: 34px !important;
+    height: 34px !important;
+    max-width: 34px !important;
+    max-height: 34px !important;
+    object-fit: cover !important;
+}
+
+
+/* NOVA_MOBILE_SINGLE_ATTACHMENT_PREVIEW_LANE_CSS_20260607 */
+#nova-mobile-single-attachment-preview,
+.nova-mobile-single-attachment-preview {
+    position: relative !important;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    min-height: 0;
+    max-height: 74px !important;
+    padding: 4px 2px 8px 2px;
+    margin: 0 0 4px 0;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    box-sizing: border-box;
+    z-index: 6;
+    flex-wrap: nowrap !important;
+}
+
+#nova-mobile-attachment-preview,
+#nova-mobile-attachment-preview-bottom,
+.nova-mobile-attachment-preview:not(#nova-mobile-single-attachment-preview),
+[data-attachment-preview],
+[data-attachment-preview-bottom],
+[data-nova-disabled-preview="true"] {
+    display: none !important;
+    max-height: 0 !important;
+    height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+}
+
+#nova-mobile-single-attachment-preview .nova-mobile-attachment-chip {
+    flex: 0 0 auto !important;
+    max-width: 230px !important;
+    min-height: 38px !important;
+}
+
+#nova-mobile-single-attachment-preview .nova-mobile-attachment-thumb {
+    width: 32px !important;
+    height: 32px !important;
+    max-width: 32px !important;
+    max-height: 32px !important;
+    object-fit: cover !important;
+}
+
+
+/* NOVA_MOBILE_ATTACHMENT_FILENAME_CLEANUP_CSS_20260607 */
+.nova-mobile-attachment-name {
+    display: inline-block !important;
+    max-width: 150px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    vertical-align: middle !important;
+}
+
+#nova-mobile-single-attachment-preview .nova-mobile-attachment-name {
+    max-width: 145px !important;
+}
+
+.nova-mobile-attachment-chip {
+    overflow: hidden !important;
+}
+
+
+/* NOVA_MOBILE_COMPOSER_AUTORE_SIZE_20260607 */
+#nova-mobile-input,
+.nova-mobile-input {
+    min-height: 36px !important;
+    max-height: 140px !important;
+    height: auto !important;
+    overflow-y: hidden !important;
+    resize: none !important;
+    line-height: 1.3 !important;
+    padding: 6px 8px !important;
+    box-sizing: border-box !important;
+}
+
+
+/* NOVA_MOBILE_ATTACHMENT_LANE_SCROLL_POLISH_20260607 */
+#nova-mobile-single-attachment-preview,
+.nova-mobile-single-attachment-preview {
+    scrollbar-width: thin !important;
+    scroll-behavior: smooth !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior-x: contain !important;
+}
+
+#nova-mobile-single-attachment-preview::-webkit-scrollbar,
+.nova-mobile-single-attachment-preview::-webkit-scrollbar {
+    height: 5px !important;
+}
+
+#nova-mobile-single-attachment-preview::-webkit-scrollbar-track,
+.nova-mobile-single-attachment-preview::-webkit-scrollbar-track {
+    background: transparent !important;
+}
+
+#nova-mobile-single-attachment-preview::-webkit-scrollbar-thumb,
+.nova-mobile-single-attachment-preview::-webkit-scrollbar-thumb {
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, 0.22) !important;
+}
+
+.nova-mobile-attachment-scroll-wrap {
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+.nova-mobile-attachment-scroll-wrap::before,
+.nova-mobile-attachment-scroll-wrap::after {
+    content: "" !important;
+    position: absolute !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: 22px !important;
+    pointer-events: none !important;
+    z-index: 8 !important;
+    opacity: 0 !important;
+    transition: opacity 140ms ease !important;
+}
+
+.nova-mobile-attachment-scroll-wrap::before {
+    left: 0 !important;
+    background: linear-gradient(to right, rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0)) !important;
+}
+
+.nova-mobile-attachment-scroll-wrap::after {
+    right: 0 !important;
+    background: linear-gradient(to left, rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0)) !important;
+}
+
+.nova-mobile-attachment-scroll-wrap.has-left-shadow::before {
+    opacity: 1 !important;
+}
+
+.nova-mobile-attachment-scroll-wrap.has-right-shadow::after {
+    opacity: 1 !important;
+}
+
+
+/* NOVA_MOBILE_COMPOSER_ALIGNMENT_SEND_STATE_20260607 */
+#nova-mobile-composer,
+.nova-mobile-composer,
+.mobile-composer,
+.composer {
+    box-sizing: border-box !important;
+}
+
+#nova-mobile-input,
+.nova-mobile-input {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+}
+
+#nova-mobile-send,
+#mobileSendBtn,
+.nova-mobile-send,
+.send-button {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+}
+
+#nova-mobile-send.nova-mobile-send-disabled,
+#mobileSendBtn.nova-mobile-send-disabled,
+.nova-mobile-send.nova-mobile-send-disabled,
+.send-button.nova-mobile-send-disabled,
+#nova-mobile-send:disabled,
+#mobileSendBtn:disabled,
+.nova-mobile-send:disabled,
+.send-button:disabled {
+    opacity: 0.45 !important;
+    filter: grayscale(0.35) !important;
+    cursor: not-allowed !important;
+    pointer-events: none !important;
+}
+
+#nova-mobile-single-attachment-preview {
+    flex-shrink: 0 !important;
+}
+
+
+/* NOVA_MOBILE_QUICK_PROMPT_ROW_CLEANUP_20260607 */
+#nova-mobile-quick-prompts,
+.nova-mobile-quick-prompts,
+.quick-prompts-container,
+.quick-prompts {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    flex-wrap: nowrap !important;
+    padding: 6px 8px !important;
+    box-sizing: border-box !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: thin !important;
+}
+
+#nova-mobile-quick-prompts::-webkit-scrollbar,
+.nova-mobile-quick-prompts::-webkit-scrollbar,
+.quick-prompts-container::-webkit-scrollbar,
+.quick-prompts::-webkit-scrollbar {
+    height: 4px !important;
+}
+
+#nova-mobile-quick-prompts button,
+.nova-mobile-quick-prompts button,
+.quick-prompts-container button,
+.quick-prompts button {
+    flex: 0 0 auto !important;
+    max-width: 140px !important;
+    min-height: 34px !important;
+    padding: 7px 12px !important;
+    border-radius: 999px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 13px !important;
+    line-height: 1.15 !important;
+    box-sizing: border-box !important;
+}
+
+#nova-mobile-quick-prompts button:active,
+.nova-mobile-quick-prompts button:active,
+.quick-prompts-container button:active,
+.quick-prompts button:active {
+    transform: scale(0.97) !important;
+}
+
+
+/* NOVA_MOBILE_COMPOSER_BUTTON_SIZE_LOCK_20260607 */
+#nova-mobile-composer button,
+.nova-mobile-composer button,
+.mobile-composer button,
+.composer button {
+    flex: 0 0 auto !important;
+    width: 42px !important;
+    min-width: 42px !important;
+    max-width: 42px !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 999px !important;
+    box-sizing: border-box !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+}
+
+#nova-mobile-composer button svg,
+.nova-mobile-composer button svg,
+.mobile-composer button svg,
+.composer button svg {
+    width: 20px !important;
+    height: 20px !important;
+    flex: 0 0 auto !important;
+}
+
+#nova-mobile-composer button img,
+.nova-mobile-composer button img,
+.mobile-composer button img,
+.composer button img {
+    width: 20px !important;
+    height: 20px !important;
+    object-fit: contain !important;
+}
+
+#nova-mobile-composer .nova-mobile-attachment-remove,
+.nova-mobile-composer .nova-mobile-attachment-remove,
+.mobile-composer .nova-mobile-attachment-remove,
+.composer .nova-mobile-attachment-remove {
+    width: 22px !important;
+    min-width: 22px !important;
+    max-width: 22px !important;
+    height: 22px !important;
+    min-height: 22px !important;
+    max-height: 22px !important;
+    font-size: 17px !important;
+}
+
+
+/* NOVA_MOBILE_COMPOSER_BOTTOM_SAFE_LOCK_20260607 */
+#nova-mobile-composer-container,
+.nova-mobile-composer-container,
+.mobile-composer-container,
+.composer-container {
+    position: sticky !important;
+    bottom: env(safe-area-inset-bottom, 0px) !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    z-index: 9999 !important;
+    background: var(--nova-composer-bg, #222) !important;
+    padding-bottom: env(safe-area-inset-bottom, 6px) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+}
+
+#nova-mobile-composer-container.sticky,
+.nova-mobile-composer-container.sticky {
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.32) !important;
+}
+
+
+/* NOVA_MOBILE_COMPOSER_HOVER_BOUNCE_20260607 */
+#nova-mobile-composer,
+.nova-mobile-composer,
+.mobile-composer,
+.composer {
+    transition: box-shadow 0.18s ease, transform 0.12s ease !important;
+}
+
+#nova-mobile-composer:hover,
+.nova-mobile-composer:hover,
+.mobile-composer:hover,
+.composer:hover,
+#nova-mobile-composer:focus-within,
+.nova-mobile-composer:focus-within,
+.mobile-composer:focus-within,
+.composer:focus-within {
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.35) !important;
+    transform: translateY(-1px) !important;
+}
+
+#nova-mobile-composer:active,
+.nova-mobile-composer:active,
+.mobile-composer:active,
+.composer:active {
+    transform: translateY(0px) !important;
+}
+
+
+/* NOVA_MOBILE_ATTACHMENT_CHIP_FEEDBACK_20260607 */
+.nova-mobile-attachment-chip {
+    transition:
+        transform 120ms ease,
+        background 140ms ease,
+        border-color 140ms ease,
+        box-shadow 140ms ease !important;
+}
+
+.nova-mobile-attachment-chip:hover,
+.nova-mobile-attachment-chip:focus-within {
+    transform: translateY(-1px) !important;
+    background: rgba(255, 255, 255, 0.11) !important;
+    border-color: rgba(255, 255, 255, 0.22) !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22) !important;
+}
+
+.nova-mobile-attachment-chip:active {
+    transform: scale(0.98) !important;
+}
+
+.nova-mobile-attachment-remove:hover,
+.nova-mobile-attachment-remove:focus {
+    background: rgba(255, 255, 255, 0.16) !important;
+    border-color: rgba(255, 255, 255, 0.28) !important;
+}
+
+.nova-mobile-attachment-remove:active {
+    transform: scale(0.92) !important;
+}
+
+
+
+
+
+
+/* NOVA_MOBILE_SAFE_COMPOSER_RECOVERY_20260607 */
+html,
+body {
+    overflow-x: hidden !important;
+}
+
+.mobile-composer,
+.nova-mobile-composer,
+#nova-mobile-composer {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+}
+
+/* Keep the actual input/action row horizontal */
+.mobile-composer-inner,
+.nova-mobile-composer-inner,
+.composer-row,
+.mobile-composer-actions,
+.mobile-composer-buttons {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 8px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    flex-wrap: nowrap !important;
+}
+
+/* Input gets space. Buttons do not stack. */
+#nova-mobile-input,
+.nova-mobile-input,
+.mobile-composer textarea,
+.mobile-composer input {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: 100% !important;
+}
+
+/* Buttons stay visible and equal */
+.mobile-composer-btn,
+.mobile-composer button,
+.nova-mobile-composer button,
+#nova-mobile-composer button {
+    display: inline-flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    flex: 0 0 42px !important;
+    width: 42px !important;
+    min-width: 42px !important;
+    max-width: 42px !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
+    padding: 0 !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 999px !important;
+    position: relative !important;
+    z-index: 30 !important;
+}
+
+/* Remove button stays small */
+.nova-mobile-attachment-remove {
+    flex: 0 0 22px !important;
+    width: 22px !important;
+    min-width: 22px !important;
+    max-width: 22px !important;
+    height: 22px !important;
+    min-height: 22px !important;
+    max-height: 22px !important;
+}
+
+/* Kill the white blob/cumshot decorative overlays without killing real images */
+.mobile-composer::before,
+.mobile-composer::after,
+.nova-mobile-composer::before,
+.nova-mobile-composer::after,
+#nova-mobile-composer::before,
+#nova-mobile-composer::after,
+.mobile-shell::before,
+.mobile-shell::after,
+.nova-mobile-shell::before,
+.nova-mobile-shell::after,
+#mobileApp::before,
+#mobileApp::after {
+    display: none !important;
+    content: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+/* If old decorative blob elements exist, bury/hide only decorative classes */
+.mobile-shell [class*="blob"],
+.mobile-shell [class*="glow"],
+.mobile-shell [class*="orb"],
+.mobile-shell [class*="splash"],
+.nova-mobile-shell [class*="blob"],
+.nova-mobile-shell [class*="glow"],
+.nova-mobile-shell [class*="orb"],
+.nova-mobile-shell [class*="splash"],
+#mobileApp [class*="blob"],
+#mobileApp [class*="glow"],
+#mobileApp [class*="orb"],
+#mobileApp [class*="splash"] {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+/* Keep real chat media contained */
+#mobileChatMessages img,
+#mobileChatMessages video,
+#mobileChatMessages iframe,
+.mobile-chat-messages img,
+.mobile-chat-messages video,
+.mobile-chat-messages iframe,
+.nova-mobile-chat-messages img,
+.nova-mobile-chat-messages video,
+.nova-mobile-chat-messages iframe {
+    max-width: min(100%, 320px) !important;
+    max-height: 240px !important;
+    object-fit: contain !important;
+    border-radius: 12px !important;
+}
+
+
+/* NOVA_MOBILE_MESSAGE_BAR_HEIGHT_FIX_20260607 */
+#nova-mobile-input,
+.nova-mobile-input,
+.mobile-composer textarea,
+.mobile-composer input,
+#mobileInput,
+#mobileMessageInput {
+    min-height: 46px !important;
+    height: 46px !important;
+    max-height: 120px !important;
+    padding: 11px 14px !important;
+    line-height: 1.35 !important;
+    font-size: 15px !important;
+    border-radius: 18px !important;
+    box-sizing: border-box !important;
+}
+
+.mobile-composer-inner,
+.nova-mobile-composer-inner,
+.composer-row,
+.mobile-composer-actions,
+.mobile-composer-buttons {
+    min-height: 50px !important;
+    align-items: center !important;
+}
+
+.mobile-composer,
+.nova-mobile-composer,
+#nova-mobile-composer {
+    min-height: 58px !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+}
+
+.mobile-composer-btn,
+.mobile-composer button,
+.nova-mobile-composer button,
+#nova-mobile-composer button {
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+}
+
+
+/* NOVA_MOBILE_CHAT_BOTTOM_SPACING_FIX_20260607 */
+#mobileChatMessages,
+.nova-mobile-chat-messages,
+.mobile-chat-messages,
+.chat-messages {
+    padding-bottom: 150px !important;
+    scroll-padding-bottom: 150px !important;
+    box-sizing: border-box !important;
+}
+
+.mobile-main,
+.nova-mobile-main,
+#mobileMain {
+    padding-bottom: 0 !important;
+    overflow-x: hidden !important;
+}
+
+.mobile-composer,
+.nova-mobile-composer,
+#nova-mobile-composer {
+    z-index: 1000 !important;
+}
+
+
+/* NOVA_VISIBLE_CSS_LOAD_TEST_20260607 */
+.mobile-composer,
+.nova-mobile-composer,
+#nova-mobile-composer,
+#mobileComposer,
+.composer,
+.chat-composer {
+    outline: 4px solid #a855f7 !important;
+    box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.35) !important;
+}
+
+
+/* NOVA_MOBILE_REAL_INPUT_BAR_HEIGHT_LOCK_20260607 */
+#mobileInput,
+#mobileMessageInput,
+#nova-mobile-input,
+textarea#nova-mobile-input,
+input#nova-mobile-input,
+.mobile-composer textarea,
+.mobile-composer input,
+.nova-mobile-composer textarea,
+.nova-mobile-composer input,
+.composer textarea,
+.composer input,
+.chat-composer textarea,
+.chat-composer input,
+textarea[placeholder],
+input[placeholder] {
+    min-height: 52px !important;
+    height: 52px !important;
+    max-height: 130px !important;
+    padding: 13px 15px !important;
+    line-height: 1.35 !important;
+    font-size: 16px !important;
+    border-radius: 18px !important;
+    box-sizing: border-box !important;
+    resize: none !important;
+    display: block !important;
+}
+
+/* Make the row tall enough to hold the real input */
+.mobile-composer-inner,
+.nova-mobile-composer-inner,
+.composer-row,
+.mobile-composer-actions,
+.mobile-composer-buttons,
+#nova-mobile-composer,
+.mobile-composer,
+.nova-mobile-composer,
+.composer,
+.chat-composer {
+    min-height: 62px !important;
+}
+
+/* Keep button height matched to the thicker bar */
+.mobile-composer-btn,
+.mobile-composer button,
+.nova-mobile-composer button,
+#nova-mobile-composer button,
+.composer button,
+.chat-composer button {
+    width: 46px !important;
+    min-width: 46px !important;
+    max-width: 46px !important;
+    height: 46px !important;
+    min-height: 46px !important;
+    max-height: 46px !important;
+}
+
+
+/* NOVA_MOBILE_SLIM_COMPOSER_FINAL_20260607 */
+#nova-mobile-composer,
+.mobile-composer,
+.nova-mobile-composer,
+.chat-composer,
+.composer {
+    min-height: 52px !important;
+    max-height: 70px !important;
+    padding-top: 5px !important;
+    padding-bottom: 5px !important;
+}
+
+.mobile-composer-inner,
+.nova-mobile-composer-inner,
+.composer-row,
+.mobile-composer-actions,
+.mobile-composer-buttons {
+    min-height: 48px !important;
+    height: 48px !important;
+    max-height: 48px !important;
+    align-items: center !important;
+}
+
+#nova-mobile-input,
+#mobileInput,
+#mobileMessageInput,
+textarea#nova-mobile-input,
+input#nova-mobile-input,
+.mobile-composer textarea,
+.nova-mobile-composer textarea,
+.chat-composer textarea,
+.composer textarea {
+    min-height: 40px !important;
+    height: 40px !important;
+    max-height: 90px !important;
+    padding: 8px 12px !important;
+    line-height: 1.25 !important;
+    font-size: 16px !important;
+    border-radius: 14px !important;
+    box-sizing: border-box !important;
+    resize: none !important;
+}
+
+#nova-mobile-send,
+#nova-mobile-stop-generation,
+#nova-mobile-voice,
+#nova-mobile-stop-speech,
+#nova-mobile-tts,
+#nova-mobile-attach,
+#nova-mobile-tools-toggle,
+.mobile-composer-btn {
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    padding: 0 !important;
+    flex: 0 0 40px !important;
+}
+
+
+/* NOVA_MOBILE_ANSWER_READABILITY_LOCK_20260607 */
+#nova-mobile-messages,
+.mobile-messages,
+.nova-mobile-messages,
+.chat-messages {
+    padding: 14px 12px 90px 12px !important;
+    line-height: 1.45 !important;
+}
+
+.mobile-message,
+.nova-mobile-message,
+.message,
+.chat-message,
+.mobile-bubble,
+.nova-mobile-bubble {
+    max-width: 94% !important;
+    margin: 10px 0 !important;
+    padding: 12px 14px !important;
+    border-radius: 18px !important;
+    font-size: 15.5px !important;
+    line-height: 1.45 !important;
+    letter-spacing: 0.01em !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+    white-space: pre-wrap !important;
+}
+
+.mobile-message.assistant,
+.nova-mobile-message.assistant,
+.message.assistant,
+.chat-message.assistant,
+.mobile-bubble.assistant,
+.nova-mobile-bubble.assistant,
+[data-role="assistant"],
+[data-author="assistant"] {
+    background: rgba(22, 24, 32, 0.96) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    color: rgba(255, 255, 255, 0.94) !important;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28) !important;
+}
+
+.mobile-message.user,
+.nova-mobile-message.user,
+.message.user,
+.chat-message.user,
+.mobile-bubble.user,
+.nova-mobile-bubble.user,
+[data-role="user"],
+[data-author="user"] {
+    margin-left: auto !important;
+    background: linear-gradient(135deg, rgba(126, 87, 255, 0.98), rgba(86, 57, 214, 0.98)) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    box-shadow: 0 10px 24px rgba(89, 65, 220, 0.24) !important;
+}
+
+.mobile-message p,
+.nova-mobile-message p,
+.message p,
+.chat-message p,
+.mobile-bubble p,
+.nova-mobile-bubble p,
+[data-role="assistant"] p,
+[data-author="assistant"] p {
+    margin: 0 0 10px 0 !important;
+}
+
+.mobile-message p:last-child,
+.nova-mobile-message p:last-child,
+.message p:last-child,
+.chat-message p:last-child,
+.mobile-bubble p:last-child,
+.nova-mobile-bubble p:last-child {
+    margin-bottom: 0 !important;
+}
+
+.mobile-message ul,
+.mobile-message ol,
+.nova-mobile-message ul,
+.nova-mobile-message ol,
+.message ul,
+.message ol,
+.chat-message ul,
+.chat-message ol,
+.mobile-bubble ul,
+.mobile-bubble ol,
+.nova-mobile-bubble ul,
+.nova-mobile-bubble ol {
+    margin: 8px 0 8px 20px !important;
+    padding: 0 !important;
+}
+
+.mobile-message li,
+.nova-mobile-message li,
+.message li,
+.chat-message li,
+.mobile-bubble li,
+.nova-mobile-bubble li {
+    margin: 5px 0 !important;
+    padding-left: 2px !important;
+}
+
+.mobile-message code,
+.nova-mobile-message code,
+.message code,
+.chat-message code,
+.mobile-bubble code,
+.nova-mobile-bubble code {
+    font-family: Consolas, "SFMono-Regular", Menlo, monospace !important;
+    font-size: 13.5px !important;
+    background: rgba(255, 255, 255, 0.09) !important;
+    color: rgba(255, 255, 255, 0.96) !important;
+    padding: 2px 5px !important;
+    border-radius: 6px !important;
+}
+
+.mobile-message pre,
+.nova-mobile-message pre,
+.message pre,
+.chat-message pre,
+.mobile-bubble pre,
+.nova-mobile-bubble pre {
+    margin: 10px 0 !important;
+    padding: 12px !important;
+    border-radius: 14px !important;
+    background: rgba(0, 0, 0, 0.35) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    overflow-x: auto !important;
+    white-space: pre !important;
+}
+
+.mobile-message pre code,
+.nova-mobile-message pre code,
+.message pre code,
+.chat-message pre code,
+.mobile-bubble pre code,
+.nova-mobile-bubble pre code {
+    background: transparent !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    font-size: 13px !important;
+    line-height: 1.45 !important;
+}
+
+.mobile-message strong,
+.nova-mobile-message strong,
+.message strong,
+.chat-message strong,
+.mobile-bubble strong,
+.nova-mobile-bubble strong {
+    font-weight: 800 !important;
+    color: #ffffff !important;
+}
+
+.mobile-message h1,
+.mobile-message h2,
+.mobile-message h3,
+.nova-mobile-message h1,
+.nova-mobile-message h2,
+.nova-mobile-message h3,
+.message h1,
+.message h2,
+.message h3,
+.chat-message h1,
+.chat-message h2,
+.chat-message h3,
+.mobile-bubble h1,
+.mobile-bubble h2,
+.mobile-bubble h3,
+.nova-mobile-bubble h1,
+.nova-mobile-bubble h2,
+.nova-mobile-bubble h3 {
+    margin: 4px 0 10px 0 !important;
+    font-size: 16.5px !important;
+    line-height: 1.3 !important;
+    font-weight: 850 !important;
+    color: #ffffff !important;
+}
+
+.mobile-message a,
+.nova-mobile-message a,
+.message a,
+.chat-message a,
+.mobile-bubble a,
+.nova-mobile-bubble a {
+    color: #bfa8ff !important;
+    text-decoration: underline !important;
+    text-underline-offset: 3px !important;
+}
+
+.mobile-thinking,
+.nova-mobile-thinking,
+.thinking,
+.typing,
+.typing-indicator {
+    opacity: 0.86 !important;
+    font-style: italic !important;
+    color: rgba(255, 255, 255, 0.72) !important;
 }

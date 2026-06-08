@@ -53,6 +53,7 @@ from nova_backend.utils.file_utils import ensure_dir
 from nova_backend.services.chat_service import ChatService
 from nova_backend.services.execution_handler import NextMove, default_executor
 from nova_backend.services.execution_daemon import ExecutionDaemon
+from nova_backend.services.chat_execution_service import ChatExecutionService
 from nova_backend.services.safe_unified_runtime import (
     SafeUnifiedRuntime,
 )
@@ -68,6 +69,9 @@ from nova_backend.services.runtime_response_sanitizer_service import (
 # APP SETUP
 # -----------------------
 
+
+# NOVA_EXECUTION_SERVICE_SINGLETON_20260607
+chat_execution_service = ChatExecutionService()
 app = Flask(
     __name__,
     template_folder=str(BASE_DIR / "templates"),
@@ -604,11 +608,6 @@ def api_state():
 # NOVA_WEAK_BACKEND_RESPONSE_GUARD_LOCK
 # NOVA_WEAK_BACKEND_RESPONSE_MOJIBAKE_GUARD_LOCK
 def _nova_replace_weak_backend_reply(user_text, result):
-    # DISABLE_WEAK_REPLY_HIJACK_20260605
-    # Do not replace valid model replies with stale project-phase text.
-    return result
-
-def _nova_replace_weak_backend_reply_disabled_old(user_text, result):
     """
     Last-mile response guard.
 
@@ -833,6 +832,338 @@ def _nova_safe_attachment_name(attachment, fallback="uploaded attachment"):
 
     return fallback
 
+
+
+# NOVA_PHASE1_TEXT_ATTACHMENT_READER_20260607
+def _nova_phase1_is_text_attachment(item):
+    try:
+        if not isinstance(item, dict):
+            return False
+
+        mime = str(item.get("mime_type") or item.get("type") or item.get("content_type") or "").lower()
+        name = str(
+            item.get("filename")
+            or item.get("original_filename")
+            or item.get("name")
+            or item.get("url")
+            or item.get("file_url")
+            or ""
+        ).lower()
+
+        text_exts = (
+            ".txt", ".md", ".markdown", ".json", ".jsonl",
+            ".py", ".js", ".css", ".html", ".htm",
+            ".csv", ".tsv", ".log", ".xml", ".yaml", ".yml", ".docx"
+        )
+
+        if mime.startswith("text/"):
+            return True
+
+        if mime in {
+            "application/json",
+            "application/javascript",
+            "application/x-javascript",
+            "application/xml",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/csv"
+        }:
+            return True
+
+        return name.endswith(text_exts)
+    except Exception:
+        return False
+
+
+def _nova_phase1_upload_path_from_attachment(item):
+    try:
+        import os
+
+        raw = str(
+            item.get("path")
+            or item.get("local_path")
+            or item.get("file_path")
+            or item.get("url")
+            or item.get("file_url")
+            or ""
+        ).strip()
+
+        if not raw:
+            return None
+
+        if raw.startswith("/api/uploads/"):
+            filename = raw.split("/api/uploads/", 1)[1].split("?", 1)[0].strip("/\\")
+            base = globals().get("UPLOADS_DIR") or globals().get("UPLOAD_FOLDER")
+            if base:
+                return os.path.join(str(base), filename)
+            return os.path.join(os.path.dirname(__file__), "uploads", filename)
+
+        if os.path.isabs(raw):
+            return raw
+
+        filename = raw.split("/")[-1].split("\\")[-1].split("?", 1)[0]
+        base = globals().get("UPLOADS_DIR") or globals().get("UPLOAD_FOLDER")
+        if base:
+            return os.path.join(str(base), filename)
+
+        return os.path.join(os.path.dirname(__file__), "uploads", filename)
+    except Exception:
+        return None
+
+
+
+
+# NOVA_SKIP_RAW_BINARY_ATTACHMENT_INJECTION_20260607
+def _nova_should_skip_raw_attachment_injection(item):
+    try:
+        if not isinstance(item, dict):
+            return False
+
+        mime = str(item.get("mime_type") or item.get("type") or item.get("content_type") or "").lower()
+        name = str(
+            item.get("filename")
+            or item.get("original_filename")
+            or item.get("name")
+            or item.get("url")
+            or item.get("file_url")
+            or ""
+        ).lower()
+
+        blocked_exts = (
+            ".docx", ".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif",
+            ".zip", ".exe", ".dll", ".bin"
+        )
+
+        blocked_mimes = {
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/pdf",
+            "application/zip",
+            "application/octet-stream",
+        }
+
+        if mime in blocked_mimes:
+            return True
+
+        if mime.startswith("image/"):
+            return True
+
+        return name.endswith(blocked_exts)
+    except Exception:
+        return False
+
+
+def _nova_filter_raw_injection_attachments(attachments, logger=None):
+    kept = []
+    skipped = []
+
+    for item in attachments or []:
+        if _nova_should_skip_raw_attachment_injection(item):
+            skipped.append(item)
+        else:
+            kept.append(item)
+
+    if skipped and logger:
+        try:
+            names = [
+                str(x.get("original_filename") or x.get("filename") or x.get("name") or x.get("url") or "attachment")
+                for x in skipped
+                if isinstance(x, dict)
+            ]
+            logger.info("[RawAttachmentInjectionGuard] skipped raw binary injection for attachments=%s", names)
+        except Exception:
+            pass
+
+    return kept
+
+
+def _nova_phase2_extract_docx_text(path):
+    try:
+        import zipfile
+        import xml.etree.ElementTree as ET
+
+        chunks = []
+
+        with zipfile.ZipFile(path, "r") as archive:
+            targets = [
+                "word/document.xml",
+                "word/footnotes.xml",
+                "word/endnotes.xml",
+                "word/comments.xml",
+            ]
+
+            for target in targets:
+                if target not in archive.namelist():
+                    continue
+
+                xml_bytes = archive.read(target)
+                root = ET.fromstring(xml_bytes)
+
+                namespace = {
+                    "w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+                }
+
+                paragraphs = []
+
+                for paragraph in root.findall(".//w:p", namespace):
+                    texts = []
+
+                    for node in paragraph.findall(".//w:t", namespace):
+                        if node.text:
+                            texts.append(node.text)
+
+                    line = "".join(texts).strip()
+
+                    if line:
+                        paragraphs.append(line)
+
+                if paragraphs:
+                    chunks.append("\n".join(paragraphs))
+
+        return "\n\n".join(chunks).strip()
+    except Exception:
+        return ""
+
+def _nova_phase1_read_text_attachments(attachments, logger=None):
+    sections = []
+
+    for item in attachments or []:
+        try:
+            if not _nova_phase1_is_text_attachment(item):
+                continue
+
+            path = _nova_phase1_upload_path_from_attachment(item)
+            if not path:
+                continue
+
+            import os
+
+            if not os.path.exists(path) or not os.path.isfile(path):
+                if logger:
+                    logger.warning("[Phase1TextAttachmentReader] missing file path=%s", path)
+                continue
+
+            size = os.path.getsize(path)
+            max_bytes = 120000
+
+            lower_path = str(path or "").lower()
+            lower_name = str(item.get("filename") or item.get("original_filename") or item.get("name") or "").lower()
+            mime = str(item.get("mime_type") or item.get("type") or item.get("content_type") or "").lower()
+
+            if (
+                lower_path.endswith(".docx")
+                or lower_name.endswith(".docx")
+                or mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            ):
+                text = _nova_phase2_extract_docx_text(path)
+
+                if not text:
+                    if logger:
+                        logger.warning("[Phase2DocxAttachmentReader] no readable docx text path=%s", path)
+                    continue
+
+                if len(text) > 50000:
+                    text = text[:50000] + "\n\n[TRUNCATED: attachment text was longer than 50,000 characters]"
+
+                name = (
+                    item.get("original_filename")
+                    or item.get("filename")
+                    or item.get("name")
+                    or os.path.basename(path)
+                    or "attachment"
+                )
+
+                sections.append(
+                    "Attachment file content: {name}\n"
+                    "Path: {path}\n"
+                    "Size: {size} bytes\n"
+                    "Content:\n{text}".format(
+                        name=name,
+                        path=path,
+                        size=size,
+                        text=text
+                    )
+                )
+
+                if logger:
+                    logger.info(
+                        "[Phase2DocxAttachmentReader] loaded docx attachment name=%s chars=%s",
+                        name,
+                        len(text)
+                    )
+
+                continue
+            with open(path, "rb") as handle:
+                raw = handle.read(max_bytes)
+
+            text = None
+            for encoding in ("utf-8", "utf-8-sig", "cp1252", "latin-1"):
+                try:
+                    text = raw.decode(encoding)
+                    break
+                except Exception:
+                    continue
+
+            if text is None:
+                continue
+
+            text = text.replace("\x00", "").strip()
+
+            if not text:
+                continue
+
+            if len(text) > 50000:
+                text = text[:50000] + "\n\n[TRUNCATED: attachment text was longer than 50,000 characters]"
+
+            name = (
+                item.get("original_filename")
+                or item.get("filename")
+                or item.get("name")
+                or os.path.basename(path)
+                or "attachment"
+            )
+
+            sections.append(
+                "Attachment file content: {name}\n"
+                "Path: {path}\n"
+                "Size: {size} bytes\n"
+                "Content:\n{text}".format(
+                    name=name,
+                    path=path,
+                    size=size,
+                    text=text
+                )
+            )
+
+            if logger:
+                logger.info(
+                    "[Phase1TextAttachmentReader] loaded text attachment name=%s chars=%s",
+                    name,
+                    len(text)
+                )
+        except Exception as error:
+            if logger:
+                logger.warning("[Phase1TextAttachmentReader] failed item=%s error=%s", item, error)
+
+    return sections
+
+
+def _nova_phase1_append_text_attachments_to_user_text(user_text, attachments, logger=None):
+    try:
+        sections = _nova_phase1_read_text_attachments(attachments, logger=logger)
+        if not sections:
+            return user_text
+
+        original = str(user_text or "").strip()
+
+        return (
+            original
+            + "\n\n\n[CURRENT UPLOADED TEXT ATTACHMENTS]\n"
+            + "\n\n---\n\n".join(sections)
+            + "\n[/CURRENT UPLOADED TEXT ATTACHMENTS]\n"
+        ).strip()
+    except Exception as error:
+        if logger:
+            logger.warning("[Phase1TextAttachmentReader] append failed error=%s", error)
+        return user_text
 
 @app.route("/api/runtime/summary", methods=["GET"])
 def api_runtime_summary():
@@ -2012,7 +2343,7 @@ def _nova_prevent_bad_exact_pong_response(assistant_text, user_text):
     if clean_user in allowed_pong_requests:
         return clean_answer
 
-    return ""
+    return "I’m here. The active Nova phase is frontend/mobile polish. Give me the next task and I’ll move directly on it."
 
 
 def _nova_try_project_state_direct_recall(user_text, session_id):
@@ -2171,6 +2502,22 @@ def _nova_casual_chat_guard():
 
         payload = request.get_json(silent=True) or {}
         user_text = str(payload.get("user_text") or "").strip()
+        # NOVA_AUTO_PLAN_EXECUTION_START_GUARD_20260607
+        auto_plan_execution_result = _nova_try_auto_plan_execution_start_20260607(session_id, user_text)
+        if auto_plan_execution_result is not None:
+            return jsonify(auto_plan_execution_result)
+        # NOVA_EXECUTION_STATUS_GUARD_20260607
+        execution_status_result = _nova_try_execution_status_20260607(session_id, user_text)
+        if execution_status_result is not None:
+            return jsonify(execution_status_result)
+        # NOVA_EXECUTION_AUTOPLAN_START_GUARD_20260607
+        execution_start_result = _nova_try_execution_autoplan_start_20260607(session_id, user_text)
+        if execution_start_result is not None:
+            return jsonify(execution_start_result)
+        # NOVA_EXECUTION_TRIGGER_GUARD_20260607
+        execution_result = _nova_try_execution_trigger_20260607(session_id, user_text)
+        if execution_result is not None:
+            return jsonify(execution_result)
         attachments = payload.get("attachments") or []
 
         if attachments:
@@ -2219,63 +2566,7 @@ def _nova_casual_chat_guard():
         return None
 
 
-
-# CASUAL_AND_ATTACHMENT_CLEANUP_20260604
-@app.before_request
-def _nova_early_casual_chat_guard():
-    try:
-        from flask import request, jsonify
-
-        if request.path != "/api/chat" or request.method != "POST":
-            return None
-
-        payload = request.get_json(silent=True) or {}
-        user_text = str(payload.get("user_text") or "").strip()
-        attachments = payload.get("attachments") or []
-
-        if attachments:
-            return None
-
-        clean = " ".join(user_text.lower().split()).strip(" ?!.")
-
-        replies = {
-            "hi": "Hey.",
-            "hey": "Hey.",
-            "hello": "Hey.",
-            "yo": "Yo.",
-            "sup": "I’m here.",
-            "how are you": "I’m good. Ready when you are.",
-            "how are u": "I’m good. Ready when you are.",
-            "how you doing": "I’m good. Ready when you are.",
-            "whats up": "I’m here. Ready for the next move.",
-            "what's up": "I’m here. Ready for the next move.",
-        }
-
-        if clean not in replies:
-            return None
-
-        session_id = str(payload.get("session_id") or "").strip()
-
-        return jsonify({
-            "ok": True,
-            "session_id": session_id,
-            "active_session_id": session_id,
-            "assistant_message": {
-                "role": "assistant",
-                "text": replies[clean],
-                "attachments": [],
-                "meta": {"route": "early_casual_chat_guard"}
-            },
-            "attachments": [],
-            "session_attachments": [],
-            "debug": {"route": "early_casual_chat_guard"}
-        })
-
-    except Exception:
-        return None
-
 @app.post("/api/chat")
-
 
 
 # ACTUAL_BINARY_ATTACHMENT_ANALYZER_BLOCK_LOCK
@@ -2347,13 +2638,732 @@ def _nova_analyze_binary_attachment_for_prompt(attachment_path, mime_type):
 
     return ""
 
+
+def _nova_mobile_now_iso():
+    try:
+        from datetime import datetime, timezone
+        return datetime.now(timezone.utc).isoformat()
+    except Exception:
+        return ""
+
+
+def _nova_ensure_requested_session(session_id, title="Mobile Chat"):
+    target_session_id = str(session_id or "").strip()
+    if not target_session_id:
+        return None
+
+    try:
+        existing = session_service.get_session(target_session_id)
+        if existing:
+            sessions = session_service.get_all()
+            session_service.save(sessions, active=target_session_id)
+            return existing
+    except Exception:
+        app.logger.exception("[mobile-session-save] failed checking existing session")
+
+    now = _nova_mobile_now_iso()
+
+    session = {
+        "id": target_session_id,
+        "title": str(title or "Mobile Chat").strip()[:80] or "Mobile Chat",
+        "messages": [],
+        "pinned": False,
+        "created_at": now,
+        "updated_at": now,
+        "working_state": {
+            "active_task": "",
+            "current_file": "",
+            "current_bug": "",
+            "last_success": "",
+            "next_move": "",
+            "checkpoint": "",
+            "updated_at": ""
+        },
+        "active_execution": None,
+    }
+
+    try:
+        sessions = session_service.get_all()
+        if isinstance(sessions, dict):
+            sessions = sessions.get("sessions") or []
+        if not isinstance(sessions, list):
+            sessions = []
+
+        sessions = [
+            s for s in sessions
+            if isinstance(s, dict) and str(s.get("id") or "").strip() != target_session_id
+        ]
+        sessions.insert(0, session)
+
+        session_service.save(sessions, active=target_session_id)
+        return session
+    except Exception:
+        app.logger.exception("[mobile-session-save] failed creating requested mobile session")
+        return session
+
+
+
+def _nova_direct_save_mobile_exchange(session_id, user_text, assistant_text, attachments=None, route="mobile_attachment"):
+    # NOVA_DIRECT_MOBILE_SESSION_STORE_LOCK_20260606
+    # Directly inserts/updates the mobile session in data/nova_sessions.json.
+    # This bypasses append_message() failing when the mobile session object is missing.
+    target_session_id = str(session_id or "").strip()
+    if not target_session_id:
+        return False
+
+    try:
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+    except Exception:
+        now = ""
+
+    try:
+        store = session_service._read_store()
+        sessions = store.get("sessions") if isinstance(store, dict) else []
+
+        if not isinstance(sessions, list):
+            sessions = []
+
+        found = None
+        for session in sessions:
+            if isinstance(session, dict) and str(session.get("id") or "").strip() == target_session_id:
+                found = session
+                break
+
+        if found is None:
+            found = {
+                "id": target_session_id,
+                "title": str(user_text or "Mobile Chat").strip()[:80] or "Mobile Chat",
+                "messages": [],
+                "pinned": False,
+                "created_at": now,
+                "updated_at": now,
+                "working_state": {
+                    "active_task": "",
+                    "current_file": "",
+                    "current_bug": "",
+                    "last_success": "",
+                    "next_move": "",
+                    "checkpoint": "",
+                    "updated_at": ""
+                },
+                "active_execution": None,
+            }
+            sessions.insert(0, found)
+
+        messages = found.get("messages")
+        if not isinstance(messages, list):
+            messages = []
+            found["messages"] = messages
+
+        messages.append({
+            "role": "user",
+            "text": str(user_text or "").strip(),
+            "attachments": attachments or [],
+            "created_at": now,
+            "meta": {
+                "route": route
+            }
+        })
+
+        messages.append({
+            "role": "assistant",
+            "text": str(assistant_text or "").strip(),
+            "attachments": attachments or [],
+            "created_at": now,
+            "meta": {
+                "route": route
+            }
+        })
+
+        found["updated_at"] = now
+        store["sessions"] = sessions
+        store["active_session_id"] = target_session_id
+
+        session_service._write_store(store)
+        return True
+    except Exception:
+        app.logger.exception("[direct-mobile-session-save] failed")
+        return False
+
+
+
+def _nova_save_mobile_exchange(session_id, user_text, assistant_text, attachments=None, route="mobile_attachment"):
+    target_session_id = str(session_id or "").strip()
+    if not target_session_id:
+        return False
+
+    _nova_ensure_requested_session(target_session_id, title=user_text or "Mobile Chat")
+
+    try:
+        session_service.append_message(
+            target_session_id,
+            {
+                "role": "user",
+                "text": str(user_text or "").strip(),
+                "attachments": attachments or [],
+                "meta": {
+                    "route": route
+                }
+            }
+        )
+
+        session_service.append_message(
+            target_session_id,
+            {
+                "role": "assistant",
+                "text": str(assistant_text or "").strip(),
+                "attachments": attachments or [],
+                "meta": {
+                    "route": route
+                }
+            }
+        )
+
+        sessions = session_service.get_all()
+        session_service.save(sessions, active=target_session_id)
+        return True
+    except Exception:
+        app.logger.exception("[mobile-session-save] failed appending mobile exchange")
+        return False
+
+
+
+# NOVA_EXECUTION_TRIGGER_BRIDGE_20260607
+def _nova_try_execution_trigger_20260607(session_id, user_text):
+    try:
+        if not chat_execution_service.is_execution_trigger(user_text):
+            return None
+
+        state = chat_execution_service.advance(session_id)
+        reply_text = chat_execution_service.format_reply(state)
+
+        return {
+            "ok": True,
+            "skip_cleanup": True,
+            "skip_post_processing": True,
+            "skip_rewrite": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": reply_text,
+                "content": reply_text,
+                "execution_state": state,
+            },
+            "execution_state": state,
+        }
+    except Exception as exc:
+        logger.exception("[NovaExecutionBridge] failed")
+        reply_text = "Execution bridge failed: " + str(exc)
+        return {
+            "ok": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": reply_text,
+                "content": reply_text,
+            },
+        }
+
+
+
+# NOVA_AUTO_PLAN_EXECUTION_START_20260607
+def _nova_try_auto_plan_execution_start_20260607(session_id, user_text):
+    try:
+        raw_text = str(user_text or "").strip()
+        clean_text = " ".join(raw_text.lower().split())
+
+        if not clean_text.startswith("auto-plan "):
+            return None
+
+        goal = raw_text[len("auto-plan "):].strip() or "Untitled execution mission"
+
+        steps = [
+            "Understand the mission and identify the target files",
+            "Make the smallest safe implementation change",
+            "Verify the result and report the next move",
+        ]
+
+        state = chat_execution_service.start(session_id, goal, steps)
+        if not isinstance(state, dict):
+            state = chat_execution_service.get_state(session_id)
+
+        current_step = state.get("current_step") if isinstance(state, dict) else None
+
+        reply_text = (
+            "Execution mission started: " + goal + "\n\n"
+            "Step 1/3: " + str(current_step or "Understand the mission and identify the target files") + "\n\n"
+            "Send k, next, continue, or run it to advance."
+        )
+
+        return {
+            "ok": True,
+            "skip_cleanup": True,
+            "skip_post_processing": True,
+            "skip_rewrite": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": reply_text,
+                "content": reply_text,
+                "execution_state": state,
+            },
+            "execution_state": state,
+        }
+    except Exception as exc:
+        logger.exception("[NovaAutoPlanExecutionStart] failed")
+        reply_text = "Auto-plan execution start failed: " + str(exc)
+        return {
+            "ok": True,
+            "skip_cleanup": True,
+            "skip_post_processing": True,
+            "skip_rewrite": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": reply_text,
+                "content": reply_text,
+            },
+            "execution_state": {
+                "status": "failed",
+                "error": str(exc),
+            },
+        }
+
+
+# NOVA_EXECUTION_AUTOPLAN_START_20260607
+def _nova_try_execution_autoplan_start_20260607(session_id, user_text):
+    try:
+        clean = str(user_text or "").strip()
+        lower = clean.lower()
+
+        prefixes = [
+            "auto-plan ",
+            "autoplan ",
+            "auto plan ",
+        ]
+
+        matched_prefix = None
+        for prefix in prefixes:
+            if lower.startswith(prefix):
+                matched_prefix = prefix
+                break
+
+        if not matched_prefix:
+            return None
+
+        goal = clean[len(matched_prefix):].strip()
+        if not goal:
+            goal = "Untitled mission"
+
+        steps = [
+            "Inspect the current target and identify the smallest safe change",
+            "Apply the implementation without disturbing working systems",
+            "Verify the result and report the next move",
+        ]
+
+        state = chat_execution_service.start(
+            session_id=session_id,
+            goal=goal,
+            steps=steps,
+        )
+
+        reply_text = (
+            "Mission started: " + goal + "\n\n"
+            "Step 1/" + str(len(steps)) + ": " + str(state.get("current_step")) + "\n\n"
+            "Send k, next, continue, or run it to advance."
+        )
+
+        return {
+            "ok": True,
+            "skip_cleanup": True,
+            "skip_post_processing": True,
+            "skip_rewrite": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": reply_text,
+                "content": reply_text,
+                "execution_state": state,
+            },
+            "execution_state": state,
+        }
+    except Exception as exc:
+        logger.exception("[NovaExecutionAutoPlanStart] failed")
+        reply_text = "Execution auto-plan start failed: " + str(exc)
+        return {
+            "ok": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": reply_text,
+                "content": reply_text,
+            },
+        }
+
+# NOVA_EXECUTION_STATUS_BRIDGE_20260607
+def _nova_try_execution_status_20260607(session_id, user_text):
+    try:
+        clean = str(user_text or "").strip().lower()
+
+        if clean not in {"status", "execution status", "mission status"}:
+            return None
+
+        state = chat_execution_service.get_state(session_id)
+
+        if not state or state.get("status") == "idle":
+            reply_text = "No active mission."
+        else:
+            steps = state.get("steps") or []
+            total = len(steps)
+            current_index = int(state.get("current_index") or 0)
+            current_step = state.get("current_step")
+            status = state.get("status") or "unknown"
+            goal = state.get("goal") or "Untitled mission"
+
+            if status == "complete":
+                step_line = "Step: complete"
+            else:
+                display_step = min(current_index + 1, total) if total else current_index + 1
+                step_line = "Step " + str(display_step) + "/" + str(total) + ": " + str(current_step)
+
+            reply_text = (
+                "Current mission: " + str(goal) + "\n"
+                "Status: " + str(status) + "\n"
+                + step_line
+            )
+
+        return {
+            "ok": True,
+            "skip_cleanup": True,
+            "skip_post_processing": True,
+            "skip_rewrite": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": reply_text,
+                "content": reply_text,
+                "execution_state": state,
+            },
+            "execution_state": state,
+        }
+    except Exception as exc:
+        logger.exception("[NovaExecutionStatus] failed")
+        reply_text = "Execution status failed: " + str(exc)
+        return {
+            "ok": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": reply_text,
+                "content": reply_text,
+            },
+        }
 def api_chat():
+    # NOVA_DURABLE_EXECUTION_TOP_GUARD_20260607
+    try:
+        _nova_exec_payload = request.get_json(silent=True) or {}
+        _nova_exec_user_text = str(
+            _nova_exec_payload.get("user_text")
+            or _nova_exec_payload.get("text")
+            or _nova_exec_payload.get("message")
+            or ""
+        ).strip()
+        _nova_exec_session_id = str(
+            _nova_exec_payload.get("session_id")
+            or _nova_exec_payload.get("client_session_id")
+            or "default"
+        ).strip() or "default"
+        _nova_exec_clean = " ".join(_nova_exec_user_text.lower().split())
+        # NOVA_API_CHAT_PROJECT_STATUS_FRONT_GUARD_20260607
+        _nova_project_status_phrases = [
+            "what did we fix",
+            "what we fixed",
+            "explain what we fixed",
+            "summarize what we fixed",
+            "what did we do today",
+            "what have we done today",
+        ]
+
+        if any(_phrase in _nova_exec_clean for _phrase in _nova_project_status_phrases):
+            _nova_answer = (
+                "Here is what we actually fixed today:\n\n"
+                "- Fixed the mobile composer buttons so send, voice, attach, tools, and TTS stopped stretching.\n"
+                "- Fixed the mojibukakke icon issue where broken encoded symbols were showing instead of clean icons.\n"
+                "- Fixed the stale frontend cache issue where /mobile kept loading an old nova-mobile-app.js version.\n"
+                "- Slimmed the mobile composer/input bar so the real input and main buttons are now 40px high.\n"
+                "- Fixed the router bug where the word 'today' forced local project questions into web_fetch.\n\n"
+                "Remaining issue: add a real work-log system so Nova can summarize actual project progress instead of guessing from old memories."
+            )
+
+            return jsonify({
+                "ok": True,
+                "text": _nova_answer,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": _nova_answer,
+                    "meta": {
+                        "project_status_direct": True,
+                        "route_taken": "api_chat_project_status_front_guard",
+                        "memory_bypassed": True,
+                        "web_bypassed": True
+                    },
+                    "attachments": []
+                },
+                "debug": {
+                    "route": "api_chat",
+                    "route_taken": "api_chat_project_status_front_guard",
+                    "blocked": ["chat_service_memory", "web_fetch"]
+                }
+            })
+
+
+        # NOVA_EXECUTION_STATUS_TOP_GUARD_20260607
+        if _nova_exec_clean in {"status", "execution status", "mission status"}:
+            _nova_exec_state = chat_execution_service.get_state(_nova_exec_session_id)
+            _nova_exec_reply = chat_execution_service.format_reply(_nova_exec_state)
+
+            return jsonify({
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": _nova_exec_reply,
+                    "content": _nova_exec_reply,
+                    "execution_state": _nova_exec_state,
+                },
+                "execution_state": _nova_exec_state,
+                "skip_cleanup": True,
+                "skip_post_processing": True,
+                "skip_rewrite": True,
+            })
+
+        # NOVA_EXECUTION_RESET_ALL_BRIDGE_20260607
+        if _nova_exec_clean in {"reset all", "reset all missions", "clear all missions", "clear all execution", "reset executions"}:
+            _nova_reset_session_ids = []
+
+            if hasattr(chat_execution_service, "list_sessions"):
+                try:
+                    _nova_reset_session_ids = list(chat_execution_service.list_sessions() or [])
+                except Exception:
+                    _nova_reset_session_ids = []
+
+            if not _nova_reset_session_ids:
+                for _nova_attr_name in ("states", "_states", "execution_states", "_execution_states", "missions", "_missions"):
+                    _nova_attr_value = getattr(chat_execution_service, _nova_attr_name, None)
+                    if isinstance(_nova_attr_value, dict):
+                        _nova_reset_session_ids = list(_nova_attr_value.keys())
+                        break
+
+            if _nova_exec_session_id not in _nova_reset_session_ids:
+                _nova_reset_session_ids.append(_nova_exec_session_id)
+
+            _nova_reset_session_ids = [
+                str(_nova_sid).strip()
+                for _nova_sid in _nova_reset_session_ids
+                if str(_nova_sid).strip()
+            ]
+
+            _nova_reset_session_ids = list(dict.fromkeys(_nova_reset_session_ids))
+            _nova_cleared_sessions = []
+
+            for _nova_sid in _nova_reset_session_ids:
+                try:
+                    chat_execution_service.reset(_nova_sid)
+                    _nova_cleared_sessions.append(_nova_sid)
+                except Exception:
+                    pass
+
+            if _nova_cleared_sessions:
+                reply_text = (
+                    "All known execution missions reset. Cleared sessions: "
+                    + ", ".join(_nova_cleared_sessions)
+                )
+            else:
+                reply_text = "No execution missions were found to reset."
+
+            return jsonify({
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": reply_text,
+                    "content": reply_text,
+                },
+                "skip_cleanup": True,
+                "skip_post_processing": True,
+                "skip_rewrite": True,
+            })
+        # NOVA_EXECUTION_RESET_BRIDGE_20260607
+        if _nova_exec_clean in {"reset mission", "reset execution", "clear mission", "reset"}:
+            _nova_exec_state = chat_execution_service.reset(_nova_exec_session_id)
+            reply_text = f"Mission reset. Previous mission state cleared for session {_nova_exec_session_id}."
+
+            return jsonify({
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": reply_text,
+                    "content": reply_text,
+                    "execution_state": _nova_exec_state,
+                },
+                "execution_state": _nova_exec_state,
+                "skip_cleanup": True,
+                "skip_post_processing": True,
+                "skip_rewrite": True,
+            })
+        if _nova_exec_clean.startswith("auto-plan "):
+            _nova_exec_goal = _nova_exec_user_text[len("auto-plan "):].strip() or "Untitled execution mission"
+            _nova_goal_lower = _nova_exec_goal.lower()
+
+            if "attachment" in _nova_goal_lower or "upload" in _nova_goal_lower or "preview" in _nova_goal_lower:
+                _nova_exec_steps = [
+                    "Inspect the attachment upload, payload, and preview flow",
+                    "Patch the smallest broken link between upload capture and preview rendering",
+                    "Test upload preview, send payload, and attachment summary behavior",
+                ]
+            elif "mobile" in _nova_goal_lower or "ui" in _nova_goal_lower or "css" in _nova_goal_lower:
+                _nova_exec_steps = [
+                    "Inspect the mobile UI file and identify the broken layout target",
+                    "Patch the smallest CSS or JS issue without touching stable backend logic",
+                    "Verify mobile layout, composer buttons, and session behavior",
+                ]
+            elif "web" in _nova_goal_lower or "fetch" in _nova_goal_lower or "search" in _nova_goal_lower:
+                _nova_exec_steps = [
+                    "Inspect the web fetch route, ranking path, and displayed source output",
+                    "Patch the smallest mismatch between backend fetch results and UI/session output",
+                    "Verify fresh search results, source ordering, and displayed cards",
+                ]
+            elif "memory" in _nova_goal_lower or "recall" in _nova_goal_lower:
+                _nova_exec_steps = [
+                    "Inspect memory write, ranking, and recall injection path",
+                    "Patch the smallest issue blocking correct memory recall",
+                    "Verify recall with a direct follow-up prompt",
+                ]
+            elif "execution" in _nova_goal_lower or "plan" in _nova_goal_lower:
+                _nova_exec_steps = [
+                    "Inspect execution state, trigger routing, and durable save file",
+                    "Patch the smallest issue in mission start or step advancement",
+                    "Verify auto-plan, k, next, continue, and completion behavior",
+                ]
+            else:
+                _nova_exec_steps = [
+                    "Inspect the mission and identify the likely target files",
+                    "Make the smallest safe implementation change",
+                    "Verify the result and report the next move",
+                ]
+            _nova_exec_state = chat_execution_service.start(
+                _nova_exec_session_id,
+                _nova_exec_goal,
+                _nova_exec_steps,
+            )
+            _nova_exec_reply = (
+                "Execution mission started: " + _nova_exec_goal + "\n\n"
+                "Step 1/3: " + str(_nova_exec_state.get("current_step") or _nova_exec_steps[0]) + "\n\n"
+                "Send k, next, continue, or run it to advance."
+            )
+            return jsonify({
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": _nova_exec_reply,
+                    "content": _nova_exec_reply,
+                    "execution_state": _nova_exec_state,
+                },
+                "execution_state": _nova_exec_state,
+                "skip_cleanup": True,
+                "skip_post_processing": True,
+                "skip_rewrite": True,
+            })
+
+        if _nova_exec_clean in {"k", "ok", "okay", "next", "continue", "run it", "run step", "execute", "go"}:
+            _nova_exec_state = chat_execution_service.advance(_nova_exec_session_id)
+            _nova_exec_reply = chat_execution_service.format_reply(_nova_exec_state)
+            return jsonify({
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": _nova_exec_reply,
+                    "content": _nova_exec_reply,
+                    "execution_state": _nova_exec_state,
+                },
+                "execution_state": _nova_exec_state,
+                "skip_cleanup": True,
+                "skip_post_processing": True,
+                "skip_rewrite": True,
+            })
+    except Exception as exc:
+        logger.exception("[NovaDurableExecutionTopGuard] failed")
+        _nova_exec_reply = "Execution top guard failed: " + str(exc)
+        return jsonify({
+            "ok": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": _nova_exec_reply,
+                "content": _nova_exec_reply,
+            },
+            "execution_state": {
+                "status": "failed",
+                "error": str(exc),
+            },
+            "skip_cleanup": True,
+            "skip_post_processing": True,
+            "skip_rewrite": True,
+        })
+    # NOVA_AUTO_PLAN_TOP_OF_API_CHAT_GUARD_20260607
+    try:
+        _nova_early_payload = request.get_json(silent=True) or {}
+        _nova_early_user_text = str(
+            _nova_early_payload.get("user_text")
+            or _nova_early_payload.get("text")
+            or _nova_early_payload.get("message")
+            or ""
+        ).strip()
+        _nova_early_session_id = str(
+            _nova_early_payload.get("session_id")
+            or _nova_early_payload.get("client_session_id")
+            or "default"
+        ).strip() or "default"
+
+        _nova_early_auto_plan_result = _nova_try_auto_plan_execution_start_20260607(
+            _nova_early_session_id,
+            _nova_early_user_text,
+        )
+
+        if _nova_early_auto_plan_result is not None:
+            return jsonify(_nova_early_auto_plan_result)
+    except Exception as exc:
+        logger.exception("[NovaAutoPlanTopGuard] failed")
+        return jsonify({
+            "ok": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": "Auto-plan top guard failed: " + str(exc),
+                "content": "Auto-plan top guard failed: " + str(exc),
+            },
+            "execution_state": {
+                "status": "failed",
+                "error": str(exc),
+            },
+        })
     data = request_json()
 
     user_text = str(data.get("user_text") or "").strip()
     requested_session_id = str(data.get("session_id") or "").strip()
     session_id = requested_session_id
+
+    # MOBILE_SESSION_FORCE_LOCK_20260606
+    # Honor mobile-provided session ids instead of letting backend drift to random session_* ids.
+    if requested_session_id:
+        # FORCE_MOBILE_SESSION_OBJECT_CREATE_LOCK_20260606
+        # Active id alone is not enough. Ensure the actual mobile session object exists.
+        try:
+            _nova_ensure_requested_session(
+                requested_session_id,
+                title=user_text or "Mobile Chat",
+            )
+        except Exception:
+            app.logger.exception("[api_chat] failed to ensure requested mobile session object")
+
+    try:
+        # MOBILE_ATTACHMENT_FIX_20260606: active_session_id is read-only.
+        pass
+    except Exception:
+        app.logger.exception("[api_chat] failed to force active mobile session id")
+
     attachments = normalize_attachments(data.get("attachments"))
+
+    attachments = normalize_attachments(request.json.get("attachments", []))
 
     # BACKEND_ATTACHMENT_DEBUG_LOG_LOCK
     try:
@@ -2453,6 +3463,149 @@ def api_chat():
     if not user_text and not attachments:
         return json_error("Missing user_text or attachments", 400)
 
+    # EARLY_IMAGE_ATTACHMENT_GATE_20260606
+    # If the current request includes image attachments, answer before memory,
+    # web routing, weak fallback guards, or chat_service can turn it into a generic intro.
+    try:
+        current_attachments = attachments if isinstance(attachments, list) else []
+        image_attachments = []
+
+        for item in current_attachments:
+            if not isinstance(item, dict):
+                continue
+
+            name = str(
+                item.get("original_filename")
+                or item.get("filename")
+                or item.get("name")
+                or "image attachment"
+            ).strip()
+
+            mime = str(
+                item.get("mime_type")
+                or item.get("content_type")
+                or item.get("type")
+                or item.get("mime")
+                or ""
+            ).strip()
+
+            url = str(item.get("file_url") or item.get("url") or item.get("path") or "").strip()
+            name_lower = name.lower()
+
+            if (
+                mime.lower().startswith("image/")
+                or name_lower.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif"))
+                or url.lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".gif"))
+            ):
+                image_attachments.append({
+                    "name": name,
+                    "mime": mime or "image/*",
+                    "url": url,
+                    "raw": item,
+                })
+
+        if image_attachments:
+            # SKIP_EARLY_IMAGE_GATE_FOR_ANALYSIS_REQUESTS_20260606
+            # Do not let the receipt gate block real image/attachment analysis.
+            _analysis_text = str(user_text or "").lower().strip()
+            _analysis_words = (
+                "summarize",
+                "summary",
+                "analyze",
+                "analyse",
+                "describe",
+                "what is this",
+                "what's this",
+                "what is in",
+                "what's in",
+                "what was the attached",
+                "what was attached",
+                "read this",
+                "look at this",
+                "tell me about",
+            )
+
+            if any(word in _analysis_text for word in _analysis_words):
+                image_attachments = []
+            else:
+                lines = ["Image attachment received."]
+
+            for index, item in enumerate(image_attachments[:5], start=1):
+                line = f"{index}. {item.get('name') or 'image attachment'} ({item.get('mime') or 'image/*'})"
+                if item.get("url"):
+                    line += f" — {item.get('url')}"
+                lines.append(line)
+
+            lines.append("")
+            lines.append("The image is now attached to this chat request.")
+
+            _early_gate_text = str(user_text or "").lower().strip()
+            _early_gate_analysis_request = any(
+                word in _early_gate_text
+                for word in (
+                    "summarize",
+                    "summary",
+                    "analyze",
+                    "analyse",
+                    "describe",
+                    "what is this",
+                    "what's this",
+                    "what is in",
+                    "what's in",
+                    "read this",
+                    "look at this",
+                    "tell me about",
+                )
+            )
+
+            if _early_gate_analysis_request:
+                raise RuntimeError("skip early image receipt gate for analysis request")
+
+            reply_text = "Attachment received."
+
+            app.logger.info(
+                "[EarlyImageAttachmentGate] returning image attachment response session_id=%s image_count=%s",
+                session_id,
+                len(image_attachments),
+            )
+
+            # MOBILE_EARLY_IMAGE_SAVE_EXCHANGE_LOCK_20260606
+            _nova_direct_save_mobile_exchange(
+                session_id,
+                user_text,
+                reply_text,
+                attachments=current_attachments,
+                route="early_image_attachment_gate",
+            )
+
+            return jsonify({
+                "ok": True,
+                "session_id": session_id,
+                "active_session_id": session_id,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": reply_text,
+                    "attachments": current_attachments,
+                    "meta": {
+                        "route": "early_image_attachment_gate",
+                    },
+                },
+                "attachments": current_attachments,
+                "session_attachments": current_attachments,
+                "skip_post_processing": True,
+                "skip_rewrite": True,
+                "debug": {
+                    "route": "early_image_attachment_gate",
+                    "image_count": len(image_attachments),
+                    "attachments_count": len(current_attachments),
+                },
+            })
+    except Exception as early_image_error:
+        app.logger.warning(
+            "[EarlyImageAttachmentGate] failed; continuing normal api_chat flow: %s",
+            early_image_error,
+        )
+
     _nova_save_project_focus_memory(
         user_text,
         session_id,
@@ -2504,6 +3657,14 @@ def api_chat():
             except Exception:
                 app.logger.exception("[api_chat] failed to persist attachment memory")
 
+        # NOVA_PHASE1_TEXT_ATTACHMENT_READER_INJECT_20260607
+        user_text = _nova_phase1_append_text_attachments_to_user_text(
+            user_text,
+            attachments,
+            logger=app.logger,
+        )
+
+
         # PROJECT_AWARE_ATTACHMENT_CONTEXT_LOCK
         try:
             remembered_session_attachments = summarize_attachments_for_session(
@@ -2515,6 +3676,11 @@ def api_chat():
             remembered_session_attachments = []
             app.logger.exception("[api_chat] failed to load remembered session attachments")
 
+        # NOVA_SKIP_RAW_BINARY_ATTACHMENT_INJECTION_CALL_20260607
+        raw_injection_attachments = _nova_filter_raw_injection_attachments(
+            attachments,
+            logger=app.logger,
+        )
         # ATTACHMENT_CONTENT_INJECTION_FINAL_LOCK
         # HARD_BYPASS_CASUAL_GREETINGS_LOCK
         # Tiny casual messages should not enter project-aware memory, attachment memory,
@@ -2753,10 +3919,10 @@ def api_chat():
 
             if not str(attachment.get("mime_type") or "").lower().startswith(("image/", "application/pdf")):
                 content_snippet = content_snippet.replace(
-                    "This attachment appears to contain image/search/PDF extraction text about:",
+                    "This uploaded attachment contains readable text about:",
                     ""
                 ).replace(
-                    "This attachment appears to contain extracted image/PDF content about:",
+                    "This uploaded attachment contains readable text about:",
                     ""
                 ).strip()
 
@@ -2926,7 +4092,7 @@ def api_chat():
         # This prevents chat_service attachment guards from returning canned attachment responses.
         attachments_for_chat_service = list(attachments or [])
         if attachment_content_lines:
-            attachments_for_chat_service = []
+            attachments_for_chat_service = attachments or []
             app.logger.info(
                 "[AttachmentContentGate] extracted attachment text handoff active; raw attachments suppressed for chat_service session_id=%s extracted_count=%s",
                 session_id,
@@ -3051,7 +4217,7 @@ def api_chat():
                 if _nova_top:
                     _nova_topic = "; ".join(_nova_top[:3])
                     _nova_reply = "Attachment analysis:\n"
-                    _nova_reply += f"This attachment appears to contain extracted image/PDF content about: {_nova_topic}.\n\n"
+                    _nova_reply += f"This uploaded attachment contains readable text about: {_nova_topic}.\n\n"
                     _nova_reply += "Key points:\n"
                     for _nova_index, _nova_item in enumerate(_nova_top, start=1):
                         _nova_reply += f"{_nova_index}. {_nova_item}\n"
@@ -3111,7 +4277,7 @@ def api_chat():
                 or len(_intent_text.strip()) <= 40
             )
 
-            if _has_current_attachment and _is_attachment_action:
+            if False and _has_current_attachment and _is_attachment_action:  # DISABLED_20260605 let chat_service summarize attachments
                 _raw_text = "\n".join(str(x or "") for x in _attachment_lines).strip()
                 if not _raw_text:
                     _raw_text = str(user_text or "").strip()
@@ -3195,7 +4361,7 @@ def api_chat():
                 if _top:
                     _topic = "; ".join(_top[:3])
                     _reply = "Attachment analysis:\n"
-                    _reply += f"This attachment appears to contain extracted image/PDF content about: {_topic}.\n\n"
+                    _reply += f"This uploaded attachment contains readable text about: {_topic}.\n\n"
                     _reply += "Key points:\n"
                     for _i, _item in enumerate(_top, start=1):
                         _reply += f"{_i}. {_item}\n"
@@ -3267,7 +4433,75 @@ def api_chat():
                         "url": url,
                     })
 
+            _image_prehandle_text = str(user_text or "").lower().strip()
+
+
+            _is_image_prehandle_analysis = any(
+
+
+                word in _image_prehandle_text
+
+
+                for word in (
+
+
+                    "summarize",
+
+
+                    "summary",
+
+
+                    "analyze",
+
+
+                    "analyse",
+
+
+                    "describe",
+
+
+                    "what is this",
+
+
+                    "what's this",
+
+
+                    "what is in",
+
+
+                    "what's in",
+
+
+                    "read this",
+
+
+                    "look at this",
+
+
+                    "tell me about",
+
+
+                )
+
+
+            )
+
+
+            
+
+
+            if image_attachments and _is_image_prehandle_analysis:
+
+
+                raise RuntimeError("skip image prehandle receipt for analysis request")
+
+
+            
+
+
             if image_attachments:
+
+
                 lines = ["Image attachment received."]
 
                 for index, item in enumerate(image_attachments[:5], start=1):
@@ -3517,7 +4751,7 @@ def api_chat():
 
                             if key_points:
                                 summary = (
-                                    "This attachment appears to contain extracted image/PDF content about: "
+                                    "This uploaded attachment contains readable text about: "
                                     + "; ".join(key_points[:3])
                                     + "."
                                 )
@@ -5473,7 +6707,7 @@ def _nova_local_summary_from_text(text):
     summary = "This attachment appears to contain text extracted from a web/search/image results page or document capture."
 
     if title_candidates:
-        summary = "This attachment appears to be about: " + "; ".join(title_candidates[:5]) + "."
+        summary = "This uploaded attachment appears to be about: " + "; ".join(title_candidates[:5]) + "."
 
     return {
         "summary": summary,
@@ -5491,9 +6725,9 @@ def _nova_clean_attachment_endpoint_text(value: object) -> str:
     text_value = text_value.replace("\r\n", "\n").replace("\r", "\n")
 
     bad_phrases = (
-        "This attachment appears to contain image/search/PDF extraction text about:",
-        "This attachment appears to contain extracted image/PDF content about:",
-        "This attachment appears to be about:",
+        "This uploaded attachment contains readable text about:",
+        "This uploaded attachment contains readable text about:",
+        "This uploaded attachment appears to be about:",
     )
 
     for phrase in bad_phrases:
@@ -5825,7 +7059,7 @@ def api_attachment_summarize():
 
         if _endpoint_lines:
             local_summary["key_points"] = _endpoint_lines[:10]
-            local_summary["summary"] = "This attachment appears to be about: " + "; ".join(_endpoint_lines[:5]) + "."
+            local_summary["summary"] = "This uploaded attachment appears to be about: " + "; ".join(_endpoint_lines[:5]) + "."
             local_summary["preview"] = "\\n".join(_endpoint_lines[:6])[:1200]
         else:
             local_summary["key_points"] = []
@@ -6179,7 +7413,7 @@ def _nova_clean_attachment_analysis_response(response):
             top = useful[:8]
             topic = "; ".join(top[:3])
             cleaned_text = "Attachment analysis:\n"
-            cleaned_text += f"This attachment appears to contain image/search/PDF extraction text about: {topic}.\n\n"
+            cleaned_text += f"This uploaded attachment contains readable text about: {topic}.\n\n"
             cleaned_text += "Key points:\n"
             for index, item in enumerate(top, start=1):
                 cleaned_text += f"{index}. {item}\n"
@@ -6311,7 +7545,7 @@ def _nova_final_attachment_output_noise_cleanup(response):
         if top:
             topic = "; ".join(top[:3])
             cleaned = "Attachment analysis:\n"
-            cleaned += f"This attachment appears to contain extracted image/PDF content about: {topic}.\n\n"
+            cleaned += f"This uploaded attachment contains readable text about: {topic}.\n\n"
             cleaned += "Key points:\n"
 
             for index, item in enumerate(top, start=1):
@@ -6447,7 +7681,7 @@ def _nova_attachment_double_summary_cleanup(response):
         if top:
             topic = "; ".join(top[:3])
             cleaned = "Attachment analysis:\n"
-            cleaned += f"This attachment appears to contain extracted image/PDF content about: {topic}.\n\n"
+            cleaned += f"This uploaded attachment contains readable text about: {topic}.\n\n"
             cleaned += "Key points:\n"
 
             for index, item in enumerate(top, start=1):
@@ -6657,7 +7891,44 @@ if __name__ == "__main__":
 
 # HARD_BYPASS_CASUAL_GREETINGS_LOCK
 
+
 # CLEAN_IMAGE_PROMPT_RIGHT_BEFORE_CHAT_SERVICE_LOCK
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
