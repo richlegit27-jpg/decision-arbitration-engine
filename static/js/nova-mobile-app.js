@@ -505,32 +505,6 @@ const response = await fetch("/api/chat", {
         }
     }
 
-    async function uploadFiles(files) {
-        for (const file of files) {
-            const form = new FormData();
-            form.append("file", file);
-
-            try {
-                const response = await fetch("/api/upload", {
-                    method: "POST",
-                    body: form
-                });
-
-                const data = await response.json();
-
-                if (data && data.ok) {
-                    state.pendingAttachments.push(data);
-                    if (typeof window.NovaRenderComposerInlinePreview === "function") {
-            window.NovaRenderComposerInlinePreview();
-        }
-                    console.log("[Nova Mobile Final] attachment ready", data);
-                }
-            } catch (error) {
-                console.error("[Nova Mobile Final] upload failed", error);
-            }
-        }
-    }
-
     function stopEverything() {
         if (state.abortController) {
             state.abortController.abort();
@@ -767,21 +741,6 @@ function findSessionsToggle() {
             }
         };
 
-        if (attach && upload) {
-            attach.onclick = function (event) {
-                event.preventDefault();
-                upload.click();
-            };
-
-            upload.onchange = async function () {
-                const files = Array.from(upload.files || []);
-                if (!files.length) return;
-
-                await uploadFiles(files);
-                upload.value = "";
-            };
-        }
-
         if (stop) stop.onclick = stopEverything;
         if (voice) voice.onclick = startVoice;
         if (tts) tts.onclick = speakLatest;
@@ -817,81 +776,9 @@ function findSessionsToggle() {
             console.warn("[Nova Mobile Sessions] toggle button missing");
         }
 
-// UPLOAD_STORE_BRIDGE_LOCK_20260606
-        // Keep uploaded files in the same stores sendText() reads.
-        function novaStorePendingUploadAttachment(raw) {
-            const source =
-                raw && raw.attachment ? raw.attachment :
-                raw && raw.file ? raw.file :
-                raw && raw.data ? raw.data :
-                raw;
-
-            if (!source || typeof source !== "object") return null;
-
-            const attachment = {
-                ok: source.ok !== false,
-                filename: source.filename || source.stored_name || source.name || source.original_filename || "",
-                original_filename: source.original_filename || source.name || source.filename || "",
-                mime_type: source.mime_type || source.type || "",
-                type: source.type || source.mime_type || "",
-                url: source.url || source.file_url || "",
-                file_url: source.file_url || source.url || "",
-                size: source.size || 0,
-                name: source.name || source.original_filename || source.filename || "attachment"
-            };
-
-            if (!attachment.url && !attachment.filename && !attachment.name) {
-                return null;
-            }
-
-            function merge(items, item) {
-                const list = Array.isArray(items) ? items.slice() : [];
-                const key = item.url || item.file_url || item.filename || item.name;
-
-                const exists = list.some(function (existing) {
-                    const existingKey = existing && (existing.url || existing.file_url || existing.filename || existing.name);
-                    return existingKey && existingKey === key;
-                });
-
-                if (!exists) {
-                    list.push(item);
-                }
-
-                return list;
-            }
-
-            window.NovaMobileSharedAttachments = merge(window.NovaMobileSharedAttachments, attachment);
-
-            try {
-                state.pendingAttachments = merge(state.pendingAttachments, attachment);
-            } catch (_) {}
-
-            try {
-                const pending = merge(
-                    JSON.parse(localStorage.getItem("nova_mobile_pending_attachments") || "[]"),
-                    attachment
-                );
-
-                localStorage.setItem("nova_mobile_pending_attachments", JSON.stringify(pending));
-                localStorage.setItem("nova_mobile_latest_attachments", JSON.stringify(pending));
-            } catch (_) {}
-
-            if (typeof window.NovaRenderComposerInlinePreview === "function") {
-                window.NovaRenderComposerInlinePreview();
-            }
-
-            return attachment;
-        }
-
-        if (!window.__NovaMobileUploadStoreBridgeBound) {
-            window.__NovaMobileUploadStoreBridgeBound = true;
-
-            window.addEventListener("nova-mobile-upload-complete", function (event) {
-                novaStorePendingUploadAttachment(event && event.detail ? event.detail : {});
-            });
-
-            window.NovaMobileStorePendingUploadAttachment = novaStorePendingUploadAttachment;
-        }
+        // NOVA_MOBILE_APP_REMOVED_APP_OWNED_UPLOAD_PATH_20260608
+        // Upload picker/upload storage is owned by static/js/mobile/nova-mobile-upload.js
+        // and static/js/mobile/nova-mobile-attachment-payload.js.
 
         window.NovaMobileAppSend = sendText;
         window.NovaMobileSendMessage = sendText;
@@ -1652,5 +1539,3 @@ sendText();
 
     // NOVA_MOBILE_APP_HARD_SESSION_BRIDGE_FRAGMENT_REMOVED_20260608
 })();
-
-
