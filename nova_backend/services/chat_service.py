@@ -9312,6 +9312,40 @@ if (not attachments) and (__name__ == "__main__"):
 
         cleaned_sources = self._clean_web_results(raw_results)
 
+        # NOVA_WEBFETCH_OPENAI_ENTITY_FILTER_LOCK_20260607
+        # If the user specifically asks about OpenAI, do not surface generic AI-news
+        # results that never mention OpenAI in title/snippet/source/url.
+        try:
+            _nova_openai_probe = " ".join([
+                self._safe_str(query),
+                self._safe_str(user_text),
+                self._safe_str(decision.get("query") if isinstance(decision, dict) else ""),
+                self._safe_str(decision.get("search_query") if isinstance(decision, dict) else ""),
+            ]).lower()
+
+            if "openai" in _nova_openai_probe and isinstance(cleaned_sources, list):
+                _nova_openai_sources = []
+
+                for _nova_item in cleaned_sources:
+                    if not isinstance(_nova_item, dict):
+                        continue
+
+                    _nova_blob = " ".join([
+                        self._safe_str(_nova_item.get("title")),
+                        self._safe_str(_nova_item.get("snippet")),
+                        self._safe_str(_nova_item.get("content")),
+                        self._safe_str(_nova_item.get("source")),
+                        self._safe_str(_nova_item.get("url")),
+                    ]).lower()
+
+                    if "openai" in _nova_blob:
+                        _nova_openai_sources.append(_nova_item)
+
+                cleaned_sources = _nova_openai_sources
+                exec_debug("NOVA_WEBFETCH_OPENAI_ENTITY_FILTER_COUNT:", len(cleaned_sources))
+        except Exception as _nova_openai_filter_exc:
+            exec_debug("NOVA_WEBFETCH_OPENAI_ENTITY_FILTER_FAILED:", _nova_openai_filter_exc)
+
         def _rank_key(item):
             url = self._safe_str(item.get("url")).lower()
             title = self._safe_str(item.get("title")).lower()
@@ -20785,6 +20819,7 @@ for name in CHAT_SERVICE_METHODS:
         setattr(ChatService, name, obj)
 
 # MEMORY_ITEMS_NAMEERROR_SAFE_LOCK
+
 
 
 
