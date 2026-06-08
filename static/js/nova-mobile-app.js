@@ -806,49 +806,6 @@ sendText();
 
 
 
-/* NOVA_MOBILE_UI_MEDIA_SANITIZER_20260607 */
-(function () {
-    "use strict";
-
-    function sanitizeOversizedMedia() {
-        document.querySelectorAll("img, video, iframe").forEach(function (node) {
-            var rect = node.getBoundingClientRect ? node.getBoundingClientRect() : null;
-
-            if (!rect) {
-                return;
-            }
-
-            if (rect.width > window.innerWidth * 0.96 || rect.height > 420) {
-                node.style.maxWidth = "340px";
-                node.style.maxHeight = "280px";
-                node.style.objectFit = "contain";
-                node.style.borderRadius = "14px";
-                node.style.overflow = "hidden";
-            }
-        });
-    }
-
-    var observer = new MutationObserver(function () {
-        sanitizeOversizedMedia();
-    });
-
-    document.addEventListener("DOMContentLoaded", function () {
-        sanitizeOversizedMedia();
-
-        if (document.body) {
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
-        }
-    });
-
-    window.NovaMobileSanitizeOversizedMedia = sanitizeOversizedMedia;
-
-    console.log("[Nova Mobile UI] media sanitizer ready");
-})();
-
-
 /* NOVA_MOBILE_APP_REMOVED_FETCH_CLEAR_AFTER_SEND_WRAPPER_20260608 - duplicate global fetch clearing removed. sendText() and static/js/mobile/nova-mobile-attachment-preview.js own clearing. */
 
 /* NOVA_MOBILE_APP_REMOVED_DUPLICATE_ATTACHMENT_PAYLOAD_BRIDGE_20260608 - ownership lives in static/js/mobile/nova-mobile-attachment-payload.js */
@@ -864,52 +821,4 @@ sendText();
 
 
 
-// NOVA_MOBILE_SESSIONS_HARD_BUTTON_BRIDGE_20260607
-(function () {
-    "use strict";
-
-    // NOVA_MOBILE_SESSIONS_CLEAN_RENDER_LOCK_20260607
-    function addSessionBubble(box, role, text) {
-        var bubble = document.createElement("div");
-        bubble.className = "nova-mobile-message nova-mobile-message-" + role;
-        bubble.setAttribute("data-role", role);
-        bubble.textContent = String(text || "");
-
-        bubble.style.setProperty("display", "block", "important");
-        bubble.style.setProperty("position", "relative", "important");
-        bubble.style.setProperty("clear", "both", "important");
-        bubble.style.setProperty("box-sizing", "border-box", "important");
-        bubble.style.setProperty("width", "fit-content", "important");
-        bubble.style.setProperty("max-width", "88%", "important");
-        bubble.style.setProperty("min-height", "auto", "important");
-        bubble.style.setProperty("height", "auto", "important");
-        bubble.style.setProperty("padding", "10px 12px", "important");
-        bubble.style.setProperty("margin", "10px 8px", "important");
-        bubble.style.setProperty("border-radius", "14px", "important");
-        bubble.style.setProperty("white-space", "pre-wrap", "important");
-        bubble.style.setProperty("overflow-wrap", "anywhere", "important");
-        bubble.style.setProperty("word-break", "break-word", "important");
-        bubble.style.setProperty("line-height", "1.45", "important");
-        bubble.style.setProperty("font-size", "15px", "important");
-        bubble.style.setProperty("color", "#f8fafc", "important");
-        bubble.style.setProperty("z-index", "1", "important");
-
-        if (role === "user") {
-            bubble.style.setProperty("margin-left", "auto", "important");
-            bubble.style.setProperty("margin-right", "8px", "important");
-            bubble.style.setProperty("background", "rgba(124,92,255,.35)", "important");
-        } else {
-            bubble.style.setProperty("margin-left", "8px", "important");
-            bubble.style.setProperty("margin-right", "auto", "important");
-            bubble.style.setProperty("background", "rgba(255,255,255,.09)", "important");
-        }
-
-        box.appendChild(bubble);
-    }
-
-    // NOVA_MOBILE_APP_HARD_SESSION_OWNER_REMOVED_20260608
-    // Hard session opening removed. External bridge/session module owns this now.
-
-
-    // NOVA_MOBILE_APP_HARD_SESSION_BRIDGE_FRAGMENT_REMOVED_20260608
-})();
+/* NOVA_MOBILE_APP_REMOVED_DEAD_SESSION_BRIDGE_FRAGMENT_20260608 - dead addSessionBubble-only fragment removed. Session module owns session behavior. */

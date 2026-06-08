@@ -991,3 +991,45 @@
     console.log("[Nova Mobile] compact input final ready");
 })();
 
+/* NOVA_MOBILE_UI_UTILS_OWNS_MEDIA_SANITIZER_20260608 */
+/* NOVA_MOBILE_UI_MEDIA_SANITIZER_20260607 */
+(function () {
+    "use strict";
+
+    function sanitizeOversizedMedia() {
+        document.querySelectorAll("img, video, iframe").forEach(function (node) {
+            var rect = node.getBoundingClientRect ? node.getBoundingClientRect() : null;
+
+            if (!rect) {
+                return;
+            }
+
+            if (rect.width > window.innerWidth * 0.96 || rect.height > 420) {
+                node.style.maxWidth = "340px";
+                node.style.maxHeight = "280px";
+                node.style.objectFit = "contain";
+                node.style.borderRadius = "14px";
+                node.style.overflow = "hidden";
+            }
+        });
+    }
+
+    var observer = new MutationObserver(function () {
+        sanitizeOversizedMedia();
+    });
+
+    document.addEventListener("DOMContentLoaded", function () {
+        sanitizeOversizedMedia();
+
+        if (document.body) {
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
+    });
+
+    window.NovaMobileSanitizeOversizedMedia = sanitizeOversizedMedia;
+
+    console.log("[Nova Mobile UI] media sanitizer ready");
+})();
