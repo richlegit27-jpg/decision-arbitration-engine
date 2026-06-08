@@ -108,12 +108,10 @@
         class="mobile-session-item"
         onclick="window.location.href = '/mobile?new=' + Date.now();"
     >Start Fresh Chat</button>
-
-    <button
-        type="button"
-        class="mobile-session-item"
-        onclick="alert('Mobile session history is not fully wired yet. New Chat works. Full session switching still needs a backend/frontend session list lock.');"
-    >Session History Not Ready Yet</button>
+    <!-- NOVA_MOBILE_CLEAN_STALE_SESSION_PLACEHOLDER_20260608 -->
+    <div class="mobile-session-item" style="opacity:.72; pointer-events:none;">
+        Sessions load from the live backend list.
+    </div>
 </section>
 
 <section
@@ -613,20 +611,6 @@
 
 <!-- DISABLED_FALLBACK_SEND_BRIDGE_FOR_IMAGE_RENDERING_20260606 -->
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 <script src="/static/js/mobile/nova-mobile-bridge.js?v=mobile-bridge-003"></script>
 <script src="/static/js/mobile/nova-mobile-core.js?v=mobile-modular-001"></script>
 <script src="/static/js/mobile/nova-mobile-images.js?v=mobile-modular-001"></script>
@@ -643,22 +627,19 @@
 <script src="/static/js/mobile/nova-mobile-storage.js?v=mobile-storage-003"></script>
 <script src="/static/js/mobile/nova-mobile-events.js?v=mobile-events-005"></script>
 <script src="/static/js/mobile/nova-mobile-state.js?v=mobile-state-002"></script>
-<script src="/static/js/nova-mobile-app.js?v=sessions-hard-bridge-20260607"></script>
+<script src="/static/js/nova-mobile-app.js?v=session-clean-cache-20260608"></script>
 
-<script src="/static/js/mobile/nova-mobile-attachment-payload.js?v=pipeline-probe-20260607212227"></script>
-<script src="/static/js/mobile/nova-mobile-attachment-preview.js?v=clean-chip-only-force-20260607214323"></script>
-<script src="/static/js/mobile/nova-mobile-execution-panel.js?v=mobile-execution-panel-20260607"></script>
+<script src="/static/js/mobile/nova-mobile-attachment-payload.js?v=quiet-attachment-cache-20260608"></script>
+<script src="/static/js/mobile/nova-mobile-attachment-preview.js?v=quiet-preview-cache-20260608"></script>
+<script src="/static/js/mobile/nova-mobile-execution-panel.js?v=execution-panel-cache-20260608"></script>
 </body>
 </html>
 
 
-
-
-
-
-
-
 <!-- FIX_MOBILE_SCRIPT_BLOCK_HARD_LOCK -->
+
+
+
 
 
 
