@@ -1,4 +1,4 @@
-﻿/* NOVA_MOBILE_SESSIONS_MODULE_20260606 */
+/* NOVA_MOBILE_SESSIONS_MODULE_20260606 */
 
 (function () {
     "use strict";
@@ -413,22 +413,9 @@
 
         if (!sessionsToggle || !sessionsPanel) return false;
 
-        sessionsToggle.onclick = function (event) {
-            event.preventDefault();
-            event.stopPropagation();
-
-            const isOpen =
-                sessionsPanel.style.display === "block" &&
-                !sessionsPanel.classList.contains("hidden");
-
-            if (isOpen) {
-                closeSessionsPanel(sessionsPanel);
-                return;
-            }
-
-            openSessionsPanel(sessionsPanel);
-            loadSessionsPanel(sessionsPanel);
-        };
+        // NOVA_MOBILE_FORCED_SESSIONS_TOGGLE_DELEGATED_20260608
+        // Sessions toggle click ownership lives in static/js/mobile/nova-mobile-events.js.
+        // This module still owns sessions panel rendering/open/close helpers.
 
         window.NovaMobileOpenSessions = function () {
             openSessionsPanel(sessionsPanel);
@@ -445,4 +432,4 @@
         closeSessionsPanel: closeSessionsPanel,
         loadSessionsPanel: loadSessionsPanel
     };
-})();
+})();\n
