@@ -745,7 +745,8 @@ function findSessionsToggle() {
         const newSession = $("nova-mobile-new-session");
         const newTop = $("nova-mobile-new-chat");
         const sessionsToggle = findSessionsToggle();
-        const sessionsPanel = ensureSessionsPanel();
+        // NOVA_MOBILE_APP_SESSION_TOGGLE_DELEGATE_20260608
+        // Session panel is owned by static/js/mobile/nova-mobile-sessions.js.
 
         if (!input || !send) return false;
 
@@ -792,24 +793,31 @@ function findSessionsToggle() {
                 event.preventDefault();
                 event.stopPropagation();
 
-                const isOpen =
-                    sessionsPanel.style.display === "block" &&
-                    !sessionsPanel.classList.contains("hidden");
+                if (window.NovaMobileSessions && typeof window.NovaMobileSessions.wire === "function") {
+                    try {
+                        window.NovaMobileSessions.wire();
+                    } catch (error) {
+                        console.warn("[Nova Mobile] session module wire failed", error);
+                    }
+                }
 
-                if (isOpen) {
-                    closeSessionsPanel(sessionsPanel);
+                if (typeof window.NovaMobileOpenSessions === "function") {
+                    window.NovaMobileOpenSessions();
                     return;
                 }
 
-                openSessionsPanel(sessionsPanel);
-                loadSessionsPanel(sessionsPanel);
+                if (typeof window.NovaOpenMobileSessions === "function") {
+                    window.NovaOpenMobileSessions();
+                    return;
+                }
+
+                console.warn("[Nova Mobile Sessions] module open function missing");
             };
         } else {
             console.warn("[Nova Mobile Sessions] toggle button missing");
         }
 
-
-        // UPLOAD_STORE_BRIDGE_LOCK_20260606
+// UPLOAD_STORE_BRIDGE_LOCK_20260606
         // Keep uploaded files in the same stores sendText() reads.
         function novaStorePendingUploadAttachment(raw) {
             const source =
@@ -1897,6 +1905,6 @@ sendText();
     // Hard session opening removed. External bridge/session module owns this now.
 
 
-    console.log("[Nova Mobile Sessions Hard Bridge] ready");
+    // NOVA_MOBILE_APP_HARD_SESSION_BRIDGE_FRAGMENT_REMOVED_20260608
 })();
 
