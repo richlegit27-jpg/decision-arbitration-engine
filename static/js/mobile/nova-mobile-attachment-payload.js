@@ -4,6 +4,21 @@
 (function () {
     "use strict";
 
+    // NOVA_MOBILE_QUIET_ATTACHMENT_DEBUG_LOGS_20260608
+    var NOVA_MOBILE_ATTACHMENT_DEBUG = false;
+    function novaAttachmentDebugLog() {
+        if (!NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+        try {
+            console.log.apply(console, arguments);
+        } catch (e) {}
+    }
+    function novaAttachmentDebugWarn() {
+        if (!NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+        try {
+            console.warn.apply(console, arguments);
+        } catch (e) {}
+    }
+
     if (window.__novaCaptureUploadFetchInstalled) {
         return;
     }
@@ -90,6 +105,21 @@
 (function () {
     "use strict";
 
+    // NOVA_MOBILE_QUIET_ATTACHMENT_DEBUG_LOGS_20260608
+    var NOVA_MOBILE_ATTACHMENT_DEBUG = false;
+    function novaAttachmentDebugLog() {
+        if (!NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+        try {
+            console.log.apply(console, arguments);
+        } catch (e) {}
+    }
+    function novaAttachmentDebugWarn() {
+        if (!NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+        try {
+            console.warn.apply(console, arguments);
+        } catch (e) {}
+    }
+
     if (window.__novaStrongerChatAttachmentsInstalled) {
         return;
     }
@@ -153,7 +183,7 @@
         const attachments = readStoredAttachments();
 
         if (!attachments.length) {
-            console.log("[Nova Mobile Payload Guard Strong] no pending attachments to force");
+            novaAttachmentDebugLog("[Nova Mobile Payload Guard Strong] no pending attachments to force");
             return body;
         }
 
@@ -162,7 +192,7 @@
         try {
             payload = JSON.parse(body || "{}");
         } catch (error) {
-            console.warn("[Nova Mobile Payload Guard Strong] body was not JSON", error);
+            novaAttachmentDebugWarn("[Nova Mobile Payload Guard Strong] body was not JSON", error);
             return body;
         }
 
@@ -175,9 +205,9 @@
             payload.force_attachments = true;
             payload.attachment_count = attachments.length;
 
-            console.log("[Nova Mobile Payload Guard Strong] forced attachments into chat payload", attachments);
+            novaAttachmentDebugLog("[Nova Mobile Payload Guard Strong] forced attachments into chat payload", attachments);
         } else {
-            console.log("[Nova Mobile Payload Guard Strong] payload already had attachments", existing);
+            novaAttachmentDebugLog("[Nova Mobile Payload Guard Strong] payload already had attachments", existing);
         }
 
         return JSON.stringify(payload);
@@ -205,14 +235,14 @@
                         body: patchedBody
                     });
                 } else {
-                    console.warn("[Nova Mobile Payload Guard Strong] chat fetch had no patchable body", {
+                    novaAttachmentDebugWarn("[Nova Mobile Payload Guard Strong] chat fetch had no patchable body", {
                         url: url,
                         init: nextInit
                     });
                 }
             }
         } catch (error) {
-            console.warn("[Nova Mobile Payload Guard Strong] failed before fetch", error);
+            novaAttachmentDebugWarn("[Nova Mobile Payload Guard Strong] failed before fetch", error);
         }
 
         const response = await previousFetch(nextInput, nextInit);
@@ -223,7 +253,7 @@
                 : (nextInput && nextInput.url ? nextInput.url : url);
 
             if (shouldPatchChatUrl(url)) {
-                console.log("[Nova Mobile Payload Guard Strong] chat request completed", {
+                novaAttachmentDebugLog("[Nova Mobile Payload Guard Strong] chat request completed", {
                     pendingAttachments: readStoredAttachments().length
                 });
             }
@@ -232,13 +262,28 @@
         return response;
     };
 
-    console.log("[Nova Mobile Payload Guard Strong] active");
+    novaAttachmentDebugLog("[Nova Mobile Payload Guard Strong] active");
 })();
 
 
 /* NOVA_MOBILE_HARD_UPLOAD_TO_CHAT_PAYLOAD_20260607 */
 (function () {
     "use strict";
+
+    // NOVA_MOBILE_QUIET_ATTACHMENT_DEBUG_LOGS_20260608
+    var NOVA_MOBILE_ATTACHMENT_DEBUG = false;
+    function novaAttachmentDebugLog() {
+        if (!NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+        try {
+            console.log.apply(console, arguments);
+        } catch (e) {}
+    }
+    function novaAttachmentDebugWarn() {
+        if (!NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+        try {
+            console.warn.apply(console, arguments);
+        } catch (e) {}
+    }
 
     if (window.NovaMobileHardUploadToChatPayloadInstalled) {
         return;
@@ -437,6 +482,21 @@
 (function () {
     "use strict";
 
+    // NOVA_MOBILE_QUIET_ATTACHMENT_DEBUG_LOGS_20260608
+    var NOVA_MOBILE_ATTACHMENT_DEBUG = false;
+    function novaAttachmentDebugLog() {
+        if (!NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+        try {
+            console.log.apply(console, arguments);
+        } catch (e) {}
+    }
+    function novaAttachmentDebugWarn() {
+        if (!NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+        try {
+            console.warn.apply(console, arguments);
+        } catch (e) {}
+    }
+
     if (window.NovaMobilePreflightChatAttachmentInjectInstalled) {
         return;
     }
@@ -553,6 +613,21 @@
 (function () {
     "use strict";
 
+    // NOVA_MOBILE_QUIET_ATTACHMENT_DEBUG_LOGS_20260608
+    var NOVA_MOBILE_ATTACHMENT_DEBUG = false;
+    function novaAttachmentDebugLog() {
+        if (!NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+        try {
+            console.log.apply(console, arguments);
+        } catch (e) {}
+    }
+    function novaAttachmentDebugWarn() {
+        if (!NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+        try {
+            console.warn.apply(console, arguments);
+        } catch (e) {}
+    }
+
     if (window.NovaAttachmentPipelineProbeInstalled) {
         return;
     }
@@ -582,12 +657,12 @@
         var url = typeof input === "string" ? input : (input && input.url ? input.url : "");
 
         if (url.indexOf("/api/upload") !== -1) {
-            console.log("[NOVA PIPELINE PROBE] /api/upload request starting");
+            novaAttachmentDebugLog("[NOVA PIPELINE PROBE] /api/upload request starting");
         }
 
         if (url.indexOf("/api/chat") !== -1) {
             var payload = init && init.body ? parseJson(init.body, {}) : {};
-            console.log("[NOVA PIPELINE PROBE] /api/chat BEFORE SEND", {
+            novaAttachmentDebugLog("[NOVA PIPELINE PROBE] /api/chat BEFORE SEND", {
                 text: payload.user_text || payload.text || payload.message || "",
                 payload_attachments: payload.attachments || [],
                 pending_state: readPending()
@@ -597,13 +672,13 @@
         return previousFetch.apply(this, arguments).then(function (response) {
             if (url.indexOf("/api/upload") !== -1 && response && response.clone) {
                 response.clone().json().then(function (data) {
-                    console.log("[NOVA PIPELINE PROBE] /api/upload response", data);
-                    console.log("[NOVA PIPELINE PROBE] pending after upload response", readPending());
+                    novaAttachmentDebugLog("[NOVA PIPELINE PROBE] /api/upload response", data);
+                    novaAttachmentDebugLog("[NOVA PIPELINE PROBE] pending after upload response", readPending());
                 }).catch(function () {});
             }
 
             if (url.indexOf("/api/chat") !== -1) {
-                console.log("[NOVA PIPELINE PROBE] /api/chat response completed");
+                novaAttachmentDebugLog("[NOVA PIPELINE PROBE] /api/chat response completed");
             }
 
             return response;
@@ -612,5 +687,6 @@
 
     window.NovaAttachmentPipelineProbeState = readPending;
 
-    console.log("[NOVA PIPELINE PROBE] ready");
+    novaAttachmentDebugLog("[NOVA PIPELINE PROBE] ready");
 })();
+

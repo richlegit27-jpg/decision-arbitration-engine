@@ -1,6 +1,21 @@
 ﻿(function () {
     "use strict";
 
+    // NOVA_MOBILE_QUIET_ATTACHMENT_DEBUG_LOGS_20260608
+    var NOVA_MOBILE_ATTACHMENT_DEBUG = false;
+    function novaAttachmentDebugLog() {
+        if (!NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+        try {
+            console.log.apply(console, arguments);
+        } catch (e) {}
+    }
+    function novaAttachmentDebugWarn() {
+        if (!NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+        try {
+            console.warn.apply(console, arguments);
+        } catch (e) {}
+    }
+
     const LOG_PREFIX = "[Nova Composer Inline Preview]";
 
     function $(id) {
@@ -168,7 +183,7 @@
             host.innerHTML = "";
             host.hidden = true;
             host.style.display = "none";
-            console.log(LOG_PREFIX, "hidden no attachments");
+            novaAttachmentDebugLog(LOG_PREFIX, "hidden no attachments");
             return;
         }
 
@@ -224,6 +239,21 @@
 /* NOVA_MOBILE_ATTACHMENT_PREVIEW_FINAL_CONTROLLER_20260607 */
 (function () {
     "use strict";
+
+    // NOVA_MOBILE_QUIET_ATTACHMENT_DEBUG_LOGS_20260608
+    var NOVA_MOBILE_ATTACHMENT_DEBUG = false;
+    function novaAttachmentDebugLog() {
+        if (!NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+        try {
+            console.log.apply(console, arguments);
+        } catch (e) {}
+    }
+    function novaAttachmentDebugWarn() {
+        if (!NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+        try {
+            console.warn.apply(console, arguments);
+        } catch (e) {}
+    }
 
     if (window.NovaMobileAttachmentPreviewFinalControllerInstalled) {
         return;
@@ -674,6 +704,21 @@
 (function () {
     "use strict";
 
+    // NOVA_MOBILE_QUIET_ATTACHMENT_DEBUG_LOGS_20260608
+    var NOVA_MOBILE_ATTACHMENT_DEBUG = false;
+    function novaAttachmentDebugLog() {
+        if (!NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+        try {
+            console.log.apply(console, arguments);
+        } catch (e) {}
+    }
+    function novaAttachmentDebugWarn() {
+        if (!NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+        try {
+            console.warn.apply(console, arguments);
+        } catch (e) {}
+    }
+
     if (window.NovaMobileSingleAttachmentPreviewLockInstalled) {
         return;
     }
@@ -864,6 +909,21 @@
 /* NOVA_MOBILE_CLEAN_ATTACHMENT_CHIP_ONLY_20260607 */
 (function () {
     "use strict";
+
+    // NOVA_MOBILE_QUIET_ATTACHMENT_DEBUG_LOGS_20260608
+    var NOVA_MOBILE_ATTACHMENT_DEBUG = false;
+    function novaAttachmentDebugLog() {
+        if (!NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+        try {
+            console.log.apply(console, arguments);
+        } catch (e) {}
+    }
+    function novaAttachmentDebugWarn() {
+        if (!NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+        try {
+            console.warn.apply(console, arguments);
+        } catch (e) {}
+    }
 
     if (window.NovaMobileCleanAttachmentChipOnlyInstalled) {
         return;
@@ -1186,3 +1246,4 @@
 
     console.log("[Nova Mobile Clean Attachment Chip Only] ready");
 })();
+
