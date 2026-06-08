@@ -1261,6 +1261,9 @@ sendText();
             loadSessionsPanel(sessionsPanel);
         };
 
+        // NOVA_MOBILE_SESSIONS_ALIAS_LOCK_20260607
+        window.NovaOpenMobileSessions = window.NovaMobileOpenSessions;
+
         updateActiveSessionTitle();
         scrollBottom();
 
@@ -2169,6 +2172,8 @@ sendText();
 
     console.log("[Nova Mobile Upload Response Capture Bridge] ready");
 })();
+
+
 
 
 
