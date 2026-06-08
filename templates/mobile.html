@@ -81,7 +81,7 @@
                 id="nova-mobile-sessions-toggle"
                 class="mobile-header-btn"
                 type="button"
-                onclick="window.NovaOpenMobileSessions && window.NovaOpenMobileSessions();"
+                onclick="window.NovaOpenMobileSessions && (window.NovaMobileSessionsHardOpen || window.NovaOpenMobileSessions || window.NovaMobileOpenSessions || function () {})();"
             >Sessions</button>
 
             <div class="mobile-status" aria-label="Nova online"></div>
@@ -478,13 +478,10 @@
         var executionPanel = $("nova-mobile-execution-panel");
 
         closeAllPanels();
-
-        window.NovaOpenMobileSessions = function () {
-            closeAllPanels();
-            forceShow(sessionsPanel, "top");
-        };
-
-        window.NovaCloseMobileSessions = function () {
+        // NOVA_MOBILE_REMOVE_INLINE_SESSION_OWNER_20260608
+        // Sessions are owned by external mobile session JS/hard bridge.
+        // Template only provides fallback close behavior.
+        window.NovaCloseMobileSessions = window.NovaCloseMobileSessions || function () {
             forceHide(sessionsPanel);
         };
 
@@ -519,7 +516,7 @@
             sessionsButton.addEventListener("click", function (event) {
                 event.preventDefault();
                 event.stopPropagation();
-                window.NovaOpenMobileSessions();
+                (window.NovaMobileSessionsHardOpen || window.NovaOpenMobileSessions || window.NovaMobileOpenSessions || function () {})();
             });
         }
 
@@ -637,6 +634,7 @@
 
 
 <!-- FIX_MOBILE_SCRIPT_BLOCK_HARD_LOCK -->
+
 
 
 
