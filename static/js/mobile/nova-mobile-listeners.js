@@ -32,22 +32,8 @@
         // NOVA_MOBILE_DUPLICATE_UPLOAD_CLICK_REMOVED_20260608
         // Upload click binding is owned by static/js/mobile/nova-mobile-upload.js.
 
-        if (window.ttsBtn) {
-            window.ttsBtn.addEventListener("click", speakLastAssistant);
-        }
-
-        if (window.stopSpeechBtn) {
-            window.stopSpeechBtn.addEventListener("click", function () {
-                window.speechSynthesis.cancel();
-                setStopSpeechActive(false);
-
-                if (window.ttsBtn) {
-                    window.ttsBtn.classList.remove("speaking");
-                }
-
-                showToast("Speech stopped.");
-            });
-        }
+        // NOVA_MOBILE_DUPLICATE_TTS_CLICK_REMOVED_20260608
+        // TTS click and stop-speech binding currently live in nova-mobile-app.js until a dedicated TTS module exists.
 
         // NOVA_MOBILE_DUPLICATE_VOICE_CLICK_REMOVED_20260608
         // Voice click binding is owned by static/js/mobile/nova-mobile-voice.js.
