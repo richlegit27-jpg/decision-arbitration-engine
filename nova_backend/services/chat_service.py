@@ -8518,6 +8518,18 @@ if (not attachments) and (__name__ == "__main__"):
                 "global headlines",
             ]
 
+        # NOVA_WEBFETCH_OPENAI_RSS_QUERY_EXPANSION_20260607
+        # Check OpenAI before generic "ai" because "openai" contains "ai".
+        if "openai" in raw_query:
+            return [
+                "OpenAI latest news",
+                "OpenAI announcement",
+                "OpenAI blog",
+                "OpenAI product update",
+                "site:openai.com OpenAI news",
+                "site:openai.com/blog OpenAI",
+            ]
+
         if "ai" in raw_query or "artificial intelligence" in raw_query:
             return [
                 "AI latest news",
@@ -20819,6 +20831,7 @@ for name in CHAT_SERVICE_METHODS:
         setattr(ChatService, name, obj)
 
 # MEMORY_ITEMS_NAMEERROR_SAFE_LOCK
+
 
 
 
