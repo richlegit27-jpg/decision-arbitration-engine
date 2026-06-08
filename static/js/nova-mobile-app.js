@@ -1,89 +1,5 @@
 ﻿
-/* NOVA_SENDTEXT_PENDING_ATTACHMENT_MERGE_HELPER_20260607 */
-function NovaGetPendingAttachmentsForSend20260607() {
-    function parseJson(value, fallback) {
-        try {
-            return JSON.parse(value);
-        } catch (e) {
-            return fallback;
-        }
-    }
-
-    var found = [];
-
-    var localPending = parseJson(localStorage.getItem("nova_mobile_pending_attachments") || "[]", []);
-    if (Array.isArray(localPending)) {
-        found = found.concat(localPending);
-    }
-
-    var localLast = parseJson(localStorage.getItem("nova_mobile_last_uploaded_attachment") || "null", null);
-    if (localLast && typeof localLast === "object") {
-        found.push(localLast);
-    }
-
-    if (Array.isArray(window.NovaMobilePendingAttachments)) {
-        found = found.concat(window.NovaMobilePendingAttachments);
-    }
-
-    if (Array.isArray(window.__novaMobilePendingAttachments)) {
-        found = found.concat(window.__novaMobilePendingAttachments);
-    }
-
-    var clean = [];
-    var seen = {};
-
-    found.forEach(function (item) {
-        if (!item || typeof item !== "object") {
-            return;
-        }
-
-        var filename = item.filename || item.original_filename || item.name || "";
-        var url = item.url || item.file_url || item.path || "";
-
-        if (!filename && url) {
-            filename = String(url).split("/").pop();
-        }
-
-        if (!filename && !url) {
-            return;
-        }
-
-        var normalized = {
-            ok: item.ok !== false,
-            filename: filename,
-            original_filename: item.original_filename || filename,
-            name: filename,
-            url: url,
-            file_url: item.file_url || url,
-            mime_type: item.mime_type || item.type || "",
-            size: item.size || 0,
-            source: "sendtext_pending_attachment_merge"
-        };
-
-        var key = String(normalized.url || normalized.file_url || normalized.filename || "").toLowerCase();
-
-        if (!key || seen[key]) {
-            return;
-        }
-
-        seen[key] = true;
-        clean.push(normalized);
-    });
-
-    return clean;
-}
-
-function NovaClearPendingAttachmentsAfterSend20260607() {
-    localStorage.removeItem("nova_mobile_pending_attachments");
-    localStorage.removeItem("nova_mobile_last_uploaded_attachment");
-    window.NovaMobilePendingAttachments = [];
-    window.__novaMobilePendingAttachments = [];
-    try {
-        if (typeof state !== "undefined" && state) {
-            state.pendingAttachments = [];
-        }
-    } catch (e) {}
-}
+/* NOVA_MOBILE_APP_REMOVED_TOP_ATTACHMENT_GLOBALS_20260608 - removed unused global attachment helpers. sendText() local merge/clear path remains active. */
 /* NOVA_MOBILE_SMFF_SESSIONS_STABLE_20260606 */
 
 (function () {
@@ -376,7 +292,7 @@ function NovaClearPendingAttachmentsAfterSend20260607() {
                         try { if (typeof state !== "undefined" && state) {
             state.pendingAttachments = [];
         }
-        NovaClearPendingAttachmentsAfterSend20260607(); } catch (e) {}
+         } catch (e) {}
             try { window.NovaMobilePendingAttachments = []; } catch (e) {}
             try { window.NovaPendingAttachments = []; } catch (e) {}
             try { window.__novaMobilePendingAttachments = []; } catch (e) {}
