@@ -9253,6 +9253,67 @@ if (not attachments) and (__name__ == "__main__"):
         if (not attachments) and (not isinstance(raw_results, list)):
             raw_results = []
 
+        # NOVA_WEBFETCH_SITE_DOMAIN_LOCK_20260607
+        # If the user explicitly uses site:domain, keep only matching-domain results.
+        # This prevents generic Google News / AI-adjacent results from polluting exact-site searches.
+        try:
+            import re as _nova_site_re
+            from urllib.parse import urlparse as _nova_site_urlparse
+
+            _nova_site_match = _nova_site_re.search(
+                r"\bsite:([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b",
+                query or "",
+            )
+
+            if _nova_site_match:
+                _nova_site_domain = _nova_site_match.group(1).lower().strip()
+                _nova_filtered_results = []
+
+                for _nova_item in raw_results if isinstance(raw_results, list) else []:
+                    if not isinstance(_nova_item, dict):
+                        continue
+
+                    _nova_url = self._safe_str(
+                        _nova_item.get("url")
+                        or _nova_item.get("href")
+                        or _nova_item.get("link")
+                        or ""
+                    ).strip()
+
+                    _nova_title = self._safe_str(_nova_item.get("title") or "").lower()
+                    _nova_snippet = self._safe_str(
+                        _nova_item.get("snippet")
+                        or _nova_item.get("description")
+                        or _nova_item.get("content")
+                        or ""
+                    ).lower()
+
+                    _nova_host = ""
+                    try:
+                        _nova_host = _nova_site_urlparse(_nova_url).netloc.lower().replace("www.", "")
+                    except Exception:
+                        _nova_host = ""
+
+                    _nova_blob = " ".join([
+                        _nova_host,
+                        _nova_url.lower(),
+                        _nova_title,
+                        _nova_snippet,
+                    ])
+
+                    if (
+                        _nova_host == _nova_site_domain
+                        or _nova_host.endswith("." + _nova_site_domain)
+                        or _nova_site_domain in _nova_blob
+                    ):
+                        _nova_filtered_results.append(_nova_item)
+
+                raw_results = _nova_filtered_results
+                exec_debug("NOVA_WEBFETCH_SITE_DOMAIN_LOCK_DOMAIN:", _nova_site_domain)
+                exec_debug("NOVA_WEBFETCH_SITE_DOMAIN_LOCK_COUNT:", len(raw_results))
+        except Exception as _nova_site_exc:
+            exec_debug("NOVA_WEBFETCH_SITE_DOMAIN_LOCK_FAILED:", _nova_site_exc)
+
         cleaned_sources = self._clean_web_results(raw_results)
 
         def _rank_key(item):
@@ -20703,6 +20764,7 @@ for name in CHAT_SERVICE_METHODS:
         setattr(ChatService, name, obj)
 
 # MEMORY_ITEMS_NAMEERROR_SAFE_LOCK
+
 
 
 
