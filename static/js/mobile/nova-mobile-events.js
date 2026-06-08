@@ -78,18 +78,8 @@
             });
         }
 
-        if (attachBtn) {
-            attachBtn.addEventListener("click", function () {
-                if (
-                    window.NovaMobileUpload &&
-                    typeof window.NovaMobileUpload.openUploadPicker === "function"
-                ) {
-                    window.NovaMobileUpload.openUploadPicker();
-                } else {
-                    console.warn("[Nova Mobile] upload module unavailable");
-                }
-            });
-        }
+        // NOVA_MOBILE_DUPLICATE_UPLOAD_CLICK_REMOVED_20260608
+        // Upload click binding is owned by static/js/mobile/nova-mobile-upload.js.
 
         if (ttsBtn && typeof speakLastAssistant === "function") {
             ttsBtn.addEventListener("click", speakLastAssistant);

@@ -29,12 +29,8 @@
             });
         }
 
-        if (window.attachBtn) {
-            window.attachBtn.addEventListener(
-                "click",
-                window.NovaMobileUpload.openUploadPicker
-            );
-        }
+        // NOVA_MOBILE_DUPLICATE_UPLOAD_CLICK_REMOVED_20260608
+        // Upload click binding is owned by static/js/mobile/nova-mobile-upload.js.
 
         if (window.ttsBtn) {
             window.ttsBtn.addEventListener("click", speakLastAssistant);
