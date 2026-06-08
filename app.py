@@ -3052,6 +3052,203 @@ def _nova_try_execution_status_20260607(session_id, user_text):
             },
         }
 def api_chat():
+    # NOVA_API_CHAT_IMAGE_VISION_GATE_20260607
+    try:
+        from pathlib import Path as _NovaPath
+        import base64 as _nova_base64
+        import mimetypes as _nova_mimetypes
+        import os as _nova_os
+
+        _nova_payload = request.get_json(silent=True) or {}
+        _nova_user_text = str(
+            _nova_payload.get("user_text")
+            or _nova_payload.get("text")
+            or _nova_payload.get("message")
+            or ""
+        ).strip()
+
+        _nova_session_id = str(
+            _nova_payload.get("session_id")
+            or _nova_payload.get("client_session_id")
+            or "default"
+        ).strip() or "default"
+
+        _nova_attachments = _nova_payload.get("attachments") or []
+
+        _nova_image = None
+
+        if isinstance(_nova_attachments, list):
+            for _nova_item in _nova_attachments:
+                if not isinstance(_nova_item, dict):
+                    continue
+
+                _nova_mime = str(
+                    _nova_item.get("mime_type")
+                    or _nova_item.get("type")
+                    or ""
+                ).lower()
+
+                _nova_name_probe = str(
+                    _nova_item.get("filename")
+                    or _nova_item.get("original_filename")
+                    or _nova_item.get("name")
+                    or _nova_item.get("url")
+                    or _nova_item.get("file_url")
+                    or ""
+                ).lower()
+
+                if (
+                    _nova_mime.startswith("image/")
+                    or any(_nova_ext in _nova_name_probe for _nova_ext in (".jpg", ".jpeg", ".png", ".webp", ".gif"))
+                ):
+                    _nova_image = _nova_item
+                    break
+
+        if _nova_image:
+            _nova_raw_url = str(
+                _nova_image.get("url")
+                or _nova_image.get("file_url")
+                or ""
+            ).strip()
+
+            _nova_raw_name = str(
+                _nova_image.get("filename")
+                or _nova_image.get("original_filename")
+                or _nova_image.get("name")
+                or ""
+            ).strip()
+
+            _nova_filename = ""
+
+            if "/api/uploads/" in _nova_raw_url:
+                _nova_filename = _nova_raw_url.split("/api/uploads/", 1)[1].split("?", 1)[0].split("#", 1)[0]
+            elif _nova_raw_url:
+                _nova_filename = _NovaPath(_nova_raw_url).name
+
+            if not _nova_filename and _nova_raw_name:
+                _nova_filename = _NovaPath(_nova_raw_name).name
+
+            _nova_filename = _nova_filename.replace("\\", "/").split("/")[-1].strip()
+
+            _nova_candidates = [
+                _NovaPath.cwd() / "uploads" / _nova_filename,
+                _NovaPath.cwd() / "static" / "uploads" / _nova_filename,
+                _NovaPath(__file__).resolve().parent / "uploads" / _nova_filename,
+                _NovaPath(__file__).resolve().parent / "static" / "uploads" / _nova_filename,
+            ]
+
+            _nova_image_path = None
+
+            for _nova_candidate in _nova_candidates:
+                try:
+                    if _nova_candidate.exists() and _nova_candidate.is_file():
+                        _nova_image_path = _nova_candidate
+                        break
+                except Exception:
+                    continue
+
+            if _nova_image_path is None:
+                _nova_text = (
+                    "VISION_DEBUG: image file not found. "
+                    + "filename=" + str(_nova_filename)
+                    + " raw_url=" + str(_nova_raw_url)
+                    + " candidates=" + " | ".join(str(c) for c in _nova_candidates)
+                )
+                _nova_vision_used = False
+            else:
+                try:
+                    from openai import OpenAI as _NovaOpenAI
+
+                    _nova_mime_type = _nova_mimetypes.guess_type(str(_nova_image_path))[0] or "image/jpeg"
+
+                    with open(_nova_image_path, "rb") as _nova_file:
+                        _nova_encoded = _nova_base64.b64encode(_nova_file.read()).decode("utf-8")
+
+                    _nova_data_url = "data:" + _nova_mime_type + ";base64," + _nova_encoded
+
+                    _nova_client = _NovaOpenAI(api_key=_nova_os.getenv("OPENAI_API_KEY"))
+
+                    _nova_response = _nova_client.chat.completions.create(
+                        model=_nova_os.getenv("NOVA_VISION_MODEL", "gpt-4o-mini"),
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": (
+                                    "You are Nova's image analysis module. "
+                                    "Describe the attached image directly. "
+                                    "Do not use web search. "
+                                    "Do not mention unrelated news. "
+                                    "If something cannot be identified, describe what is visible."
+                                ),
+                            },
+                            {
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": _nova_user_text or "What is this image?",
+                                    },
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {
+                                            "url": _nova_data_url,
+                                        },
+                                    },
+                                ],
+                            },
+                        ],
+                        temperature=0.2,
+                        max_tokens=500,
+                    )
+
+                    _nova_text = str(_nova_response.choices[0].message.content or "").strip()
+
+                    if not _nova_text:
+                        _nova_text = "VISION_DEBUG: OpenAI vision returned empty text."
+                        _nova_vision_used = False
+                    else:
+                        _nova_vision_used = True
+
+                except Exception as _nova_exc:
+                    _nova_text = "VISION_DEBUG: OpenAI vision failed: " + str(_nova_exc)
+                    _nova_vision_used = False
+
+            return jsonify({
+                "ok": True,
+                "active_session_id": _nova_session_id,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": _nova_text,
+                    "attachments": [],
+                    "meta": {
+                        "attachment_analysis": True,
+                        "api_chat_image_vision_gate": True,
+                        "vision_used": _nova_vision_used,
+                        "source_urls": [],
+                        "sources": [],
+                    },
+                },
+                "debug": {
+                    "route": "api_chat",
+                    "route_taken": "attachment_analysis",
+                    "decision": {
+                        "route": "attachment_analysis",
+                        "mode": "image_analysis",
+                        "strategy": "api_chat_image_vision_gate",
+                        "source_urls": [],
+                        "sources": [],
+                    },
+                },
+                "session_attachments": _nova_attachments,
+                "attachment_debug": {
+                    "requested_session_id": _nova_session_id,
+                    "session_attachments_count": len(_nova_attachments) if isinstance(_nova_attachments, list) else 0,
+                },
+            })
+
+    except Exception as _nova_api_image_gate_error:
+        print("[NOVA_API_CHAT_IMAGE_VISION_GATE] failed:", _nova_api_image_gate_error)
+
     # NOVA_DURABLE_EXECUTION_TOP_GUARD_20260607
     try:
         _nova_exec_payload = request.get_json(silent=True) or {}

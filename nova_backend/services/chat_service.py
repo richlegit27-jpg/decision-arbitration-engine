@@ -145,6 +145,41 @@ class ChatService:
     ROUTE_PLANNING = "planning"
     ROUTE_MEMORY_RECALL = "memory_recall"
 
+    # NOVA_IMAGE_ATTACHMENT_HELPER_20260607
+    def _nova_has_image_attachment_20260607(self, attachments=None) -> bool:
+        attachments = attachments or []
+
+        if not isinstance(attachments, list):
+            return False
+
+        for item in attachments:
+            if not isinstance(item, dict):
+                continue
+
+            name = self._safe_str(
+                item.get("filename")
+                or item.get("original_filename")
+                or item.get("name")
+                or item.get("url")
+                or item.get("file_url")
+            ).lower()
+
+            mime_type = self._safe_str(
+                item.get("mime_type")
+                or item.get("type")
+            ).lower()
+
+            if mime_type.startswith("image/"):
+                return True
+
+            if name.endswith((".jpg", ".jpeg", ".png", ".webp", ".gif")):
+                return True
+
+            if "/api/uploads/" in name and any(ext in name for ext in (".jpg", ".jpeg", ".png", ".webp", ".gif")):
+                return True
+
+        return False
+
     def _get_working_state(self, session_id: str) -> dict:
         session_id = self._safe_str(session_id).strip()
 
@@ -4994,6 +5029,114 @@ if (not attachments) and (__name__ == "__main__"):
         assistant_text = ""
         assistant_msg = None
 
+        # NOVA_FORCE_IMAGE_ATTACHMENTS_ATTACHMENT_ANALYSIS_20260607
+        if self._nova_has_image_attachment_20260607(attachments):
+            decision = decision if isinstance(decision, dict) else {}
+            decision["route"] = self.ROUTE_ATTACHMENT_ANALYSIS
+            decision["mode"] = "image_analysis"
+            decision["confidence"] = 1.0
+            decision["reasons"] = list(decision.get("reasons") or []) + ["forced_image_attachment_analysis"]
+            decision["save_artifact"] = False
+            decision["save_memory"] = False
+            decision["use_memory"] = False
+            decision["source_urls"] = []
+            decision["sources"] = []
+        # NOVA_IMAGE_ATTACHMENT_WEB_BLOCK_20260607
+        try:
+            _nova_has_image_attachment = False
+            _nova_image_text_probe = (
+                self._safe_str(user_text)
+                + " "
+                + self._safe_str(decision.get("query") if isinstance(decision, dict) else "")
+                + " "
+                + self._safe_str(decision.get("text") if isinstance(decision, dict) else "")
+            ).lower()
+
+            _nova_image_text_markers = (
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".webp",
+                ".gif",
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/gif",
+                "/api/uploads/",
+                "session attachment memory:",
+                "attachment rich.jpg content:",
+            )
+
+            if any(_nova_marker in _nova_image_text_probe for _nova_marker in _nova_image_text_markers):
+                _nova_has_image_attachment = True
+            _nova_image_text_probe = (
+                self._safe_str(user_text)
+                + " "
+                + self._safe_str(decision.get("query") if isinstance(decision, dict) else "")
+                + " "
+                + self._safe_str(decision.get("text") if isinstance(decision, dict) else "")
+            ).lower()
+
+            _nova_image_text_markers = (
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".webp",
+                ".gif",
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/gif",
+                "/api/uploads/",
+                "session attachment memory:",
+                "attachment rich.jpg content:",
+            )
+
+            if any(_nova_marker in _nova_image_text_probe for _nova_marker in _nova_image_text_markers):
+                _nova_has_image_attachment = True
+
+            if isinstance(attachments, list):
+                for _nova_item in attachments:
+                    if not isinstance(_nova_item, dict):
+                        continue
+
+                    _nova_name = self._safe_str(
+                        _nova_item.get("filename")
+                        or _nova_item.get("original_filename")
+                        or _nova_item.get("name")
+                        or _nova_item.get("url")
+                        or _nova_item.get("file_url")
+                    ).lower()
+
+                    _nova_mime = self._safe_str(
+                        _nova_item.get("mime_type")
+                        or _nova_item.get("type")
+                    ).lower()
+
+                    if (
+                        _nova_mime.startswith("image/")
+                        or _nova_name.endswith(".png")
+                        or _nova_name.endswith(".jpg")
+                        or _nova_name.endswith(".jpeg")
+                        or _nova_name.endswith(".webp")
+                    ):
+                        _nova_has_image_attachment = True
+                        break
+
+            if _nova_has_image_attachment:
+                decision = decision if isinstance(decision, dict) else {}
+                decision["route"] = self.ROUTE_ATTACHMENT_ANALYSIS
+                decision["mode"] = "image_analysis"
+                decision["confidence"] = 1.0
+                decision["reasons"] = list(decision.get("reasons") or []) + ["image_attachment_web_block"]
+                decision["save_artifact"] = False
+                decision["save_memory"] = False
+                decision["use_memory"] = False
+                decision["source_urls"] = []
+                decision["sources"] = []
+
+        except Exception as _nova_image_route_error:
+            print("[NOVA_IMAGE_ATTACHMENT_WEB_BLOCK] failed:", _nova_image_route_error)
         route = self._safe_str(decision.get("route")).lower()
 
         try:
@@ -5475,6 +5618,114 @@ if (not attachments) and (__name__ == "__main__"):
                 },
             }
 
+        # NOVA_FORCE_IMAGE_ATTACHMENTS_ATTACHMENT_ANALYSIS_20260607
+        if self._nova_has_image_attachment_20260607(attachments):
+            decision = decision if isinstance(decision, dict) else {}
+            decision["route"] = self.ROUTE_ATTACHMENT_ANALYSIS
+            decision["mode"] = "image_analysis"
+            decision["confidence"] = 1.0
+            decision["reasons"] = list(decision.get("reasons") or []) + ["forced_image_attachment_analysis"]
+            decision["save_artifact"] = False
+            decision["save_memory"] = False
+            decision["use_memory"] = False
+            decision["source_urls"] = []
+            decision["sources"] = []
+        # NOVA_IMAGE_ATTACHMENT_WEB_BLOCK_20260607
+        try:
+            _nova_has_image_attachment = False
+            _nova_image_text_probe = (
+                self._safe_str(user_text)
+                + " "
+                + self._safe_str(decision.get("query") if isinstance(decision, dict) else "")
+                + " "
+                + self._safe_str(decision.get("text") if isinstance(decision, dict) else "")
+            ).lower()
+
+            _nova_image_text_markers = (
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".webp",
+                ".gif",
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/gif",
+                "/api/uploads/",
+                "session attachment memory:",
+                "attachment rich.jpg content:",
+            )
+
+            if any(_nova_marker in _nova_image_text_probe for _nova_marker in _nova_image_text_markers):
+                _nova_has_image_attachment = True
+            _nova_image_text_probe = (
+                self._safe_str(user_text)
+                + " "
+                + self._safe_str(decision.get("query") if isinstance(decision, dict) else "")
+                + " "
+                + self._safe_str(decision.get("text") if isinstance(decision, dict) else "")
+            ).lower()
+
+            _nova_image_text_markers = (
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".webp",
+                ".gif",
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/gif",
+                "/api/uploads/",
+                "session attachment memory:",
+                "attachment rich.jpg content:",
+            )
+
+            if any(_nova_marker in _nova_image_text_probe for _nova_marker in _nova_image_text_markers):
+                _nova_has_image_attachment = True
+
+            if isinstance(attachments, list):
+                for _nova_item in attachments:
+                    if not isinstance(_nova_item, dict):
+                        continue
+
+                    _nova_name = self._safe_str(
+                        _nova_item.get("filename")
+                        or _nova_item.get("original_filename")
+                        or _nova_item.get("name")
+                        or _nova_item.get("url")
+                        or _nova_item.get("file_url")
+                    ).lower()
+
+                    _nova_mime = self._safe_str(
+                        _nova_item.get("mime_type")
+                        or _nova_item.get("type")
+                    ).lower()
+
+                    if (
+                        _nova_mime.startswith("image/")
+                        or _nova_name.endswith(".png")
+                        or _nova_name.endswith(".jpg")
+                        or _nova_name.endswith(".jpeg")
+                        or _nova_name.endswith(".webp")
+                    ):
+                        _nova_has_image_attachment = True
+                        break
+
+            if _nova_has_image_attachment:
+                decision = decision if isinstance(decision, dict) else {}
+                decision["route"] = self.ROUTE_ATTACHMENT_ANALYSIS
+                decision["mode"] = "image_analysis"
+                decision["confidence"] = 1.0
+                decision["reasons"] = list(decision.get("reasons") or []) + ["image_attachment_web_block"]
+                decision["save_artifact"] = False
+                decision["save_memory"] = False
+                decision["use_memory"] = False
+                decision["source_urls"] = []
+                decision["sources"] = []
+
+        except Exception as _nova_image_route_error:
+            print("[NOVA_IMAGE_ATTACHMENT_WEB_BLOCK] failed:", _nova_image_route_error)
         route = self._safe_str(decision.get("route")).lower()
 
         isolated_routes = {
@@ -5640,6 +5891,15 @@ if (not attachments) and (__name__ == "__main__"):
                 ),
                 assistant_msg=assistant_msg,
                 decision=decision,
+            )
+
+        if route == self.ROUTE_ATTACHMENT_ANALYSIS:
+            # NOVA_DISPATCH_ATTACHMENT_ANALYSIS_ROUTE_20260607
+            return self._execute_attachment_analysis(
+                decision=decision,
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
             )
 
         if route in isolated_routes:
@@ -7622,6 +7882,114 @@ if (not attachments) and (__name__ == "__main__"):
 
         text = self._safe_str(user_text).lower().strip()
 
+        # NOVA_FORCE_IMAGE_ATTACHMENTS_ATTACHMENT_ANALYSIS_20260607
+        if self._nova_has_image_attachment_20260607(attachments):
+            decision = decision if isinstance(decision, dict) else {}
+            decision["route"] = self.ROUTE_ATTACHMENT_ANALYSIS
+            decision["mode"] = "image_analysis"
+            decision["confidence"] = 1.0
+            decision["reasons"] = list(decision.get("reasons") or []) + ["forced_image_attachment_analysis"]
+            decision["save_artifact"] = False
+            decision["save_memory"] = False
+            decision["use_memory"] = False
+            decision["source_urls"] = []
+            decision["sources"] = []
+        # NOVA_IMAGE_ATTACHMENT_WEB_BLOCK_20260607
+        try:
+            _nova_has_image_attachment = False
+            _nova_image_text_probe = (
+                self._safe_str(user_text)
+                + " "
+                + self._safe_str(decision.get("query") if isinstance(decision, dict) else "")
+                + " "
+                + self._safe_str(decision.get("text") if isinstance(decision, dict) else "")
+            ).lower()
+
+            _nova_image_text_markers = (
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".webp",
+                ".gif",
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/gif",
+                "/api/uploads/",
+                "session attachment memory:",
+                "attachment rich.jpg content:",
+            )
+
+            if any(_nova_marker in _nova_image_text_probe for _nova_marker in _nova_image_text_markers):
+                _nova_has_image_attachment = True
+            _nova_image_text_probe = (
+                self._safe_str(user_text)
+                + " "
+                + self._safe_str(decision.get("query") if isinstance(decision, dict) else "")
+                + " "
+                + self._safe_str(decision.get("text") if isinstance(decision, dict) else "")
+            ).lower()
+
+            _nova_image_text_markers = (
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".webp",
+                ".gif",
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/gif",
+                "/api/uploads/",
+                "session attachment memory:",
+                "attachment rich.jpg content:",
+            )
+
+            if any(_nova_marker in _nova_image_text_probe for _nova_marker in _nova_image_text_markers):
+                _nova_has_image_attachment = True
+
+            if isinstance(attachments, list):
+                for _nova_item in attachments:
+                    if not isinstance(_nova_item, dict):
+                        continue
+
+                    _nova_name = self._safe_str(
+                        _nova_item.get("filename")
+                        or _nova_item.get("original_filename")
+                        or _nova_item.get("name")
+                        or _nova_item.get("url")
+                        or _nova_item.get("file_url")
+                    ).lower()
+
+                    _nova_mime = self._safe_str(
+                        _nova_item.get("mime_type")
+                        or _nova_item.get("type")
+                    ).lower()
+
+                    if (
+                        _nova_mime.startswith("image/")
+                        or _nova_name.endswith(".png")
+                        or _nova_name.endswith(".jpg")
+                        or _nova_name.endswith(".jpeg")
+                        or _nova_name.endswith(".webp")
+                    ):
+                        _nova_has_image_attachment = True
+                        break
+
+            if _nova_has_image_attachment:
+                decision = decision if isinstance(decision, dict) else {}
+                decision["route"] = self.ROUTE_ATTACHMENT_ANALYSIS
+                decision["mode"] = "image_analysis"
+                decision["confidence"] = 1.0
+                decision["reasons"] = list(decision.get("reasons") or []) + ["image_attachment_web_block"]
+                decision["save_artifact"] = False
+                decision["save_memory"] = False
+                decision["use_memory"] = False
+                decision["source_urls"] = []
+                decision["sources"] = []
+
+        except Exception as _nova_image_route_error:
+            print("[NOVA_IMAGE_ATTACHMENT_WEB_BLOCK] failed:", _nova_image_route_error)
         route = self._safe_str(decision.get("route")).lower()
         mode = self._safe_str(decision.get("mode")).lower()
         intent = self._safe_str(
@@ -7867,6 +8235,114 @@ if (not attachments) and (__name__ == "__main__"):
 
         text = self._safe_str(user_text).lower().strip()
 
+        # NOVA_FORCE_IMAGE_ATTACHMENTS_ATTACHMENT_ANALYSIS_20260607
+        if self._nova_has_image_attachment_20260607(attachments):
+            decision = decision if isinstance(decision, dict) else {}
+            decision["route"] = self.ROUTE_ATTACHMENT_ANALYSIS
+            decision["mode"] = "image_analysis"
+            decision["confidence"] = 1.0
+            decision["reasons"] = list(decision.get("reasons") or []) + ["forced_image_attachment_analysis"]
+            decision["save_artifact"] = False
+            decision["save_memory"] = False
+            decision["use_memory"] = False
+            decision["source_urls"] = []
+            decision["sources"] = []
+        # NOVA_IMAGE_ATTACHMENT_WEB_BLOCK_20260607
+        try:
+            _nova_has_image_attachment = False
+            _nova_image_text_probe = (
+                self._safe_str(user_text)
+                + " "
+                + self._safe_str(decision.get("query") if isinstance(decision, dict) else "")
+                + " "
+                + self._safe_str(decision.get("text") if isinstance(decision, dict) else "")
+            ).lower()
+
+            _nova_image_text_markers = (
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".webp",
+                ".gif",
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/gif",
+                "/api/uploads/",
+                "session attachment memory:",
+                "attachment rich.jpg content:",
+            )
+
+            if any(_nova_marker in _nova_image_text_probe for _nova_marker in _nova_image_text_markers):
+                _nova_has_image_attachment = True
+            _nova_image_text_probe = (
+                self._safe_str(user_text)
+                + " "
+                + self._safe_str(decision.get("query") if isinstance(decision, dict) else "")
+                + " "
+                + self._safe_str(decision.get("text") if isinstance(decision, dict) else "")
+            ).lower()
+
+            _nova_image_text_markers = (
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".webp",
+                ".gif",
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/gif",
+                "/api/uploads/",
+                "session attachment memory:",
+                "attachment rich.jpg content:",
+            )
+
+            if any(_nova_marker in _nova_image_text_probe for _nova_marker in _nova_image_text_markers):
+                _nova_has_image_attachment = True
+
+            if isinstance(attachments, list):
+                for _nova_item in attachments:
+                    if not isinstance(_nova_item, dict):
+                        continue
+
+                    _nova_name = self._safe_str(
+                        _nova_item.get("filename")
+                        or _nova_item.get("original_filename")
+                        or _nova_item.get("name")
+                        or _nova_item.get("url")
+                        or _nova_item.get("file_url")
+                    ).lower()
+
+                    _nova_mime = self._safe_str(
+                        _nova_item.get("mime_type")
+                        or _nova_item.get("type")
+                    ).lower()
+
+                    if (
+                        _nova_mime.startswith("image/")
+                        or _nova_name.endswith(".png")
+                        or _nova_name.endswith(".jpg")
+                        or _nova_name.endswith(".jpeg")
+                        or _nova_name.endswith(".webp")
+                    ):
+                        _nova_has_image_attachment = True
+                        break
+
+            if _nova_has_image_attachment:
+                decision = decision if isinstance(decision, dict) else {}
+                decision["route"] = self.ROUTE_ATTACHMENT_ANALYSIS
+                decision["mode"] = "image_analysis"
+                decision["confidence"] = 1.0
+                decision["reasons"] = list(decision.get("reasons") or []) + ["image_attachment_web_block"]
+                decision["save_artifact"] = False
+                decision["save_memory"] = False
+                decision["use_memory"] = False
+                decision["source_urls"] = []
+                decision["sources"] = []
+
+        except Exception as _nova_image_route_error:
+            print("[NOVA_IMAGE_ATTACHMENT_WEB_BLOCK] failed:", _nova_image_route_error)
         route = self._safe_str(decision.get("route")).lower()
         mode = self._safe_str(decision.get("mode")).lower()
         intent = self._safe_str(
@@ -8078,6 +8554,77 @@ if (not attachments) and (__name__ == "__main__"):
     ) -> dict:
         decision = decision if isinstance(decision, dict) else {}
         attachments = attachments or []
+        # NOVA_WEBFETCH_INTERNAL_IMAGE_BOUNCE_20260607
+        try:
+            _nova_image_probe_parts = [
+                self._safe_str(user_text),
+                self._safe_str(decision.get("query") if isinstance(decision, dict) else ""),
+                self._safe_str(decision.get("text") if isinstance(decision, dict) else ""),
+            ]
+
+            if isinstance(attachments, list):
+                for _nova_attachment in attachments:
+                    if isinstance(_nova_attachment, dict):
+                        _nova_image_probe_parts.extend([
+                            self._safe_str(_nova_attachment.get("filename")),
+                            self._safe_str(_nova_attachment.get("original_filename")),
+                            self._safe_str(_nova_attachment.get("name")),
+                            self._safe_str(_nova_attachment.get("mime_type")),
+                            self._safe_str(_nova_attachment.get("url")),
+                            self._safe_str(_nova_attachment.get("file_url")),
+                        ])
+
+            _nova_image_probe = " ".join(_nova_image_probe_parts).lower()
+
+            _nova_has_image_attachment = any(_nova_marker in _nova_image_probe for _nova_marker in (
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".webp",
+                ".gif",
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/gif",
+                "/api/uploads/",
+                "attachment analysis failed:",
+                "session attachment memory:",
+            ))
+
+            if _nova_has_image_attachment:
+                user_msg = self._build_user_message(user_text, attachments=attachments)
+                result = self._handle_attachment_analysis(user_text, attachments)
+
+                assistant_msg = self._build_assistant_message(
+                    text=self._safe_str(result.get("text")) or "Attachment analysis completed.",
+                    meta={
+                        "attachment_analysis": True,
+                        "web_fetch_blocked_for_image": True,
+                        "source_urls": [],
+                        "sources": [],
+                    },
+                    attachments=[],
+                )
+
+                if isinstance(decision, dict):
+                    decision["route"] = self.ROUTE_ATTACHMENT_ANALYSIS
+                    decision["mode"] = "image_analysis"
+                    decision["intent"] = "image_analysis"
+                    decision["strategy"] = "webfetch_internal_image_bounce"
+                    decision["source_urls"] = []
+                    decision["sources"] = []
+
+                return self._finalize_response(
+                    session_id=session_id,
+                    user_text=user_text,
+                    user_msg=user_msg,
+                    assistant_msg=assistant_msg,
+                    decision=decision if isinstance(decision, dict) else {},
+                    saved_artifact=None,
+                )
+        except Exception as _nova_webfetch_image_bounce_error:
+            print("[NOVA_WEBFETCH_INTERNAL_IMAGE_BOUNCE] failed:", _nova_webfetch_image_bounce_error)
+
 
         text = str(user_text or "").strip()
         user_msg = self._build_user_message(user_text, attachments=attachments)
@@ -11963,6 +12510,114 @@ Auto-fix result:
         if not decision.get("use_memory", True):
             return False
 
+        # NOVA_FORCE_IMAGE_ATTACHMENTS_ATTACHMENT_ANALYSIS_20260607
+        if self._nova_has_image_attachment_20260607(attachments):
+            decision = decision if isinstance(decision, dict) else {}
+            decision["route"] = self.ROUTE_ATTACHMENT_ANALYSIS
+            decision["mode"] = "image_analysis"
+            decision["confidence"] = 1.0
+            decision["reasons"] = list(decision.get("reasons") or []) + ["forced_image_attachment_analysis"]
+            decision["save_artifact"] = False
+            decision["save_memory"] = False
+            decision["use_memory"] = False
+            decision["source_urls"] = []
+            decision["sources"] = []
+        # NOVA_IMAGE_ATTACHMENT_WEB_BLOCK_20260607
+        try:
+            _nova_has_image_attachment = False
+            _nova_image_text_probe = (
+                self._safe_str(user_text)
+                + " "
+                + self._safe_str(decision.get("query") if isinstance(decision, dict) else "")
+                + " "
+                + self._safe_str(decision.get("text") if isinstance(decision, dict) else "")
+            ).lower()
+
+            _nova_image_text_markers = (
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".webp",
+                ".gif",
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/gif",
+                "/api/uploads/",
+                "session attachment memory:",
+                "attachment rich.jpg content:",
+            )
+
+            if any(_nova_marker in _nova_image_text_probe for _nova_marker in _nova_image_text_markers):
+                _nova_has_image_attachment = True
+            _nova_image_text_probe = (
+                self._safe_str(user_text)
+                + " "
+                + self._safe_str(decision.get("query") if isinstance(decision, dict) else "")
+                + " "
+                + self._safe_str(decision.get("text") if isinstance(decision, dict) else "")
+            ).lower()
+
+            _nova_image_text_markers = (
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".webp",
+                ".gif",
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/gif",
+                "/api/uploads/",
+                "session attachment memory:",
+                "attachment rich.jpg content:",
+            )
+
+            if any(_nova_marker in _nova_image_text_probe for _nova_marker in _nova_image_text_markers):
+                _nova_has_image_attachment = True
+
+            if isinstance(attachments, list):
+                for _nova_item in attachments:
+                    if not isinstance(_nova_item, dict):
+                        continue
+
+                    _nova_name = self._safe_str(
+                        _nova_item.get("filename")
+                        or _nova_item.get("original_filename")
+                        or _nova_item.get("name")
+                        or _nova_item.get("url")
+                        or _nova_item.get("file_url")
+                    ).lower()
+
+                    _nova_mime = self._safe_str(
+                        _nova_item.get("mime_type")
+                        or _nova_item.get("type")
+                    ).lower()
+
+                    if (
+                        _nova_mime.startswith("image/")
+                        or _nova_name.endswith(".png")
+                        or _nova_name.endswith(".jpg")
+                        or _nova_name.endswith(".jpeg")
+                        or _nova_name.endswith(".webp")
+                    ):
+                        _nova_has_image_attachment = True
+                        break
+
+            if _nova_has_image_attachment:
+                decision = decision if isinstance(decision, dict) else {}
+                decision["route"] = self.ROUTE_ATTACHMENT_ANALYSIS
+                decision["mode"] = "image_analysis"
+                decision["confidence"] = 1.0
+                decision["reasons"] = list(decision.get("reasons") or []) + ["image_attachment_web_block"]
+                decision["save_artifact"] = False
+                decision["save_memory"] = False
+                decision["use_memory"] = False
+                decision["source_urls"] = []
+                decision["sources"] = []
+
+        except Exception as _nova_image_route_error:
+            print("[NOVA_IMAGE_ATTACHMENT_WEB_BLOCK] failed:", _nova_image_route_error)
         route = self._safe_str(decision.get("route")).lower()
 
         if route in {
@@ -12053,6 +12708,114 @@ Auto-fix result:
 
         assistant_text = self._safe_str((assistant_msg or {}).get("text")).lower()
 
+        # NOVA_FORCE_IMAGE_ATTACHMENTS_ATTACHMENT_ANALYSIS_20260607
+        if self._nova_has_image_attachment_20260607(attachments):
+            decision = decision if isinstance(decision, dict) else {}
+            decision["route"] = self.ROUTE_ATTACHMENT_ANALYSIS
+            decision["mode"] = "image_analysis"
+            decision["confidence"] = 1.0
+            decision["reasons"] = list(decision.get("reasons") or []) + ["forced_image_attachment_analysis"]
+            decision["save_artifact"] = False
+            decision["save_memory"] = False
+            decision["use_memory"] = False
+            decision["source_urls"] = []
+            decision["sources"] = []
+        # NOVA_IMAGE_ATTACHMENT_WEB_BLOCK_20260607
+        try:
+            _nova_has_image_attachment = False
+            _nova_image_text_probe = (
+                self._safe_str(user_text)
+                + " "
+                + self._safe_str(decision.get("query") if isinstance(decision, dict) else "")
+                + " "
+                + self._safe_str(decision.get("text") if isinstance(decision, dict) else "")
+            ).lower()
+
+            _nova_image_text_markers = (
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".webp",
+                ".gif",
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/gif",
+                "/api/uploads/",
+                "session attachment memory:",
+                "attachment rich.jpg content:",
+            )
+
+            if any(_nova_marker in _nova_image_text_probe for _nova_marker in _nova_image_text_markers):
+                _nova_has_image_attachment = True
+            _nova_image_text_probe = (
+                self._safe_str(user_text)
+                + " "
+                + self._safe_str(decision.get("query") if isinstance(decision, dict) else "")
+                + " "
+                + self._safe_str(decision.get("text") if isinstance(decision, dict) else "")
+            ).lower()
+
+            _nova_image_text_markers = (
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".webp",
+                ".gif",
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/gif",
+                "/api/uploads/",
+                "session attachment memory:",
+                "attachment rich.jpg content:",
+            )
+
+            if any(_nova_marker in _nova_image_text_probe for _nova_marker in _nova_image_text_markers):
+                _nova_has_image_attachment = True
+
+            if isinstance(attachments, list):
+                for _nova_item in attachments:
+                    if not isinstance(_nova_item, dict):
+                        continue
+
+                    _nova_name = self._safe_str(
+                        _nova_item.get("filename")
+                        or _nova_item.get("original_filename")
+                        or _nova_item.get("name")
+                        or _nova_item.get("url")
+                        or _nova_item.get("file_url")
+                    ).lower()
+
+                    _nova_mime = self._safe_str(
+                        _nova_item.get("mime_type")
+                        or _nova_item.get("type")
+                    ).lower()
+
+                    if (
+                        _nova_mime.startswith("image/")
+                        or _nova_name.endswith(".png")
+                        or _nova_name.endswith(".jpg")
+                        or _nova_name.endswith(".jpeg")
+                        or _nova_name.endswith(".webp")
+                    ):
+                        _nova_has_image_attachment = True
+                        break
+
+            if _nova_has_image_attachment:
+                decision = decision if isinstance(decision, dict) else {}
+                decision["route"] = self.ROUTE_ATTACHMENT_ANALYSIS
+                decision["mode"] = "image_analysis"
+                decision["confidence"] = 1.0
+                decision["reasons"] = list(decision.get("reasons") or []) + ["image_attachment_web_block"]
+                decision["save_artifact"] = False
+                decision["save_memory"] = False
+                decision["use_memory"] = False
+                decision["source_urls"] = []
+                decision["sources"] = []
+
+        except Exception as _nova_image_route_error:
+            print("[NOVA_IMAGE_ATTACHMENT_WEB_BLOCK] failed:", _nova_image_route_error)
         route = self._safe_str(decision.get("route")).lower()
 
         mode = self._safe_str(decision.get("mode")).lower()
@@ -18066,6 +18829,113 @@ def _save_artifact_fallback(self, artifact: dict):
             },
         }
 
+    # NOVA_OPENAI_VISION_ATTACHMENT_ANALYSIS_20260607
+    def _nova_describe_image_with_openai_20260607(
+        self,
+        image_url: str,
+        image_name: str = "",
+        user_text: str = "",
+    ) -> str:
+        try:
+            import base64
+            import mimetypes
+            import os
+            from pathlib import Path
+
+            from openai import OpenAI
+
+            raw_url = self._safe_str(image_url).strip()
+            raw_name = self._safe_str(image_name).strip()
+
+            if not raw_url:
+                return ""
+
+            filename = ""
+
+            if "/api/uploads/" in raw_url:
+                filename = raw_url.split("/api/uploads/", 1)[1].split("?", 1)[0].split("#", 1)[0]
+            elif raw_url.startswith("uploads/") or raw_url.startswith("uploads\\"):
+                filename = Path(raw_url).name
+            elif raw_name:
+                filename = Path(raw_name).name
+
+            if not filename:
+                filename = Path(raw_url).name
+
+            filename = filename.replace("\\", "/").split("/")[-1].strip()
+
+            if not filename:
+                return ""
+
+            candidates = [
+                Path.cwd() / "uploads" / filename,
+                Path.cwd() / "static" / "uploads" / filename,
+                Path(__file__).resolve().parents[2] / "uploads" / filename,
+                Path(__file__).resolve().parents[1] / "uploads" / filename,
+            ]
+
+            image_path = None
+
+            for candidate in candidates:
+                try:
+                    if candidate.exists() and candidate.is_file():
+                        image_path = candidate
+                        break
+                except Exception:
+                    continue
+
+            if image_path is None:
+                return ""
+
+            mime_type = mimetypes.guess_type(str(image_path))[0] or "image/jpeg"
+
+            with open(image_path, "rb") as image_file:
+                encoded = base64.b64encode(image_file.read()).decode("utf-8")
+
+            data_url = f"data:{mime_type};base64,{encoded}"
+
+            prompt_text = self._safe_str(user_text).strip() or "Describe this image clearly."
+
+            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+            response = client.chat.completions.create(
+                model=os.getenv("NOVA_VISION_MODEL", "gpt-4o-mini"),
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are Nova's image analysis module. "
+                            "Describe the attached image directly and honestly. "
+                            "If the image contains readable text, include the important text. "
+                            "Do not use web search. Do not mention unrelated news."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": prompt_text,
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": data_url,
+                                },
+                            },
+                        ],
+                    },
+                ],
+                temperature=0.2,
+                max_tokens=500,
+            )
+
+            return self._safe_str(response.choices[0].message.content).strip()
+
+        except Exception as exc:
+            print("[NOVA_OPENAI_VISION_ATTACHMENT_ANALYSIS] failed:", exc)
+            return ""
+
     def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict:
         attachments = attachments or []
 
@@ -18087,6 +18957,24 @@ def _save_artifact_fallback(self, artifact: dict):
                 break
 
         if image_url:
+            vision_text = self._nova_describe_image_with_openai_20260607(
+                image_url=image_url,
+                image_name=image_name,
+                user_text=user_text,
+            )
+
+            if vision_text:
+                return {
+                    "ok": True,
+                    "text": vision_text,
+                    "attachment_analysis": True,
+                    "vision_used": True,
+                    "ocr_used": False,
+                    "source_urls": [],
+                    "sources": [],
+                    "saved_artifact": None,
+                }
+
             try:
                 prompt = self._safe_str(user_text) or "what is in this image"
 
@@ -18165,6 +19053,114 @@ def _save_artifact_fallback(self, artifact: dict):
         user_text = self._safe_str(user_text)
         decision = decision if isinstance(decision, dict) else {}
 
+        # NOVA_FORCE_IMAGE_ATTACHMENTS_ATTACHMENT_ANALYSIS_20260607
+        if self._nova_has_image_attachment_20260607(attachments):
+            decision = decision if isinstance(decision, dict) else {}
+            decision["route"] = self.ROUTE_ATTACHMENT_ANALYSIS
+            decision["mode"] = "image_analysis"
+            decision["confidence"] = 1.0
+            decision["reasons"] = list(decision.get("reasons") or []) + ["forced_image_attachment_analysis"]
+            decision["save_artifact"] = False
+            decision["save_memory"] = False
+            decision["use_memory"] = False
+            decision["source_urls"] = []
+            decision["sources"] = []
+        # NOVA_IMAGE_ATTACHMENT_WEB_BLOCK_20260607
+        try:
+            _nova_has_image_attachment = False
+            _nova_image_text_probe = (
+                self._safe_str(user_text)
+                + " "
+                + self._safe_str(decision.get("query") if isinstance(decision, dict) else "")
+                + " "
+                + self._safe_str(decision.get("text") if isinstance(decision, dict) else "")
+            ).lower()
+
+            _nova_image_text_markers = (
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".webp",
+                ".gif",
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/gif",
+                "/api/uploads/",
+                "session attachment memory:",
+                "attachment rich.jpg content:",
+            )
+
+            if any(_nova_marker in _nova_image_text_probe for _nova_marker in _nova_image_text_markers):
+                _nova_has_image_attachment = True
+            _nova_image_text_probe = (
+                self._safe_str(user_text)
+                + " "
+                + self._safe_str(decision.get("query") if isinstance(decision, dict) else "")
+                + " "
+                + self._safe_str(decision.get("text") if isinstance(decision, dict) else "")
+            ).lower()
+
+            _nova_image_text_markers = (
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".webp",
+                ".gif",
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/gif",
+                "/api/uploads/",
+                "session attachment memory:",
+                "attachment rich.jpg content:",
+            )
+
+            if any(_nova_marker in _nova_image_text_probe for _nova_marker in _nova_image_text_markers):
+                _nova_has_image_attachment = True
+
+            if isinstance(attachments, list):
+                for _nova_item in attachments:
+                    if not isinstance(_nova_item, dict):
+                        continue
+
+                    _nova_name = self._safe_str(
+                        _nova_item.get("filename")
+                        or _nova_item.get("original_filename")
+                        or _nova_item.get("name")
+                        or _nova_item.get("url")
+                        or _nova_item.get("file_url")
+                    ).lower()
+
+                    _nova_mime = self._safe_str(
+                        _nova_item.get("mime_type")
+                        or _nova_item.get("type")
+                    ).lower()
+
+                    if (
+                        _nova_mime.startswith("image/")
+                        or _nova_name.endswith(".png")
+                        or _nova_name.endswith(".jpg")
+                        or _nova_name.endswith(".jpeg")
+                        or _nova_name.endswith(".webp")
+                    ):
+                        _nova_has_image_attachment = True
+                        break
+
+            if _nova_has_image_attachment:
+                decision = decision if isinstance(decision, dict) else {}
+                decision["route"] = self.ROUTE_ATTACHMENT_ANALYSIS
+                decision["mode"] = "image_analysis"
+                decision["confidence"] = 1.0
+                decision["reasons"] = list(decision.get("reasons") or []) + ["image_attachment_web_block"]
+                decision["save_artifact"] = False
+                decision["save_memory"] = False
+                decision["use_memory"] = False
+                decision["source_urls"] = []
+                decision["sources"] = []
+
+        except Exception as _nova_image_route_error:
+            print("[NOVA_IMAGE_ATTACHMENT_WEB_BLOCK] failed:", _nova_image_route_error)
         route = self._safe_str(decision.get("route")).lower()
 
         tool_locked_routes = {
@@ -18631,6 +19627,178 @@ def _save_artifact_fallback(self, artifact: dict):
         attachments=None,
     ) -> dict:
         attachments = attachments or []
+        # NOVA_HARD_VISION_EXECUTOR_20260607
+        try:
+            import base64
+            import mimetypes
+            import os
+            from pathlib import Path
+
+            _nova_image_item = None
+
+            if isinstance(attachments, list):
+                for _nova_item in attachments:
+                    if not isinstance(_nova_item, dict):
+                        continue
+
+                    _nova_mime = self._safe_str(
+                        _nova_item.get("mime_type")
+                        or _nova_item.get("type")
+                    ).lower()
+
+                    _nova_name_probe = self._safe_str(
+                        _nova_item.get("filename")
+                        or _nova_item.get("original_filename")
+                        or _nova_item.get("name")
+                        or _nova_item.get("url")
+                        or _nova_item.get("file_url")
+                    ).lower()
+
+                    if (
+                        _nova_mime.startswith("image/")
+                        or _nova_name_probe.endswith((".jpg", ".jpeg", ".png", ".webp", ".gif"))
+                        or any(_nova_ext in _nova_name_probe for _nova_ext in (".jpg", ".jpeg", ".png", ".webp", ".gif"))
+                    ):
+                        _nova_image_item = _nova_item
+                        break
+
+            if _nova_image_item:
+                _nova_raw_url = self._safe_str(
+                    _nova_image_item.get("url")
+                    or _nova_image_item.get("file_url")
+                    or ""
+                ).strip()
+
+                _nova_raw_name = self._safe_str(
+                    _nova_image_item.get("filename")
+                    or _nova_image_item.get("original_filename")
+                    or _nova_image_item.get("name")
+                    or ""
+                ).strip()
+
+                _nova_filename = ""
+
+                if "/api/uploads/" in _nova_raw_url:
+                    _nova_filename = _nova_raw_url.split("/api/uploads/", 1)[1].split("?", 1)[0].split("#", 1)[0]
+                elif _nova_raw_url:
+                    _nova_filename = Path(_nova_raw_url).name
+
+                if not _nova_filename and _nova_raw_name:
+                    _nova_filename = Path(_nova_raw_name).name
+
+                _nova_filename = _nova_filename.replace("\\", "/").split("/")[-1].strip()
+
+                _nova_candidates = [
+                    Path.cwd() / "uploads" / _nova_filename,
+                    Path.cwd() / "static" / "uploads" / _nova_filename,
+                    Path(__file__).resolve().parents[2] / "uploads" / _nova_filename,
+                    Path(__file__).resolve().parents[1] / "uploads" / _nova_filename,
+                ]
+
+                _nova_image_path = None
+
+                for _nova_candidate in _nova_candidates:
+                    try:
+                        if _nova_candidate.exists() and _nova_candidate.is_file():
+                            _nova_image_path = _nova_candidate
+                            break
+                    except Exception:
+                        continue
+
+                if _nova_image_path is None:
+                    _nova_text = (
+                        "VISION_DEBUG: image file not found. "
+                        + "filename=" + str(_nova_filename)
+                        + " raw_url=" + str(_nova_raw_url)
+                        + " candidates=" + " | ".join(str(c) for c in _nova_candidates)
+                    )
+                else:
+                    try:
+                        from openai import OpenAI
+
+                        _nova_mime_type = mimetypes.guess_type(str(_nova_image_path))[0] or "image/jpeg"
+
+                        with open(_nova_image_path, "rb") as _nova_image_file:
+                            _nova_encoded = base64.b64encode(_nova_image_file.read()).decode("utf-8")
+
+                        _nova_data_url = "data:" + _nova_mime_type + ";base64," + _nova_encoded
+
+                        _nova_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+                        _nova_response = _nova_client.chat.completions.create(
+                            model=os.getenv("NOVA_VISION_MODEL", "gpt-4o-mini"),
+                            messages=[
+                                {
+                                    "role": "system",
+                                    "content": (
+                                        "You are Nova's image analysis module. "
+                                        "Describe the image directly. "
+                                        "Do not use web search. "
+                                        "Do not mention unrelated news. "
+                                        "If you cannot identify something, say what is visible instead."
+                                    ),
+                                },
+                                {
+                                    "role": "user",
+                                    "content": [
+                                        {
+                                            "type": "text",
+                                            "text": self._safe_str(user_text) or "What is this image?",
+                                        },
+                                        {
+                                            "type": "image_url",
+                                            "image_url": {
+                                                "url": _nova_data_url,
+                                            },
+                                        },
+                                    ],
+                                },
+                            ],
+                            temperature=0.2,
+                            max_tokens=500,
+                        )
+
+                        _nova_text = self._safe_str(_nova_response.choices[0].message.content).strip()
+
+                        if not _nova_text:
+                            _nova_text = "VISION_DEBUG: OpenAI vision returned empty text."
+
+                    except Exception as _nova_vision_exc:
+                        _nova_text = "VISION_DEBUG: OpenAI vision failed: " + str(_nova_vision_exc)
+
+                _nova_user_msg = self._build_user_message(user_text, attachments=attachments)
+
+                _nova_assistant_msg = self._build_assistant_message(
+                    text=_nova_text,
+                    meta={
+                        "attachment_analysis": True,
+                        "hard_vision_executor": True,
+                        "vision_used": not _nova_text.startswith("VISION_DEBUG:"),
+                        "source_urls": [],
+                        "sources": [],
+                    },
+                    attachments=[],
+                )
+
+                if isinstance(decision, dict):
+                    decision["route"] = self.ROUTE_ATTACHMENT_ANALYSIS
+                    decision["mode"] = "image_analysis"
+                    decision["strategy"] = "hard_vision_executor"
+                    decision["source_urls"] = []
+                    decision["sources"] = []
+
+                return self._finalize_response(
+                    session_id=session_id,
+                    user_text=user_text,
+                    user_msg=_nova_user_msg,
+                    assistant_msg=_nova_assistant_msg,
+                    decision=decision if isinstance(decision, dict) else {},
+                    saved_artifact=None,
+                )
+
+        except Exception as _nova_hard_vision_executor_error:
+            print("[NOVA_HARD_VISION_EXECUTOR] failed:", _nova_hard_vision_executor_error)
+
         user_msg = self._build_user_message(user_text, attachments=attachments)
         result = self._handle_attachment_analysis(user_text, attachments)
 
@@ -19535,6 +20703,15 @@ for name in CHAT_SERVICE_METHODS:
         setattr(ChatService, name, obj)
 
 # MEMORY_ITEMS_NAMEERROR_SAFE_LOCK
+
+
+
+
+
+
+
+
+
 
 
 
