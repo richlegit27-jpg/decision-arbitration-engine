@@ -403,32 +403,6 @@ function NovaClearPendingAttachmentsAfterSend20260607() {
         window.dispatchEvent(new CustomEvent("nova-mobile-attachments-cleared"));
     }
 async function sendText(textOverride) {
-        // NOVA_MOBILE_CLEAR_PREVIEW_AFTER_SEND_SAFE_20260607
-        try {
-            localStorage.setItem("nova_mobile_pending_attachments", "[]");
-
-            if (window.NovaMobileState && Array.isArray(window.NovaMobileState.pendingAttachments)) {
-                window.NovaMobileState.pendingAttachments = [];
-            }
-
-            if (typeof state !== "undefined" && state) {
-                state.pendingAttachments = [];
-            }
-
-            if (typeof NovaClearPendingAttachmentsAfterSend20260607 === "function") {
-                NovaClearPendingAttachmentsAfterSend20260607();
-            }
-
-            if (typeof window.NovaMobileClearAttachmentPreviews === "function") {
-                window.NovaMobileClearAttachmentPreviews();
-            } else if (typeof window.NovaRenderComposerInlinePreview === "function") {
-                window.NovaRenderComposerInlinePreview();
-            } else if (typeof window.renderAttachmentPreviews === "function") {
-                window.renderAttachmentPreviews();
-            }
-        } catch (error) {
-            console.warn("[Nova Mobile] failed to clear attachment previews after send", error);
-        }
 const input = $("nova-mobile-input");
         const text = String(textOverride || (input ? input.value : "") || "").trim();
         state.pendingAttachments = window.NovaMobileSharedAttachments || state.pendingAttachments || [];
@@ -2195,6 +2169,7 @@ sendText();
 
     console.log("[Nova Mobile Upload Response Capture Bridge] ready");
 })();
+
 
 
 
