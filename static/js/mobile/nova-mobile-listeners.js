@@ -53,19 +53,8 @@
             });
         }
 
-        if (window.voiceBtn && window.NovaMobileVoice) {
-            window.voiceBtn.addEventListener("click", async function () {
-                window.voiceBtn.classList.add("recording");
-
-                try {
-                    await window.NovaMobileVoice.startVoiceInput();
-                } finally {
-                    setTimeout(function () {
-                        window.voiceBtn.classList.remove("recording");
-                    }, 800);
-                }
-            });
-        }
+        // NOVA_MOBILE_DUPLICATE_VOICE_CLICK_REMOVED_20260608
+        // Voice click binding is owned by static/js/mobile/nova-mobile-voice.js.
 
         if (window.toolsToggleBtn) {
             window.toolsToggleBtn.addEventListener("click", function () {
