@@ -2,122 +2,9 @@
     "use strict";
 
     function installCoreListeners() {
-        if (window.sendBtn) {
-            window.sendBtn.addEventListener("click", function () {
-                sendMessage();
-            });
-        }
-
-        if (window.inputEl) {
-            window.inputEl.addEventListener("keydown", function (event) {
-                if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    sendMessage();
-                }
-            });
-
-            window.inputEl.addEventListener("input", function () {
-                saveDraft();
-                window.NovaMobileCore.autoGrowInput();
-            });
-        }
-
-        if (window.chatContainer) {
-            window.chatContainer.addEventListener("scroll", function () {
-                window.NovaMobileCore.updateParallaxDepth();
-                window.NovaMobileCore.updateHeaderVisibility();
-            });
-        }
-
-        // NOVA_MOBILE_DUPLICATE_UPLOAD_CLICK_REMOVED_20260608
-        // Upload click binding is owned by static/js/mobile/nova-mobile-upload.js.
-
-        // NOVA_MOBILE_DUPLICATE_TTS_CLICK_REMOVED_20260608
-        // TTS click and stop-speech binding currently live in nova-mobile-app.js until a dedicated TTS module exists.
-
-        // NOVA_MOBILE_DUPLICATE_VOICE_CLICK_REMOVED_20260608
-        // Voice click binding is owned by static/js/mobile/nova-mobile-voice.js.
-
-        if (window.toolsToggleBtn) {
-            window.toolsToggleBtn.addEventListener("click", function () {
-                window.NovaMobileUiUtils.togglePanel(window.toolsPanel);
-            });
-        }
-
-        if (window.memoryToggleBtn) {
-            window.memoryToggleBtn.addEventListener("click", function () {
-                window.NovaMobileUiUtils.togglePanel(window.memoryPanel);
-            });
-        }
-
-        if (window.memoryCloseBtn) {
-            window.memoryCloseBtn.addEventListener("click", function () {
-                window.NovaMobileUiUtils.closePanel(window.memoryPanel);
-            });
-        }
-
-        if (window.executionCloseBtn) {
-            window.executionCloseBtn.addEventListener("click", function () {
-                window.NovaMobileUiUtils.closePanel(window.executionPanel);
-            });
-        }
-
-        if (window.sessionsToggleBtn) {
-            window.sessionsToggleBtn.addEventListener("click", function () {
-                window.NovaMobileUiUtils.togglePanel(window.sessionsPanel);
-            });
-        }
-
-        if (window.sessionsCloseBtn) {
-            window.sessionsCloseBtn.addEventListener("click", function () {
-                window.NovaMobileUiUtils.closePanel(window.sessionsPanel);
-            });
-        }
-
-        if (window.copyChatBtn) {
-            window.copyChatBtn.addEventListener(
-                "click",
-                window.NovaMobileUiUtils.copyWholeChat
-            );
-        }
-
-        if (window.exportChatBtn) {
-            window.exportChatBtn.addEventListener(
-                "click",
-                window.NovaMobileUiUtils.exportWholeChat
-            );
-        }
-
-        if (window.clearChatBtn) {
-            window.clearChatBtn.addEventListener("click", function () {
-                window.speechSynthesis.cancel();
-                setStopSpeechActive(false);
-
-                if (window.chatContainer) {
-                    window.chatContainer.innerHTML = "";
-                }
-
-                localStorage.removeItem(
-                    window.NovaMobileCore.getCurrentSessionMessagesKey()
-                );
-
-                showToast("Chat cleared.");
-            });
-        }
-
-        if (window.newChatBtn) {
-            window.newChatBtn.addEventListener(
-                "click",
-                window.NovaMobileSessions.createNewMobileSession
-            );
-        }
-
-        if (window.stopGenerationBtn) {
-            window.stopGenerationBtn.addEventListener(
-                "click",
-                stopGeneration
-            );
-        }
+        // NOVA_MOBILE_LISTENERS_CORE_DELEGATED_TO_EVENTS_20260608
+        // Core button/input listeners are owned by static/js/mobile/nova-mobile-events.js.
+        // This function remains as a safe no-op so older boot calls do not break.
     }
 
     function installDocumentListeners() {
@@ -248,4 +135,4 @@
     };
 
     console.log("[Nova Mobile] listeners module ready");
-})();
+})();\n
