@@ -9519,9 +9519,17 @@ if (not attachments) and (__name__ == "__main__"):
             # NOVA_WEBFETCH_SITE_EMPTY_MESSAGE_LOCK_20260607
             try:
                 import re as _nova_empty_site_re
+                # NOVA_WEBFETCH_SITE_EMPTY_USER_TEXT_LOCK_20260607
+                _nova_empty_site_probe = " ".join([
+                    str(query or ""),
+                    str(user_text or ""),
+                    str(decision.get("query") if isinstance(decision, dict) else ""),
+                    str(decision.get("search_query") if isinstance(decision, dict) else ""),
+                ])
+
                 _nova_empty_site_match = _nova_empty_site_re.search(
                     r"\bsite:([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b",
-                    query or "",
+                    _nova_empty_site_probe,
                 )
             except Exception:
                 _nova_empty_site_match = None
@@ -20777,6 +20785,7 @@ for name in CHAT_SERVICE_METHODS:
         setattr(ChatService, name, obj)
 
 # MEMORY_ITEMS_NAMEERROR_SAFE_LOCK
+
 
 
 
