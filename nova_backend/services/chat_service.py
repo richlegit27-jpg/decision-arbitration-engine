@@ -9355,6 +9355,49 @@ if (not attachments) and (__name__ == "__main__"):
 
                 cleaned_sources = _nova_openai_sources
                 exec_debug("NOVA_WEBFETCH_OPENAI_ENTITY_FILTER_COUNT:", len(cleaned_sources))
+
+                # NOVA_WEBFETCH_OPENAI_OFFICIAL_FALLBACK_SOURCES_20260607
+                # If OpenAI-specific search returns no surviving results, provide official
+                # OpenAI source pages instead of returning unrelated generic AI news.
+                if not cleaned_sources:
+                    cleaned_sources = [
+                        {
+                            "title": "OpenAI News",
+                            "snippet": "Official OpenAI news and announcements.",
+                            "content": "Official OpenAI news and announcements.",
+                            "source": "openai.com",
+                            "url": "https://openai.com/news/",
+                        },
+                        {
+                            "title": "OpenAI Company Announcements",
+                            "snippet": "Official OpenAI company announcement feed.",
+                            "content": "Official OpenAI company announcement feed.",
+                            "source": "openai.com",
+                            "url": "https://openai.com/news/company-announcements/",
+                        },
+                        {
+                            "title": "OpenAI Product Releases",
+                            "snippet": "Official OpenAI product release feed.",
+                            "content": "Official OpenAI product release feed.",
+                            "source": "openai.com",
+                            "url": "https://openai.com/news/product-releases/",
+                        },
+                        {
+                            "title": "OpenAI Research",
+                            "snippet": "Official OpenAI research news feed.",
+                            "content": "Official OpenAI research news feed.",
+                            "source": "openai.com",
+                            "url": "https://openai.com/news/research/",
+                        },
+                        {
+                            "title": "OpenAI Developer Blog",
+                            "snippet": "Official OpenAI developer updates and technical posts.",
+                            "content": "Official OpenAI developer updates and technical posts.",
+                            "source": "developers.openai.com",
+                            "url": "https://developers.openai.com/blog/",
+                        },
+                    ]
+                    exec_debug("NOVA_WEBFETCH_OPENAI_OFFICIAL_FALLBACK_COUNT:", len(cleaned_sources))
         except Exception as _nova_openai_filter_exc:
             exec_debug("NOVA_WEBFETCH_OPENAI_ENTITY_FILTER_FAILED:", _nova_openai_filter_exc)
 
@@ -20831,6 +20874,7 @@ for name in CHAT_SERVICE_METHODS:
         setattr(ChatService, name, obj)
 
 # MEMORY_ITEMS_NAMEERROR_SAFE_LOCK
+
 
 
 
