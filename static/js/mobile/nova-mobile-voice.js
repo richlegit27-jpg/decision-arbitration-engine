@@ -1,6 +1,23 @@
 (function () {
     "use strict";
 
+    // NOVA_MOBILE_SAFE_VOICE_TOAST_20260608
+    function safeToast(message) {
+        if (typeof window.showToast === "function") {
+            window.showToast(message);
+            return;
+        }
+
+        if (typeof window.NovaToast === "function") {
+            window.NovaToast(message);
+            return;
+        }
+
+        try {
+            console.log("[Nova Mobile Voice]", message);
+        } catch (error) {}
+    }
+
     function getRecognitionConstructor() {
         return (
             window.SpeechRecognition ||
@@ -13,7 +30,7 @@
         const Recognition = getRecognitionConstructor();
 
         if (!Recognition) {
-            window.showToast("Voice input is not supported in this browser.");
+            safeToast("Voice input is not supported in this browser.");
             return;
         }
 
@@ -22,7 +39,7 @@
             document.getElementById("nova-mobile-input");
 
         if (!input) {
-            window.showToast("Input box not found.");
+            safeToast("Input box not found.");
             return;
         }
 
@@ -52,11 +69,11 @@
                 window.NovaMobileCore.autoGrowInput();
             }
 
-            window.showToast("Voice captured.");
+            safeToast("Voice captured.");
         };
 
         recognition.onerror = function () {
-            window.showToast("Voice input failed.");
+            safeToast("Voice input failed.");
         };
 
         recognition.onend = function () {
@@ -66,7 +83,7 @@
         };
 
         recognition.start();
-        window.showToast("Listening...");
+        safeToast("Listening...");
     }
 
     window.NovaMobileVoice = {
