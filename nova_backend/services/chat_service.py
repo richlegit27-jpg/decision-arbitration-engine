@@ -9401,6 +9401,85 @@ if (not attachments) and (__name__ == "__main__"):
         except Exception as _nova_openai_filter_exc:
             exec_debug("NOVA_WEBFETCH_OPENAI_ENTITY_FILTER_FAILED:", _nova_openai_filter_exc)
 
+        # NOVA_WEBFETCH_GENERIC_NEWS_BAD_SOURCE_FILTER_20260608
+        # For broad news prompts, remove generic landing-page / homepage results
+        # before ranking and final source-card construction.
+        try:
+            _nova_generic_news_probe = " ".join([
+                self._safe_str(query),
+                self._safe_str(user_text),
+            ]).lower()
+
+            _nova_is_generic_news_query = any(
+                phrase in _nova_generic_news_probe
+                for phrase in [
+                    "whats on the news",
+                    "what's on the news",
+                    "what is on the news",
+                    "latest news",
+                    "news today",
+                    "headlines",
+                ]
+            )
+
+            if _nova_is_generic_news_query and isinstance(cleaned_sources, list):
+                _nova_filtered_news_sources = []
+
+                for _nova_item in cleaned_sources:
+                    if not isinstance(_nova_item, dict):
+                        continue
+
+                    _nova_title = self._safe_str(_nova_item.get("title")).lower()
+                    _nova_snippet = self._safe_str(
+                        _nova_item.get("snippet")
+                        or _nova_item.get("description")
+                        or _nova_item.get("content")
+                        or ""
+                    ).lower()
+                    _nova_source = self._safe_str(_nova_item.get("source")).lower()
+                    _nova_url = self._safe_str(
+                        _nova_item.get("url")
+                        or _nova_item.get("href")
+                        or _nova_item.get("link")
+                        or ""
+                    ).lower()
+
+                    _nova_blob = " ".join([
+                        _nova_title,
+                        _nova_snippet,
+                        _nova_source,
+                        _nova_url,
+                    ])
+
+                    _nova_bad_landing = any(
+                        bad in _nova_blob
+                        for bad in [
+                            "nbc news - breaking headlines",
+                            "breaking headlines and video reports",
+                            "new york stock exchange",
+                            "the new york stock exchange",
+                            "nyse homepage",
+                            " | nyse",
+                        ]
+                    )
+
+                    if _nova_bad_landing:
+                        exec_debug(
+                            "NOVA_WEBFETCH_GENERIC_NEWS_BAD_SOURCE_SKIPPED:",
+                            {
+                                "title": _nova_item.get("title"),
+                                "source": _nova_item.get("source"),
+                                "url": _nova_item.get("url"),
+                            },
+                        )
+                        continue
+
+                    _nova_filtered_news_sources.append(_nova_item)
+
+                cleaned_sources = _nova_filtered_news_sources
+                exec_debug("NOVA_WEBFETCH_GENERIC_NEWS_BAD_SOURCE_COUNT:", len(cleaned_sources))
+        except Exception as _nova_bad_source_filter_exc:
+            exec_debug("NOVA_WEBFETCH_GENERIC_NEWS_BAD_SOURCE_FILTER_FAILED:", _nova_bad_source_filter_exc)
         def _rank_key(item):
             url = self._safe_str(item.get("url")).lower()
             title = self._safe_str(item.get("title")).lower()
@@ -9539,6 +9618,73 @@ if (not attachments) and (__name__ == "__main__"):
             if snippet and snippet not in body:
                 body += "\n\n" + snippet
 
+        # NOVA_WEBFETCH_FINAL_NEWS_BAD_SOURCE_FILTER_20260608
+        # Final guard: remove broad landing pages after source cards are built.
+        try:
+            _nova_final_news_probe = " ".join([
+                self._safe_str(query),
+                self._safe_str(user_text),
+            ]).lower()
+
+            _nova_final_is_news = any(
+                phrase in _nova_final_news_probe
+                for phrase in [
+                    "whats on the news",
+                    "what's on the news",
+                    "what is on the news",
+                    "latest news",
+                    "news today",
+                    "headlines",
+                ]
+            )
+
+            if _nova_final_is_news and isinstance(sources, list):
+                _nova_clean_final_sources = []
+
+                for _nova_source_item in sources:
+                    if not isinstance(_nova_source_item, dict):
+                        continue
+
+                    _nova_blob = " ".join([
+                        self._safe_str(_nova_source_item.get("title")),
+                        self._safe_str(_nova_source_item.get("snippet")),
+                        self._safe_str(_nova_source_item.get("source")),
+                        self._safe_str(_nova_source_item.get("url")),
+                    ]).lower()
+
+                    _nova_bad_final_source = any(
+                        bad in _nova_blob
+                        for bad in [
+                            "nbc news - breaking headlines",
+                            "breaking headlines and video reports",
+                            "new york stock exchange",
+                            "the new york stock exchange",
+                            " | nyse",
+                        ]
+                    )
+
+                    if _nova_bad_final_source:
+                        exec_debug(
+                            "NOVA_WEBFETCH_FINAL_NEWS_BAD_SOURCE_SKIPPED:",
+                            {
+                                "title": _nova_source_item.get("title"),
+                                "source": _nova_source_item.get("source"),
+                                "url": _nova_source_item.get("url"),
+                            },
+                        )
+                        continue
+
+                    _nova_clean_final_sources.append(_nova_source_item)
+
+                sources = _nova_clean_final_sources
+                source_urls = [
+                    item.get("url")
+                    for item in sources
+                    if isinstance(item, dict) and item.get("url")
+                ]
+                exec_debug("NOVA_WEBFETCH_FINAL_NEWS_BAD_SOURCE_COUNT:", len(sources))
+        except Exception as _nova_final_news_filter_exc:
+            exec_debug("NOVA_WEBFETCH_FINAL_NEWS_BAD_SOURCE_FILTER_FAILED:", _nova_final_news_filter_exc)
         def _final_source_rank(source_item):
             title_value = self._safe_str(source_item.get("title")).lower()
 
@@ -20874,6 +21020,8 @@ for name in CHAT_SERVICE_METHODS:
         setattr(ChatService, name, obj)
 
 # MEMORY_ITEMS_NAMEERROR_SAFE_LOCK
+
+
 
 
 
