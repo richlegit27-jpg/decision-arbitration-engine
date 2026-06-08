@@ -491,34 +491,8 @@ const response = await fetch("/api/chat", {
         window.speechSynthesis.speak(utterance);
     }
 
-    function startVoice() {
-        const input = $("nova-mobile-input");
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-        if (!input || !SpeechRecognition) {
-            addBubble("assistant", "Voice is not supported in this browser.");
-            return;
-        }
-
-        const rec = new SpeechRecognition();
-        state.recognition = rec;
-
-        rec.lang = "en-US";
-        rec.interimResults = false;
-        rec.maxAlternatives = 1;
-
-        rec.onresult = function (event) {
-            const text = event.results?.[0]?.[0]?.transcript || "";
-            input.value = text;
-            input.focus();
-        };
-
-        rec.onerror = function (event) {
-            addBubble("assistant", "Voice failed: " + (event.error || "unknown error"));
-        };
-
-        rec.start();
-    }
+    // NOVA_MOBILE_APP_REMOVED_APP_OWNED_VOICE_20260608
+    // Voice button/input ownership lives in static/js/mobile/nova-mobile-voice.js.
 
 async function newChat(event) {
     if (!event || !event.isTrusted) {
@@ -658,7 +632,6 @@ function findSessionsToggle() {
         };
 
         if (stop) stop.onclick = stopEverything;
-        if (voice) voice.onclick = startVoice;
         if (tts) tts.onclick = speakLatest;
         if (newSession) newSession.onclick = newChat;
         if (newTop) newTop.onclick = newChat;
