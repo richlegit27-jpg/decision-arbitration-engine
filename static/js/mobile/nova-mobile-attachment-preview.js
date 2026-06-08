@@ -1,4 +1,20 @@
-﻿(function () {
+﻿// NOVA_MOBILE_QUIET_REMAINING_ATTACHMENT_LOGS_20260608
+window.NOVA_MOBILE_ATTACHMENT_DEBUG = window.NOVA_MOBILE_ATTACHMENT_DEBUG === true;
+
+window.NovaMobileAttachmentDebugLog = window.NovaMobileAttachmentDebugLog || function () {
+    if (!window.NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+    try {
+        console.log.apply(console, arguments);
+    } catch (e) {}
+};
+
+window.NovaMobileAttachmentDebugWarn = window.NovaMobileAttachmentDebugWarn || function () {
+    if (!window.NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+    try {
+        console.warn.apply(console, arguments);
+    } catch (e) {}
+};
+(function () {
     "use strict";
 
     // NOVA_MOBILE_QUIET_ATTACHMENT_DEBUG_LOGS_20260608
@@ -175,7 +191,7 @@
         const host = ensurePreviewHost();
 
         if (!host) {
-            console.log(LOG_PREFIX, "hidden no host");
+            window.NovaMobileAttachmentDebugLog(LOG_PREFIX, "hidden no host");
             return;
         }
 
@@ -208,7 +224,7 @@
             );
         }).join("");
 
-        console.log(LOG_PREFIX, "rendered", attachments.length, attachments);
+        window.NovaMobileAttachmentDebugLog(LOG_PREFIX, "rendered", attachments.length, attachments);
     }
 
     window.NovaRenderComposerInlinePreview = renderInlineComposerPreview;
@@ -232,7 +248,7 @@
 
     setTimeout(renderInlineComposerPreview, 1200);
 
-    console.log(LOG_PREFIX, "active");
+    window.NovaMobileAttachmentDebugLog(LOG_PREFIX, "active");
 })();
 
 
@@ -592,7 +608,7 @@
         var current = getStoredAttachments();
 
         if (current.length >= MAX_ATTACHMENTS) {
-            console.warn("[Nova Mobile] max attachments reached");
+            window.NovaMobileAttachmentDebugWarn("[Nova Mobile] max attachments reached");
             return;
         }
 
@@ -695,7 +711,7 @@
         setTimeout(updateScrollShadows, 0);
     });
 
-    console.log("[Nova Mobile Attachment] final clean controller ready");
+    window.NovaMobileAttachmentDebugLog("[Nova Mobile Attachment] final clean controller ready");
 })();
 
 
@@ -902,7 +918,7 @@
 
     setInterval(normalizePreviewState, 1500);
 
-    console.log("[Nova Mobile Single Attachment Preview Lock] ready");
+    window.NovaMobileAttachmentDebugLog("[Nova Mobile Single Attachment Preview Lock] ready");
 })();
 
 
@@ -1244,6 +1260,7 @@
 
     setInterval(run, 1500);
 
-    console.log("[Nova Mobile Clean Attachment Chip Only] ready");
+    window.NovaMobileAttachmentDebugLog("[Nova Mobile Clean Attachment Chip Only] ready");
 })();
+
 

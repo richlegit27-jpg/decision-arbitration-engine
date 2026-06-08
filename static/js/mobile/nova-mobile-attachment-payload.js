@@ -1,4 +1,20 @@
-﻿/* NOVA_MOBILE_ATTACHMENT_PAYLOAD_MODULE_20260606 */
+﻿// NOVA_MOBILE_QUIET_REMAINING_ATTACHMENT_LOGS_20260608
+window.NOVA_MOBILE_ATTACHMENT_DEBUG = window.NOVA_MOBILE_ATTACHMENT_DEBUG === true;
+
+window.NovaMobileAttachmentDebugLog = window.NovaMobileAttachmentDebugLog || function () {
+    if (!window.NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+    try {
+        console.log.apply(console, arguments);
+    } catch (e) {}
+};
+
+window.NovaMobileAttachmentDebugWarn = window.NovaMobileAttachmentDebugWarn || function () {
+    if (!window.NOVA_MOBILE_ATTACHMENT_DEBUG) return;
+    try {
+        console.warn.apply(console, arguments);
+    } catch (e) {}
+};
+/* NOVA_MOBILE_ATTACHMENT_PAYLOAD_MODULE_20260606 */
 
 /* NOVA_CAPTURE_UPLOAD_FETCH_20260606 */
 (function () {
@@ -43,7 +59,7 @@
 
     function storeCapturedAttachment(attachment) {
         if (!attachment || (!attachment.url && !attachment.file_url && !attachment.filename)) {
-            console.warn("[Nova Mobile Upload Capture] skipped empty attachment", attachment);
+            window.NovaMobileAttachmentDebugWarn("[Nova Mobile Upload Capture] skipped empty attachment", attachment);
             return;
         }
 
@@ -70,7 +86,7 @@
             window.NovaMobileReceiveUploadedAttachment(attachment, null);
         }
 
-        console.log("[Nova Mobile Upload Capture] captured /api/upload attachment", attachment);
+        window.NovaMobileAttachmentDebugLog("[Nova Mobile Upload Capture] captured /api/upload attachment", attachment);
     }
 
     window.fetch = async function (input, init) {
@@ -92,13 +108,13 @@
                 }
             }
         } catch (error) {
-            console.warn("[Nova Mobile Upload Capture] failed to capture upload response", error);
+            window.NovaMobileAttachmentDebugWarn("[Nova Mobile Upload Capture] failed to capture upload response", error);
         }
 
         return response;
     };
 
-    console.log("[Nova Mobile Upload Capture] active");
+    window.NovaMobileAttachmentDebugLog("[Nova Mobile Upload Capture] active");
 })();
 
 /* NOVA_STRONGER_CHAT_ATTACHMENTS_PAYLOAD_20260606 */
@@ -391,7 +407,7 @@
         var normalized = normalizeAttachment(value);
 
         if (!normalized) {
-            console.warn("[Nova Mobile Hard Attachment Payload] upload response could not normalize", value);
+            window.NovaMobileAttachmentDebugWarn("[Nova Mobile Hard Attachment Payload] upload response could not normalize", value);
             return false;
         }
 
@@ -416,7 +432,7 @@
         window.NovaMobilePendingAttachments = clean;
         window.__novaMobilePendingAttachments = clean;
 
-        console.log("[Nova Mobile Hard Attachment Payload] stored pending attachment", normalized);
+        window.NovaMobileAttachmentDebugLog("[Nova Mobile Hard Attachment Payload] stored pending attachment", normalized);
         return true;
     }
 
@@ -431,7 +447,7 @@
                     response.clone().json().then(function (data) {
                         storePendingAttachment(data);
                     }).catch(function (e) {
-                        console.warn("[Nova Mobile Hard Attachment Payload] could not read upload json", e);
+                        window.NovaMobileAttachmentDebugWarn("[Nova Mobile Hard Attachment Payload] could not read upload json", e);
                     });
                 }
 
@@ -456,15 +472,15 @@
                             if (pending.length > 0) {
                                 payload.attachments = pending;
                                 init.body = JSON.stringify(payload);
-                                console.log("[Nova Mobile Hard Attachment Payload] injected attachments into /api/chat", pending);
+                                window.NovaMobileAttachmentDebugLog("[Nova Mobile Hard Attachment Payload] injected attachments into /api/chat", pending);
                             } else {
-                                console.warn("[Nova Mobile Hard Attachment Payload] attachment prompt but pending list is empty");
+                                window.NovaMobileAttachmentDebugWarn("[Nova Mobile Hard Attachment Payload] attachment prompt but pending list is empty");
                             }
                         }
                     }
                 }
             } catch (e) {
-                console.warn("[Nova Mobile Hard Attachment Payload] fetch bridge failed", e);
+                window.NovaMobileAttachmentDebugWarn("[Nova Mobile Hard Attachment Payload] fetch bridge failed", e);
             }
 
             return response;
@@ -474,7 +490,7 @@
     window.NovaMobileHardAttachmentPayloadGet = getPendingAttachments;
     window.NovaMobileHardAttachmentPayloadStore = storePendingAttachment;
 
-    console.log("[Nova Mobile Hard Attachment Payload] ready");
+    window.NovaMobileAttachmentDebugLog("[Nova Mobile Hard Attachment Payload] ready");
 })();
 
 
@@ -589,15 +605,15 @@
                             payload.attachments = pending;
                             init.body = JSON.stringify(payload);
 
-                            console.log("[Nova Mobile Preflight Attachment Inject] injected before /api/chat", pending);
+                            window.NovaMobileAttachmentDebugLog("[Nova Mobile Preflight Attachment Inject] injected before /api/chat", pending);
                         } else {
-                            console.warn("[Nova Mobile Preflight Attachment Inject] wanted attachment but pending empty");
+                            window.NovaMobileAttachmentDebugWarn("[Nova Mobile Preflight Attachment Inject] wanted attachment but pending empty");
                         }
                     }
                 }
             }
         } catch (e) {
-            console.warn("[Nova Mobile Preflight Attachment Inject] failed", e);
+            window.NovaMobileAttachmentDebugWarn("[Nova Mobile Preflight Attachment Inject] failed", e);
         }
 
         return previousFetch.apply(this, arguments);
@@ -605,7 +621,7 @@
 
     window.NovaMobilePreflightChatAttachmentGet = getPendingAttachments;
 
-    console.log("[Nova Mobile Preflight Attachment Inject] ready");
+    window.NovaMobileAttachmentDebugLog("[Nova Mobile Preflight Attachment Inject] ready");
 })();
 
 
@@ -689,4 +705,5 @@
 
     novaAttachmentDebugLog("[NOVA PIPELINE PROBE] ready");
 })();
+
 
