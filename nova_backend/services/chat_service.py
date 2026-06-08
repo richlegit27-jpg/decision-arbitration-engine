@@ -9516,10 +9516,27 @@ if (not attachments) and (__name__ == "__main__"):
 
         # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
         if (not attachments) and (not body):
-            assistant_text = (
-                "No verified fresh web results were retrieved.\n\n"
-                "Try a more specific query with a team, person, date, or source."
-            )
+            # NOVA_WEBFETCH_SITE_EMPTY_MESSAGE_LOCK_20260607
+            try:
+                import re as _nova_empty_site_re
+                _nova_empty_site_match = _nova_empty_site_re.search(
+                    r"\bsite:([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b",
+                    query or "",
+                )
+            except Exception:
+                _nova_empty_site_match = None
+
+            if _nova_empty_site_match:
+                _nova_empty_site_domain = _nova_empty_site_match.group(1).lower().strip()
+                assistant_text = (
+                    f"No matching results were found from {_nova_empty_site_domain}.\n\n"
+                    f"I did not use unrelated sources because the search was constrained to site:{_nova_empty_site_domain}."
+                )
+            else:
+                assistant_text = (
+                    "No verified fresh web results were retrieved.\n\n"
+                    "Try a more specific query with a team, person, date, or source."
+                )
         else:
             assistant_text = ""
 
@@ -20760,6 +20777,7 @@ for name in CHAT_SERVICE_METHODS:
         setattr(ChatService, name, obj)
 
 # MEMORY_ITEMS_NAMEERROR_SAFE_LOCK
+
 
 
 
