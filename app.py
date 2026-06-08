@@ -3067,6 +3067,205 @@ def api_chat():
             or "default"
         ).strip() or "default"
         _nova_exec_clean = " ".join(_nova_exec_user_text.lower().split())
+        # NOVA_IMAGE_ATTACHMENT_NO_WEB_FALLBACK_20260607
+        _nova_image_prompt_words = [
+            "describe this image",
+            "what is this image",
+            "what is in this image",
+            "what's in this image",
+            "look at this image",
+            "analyze this image",
+            "analyse this image",
+            "this picture",
+            "this photo",
+        ]
+
+        _nova_current_attachments = _nova_exec_payload.get("attachments") or []
+        if not isinstance(_nova_current_attachments, list):
+            _nova_current_attachments = []
+
+        _nova_has_image_attachment = False
+        for _nova_attachment in _nova_current_attachments:
+            if not isinstance(_nova_attachment, dict):
+                continue
+
+            _nova_name = str(
+                _nova_attachment.get("filename")
+                or _nova_attachment.get("original_filename")
+                or _nova_attachment.get("name")
+                or _nova_attachment.get("url")
+                or _nova_attachment.get("file_url")
+                or ""
+            ).lower()
+
+            _nova_mime = str(_nova_attachment.get("mime_type") or _nova_attachment.get("type") or "").lower()
+
+            if (
+                _nova_mime.startswith("image/")
+                or _nova_name.endswith(".png")
+                or _nova_name.endswith(".jpg")
+                or _nova_name.endswith(".jpeg")
+                or _nova_name.endswith(".webp")
+            ):
+                _nova_has_image_attachment = True
+                break
+
+        if _nova_has_image_attachment and any(_word in _nova_exec_clean for _word in _nova_image_prompt_words):
+            _nova_exec_payload["force_image_analysis"] = True
+            _nova_exec_payload["disable_web_fetch"] = True
+
+        # NOVA_IMAGE_PROMPT_NO_WEB_GUARD_20260607
+        _nova_image_words = [
+            "describe this image",
+            "describe image",
+            "what is in this image",
+            "what's in this image",
+            "what is this image",
+            "look at this image",
+            "analyze this image",
+            "analyse this image",
+            "this picture",
+            "this photo",
+        ]
+
+        if any(_word in _nova_exec_clean for _word in _nova_image_words):
+            _nova_current_attachments = _nova_exec_payload.get("attachments") or []
+            if not isinstance(_nova_current_attachments, list):
+                _nova_current_attachments = []
+
+            if not _nova_current_attachments:
+                _nova_answer = (
+                    "I can see you asked me to describe an image, but no image attachment reached /api/chat.\n\n"
+                    "The upload/preview side may be working, but the mobile send payload is still dropping the attachment before the backend receives it.\n\n"
+                    "Next fix: make the mobile /api/chat request include the pending image attachment so backend sees attachments_count=1."
+                )
+
+                return jsonify({
+                    "ok": True,
+                    "text": _nova_answer,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": _nova_answer,
+                        "meta": {
+                            "image_prompt_no_attachment": True,
+                            "web_bypassed": True,
+                            "route_taken": "image_prompt_no_web_guard"
+                        },
+                        "attachments": []
+                    },
+                    "debug": {
+                        "route": "api_chat",
+                        "route_taken": "image_prompt_no_web_guard",
+                        "blocked": ["web_fetch"]
+                    }
+                })
+
+        # NOVA_DOCX_ATTACHMENT_DIRECT_HANDLER_20260607
+        _nova_docx_attachment_words = [
+            "attachment",
+            "attach",
+            "what is this file",
+            "what is this attachment",
+            "summarize this attachment",
+            "summarise this attachment",
+            "summarize this file",
+            "summarise this file",
+            "this file",
+        ]
+
+        if any(_word in _nova_exec_clean for _word in _nova_docx_attachment_words):
+            _nova_current_attachments = _nova_exec_payload.get("attachments") or []
+
+            if isinstance(_nova_current_attachments, list) and _nova_current_attachments:
+                for _nova_attachment in _nova_current_attachments:
+                    _nova_name = str(
+                        _nova_attachment.get("original_filename")
+                        or _nova_attachment.get("filename")
+                        or _nova_attachment.get("name")
+                        or _nova_attachment.get("url")
+                        or _nova_attachment.get("file_url")
+                        or ""
+                    ).lower()
+
+                    if ".docx" not in _nova_name:
+                        continue
+
+                    _nova_file_path = _nova_find_uploaded_file_path_20260607(_nova_attachment)
+                    _nova_docx_text = _nova_extract_docx_text_20260607(_nova_file_path)
+
+                    if _nova_docx_text:
+                        _nova_preview = _nova_docx_text[:1200].strip()
+
+                        _nova_answer = (
+                            "This is a Microsoft Word .docx document.\n\n"
+                            "Readable extracted text preview:\n\n"
+                            f"{_nova_preview}"
+                        )
+
+                        return jsonify({
+                            "ok": True,
+                            "text": _nova_answer,
+                            "assistant_message": {
+                                "role": "assistant",
+                                "text": _nova_answer,
+                                "meta": {
+                                    "docx_attachment_extracted": True,
+                                    "route_taken": "docx_attachment_direct_handler",
+                                    "file_path": _nova_file_path
+                                },
+                                "attachments": []
+                            },
+                            "debug": {
+                                "route": "api_chat",
+                                "route_taken": "docx_attachment_direct_handler",
+                                "file_path": _nova_file_path,
+                                "extracted_chars": len(_nova_docx_text)
+                            }
+                        })
+
+        # NOVA_ATTACHMENT_PROMPT_NO_WEB_GUARD_20260607
+        _nova_attachment_words = [
+            "attachment",
+            "attach",
+            "summarize this attachment",
+            "summarise this attachment",
+            "summarize this file",
+            "summarise this file",
+            "this file",
+        ]
+
+        if any(_word in _nova_exec_clean for _word in _nova_attachment_words):
+            _nova_current_attachments = _nova_exec_payload.get("attachments") or []
+            if not isinstance(_nova_current_attachments, list):
+                _nova_current_attachments = []
+
+            if not _nova_current_attachments:
+                _nova_answer = (
+                    "I can see you asked about an attachment, but no attachment reached /api/chat.\n\n"
+                    "Frontend upload/preview may have worked, but the send payload did not include the file.\n\n"
+                    "Next fix: make the mobile send payload carry the uploaded attachment into /api/chat."
+                )
+
+                return jsonify({
+                    "ok": True,
+                    "text": _nova_answer,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": _nova_answer,
+                        "meta": {
+                            "attachment_prompt_no_attachment": True,
+                            "web_bypassed": True,
+                            "route_taken": "attachment_prompt_no_web_guard"
+                        },
+                        "attachments": []
+                    },
+                    "debug": {
+                        "route": "api_chat",
+                        "route_taken": "attachment_prompt_no_web_guard",
+                        "blocked": ["web_fetch"]
+                    }
+                })
+
         # NOVA_API_CHAT_PROJECT_STATUS_FRONT_GUARD_20260607
         _nova_project_status_phrases = [
             "what did we fix",
@@ -3082,7 +3281,7 @@ def api_chat():
                 "Here is what we actually fixed today:\n\n"
                 "- Fixed the mobile composer buttons so send, voice, attach, tools, and TTS stopped stretching.\n"
                 "- Fixed the mojibukakke icon issue where broken encoded symbols were showing instead of clean icons.\n"
-                "- Fixed the stale frontend cache issue where /mobile kept loading an old nova-mobile-app.js version.\n"
+                "- Fixed the stale frontend cache issue where /mobile kept loading an old nova-mobile-app.js?v=attachment-payload-bridge-20260607204432 version.\n"
                 "- Slimmed the mobile composer/input bar so the real input and main buttons are now 40px high.\n"
                 "- Fixed the router bug where the word 'today' forced local project questions into web_fetch.\n\n"
                 "Remaining issue: add a real work-log system so Nova can summarize actual project progress instead of guessing from old memories."
@@ -7893,6 +8092,11 @@ if __name__ == "__main__":
 
 
 # CLEAN_IMAGE_PROMPT_RIGHT_BEFORE_CHAT_SERVICE_LOCK
+
+
+
+
+
 
 
 

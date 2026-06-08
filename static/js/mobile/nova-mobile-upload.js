@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     "use strict";
 
     function createUploadProgress(file) {
@@ -15,7 +15,7 @@
         const icon = document.createElement("div");
 
         icon.className = "mobile-upload-icon";
-        icon.textContent = "↑";
+        icon.textContent = "â†‘";
 
         const meta = document.createElement("div");
 
@@ -82,7 +82,7 @@
         );
 
         uploadUi.bar.style.width = "100%";
-        uploadUi.icon.textContent = "✓";
+        uploadUi.icon.textContent = "âœ“";
         uploadUi.label.textContent = "Uploaded";
 
         uploadUi.title.textContent =
@@ -253,4 +253,141 @@
         "[Nova Mobile] upload module ready"
     );
 
+})();
+
+/* NOVA_MOBILE_HARD_ATTACH_BUTTON_BRIDGE_20260607 */
+(function () {
+    "use strict";
+
+    if (window.NovaMobileHardAttachButtonBridgeInstalled) {
+        return;
+    }
+
+    window.NovaMobileHardAttachButtonBridgeInstalled = true;
+
+    function getOrCreateFileInput() {
+        var input = document.getElementById("nova-mobile-hard-file-input");
+
+        if (input) {
+            return input;
+        }
+
+        input = document.createElement("input");
+        input.id = "nova-mobile-hard-file-input";
+        input.type = "file";
+        input.multiple = true;
+        input.style.position = "fixed";
+        input.style.left = "-9999px";
+        input.style.top = "-9999px";
+        input.style.width = "1px";
+        input.style.height = "1px";
+        input.style.opacity = "0";
+
+        document.body.appendChild(input);
+
+        input.addEventListener("change", function () {
+            var files = Array.from(input.files || []);
+
+            if (!files.length) {
+                return;
+            }
+
+            files.forEach(function (file) {
+                var form = new FormData();
+                form.append("file", file);
+
+                fetch("/api/upload", {
+                    method: "POST",
+                    body: form
+                })
+                    .then(function (response) {
+                        return response.json();
+                    })
+                    .then(function (data) {
+                        console.log("[Nova Mobile Hard Attach Button Bridge] uploaded", data);
+
+                        if (typeof window.NovaMobileHardAttachmentPayloadStore === "function") {
+                            window.NovaMobileHardAttachmentPayloadStore(data);
+                        }
+
+                        window.dispatchEvent(new CustomEvent("nova-mobile-upload-complete", {
+                            detail: data
+                        }));
+
+                        window.dispatchEvent(new CustomEvent("nova-mobile-attachment-uploaded", {
+                            detail: data
+                        }));
+                    })
+                    .catch(function (error) {
+                        console.error("[Nova Mobile Hard Attach Button Bridge] upload failed", error);
+                    });
+            });
+
+            input.value = "";
+        });
+
+        return input;
+    }
+
+    function isAttachButton(button) {
+        if (!button) {
+            return false;
+        }
+
+        var id = String(button.id || "").toLowerCase();
+        var cls = String(button.className || "").toLowerCase();
+        var label = String(
+            button.getAttribute("aria-label") ||
+            button.getAttribute("title") ||
+            button.textContent ||
+            ""
+        ).toLowerCase();
+
+        return (
+            id.indexOf("attach") !== -1 ||
+            cls.indexOf("attach") !== -1 ||
+            label.indexOf("attach") !== -1 ||
+            label.indexOf("upload") !== -1 ||
+            label.indexOf("file") !== -1
+        );
+    }
+
+    function bindAttachButtons() {
+        Array.from(document.querySelectorAll("button, [role='button']")).forEach(function (button) {
+            if (!isAttachButton(button)) {
+                return;
+            }
+
+            if (button.dataset.novaHardAttachBridge === "1") {
+                return;
+            }
+
+            button.dataset.novaHardAttachBridge = "1";
+
+            button.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                var input = getOrCreateFileInput();
+                input.click();
+
+                console.log("[Nova Mobile Hard Attach Button Bridge] attach click handled", button.id || button.textContent || button.className);
+            }, true);
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        setTimeout(bindAttachButtons, 0);
+        setTimeout(bindAttachButtons, 500);
+        setTimeout(bindAttachButtons, 1500);
+    });
+
+    document.addEventListener("click", function () {
+        setTimeout(bindAttachButtons, 0);
+    }, true);
+
+    window.NovaMobileHardAttachBind = bindAttachButtons;
+    window.NovaMobileHardAttachInput = getOrCreateFileInput;
+
+    console.log("[Nova Mobile Hard Attach Button Bridge] ready");
 })();

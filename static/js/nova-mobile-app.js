@@ -1,4 +1,90 @@
-﻿/* NOVA_MOBILE_SMFF_SESSIONS_STABLE_20260606 */
+﻿
+/* NOVA_SENDTEXT_PENDING_ATTACHMENT_MERGE_HELPER_20260607 */
+function NovaGetPendingAttachmentsForSend20260607() {
+    function parseJson(value, fallback) {
+        try {
+            return JSON.parse(value);
+        } catch (e) {
+            return fallback;
+        }
+    }
+
+    var found = [];
+
+    var localPending = parseJson(localStorage.getItem("nova_mobile_pending_attachments") || "[]", []);
+    if (Array.isArray(localPending)) {
+        found = found.concat(localPending);
+    }
+
+    var localLast = parseJson(localStorage.getItem("nova_mobile_last_uploaded_attachment") || "null", null);
+    if (localLast && typeof localLast === "object") {
+        found.push(localLast);
+    }
+
+    if (Array.isArray(window.NovaMobilePendingAttachments)) {
+        found = found.concat(window.NovaMobilePendingAttachments);
+    }
+
+    if (Array.isArray(window.__novaMobilePendingAttachments)) {
+        found = found.concat(window.__novaMobilePendingAttachments);
+    }
+
+    var clean = [];
+    var seen = {};
+
+    found.forEach(function (item) {
+        if (!item || typeof item !== "object") {
+            return;
+        }
+
+        var filename = item.filename || item.original_filename || item.name || "";
+        var url = item.url || item.file_url || item.path || "";
+
+        if (!filename && url) {
+            filename = String(url).split("/").pop();
+        }
+
+        if (!filename && !url) {
+            return;
+        }
+
+        var normalized = {
+            ok: item.ok !== false,
+            filename: filename,
+            original_filename: item.original_filename || filename,
+            name: filename,
+            url: url,
+            file_url: item.file_url || url,
+            mime_type: item.mime_type || item.type || "",
+            size: item.size || 0,
+            source: "sendtext_pending_attachment_merge"
+        };
+
+        var key = String(normalized.url || normalized.file_url || normalized.filename || "").toLowerCase();
+
+        if (!key || seen[key]) {
+            return;
+        }
+
+        seen[key] = true;
+        clean.push(normalized);
+    });
+
+    return clean;
+}
+
+function NovaClearPendingAttachmentsAfterSend20260607() {
+    localStorage.removeItem("nova_mobile_pending_attachments");
+    localStorage.removeItem("nova_mobile_last_uploaded_attachment");
+    window.NovaMobilePendingAttachments = [];
+    window.__novaMobilePendingAttachments = [];
+    try {
+        if (typeof state !== "undefined" && state) {
+            state.pendingAttachments = [];
+        }
+    } catch (e) {}
+}
+/* NOVA_MOBILE_SMFF_SESSIONS_STABLE_20260606 */
 
 (function () {
 
@@ -287,7 +373,10 @@
         window.NovaMobileSharedAttachments = [];
 
         try {
-                        try { state.pendingAttachments = []; } catch (e) {}
+                        try { if (typeof state !== "undefined" && state) {
+            state.pendingAttachments = [];
+        }
+        NovaClearPendingAttachmentsAfterSend20260607(); } catch (e) {}
             try { window.NovaMobilePendingAttachments = []; } catch (e) {}
             try { window.NovaPendingAttachments = []; } catch (e) {}
             try { window.__novaMobilePendingAttachments = []; } catch (e) {}
@@ -320,6 +409,14 @@ async function sendText(textOverride) {
 
             if (window.NovaMobileState && Array.isArray(window.NovaMobileState.pendingAttachments)) {
                 window.NovaMobileState.pendingAttachments = [];
+            }
+
+            if (typeof state !== "undefined" && state) {
+                state.pendingAttachments = [];
+            }
+
+            if (typeof NovaClearPendingAttachmentsAfterSend20260607 === "function") {
+                NovaClearPendingAttachmentsAfterSend20260607();
             }
 
             if (typeof window.NovaMobileClearAttachmentPreviews === "function") {
@@ -1314,6 +1411,14 @@ sendText();
                 window.NovaMobileState.pendingAttachments = [];
             }
 
+            if (typeof state !== "undefined" && state) {
+                state.pendingAttachments = [];
+            }
+
+            if (typeof NovaClearPendingAttachmentsAfterSend20260607 === "function") {
+                NovaClearPendingAttachmentsAfterSend20260607();
+            }
+
             if (typeof window.NovaMobileClearAttachmentPreviews === "function") {
                 window.NovaMobileClearAttachmentPreviews();
             } else if (typeof window.NovaRenderComposerInlinePreview === "function") {
@@ -1827,3 +1932,269 @@ sendText();
 
     console.log("[Nova Mobile] compact input final ready");
 })();
+
+
+/* NOVA_MOBILE_ATTACHMENT_PAYLOAD_BRIDGE_FINAL_20260607 */
+(function () {
+    "use strict";
+
+    if (window.NovaMobileAttachmentPayloadBridgeFinalInstalled) {
+        return;
+    }
+
+    window.NovaMobileAttachmentPayloadBridgeFinalInstalled = true;
+
+    var LAST_UPLOAD_KEY = "nova_mobile_last_uploaded_attachment";
+    var PENDING_KEY = "nova_mobile_pending_attachments";
+
+    function safeJsonParse(value, fallback) {
+        try {
+            return JSON.parse(value);
+        } catch (e) {
+            return fallback;
+        }
+    }
+
+    function normalizeAttachment(item) {
+        if (!item || typeof item !== "object") {
+            return null;
+        }
+
+        var url = item.url || item.file_url || item.path || "";
+        var filename = item.filename || item.name || item.original_filename || "";
+
+        if (!url && !filename) {
+            return null;
+        }
+
+        return {
+            filename: filename,
+            original_filename: item.original_filename || filename,
+            name: filename,
+            url: url,
+            file_url: item.file_url || url,
+            mime_type: item.mime_type || item.type || "",
+            size: item.size || 0,
+            source: "mobile_payload_bridge_final"
+        };
+    }
+
+    function getStoredAttachments() {
+        var found = [];
+
+        var pending = safeJsonParse(localStorage.getItem(PENDING_KEY) || "[]", []);
+        if (Array.isArray(pending)) {
+            pending.forEach(function (item) {
+                var normalized = normalizeAttachment(item);
+                if (normalized) {
+                    found.push(normalized);
+                }
+            });
+        }
+
+        var last = safeJsonParse(localStorage.getItem(LAST_UPLOAD_KEY) || "null", null);
+        var normalizedLast = normalizeAttachment(last);
+        if (normalizedLast) {
+            found.push(normalizedLast);
+        }
+
+        if (Array.isArray(window.NovaMobilePendingAttachments)) {
+            window.NovaMobilePendingAttachments.forEach(function (item) {
+                var normalized = normalizeAttachment(item);
+                if (normalized) {
+                    found.push(normalized);
+                }
+            });
+        }
+
+        if (Array.isArray(window.__novaMobilePendingAttachments)) {
+            window.__novaMobilePendingAttachments.forEach(function (item) {
+                var normalized = normalizeAttachment(item);
+                if (normalized) {
+                    found.push(normalized);
+                }
+            });
+        }
+
+        var deduped = [];
+        var seen = {};
+
+        found.forEach(function (item) {
+            var key = String(item.url || item.file_url || item.filename || "").toLowerCase();
+            if (!key || seen[key]) {
+                return;
+            }
+            seen[key] = true;
+            deduped.push(item);
+        });
+
+        return deduped;
+    }
+
+    window.addEventListener("nova-mobile-upload-complete", function (event) {
+        var detail = event && event.detail ? event.detail : {};
+        var normalized = normalizeAttachment(detail);
+
+        if (!normalized && detail.attachment) {
+            normalized = normalizeAttachment(detail.attachment);
+        }
+
+        if (!normalized && detail.result) {
+            normalized = normalizeAttachment(detail.result);
+        }
+
+        if (!normalized) {
+            return;
+        }
+
+        localStorage.setItem(LAST_UPLOAD_KEY, JSON.stringify(normalized));
+        localStorage.setItem(PENDING_KEY, JSON.stringify([normalized]));
+
+        window.NovaMobilePendingAttachments = [normalized];
+        window.__novaMobilePendingAttachments = [normalized];
+
+        console.log("[Nova Mobile Attachment Payload Bridge Final] stored upload", normalized);
+    }, true);
+
+    var originalFetch = window.fetch;
+
+    window.fetch = function (input, init) {
+        try {
+            var url = typeof input === "string" ? input : (input && input.url ? input.url : "");
+
+            if (url && url.indexOf("/api/chat") !== -1 && init && init.body) {
+                var payload = safeJsonParse(init.body, null);
+
+                if (payload && typeof payload === "object") {
+                    var text = String(payload.user_text || payload.text || payload.message || "").toLowerCase();
+                    var wantsAttachment = (
+                        text.indexOf("attachment") !== -1 ||
+                        text.indexOf("attach") !== -1 ||
+                        text.indexOf("summarize this") !== -1 ||
+                        text.indexOf("summarise this") !== -1 ||
+                        text.indexOf("this file") !== -1
+                    );
+
+                    var currentAttachments = Array.isArray(payload.attachments) ? payload.attachments : [];
+
+                    if (wantsAttachment && currentAttachments.length === 0) {
+                        var stored = getStoredAttachments();
+
+                        if (stored.length > 0) {
+                            payload.attachments = stored;
+                            init.body = JSON.stringify(payload);
+
+                            console.log("[Nova Mobile Attachment Payload Bridge Final] injected attachments into /api/chat", stored);
+                        } else {
+                            console.warn("[Nova Mobile Attachment Payload Bridge Final] attachment prompt but no stored attachments found");
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("[Nova Mobile Attachment Payload Bridge Final] failed", e);
+        }
+
+        return originalFetch.apply(this, arguments);
+    };
+
+    window.NovaMobileAttachmentPayloadBridgeFinalGet = getStoredAttachments;
+
+    console.log("[Nova Mobile Attachment Payload Bridge Final] ready");
+})();
+
+
+/* NOVA_MOBILE_UPLOAD_RESPONSE_CAPTURE_BRIDGE_20260607 */
+(function () {
+    "use strict";
+
+    if (window.NovaMobileUploadResponseCaptureBridgeInstalled) {
+        return;
+    }
+
+    window.NovaMobileUploadResponseCaptureBridgeInstalled = true;
+
+    var LAST_UPLOAD_KEY = "nova_mobile_last_uploaded_attachment";
+    var PENDING_KEY = "nova_mobile_pending_attachments";
+
+    function normalizeAttachment(item) {
+        if (!item || typeof item !== "object") {
+            return null;
+        }
+
+        var source = item.attachment || item.result || item.file || item;
+
+        var url = source.url || source.file_url || source.path || "";
+        var filename = source.filename || source.original_filename || source.name || "";
+
+        if (!url && !filename) {
+            return null;
+        }
+
+        return {
+            filename: filename,
+            original_filename: source.original_filename || filename,
+            name: filename,
+            url: url,
+            file_url: source.file_url || url,
+            mime_type: source.mime_type || source.type || "",
+            size: source.size || 0,
+            source: "mobile_upload_response_capture_bridge"
+        };
+    }
+
+    function storeAttachment(item) {
+        var normalized = normalizeAttachment(item);
+
+        if (!normalized) {
+            return false;
+        }
+
+        localStorage.setItem(LAST_UPLOAD_KEY, JSON.stringify(normalized));
+        localStorage.setItem(PENDING_KEY, JSON.stringify([normalized]));
+
+        window.NovaMobilePendingAttachments = [normalized];
+        window.__novaMobilePendingAttachments = [normalized];
+
+        console.log("[Nova Mobile Upload Response Capture Bridge] stored upload", normalized);
+        return true;
+    }
+
+    function getStoredAttachments() {
+        var raw = localStorage.getItem(PENDING_KEY) || "[]";
+
+        try {
+            var parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    var previousFetch = window.fetch;
+
+    window.fetch = function (input, init) {
+        var url = typeof input === "string" ? input : (input && input.url ? input.url : "");
+
+        return previousFetch.apply(this, arguments).then(function (response) {
+            try {
+                if (url && url.indexOf("/api/upload") !== -1 && response && response.clone) {
+                    response.clone().json().then(function (data) {
+                        storeAttachment(data);
+                    }).catch(function () {});
+                }
+            } catch (e) {
+                console.warn("[Nova Mobile Upload Response Capture Bridge] upload capture failed", e);
+            }
+
+            return response;
+        });
+    };
+
+    window.NovaMobileUploadResponseCaptureBridgeGet = getStoredAttachments;
+
+    console.log("[Nova Mobile Upload Response Capture Bridge] ready");
+})();
+
+
+

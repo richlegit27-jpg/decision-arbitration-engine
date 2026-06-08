@@ -70,7 +70,7 @@ def _nova_local_project_status_answer_20260607(user_text):
         "Here is what we actually fixed today:\n\n"
         "- Fixed the mobile composer buttons so the send/voice/attach/tools buttons stopped stretching and now hold a clean square size.\n"
         "- Fixed the mojibukakke icon problem where symbols were showing as broken text like âž¤, ðŸŽ™, and ï¼‹.\n"
-        "- Fixed the stale frontend cache problem where /mobile kept loading an old nova-mobile-app.js version instead of the patched one.\n"
+        "- Fixed the stale frontend cache problem where /mobile kept loading an old nova-mobile-app.js?v=attachment-payload-bridge-20260607204432 version instead of the patched one.\n"
         "- Slimmed the mobile input/composer bar down so the textarea and main composer buttons are now 40px high.\n"
         "- Found the next real issue: Nova's answer quality is contaminated by stale web/search context, so normal project questions can get wrong web-result answers.\n\n"
         "Next move: block stale web/search context from normal Nova project/session questions."
@@ -4680,7 +4680,7 @@ if (not attachments) and (__name__ == "__main__"):
                 "Here is what we actually fixed today:\n\n"
                 "- Fixed the mobile composer buttons so send, voice, attach, tools, and TTS stopped stretching.\n"
                 "- Fixed the mojibukakke icon issue where broken encoded symbols were showing instead of clean icons.\n"
-                "- Fixed the stale frontend cache issue where /mobile kept loading an old nova-mobile-app.js version.\n"
+                "- Fixed the stale frontend cache issue where /mobile kept loading an old nova-mobile-app.js?v=attachment-payload-bridge-20260607204432 version.\n"
                 "- Slimmed the mobile composer/input bar so the real input and main buttons are now 40px high.\n"
                 "- Fixed the router bug where the word 'today' forced local project questions into web_fetch.\n\n"
                 "Remaining issue: project status answers still need a real work-log system so Nova does not guess from old memories."
@@ -19535,6 +19535,7 @@ for name in CHAT_SERVICE_METHODS:
         setattr(ChatService, name, obj)
 
 # MEMORY_ITEMS_NAMEERROR_SAFE_LOCK
+
 
 
 
