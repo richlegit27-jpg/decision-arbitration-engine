@@ -637,38 +637,9 @@ function findSessionsToggle() {
         window.NovaMobileSendMessage = sendText;
         window.NovaMobileStop = stopEverything;
         window.NovaMobileSpeak = speakLatest;
-        if (!window.__NovaMobileSendFallbackBound) {
-            window.__NovaMobileSendFallbackBound = true;
+        // NOVA_MOBILE_APP_SEND_FALLBACK_DELEGATED_20260608
+        // Fallback send click/keydown listeners removed because events module owns send/input.
 
-            document.addEventListener("click", function (event) {
-                const target = event.target && event.target.closest
-                    ? event.target.closest("#nova-mobile-send, [data-nova-mobile-send], [data-mobile-send], .nova-mobile-send-button")
-                    : null;
-
-                if (!target) return;
-
-                event.preventDefault();
-                event.stopPropagation();
-sendText();
-            }, true);
-
-            document.addEventListener("keydown", function (event) {
-                const target = event.target;
-                const isInput =
-                    target &&
-                    (
-                        target.id === "nova-mobile-input" ||
-                        target.matches?.("#nova-mobile-input, textarea, [contenteditable='true']")
-                    );
-
-                if (!isInput) return;
-                if (event.key !== "Enter" || event.shiftKey) return;
-
-                event.preventDefault();
-                event.stopPropagation();
-sendText();
-            }, true);
-}
         // NOVA_MOBILE_APP_SESSION_DELEGATE_20260608
         // Session opening is owned by static/js/mobile/nova-mobile-sessions.js.
         if (window.NovaMobileSessions && typeof window.NovaMobileSessions.wire === "function") {
@@ -758,4 +729,4 @@ sendText();
 
 
 
-/* NOVA_MOBILE_APP_REMOVED_DEAD_SESSION_BRIDGE_FRAGMENT_20260608 - dead addSessionBubble-only fragment removed. Session module owns session behavior. */\n
+/* NOVA_MOBILE_APP_REMOVED_DEAD_SESSION_BRIDGE_FRAGMENT_20260608 - dead addSessionBubble-only fragment removed. Session module owns session behavior. */\n\n
