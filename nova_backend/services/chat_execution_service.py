@@ -299,3 +299,47 @@ class ChatExecutionService:
 
 
 ExecutionService = ChatExecutionService
+
+
+# NOVA_EXECUTION_POST_COMPLETE_IDLE_GUARD_20260609
+# If user sends k/next/continue after a mission is already complete,
+# return idle instead of repeating "Execution complete: <goal>".
+
+try:
+    _nova_original_execution_advance_20260609 = ChatExecutionService.advance
+
+    def _nova_execution_advance_post_complete_idle_20260609(self, session_id: str):
+        safe_session_id = self._safe_session_id(session_id)
+
+        try:
+            state = self._states.get(safe_session_id) or {}
+
+            if isinstance(state, dict) and (
+                state.get("complete") is True
+                or str(state.get("status") or "").strip().lower() in {"complete", "completed"}
+            ):
+                self._states[safe_session_id] = {
+                    "status": "idle",
+                    "goal": None,
+                    "steps": [],
+                    "current_index": 0,
+                    "current_step": None,
+                    "history": [],
+                    "waiting": False,
+                    "complete": False,
+                    "error": "No active execution mission. Start one with: auto-plan <goal>",
+                }
+
+                self._save_states()
+
+                return self._copy_state(self._states[safe_session_id])
+        except Exception:
+            pass
+
+        return _nova_original_execution_advance_20260609(self, session_id)
+
+    ChatExecutionService.advance = _nova_execution_advance_post_complete_idle_20260609
+
+except Exception:
+    pass
+

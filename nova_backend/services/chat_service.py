@@ -21047,3 +21047,302 @@ for name in CHAT_SERVICE_METHODS:
 
 
 
+
+
+# NOVA_PLANNER_SERVICE_WIRING_20260609
+# Safe planner_service wiring layer.
+# This does NOT delete the existing _process_goal_and_plan.
+# It wraps the existing method and falls back to planner_service only when needed.
+
+try:
+    from nova_backend.services.planner_service import planner_service as _nova_planner_service_20260609
+except Exception as _nova_planner_import_error_20260609:
+    _nova_planner_service_20260609 = None
+
+
+def _nova_clean_goal_for_planner_20260609(value: str) -> str:
+    text = str(value or "").strip()
+
+    prefixes = (
+        "auto-plan ",
+        "autoplan ",
+        "plan ",
+        "build ",
+        "create ",
+        "make ",
+        "implement ",
+        "fix ",
+        "repair ",
+        "upgrade ",
+    )
+
+    lowered = text.lower()
+
+    for prefix in prefixes:
+        if lowered.startswith(prefix):
+            return text[len(prefix):].strip() or "generic"
+
+    return text or "generic"
+
+
+def _nova_build_planner_fallback_state_20260609(goal_text: str) -> dict:
+    safe_goal = _nova_clean_goal_for_planner_20260609(goal_text)
+
+    if _nova_planner_service_20260609 is None:
+        steps = [
+            f"Design the approach for {safe_goal}.",
+            f"Implement the solution for {safe_goal}.",
+            f"Test and verify {safe_goal}.",
+        ]
+        planner_available = False
+    else:
+        try:
+            steps = _nova_planner_service_20260609.build_execution_steps(safe_goal)
+            planner_available = True
+        except Exception:
+            steps = [
+                f"Design the approach for {safe_goal}.",
+                f"Implement the solution for {safe_goal}.",
+                f"Test and verify {safe_goal}.",
+            ]
+            planner_available = False
+
+    steps = [
+        str(step or "").strip()
+        for step in (steps or [])
+        if str(step or "").strip()
+    ]
+
+    if not steps:
+        steps = [
+            f"Design the approach for {safe_goal}.",
+            f"Implement the solution for {safe_goal}.",
+            f"Test and verify {safe_goal}.",
+        ]
+
+    return {
+        "status": "waiting",
+        "goal": safe_goal,
+        "original_user_text": str(goal_text or ""),
+        "steps": steps,
+        "current_index": 0,
+        "current_step": steps[0] if steps else None,
+        "current_step_title": steps[0] if steps else None,
+        "history": [],
+        "waiting": True,
+        "complete": False,
+        "error": None,
+        "planner_service_used": planner_available,
+        "planner_fallback": True,
+        "source": "planner_service",
+    }
+
+
+try:
+    _nova_original_process_goal_and_plan_20260609 = getattr(
+        ChatService,
+        "_process_goal_and_plan",
+        None,
+    )
+
+    def _nova_process_goal_and_plan_with_planner_20260609(
+        self,
+        user_text,
+        session_id="",
+        *args,
+        **kwargs,
+    ):
+        original_error = None
+
+        if callable(_nova_original_process_goal_and_plan_20260609):
+            try:
+                result = _nova_original_process_goal_and_plan_20260609(
+                    self,
+                    user_text,
+                    session_id,
+                    *args,
+                    **kwargs,
+                )
+
+                if isinstance(result, dict):
+                    steps = result.get("steps") or []
+
+                    if isinstance(steps, list) and steps:
+                        result.setdefault("planner_service_checked", True)
+                        return result
+
+                    result["planner_service_original_empty"] = True
+
+            except Exception as exc:
+                original_error = str(exc)
+
+        fallback = _nova_build_planner_fallback_state_20260609(user_text)
+
+        if original_error:
+            fallback["original_planner_error"] = original_error
+
+        try:
+            if hasattr(self, "_save_execution_state"):
+                self._save_execution_state(session_id, fallback)
+
+            if hasattr(self, "_update_working_state"):
+                self._update_working_state(
+                    session_id,
+                    {
+                        "active_task": fallback.get("goal"),
+                        "next_move": fallback.get("current_step"),
+                        "checkpoint": "planner_service_fallback_created",
+                        "execution_status": fallback.get("status"),
+                    },
+                )
+        except Exception:
+            pass
+
+        return fallback
+
+    ChatService._process_goal_and_plan = _nova_process_goal_and_plan_with_planner_20260609
+
+except Exception:
+    pass
+
+
+
+# NOVA_CHATSERVICE_POST_COMPLETE_IDLE_GUARD_20260609
+# Prevent repeated "Execution complete: <goal>" after completion when user sends k/next/continue/run it.
+
+try:
+    _nova_original_advance_execution_request_20260609 = getattr(
+        ChatService,
+        "_advance_execution_request",
+        None,
+    )
+
+    def _nova_control_text_is_advance_20260609(value) -> bool:
+        text = str(value or "").strip().lower()
+        return text in {
+            "k",
+            "ok",
+            "next",
+            "continue",
+            "run it",
+            "run step",
+            "execute",
+            "advance",
+        }
+
+    def _nova_build_no_active_execution_response_20260609(self, user_text, session_id="", attachments=None):
+        attachments = attachments or []
+
+        try:
+            if hasattr(self, "_save_execution_state"):
+                self._save_execution_state(session_id, {})
+
+            if hasattr(self, "_set_session_meta"):
+                self._set_session_meta(session_id, "execution_state", {})
+                self._set_session_meta(session_id, "active_execution", {})
+
+            if hasattr(self, "_update_working_state"):
+                self._update_working_state(
+                    session_id,
+                    {
+                        "active_task": "",
+                        "next_move": "await_new_mission",
+                        "checkpoint": "execution_complete_idle_guard",
+                        "execution_status": "idle",
+                    },
+                )
+        except Exception:
+            pass
+
+        text = "No active execution mission. Start one with: auto-plan <goal>"
+
+        try:
+            user_msg = self._build_user_message(user_text, attachments=attachments)
+            assistant_msg = self._build_assistant_message(
+                text=text,
+                meta={
+                    "execution_idle": True,
+                    "post_complete_guard": True,
+                },
+                attachments=[],
+            )
+
+            return self._finalize_response(
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision={
+                    "route": "execution_idle",
+                    "mode": "execution",
+                    "save_artifact": False,
+                    "save_memory": False,
+                    "use_memory": False,
+                },
+                saved_artifact=None,
+                session_id=session_id,
+                attachments=attachments,
+            )
+        except Exception:
+            return {
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": text,
+                    "attachments": [],
+                    "meta": {
+                        "execution_idle": True,
+                        "post_complete_guard": True,
+                    },
+                },
+                "text": text,
+            }
+
+    def _nova_advance_execution_request_post_complete_idle_20260609(
+        self,
+        user_text: str,
+        session_id: str = "",
+        attachments=None,
+    ):
+        attachments = attachments or []
+
+        if _nova_control_text_is_advance_20260609(user_text):
+            try:
+                execution = {}
+
+                if hasattr(self, "_load_execution_state"):
+                    execution = self._load_execution_state(session_id) or {}
+
+                if not execution and hasattr(self, "_get_session_meta"):
+                    execution = self._get_session_meta(session_id, "execution_state") or {}
+
+                status = str((execution or {}).get("status") or "").strip().lower()
+
+                if status in {"complete", "completed"} or (execution or {}).get("complete") is True:
+                    return _nova_build_no_active_execution_response_20260609(
+                        self,
+                        user_text=user_text,
+                        session_id=session_id,
+                        attachments=attachments,
+                    )
+            except Exception:
+                pass
+
+        if callable(_nova_original_advance_execution_request_20260609):
+            return _nova_original_advance_execution_request_20260609(
+                self,
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
+            )
+
+        return _nova_build_no_active_execution_response_20260609(
+            self,
+            user_text=user_text,
+            session_id=session_id,
+            attachments=attachments,
+        )
+
+    ChatService._advance_execution_request = _nova_advance_execution_request_post_complete_idle_20260609
+
+except Exception:
+    pass
+

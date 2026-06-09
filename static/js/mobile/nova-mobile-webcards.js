@@ -1,3 +1,265 @@
+﻿// NOVA_MOBILE_WEB_RICH_CARDS_20260609
+
+// SMFF: C:\Users\Owner\nova\static\js\mobile\nova-mobile-webcards.js
+
+// FIX: getHostnameFromUrl must exist before appendWebCard uses it
+
+// NOVA_MOBILE_WEBCARDS_SAFE_TOAST_20260609
+function showToast(msg) {
+    try {
+        console.log("TOAST:", msg);
+    } catch (_) {}
+}
+
+// NOVA_MOBILE_WEBCARDS_SAFE_VIBRATE_20260609
+function vibrate(ms) {
+    try {
+        if (navigator && typeof navigator.vibrate === "function") {
+            navigator.vibrate(ms || 8);
+        }
+    } catch (_) {}
+}
+
+// NOVA_MOBILE_WEBCARDS_SAFE_COPY_TEXT_20260609
+
+function copyText(text) {
+    const value = String(text || "");
+
+    if (!value) return;
+
+    if (
+        navigator &&
+        navigator.clipboard &&
+        typeof navigator.clipboard.writeText === "function"
+    ) {
+        navigator.clipboard.writeText(value).catch(function () {});
+        return;
+    }
+
+    try {
+        const textarea = document.createElement("textarea");
+        textarea.value = value;
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        textarea.style.top = "-9999px";
+
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+
+        document.execCommand("copy");
+
+        textarea.remove();
+    } catch (_) {}
+}
+
+function getHostnameFromUrl(url) {
+    try {
+        return new URL(url).hostname.replace(/^www\./, '');
+    } catch (e) {
+        return 'Source';
+    }
+}
+
+// NOVA_MOBILE_WEB_RICH_CARDS_20260609
+function collectWebCardSources(data) {
+    const out = [];
+    const seen = new Set();
+
+    function add(item) {
+        if (!item) return;
+        let url = "", title = "", source = "", snippet = "";
+
+        if (typeof item === "string") {
+            url = item;
+        } else if (typeof item === "object") {
+            url = item.url || item.link || item.href || item.source_url || "";
+            title = item.title || "";
+            source = item.source || item.publisher || item.site || "";
+            snippet = item.snippet || item.description || "";
+        }
+
+        url = String(url || "").trim();
+        if (!/^https?:\/\//i.test(url)) return;
+        if (seen.has(url)) return;
+        seen.add(url);
+
+        if (!source) {
+            try { source = new URL(url).hostname.replace(/^www\./,""); } catch(_) { source="Source"; }
+        }
+
+        out.push({url, title: title || source, source: source || "Source", snippet});
+    }
+
+    const msg = data && data.assistant_message ? data.assistant_message : {};
+    const meta = msg && msg.meta ? msg.meta : {};
+
+    [meta.sources, meta.source_urls, msg.sources, msg.source_urls].forEach(list => {
+        if (!Array.isArray(list)) return;
+        list.forEach(add);
+    });
+
+    return out.slice(0,5);
+}
+
+function renderWebCardSources(targetBubble, data) {
+    const cards = collectWebCardSources(data);
+    if (!targetBubble || !cards.length) return;
+
+    const wrap = document.createElement("div");
+    wrap.className = "nova-mobile-source-cards";
+    wrap.style.display = "grid";
+    wrap.style.gap = "8px";
+    wrap.style.marginTop = "12px";
+
+    cards.forEach(function(c, i){
+        const card = document.createElement("a");
+        card.href = c.url;
+        card.target = "_blank";
+        card.rel = "noopener noreferrer";
+        card.style.display="block";
+        card.style.padding="10px 12px";
+        card.style.borderRadius="14px";
+        card.style.background="rgba(124,92,255,.18)";
+        card.style.border="1px solid rgba(255,255,255,.16)";
+        card.style.color="#f8fafc";
+        card.style.textDecoration="none";
+        card.style.fontSize="13px";
+        card.style.lineHeight="1.35";
+        card.style.wordBreak="break-word";
+
+        const sourceLine = document.createElement("div");
+        sourceLine.textContent = "Source "+(i+1)+" · "+c.source;
+        sourceLine.style.opacity=".78";
+        sourceLine.style.fontSize="12px";
+        sourceLine.style.marginBottom="4px";
+
+        const titleLine = document.createElement("div");
+        titleLine.textContent = c.title;
+        titleLine.style.fontWeight="700";
+
+        card.appendChild(sourceLine);
+        card.appendChild(titleLine);
+
+        if (c.snippet && c.snippet!==c.title) {
+            const snippetLine = document.createElement("div");
+            snippetLine.textContent = c.snippet;
+            snippetLine.style.opacity=".82";
+            snippetLine.style.fontSize="12px";
+            snippetLine.style.marginTop="4px";
+            card.appendChild(snippetLine);
+        }
+
+        wrap.appendChild(card);
+    });
+
+    targetBubble.appendChild(wrap);
+    console.log("[Nova Mobile Sources] rendered", cards.length);
+}
+
+// Patch done: now window.renderWebSourcesFromPayload can call renderWebCardSources
+window.renderWebSourcesFromPayload = function(payload){
+    try {
+        renderWebCardSources(document.getElementById("mobileChatMessages"), payload);
+    } catch(e){
+        console.error("[Nova Mobile Sources] render failed", e);
+    }
+};
+
+function collectWebCardSources(data) {
+    const out = [];
+    const seen = new Set();
+
+    function add(item) {
+        if (!item) return;
+        let url = "", title = "", source = "", snippet = "";
+
+        if (typeof item === "string") {
+            url = item;
+        } else if (typeof item === "object") {
+            url = item.url || item.link || item.href || item.source_url || "";
+            title = item.title || "";
+            source = item.source || item.publisher || item.site || "";
+            snippet = item.snippet || item.description || "";
+        }
+
+        url = String(url || "").trim();
+        if (!/^https?:\/\//i.test(url)) return;
+        if (seen.has(url)) return;
+        seen.add(url);
+
+        if (!source) {
+            try { source = new URL(url).hostname.replace(/^www\./,""); } catch(_) { source="Source"; }
+        }
+
+        out.push({url, title: title || source, source: source || "Source", snippet});
+    }
+
+    const msg = data && data.assistant_message ? data.assistant_message : {};
+    const meta = msg && msg.meta ? msg.meta : {};
+
+    [meta.sources, meta.source_urls, msg.sources, msg.source_urls].forEach(list => {
+        if (!Array.isArray(list)) return;
+        list.forEach(add);
+    });
+
+    return out.slice(0,5);
+}
+
+function renderWebCardSources(targetBubble, data) {
+    const cards = collectWebCardSources(data);
+    if (!targetBubble || !cards.length) return;
+
+    const wrap = document.createElement("div");
+    wrap.className = "nova-mobile-source-cards";
+    wrap.style.display = "grid";
+    wrap.style.gap = "8px";
+    wrap.style.marginTop = "12px";
+
+    cards.forEach(function(c, i){
+        const card = document.createElement("a");
+        card.href = c.url;
+        card.target = "_blank";
+        card.rel = "noopener noreferrer";
+        card.style.display="block";
+        card.style.padding="10px 12px";
+        card.style.borderRadius="14px";
+        card.style.background="rgba(124,92,255,.18)";
+        card.style.border="1px solid rgba(255,255,255,.16)";
+        card.style.color="#f8fafc";
+        card.style.textDecoration="none";
+        card.style.fontSize="13px";
+        card.style.lineHeight="1.35";
+        card.style.wordBreak="break-word";
+
+        const sourceLine = document.createElement("div");
+        sourceLine.textContent = "Source "+(i+1)+" · "+c.source;
+        sourceLine.style.opacity=".78";
+        sourceLine.style.fontSize="12px";
+        sourceLine.style.marginBottom="4px";
+
+        const titleLine = document.createElement("div");
+        titleLine.textContent = c.title;
+        titleLine.style.fontWeight="700";
+
+        card.appendChild(sourceLine);
+        card.appendChild(titleLine);
+
+        if (c.snippet && c.snippet!==c.title) {
+            const snippetLine = document.createElement("div");
+            snippetLine.textContent = c.snippet;
+            snippetLine.style.opacity=".82";
+            snippetLine.style.fontSize="12px";
+            snippetLine.style.marginTop="4px";
+            card.appendChild(snippetLine);
+        }
+
+        wrap.appendChild(card);
+    });
+
+    targetBubble.appendChild(wrap);
+    console.log("[Nova Mobile Sources] rendered", cards.length);
+}
 (function () {
 "use strict";
 
@@ -192,7 +454,7 @@ function appendWebCard(
     externalIcon.className =
         "mobile-web-card-external";
 
-    externalIcon.textContent = "↗";
+    externalIcon.textContent = "â†—";
 
     const heading =
         document.createElement("div");
@@ -676,22 +938,22 @@ function getWebCardBadgeIcon(type) {
         String(type || "").toUpperCase()
     ) {
         case "VIDEO":
-            return "▶";
+            return "â–¶";
 
         case "NEWS":
-            return "📰";
+            return "ðŸ“°";
 
         case "GITHUB":
-            return "⌘";
+            return "âŒ˜";
 
         case "DOCS":
-            return "📘";
+            return "ðŸ“˜";
 
         case "SEARCH":
-            return "⌕";
+            return "âŒ•";
 
         default:
-            return "●";
+            return "â—";
     }
 }
 
@@ -873,6 +1135,44 @@ function resetCopyButton(copyBtn) {
     }, 900);
 }
 
+// NOVA_DEFINE_RENDER_WEB_SOURCES_FROM_PAYLOAD_20260609
+window.renderWebSourcesFromPayload = function (payload) {
+    try {
+        if (typeof collectWebCardSources !== "function") {
+            console.warn("[Nova Mobile Sources] collectWebCardSources missing");
+            return;
+        }
+
+        if (typeof appendWebSectionHeader !== "function" || typeof appendWebCard !== "function") {
+            console.warn("[Nova Mobile Sources] web card functions missing");
+            return;
+        }
+
+        const cards = collectWebCardSources(payload);
+
+        if (!cards.length) {
+            console.log("[Nova Mobile Sources] no payload sources");
+            return;
+        }
+
+        appendWebSectionHeader();
+
+        cards.forEach(function (card) {
+            appendWebCard(
+                card.title || card.source || "Source",
+                card.url || "",
+                card.snippet || card.title || "",
+                "news",
+                100
+            );
+        });
+
+        console.log("[Nova Mobile Sources] rendered from payload", cards.length);
+    } catch (error) {
+        console.error("[Nova Mobile Sources] render failed", error);
+    }
+};
+
 window.NovaMobileWebCards = {
     appendWebCardSkeleton,
     appendWebSectionHeader,
@@ -891,3 +1191,4 @@ window.NovaMobileWebCards = {
 };
 
 })();
+

@@ -1,4 +1,4 @@
-/* NOVA_MOBILE_SESSIONS_MODULE_20260606 */
+﻿/* NOVA_MOBILE_SESSIONS_MODULE_20260606 */
 
 (function () {
     "use strict";
@@ -121,7 +121,7 @@
 
         const renameBtn = document.createElement("button");
         renameBtn.type = "button";
-        renameBtn.textContent = "✏";
+        renameBtn.textContent = "âœ";
         renameBtn.title = "Rename session";
         renameBtn.style.width = "42px";
         renameBtn.style.flex = "0 0 42px";
@@ -130,7 +130,7 @@
 
         const deleteBtn = document.createElement("button");
         deleteBtn.type = "button";
-        deleteBtn.textContent = "🗑";
+        deleteBtn.textContent = "ðŸ—‘";
         deleteBtn.title = "Delete session";
         deleteBtn.style.width = "42px";
         deleteBtn.style.flex = "0 0 42px";
@@ -148,10 +148,10 @@
         }
 
         function renderTitle() {
-            const pinnedText = session.pinned ? "📌 " : "";
+            const pinnedText = session.pinned ? "ðŸ“Œ " : "";
 
-            btn.textContent = pinnedText + currentTitle() + " · " + shortId;
-            pinBtn.textContent = session.pinned ? "📌" : "📍";
+            btn.textContent = pinnedText + currentTitle() + " Â· " + shortId;
+            pinBtn.textContent = session.pinned ? "ðŸ“Œ" : "ðŸ“";
         }
 
         renderTitle();
@@ -379,7 +379,7 @@
         btn = document.createElement("button");
         btn.id = "nova-mobile-sessions-toggle-forced";
         btn.type = "button";
-        btn.textContent = "☰";
+        btn.textContent = "â˜°";
         btn.title = "Sessions";
 
         btn.style.position = "fixed";
@@ -432,4 +432,5 @@
         closeSessionsPanel: closeSessionsPanel,
         loadSessionsPanel: loadSessionsPanel
     };
-})();\n
+})();
+

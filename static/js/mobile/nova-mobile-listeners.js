@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     "use strict";
 
     function installCoreListeners() {
@@ -135,4 +135,5 @@
     };
 
     console.log("[Nova Mobile] listeners module ready");
-})();\n
+})();
+

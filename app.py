@@ -8264,6 +8264,25 @@ def _nova_stop_fake_attachment_chat_gate():
         return None
 
 
+
+# NOVA_BACKEND_READINESS_ROUTE_20260609
+# Live local backend readiness endpoint.
+try:
+    from nova_backend.services.chat_service_backend_readiness import get_backend_readiness
+
+    @app.route("/api/backend/readiness", methods=["GET"])
+    def api_backend_readiness_20260609():
+        return get_backend_readiness()
+
+except Exception as _nova_backend_readiness_route_error_20260609:
+    @app.route("/api/backend/readiness", methods=["GET"])
+    def api_backend_readiness_route_error_20260609():
+        return {
+            "ok": False,
+            "error": "backend_readiness_route_failed",
+            "detail": str(_nova_backend_readiness_route_error_20260609),
+        }, 500
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
@@ -8289,6 +8308,7 @@ if __name__ == "__main__":
 
 
 # CLEAN_IMAGE_PROMPT_RIGHT_BEFORE_CHAT_SERVICE_LOCK
+
 
 
 

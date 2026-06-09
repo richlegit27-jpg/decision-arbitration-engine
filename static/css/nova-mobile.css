@@ -10892,3 +10892,729 @@ input#nova-mobile-input,
     font-style: italic !important;
     color: rgba(255, 255, 255, 0.72) !important;
 }
+
+
+/* NOVA_MOBILE_WEBCARD_OVERLAP_LOCK_20260608 */
+/* Keep web/source/artifact cards inside the chat flow so they cannot cover session header or summary text. */
+
+.nova-mobile-chat,
+.nova-mobile-messages,
+#nova-mobile-chat,
+#nova-mobile-messages,
+#nova-mobile-thread,
+.mobile-chat,
+.mobile-messages {
+    isolation: isolate !important;
+    overflow-x: hidden !important;
+}
+
+.nova-web-card,
+.nova-webcard,
+.web-card,
+.webcard,
+.source-card,
+.nova-source-card,
+.nova-mobile-web-card,
+.nova-mobile-webcard,
+.nova-mobile-source-card,
+.nova-artifact-card,
+.artifact-card,
+[class*="webcard"],
+[class*="web-card"],
+[class*="source-card"],
+[class*="artifact-card"] {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    z-index: 2 !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 10px 0 !important;
+    transform: none !important;
+    float: none !important;
+    clear: both !important;
+}
+
+.nova-mobile-session-header,
+.mobile-session-header,
+#nova-mobile-session-header,
+#nova-mobile-active-session,
+#nova-active-session,
+[class*="session-header"],
+[class*="active-session"] {
+    position: relative !important;
+    z-index: 50 !important;
+}
+
+.nova-mobile-summary,
+.mobile-summary,
+.nova-summary,
+.summary,
+[class*="summary"] {
+    position: relative !important;
+    z-index: 3 !important;
+    overflow: visible !important;
+}
+
+.nova-mobile-message,
+.mobile-message,
+.message,
+.chat-message,
+.assistant-message,
+.user-message,
+[class*="message-bubble"] {
+    position: relative !important;
+    z-index: 1 !important;
+    overflow: visible !important;
+}
+
+.nova-mobile-message:has(.nova-web-card),
+.nova-mobile-message:has(.nova-webcard),
+.nova-mobile-message:has(.web-card),
+.nova-mobile-message:has(.webcard),
+.nova-mobile-message:has(.source-card),
+.message:has(.nova-web-card),
+.message:has(.nova-webcard),
+.message:has(.web-card),
+.message:has(.webcard),
+.message:has(.source-card) {
+    overflow: visible !important;
+    contain: none !important;
+}
+
+
+/* NOVA_MOBILE_CHAT_CONTAINER_HEADER_OFFSET_20260608 */
+/* The webcards were not only overlapping by z-index. The whole chat container was starting too high and covering the session/header area. */
+
+#mobileChatMessages,
+.mobile-chat-container {
+    position: relative !important;
+    z-index: 1 !important;
+    margin-top: 58px !important;
+    height: calc(100dvh - 178px) !important;
+    max-height: calc(100dvh - 178px) !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+    padding-top: 8px !important;
+    padding-bottom: 120px !important;
+}
+
+#mobileChatMessages > *,
+.mobile-chat-container > * {
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+#mobileChatMessages .mobile-web-card-title-wrap,
+.mobile-chat-container .mobile-web-card-title-wrap,
+#mobileChatMessages .mobile-web-card,
+.mobile-chat-container .mobile-web-card,
+#mobileChatMessages [class*="web-card"],
+.mobile-chat-container [class*="web-card"],
+#mobileChatMessages [class*="webcard"],
+.mobile-chat-container [class*="webcard"],
+#mobileChatMessages [class*="source-card"],
+.mobile-chat-container [class*="source-card"] {
+    position: relative !important;
+    z-index: 2 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    transform: none !important;
+}
+
+/* Keep session/header chrome above the scroll area. */
+#mobileSessionLabel,
+#mobileActiveSession,
+#nova-mobile-session-header,
+.mobile-session-header,
+[class*="session-header"],
+[class*="active-session"] {
+    position: relative !important;
+    z-index: 20 !important;
+}
+
+
+/* NOVA_MOBILE_BUBBLE_CARD_POLISH_20260608 */
+
+/* Chat bubble styling */
+.nova-mobile-message,
+.mobile-message,
+.message,
+.user-message,
+.assistant-message {
+    border-radius: 16px !important;
+    padding: 8px 14px !important;
+    margin: 6px 12px !important;
+    max-width: 84% !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.12) !important;
+}
+
+/* User bubble colors */
+.user-message {
+    background-color: #4a3aff !important; /* purple bubble */
+    color: #ffffff !important;
+    text-align: right !important;
+}
+
+/* Assistant bubble colors */
+.assistant-message {
+    background-color: #f2f2f7 !important; /* light gray */
+    color: #1c1c1e !important;
+    text-align: left !important;
+}
+
+/* Card content styling */
+.nova-web-card,
+.nova-webcard,
+.web-card,
+.webcard,
+.source-card,
+.nova-source-card,
+.nova-artifact-card,
+.artifact-card {
+    background-color: #1e1e28 !important; /* dark card background */
+    color: #e5e5f0 !important;
+    border-radius: 12px !important;
+    padding: 10px 14px !important;
+    margin: 8px 0 !important;
+    max-width: 100% !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.18) !important;
+    overflow-wrap: break-word !important;
+}
+
+/* Card title styling */
+.nova-web-card-title,
+.nova-webcard-title,
+.web-card-title,
+.webcard-title,
+.source-card-title {
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    color: #ffffff !important;
+    margin-bottom: 6px !important;
+}
+
+/* Card content text */
+.nova-web-card-content,
+.nova-webcard-content,
+.web-card-content,
+.webcard-content,
+.source-card-content {
+    font-weight: 400 !important;
+    font-size: 13px !important;
+    color: #c8c8d1 !important;
+    line-height: 1.4 !important;
+}
+
+/* Limit overflow / “spread” */
+.nova-web-card,
+.nova-webcard {
+    word-break: break-word !important;
+    white-space: pre-wrap !important;
+    overflow-wrap: break-word !important;
+}
+
+/* Optional: hover effect */
+.nova-web-card:hover,
+.nova-webcard:hover {
+    background-color: #272736 !important;
+    transform: translateY(-1px) !important;
+    transition: all 0.15s ease-in-out !important;
+}
+
+
+/* NOVA_MOBILE_RESTORE_COPY_REGEN_ACTIONS_20260608 */
+/* Restore mobile message action buttons after bubble/card polish. */
+
+.mobile-message-actions,
+.nova-mobile-message-actions,
+.message-actions,
+.bubble-actions,
+.assistant-actions,
+.user-actions,
+.chat-message-actions,
+[class*="message-actions"],
+[class*="bubble-actions"],
+[class*="copy"],
+[class*="regen"],
+[class*="regenerate"] {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+.mobile-message-actions,
+.nova-mobile-message-actions,
+.message-actions,
+.bubble-actions,
+.assistant-actions,
+.user-actions,
+.chat-message-actions,
+[class*="message-actions"],
+[class*="bubble-actions"] {
+    position: relative !important;
+    z-index: 25 !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 6px !important;
+    margin-top: 6px !important;
+    width: 100% !important;
+    min-height: 28px !important;
+}
+
+.mobile-message-actions button,
+.nova-mobile-message-actions button,
+.message-actions button,
+.bubble-actions button,
+.assistant-actions button,
+.user-actions button,
+.chat-message-actions button,
+button[class*="copy"],
+button[class*="regen"],
+button[class*="regenerate"],
+[class*="message-actions"] button,
+[class*="bubble-actions"] button {
+    display: inline-flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 30px !important;
+    min-height: 28px !important;
+    padding: 5px 8px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: inherit !important;
+    font-size: 12px !important;
+    line-height: 1 !important;
+    cursor: pointer !important;
+    transform: none !important;
+}
+
+.mobile-message-actions button:hover,
+.nova-mobile-message-actions button:hover,
+.message-actions button:hover,
+.bubble-actions button:hover,
+.assistant-actions button:hover,
+.user-actions button:hover,
+.chat-message-actions button:hover,
+[class*="message-actions"] button:hover,
+[class*="bubble-actions"] button:hover {
+    background: rgba(255, 255, 255, 0.14) !important;
+}
+
+/* Make sure message bubbles do not clip their own action buttons. */
+.nova-mobile-message,
+.mobile-message,
+.message,
+.user-message,
+.assistant-message,
+.chat-message,
+[class*="message-bubble"] {
+    overflow: visible !important;
+}
+
+
+/* NOVA_MOBILE_COLOR_TEXT_SYSTEM_20260609 */
+/* Clean semantic text/status color layer. Does not change bubble layout. */
+
+:root {
+    --nova-color-info: #a78bfa;
+    --nova-color-success: #34d399;
+    --nova-color-warning: #fbbf24;
+    --nova-color-error: #fb7185;
+    --nova-color-memory: #60a5fa;
+    --nova-color-web: #38bdf8;
+    --nova-color-execution: #c084fc;
+
+    --nova-bg-info: rgba(167, 139, 250, 0.14);
+    --nova-bg-success: rgba(52, 211, 153, 0.13);
+    --nova-bg-warning: rgba(251, 191, 36, 0.13);
+    --nova-bg-error: rgba(251, 113, 133, 0.13);
+    --nova-bg-memory: rgba(96, 165, 250, 0.13);
+    --nova-bg-web: rgba(56, 189, 248, 0.12);
+    --nova-bg-execution: rgba(192, 132, 252, 0.13);
+}
+
+/* Inline semantic text */
+.nova-info,
+.info-text,
+.text-info {
+    color: var(--nova-color-info) !important;
+}
+
+.nova-success,
+.success-text,
+.text-success {
+    color: var(--nova-color-success) !important;
+}
+
+.nova-warning,
+.warning-text,
+.text-warning {
+    color: var(--nova-color-warning) !important;
+}
+
+.nova-error,
+.error-text,
+.text-error {
+    color: var(--nova-color-error) !important;
+}
+
+.nova-memory,
+.memory-text,
+.text-memory {
+    color: var(--nova-color-memory) !important;
+}
+
+.nova-web,
+.web-text,
+.text-web {
+    color: var(--nova-color-web) !important;
+}
+
+.nova-execution,
+.execution-text,
+.text-execution {
+    color: var(--nova-color-execution) !important;
+}
+
+/* Reusable status blocks */
+.nova-info-block,
+.info-block {
+    border-left: 3px solid var(--nova-color-info) !important;
+    background: var(--nova-bg-info) !important;
+}
+
+.nova-success-block,
+.success-block {
+    border-left: 3px solid var(--nova-color-success) !important;
+    background: var(--nova-bg-success) !important;
+}
+
+.nova-warning-block,
+.warning-block {
+    border-left: 3px solid var(--nova-color-warning) !important;
+    background: var(--nova-bg-warning) !important;
+}
+
+.nova-error-block,
+.error-block {
+    border-left: 3px solid var(--nova-color-error) !important;
+    background: var(--nova-bg-error) !important;
+}
+
+.nova-memory-block,
+.memory-block {
+    border-left: 3px solid var(--nova-color-memory) !important;
+    background: var(--nova-bg-memory) !important;
+}
+
+.nova-web-block,
+.web-block {
+    border-left: 3px solid var(--nova-color-web) !important;
+    background: var(--nova-bg-web) !important;
+}
+
+.nova-execution-block,
+.execution-block,
+.execution-step {
+    border-left: 3px solid var(--nova-color-execution) !important;
+    background: var(--nova-bg-execution) !important;
+}
+
+/* Shared block shape only. No bubble layout changes. */
+.nova-info-block,
+.info-block,
+.nova-success-block,
+.success-block,
+.nova-warning-block,
+.warning-block,
+.nova-error-block,
+.error-block,
+.nova-memory-block,
+.memory-block,
+.nova-web-block,
+.web-block,
+.nova-execution-block,
+.execution-block,
+.execution-step {
+    display: block !important;
+    padding: 10px 12px !important;
+    margin: 10px 0 !important;
+    border-radius: 12px !important;
+    color: rgba(255, 255, 255, 0.92) !important;
+    box-sizing: border-box !important;
+}
+
+/* Small pills for labels/status. */
+.nova-pill,
+.status-pill,
+.execution-pill,
+.memory-pill,
+.web-pill {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    padding: 3px 8px !important;
+    border-radius: 999px !important;
+    font-size: 11px !important;
+    font-weight: 750 !important;
+    line-height: 1.2 !important;
+    letter-spacing: 0.01em !important;
+    border: 1px solid rgba(255, 255, 255, 0.13) !important;
+    background: rgba(255, 255, 255, 0.065) !important;
+    color: rgba(255, 255, 255, 0.82) !important;
+}
+
+.status-pill.success,
+.nova-pill.success {
+    color: var(--nova-color-success) !important;
+    border-color: rgba(52, 211, 153, 0.35) !important;
+    background: var(--nova-bg-success) !important;
+}
+
+.status-pill.warning,
+.nova-pill.warning {
+    color: var(--nova-color-warning) !important;
+    border-color: rgba(251, 191, 36, 0.35) !important;
+    background: var(--nova-bg-warning) !important;
+}
+
+.status-pill.error,
+.nova-pill.error {
+    color: var(--nova-color-error) !important;
+    border-color: rgba(251, 113, 133, 0.35) !important;
+    background: var(--nova-bg-error) !important;
+}
+
+.status-pill.info,
+.nova-pill.info {
+    color: var(--nova-color-info) !important;
+    border-color: rgba(167, 139, 250, 0.35) !important;
+    background: var(--nova-bg-info) !important;
+}
+
+
+/* NOVA_MOBILE_EXECUTION_PANEL_POLISH_20260609 */
+/* Execution visibility polish only. Does not touch bubbles/webcards. */
+
+#nova-mobile-execution-panel,
+.nova-mobile-execution-panel,
+.mobile-execution-panel,
+.execution-panel {
+    background: rgba(14, 14, 22, 0.96) !important;
+    border: 1px solid rgba(192, 132, 252, 0.28) !important;
+    border-radius: 18px !important;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34) !important;
+    color: rgba(255, 255, 255, 0.92) !important;
+    overflow: hidden !important;
+}
+
+/* Panel headers */
+#nova-mobile-execution-panel h1,
+#nova-mobile-execution-panel h2,
+#nova-mobile-execution-panel h3,
+.nova-mobile-execution-panel h1,
+.nova-mobile-execution-panel h2,
+.nova-mobile-execution-panel h3,
+.mobile-execution-panel h1,
+.mobile-execution-panel h2,
+.mobile-execution-panel h3,
+.execution-panel h1,
+.execution-panel h2,
+.execution-panel h3 {
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.02em !important;
+}
+
+/* Current mission / active step */
+.execution-current,
+.execution-current-step,
+.current-execution-step,
+.nova-execution-current,
+#nova-execution-current,
+#nova-mobile-current-step,
+[class*="current-step"],
+[class*="execution-current"] {
+    background: rgba(192, 132, 252, 0.13) !important;
+    border: 1px solid rgba(192, 132, 252, 0.30) !important;
+    border-left: 3px solid var(--nova-color-execution, #c084fc) !important;
+    border-radius: 14px !important;
+    color: rgba(255, 255, 255, 0.94) !important;
+    padding: 10px 12px !important;
+    margin: 9px 0 !important;
+    line-height: 1.42 !important;
+}
+
+/* Execution history/log rows */
+.execution-history,
+.execution-log,
+.execution-step-list,
+.nova-execution-history,
+#nova-execution-history,
+#nova-mobile-execution-history,
+[class*="execution-history"],
+[class*="execution-log"] {
+    display: block !important;
+    max-height: 38vh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 4px 2px !important;
+    margin-top: 8px !important;
+}
+
+.execution-history-row,
+.execution-log-row,
+.execution-step-row,
+.nova-execution-step,
+[class*="execution-step-row"],
+[class*="execution-history-row"],
+[class*="execution-log-row"] {
+    display: block !important;
+    background: rgba(255, 255, 255, 0.055) !important;
+    border: 1px solid rgba(255, 255, 255, 0.085) !important;
+    border-radius: 12px !important;
+    padding: 8px 10px !important;
+    margin: 7px 0 !important;
+    color: rgba(255, 255, 255, 0.86) !important;
+    font-size: 13px !important;
+    line-height: 1.38 !important;
+}
+
+/* Step states */
+.execution-step-complete,
+.execution-complete,
+.step-complete,
+.status-complete,
+[class*="step-complete"],
+[class*="status-complete"] {
+    border-left: 3px solid var(--nova-color-success, #34d399) !important;
+    background: rgba(52, 211, 153, 0.11) !important;
+}
+
+.execution-step-running,
+.execution-running,
+.step-running,
+.status-running,
+[class*="step-running"],
+[class*="status-running"] {
+    border-left: 3px solid var(--nova-color-info, #a78bfa) !important;
+    background: rgba(167, 139, 250, 0.12) !important;
+}
+
+.execution-step-waiting,
+.execution-waiting,
+.step-waiting,
+.status-waiting,
+[class*="step-waiting"],
+[class*="status-waiting"] {
+    border-left: 3px solid var(--nova-color-warning, #fbbf24) !important;
+    background: rgba(251, 191, 36, 0.11) !important;
+}
+
+.execution-step-failed,
+.execution-failed,
+.step-failed,
+.status-failed,
+.execution-error,
+[class*="step-failed"],
+[class*="status-failed"],
+[class*="execution-error"] {
+    border-left: 3px solid var(--nova-color-error, #fb7185) !important;
+    background: rgba(251, 113, 133, 0.12) !important;
+}
+
+/* Status labels/pills inside execution panel */
+#nova-mobile-execution-panel .status,
+#nova-mobile-execution-panel .badge,
+#nova-mobile-execution-panel .pill,
+.nova-mobile-execution-panel .status,
+.nova-mobile-execution-panel .badge,
+.nova-mobile-execution-panel .pill,
+.mobile-execution-panel .status,
+.mobile-execution-panel .badge,
+.mobile-execution-panel .pill,
+.execution-panel .status,
+.execution-panel .badge,
+.execution-panel .pill {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 3px 8px !important;
+    border-radius: 999px !important;
+    background: rgba(192, 132, 252, 0.14) !important;
+    border: 1px solid rgba(192, 132, 252, 0.28) !important;
+    color: rgba(255, 255, 255, 0.88) !important;
+    font-size: 11px !important;
+    font-weight: 750 !important;
+    line-height: 1.15 !important;
+}
+
+/* Execution controls/buttons */
+#nova-mobile-execution-panel button,
+.nova-mobile-execution-panel button,
+.mobile-execution-panel button,
+.execution-panel button {
+    border-radius: 999px !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    background: rgba(255, 255, 255, 0.075) !important;
+    color: rgba(255, 255, 255, 0.88) !important;
+    min-height: 30px !important;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+}
+
+#nova-mobile-execution-panel button:hover,
+.nova-mobile-execution-panel button:hover,
+.mobile-execution-panel button:hover,
+.execution-panel button:hover {
+    background: rgba(192, 132, 252, 0.18) !important;
+    border-color: rgba(192, 132, 252, 0.38) !important;
+    color: #ffffff !important;
+}
+
+/* Dangerous/stop/reset buttons if classes exist */
+#nova-mobile-execution-panel button.stop,
+#nova-mobile-execution-panel button.reset,
+#nova-mobile-execution-panel button.danger,
+.nova-mobile-execution-panel button.stop,
+.nova-mobile-execution-panel button.reset,
+.nova-mobile-execution-panel button.danger,
+.mobile-execution-panel button.stop,
+.mobile-execution-panel button.reset,
+.mobile-execution-panel button.danger,
+.execution-panel button.stop,
+.execution-panel button.reset,
+.execution-panel button.danger {
+    background: rgba(251, 113, 133, 0.12) !important;
+    border-color: rgba(251, 113, 133, 0.32) !important;
+    color: var(--nova-color-error, #fb7185) !important;
+}
+
+/* Small muted details */
+.execution-detail,
+.execution-meta,
+.execution-timestamp,
+.execution-last-action,
+[class*="execution-meta"],
+[class*="execution-detail"],
+[class*="last-action"] {
+    color: rgba(255, 255, 255, 0.58) !important;
+    font-size: 12px !important;
+    line-height: 1.32 !important;
+}
