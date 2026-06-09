@@ -450,41 +450,10 @@
             sessionsPanel.appendChild(err);
         }
     }
-
-    function findSessionsToggle() {
-        let btn = $("nova-mobile-sessions-toggle-forced");
-
-        if (btn) {
-            return btn;
-        }
-
-        btn = document.createElement("button");
-        btn.id = "nova-mobile-sessions-toggle-forced";
-        btn.type = "button";
-        btn.textContent = "â˜°";
-        btn.title = "Sessions";
-
-        btn.style.position = "fixed";
-        btn.style.top = "12px";
-        btn.style.left = "12px";
-        btn.style.width = "48px";
-        btn.style.height = "48px";
-        btn.style.borderRadius = "999px";
-        btn.style.zIndex = "2147483647";
-        btn.style.background = "rgba(124,92,255,.98)";
-        btn.style.color = "#ffffff";
-        btn.style.border = "1px solid rgba(255,255,255,.30)";
-        btn.style.fontSize = "24px";
-        btn.style.display = "flex";
-        btn.style.alignItems = "center";
-        btn.style.justifyContent = "center";
-        btn.style.boxShadow = "0 10px 30px rgba(0,0,0,.45)";
-        btn.style.cursor = "pointer";
-
-        document.body.appendChild(btn);
-
-        return btn;
-    }
+    // NOVA_REMOVE_FORCED_SESSIONS_TOGGLE_20260609
+    // Forced floating sessions toggle removed.
+    // The real Sessions button is owned by templates/mobile.html.
+    // Its click behavior is owned by static/js/mobile/nova-mobile-events.js.
 
     function wire() {
         const api = requireApi();
