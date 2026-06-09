@@ -434,3 +434,175 @@
     };
 })();
 
+// NOVA_MOBILE_HARD_OPEN_SESSIONS_20260608
+(function () {
+    "use strict";
+
+    function byId(id) {
+        return document.getElementById(id);
+    }
+
+    function showElement(el) {
+        if (!el) return;
+
+        el.hidden = false;
+        el.removeAttribute("hidden");
+        el.setAttribute("aria-hidden", "false");
+
+        el.classList.add("open");
+        el.classList.add("active");
+        el.classList.add("is-open");
+        el.classList.add("show");
+
+        el.style.display = "block";
+        el.style.visibility = "visible";
+        el.style.opacity = "1";
+        el.style.pointerEvents = "auto";
+        el.style.transform = "translateX(0)";
+        el.style.zIndex = "99999";
+    }
+
+    function findSessionPanel() {
+        return (
+            byId("nova-mobile-sessions-panel") ||
+            byId("nova-mobile-session-panel") ||
+            byId("nova-mobile-sessions-drawer") ||
+            byId("nova-mobile-session-drawer") ||
+            byId("nova-mobile-sessions") ||
+            byId("mobile-sessions-panel") ||
+            document.querySelector("[data-nova-mobile-sessions]") ||
+            document.querySelector(".nova-mobile-sessions-panel") ||
+            document.querySelector(".nova-mobile-sessions-drawer") ||
+            document.querySelector(".mobile-sessions-panel") ||
+            document.querySelector(".sessions-panel") ||
+            document.querySelector(".sessions-drawer")
+        );
+    }
+
+    function findSessionOverlay() {
+        return (
+            byId("nova-mobile-sessions-overlay") ||
+            byId("nova-mobile-session-overlay") ||
+            document.querySelector(".nova-mobile-sessions-overlay") ||
+            document.querySelector(".sessions-overlay")
+        );
+    }
+
+    function openSessions(event) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        var panel = findSessionPanel();
+        var overlay = findSessionOverlay();
+
+        showElement(panel);
+        showElement(overlay);
+
+        document.body.classList.add("sessions-open");
+        document.body.classList.add("nova-mobile-sessions-open");
+
+        if (typeof window.NovaMobileRenderSessions === "function") {
+            window.NovaMobileRenderSessions();
+        }
+
+        if (typeof window.renderMobileSessions === "function") {
+            window.renderMobileSessions();
+        }
+
+        if (typeof window.renderSessions === "function") {
+            window.renderSessions();
+        }
+
+        console.log("[Nova Mobile Sessions] hard open fired", {
+            panelFound: !!panel,
+            overlayFound: !!overlay
+        });
+    }
+
+    function closeSessions(event) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        var panel = findSessionPanel();
+        var overlay = findSessionOverlay();
+
+        [panel, overlay].forEach(function (el) {
+            if (!el) return;
+
+            el.classList.remove("open");
+            el.classList.remove("active");
+            el.classList.remove("is-open");
+            el.classList.remove("show");
+
+            el.setAttribute("aria-hidden", "true");
+            el.style.display = "none";
+            el.style.pointerEvents = "none";
+        });
+
+        document.body.classList.remove("sessions-open");
+        document.body.classList.remove("nova-mobile-sessions-open");
+    }
+
+    function bindSessionButtons() {
+        var selectors = [
+            "#nova-mobile-sessions-button",
+            "#nova-mobile-session-button",
+            "#nova-mobile-open-sessions",
+            "#nova-mobile-sessions-toggle",
+            "#mobile-sessions-button",
+            "#sessions-button",
+            "[data-action='sessions']",
+            "[data-action='open-sessions']",
+            "[data-nova-open-sessions]",
+            ".nova-mobile-sessions-button",
+            ".mobile-sessions-button",
+            ".sessions-button"
+        ];
+
+        var buttons = [];
+
+        selectors.forEach(function (selector) {
+            document.querySelectorAll(selector).forEach(function (button) {
+                if (buttons.indexOf(button) === -1) {
+                    buttons.push(button);
+                }
+            });
+        });
+
+        buttons.forEach(function (button) {
+            if (button.dataset.novaHardSessionsBound === "1") return;
+            button.dataset.novaHardSessionsBound = "1";
+            button.addEventListener("click", openSessions, true);
+        });
+
+        document.querySelectorAll("[data-action='close-sessions'], .sessions-close, .nova-mobile-sessions-close").forEach(function (button) {
+            if (button.dataset.novaHardSessionsCloseBound === "1") return;
+            button.dataset.novaHardSessionsCloseBound = "1";
+            button.addEventListener("click", closeSessions, true);
+        });
+
+        console.log("[Nova Mobile Sessions] hard open bridge ready", buttons.length);
+    }
+
+    window.NovaMobileSessionsHardOpen = openSessions;
+    window.NovaOpenMobileSessions = openSessions;
+    window.NovaMobileOpenSessions = openSessions;
+    window.openMobileSessions = openSessions;
+
+    window.NovaMobileSessionsHardClose = closeSessions;
+    window.NovaCloseMobileSessions = closeSessions;
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", bindSessionButtons);
+    } else {
+        bindSessionButtons();
+    }
+
+    window.addEventListener("load", bindSessionButtons);
+    setTimeout(bindSessionButtons, 250);
+    setTimeout(bindSessionButtons, 1000);
+})();
