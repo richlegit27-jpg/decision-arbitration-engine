@@ -9,7 +9,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nova Mobile</title>
 
-<link rel="stylesheet" href="/static/css/nova-mobile.css?v=answer-readability-20260607182523">
+<link rel="stylesheet" href="/static/css/nova-mobile.css?v=stable-ui-20260608212440">
 <style>
     html,
     body,
@@ -606,9 +606,9 @@
 <script src="/static/js/mobile/nova-mobile-code-ui.js?v=mobile-modular-001"></script>
 <script src="/static/js/mobile/nova-mobile-chat-ui.js?v=mobile-modular-001"></script>
 <script src="/static/js/mobile/nova-mobile-message-actions.js?v=mobile-actions-fix-007"></script>
-<script src="/static/js/mobile/nova-mobile-webcards.js?v=mobile-webcards-dedupe-011"></script>
+<script src="/static/js/mobile/nova-mobile-webcards.js?v=webcards-payload-hook-20260609"></script>
 <script src="/static/js/mobile/nova-mobile-upload.js?v=hard-attach-final-20260607210437"></script>
-<script src="/static/js/mobile/nova-mobile-ui-utils.js?v=mobile-ui-utils-clean-quick-004"></script>
+<script src="/static/js/mobile/nova-mobile-ui-utils.js?v=stable-regen-copy-20260608212440"></script>
 <script src="/static/js/mobile/nova-mobile-voice.js?v=mobile-voice-endgame-002"></script>
 <script src="/static/js/mobile/nova-mobile-listeners.js?v=mobile-modular-001"></script>
 <script src="/static/js/mobile/nova-mobile-stream.js?v=mobile-stream-full-clean-20260604-001"></script>
@@ -616,15 +616,249 @@
 <script src="/static/js/mobile/nova-mobile-events.js?v=mobile-events-005"></script>
 <script src="/static/js/mobile/nova-mobile-state.js?v=mobile-state-002"></script>
 <script src="/static/js/mobile/nova-mobile-sessions.js?v=sessions-after-state-20260608"></script>
-<script src="/static/js/nova-mobile-app.js?v=attachment-bridge-clean-20260608"></script>
+<script src="/static/js/nova-mobile-app.js?v=json-news-cards-force-20260609"></script>
 
 <script src="/static/js/mobile/nova-mobile-attachment-payload.js?v=quiet-attachment-cache-20260608"></script>
 <script src="/static/js/mobile/nova-mobile-attachment-preview.js?v=quiet-preview-cache-20260608"></script>
 <script src="/static/js/mobile/nova-mobile-execution-panel.js?v=execution-panel-cache-20260608"></script>
+<!-- NOVA_BACKEND_READINESS_PILL_FINAL_20260608 -->
+<style>
+    #nova-backend-readiness-pill {
+        position: fixed;
+        top: 8px;
+        right: 8px;
+        z-index: 99999;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+        font-family: inherit;
+        pointer-events: none;
+        font-size: 11px;
+    }
+
+    #nova-backend-readiness-button {
+        pointer-events: auto;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        background: rgba(18, 18, 28, 0.82);
+        color: #ffffff;
+        padding: 5px 9px;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1;
+        cursor: pointer;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+    }
+
+    #nova-backend-readiness-button.ready {
+        border-color: rgba(72, 255, 150, 0.5);
+    }
+
+    #nova-backend-readiness-button.warn {
+        border-color: rgba(255, 210, 90, 0.6);
+    }
+
+    #nova-backend-readiness-button.fail {
+        border-color: rgba(255, 90, 90, 0.7);
+    }
+
+    #nova-backend-readiness-panel {
+        pointer-events: auto;
+        display: none;
+        width: 250px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 14px;
+        background: rgba(18, 18, 28, 0.94);
+        color: #ffffff;
+        padding: 9px;
+        box-shadow: 0 14px 32px rgba(0, 0, 0, 0.36);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        font-size: 11px;
+    }
+
+    #nova-backend-readiness-pill.open #nova-backend-readiness-panel {
+        display: block;
+    }
+
+    .nova-readiness-title {
+        font-size: 12px;
+        font-weight: 800;
+        margin-bottom: 6px;
+    }
+
+    .nova-readiness-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 3px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .nova-readiness-row:last-child {
+        border-bottom: 0;
+    }
+
+    .nova-readiness-label {
+        opacity: 0.72;
+    }
+
+    .nova-readiness-value {
+        font-weight: 800;
+    }
+</style>
+
+<div id="nova-backend-readiness-pill" aria-live="polite">
+    <button id="nova-backend-readiness-button" type="button" title="Tap to show backend readiness">Backend --%</button>
+
+    <div id="nova-backend-readiness-panel">
+        <div class="nova-readiness-title">Backend Readiness</div>
+
+        <div class="nova-readiness-row" title="Total backend readiness score">
+            <span class="nova-readiness-label">Overall</span>
+            <span class="nova-readiness-value" id="nova-readiness-overall">--%</span>
+        </div>
+
+        <div class="nova-readiness-row" title="Memory system readiness">
+            <span class="nova-readiness-label">Memory</span>
+            <span class="nova-readiness-value" id="nova-readiness-memory">--%</span>
+        </div>
+
+        <div class="nova-readiness-row" title="Agent decision system readiness">
+            <span class="nova-readiness-label">Agency</span>
+            <span class="nova-readiness-value" id="nova-readiness-agency">--%</span>
+        </div>
+
+        <div class="nova-readiness-row" title="Planning system readiness">
+            <span class="nova-readiness-label">Planner</span>
+            <span class="nova-readiness-value" id="nova-readiness-planner">--%</span>
+        </div>
+
+        <div class="nova-readiness-row" title="Session storage readiness">
+            <span class="nova-readiness-label">Session</span>
+            <span class="nova-readiness-value" id="nova-readiness-session">--%</span>
+        </div>
+
+        <div class="nova-readiness-row" title="Execution mission completion readiness">
+            <span class="nova-readiness-label">Execution</span>
+            <span class="nova-readiness-value" id="nova-readiness-execution">--%</span>
+        </div>
+
+        <div class="nova-readiness-row" title="Execution, memory, and session record counts">
+            <span class="nova-readiness-label">Records</span>
+            <span class="nova-readiness-value" id="nova-readiness-records">--</span>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    "use strict";
+
+    var pill = document.getElementById("nova-backend-readiness-pill");
+    var button = document.getElementById("nova-backend-readiness-button");
+
+    if (!pill || !button) return;
+
+    function setText(id, value) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = value;
+    }
+
+    function percent(value) {
+        var number = Number(value);
+        if (!Number.isFinite(number)) return "--%";
+        return Math.round(number) + "%";
+    }
+
+    function setButtonState(overall) {
+        button.classList.remove("ready", "warn", "fail");
+
+        if (!Number.isFinite(overall)) {
+            button.classList.add("fail");
+            button.textContent = "Backend offline";
+            return;
+        }
+
+        button.textContent = "Backend " + Math.round(overall) + "%";
+
+        if (overall >= 90) {
+            button.classList.add("ready");
+        } else if (overall >= 70) {
+            button.classList.add("warn");
+        } else {
+            button.classList.add("fail");
+        }
+    }
+
+    async function refreshReadiness() {
+        try {
+            var response = await fetch("/api/backend/readiness", {
+                method: "GET",
+                headers: {
+                    "Accept": "application/json"
+                },
+                cache: "no-store"
+            });
+
+            if (!response.ok) {
+                throw new Error("Readiness endpoint returned " + response.status);
+            }
+
+            var data = await response.json();
+            var overall = Number(data.overall_backend_readiness);
+
+            setButtonState(overall);
+
+            setText("nova-readiness-overall", percent(data.overall_backend_readiness));
+            setText("nova-readiness-memory", percent(data.memory_percent));
+            setText("nova-readiness-agency", percent(data.agency_percent));
+            setText("nova-readiness-planner", percent(data.planner_percent));
+            setText("nova-readiness-session", percent(data.session_percent));
+            setText("nova-readiness-execution", percent(data.execution_percent));
+
+            setText(
+                "nova-readiness-records",
+                "E:" + (data.execution_records ?? "--") +
+                " M:" + (data.memory_items ?? "--") +
+                " S:" + (data.session_records ?? "--")
+            );
+        } catch (error) {
+            setButtonState(NaN);
+            setText("nova-readiness-overall", "offline");
+            setText("nova-readiness-memory", "--%");
+            setText("nova-readiness-agency", "--%");
+            setText("nova-readiness-planner", "--%");
+            setText("nova-readiness-session", "--%");
+            setText("nova-readiness-execution", "--%");
+            setText("nova-readiness-records", "--");
+            console.warn("[Nova Backend Readiness]", error);
+        }
+    }
+
+    button.addEventListener("click", function () {
+        pill.classList.toggle("open");
+        refreshReadiness();
+    });
+
+    refreshReadiness();
+    window.setInterval(refreshReadiness, 15000);
+})();
+</script>
 </body>
 </html>
 
 
 <!-- FIX_MOBILE_SCRIPT_BLOCK_HARD_LOCK -->
+
+
+
+
+
+
+
 
 
