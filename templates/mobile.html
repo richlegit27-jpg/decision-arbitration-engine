@@ -81,7 +81,6 @@
                 id="nova-mobile-sessions-toggle"
                 class="mobile-header-btn"
                 type="button"
-                onclick="window.NovaOpenMobileSessions && (window.NovaMobileSessionsHardOpen || window.NovaOpenMobileSessions || window.NovaMobileOpenSessions || function () {})();"
             >Sessions</button>
 
             <div class="mobile-status" aria-label="Nova online"></div>
@@ -511,14 +510,7 @@
         window.NovaCloseMobileExecution = function () {
             forceHide(executionPanel);
         };
-
-        if (sessionsButton) {
-            sessionsButton.addEventListener("click", function (event) {
-                event.preventDefault();
-                event.stopPropagation();
-                (window.NovaMobileSessionsHardOpen || window.NovaOpenMobileSessions || window.NovaMobileOpenSessions || function () {})();
-            });
-        }
+        // NOVA_TEMPLATE_SESSIONS_CLICK_REMOVED_20260608_FIXED: sessions click is owned by static/js/mobile/nova-mobile-events.js
 
         if (toolsButton) {
             toolsButton.addEventListener("click", function (event) {
@@ -634,4 +626,5 @@
 
 
 <!-- FIX_MOBILE_SCRIPT_BLOCK_HARD_LOCK -->
+
 
