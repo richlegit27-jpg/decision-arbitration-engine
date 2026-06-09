@@ -618,52 +618,16 @@ function findSessionsToggle() {
         const voice = ensureButton("nova-mobile-voice", "🎙", "Voice");
         const tts = ensureButton("nova-mobile-tts", "🔊", "Speak");
 
-        send.onclick = function (event) {
-            event.preventDefault();
-            event.stopPropagation();
-            sendText();
-        };
-
-        input.onkeydown = function (event) {
-            if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                sendText();
-            }
-        };
+        // NOVA_MOBILE_APP_CORE_HANDLERS_DELEGATED_20260608
+        // Send button and input Enter key are owned by static/js/mobile/nova-mobile-events.js.
 
         if (stop) stop.onclick = stopEverything;
         if (tts) tts.onclick = speakLatest;
-        if (newSession) newSession.onclick = newChat;
-        if (newTop) newTop.onclick = newChat;
+        // NOVA_MOBILE_APP_NEW_SESSION_DELEGATED_20260608
+        // New session click ownership lives in static/js/mobile/nova-mobile-events.js.
 
-        if (sessionsToggle) {
-            sessionsToggle.onclick = function (event) {
-                event.preventDefault();
-                event.stopPropagation();
-
-                if (window.NovaMobileSessions && typeof window.NovaMobileSessions.wire === "function") {
-                    try {
-                        window.NovaMobileSessions.wire();
-                    } catch (error) {
-                        console.warn("[Nova Mobile] session module wire failed", error);
-                    }
-                }
-
-                if (typeof window.NovaMobileOpenSessions === "function") {
-                    window.NovaMobileOpenSessions();
-                    return;
-                }
-
-                if (typeof window.NovaOpenMobileSessions === "function") {
-                    window.NovaOpenMobileSessions();
-                    return;
-                }
-
-                console.warn("[Nova Mobile Sessions] module open function missing");
-            };
-        } else {
-            console.warn("[Nova Mobile Sessions] toggle button missing");
-        }
+        // NOVA_MOBILE_APP_SESSIONS_TOGGLE_DELEGATED_20260608
+        // Sessions toggle click ownership lives in static/js/mobile/nova-mobile-events.js.
 
         // NOVA_MOBILE_APP_REMOVED_APP_OWNED_UPLOAD_PATH_20260608
         // Upload picker/upload storage is owned by static/js/mobile/nova-mobile-upload.js
@@ -794,4 +758,4 @@ sendText();
 
 
 
-/* NOVA_MOBILE_APP_REMOVED_DEAD_SESSION_BRIDGE_FRAGMENT_20260608 - dead addSessionBubble-only fragment removed. Session module owns session behavior. */
+/* NOVA_MOBILE_APP_REMOVED_DEAD_SESSION_BRIDGE_FRAGMENT_20260608 - dead addSessionBubble-only fragment removed. Session module owns session behavior. */\n
