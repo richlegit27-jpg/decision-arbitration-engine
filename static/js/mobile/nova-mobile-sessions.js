@@ -624,3 +624,224 @@
     setTimeout(bindSessionButtons, 250);
     setTimeout(bindSessionButtons, 1000);
 })();
+
+// NOVA_MOBILE_SESSIONS_BACKEND_RENDER_FALLBACK_20260608
+(function () {
+    "use strict";
+
+    function byId(id) {
+        return document.getElementById(id);
+    }
+
+    function getPanel() {
+        return byId("nova-mobile-sessions-panel");
+    }
+
+    function getChatBox() {
+        return (
+            byId("nova-mobile-chat") ||
+            byId("nova-mobile-messages") ||
+            byId("mobile-chat") ||
+            document.querySelector(".nova-mobile-chat") ||
+            document.querySelector(".mobile-chat")
+        );
+    }
+
+    function safeText(value) {
+        return String(value || "").trim();
+    }
+
+    function rememberSession(sessionId) {
+        if (!sessionId) return;
+
+        try {
+            localStorage.setItem("nova_mobile_active_session_id", sessionId);
+        } catch (error) {
+            console.warn("[Nova Mobile Sessions Fallback] localStorage failed", error);
+        }
+
+        if (typeof window.NovaRememberMobileSession === "function") {
+            window.NovaRememberMobileSession(sessionId);
+        }
+
+        if (window.NovaMobileState && window.NovaMobileState.state) {
+            window.NovaMobileState.state.sessionId = sessionId;
+            window.NovaMobileState.state.activeSessionId = sessionId;
+        }
+    }
+
+    function renderMessage(message) {
+        var role = safeText(message.role || message.type || "assistant");
+        var content = safeText(
+            message.content ||
+            message.text ||
+            message.message ||
+            message.assistant_text ||
+            ""
+        );
+
+        if (!content) return null;
+
+        var bubble = document.createElement("div");
+        bubble.className = "mobile-message mobile-message-" + role;
+
+        var inner = document.createElement("div");
+        inner.className = "mobile-message-content";
+        inner.textContent = content;
+
+        bubble.appendChild(inner);
+        return bubble;
+    }
+
+    async function loadSessionMessages(session) {
+        var sessionId = session && session.id;
+        if (!sessionId) return;
+
+        rememberSession(sessionId);
+
+        var title = safeText(session.title || session.name || sessionId);
+        var activeTitle = byId("nova-mobile-active-session");
+        if (activeTitle) {
+            activeTitle.textContent = title;
+        }
+
+        var box = getChatBox();
+        if (box) {
+            box.innerHTML = "";
+        }
+
+        try {
+            var response = await fetch("/api/sessions/" + encodeURIComponent(sessionId));
+            var data = await response.json();
+            var messages = Array.isArray(data.messages) ? data.messages : [];
+
+            if (box) {
+                if (!messages.length) {
+                    var empty = document.createElement("div");
+                    empty.className = "mobile-message mobile-message-assistant";
+                    empty.textContent = "No messages found in this session yet.";
+                    box.appendChild(empty);
+                } else {
+                    messages.forEach(function (message) {
+                        var bubble = renderMessage(message);
+                        if (bubble) {
+                            box.appendChild(bubble);
+                        }
+                    });
+                }
+
+                box.scrollTop = box.scrollHeight;
+            }
+
+            if (typeof window.NovaCloseMobileSessions === "function") {
+                window.NovaCloseMobileSessions();
+            }
+        } catch (error) {
+            console.error("[Nova Mobile Sessions Fallback] failed to load session", error);
+
+            if (box) {
+                var err = document.createElement("div");
+                err.className = "mobile-message mobile-message-assistant";
+                err.textContent = "Failed to load that session.";
+                box.appendChild(err);
+            }
+        }
+    }
+
+    function makeRow(session) {
+        var button = document.createElement("button");
+        button.type = "button";
+        button.className = "mobile-session-item";
+
+        var title = safeText(session.title || session.name || "Untitled session");
+        var shortId = safeText(session.id).slice(-8);
+
+        button.textContent = title + (shortId ? " · " + shortId : "");
+
+        button.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            loadSessionMessages(session);
+        });
+
+        return button;
+    }
+
+    async function renderSessionsFallback() {
+        var panel = getPanel();
+        if (!panel) return;
+
+        try {
+            var response = await fetch("/api/sessions");
+            var data = await response.json();
+            var sessions = Array.isArray(data.sessions) ? data.sessions : [];
+
+            panel.innerHTML = "";
+
+            var close = document.createElement("button");
+            close.type = "button";
+            close.className = "mobile-session-item";
+            close.textContent = "Close Sessions";
+            close.addEventListener("click", function () {
+                if (typeof window.NovaCloseMobileSessions === "function") {
+                    window.NovaCloseMobileSessions();
+                }
+            });
+            panel.appendChild(close);
+
+            if (!sessions.length) {
+                var empty = document.createElement("div");
+                empty.className = "mobile-session-item";
+                empty.textContent = "No saved sessions found yet.";
+                panel.appendChild(empty);
+                return;
+            }
+
+            sessions.forEach(function (session) {
+                if (session && session.id) {
+                    panel.appendChild(makeRow(session));
+                }
+            });
+
+            console.log("[Nova Mobile Sessions Fallback] rendered sessions", sessions.length);
+        } catch (error) {
+            console.error("[Nova Mobile Sessions Fallback] failed", error);
+
+            panel.innerHTML = "";
+
+            var err = document.createElement("div");
+            err.className = "mobile-session-item";
+            err.textContent = "Failed to load sessions from backend.";
+            panel.appendChild(err);
+        }
+    }
+
+    var originalHardOpen = window.NovaMobileSessionsHardOpen || window.NovaMobileOpenSessions || window.NovaOpenMobileSessions;
+
+    function openAndRender(event) {
+        if (typeof originalHardOpen === "function") {
+            originalHardOpen(event);
+        }
+
+        setTimeout(renderSessionsFallback, 50);
+        setTimeout(renderSessionsFallback, 250);
+    }
+
+    window.NovaMobileRenderSessionsFallback = renderSessionsFallback;
+    window.NovaMobileSessionsHardOpen = openAndRender;
+    window.NovaMobileOpenSessions = openAndRender;
+    window.NovaOpenMobileSessions = openAndRender;
+
+    document.addEventListener("click", function (event) {
+        var target = event.target && event.target.closest && event.target.closest(
+            "#nova-mobile-sessions-toggle, #nova-mobile-sessions-toggle-forced, [data-action='sessions'], [data-action='open-sessions']"
+        );
+
+        if (!target) return;
+
+        setTimeout(renderSessionsFallback, 80);
+        setTimeout(renderSessionsFallback, 300);
+    }, true);
+
+    console.log("[Nova Mobile Sessions Fallback] backend renderer ready");
+})();
