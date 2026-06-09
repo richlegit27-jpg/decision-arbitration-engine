@@ -445,21 +445,35 @@
     function showElement(el) {
         if (!el) return;
 
+        // NOVA_MOBILE_SESSIONS_REMOVE_HIDDEN_CLASS_20260608
+        // The panel was found, but class="hidden" kept computed display as none.
         el.hidden = false;
         el.removeAttribute("hidden");
+        el.removeAttribute("aria-hidden");
         el.setAttribute("aria-hidden", "false");
+
+        el.classList.remove("hidden");
+        el.classList.remove("is-hidden");
+        el.classList.remove("closed");
 
         el.classList.add("open");
         el.classList.add("active");
         el.classList.add("is-open");
         el.classList.add("show");
 
-        el.style.display = "block";
-        el.style.visibility = "visible";
-        el.style.opacity = "1";
-        el.style.pointerEvents = "auto";
-        el.style.transform = "translateX(0)";
-        el.style.zIndex = "99999";
+        el.style.setProperty("display", "block", "important");
+        el.style.setProperty("visibility", "visible", "important");
+        el.style.setProperty("opacity", "1", "important");
+        el.style.setProperty("pointer-events", "auto", "important");
+        el.style.setProperty("position", "fixed", "important");
+        el.style.setProperty("top", "0", "important");
+        el.style.setProperty("right", "0", "important");
+        el.style.setProperty("bottom", "0", "important");
+        el.style.setProperty("width", "min(92vw, 420px)", "important");
+        el.style.setProperty("max-width", "420px", "important");
+        el.style.setProperty("overflow-y", "auto", "important");
+        el.style.setProperty("transform", "translateX(0)", "important");
+        el.style.setProperty("z-index", "99999", "important");
     }
 
     function findSessionPanel() {
@@ -499,6 +513,10 @@
 
         showElement(panel);
         showElement(overlay);
+
+        if (window.NovaMobileSessions && typeof window.NovaMobileSessions.loadSessionsPanel === "function") {
+            window.NovaMobileSessions.loadSessionsPanel(panel);
+        }
 
         document.body.classList.add("sessions-open");
         document.body.classList.add("nova-mobile-sessions-open");
