@@ -1939,3 +1939,191 @@
 
     console.log("[Nova Mobile] consolidated patch ready");
 })();
+
+// NOVA_MOBILE_RUNTIME_MESSAGE_BAR_FIX_20260609
+(function () {
+    "use strict";
+
+    if (window.__NOVA_MOBILE_RUNTIME_MESSAGE_BAR_FIX__) {
+        return;
+    }
+
+    window.__NOVA_MOBILE_RUNTIME_MESSAGE_BAR_FIX__ = true;
+
+    function findInput() {
+        return (
+            document.getElementById("nova-mobile-input") ||
+            document.querySelector("textarea[placeholder*='message' i]") ||
+            document.querySelector("input[placeholder*='message' i]") ||
+            document.querySelector("textarea") ||
+            document.querySelector("[contenteditable='true']")
+        );
+    }
+
+    function scoreComposer(el, input) {
+        if (!el || !input || el === document.body || el === document.documentElement) {
+            return -1;
+        }
+
+        var score = 0;
+        var id = String(el.id || "").toLowerCase();
+        var cls = String(el.className || "").toLowerCase();
+
+        if (id.indexOf("composer") !== -1) score += 50;
+        if (cls.indexOf("composer") !== -1) score += 50;
+        if (id.indexOf("input") !== -1) score += 20;
+        if (cls.indexOf("input") !== -1) score += 20;
+        if (id.indexOf("bar") !== -1) score += 20;
+        if (cls.indexOf("bar") !== -1) score += 20;
+        if (el.querySelector("button")) score += 20;
+        if (el.contains(input)) score += 10;
+
+        var rect = el.getBoundingClientRect();
+        if (rect.height >= 40 && rect.height <= 180) score += 20;
+        if (rect.width > window.innerWidth * 0.7) score += 20;
+
+        return score;
+    }
+
+    function findComposer(input) {
+        if (!input) return null;
+
+        var best = null;
+        var bestScore = -1;
+        var node = input.parentElement;
+        var steps = 0;
+
+        while (node && steps < 8) {
+            var score = scoreComposer(node, input);
+            if (score > bestScore) {
+                best = node;
+                bestScore = score;
+            }
+
+            node = node.parentElement;
+            steps += 1;
+        }
+
+        return best || input.parentElement;
+    }
+
+    function fixButton(button) {
+        if (!button) return;
+
+        button.style.flex = "0 0 42px";
+        button.style.width = "42px";
+        button.style.height = "42px";
+        button.style.minWidth = "42px";
+        button.style.minHeight = "42px";
+        button.style.maxWidth = "42px";
+        button.style.maxHeight = "42px";
+        button.style.display = "inline-flex";
+        button.style.alignItems = "center";
+        button.style.justifyContent = "center";
+        button.style.boxSizing = "border-box";
+        button.style.borderRadius = "999px";
+        button.style.padding = "0";
+        button.style.margin = "0";
+        button.style.overflow = "hidden";
+    }
+
+    function fixComposer() {
+        var input = findInput();
+        if (!input) return false;
+
+        var composer = findComposer(input);
+        if (!composer) return false;
+
+        composer.id = composer.id || "nova-mobile-runtime-fixed-composer";
+
+        composer.style.position = "fixed";
+        composer.style.left = "0";
+        composer.style.right = "0";
+        composer.style.bottom = "0";
+        composer.style.zIndex = "2147483646";
+        composer.style.display = "flex";
+        composer.style.alignItems = "center";
+        composer.style.justifyContent = "center";
+        composer.style.gap = "8px";
+        composer.style.width = "100vw";
+        composer.style.maxWidth = "100vw";
+        composer.style.minHeight = "64px";
+        composer.style.maxHeight = "84px";
+        composer.style.padding = "8px 10px calc(8px + env(safe-area-inset-bottom)) 10px";
+        composer.style.boxSizing = "border-box";
+        composer.style.background = "#0b0b12";
+        composer.style.borderTop = "1px solid rgba(255,255,255,0.12)";
+        composer.style.overflow = "hidden";
+        composer.style.transform = "none";
+
+        input.style.flex = "1 1 auto";
+        input.style.width = "auto";
+        input.style.minWidth = "0";
+        input.style.maxWidth = "100%";
+        input.style.height = "44px";
+        input.style.minHeight = "44px";
+        input.style.maxHeight = "110px";
+        input.style.padding = "10px 12px";
+        input.style.boxSizing = "border-box";
+        input.style.resize = "none";
+        input.style.overflowY = "auto";
+        input.style.overflowX = "hidden";
+        input.style.lineHeight = "1.25";
+        input.style.borderRadius = "18px";
+        input.style.margin = "0";
+        input.style.transform = "none";
+
+        Array.from(composer.querySelectorAll("button")).forEach(fixButton);
+
+        var chat = (
+            document.getElementById("nova-mobile-chat") ||
+            document.getElementById("nova-mobile-messages") ||
+            document.querySelector(".nova-mobile-chat") ||
+            document.querySelector(".nova-mobile-messages") ||
+            document.querySelector(".chat-messages") ||
+            document.querySelector("main")
+        );
+
+        if (chat) {
+            chat.style.paddingBottom = "170px";
+            chat.style.scrollPaddingBottom = "170px";
+            chat.style.boxSizing = "border-box";
+        }
+
+        document.body.style.paddingBottom = "100px";
+        document.documentElement.style.overflowX = "hidden";
+        document.body.style.overflowX = "hidden";
+
+        return true;
+    }
+
+    function run() {
+        fixComposer();
+    }
+
+    window.NovaMobileRuntimeFixMessageBar = run;
+
+    window.addEventListener("load", function () {
+        setTimeout(run, 0);
+        setTimeout(run, 150);
+        setTimeout(run, 600);
+        setTimeout(run, 1500);
+    });
+
+    window.addEventListener("resize", function () {
+        setTimeout(run, 50);
+    });
+
+    window.addEventListener("focusin", function () {
+        setTimeout(run, 50);
+        setTimeout(run, 350);
+    }, true);
+
+    document.addEventListener("input", function () {
+        setTimeout(run, 0);
+    }, true);
+
+    setInterval(run, 1000);
+
+    console.log("[Nova Mobile Runtime Message Bar Fix] ready");
+})();
