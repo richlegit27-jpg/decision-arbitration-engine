@@ -3110,6 +3110,14 @@ def _nova_plain_attachment_text_summary_20260609(file_name, file_path, content, 
             continue
         if item.lower() in {"summarize this file", "summarise this file", "summarize this", "summarise this"}:
             continue
+
+        # NOVA_FILTER_ATTACHMENT_SUMMARY_JUNK_LINES_20260609
+        compact = re.sub(r"\s+", "", item)
+        if len(compact) <= 2:
+            continue
+        if re.fullmatch(r"[\W_]+", compact):
+            continue
+
         lines.append(item)
 
     sample = "\n".join(lines[:120]).strip()
@@ -8651,5 +8659,6 @@ if __name__ == "__main__":
 
 
 # CLEAN_IMAGE_PROMPT_RIGHT_BEFORE_CHAT_SERVICE_LOCK
+
 
 
