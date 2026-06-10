@@ -3470,10 +3470,12 @@ def api_chat():
                     if _nova_docx_text:
                         _nova_preview = _nova_docx_text[:1200].strip()
 
-                        _nova_answer = (
-                            "This is a Microsoft Word .docx document.\n\n"
-                            "Readable extracted text preview:\n\n"
-                            f"{_nova_preview}"
+                        # NOVA_DIRECT_DOCX_ATTACHMENT_SUMMARY_RETURN_20260609
+                        _nova_answer = _nova_plain_attachment_text_summary_20260609(
+                            _nova_name,
+                            _nova_file_path,
+                            _nova_docx_text,
+                            _nova_original_user_text_before_project_context,
                         )
 
                         return jsonify({
@@ -8612,6 +8614,7 @@ if __name__ == "__main__":
 
 
 # CLEAN_IMAGE_PROMPT_RIGHT_BEFORE_CHAT_SERVICE_LOCK
+
 
 
 
