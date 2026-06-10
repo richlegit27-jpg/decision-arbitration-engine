@@ -138,6 +138,26 @@ def exec_debug(*args):
 
 
 class ChatService:
+
+    # NOVA_WEB_NEWS_BLOCKS_IMAGE_GENERATION_BRANCHES_20260609
+    def _nova_is_web_news_intent_20260609(self, value) -> bool:
+        probe = " ".join(str(value or "").split("\n", 1)[0].lower().split())
+        terms = (
+            "latest news",
+            "news about",
+            "today in",
+            "what happened today",
+            "current news",
+            "breaking news",
+            "recent news",
+            "latest tech news",
+            "latest sports",
+            "weather",
+            "forecast",
+            "current events",
+        )
+        return any(term in probe for term in terms)
+
     ROUTE_GENERAL_CHAT = "general_chat"
     ROUTE_IMAGE_GENERATION = "image_generation"
     ROUTE_WEB_FETCH = "web_fetch"
@@ -5264,7 +5284,7 @@ if (not attachments) and (__name__ == "__main__"):
                 source_type="regenerated",
             )
 
-        if self._is_image_generation_request(user_text):
+        if self._is_image_generation_request(user_text) and not self._nova_is_web_news_intent_20260609(user_text):
             return self._handle_image_generation(
                 prompt=user_text,
                 session_id=session_id,
@@ -14878,7 +14898,7 @@ Auto-fix result:
             "ufc",
         )
 
-        if self._is_image_generation_request(user_text):
+        if self._is_image_generation_request(user_text) and not self._nova_is_web_news_intent_20260609(user_text):
             return {
                 "route": self.ROUTE_IMAGE_GENERATION,
                 "mode": "image_generation",

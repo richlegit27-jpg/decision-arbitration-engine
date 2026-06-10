@@ -3198,6 +3198,31 @@ def api_chat():
 
         _nova_attachments = _nova_payload.get("attachments") or []
 
+        # NOVA_WEB_INTENT_STRIPS_CURRENT_ATTACHMENTS_20260609
+        # Web/news prompts must ignore stale mobile attachment payload before the image gate scans it.
+        _nova_image_gate_clean = " ".join(str(_nova_user_text or "").lower().split())
+        _nova_image_gate_web_terms = (
+            "latest news",
+            "news about",
+            "today in",
+            "what happened today",
+            "current news",
+            "breaking news",
+            "recent news",
+            "latest tech news",
+            "latest sports",
+            "weather",
+            "forecast",
+            "current events",
+        )
+        if any(term in _nova_image_gate_clean for term in _nova_image_gate_web_terms):
+            _nova_attachments = []
+            try:
+                request.environ["NOVA_FORCE_WEB_INTENT_20260609"] = "1"
+                request.environ["NOVA_IGNORE_STALE_ATTACHMENTS_20260609"] = "1"
+            except Exception:
+                pass
+
         _nova_image = None
 
         if isinstance(_nova_attachments, list):
@@ -3387,6 +3412,31 @@ def api_chat():
             or "default"
         ).strip() or "default"
         _nova_exec_clean = " ".join(_nova_exec_user_text.lower().split())
+
+        # NOVA_WEB_INTENT_BLOCKS_STALE_ATTACHMENT_20260609
+        # Fresh web/news/weather/current-events prompts must not be hijacked by stale attachment/image state.
+        _nova_web_intent_terms = (
+            "latest news",
+            "news about",
+            "today in",
+            "what happened today",
+            "current news",
+            "breaking news",
+            "recent news",
+            "latest tech news",
+            "latest sports",
+            "weather",
+            "forecast",
+            "current events",
+        )
+        _nova_is_web_intent = any(term in _nova_exec_clean for term in _nova_web_intent_terms)
+
+        if _nova_is_web_intent:
+            try:
+                request.environ["NOVA_FORCE_WEB_INTENT_20260609"] = "1"
+                request.environ["NOVA_IGNORE_STALE_ATTACHMENTS_20260609"] = "1"
+            except Exception:
+                pass
         # NOVA_IMAGE_ATTACHMENT_NO_WEB_FALLBACK_20260607
         _nova_image_prompt_words = [
             "describe this image",
@@ -3886,6 +3936,35 @@ def api_chat():
     attachments = normalize_attachments(data.get("attachments"))
 
     attachments = normalize_attachments(request.json.get("attachments", []))
+
+    # NOVA_WEB_INTENT_STRIPS_CURRENT_ATTACHMENTS_20260609
+    # If this is a fresh web/news request, do not let stale mobile attachment state hijack routing.
+    _nova_main_clean_for_web = " ".join(str(user_text or "").lower().split())
+    _nova_main_web_terms = (
+        "latest news",
+        "news about",
+        "today in",
+        "what happened today",
+        "current news",
+        "breaking news",
+        "recent news",
+        "latest tech news",
+        "latest sports",
+        "weather",
+        "forecast",
+        "current events",
+    )
+    if (
+        request.environ.get("NOVA_IGNORE_STALE_ATTACHMENTS_20260609") == "1"
+        or any(term in _nova_main_clean_for_web for term in _nova_main_web_terms)
+    ):
+        attachments = []
+        try:
+            data["attachments"] = []
+            request.environ["NOVA_FORCE_WEB_INTENT_20260609"] = "1"
+            request.environ["NOVA_IGNORE_STALE_ATTACHMENTS_20260609"] = "1"
+        except Exception:
+            pass
 
     # BACKEND_ATTACHMENT_DEBUG_LOG_LOCK
     try:
@@ -5103,6 +5182,54 @@ def api_chat():
                 session_id,
                 len(user_text),
             )
+
+        # NOVA_WEB_INTENT_CLEANS_PROJECT_CONTEXT_BEFORE_CHAT_SERVICE_20260609
+        # Fresh web/news prompts must not let injected recent context trigger image generation.
+        _nova_real_user_text_for_web = str(
+            data.get("user_text")
+            or data.get("text")
+            or data.get("message")
+            or ""
+        ).strip()
+
+        _nova_real_web_probe = " ".join(_nova_real_user_text_for_web.lower().split())
+        _nova_real_web_terms = (
+            "latest news",
+            "news about",
+            "today in",
+            "what happened today",
+            "current news",
+            "breaking news",
+            "recent news",
+            "latest tech news",
+            "latest sports",
+            "weather",
+            "forecast",
+            "current events",
+        )
+
+        if (
+            request.environ.get("NOVA_FORCE_WEB_INTENT_20260609") == "1"
+            or any(term in _nova_real_web_probe for term in _nova_real_web_terms)
+        ):
+            if _nova_real_user_text_for_web:
+                user_text = _nova_real_user_text_for_web
+                attachments_for_chat_service = []
+                attachments = []
+
+                try:
+                    data["attachments"] = []
+                    data["user_text"] = _nova_real_user_text_for_web
+                    data["text"] = _nova_real_user_text_for_web
+                    data["message"] = _nova_real_user_text_for_web
+                    request.environ["NOVA_FORCE_WEB_INTENT_20260609"] = "1"
+                    request.environ["NOVA_IGNORE_STALE_ATTACHMENTS_20260609"] = "1"
+                    app.logger.info(
+                        "[api_chat] web intent cleaned project context before chat_service.handle text=%r",
+                        _nova_real_user_text_for_web,
+                    )
+                except Exception:
+                    pass
 
         result = chat_service.handle(
             user_text=user_text,
@@ -8661,6 +8788,7 @@ if __name__ == "__main__":
 
 
 # CLEAN_IMAGE_PROMPT_RIGHT_BEFORE_CHAT_SERVICE_LOCK
+
 
 
 
