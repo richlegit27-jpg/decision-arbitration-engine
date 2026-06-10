@@ -660,13 +660,43 @@
       }
     }
 
+
+    // NOVA_DESKTOP_SAFE_RENDER_TEXT_20260610
+    function safeRenderText(value) {
+      if (value === null || value === undefined) return "";
+
+      if (typeof value === "string") return value;
+      if (typeof value === "number" || typeof value === "boolean") return String(value);
+
+      if (Array.isArray(value)) {
+        return value.map(safeRenderText).filter(Boolean).join("\n");
+      }
+
+      if (typeof value === "object") {
+        return value.response
+          || value.assistant_message
+          || value.message
+          || value.text
+          || value.answer
+          || value.content
+          || value.output
+          || value.result
+          || value.summary
+          || JSON.stringify(value, null, 2);
+      }
+
+      return String(value);
+    }
     function normalizeFallbackResponse(j) {
-      return j.response
+      return safeRenderText(j.response
         || j.assistant_message
         || j.message
         || j.text
         || j.answer
-        || ("Error: " + (j.error || "unknown"));
+        || j.content
+        || j.output
+        || j.result
+        || j);
     }
 
     async function sendText(textOverride) {
@@ -745,11 +775,11 @@
             const data = msg.payload || msg.data || msg;
 
             if (ev === "token" || ev === "delta" || data.token || data.delta) {
-              rendered += data.token || data.delta || "";
+              rendered += safeRenderText(data.token || data.delta || "");
               assistantBubble.textContent = rendered;
               autoScroll();
             } else if (ev === "message" || data.response || data.text || data.assistant_message) {
-              rendered = data.response || data.text || data.assistant_message || rendered;
+              rendered = safeRenderText(data.response || data.text || data.assistant_message || data.message || data.content || data.output || data.result || rendered);
               assistantBubble.textContent = rendered;
               autoScroll();
             } else if (ev === "done") {
@@ -786,7 +816,7 @@
 
           const j = await fb.json();
           if (j.session_id) setSessionId(j.session_id);
-          assistantBubble.textContent = normalizeFallbackResponse(j);
+          assistantBubble.textContent = safeRenderText(normalizeFallbackResponse(j));
           setStatus("done fallback");
           await refreshSummaryMeta();
         } catch (fallbackError) {
@@ -837,3 +867,4 @@
   </script>
 </body>
 </html>
+
