@@ -8761,44 +8761,17 @@ def nova_mobile_direct_session_persist_20260609():
             "error": str(exc)
         }), 500
 
-
-
+# NOVA_APP_ROUTE_FIXED_CLEAN_BOTTOM_20260610
+@app.get("/app")
+def nova_desktop_app_fixed_20260610():
+    return render_template("app.html")
 
 
 if __name__ == "__main__":
     create_startup_backup()
-
-# NOVA_REAL_RESTORE_APP_ROUTE_BEFORE_RUN_20260610
-@app.get("/app")
-def nova_desktop_app_route_20260610():
-    return render_template("app.html")
     app.run(
         host="127.0.0.1",
         port=5001,
         debug=True,
-        use_reloader=False,
     )
-
-# ATTACHMENT_MEMORY_SESSION_ALIAS_APP_LOCK
-
-
-
-# ATTACHMENT_UI_JUNK_FILTER_LOCK
-
-# ACTUAL_STOP_STALE_ATTACHMENT_MEMORY_LOCK
-
-# KILL_STALE_ATTACHMENT_LOOP_DIRECT_LOCK
-
-# SKIP_PROJECT_CONTEXT_FOR_CASUAL_SHORT_MESSAGES_LOCK
-
-# HARD_BYPASS_CASUAL_GREETINGS_LOCK
-
-
-# CLEAN_IMAGE_PROMPT_RIGHT_BEFORE_CHAT_SERVICE_LOCK
-
-
-
-
-
-
 
