@@ -1252,6 +1252,8 @@ def api_fetch():
     )
 
     return jsonify(clean_result)
+# NOVA_RESTORE_API_SESSIONS_ROUTE_20260609
+@app.get("/api/sessions")
 def api_sessions():
     return json_ok(
         sessions=session_service.get_all(),
@@ -8659,6 +8661,7 @@ if __name__ == "__main__":
 
 
 # CLEAN_IMAGE_PROMPT_RIGHT_BEFORE_CHAT_SERVICE_LOCK
+
 
 
 
