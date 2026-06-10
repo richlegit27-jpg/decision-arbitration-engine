@@ -565,6 +565,24 @@
     .desktop-attachment-chip strong {
       color: var(--text);
     }
+
+    .footer-mini-button {
+      flex: 1;
+      text-align: center;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 10px;
+      background: rgba(255,255,255,.045);
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .footer-mini-button:hover {
+      color: var(--text);
+      border-color: rgba(167,139,250,.65);
+    }
     @media (max-width: 1100px) {
       .shell {
         grid-template-columns: 260px minmax(0, 1fr);
@@ -639,6 +657,7 @@
       <div class="side-footer-links">
         <a href="/">Home</a>
         <a href="/mobile">Mobile</a>
+        <button class="footer-mini-button" id="openMemoryBtn" type="button">Memory</button>
       </div>
     </aside>
 
@@ -784,6 +803,7 @@
     let pendingDesktopAttachments = [];
     const newSessionBtn = $("newSessionBtn");
     const summarizeBtn = $("summarizeBtn");
+    const openMemoryBtn = $("openMemoryBtn");
 
     function setStatus(s) {
       status.textContent = "status: " + s;
@@ -846,6 +866,37 @@
     }
 
 
+
+    // NOVA_DESKTOP_SAFE_JSON_AND_MEMORY_OPEN_20260610
+    async function fetchJsonOrNull(url, options) {
+      const response = await fetch(url, options || {});
+      const raw = await response.text();
+
+      if (!response.ok) {
+        console.warn("[Nova Desktop] non-OK JSON endpoint", response.status, url, raw.slice(0, 120));
+        return null;
+      }
+
+      try {
+        return JSON.parse(raw);
+      } catch (error) {
+        console.warn("[Nova Desktop] endpoint returned non-JSON", url, raw.slice(0, 120));
+        return null;
+      }
+    }
+
+    function openDesktopMemoryPanel() {
+      const panel = document.querySelector(".tools");
+      const memory = document.querySelector(".memory-section");
+
+      if (panel) {
+        panel.style.display = "flex";
+      }
+
+      if (memory && typeof memory.scrollIntoView === "function") {
+        memory.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
     // NOVA_DESKTOP_SESSIONS_LIST_20260610
     function normalizeSessionListPayload(data) {
       if (!data) return [];
@@ -908,8 +959,8 @@
       if (!list) return;
 
       try {
-        const response = await fetch("/api/memory");
-        const data = await response.json();
+        const data = await fetchJsonOrNull("/api/memory");
+        if (!data) throw new Error("Memory endpoint did not return JSON");
         const items = normalizeMemoryPayload(data);
 
         if (count) count.textContent = String(items.length);
@@ -967,8 +1018,8 @@
       const note = $("executionNote");
 
       try {
-        const response = await fetch("/api/backend/readiness");
-        const data = await response.json();
+        const data = await fetchJsonOrNull("/api/backend/readiness");
+        if (!data) throw new Error("Readiness endpoint did not return JSON");
 
         const exec = Number(data.execution_percent || 0);
         const planner = Number(data.planner_percent || 0);
@@ -997,8 +1048,8 @@
       if (!list) return;
 
       try {
-        const response = await fetch("/api/sessions");
-        const data = await response.json();
+        const data = await fetchJsonOrNull("/api/sessions");
+        if (!data) throw new Error("Sessions endpoint did not return JSON");
         const sessions = normalizeSessionListPayload(data);
         const activeId = data.active_session_id || getSessionId();
 
@@ -1033,13 +1084,8 @@
             if (!sid) return;
             setSessionId(sid);
             setStatus("session selected");
-            loadDesktopSessions();
-    loadDesktopMemory();
-    loadDesktopExecutionStatus();
+            refreshDesktopPanels();
             refreshSummaryMeta();
-    loadDesktopSessions();
-    loadDesktopMemory();
-    loadDesktopExecutionStatus();
           });
 
           list.appendChild(button);
@@ -1052,6 +1098,11 @@
         list.appendChild(failed);
       }
     }
+
+    // NOVA_DESKTOP_REFRESH_HELPER_20260610
+    function refreshDesktopPanels() {
+      refreshDesktopPanels();
+    }
     async function refreshSummaryMeta() {
       const sid = getSessionId();
       if (!sid) {
@@ -1060,20 +1111,18 @@
       }
 
       try {
-        const r = await fetch("/api/session/summary?session_id=" + encodeURIComponent(sid), {
+        const j = await fetchJsonOrNull("/api/session/summary?session_id=" + encodeURIComponent(sid), {
           headers: { "x-api-key": API_KEY }
         });
 
-        if (!r.ok) return;
-
-        const j = await r.json();
+        if (!j) return;
         setMeta(j.summary || j.text || "");
       } catch (e) {}
     }
 
     async function newSession() {
       setStatus("new session...");
-      const r = await fetch("/api/session/new", {
+      const j = await fetchJsonOrNull("/api/session/new", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1082,7 +1131,7 @@
         body: JSON.stringify({})
       });
 
-      const j = await r.json();
+      if (!j) throw new Error("New session endpoint did not return JSON");
       if (!j || !j.session_id) throw new Error("No session_id returned");
 
       setSessionId(j.session_id);
@@ -1090,9 +1139,7 @@
       addMsg("assistant", "New desktop session started.");
       setStatus("idle");
       await refreshSummaryMeta();
-      loadDesktopSessions();
-    loadDesktopMemory();
-    loadDesktopExecutionStatus();
+      refreshDesktopPanels();
     }
 
     async function summarizeNow() {
@@ -1104,7 +1151,7 @@
       summarizeBtn.disabled = true;
 
       try {
-        const r = await fetch("/api/session/summarize", {
+        const j = await fetchJsonOrNull("/api/session/summarize", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -1113,7 +1160,7 @@
           body: JSON.stringify({ session_id: getSessionId() })
         });
 
-        const j = await r.json();
+        if (!j) throw new Error("Summarize endpoint did not return JSON");
         setMeta(j.summary || j.text || "");
         addMsg("assistant", j.summary || j.text || "Summary refreshed.");
         setStatus("idle");
@@ -1250,6 +1297,48 @@
         || j);
     }
 
+
+    // NOVA_DESKTOP_ATTACHMENT_DIRECT_CHAT_20260610
+    function buildDesktopChatPayload(text, attachments) {
+      return {
+        text: text,
+        user_text: text,
+        message: text,
+        session_id: getSessionId(),
+        client_session_id: getSessionId(),
+        attachments: attachments || [],
+        uploaded_attachments: attachments || [],
+        raw_injection_attachments: attachments || []
+      };
+    }
+
+    async function sendDesktopAttachmentDirect(text, attachments, assistantBubble) {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": API_KEY
+        },
+        body: JSON.stringify(buildDesktopChatPayload(text, attachments))
+      });
+
+      const raw = await response.text();
+      let data = null;
+
+      try {
+        data = JSON.parse(raw);
+      } catch (error) {
+        data = { response: raw };
+      }
+
+      if (data.session_id) setSessionId(data.session_id);
+
+      assistantBubble.textContent = safeRenderText(normalizeFallbackResponse(data));
+      setStatus("done attachment");
+      clearDesktopAttachments();
+      await refreshSummaryMeta();
+      refreshDesktopPanels();
+    }
     async function sendText(textOverride) {
       const rawText = String(textOverride || input.value || "").trim();
       const attachments = pendingDesktopAttachments.slice();
@@ -1268,20 +1357,18 @@
       const assistantBubble = addMsg("assistant", "");
 
       try {
+        if (attachments.length) {
+          await sendDesktopAttachmentDirect(text, attachments, assistantBubble);
+          return;
+        }
+
         const response = await fetch("/api/chat/stream", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "x-api-key": API_KEY
           },
-          body: JSON.stringify({
-            text: text,
-            user_text: text,
-            message: text,
-            session_id: getSessionId(),
-            client_session_id: getSessionId(),
-            attachments: attachments
-          })
+          body: JSON.stringify(buildDesktopChatPayload(text, attachments))
         });
 
         if (!response.ok || !response.body) {
@@ -1350,9 +1437,7 @@
         setStatus("done");
         clearDesktopAttachments();
         await refreshSummaryMeta();
-      loadDesktopSessions();
-    loadDesktopMemory();
-    loadDesktopExecutionStatus();
+      refreshDesktopPanels();
       } catch (e) {
         setStatus("fallback...");
 
@@ -1378,9 +1463,7 @@
           setStatus("done fallback");
           clearDesktopAttachments();
           await refreshSummaryMeta();
-      loadDesktopSessions();
-    loadDesktopMemory();
-    loadDesktopExecutionStatus();
+      refreshDesktopPanels();
         } catch (fallbackError) {
           assistantBubble.textContent = "Error: " + (fallbackError.message || fallbackError);
           setStatus("error");
@@ -1391,6 +1474,10 @@
     }
 
     sendBtn.addEventListener("click", () => sendText());
+
+    if (openMemoryBtn) {
+      openMemoryBtn.addEventListener("click", openDesktopMemoryPanel);
+    }
 
     if (attachBtn && desktopFileInput) {
       attachBtn.addEventListener("click", () => desktopFileInput.click());
@@ -1440,12 +1527,13 @@
     } catch (e) {}
 
     refreshSummaryMeta();
-    loadDesktopSessions();
-    loadDesktopMemory();
-    loadDesktopExecutionStatus();
+    refreshDesktopPanels();
   </script>
 </body>
 </html>
+
+
+
 
 
 
