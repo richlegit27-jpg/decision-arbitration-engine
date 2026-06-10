@@ -1517,3 +1517,392 @@
 
     console.log("[Nova Mobile Direct Session Persist Bridge] ready");
 })();
+
+// NOVA_MOBILE_FINAL_SESSION_ACTIONS_OWNER_20260609
+(function () {
+    "use strict";
+
+    if (window.__NOVA_MOBILE_FINAL_SESSION_ACTIONS_OWNER__) {
+        return;
+    }
+
+    window.__NOVA_MOBILE_FINAL_SESSION_ACTIONS_OWNER__ = true;
+
+    var rendering = false;
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function getPanel() {
+        return $("nova-mobile-sessions-panel") ||
+            $("mobileSessionsPanel") ||
+            $("sessionsPanel") ||
+            document.querySelector("[data-mobile-sessions-panel]");
+    }
+
+    function getChatBox() {
+        return $("nova-mobile-chat") ||
+            $("nova-mobile-messages") ||
+            $("mobileChatMessages") ||
+            document.querySelector(".mobile-chat-messages") ||
+            document.querySelector(".mobile-chat-container") ||
+            document.querySelector("[data-mobile-chat-messages]");
+    }
+
+    function isPanelOpen(panel) {
+        if (!panel) return false;
+
+        var rect = panel.getBoundingClientRect();
+        var style = window.getComputedStyle(panel);
+
+        return (
+            style.display !== "none" &&
+            style.visibility !== "hidden" &&
+            rect.width > 20 &&
+            rect.height > 20
+        );
+    }
+
+    function stylePanel(panel) {
+        panel.id = "nova-mobile-sessions-panel";
+        panel.removeAttribute("aria-hidden");
+        panel.classList.remove("hidden");
+        panel.style.setProperty("display", "block", "important");
+        panel.style.setProperty("position", "fixed", "important");
+        panel.style.setProperty("top", "72px", "important");
+        panel.style.setProperty("left", "10px", "important");
+        panel.style.setProperty("right", "10px", "important");
+        panel.style.setProperty("bottom", "92px", "important");
+        panel.style.setProperty("z-index", "2147483646", "important");
+        panel.style.setProperty("overflow", "auto", "important");
+        panel.style.setProperty("padding", "12px", "important");
+        panel.style.setProperty("border-radius", "18px", "important");
+        panel.style.setProperty("background", "rgba(10,10,18,.96)", "important");
+        panel.style.setProperty("border", "1px solid rgba(255,255,255,.16)", "important");
+        panel.style.setProperty("box-shadow", "0 18px 50px rgba(0,0,0,.45)", "important");
+    }
+
+    function closePanel() {
+        var panel = getPanel();
+        if (!panel) return;
+        panel.style.setProperty("display", "none", "important");
+        panel.classList.add("hidden");
+        panel.setAttribute("aria-hidden", "true");
+        panel.removeAttribute("data-nova-final-session-actions");
+    }
+
+    function button(label) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = label;
+        b.style.setProperty("border", "1px solid rgba(255,255,255,.18)", "important");
+        b.style.setProperty("background", "rgba(255,255,255,.09)", "important");
+        b.style.setProperty("color", "#fff", "important");
+        b.style.setProperty("border-radius", "12px", "important");
+        b.style.setProperty("padding", "8px 10px", "important");
+        b.style.setProperty("font-size", "13px", "important");
+        b.style.setProperty("cursor", "pointer", "important");
+        return b;
+    }
+
+    async function api(path, body) {
+        var response = await fetch(path, {
+            method: body ? "POST" : "GET",
+            headers: body ? {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            } : {
+                "Accept": "application/json"
+            },
+            body: body ? JSON.stringify(body) : undefined,
+            cache: "no-store"
+        });
+
+        var data = await response.json();
+
+        if (!response.ok || data.ok === false) {
+            throw new Error(data.error || data.message || ("Request failed: " + path));
+        }
+
+        return data;
+    }
+
+    function messageText(message) {
+        return String(
+            (message && (message.text || message.content || message.body || message.message)) ||
+            ""
+        );
+    }
+
+    function renderLoadedSession(session) {
+        if (!session || !session.id) return;
+
+        try {
+            localStorage.setItem("nova_mobile_active_session_id", String(session.id));
+            localStorage.setItem("nova_active_session_id", String(session.id));
+        } catch (error) {}
+
+        api("/api/sessions/switch", { session_id: session.id }).catch(function () {});
+
+        var chat = getChatBox();
+        if (!chat) {
+            closePanel();
+            return;
+        }
+
+        var messages = Array.isArray(session.messages) ? session.messages : [];
+
+        chat.innerHTML = "";
+
+        if (!messages.length) {
+            var empty = document.createElement("div");
+            empty.className = "assistant-message mobile-message assistant";
+            empty.textContent = "This saved session has no messages yet.";
+            chat.appendChild(empty);
+        }
+
+        messages.forEach(function (message) {
+            var role = String((message && message.role) || "assistant").toLowerCase();
+            var bubble = document.createElement("div");
+            bubble.className = "mobile-message " + (role === "user" ? "user" : "assistant");
+            bubble.textContent = messageText(message);
+            chat.appendChild(bubble);
+        });
+
+        try {
+            chat.scrollTop = chat.scrollHeight;
+        } catch (error) {}
+
+        closePanel();
+
+        console.log("[Nova Mobile Final Session Actions] opened", {
+            id: session.id,
+            messages: messages.length
+        });
+    }
+
+    async function loadSessionById(sessionId) {
+        var data = await api("/api/sessions/" + encodeURIComponent(sessionId));
+        renderLoadedSession(data.session || data);
+    }
+
+    function renderRow(panel, session) {
+        var row = document.createElement("div");
+        row.setAttribute("data-nova-final-session-row", String(session.id || ""));
+        row.style.setProperty("display", "grid", "important");
+        row.style.setProperty("grid-template-columns", "1fr auto auto auto", "important");
+        row.style.setProperty("gap", "6px", "important");
+        row.style.setProperty("align-items", "center", "important");
+        row.style.setProperty("margin", "0 0 8px 0", "important");
+        row.style.setProperty("padding", "8px", "important");
+        row.style.setProperty("border-radius", "14px", "important");
+        row.style.setProperty("background", "rgba(255,255,255,.06)", "important");
+        row.style.setProperty("border", "1px solid rgba(255,255,255,.12)", "important");
+
+        var title = button((session.pinned ? "📌 " : "") + String(session.title || session.id || "Saved Session"));
+        title.style.setProperty("text-align", "left", "important");
+        title.style.setProperty("overflow", "hidden", "important");
+        title.style.setProperty("text-overflow", "ellipsis", "important");
+        title.style.setProperty("white-space", "nowrap", "important");
+        title.onclick = function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            loadSessionById(session.id).catch(function (error) {
+                console.error("[Nova Mobile Final Session Actions] open failed", error);
+                alert("Open failed");
+            });
+        };
+
+        var pin = button(session.pinned ? "Unpin" : "Pin");
+        pin.onclick = async function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            try {
+                await api("/api/sessions/pin", {
+                    session_id: session.id,
+                    pinned: !session.pinned
+                });
+                await renderFinalSessions(true);
+            } catch (error) {
+                console.error("[Nova Mobile Final Session Actions] pin failed", error);
+                alert("Pin failed");
+            }
+        };
+
+        var rename = button("Rename");
+        rename.onclick = async function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            var current = String(session.title || "");
+            var next = prompt("Rename session:", current);
+            if (next === null) return;
+
+            next = String(next || "").trim();
+            if (!next) return;
+
+            try {
+                await api("/api/sessions/rename", {
+                    session_id: session.id,
+                    title: next
+                });
+                await renderFinalSessions(true);
+            } catch (error) {
+                console.error("[Nova Mobile Final Session Actions] rename failed", error);
+                alert("Rename failed");
+            }
+        };
+
+        var del = button("Delete");
+        del.style.setProperty("background", "rgba(255,70,70,.22)", "important");
+        del.onclick = async function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (!confirm("Delete this session?")) return;
+
+            try {
+                await api("/api/sessions/delete", {
+                    session_id: session.id
+                });
+                await renderFinalSessions(true);
+            } catch (error) {
+                console.error("[Nova Mobile Final Session Actions] delete failed", error);
+                alert("Delete failed");
+            }
+        };
+
+        row.appendChild(title);
+        row.appendChild(pin);
+        row.appendChild(rename);
+        row.appendChild(del);
+        panel.appendChild(row);
+    }
+
+    async function renderFinalSessions(force) {
+        var panel = getPanel();
+
+        if (!panel) {
+            panel = document.createElement("section");
+            panel.id = "nova-mobile-sessions-panel";
+            document.body.appendChild(panel);
+        }
+
+        if (rendering) return;
+        if (!force && panel.getAttribute("data-nova-final-session-actions") === "ready") return;
+
+        rendering = true;
+
+        try {
+            stylePanel(panel);
+            panel.setAttribute("data-nova-final-session-actions", "rendering");
+            panel.innerHTML = "";
+
+            var header = document.createElement("div");
+            header.style.setProperty("display", "flex", "important");
+            header.style.setProperty("justify-content", "space-between", "important");
+            header.style.setProperty("align-items", "center", "important");
+            header.style.setProperty("gap", "8px", "important");
+            header.style.setProperty("margin-bottom", "10px", "important");
+
+            var title = document.createElement("strong");
+            title.textContent = "Saved Sessions";
+            title.style.setProperty("color", "#fff", "important");
+
+            var close = button("Close");
+            close.onclick = function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                closePanel();
+            };
+
+            header.appendChild(title);
+            header.appendChild(close);
+            panel.appendChild(header);
+
+            var data = await api("/api/sessions");
+            var sessions = Array.isArray(data.sessions) ? data.sessions : [];
+
+            sessions = sessions.filter(function (session) {
+                return session && session.id;
+            }).sort(function (a, b) {
+                if (!!a.pinned !== !!b.pinned) {
+                    return a.pinned ? -1 : 1;
+                }
+
+                return String(b.updated_at || b.created_at || "").localeCompare(
+                    String(a.updated_at || a.created_at || "")
+                );
+            }).slice(0, 25);
+
+            if (!sessions.length) {
+                var empty = document.createElement("div");
+                empty.textContent = "No saved sessions found yet.";
+                empty.style.setProperty("padding", "12px", "important");
+                empty.style.setProperty("color", "#fff", "important");
+                panel.appendChild(empty);
+            } else {
+                sessions.forEach(function (session) {
+                    renderRow(panel, session);
+                });
+            }
+
+            panel.setAttribute("data-nova-final-session-actions", "ready");
+
+            console.log("[Nova Mobile Final Session Actions] rendered", sessions.length);
+        } catch (error) {
+            console.error("[Nova Mobile Final Session Actions] render failed", error);
+            panel.innerHTML = "<div class='mobile-session-item'>Failed to load sessions actions.</div>";
+        } finally {
+            rendering = false;
+        }
+    }
+
+    function isSessionsButton(target) {
+        if (!target || !target.closest) return false;
+
+        var button = target.closest("button, a");
+        if (!button) return false;
+        if (button.closest("#nova-mobile-sessions-panel")) return false;
+
+        var text = String(button.textContent || "").trim().toLowerCase();
+        var id = String(button.id || "").toLowerCase();
+        var cls = String(button.className || "").toLowerCase();
+        var aria = String(button.getAttribute("aria-label") || "").toLowerCase();
+
+        return (
+            text === "sessions" ||
+            id.includes("session") ||
+            cls.includes("session") ||
+            aria.includes("session")
+        );
+    }
+
+    document.addEventListener("click", function (event) {
+        if (!isSessionsButton(event.target)) return;
+
+        setTimeout(function () {
+            renderFinalSessions(true);
+        }, 80);
+    }, true);
+
+    setInterval(function () {
+        var panel = getPanel();
+
+        if (
+            panel &&
+            isPanelOpen(panel) &&
+            panel.getAttribute("data-nova-final-session-actions") !== "ready"
+        ) {
+            renderFinalSessions(true);
+        }
+    }, 500);
+
+    window.NovaMobileFinalSessionActionsOpen = function () {
+        renderFinalSessions(true);
+    };
+
+    console.log("[Nova Mobile Final Session Actions] ready");
+})();
