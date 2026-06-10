@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     "use strict";
 
     function installCoreListeners(options) {
@@ -183,4 +183,45 @@
     };
 
     console.log("[Nova Mobile] events module ready");
+})();
+
+// NOVA_ROUTE_SESSIONS_BUTTON_TO_FINAL_OWNER_20260609
+(function () {
+    "use strict";
+
+    function isSessionsButton(target) {
+        if (!target || !target.closest) return false;
+
+        var button = target.closest("button, a");
+        if (!button) return false;
+
+        var text = String(button.textContent || "").trim().toLowerCase();
+        var id = String(button.id || "").toLowerCase();
+        var cls = String(button.className || "").toLowerCase();
+        var aria = String(button.getAttribute("aria-label") || "").toLowerCase();
+
+        return (
+            text === "sessions" ||
+            id === "nova-mobile-sessions-toggle" ||
+            id.includes("sessions") ||
+            cls.includes("sessions") ||
+            aria.includes("sessions")
+        );
+    }
+
+    document.addEventListener("click", function (event) {
+        if (!isSessionsButton(event.target)) return;
+
+        if (typeof window.NovaMobileFinalSessionActionsOpen !== "function") {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        window.NovaMobileFinalSessionActionsOpen();
+    }, true);
+
+    console.log("[Nova Mobile Sessions Button Final Owner] ready");
 })();
