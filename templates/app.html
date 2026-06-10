@@ -867,7 +867,82 @@
 
 
 
-    // NOVA_DESKTOP_SAFE_JSON_AND_MEMORY_OPEN_20260610
+    // NOVA_DESKTOP_FIX_SESSION_ENDPOINTS_20260610
+
+    // NOVA_DESKTOP_LOCAL_SESSION_AND_MEMORY_FIX_20260610
+    function createDesktopLocalSessionId() {
+      return "desktop_" + Date.now().toString(16) + "_" + Math.random().toString(16).slice(2);
+    }
+
+    function normalizeDesktopMemoryItems(data) {
+      if (!data) return [];
+
+      if (Array.isArray(data)) return data;
+      if (Array.isArray(data.memory)) return data.memory;
+      if (Array.isArray(data.items)) return data.items;
+      if (Array.isArray(data.memories)) return data.memories;
+      if (data.content && Array.isArray(data.content.memory)) return data.content.memory;
+      if (data.content && Array.isArray(data.content.items)) return data.content.items;
+      if (data.data && Array.isArray(data.data.memory)) return data.data.memory;
+      if (data.data && Array.isArray(data.data.items)) return data.data.items;
+
+      if (typeof data === "object") {
+        return Object.keys(data)
+          .filter((key) => {
+            const value = data[key];
+            return value && typeof value === "object" && !Array.isArray(value);
+          })
+          .map((key) => {
+            const value = data[key] || {};
+            return Object.assign({ key: key }, value);
+          });
+      }
+
+      return [];
+    }
+
+    function renderDesktopMemoryItems(items, rawData) {
+      const list = $("desktopMemoryList");
+      const count = $("desktopMemoryCount");
+
+      if (count) count.textContent = String(items.length || 0);
+
+      if (!list) return;
+
+      list.innerHTML = "";
+
+      if (!items.length) {
+        const empty = document.createElement("div");
+        empty.className = "session-placeholder";
+        empty.textContent = rawData ? "No memory items found in current payload." : "No memory data loaded.";
+        list.appendChild(empty);
+        return;
+      }
+
+      items.slice(0, 12).forEach((item) => {
+        const row = document.createElement("div");
+        row.className = "desktop-memory-item";
+
+        const title = document.createElement("div");
+        title.className = "desktop-memory-title";
+
+        const body = document.createElement("div");
+        body.className = "desktop-memory-body";
+
+        if (typeof item === "string") {
+          title.textContent = "Memory";
+          body.textContent = item;
+        } else {
+          title.textContent = item.title || item.key || item.category || item.type || "Memory";
+          body.textContent = item.text || item.value || item.content || item.summary || item.note || JSON.stringify(item);
+        }
+
+        row.appendChild(title);
+        row.appendChild(body);
+        list.appendChild(row);
+      });
+    }
+\n    // NOVA_DESKTOP_SAFE_JSON_AND_MEMORY_OPEN_20260610
     async function fetchJsonOrNull(url, options) {
       const response = await fetch(url, options || {});
       const raw = await response.text();
@@ -953,59 +1028,35 @@
         || "memory";
     }
 
+    
     async function loadDesktopMemory() {
       const list = $("desktopMemoryList");
       const count = $("desktopMemoryCount");
-      if (!list) return;
+
+      if (list) {
+        list.innerHTML = "";
+        const loading = document.createElement("div");
+        loading.className = "session-placeholder";
+        loading.textContent = "Loading memory...";
+        list.appendChild(loading);
+      }
 
       try {
         const data = await fetchJsonOrNull("/api/memory");
-        if (!data) throw new Error("Memory endpoint did not return JSON");
-        const items = normalizeMemoryPayload(data);
+        const items = normalizeDesktopMemoryItems(data);
+        renderDesktopMemoryItems(items, data);
+      } catch (error) {
+        if (count) count.textContent = "0";
 
-        if (count) count.textContent = String(items.length);
-
-        list.innerHTML = "";
-
-        if (!items.length) {
-          const empty = document.createElement("div");
-          empty.className = "execution-note";
-          empty.textContent = "No memory items yet.";
-          list.appendChild(empty);
-          return;
+        if (list) {
+          list.innerHTML = "";
+          const failed = document.createElement("div");
+          failed.className = "session-placeholder";
+          failed.textContent = "Could not load memory.";
+          list.appendChild(failed);
         }
 
-        items.slice(0, 8).forEach((item, index) => {
-          const card = document.createElement("div");
-          card.className = "desktop-memory-item";
-
-          const text = document.createElement("div");
-          text.className = "desktop-memory-text";
-          text.textContent = getMemoryText(item);
-
-          const meta = document.createElement("div");
-          meta.className = "desktop-memory-meta";
-
-          const kind = document.createElement("span");
-          kind.textContent = getMemoryKind(item);
-
-          const number = document.createElement("span");
-          number.textContent = "#" + String(index + 1);
-
-          meta.appendChild(kind);
-          meta.appendChild(number);
-
-          card.appendChild(text);
-          card.appendChild(meta);
-          list.appendChild(card);
-        });
-      } catch (error) {
-        if (count) count.textContent = "error";
-        list.innerHTML = "";
-        const failed = document.createElement("div");
-        failed.className = "execution-note";
-        failed.textContent = "Could not load memory.";
-        list.appendChild(failed);
+        console.warn("[Nova Desktop] memory load failed", error);
       }
     }
 
@@ -1120,24 +1171,26 @@
       } catch (e) {}
     }
 
+    
     async function newSession() {
-      setStatus("new session...");
-      const j = await fetchJsonOrNull("/api/session/new", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": API_KEY
-        },
-        body: JSON.stringify({})
-      });
+      const sid = createDesktopLocalSessionId();
+      setSessionId(sid);
+      setStatus("new local session");
 
-      if (!j) throw new Error("New session endpoint did not return JSON");
-      if (!j || !j.session_id) throw new Error("No session_id returned");
+      const input = $("prompt");
+      if (input) input.value = "";
 
-      setSessionId(j.session_id);
-      chat.innerHTML = "";
-      addMsg("assistant", "New desktop session started.");
-      setStatus("idle");
+      const messages =
+        $("messages") ||
+        $("chatMessages") ||
+        $("desktopMessages") ||
+        document.querySelector(".messages") ||
+        document.querySelector(".chat-messages");
+
+      if (messages) {
+        messages.innerHTML = "";
+      }
+
       await refreshSummaryMeta();
       refreshDesktopPanels();
     }
@@ -1151,13 +1204,13 @@
       summarizeBtn.disabled = true;
 
       try {
-        const j = await fetchJsonOrNull("/api/session/summarize", {
+        const j = await fetchJsonOrNull("/api/session/summary", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "x-api-key": API_KEY
           },
-          body: JSON.stringify({ session_id: getSessionId() })
+          body: JSON.stringify({ session_id: getSessionId(), summarize: true })
         });
 
         if (!j) throw new Error("Summarize endpoint did not return JSON");
@@ -1531,6 +1584,7 @@
   </script>
 </body>
 </html>
+
 
 
 
