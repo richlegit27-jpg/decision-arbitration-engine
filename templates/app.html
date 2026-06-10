@@ -493,6 +493,43 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+
+    /* NOVA_DESKTOP_MEMORY_PANEL_20260610 */
+    .desktop-memory-list {
+      display: grid;
+      gap: 8px;
+      max-height: 24vh;
+      overflow: auto;
+      padding-right: 2px;
+    }
+
+    .desktop-memory-item {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(0,0,0,.16);
+      padding: 10px;
+      display: grid;
+      gap: 5px;
+    }
+
+    .desktop-memory-text {
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .desktop-memory-meta {
+      color: var(--muted);
+      font-size: 11px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
     @media (max-width: 1100px) {
       .shell {
         grid-template-columns: 260px minmax(0, 1fr);
@@ -612,10 +649,10 @@
         <div class="memory-card-shell">
           <div class="metric">
             <span>Memory</span>
-            <strong>shared</strong>
+            <strong id="desktopMemoryCount">loading</strong>
           </div>
-          <div class="execution-note">
-            Recent memory items will go here next.
+          <div id="desktopMemoryList" class="desktop-memory-list">
+            <div class="execution-note">Loading memory...</div>
           </div>
         </div>
       </section>
@@ -782,6 +819,89 @@
         || "";
     }
 
+
+    // NOVA_DESKTOP_MEMORY_PANEL_20260610
+    function normalizeMemoryPayload(data) {
+      if (!data) return [];
+      if (Array.isArray(data)) return data;
+      if (Array.isArray(data.memory)) return data.memory;
+      if (Array.isArray(data.items)) return data.items;
+      if (Array.isArray(data.data)) return data.data;
+      return [];
+    }
+
+    function getMemoryText(item) {
+      return item.text
+        || item.content
+        || item.value
+        || item.memory
+        || item.summary
+        || safeRenderText(item);
+    }
+
+    function getMemoryKind(item) {
+      return item.kind
+        || item.category
+        || item.type
+        || item.source
+        || "memory";
+    }
+
+    async function loadDesktopMemory() {
+      const list = $("desktopMemoryList");
+      const count = $("desktopMemoryCount");
+      if (!list) return;
+
+      try {
+        const response = await fetch("/api/memory");
+        const data = await response.json();
+        const items = normalizeMemoryPayload(data);
+
+        if (count) count.textContent = String(items.length);
+
+        list.innerHTML = "";
+
+        if (!items.length) {
+          const empty = document.createElement("div");
+          empty.className = "execution-note";
+          empty.textContent = "No memory items yet.";
+          list.appendChild(empty);
+          return;
+        }
+
+        items.slice(0, 8).forEach((item, index) => {
+          const card = document.createElement("div");
+          card.className = "desktop-memory-item";
+
+          const text = document.createElement("div");
+          text.className = "desktop-memory-text";
+          text.textContent = getMemoryText(item);
+
+          const meta = document.createElement("div");
+          meta.className = "desktop-memory-meta";
+
+          const kind = document.createElement("span");
+          kind.textContent = getMemoryKind(item);
+
+          const number = document.createElement("span");
+          number.textContent = "#" + String(index + 1);
+
+          meta.appendChild(kind);
+          meta.appendChild(number);
+
+          card.appendChild(text);
+          card.appendChild(meta);
+          list.appendChild(card);
+        });
+      } catch (error) {
+        if (count) count.textContent = "error";
+        list.innerHTML = "";
+        const failed = document.createElement("div");
+        failed.className = "execution-note";
+        failed.textContent = "Could not load memory.";
+        list.appendChild(failed);
+      }
+    }
     async function loadDesktopSessions() {
       const list = $("desktopSessionList");
       if (!list) return;
@@ -824,8 +944,10 @@
             setSessionId(sid);
             setStatus("session selected");
             loadDesktopSessions();
+    loadDesktopMemory();
             refreshSummaryMeta();
     loadDesktopSessions();
+    loadDesktopMemory();
           });
 
           list.appendChild(button);
@@ -877,6 +999,7 @@
       setStatus("idle");
       await refreshSummaryMeta();
       loadDesktopSessions();
+    loadDesktopMemory();
     }
 
     async function summarizeNow() {
@@ -1042,6 +1165,7 @@
         setStatus("done");
         await refreshSummaryMeta();
       loadDesktopSessions();
+    loadDesktopMemory();
       } catch (e) {
         setStatus("fallback...");
 
@@ -1067,6 +1191,7 @@
           setStatus("done fallback");
           await refreshSummaryMeta();
       loadDesktopSessions();
+    loadDesktopMemory();
         } catch (fallbackError) {
           assistantBubble.textContent = "Error: " + (fallbackError.message || fallbackError);
           setStatus("error");
@@ -1113,9 +1238,11 @@
 
     refreshSummaryMeta();
     loadDesktopSessions();
+    loadDesktopMemory();
   </script>
 </body>
 </html>
+
 
 
 
