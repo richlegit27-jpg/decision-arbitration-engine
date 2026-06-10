@@ -8763,6 +8763,12 @@ def nova_mobile_direct_session_persist_20260609():
 
 
 
+
+# NOVA_FORCE_RESTORE_DESKTOP_APP_ROUTE_20260610
+@app.get("/app")
+def nova_desktop_app_20260610():
+    return render_template("app.html")
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
@@ -8788,6 +8794,7 @@ if __name__ == "__main__":
 
 
 # CLEAN_IMAGE_PROMPT_RIGHT_BEFORE_CHAT_SERVICE_LOCK
+
 
 
 
