@@ -1079,24 +1079,38 @@
     }
 
     // NOVA_DESKTOP_REFRESH_HELPER_20260610
+    
     function refreshDesktopPanels() {
-      refreshDesktopPanels();
-    }
-    async function refreshSummaryMeta() {
-      const sid = getSessionId();
-      if (!sid) {
-        setMeta("");
-        return;
+      // NOVA_FIX_DESKTOP_RECURSION_AND_SUMMARY_20260610
+      try {
+        if (typeof loadDesktopSessions === "function") {
+          loadDesktopSessions();
+        }
+      } catch (error) {
+        console.warn("[Nova Desktop] sessions panel refresh skipped", error);
       }
 
       try {
-        const j = await fetchJsonOrNull("/api/session/summary?session_id=" + encodeURIComponent(sid), {
-          headers: { "x-api-key": API_KEY }
-        });
+        if (typeof loadDesktopMemory === "function") {
+          loadDesktopMemory();
+        }
+      } catch (error) {
+        console.warn("[Nova Desktop] memory panel refresh skipped", error);
+      }
+    }
+    
+    async function refreshSummaryMeta() {
+      // NOVA_DISABLE_MISSING_DESKTOP_SUMMARY_ENDPOINT_20260610
+      const summary =
+        document.getElementById("desktopSummary") ||
+        document.getElementById("summary") ||
+        document.querySelector("[data-summary]");
 
-        if (!j) return;
-        setMeta(j.summary || j.text || "");
-      } catch (e) {}
+      if (summary && !summary.textContent.trim()) {
+        summary.textContent = "No summary yet.";
+      }
+
+      return null;
     }
 
     
@@ -1132,14 +1146,14 @@
       summarizeBtn.disabled = true;
 
       try {
-        const j = await fetchJsonOrNull("/api/session/summary", {
+        const j = await Promise.resolve({ ok: false, skipped: true, reason: "desktop summary endpoint disabled" }) /* {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "x-api-key": API_KEY
           },
           body: JSON.stringify({ session_id: getSessionId(), summarize: true })
-        });
+        }); */
 
         if (!j) throw new Error("Summarize endpoint did not return JSON");
         setMeta(j.summary || j.text || "");
