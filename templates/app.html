@@ -1,285 +1,839 @@
-﻿<!doctype html>
-<html>
+﻿<!-- NOVA_DESKTOP_APP_UI_V1_20260610 -->
+<!doctype html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Nova</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Nova Desktop</title>
   <style>
-    body { font-family: Consolas, monospace; background:#0f0f0f; color:#e6e6e6; margin:0; padding:20px; }
-    #topbar { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:10px; }
-    #status { font-size:12px; opacity:0.8; }
-    #meta { font-size:12px; opacity:0.8; margin-top:4px; }
-    #sessionbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
-    #sid { width: 360px; background:#1a1a1a; color:#fff; border:1px solid #333; padding:6px 8px; }
-    button { padding:7px 12px; background:#222; color:#fff; border:1px solid #444; cursor:pointer; }
-    button:hover { background:#333; }
-    #chat { border:1px solid #333; padding:12px; min-height:260px; margin-bottom:10px; overflow:auto; white-space:pre-wrap; }
-    .msg { margin: 0 0 10px 0; }
-    .role { opacity:0.75; font-size:12px; }
-    .bubble { margin-top:4px; padding:10px; border:1px solid #333; background:#141414; }
-    textarea { width:100%; height:90px; background:#1a1a1a; color:#fff; border:1px solid #333; padding:10px; resize:vertical; }
-  </style>
-</head>
-<body>
-
-<div id="topbar">
-  <div style="display:flex; flex-direction:column; gap:6px;">
-    <div style="font-size:18px; font-weight:700;">Nova (Summary Memory + Streaming)</div>
-    <div id="status">status: idle</div>
-    <div id="meta">summary: 0 chars</div>
-  </div>
-
-  <div id="sessionbar">
-    <span style="opacity:.8;">session_id</span>
-    <input id="sid" spellcheck="false" />
-    <button id="newSessionBtn">New Session</button>
-    <button id="summarizeBtn">Summarize Now</button>
-  </div>
-</div>
-
-<div id="chat"></div>
-
-<textarea id="input" placeholder="Type here..."></textarea>
-<br>
-<button id="sendBtn">Send</button>
-
-<script>
-const API_KEY = "testkey123";
-const LS_SID = "nova.session_id";
-
-const $ = (id) => document.getElementById(id);
-const chat = $("chat");
-const input = $("input");
-const status = $("status");
-const meta = $("meta");
-const sidEl = $("sid");
-const sendBtn = $("sendBtn");
-const newSessionBtn = $("newSessionBtn");
-const summarizeBtn = $("summarizeBtn");
-
-function setStatus(s){ status.textContent = "status: " + s; }
-function setMeta(summaryText){ meta.textContent = "summary: " + ((summaryText||"").length) + " chars"; }
-function autoScroll(){ try { chat.scrollTop = chat.scrollHeight; } catch(e){} }
-
-function addMsg(role, text){
-  const wrap = document.createElement("div");
-  wrap.className = "msg";
-  const r = document.createElement("div");
-  r.className = "role";
-  r.textContent = role;
-  const b = document.createElement("div");
-  b.className = "bubble";
-  b.textContent = text || "";
-  wrap.appendChild(r);
-  wrap.appendChild(b);
-  chat.appendChild(wrap);
-  autoScroll();
-  return b;
-}
-
-function getSessionId(){ return (sidEl.value || "").trim(); }
-function setSessionId(v){
-  sidEl.value = v || "";
-  try { localStorage.setItem(LS_SID, sidEl.value); } catch(e){}
-}
-
-async function refreshSummaryMeta(){
-  const sid = getSessionId();
-  if(!sid){ setMeta(""); return; }
-  try{
-    const r = await fetch("/api/session/summary?session_id=" + encodeURIComponent(sid), {
-      headers: { "x-api-key": API_KEY }
-    });
-    const j = await r.json();
-    setMeta(j.summary || "");
-  } catch(e){}
-}
-
-async function newSession(){
-  setStatus("new session…");
-  const r = await fetch("/api/session/new", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": API_KEY
-    },
-    body: "{}"
-  });
-  const j = await r.json();
-  if(!j || !j.session_id) throw new Error("No session_id returned");
-  setSessionId(j.session_id);
-  chat.textContent = "";
-  setStatus("idle");
-  await refreshSummaryMeta();
-}
-
-async function summarizeNow(){
-  const sid = getSessionId();
-  if(!sid){ await newSession(); }
-  setStatus("summarizing…");
-  summarizeBtn.disabled = true;
-  try{
-    const r = await fetch("/api/session/summarize", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": API_KEY
-      },
-      body: JSON.stringify({ session_id: getSessionId() })
-    });
-    const j = await r.json();
-    if(j.summary !== undefined){
-      setMeta(j.summary || "");
-    }
-    setStatus("done");
-  } catch(e){
-    setStatus("error");
-    alert(e.message || e);
-  } finally {
-    summarizeBtn.disabled = false;
-  }
-}
-
-function parseSSEChunk(chunk){
-  const lines = chunk.split("\n").map(x => x.trimEnd());
-  let ev = "";
-  let dataLine = "";
-  for(const ln of lines){
-    if(ln.startsWith("event:")) ev = ln.slice(6).trim();
-    if(ln.startsWith("data:")) dataLine = ln;
-  }
-  if(!ev) return null;
-  let payload = null;
-  if(dataLine){
-    const raw = dataLine.replace(/^data:\s*/,"");
-    try { payload = JSON.parse(raw); } catch(e){ payload = { raw }; }
-  }
-  return { ev, payload };
-}
-
-async function send(){
-  const text = input.value.trim();
-  if(!text) return;
-
-  if(!getSessionId()){
-    await newSession();
-  }
-
-  input.value = "";
-  setStatus("streaming…");
-  sendBtn.disabled = true;
-
-  addMsg("user", text);
-  const assistantBubble = addMsg("assistant", "");
-
-  try{
-    const response = await fetch("/api/chat/stream", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": API_KEY
-      },
-      body: JSON.stringify({ text, session_id: getSessionId() })
-    });
-
-    if(!response.ok || !response.body){
-      throw new Error("Stream failed: HTTP " + response.status);
+    :root {
+      --bg: #080812;
+      --panel: rgba(255,255,255,.075);
+      --panel-strong: rgba(255,255,255,.11);
+      --line: rgba(255,255,255,.13);
+      --text: rgba(255,255,255,.94);
+      --muted: rgba(255,255,255,.62);
+      --soft: rgba(255,255,255,.08);
+      --brand: #8b5cf6;
+      --brand-2: #a78bfa;
+      --good: #22c55e;
+      --danger: #ef4444;
+      --shadow: 0 22px 80px rgba(0,0,0,.38);
     }
 
-    const sidHdr = response.headers.get("x-nova-session-id");
-    if(sidHdr) setSessionId(sidHdr);
+    * {
+      box-sizing: border-box;
+    }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(139,92,246,.28), transparent 34rem),
+        radial-gradient(circle at bottom right, rgba(59,130,246,.18), transparent 30rem),
+        var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
 
-    while(true){
-      const { done, value } = await reader.read();
-      if(done) break;
+    button,
+    input,
+    textarea {
+      font: inherit;
+    }
 
-      buffer += decoder.decode(value, { stream:true });
+    button {
+      cursor: pointer;
+    }
 
-      const parts = buffer.split("\n\n");
-      buffer = parts.pop() || "";
+    .shell {
+      height: 100%;
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr) 320px;
+      gap: 14px;
+      padding: 14px;
+    }
 
-      for(const part of parts){
-        if(!part) continue;
-        if(part.startsWith(":")) continue;
+    .panel {
+      min-height: 0;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: linear-gradient(180deg, var(--panel-strong), var(--panel));
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+      overflow: hidden;
+    }
 
-        const msg = parseSSEChunk(part);
-        if(!msg) continue;
+    .sidebar,
+    .tools {
+      display: flex;
+      flex-direction: column;
+    }
 
-        if(msg.ev === "token"){
-          const t = msg.payload?.t || "";
-          if(t){
-            assistantBubble.textContent += t;
-            autoScroll();
-          }
-          if(msg.payload?.session_id){
-            setSessionId(msg.payload.session_id);
-          }
-        } else if(msg.ev === "done"){
-          if(msg.payload?.session_id){
-            setSessionId(msg.payload.session_id);
-          }
-          setStatus("done");
-          await refreshSummaryMeta();
-        } else if(msg.ev === "error"){
-          setStatus("error");
-          assistantBubble.textContent += "\n\n[stream error] " + (msg.payload?.error || "unknown");
-        }
+    .brand {
+      padding: 22px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand-title {
+      margin: 0;
+      font-size: 36px;
+      line-height: .95;
+      letter-spacing: -.075em;
+    }
+
+    .brand-copy {
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(255,255,255,.055);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--good);
+      box-shadow: 0 0 16px rgba(34,197,94,.85);
+    }
+
+    .nav {
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .nav a,
+    .nav button,
+    .quick button,
+    .utility-button {
+      width: 100%;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255,255,255,.065);
+      color: var(--text);
+      text-decoration: none;
+      text-align: left;
+    }
+
+    .nav a:hover,
+    .nav button:hover,
+    .quick button:hover,
+    .utility-button:hover {
+      border-color: rgba(167,139,250,.7);
+      background: rgba(255,255,255,.11);
+    }
+
+    .nav small,
+    .quick small {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .session-box {
+      margin-top: auto;
+      padding: 14px;
+      border-top: 1px solid var(--line);
+      display: grid;
+      gap: 10px;
+    }
+
+    .session-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    #sid {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(0,0,0,.22);
+      color: var(--text);
+      padding: 10px 12px;
+      outline: none;
+      font-size: 12px;
+    }
+
+    .chat-panel {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+    }
+
+    .chat-top {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .chat-title {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: -.025em;
+    }
+
+    #status,
+    #meta {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    #chat {
+      min-height: 0;
+      overflow: auto;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .msg {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-width: min(780px, 82%);
+    }
+
+    .msg:has(.role:nth-child(1)) {
+      width: fit-content;
+    }
+
+    .role {
+      color: var(--muted);
+      font-size: 12px;
+      padding: 0 4px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-weight: 800;
+    }
+
+    .bubble {
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255,255,255,.075);
+      color: var(--text);
+      white-space: pre-wrap;
+      line-height: 1.45;
+      font-size: 15px;
+      overflow-wrap: anywhere;
+    }
+
+    .msg.user {
+      align-self: flex-end;
+    }
+
+    .msg.user .bubble {
+      background: linear-gradient(135deg, rgba(139,92,246,.92), rgba(91,33,182,.92));
+      border-color: rgba(255,255,255,.22);
+    }
+
+    .msg.assistant {
+      align-self: flex-start;
+    }
+
+    .composer {
+      padding: 16px;
+      border-top: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    #input {
+      width: 100%;
+      min-height: 54px;
+      max-height: 180px;
+      resize: none;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 15px 16px;
+      background: rgba(0,0,0,.24);
+      color: var(--text);
+      outline: none;
+      line-height: 1.35;
+    }
+
+    #input:focus,
+    #sid:focus {
+      border-color: rgba(167,139,250,.85);
+    }
+
+    #sendBtn {
+      height: 54px;
+      min-width: 96px;
+      border: 1px solid rgba(255,255,255,.22);
+      border-radius: 18px;
+      background: linear-gradient(135deg, var(--brand), #5b21b6);
+      color: white;
+      font-weight: 900;
+    }
+
+    #sendBtn:disabled {
+      opacity: .6;
+      cursor: not-allowed;
+    }
+
+    .tools-section {
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .tools-section h3 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      letter-spacing: -.015em;
+    }
+
+    .quick {
+      display: grid;
+      gap: 8px;
+    }
+
+    .metric {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 11px 0;
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+
+    .metric:first-of-type {
+      border-top: 0;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .metric strong {
+      color: var(--brand-2);
+    }
+
+    @media (max-width: 1100px) {
+      .shell {
+        grid-template-columns: 260px minmax(0, 1fr);
+      }
+
+      .tools {
+        display: none;
       }
     }
 
-    if(status.textContent === "status: streaming…"){
-      setStatus("done");
-      await refreshSummaryMeta();
+    @media (max-width: 760px) {
+      html,
+      body {
+        overflow: auto;
+      }
+
+      .shell {
+        min-height: 100%;
+        height: auto;
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        order: 2;
+      }
+
+      .chat-panel {
+        order: 1;
+        min-height: 78vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="panel sidebar">
+      <div class="brand">
+        <div class="brand-row">
+          <h1 class="brand-title">Nova</h1>
+          <span class="pill"><span class="dot"></span> local</span>
+        </div>
+        <p class="brand-copy">Desktop workspace for streaming chat, session memory, summaries, and execution.</p>
+      </div>
+
+      <nav class="nav">
+        <a href="/">
+          <span>
+            Home
+            <small>Launcher and status</small>
+          </span>
+          <span>&gt;</span>
+        </a>
+
+        <a href="/mobile">
+          <span>
+            Mobile
+            <small>Locked mobile UI</small>
+          </span>
+          <span>&gt;</span>
+        </a>
+
+        <a href="/api/backend/readiness">
+          <span>
+            Readiness
+            <small>Backend status JSON</small>
+          </span>
+          <span>&gt;</span>
+        </a>
+
+        <a href="/api/sessions">
+          <span>
+            Sessions
+            <small>Raw session data</small>
+          </span>
+          <span>&gt;</span>
+        </a>
+      </nav>
+
+      <div class="session-box">
+        <div class="session-label">Session</div>
+        <input id="sid" spellcheck="false" />
+        <button class="utility-button" id="newSessionBtn" type="button">
+          <span>New Session</span>
+          <span>&gt;</span>
+        </button>
+      </div>
+    </aside>
+
+    <main class="panel chat-panel">
+      <header class="chat-top">
+        <div>
+          <h2 class="chat-title">Desktop Chat</h2>
+          <div id="status">status: idle</div>
+          <div id="meta">summary: 0 chars</div>
+        </div>
+        <span class="pill"><span class="dot"></span> ready</span>
+      </header>
+
+      <section id="chat">
+        <div class="msg assistant">
+          <div class="role">assistant</div>
+          <div class="bubble">Nova Desktop is ready. Type a message, press Enter to send, or use a quick action.</div>
+        </div>
+      </section>
+
+      <div class="composer">
+        <textarea id="input" placeholder="Message Nova... Enter sends, Shift+Enter makes a new line"></textarea>
+        <button id="sendBtn" type="button">Send</button>
+      </div>
+    </main>
+
+    <aside class="panel tools">
+      <section class="tools-section">
+        <h3>Quick actions</h3>
+        <div class="quick">
+          <button type="button" data-prompt="Continue from where we left off. Keep it direct and tell me the next move.">
+            <span>
+              Continue
+              <small>Pick up the thread</small>
+            </span>
+          </button>
+
+          <button type="button" data-prompt="Summarize the current situation in plain English and tell me what matters most.">
+            <span>
+              Summarize
+              <small>Plain-English recap</small>
+            </span>
+          </button>
+
+          <button type="button" data-prompt="Improve this and make it cleaner, more direct, and more useful.">
+            <span>
+              Improve
+              <small>Clean up the current work</small>
+            </span>
+          </button>
+
+          <button type="button" data-prompt="What should I do next? Give me the best next step only.">
+            <span>
+              Next
+              <small>Best next move only</small>
+            </span>
+          </button>
+        </div>
+      </section>
+
+      <section class="tools-section">
+        <h3>System</h3>
+        <div class="metric">
+          <span>Chat</span>
+          <strong>streaming</strong>
+        </div>
+        <div class="metric">
+          <span>Backend</span>
+          <strong>shared</strong>
+        </div>
+        <div class="metric">
+          <span>Mobile</span>
+          <strong>separate</strong>
+        </div>
+      </section>
+
+      <section class="tools-section">
+        <h3>Session tools</h3>
+        <button class="utility-button" id="summarizeBtn" type="button">
+          <span>Summarize Now</span>
+          <span>&gt;</span>
+        </button>
+      </section>
+    </aside>
+  </div>
+
+  <script>
+    const API_KEY = "testkey123";
+    const LS_SID = "nova.session_id";
+
+    const $ = (id) => document.getElementById(id);
+    const chat = $("chat");
+    const input = $("input");
+    const status = $("status");
+    const meta = $("meta");
+    const sidEl = $("sid");
+    const sendBtn = $("sendBtn");
+    const newSessionBtn = $("newSessionBtn");
+    const summarizeBtn = $("summarizeBtn");
+
+    function setStatus(s) {
+      status.textContent = "status: " + s;
     }
 
-  } catch(err){
-    setStatus("fallback…");
-    try{
-      const fb = await fetch("/api/chat", {
+    function setMeta(summaryText) {
+      meta.textContent = "summary: " + ((summaryText || "").length) + " chars";
+    }
+
+    function autoScroll() {
+      try {
+        chat.scrollTop = chat.scrollHeight;
+      } catch (e) {}
+    }
+
+    function addMsg(role, text) {
+      const wrap = document.createElement("div");
+      wrap.className = "msg " + role;
+
+      const r = document.createElement("div");
+      r.className = "role";
+      r.textContent = role;
+
+      const b = document.createElement("div");
+      b.className = "bubble";
+      b.textContent = text || "";
+
+      wrap.appendChild(r);
+      wrap.appendChild(b);
+      chat.appendChild(wrap);
+      autoScroll();
+      return b;
+    }
+
+    function getSessionId() {
+      return (sidEl.value || "").trim();
+    }
+
+    function setSessionId(v) {
+      sidEl.value = v || "";
+      try {
+        localStorage.setItem(LS_SID, sidEl.value);
+      } catch (e) {}
+    }
+
+    function ensureLocalSessionId() {
+      let sid = getSessionId();
+      if (sid) return sid;
+
+      try {
+        sid = localStorage.getItem(LS_SID) || "";
+      } catch (e) {}
+
+      if (!sid) {
+        sid = "desktop_" + Date.now().toString(16) + "_" + Math.random().toString(16).slice(2);
+      }
+
+      setSessionId(sid);
+      return sid;
+    }
+
+    async function refreshSummaryMeta() {
+      const sid = getSessionId();
+      if (!sid) {
+        setMeta("");
+        return;
+      }
+
+      try {
+        const r = await fetch("/api/session/summary?session_id=" + encodeURIComponent(sid), {
+          headers: { "x-api-key": API_KEY }
+        });
+
+        if (!r.ok) return;
+
+        const j = await r.json();
+        setMeta(j.summary || j.text || "");
+      } catch (e) {}
+    }
+
+    async function newSession() {
+      setStatus("new session...");
+      const r = await fetch("/api/session/new", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-api-key": API_KEY
         },
-        body: JSON.stringify({ text, session_id: getSessionId() })
+        body: JSON.stringify({})
       });
-      const j = await fb.json();
-      if(j.session_id) setSessionId(j.session_id);
-      assistantBubble.textContent = j.response || ("Error: " + (j.error || "unknown"));
-      setStatus("done (fallback)");
+
+      const j = await r.json();
+      if (!j || !j.session_id) throw new Error("No session_id returned");
+
+      setSessionId(j.session_id);
+      chat.innerHTML = "";
+      addMsg("assistant", "New desktop session started.");
+      setStatus("idle");
       await refreshSummaryMeta();
-    } catch(e2){
-      setStatus("error");
-      assistantBubble.textContent = "Error: " + (err?.message || err) + "\n" + (e2?.message || e2);
     }
-  } finally {
-    sendBtn.disabled = false;
-  }
-}
 
-sendBtn.addEventListener("click", send);
+    async function summarizeNow() {
+      if (!getSessionId()) {
+        ensureLocalSessionId();
+      }
 
-input.addEventListener("keydown", (e) => {
-  if(e.key === "Enter" && !e.shiftKey){
-    e.preventDefault();
-    send();
-  }
-});
+      setStatus("summarizing...");
+      summarizeBtn.disabled = true;
 
-newSessionBtn.addEventListener("click", () => newSession().catch(e => { setStatus("error"); alert(e.message || e); }));
-summarizeBtn.addEventListener("click", () => summarizeNow().catch(e => { setStatus("error"); alert(e.message || e); }));
+      try {
+        const r = await fetch("/api/session/summarize", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": API_KEY
+          },
+          body: JSON.stringify({ session_id: getSessionId() })
+        });
 
-(function boot(){
-  try{
-    const saved = localStorage.getItem(LS_SID);
-    if(saved) sidEl.value = saved;
-  } catch(e){}
-  refreshSummaryMeta();
-})();
-</script>
+        const j = await r.json();
+        setMeta(j.summary || j.text || "");
+        addMsg("assistant", j.summary || j.text || "Summary refreshed.");
+        setStatus("idle");
+      } finally {
+        summarizeBtn.disabled = false;
+      }
+    }
 
+    function normalizeFallbackResponse(j) {
+      return j.response
+        || j.assistant_message
+        || j.message
+        || j.text
+        || j.answer
+        || ("Error: " + (j.error || "unknown"));
+    }
+
+    async function sendText(textOverride) {
+      const text = String(textOverride || input.value || "").trim();
+      if (!text) return;
+
+      ensureLocalSessionId();
+
+      input.value = "";
+      input.style.height = "auto";
+
+      setStatus("streaming...");
+      sendBtn.disabled = true;
+
+      addMsg("user", text);
+      const assistantBubble = addMsg("assistant", "");
+
+      try {
+        const response = await fetch("/api/chat/stream", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": API_KEY
+          },
+          body: JSON.stringify({
+            text: text,
+            user_text: text,
+            message: text,
+            session_id: getSessionId(),
+            client_session_id: getSessionId()
+          })
+        });
+
+        if (!response.ok || !response.body) {
+          throw new Error("stream failed: " + response.status);
+        }
+
+        const sidHdr = response.headers.get("x-nova-session-id");
+        if (sidHdr) setSessionId(sidHdr);
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let rendered = "";
+
+        while (true) {
+          const chunk = await reader.read();
+          if (chunk.done) break;
+
+          buffer += decoder.decode(chunk.value, { stream: true });
+
+          const parts = buffer.split("\n\n");
+          buffer = parts.pop() || "";
+
+          for (const part of parts) {
+            const line = part
+              .split("\n")
+              .find((x) => x.startsWith("data:"));
+
+            if (!line) continue;
+
+            const payload = line.slice(5).trim();
+            if (!payload || payload === "[DONE]") continue;
+
+            let msg = null;
+            try {
+              msg = JSON.parse(payload);
+            } catch (e) {
+              rendered += payload;
+              assistantBubble.textContent = rendered;
+              autoScroll();
+              continue;
+            }
+
+            const ev = msg.ev || msg.event || msg.type;
+            const data = msg.payload || msg.data || msg;
+
+            if (ev === "token" || ev === "delta" || data.token || data.delta) {
+              rendered += data.token || data.delta || "";
+              assistantBubble.textContent = rendered;
+              autoScroll();
+            } else if (ev === "message" || data.response || data.text || data.assistant_message) {
+              rendered = data.response || data.text || data.assistant_message || rendered;
+              assistantBubble.textContent = rendered;
+              autoScroll();
+            } else if (ev === "done") {
+              if (data.session_id) setSessionId(data.session_id);
+              setStatus("done");
+            }
+          }
+        }
+
+        if (!assistantBubble.textContent.trim()) {
+          assistantBubble.textContent = rendered || "Done.";
+        }
+
+        setStatus("done");
+        await refreshSummaryMeta();
+      } catch (e) {
+        setStatus("fallback...");
+
+        try {
+          const fb = await fetch("/api/chat", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": API_KEY
+            },
+            body: JSON.stringify({
+              text: text,
+              user_text: text,
+              message: text,
+              session_id: getSessionId(),
+              client_session_id: getSessionId()
+            })
+          });
+
+          const j = await fb.json();
+          if (j.session_id) setSessionId(j.session_id);
+          assistantBubble.textContent = normalizeFallbackResponse(j);
+          setStatus("done fallback");
+          await refreshSummaryMeta();
+        } catch (fallbackError) {
+          assistantBubble.textContent = "Error: " + (fallbackError.message || fallbackError);
+          setStatus("error");
+        }
+      } finally {
+        sendBtn.disabled = false;
+      }
+    }
+
+    sendBtn.addEventListener("click", () => sendText());
+
+    input.addEventListener("input", () => {
+      input.style.height = "auto";
+      input.style.height = Math.min(input.scrollHeight, 180) + "px";
+    });
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendText();
+      }
+    });
+
+    newSessionBtn.addEventListener("click", () => newSession().catch(e => {
+      setStatus("error");
+      alert(e.message || e);
+    }));
+
+    summarizeBtn.addEventListener("click", () => summarizeNow().catch(e => {
+      setStatus("error");
+      alert(e.message || e);
+    }));
+
+    document.querySelectorAll("[data-prompt]").forEach((button) => {
+      button.addEventListener("click", () => {
+        sendText(button.getAttribute("data-prompt") || "");
+      });
+    });
+
+    try {
+      const saved = localStorage.getItem(LS_SID);
+      if (saved) setSessionId(saved);
+    } catch (e) {}
+
+    refreshSummaryMeta();
+  </script>
 </body>
 </html>
