@@ -446,6 +446,53 @@
       border-bottom: 0;
       border-top: 1px solid var(--line);
     }
+
+    /* NOVA_DESKTOP_SESSIONS_LIST_20260610 */
+    .desktop-session-list {
+      display: grid;
+      gap: 8px;
+      max-height: 42vh;
+      overflow: auto;
+      padding-right: 2px;
+    }
+
+    .desktop-session-item {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255,255,255,.055);
+      color: var(--text);
+      padding: 10px;
+      display: grid;
+      gap: 4px;
+      text-align: left;
+    }
+
+    .desktop-session-item:hover {
+      border-color: rgba(167,139,250,.65);
+      background: rgba(255,255,255,.10);
+    }
+
+    .desktop-session-item.is-active {
+      border-color: rgba(167,139,250,.85);
+      background: rgba(139,92,246,.18);
+    }
+
+    .desktop-session-title {
+      font-size: 13px;
+      font-weight: 900;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .desktop-session-meta {
+      color: var(--muted);
+      font-size: 11px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     @media (max-width: 1100px) {
       .shell {
         grid-template-columns: 260px minmax(0, 1fr);
@@ -511,8 +558,8 @@
 
         <div class="session-list-shell">
           <div class="session-label">Recent</div>
-          <div class="session-placeholder">
-            Session list goes here next.
+          <div id="desktopSessionList" class="desktop-session-list">
+            <div class="session-placeholder">Loading sessions...</div>
           </div>
         </div>
       </section>
@@ -706,6 +753,91 @@
       return sid;
     }
 
+
+    // NOVA_DESKTOP_SESSIONS_LIST_20260610
+    function normalizeSessionListPayload(data) {
+      if (!data) return [];
+      if (Array.isArray(data)) return data;
+      if (Array.isArray(data.sessions)) return data.sessions;
+      if (Array.isArray(data.items)) return data.items;
+      if (Array.isArray(data.data)) return data.data;
+      return [];
+    }
+
+    function getSessionTitle(session) {
+      return session.title
+        || session.name
+        || session.summary
+        || session.last_message
+        || session.preview
+        || session.id
+        || session.session_id
+        || "Untitled session";
+    }
+
+    function getSessionIdFromObject(session) {
+      return session.id
+        || session.session_id
+        || session.client_session_id
+        || "";
+    }
+
+    async function loadDesktopSessions() {
+      const list = $("desktopSessionList");
+      if (!list) return;
+
+      try {
+        const response = await fetch("/api/sessions");
+        const data = await response.json();
+        const sessions = normalizeSessionListPayload(data);
+        const activeId = data.active_session_id || getSessionId();
+
+        list.innerHTML = "";
+
+        if (!sessions.length) {
+          const empty = document.createElement("div");
+          empty.className = "session-placeholder";
+          empty.textContent = "No saved sessions yet.";
+          list.appendChild(empty);
+          return;
+        }
+
+        sessions.slice(0, 20).forEach((session) => {
+          const sid = getSessionIdFromObject(session);
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "desktop-session-item" + (sid && sid === activeId ? " is-active" : "");
+
+          const title = document.createElement("div");
+          title.className = "desktop-session-title";
+          title.textContent = getSessionTitle(session);
+
+          const meta = document.createElement("div");
+          meta.className = "desktop-session-meta";
+          meta.textContent = sid || "no session id";
+
+          button.appendChild(title);
+          button.appendChild(meta);
+
+          button.addEventListener("click", () => {
+            if (!sid) return;
+            setSessionId(sid);
+            setStatus("session selected");
+            loadDesktopSessions();
+            refreshSummaryMeta();
+    loadDesktopSessions();
+          });
+
+          list.appendChild(button);
+        });
+      } catch (error) {
+        list.innerHTML = "";
+        const failed = document.createElement("div");
+        failed.className = "session-placeholder";
+        failed.textContent = "Could not load sessions.";
+        list.appendChild(failed);
+      }
+    }
     async function refreshSummaryMeta() {
       const sid = getSessionId();
       if (!sid) {
@@ -744,6 +876,7 @@
       addMsg("assistant", "New desktop session started.");
       setStatus("idle");
       await refreshSummaryMeta();
+      loadDesktopSessions();
     }
 
     async function summarizeNow() {
@@ -908,6 +1041,7 @@
 
         setStatus("done");
         await refreshSummaryMeta();
+      loadDesktopSessions();
       } catch (e) {
         setStatus("fallback...");
 
@@ -932,6 +1066,7 @@
           assistantBubble.textContent = safeRenderText(normalizeFallbackResponse(j));
           setStatus("done fallback");
           await refreshSummaryMeta();
+      loadDesktopSessions();
         } catch (fallbackError) {
           assistantBubble.textContent = "Error: " + (fallbackError.message || fallbackError);
           setStatus("error");
@@ -977,8 +1112,10 @@
     } catch (e) {}
 
     refreshSummaryMeta();
+    loadDesktopSessions();
   </script>
 </body>
 </html>
+
 
 
