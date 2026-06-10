@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 # NOVA_LOCAL_PROJECT_CONTEXT_GUARD_20260607
 def _nova_is_local_project_status_question_20260607(user_text):
     clean = " ".join(str(user_text or "").lower().split())
@@ -125,6 +125,44 @@ from nova_backend.services.runtime_cognitive_injection_service import (
 )
 
 from nova_backend.services.runtime_cognitive_firewall import (
+
+# NOVA_ATTACHMENT_WRAPPER_CLEANUP_20260610
+_ATTACHMENT_WRAPPER_PREFIXES_20260610 = (
+    "Attachment analysis:",
+    "This uploaded attachment contains readable text about:",
+    "Key points:",
+    "Preview:",
+    "File path:",
+)
+
+def _nova_clean_attachment_wrapper_text_20260610(value: str) -> str:
+    text = str(value or "").replace("\r\n", "\n").replace("\r", "\n")
+    lines = []
+
+    for raw_line in text.split("\n"):
+        line = raw_line.strip()
+
+        if not line:
+            continue
+
+        if any(line.startswith(prefix) for prefix in _ATTACHMENT_WRAPPER_PREFIXES_20260610):
+            continue
+
+        if re.match(r"^\d+\.\s+This uploaded attachment contains readable text about:", line):
+            continue
+
+        lines.append(raw_line)
+
+    cleaned = "\n".join(lines).strip()
+
+    # Collapse repeated recursive summary phrase if it appears inline.
+    phrase = "This uploaded attachment contains readable text about:"
+    while cleaned.count(phrase) > 1:
+        cleaned = cleaned.replace(phrase + " " + phrase, phrase)
+
+    return cleaned
+
+
     RuntimeCognitiveFirewall,
 )
 
@@ -18201,6 +18239,8 @@ Next action:
             else:
 
                 content = str(memory or "").strip()
+
+                content = _nova_clean_attachment_wrapper_text_20260610(content)  # NOVA_ATTACHMENT_WRAPPER_CLEANUP_20260610_ENTRY
 
             if not content:
                 continue
