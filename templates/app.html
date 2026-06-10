@@ -1998,6 +1998,120 @@
 })();
 </script>
 
+
+<script>
+(function () {
+  "use strict";
+
+  // NOVA_DESKTOP_CLICK_TRACE_BIND_20260610
+  function describeElement(el) {
+    if (!el) return "";
+
+    var parts = [
+      el.tagName || "",
+      el.id || "",
+      el.className || "",
+      el.getAttribute && el.getAttribute("aria-label") || "",
+      el.getAttribute && el.getAttribute("title") || "",
+      el.getAttribute && el.getAttribute("data-action") || "",
+      el.getAttribute && el.getAttribute("data-panel") || "",
+      el.innerText || "",
+      el.textContent || ""
+    ];
+
+    return parts.join(" ").toLowerCase().replace(/\s+/g, " ").trim();
+  }
+
+  function findClickableTarget(start) {
+    var node = start;
+    var steps = 0;
+
+    while (node && steps < 8) {
+      if (
+        node.matches &&
+        node.matches("button, a, [role='button'], [data-action], [data-panel], .toolbar-button, .nav-button, .icon-button")
+      ) {
+        return node;
+      }
+
+      node = node.parentElement;
+      steps += 1;
+    }
+
+    return start;
+  }
+
+  function classifyDesktopAction(el) {
+    var target = findClickableTarget(el);
+    var haystack = describeElement(target) + " " + describeElement(target && target.parentElement);
+
+    if (haystack.indexOf("new session") !== -1 || haystack.indexOf("new chat") !== -1) {
+      return "new-session";
+    }
+
+    if (haystack.indexOf("sessions") !== -1 || haystack.indexOf("session") !== -1) {
+      return "sessions";
+    }
+
+    if (haystack.indexOf("memory") !== -1 || haystack.indexOf("memories") !== -1) {
+      return "memory";
+    }
+
+    return "";
+  }
+
+  function runDesktopAction(action, event) {
+    if (!action) return false;
+
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+    }
+
+    console.log("[Nova Desktop Click Trace] action:", action);
+
+    if (action === "sessions" && typeof window.NovaDesktopOpenSessionsRescue === "function") {
+      window.NovaDesktopOpenSessionsRescue()
+        .then(function () { console.log("[Nova Desktop Click Trace] sessions opened"); })
+        .catch(console.error);
+      return true;
+    }
+
+    if (action === "memory" && typeof window.NovaDesktopOpenMemoryRescue === "function") {
+      window.NovaDesktopOpenMemoryRescue()
+        .then(function () { console.log("[Nova Desktop Click Trace] memory opened"); })
+        .catch(console.error);
+      return true;
+    }
+
+    if (action === "new-session" && typeof window.NovaDesktopNewSessionRescue === "function") {
+      window.NovaDesktopNewSessionRescue();
+      console.log("[Nova Desktop Click Trace] new session started");
+      return true;
+    }
+
+    console.warn("[Nova Desktop Click Trace] missing rescue function for:", action);
+    return false;
+  }
+
+  ["pointerdown", "mousedown", "click"].forEach(function (eventName) {
+    document.addEventListener(eventName, function (event) {
+      var target = findClickableTarget(event.target);
+      var action = classifyDesktopAction(target);
+
+      if (action) {
+        console.log("[Nova Desktop Click Trace]", eventName, describeElement(target));
+        runDesktopAction(action, event);
+      }
+    }, true);
+  });
+
+  window.NovaDesktopClickTraceBindReady = true;
+  console.log("[Nova Desktop Click Trace] ready");
+})();
+</script>
+
 </body>
 </html>
 
