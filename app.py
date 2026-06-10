@@ -3512,7 +3512,7 @@ def api_chat():
                             _nova_name,
                             _nova_file_path,
                             _nova_docx_text,
-                            _nova_original_user_text_before_project_context,
+                            _nova_exec_user_text,  # NOVA_FIX_DOCX_SUMMARY_USER_TEXT_ARG_20260609
                         )
 
                         return jsonify({
@@ -4567,7 +4567,7 @@ def api_chat():
             app.logger.info(
                 "[project-aware] skipped project context for short casual message session_id=%s text=%r",
                 session_id,
-                _nova_original_user_text_before_project_context,
+                _nova_exec_user_text,  # NOVA_FIX_DOCX_SUMMARY_USER_TEXT_ARG_20260609
             )
         else:
             user_text = _nova_inject_project_state_context(
@@ -8651,4 +8651,5 @@ if __name__ == "__main__":
 
 
 # CLEAN_IMAGE_PROMPT_RIGHT_BEFORE_CHAT_SERVICE_LOCK
+
 
