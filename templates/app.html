@@ -1080,23 +1080,11 @@
 
     // NOVA_DESKTOP_REFRESH_HELPER_20260610
     
+    
     function refreshDesktopPanels() {
-      // NOVA_FIX_DESKTOP_RECURSION_AND_SUMMARY_20260610
-      try {
-        if (typeof loadDesktopSessions === "function") {
-          loadDesktopSessions();
-        }
-      } catch (error) {
-        console.warn("[Nova Desktop] sessions panel refresh skipped", error);
-      }
-
-      try {
-        if (typeof loadDesktopMemory === "function") {
-          loadDesktopMemory();
-        }
-      } catch (error) {
-        console.warn("[Nova Desktop] memory panel refresh skipped", error);
-      }
+      // NOVA_REFRESH_DESKTOP_PANELS_NOOP_20260610
+      // Intentionally no-op. Sessions and memory are opened by the desktop rescue handlers.
+      return null;
     }
     
     async function refreshSummaryMeta() {
