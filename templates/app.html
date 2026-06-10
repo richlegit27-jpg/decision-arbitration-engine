@@ -1682,6 +1682,92 @@
     return [];
   }
 
+
+  // NOVA_DESKTOP_SESSION_SELECT_LOAD_MESSAGES_20260610
+  function getDesktopMessagesContainerRescue() {
+    return (
+      document.getElementById("messages") ||
+      document.getElementById("chatMessages") ||
+      document.getElementById("desktopMessages") ||
+      document.querySelector(".messages") ||
+      document.querySelector(".chat-messages") ||
+      document.querySelector("[data-messages]")
+    );
+  }
+
+  function normalizeDesktopChatMessagesRescue(data) {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.messages)) return data.messages;
+    if (data.data && Array.isArray(data.data.messages)) return data.data.messages;
+    if (data.chat && Array.isArray(data.chat.messages)) return data.chat.messages;
+    if (data.session && Array.isArray(data.session.messages)) return data.session.messages;
+    return [];
+  }
+
+  function renderDesktopChatMessagesRescue(messages) {
+    var box = getDesktopMessagesContainerRescue();
+    if (!box) return false;
+
+    box.innerHTML = "";
+
+    if (!messages.length) {
+      var empty = document.createElement("div");
+      empty.className = "message assistant";
+      empty.textContent = "No messages in this session yet.";
+      box.appendChild(empty);
+      return true;
+    }
+
+    messages.forEach(function (msg) {
+      var role = String(msg.role || msg.sender || msg.type || "assistant").toLowerCase();
+      var text = msg.content || msg.text || msg.message || msg.body || "";
+
+      if (Array.isArray(text)) {
+        text = text.map(function (part) {
+          return typeof part === "string" ? part : (part.text || part.content || JSON.stringify(part));
+        }).join("\n");
+      }
+
+      if (!text && typeof msg === "string") {
+        text = msg;
+      }
+
+      var row = document.createElement("div");
+      row.className = "message " + (role.indexOf("user") !== -1 ? "user" : "assistant");
+      row.textContent = String(text || "").trim() || JSON.stringify(msg);
+      box.appendChild(row);
+    });
+
+    box.scrollTop = box.scrollHeight;
+    return true;
+  }
+
+  async function loadDesktopSessionMessagesRescue(sid) {
+    if (!sid) return;
+
+    setStatusSafe("loading session...");
+
+    try {
+      var res = await fetch("/api/chat/" + encodeURIComponent(sid), {
+        headers: { "Accept": "application/json" }
+      });
+
+      if (!res.ok) {
+        throw new Error("session load failed: " + res.status);
+      }
+
+      var data = await res.json();
+      var messages = normalizeDesktopChatMessagesRescue(data);
+      renderDesktopChatMessagesRescue(messages);
+      setStatusSafe("session loaded");
+    } catch (error) {
+      setStatusSafe("session selected, messages unavailable");
+      console.warn("[Nova Desktop Rescue] session messages load failed", error);
+    }
+  }
+
+
   function renderSessionsFallback(data) {
     var list = $("desktopSessionList");
     var sessions = normalizeSessionPayload(data);
@@ -1708,8 +1794,12 @@
       button.textContent = titleText;
 
       button.addEventListener("click", function () {
-        if (sid) setSessionIdSafe(sid);
-        setStatusSafe("session selected");
+        if (sid) {
+          setSessionIdSafe(sid);
+          loadDesktopSessionMessagesRescue(sid);
+        } else {
+          setStatusSafe("session selected");
+        }
       });
 
       list.appendChild(button);
