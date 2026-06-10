@@ -2965,8 +2965,117 @@ main,
   console.log("[Nova Desktop Memory Loading Hardlock] ready");
 })();
 </script>
+
+<!-- NOVA_DESKTOP_QUICK_BUTTONS_FINAL_20260610 -->
+<script>
+(function () {
+  "use strict";
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function inputBox() {
+    return $("messageInput") ||
+      $("desktopInput") ||
+      $("promptInput") ||
+      $("input") ||
+      document.querySelector("textarea") ||
+      document.querySelector("input[type='text']");
+  }
+
+  function sendButton() {
+    return $("sendBtn") ||
+      document.querySelector("button[type='submit']");
+  }
+
+  function sendPrompt(prompt) {
+    var input = inputBox();
+    var send = sendButton();
+
+    if (!input) {
+      console.warn("[Nova Desktop Quick Buttons] input not found");
+      return;
+    }
+
+    input.value = prompt;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    input.focus();
+
+    if (send) {
+      send.click();
+      return;
+    }
+
+    input.dispatchEvent(new KeyboardEvent("keydown", {
+      key: "Enter",
+      code: "Enter",
+      bubbles: true
+    }));
+  }
+
+  var prompts = {
+    "continue": "Continue from where we left off. Keep it direct and tell me the next move.",
+    "summarize": "Summarize the current situation in plain English and tell me what matters most.",
+    "improve": "Improve this and make it cleaner, more direct, and more useful.",
+    "next": "What should I do next? Give me the best next step only.",
+    "summarize now": "Summarize the current chat and key work completed so far."
+  };
+
+  function labelFor(button) {
+    return String(
+      button.textContent ||
+      button.value ||
+      button.getAttribute("aria-label") ||
+      button.title ||
+      ""
+    ).trim().toLowerCase().replace(/\s+/g, " ");
+  }
+
+  function promptFor(button) {
+    var label = labelFor(button);
+
+    if (label.indexOf("summarize now") === 0) return prompts["summarize now"];
+    if (label.indexOf("continue") === 0) return prompts["continue"];
+    if (label.indexOf("summarize") === 0) return prompts["summarize"];
+    if (label.indexOf("improve") === 0) return prompts["improve"];
+    if (label.indexOf("next") === 0) return prompts["next"];
+
+    return "";
+  }
+
+  function wire() {
+    Array.from(document.querySelectorAll("button, a, [role='button']")).forEach(function (button) {
+      var prompt = promptFor(button);
+      if (!prompt) return;
+
+      if (button.dataset.novaQuickButtonWired === "true") return;
+      button.dataset.novaQuickButtonWired = "true";
+
+      button.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        sendPrompt(prompt);
+      }, true);
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", wire);
+  } else {
+    wire();
+  }
+
+  setTimeout(wire, 500);
+  setTimeout(wire, 1500);
+
+  console.log("[Nova Desktop Quick Buttons Final] ready");
+})();
+</script>
 </body>
 </html>
+
 
 
 
