@@ -1,4 +1,4 @@
-<!-- NOVA_DESKTOP_APP_UI_V1_20260610 -->
+﻿<!-- NOVA_DESKTOP_APP_UI_V1_20260610 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -2760,8 +2760,105 @@ main,
 })();
 </script>
 
+
+<!-- NOVA_DESKTOP_EXECUTION_FINAL_RENDERER_20260610 -->
+<script>
+(function () {
+  "use strict";
+
+  function executionSection() {
+    return document.querySelector(".tools-section.execution-section");
+  }
+
+  function executionNote() {
+    return document.getElementById("executionNote");
+  }
+
+  function executionMetrics() {
+    var section = executionSection();
+    return section ? Array.from(section.querySelectorAll(".metric")) : [];
+  }
+
+  function setMetric(metric, label, value) {
+    if (!metric) return;
+    metric.innerHTML = [
+      '<span style="opacity:.72;font-size:12px;">' + label + '</span>',
+      '<strong style="font-size:18px;">' + value + '</strong>'
+    ].join("");
+  }
+
+  function renderExecution(payload) {
+    var section = executionSection();
+    var note = executionNote();
+    var metrics = executionMetrics();
+
+    if (!section) {
+      console.warn("[Nova Desktop Execution Final Renderer] execution section not found");
+      return;
+    }
+
+    section.style.display = "block";
+    section.style.visibility = "visible";
+    section.style.opacity = "1";
+    section.hidden = false;
+    section.removeAttribute("hidden");
+
+    var overall = payload.overall_backend_readiness;
+    var execution = payload.execution_percent;
+    var records = payload.execution_records;
+
+    setMetric(metrics[0], "Execution", String(execution ?? 0) + "%");
+    setMetric(metrics[1], "Records", String(records ?? 0));
+
+    if (note) {
+      note.innerHTML = [
+        '<strong>Execution ready.</strong>',
+        '<br>',
+        '<span>Overall backend readiness: ' + String(overall ?? 0) + '%</span>',
+        '<br>',
+        '<span>Planner: ' + String(payload.planner_percent ?? 0) + '% · Memory: ' + String(payload.memory_percent ?? 0) + '% · Sessions: ' + String(payload.session_percent ?? 0) + '%</span>'
+      ].join("");
+    }
+  }
+
+  function loadDesktopExecution() {
+    var note = executionNote();
+    if (note) {
+      note.textContent = "Loading execution status...";
+    }
+
+    fetch("/api/backend/readiness", { cache: "no-store" })
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (payload) {
+        renderExecution(payload || {});
+      })
+      .catch(function (error) {
+        console.error("[Nova Desktop Execution Final Renderer] failed", error);
+        var note = executionNote();
+        if (note) {
+          note.textContent = "Execution failed to load. Check console/server log.";
+        }
+      });
+  }
+
+  window.NovaLoadDesktopExecution = loadDesktopExecution;
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", loadDesktopExecution);
+  } else {
+    loadDesktopExecution();
+  }
+
+  setTimeout(loadDesktopExecution, 500);
+
+  console.log("[Nova Desktop Execution Final Renderer] ready");
+})();
+</script>
 </body>
 </html>
+
 
 
 
