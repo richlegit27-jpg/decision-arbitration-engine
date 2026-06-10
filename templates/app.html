@@ -2295,6 +2295,233 @@ main,
 })();
 </script>
 
+
+<style>
+/* NOVA_MANAGE_CURRENT_SESSION_PANEL_20260610 */
+
+#nova-current-session-manager {
+  margin-top: 10px !important;
+  padding: 10px !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+  border-radius: 14px !important;
+  background: rgba(255,255,255,.05) !important;
+}
+
+#nova-current-session-manager-title {
+  font-size: 12px !important;
+  opacity: .75 !important;
+  margin-bottom: 8px !important;
+}
+
+.nova-current-session-manager-row {
+  display: flex !important;
+  gap: 6px !important;
+  flex-wrap: wrap !important;
+}
+
+.nova-current-session-manager-btn {
+  border: 1px solid rgba(167,139,250,.55) !important;
+  border-radius: 999px !important;
+  background: rgba(167,139,250,.12) !important;
+  color: inherit !important;
+  padding: 7px 10px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+}
+
+.nova-current-session-manager-btn:hover {
+  background: rgba(167,139,250,.25) !important;
+}
+
+#nova-current-session-manager-status {
+  margin-top: 8px !important;
+  font-size: 12px !important;
+  opacity: .8 !important;
+  word-break: break-word !important;
+}
+</style>
+
+<script>
+(function () {
+  "use strict";
+
+  // NOVA_MANAGE_CURRENT_SESSION_PANEL_20260610
+
+  function getCurrentSessionId() {
+    return (
+      localStorage.getItem("nova_desktop_session_id") ||
+      localStorage.getItem("nova_session_id") ||
+      localStorage.getItem("session_id") ||
+      ""
+    ).trim();
+  }
+
+  function setStatus(text) {
+    var status = document.getElementById("nova-current-session-manager-status");
+    if (status) status.textContent = text || "";
+  }
+
+  async function postJson(url, payload) {
+    var response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload || {})
+    });
+
+    var data = await response.json().catch(function () {
+      return {};
+    });
+
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.error || data.message || "Request failed");
+    }
+
+    return data;
+  }
+
+  async function getCurrentSession() {
+    var sid = getCurrentSessionId();
+
+    if (!sid) {
+      throw new Error("No current session selected.");
+    }
+
+    var response = await fetch("/api/sessions/" + encodeURIComponent(sid), {
+      headers: { "Accept": "application/json" }
+    });
+
+    var data = await response.json();
+
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.error || data.message || "Could not load current session.");
+    }
+
+    return data.session || data.data || data;
+  }
+
+  async function refreshSessionsIfPossible() {
+    try {
+      if (typeof window.loadDesktopSessions === "function") {
+        await window.loadDesktopSessions();
+      }
+    } catch (error) {}
+
+    try {
+      if (typeof window.NovaDesktopOpenSessionsRescue === "function") {
+        await window.NovaDesktopOpenSessionsRescue();
+      }
+    } catch (error) {}
+  }
+
+  async function renameCurrentSession() {
+    try {
+      var session = await getCurrentSession();
+      var sid = session.id || getCurrentSessionId();
+      var oldTitle = session.title || "Session";
+      var nextTitle = prompt("Rename current session:", oldTitle);
+
+      if (!nextTitle) return;
+
+      nextTitle = String(nextTitle).trim();
+      if (!nextTitle || nextTitle === oldTitle) return;
+
+      await postJson("/api/sessions/rename", {
+        session_id: sid,
+        title: nextTitle
+      });
+
+      setStatus("Renamed to: " + nextTitle);
+      await refreshSessionsIfPossible();
+    } catch (error) {
+      setStatus(error.message || "Rename failed.");
+    }
+  }
+
+  async function togglePinCurrentSession() {
+    try {
+      var session = await getCurrentSession();
+      var sid = session.id || getCurrentSessionId();
+      var nextPinned = !Boolean(session.pinned);
+
+      await postJson("/api/sessions/pin", {
+        session_id: sid,
+        pinned: nextPinned
+      });
+
+      setStatus(nextPinned ? "Pinned current session." : "Unpinned current session.");
+      await refreshSessionsIfPossible();
+    } catch (error) {
+      setStatus(error.message || "Pin failed.");
+    }
+  }
+
+  async function deleteCurrentSession() {
+    try {
+      var session = await getCurrentSession();
+      var sid = session.id || getCurrentSessionId();
+      var title = session.title || sid;
+
+      if (!confirm("Delete current session?\n\n" + title)) return;
+
+      await postJson("/api/sessions/delete", {
+        session_id: sid
+      });
+
+      localStorage.removeItem("nova_desktop_session_id");
+      localStorage.removeItem("nova_session_id");
+      localStorage.removeItem("session_id");
+
+      setStatus("Deleted session: " + title);
+      await refreshSessionsIfPossible();
+    } catch (error) {
+      setStatus(error.message || "Delete failed.");
+    }
+  }
+
+  function installManager() {
+    if (document.getElementById("nova-current-session-manager")) return;
+
+    var host =
+      document.querySelector(".session-list-shell") ||
+      document.querySelector(".desktop-session-list") ||
+      document.querySelector("aside") ||
+      document.querySelector(".sidebar") ||
+      document.body;
+
+    var box = document.createElement("div");
+    box.id = "nova-current-session-manager";
+    box.innerHTML =
+      '<div id="nova-current-session-manager-title">Manage current session</div>' +
+      '<div class="nova-current-session-manager-row">' +
+        '<button id="nova-manage-rename-session" class="nova-current-session-manager-btn" type="button">Rename</button>' +
+        '<button id="nova-manage-pin-session" class="nova-current-session-manager-btn" type="button">Pin/Unpin</button>' +
+        '<button id="nova-manage-delete-session" class="nova-current-session-manager-btn" type="button">Delete</button>' +
+      '</div>' +
+      '<div id="nova-current-session-manager-status"></div>';
+
+    if (host.firstChild) {
+      host.insertBefore(box, host.firstChild);
+    } else {
+      host.appendChild(box);
+    }
+
+    document.getElementById("nova-manage-rename-session").onclick = renameCurrentSession;
+    document.getElementById("nova-manage-pin-session").onclick = togglePinCurrentSession;
+    document.getElementById("nova-manage-delete-session").onclick = deleteCurrentSession;
+
+    console.log("[Nova Current Session Manager] ready");
+  }
+
+  installManager();
+
+  window.NovaInstallCurrentSessionManager = installManager;
+})();
+</script>
+
 </body>
 </html>
 
