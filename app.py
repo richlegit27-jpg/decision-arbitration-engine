@@ -1252,65 +1252,6 @@ def api_fetch():
     )
 
     return jsonify(clean_result)
-
-
-# NOVA_FIX_MISSING_UPLOAD_HELPER_LOGGER_20260609
-import logging as _nova_logging_20260609
-logger = _nova_logging_20260609.getLogger(__name__)
-
-def _nova_find_uploaded_file_path_20260607(attachment):
-    """
-    Resolve a mobile upload attachment dict into a local uploads file path.
-    Safe fallback for attachment summary routes.
-    """
-    from pathlib import Path
-
-    try:
-        item = attachment if isinstance(attachment, dict) else {}
-
-        candidates = [
-            item.get("path"),
-            item.get("file_path"),
-            item.get("stored_path"),
-            item.get("local_path"),
-            item.get("filename"),
-            item.get("stored_filename"),
-            item.get("name"),
-            item.get("url"),
-            item.get("file_url"),
-        ]
-
-        base_dir = Path(__file__).resolve().parent
-        upload_dir = base_dir / "uploads"
-
-        for raw in candidates:
-            if not raw:
-                continue
-
-            value = str(raw).strip().replace("\\", "/")
-            value = value.split("?", 1)[0].split("#", 1)[0]
-
-            if "/api/uploads/" in value:
-                value = value.rsplit("/api/uploads/", 1)[-1]
-
-            if value.startswith("/api/uploads/"):
-                value = value[len("/api/uploads/"):]
-
-            direct = Path(value)
-            if direct.is_file():
-                return str(direct)
-
-            name = value.rsplit("/", 1)[-1]
-            if name:
-                candidate = upload_dir / name
-                if candidate.is_file():
-                    return str(candidate)
-
-        return None
-    except Exception:
-        return None
-
-@app.get("/api/sessions")
 def api_sessions():
     return json_ok(
         sessions=session_service.get_all(),
@@ -8592,6 +8533,7 @@ if __name__ == "__main__":
 
 
 # CLEAN_IMAGE_PROMPT_RIGHT_BEFORE_CHAT_SERVICE_LOCK
+
 
 
 
