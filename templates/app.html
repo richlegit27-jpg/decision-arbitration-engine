@@ -1922,6 +1922,82 @@
 })();
 </script>
 
+
+<script>
+(function () {
+  "use strict";
+
+  // NOVA_DESKTOP_DIRECT_BUTTON_BIND_20260610
+  function labelOf(el) {
+    return String(
+      (el && (
+        el.innerText ||
+        el.textContent ||
+        el.getAttribute("aria-label") ||
+        el.getAttribute("title") ||
+        el.id ||
+        el.className
+      )) || ""
+    ).toLowerCase().trim();
+  }
+
+  function bindDesktopButtonRescue() {
+    document.querySelectorAll("button, a, [role='button']").forEach(function (el) {
+      var label = labelOf(el);
+      if (!label) return;
+
+      if (el.dataset.novaDesktopDirectBound === "true") return;
+
+      if (label.indexOf("sessions") !== -1 || label === "session") {
+        el.dataset.novaDesktopDirectBound = "true";
+        el.addEventListener("click", function (event) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          if (typeof window.NovaDesktopOpenSessionsRescue === "function") {
+            window.NovaDesktopOpenSessionsRescue();
+          }
+        }, true);
+      }
+
+      if (label.indexOf("memory") !== -1) {
+        el.dataset.novaDesktopDirectBound = "true";
+        el.addEventListener("click", function (event) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          if (typeof window.NovaDesktopOpenMemoryRescue === "function") {
+            window.NovaDesktopOpenMemoryRescue();
+          }
+        }, true);
+      }
+
+      if (label.indexOf("new session") !== -1 || label.indexOf("new chat") !== -1) {
+        el.dataset.novaDesktopDirectBound = "true";
+        el.addEventListener("click", function (event) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          if (typeof window.NovaDesktopNewSessionRescue === "function") {
+            window.NovaDesktopNewSessionRescue();
+          }
+        }, true);
+      }
+    });
+  }
+
+  bindDesktopButtonRescue();
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bindDesktopButtonRescue);
+  } else {
+    setTimeout(bindDesktopButtonRescue, 0);
+  }
+
+  setInterval(bindDesktopButtonRescue, 1000);
+
+  window.NovaDesktopBindButtonsRescue = bindDesktopButtonRescue;
+  console.log("[Nova Desktop Direct Bind] ready");
+})();
+</script>
+
 </body>
 </html>
 
