@@ -2856,8 +2856,118 @@ main,
   console.log("[Nova Desktop Execution Final Renderer] ready");
 })();
 </script>
+
+<!-- NOVA_DESKTOP_MEMORY_LOADING_HARDLOCK_20260610 -->
+<script>
+(function () {
+  "use strict";
+
+  function list() {
+    return document.getElementById("desktopMemoryList");
+  }
+
+  function metric() {
+    var section = document.querySelector(".tools-section.memory-section");
+    return section ? section.querySelector(".metric") : null;
+  }
+
+  function normalize(payload) {
+    if (!payload) return [];
+    if (Array.isArray(payload)) return payload;
+    if (payload.data && Array.isArray(payload.data.memory)) return payload.data.memory;
+    if (payload.data && Array.isArray(payload.data.items)) return payload.data.items;
+    if (Array.isArray(payload.memory)) return payload.memory;
+    if (Array.isArray(payload.items)) return payload.items;
+    return [];
+  }
+
+  function render(payload) {
+    var box = list();
+    var countBox = metric();
+    if (!box) return;
+
+    var items = normalize(payload);
+
+    if (countBox) countBox.textContent = String(items.length);
+
+    box.innerHTML = "";
+
+    if (!items.length) {
+      var empty = document.createElement("div");
+      empty.className = "session-placeholder";
+      empty.innerHTML = "<strong>No memory items yet.</strong><br><span>Saved facts, preferences, and project notes will show here.</span>";
+      box.appendChild(empty);
+      return;
+    }
+
+    items.forEach(function (item) {
+      var row = document.createElement("div");
+      row.className = "memory-item";
+      row.style.cssText = "padding:10px 12px;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-bottom:10px;white-space:pre-wrap;word-break:break-word;";
+      row.textContent = String(item.text || item.content || item.value || item.memory || JSON.stringify(item));
+      box.appendChild(row);
+    });
+  }
+
+  function load() {
+    fetch("/api/memory", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(render)
+      .catch(function (err) {
+        console.error("[Nova Desktop Memory Hardlock] failed", err);
+        var box = list();
+        if (box) box.innerHTML = '<div class="session-placeholder">Memory failed to load.</div>';
+      });
+  }
+
+  function hardlock() {
+    var box = list();
+    if (!box || box.dataset.novaMemoryHardlock === "true") return;
+
+    box.dataset.novaMemoryHardlock = "true";
+
+    var observer = new MutationObserver(function () {
+      var text = String(box.textContent || "").trim().toLowerCase();
+      if (text === "loading" || text === "loading..." || text.indexOf("loading memory") !== -1) {
+        load();
+      }
+    });
+
+    observer.observe(box, { childList: true, subtree: true, characterData: true });
+
+    load();
+  }
+
+  window.NovaDesktopMemoryHardlock = load;
+  window.NovaOpenDesktopMemory = load;
+  window.NovaLoadMemory = load;
+  window.loadMemory = load;
+  window.loadMemories = load;
+
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest("#openMemoryBtn");
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    load();
+  }, true);
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", hardlock);
+  } else {
+    hardlock();
+  }
+
+  setTimeout(hardlock, 500);
+  setTimeout(load, 1000);
+  setTimeout(load, 2000);
+
+  console.log("[Nova Desktop Memory Loading Hardlock] ready");
+})();
+</script>
 </body>
 </html>
+
 
 
 
