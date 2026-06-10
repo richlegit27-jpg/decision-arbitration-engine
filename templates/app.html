@@ -530,6 +530,41 @@
       justify-content: space-between;
       gap: 8px;
     }
+
+    /* NOVA_DESKTOP_ATTACH_UPLOAD_20260610 */
+    .composer {
+      grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+
+    .attach-button {
+      height: 54px;
+      min-width: 88px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255,255,255,.075);
+      color: var(--text);
+      font-weight: 900;
+    }
+
+    .attach-button:hover {
+      border-color: rgba(167,139,250,.7);
+      background: rgba(255,255,255,.12);
+    }
+
+    .desktop-attachment-chip {
+      margin: 0 16px 12px;
+      border: 1px solid rgba(167,139,250,.45);
+      border-radius: 16px;
+      background: rgba(139,92,246,.12);
+      color: var(--muted);
+      padding: 10px 12px;
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+
+    .desktop-attachment-chip strong {
+      color: var(--text);
+    }
     @media (max-width: 1100px) {
       .shell {
         grid-template-columns: 260px minmax(0, 1fr);
@@ -624,7 +659,11 @@
         </div>
       </section>
 
+      <div id="desktopAttachmentChip" class="desktop-attachment-chip" hidden></div>
+
       <div class="composer">
+        <input id="desktopFileInput" type="file" hidden />
+        <button id="attachBtn" class="attach-button" type="button">Attach</button>
         <textarea id="input" placeholder="Message Nova... Enter sends, Shift+Enter makes a new line"></textarea>
         <button id="sendBtn" type="button">Send</button>
       </div>
@@ -739,6 +778,10 @@
     const meta = $("meta");
     const sidEl = $("sid");
     const sendBtn = $("sendBtn");
+    const attachBtn = $("attachBtn");
+    const desktopFileInput = $("desktopFileInput");
+    const desktopAttachmentChip = $("desktopAttachmentChip");
+    let pendingDesktopAttachments = [];
     const newSessionBtn = $("newSessionBtn");
     const summarizeBtn = $("summarizeBtn");
 
@@ -1080,6 +1123,62 @@
     }
 
 
+
+    // NOVA_DESKTOP_ATTACH_UPLOAD_20260610
+    function showDesktopAttachmentChip(text) {
+      if (!desktopAttachmentChip) return;
+      desktopAttachmentChip.hidden = false;
+      desktopAttachmentChip.innerHTML = text;
+    }
+
+    function clearDesktopAttachments() {
+      pendingDesktopAttachments = [];
+      if (desktopAttachmentChip) {
+        desktopAttachmentChip.hidden = true;
+        desktopAttachmentChip.textContent = "";
+      }
+      if (desktopFileInput) {
+        desktopFileInput.value = "";
+      }
+    }
+
+    function normalizeUploadedAttachment(data, file) {
+      const uploaded = data || {};
+      return {
+        filename: uploaded.filename || uploaded.name || (file ? file.name : ""),
+        original_filename: uploaded.original_filename || uploaded.filename || (file ? file.name : ""),
+        name: uploaded.original_filename || uploaded.filename || (file ? file.name : ""),
+        mime_type: uploaded.mime_type || uploaded.content_type || (file ? file.type : ""),
+        size: uploaded.size || uploaded.size_bytes || (file ? file.size : 0),
+        url: uploaded.url || uploaded.file_url || "",
+        file_url: uploaded.file_url || uploaded.url || ""
+      };
+    }
+
+    async function uploadDesktopAttachment(file) {
+      if (!file) return;
+
+      showDesktopAttachmentChip("Uploading <strong>" + file.name + "</strong>...");
+
+      const form = new FormData();
+      form.append("file", file);
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: form
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.error || data.message || "Upload failed");
+      }
+
+      const attachment = normalizeUploadedAttachment(data, file);
+      pendingDesktopAttachments = [attachment];
+
+      showDesktopAttachmentChip("Attached: <strong>" + (attachment.original_filename || attachment.filename || file.name) + "</strong>");
+    }
     // NOVA_DESKTOP_SAFE_RENDER_TEXT_20260610
     function safeRenderText(value) {
       if (value === null || value === undefined) return "";
@@ -1120,7 +1219,8 @@
 
     async function sendText(textOverride) {
       const text = String(textOverride || input.value || "").trim();
-      if (!text) return;
+      const attachments = pendingDesktopAttachments.slice();
+      if (!text && !attachments.length) return;
 
       ensureLocalSessionId();
 
@@ -1145,7 +1245,8 @@
             user_text: text,
             message: text,
             session_id: getSessionId(),
-            client_session_id: getSessionId()
+            client_session_id: getSessionId(),
+            attachments: attachments
           })
         });
 
@@ -1213,6 +1314,7 @@
         }
 
         setStatus("done");
+        clearDesktopAttachments();
         await refreshSummaryMeta();
       loadDesktopSessions();
     loadDesktopMemory();
@@ -1240,6 +1342,7 @@
           if (j.session_id) setSessionId(j.session_id);
           assistantBubble.textContent = safeRenderText(normalizeFallbackResponse(j));
           setStatus("done fallback");
+          clearDesktopAttachments();
           await refreshSummaryMeta();
       loadDesktopSessions();
     loadDesktopMemory();
@@ -1254,6 +1357,20 @@
     }
 
     sendBtn.addEventListener("click", () => sendText());
+
+    if (attachBtn && desktopFileInput) {
+      attachBtn.addEventListener("click", () => desktopFileInput.click());
+
+      desktopFileInput.addEventListener("change", () => {
+        const file = desktopFileInput.files && desktopFileInput.files[0];
+        if (!file) return;
+
+        uploadDesktopAttachment(file).catch((error) => {
+          clearDesktopAttachments();
+          addMsg("assistant", "Upload error: " + (error.message || error));
+        });
+      });
+    }
 
     input.addEventListener("input", () => {
       input.style.height = "auto";
@@ -1295,6 +1412,7 @@
   </script>
 </body>
 </html>
+
 
 
 
