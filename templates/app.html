@@ -2112,6 +2112,113 @@
 })();
 </script>
 
+
+<script>
+(function () {
+  "use strict";
+
+  // NOVA_ADD_REAL_DESKTOP_SESSIONS_BUTTON_20260610
+  function addDesktopSessionsButton() {
+    if (document.getElementById("openSessionsBtn")) return;
+
+    var newButton = document.getElementById("newSessionBtn");
+    var memoryButton = document.getElementById("openMemoryBtn");
+    var host =
+      (newButton && newButton.parentElement) ||
+      (memoryButton && memoryButton.parentElement) ||
+      document.querySelector("aside") ||
+      document.querySelector(".sidebar") ||
+      document.body;
+
+    var button = document.createElement("button");
+    button.id = "openSessionsBtn";
+    button.type = "button";
+    button.className = newButton ? newButton.className : "primary-side-button";
+    button.innerHTML = "Sessions";
+
+    button.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+
+      console.log("[Nova Desktop Sessions Button] clicked");
+
+      if (typeof window.NovaDesktopOpenSessionsRescue === "function") {
+        window.NovaDesktopOpenSessionsRescue()
+          .then(function () {
+            console.log("[Nova Desktop Sessions Button] sessions opened");
+          })
+          .catch(console.error);
+      } else {
+        console.warn("[Nova Desktop Sessions Button] rescue function missing");
+      }
+    }, true);
+
+    if (newButton && newButton.nextSibling) {
+      newButton.parentElement.insertBefore(button, newButton.nextSibling);
+    } else if (newButton) {
+      newButton.parentElement.appendChild(button);
+    } else {
+      host.insertBefore(button, host.firstChild);
+    }
+  }
+
+  function bindExactDesktopButtons() {
+    var memoryButton = document.getElementById("openMemoryBtn");
+    var newButton = document.getElementById("newSessionBtn");
+
+    addDesktopSessionsButton();
+
+    if (memoryButton && memoryButton.dataset.novaExactMemoryBound !== "true") {
+      memoryButton.dataset.novaExactMemoryBound = "true";
+      memoryButton.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        console.log("[Nova Desktop Exact Bind] memory clicked");
+
+        if (typeof window.NovaDesktopOpenMemoryRescue === "function") {
+          window.NovaDesktopOpenMemoryRescue()
+            .then(function () {
+              console.log("[Nova Desktop Exact Bind] memory opened");
+            })
+            .catch(console.error);
+        }
+      }, true);
+    }
+
+    if (newButton && newButton.dataset.novaExactNewBound !== "true") {
+      newButton.dataset.novaExactNewBound = "true";
+      newButton.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        console.log("[Nova Desktop Exact Bind] new session clicked");
+
+        if (typeof window.NovaDesktopNewSessionRescue === "function") {
+          window.NovaDesktopNewSessionRescue();
+        }
+      }, true);
+    }
+  }
+
+  bindExactDesktopButtons();
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bindExactDesktopButtons);
+  } else {
+    setTimeout(bindExactDesktopButtons, 0);
+  }
+
+  setInterval(bindExactDesktopButtons, 1000);
+
+  window.NovaDesktopAddSessionsButton = addDesktopSessionsButton;
+  console.log("[Nova Desktop Sessions Button] ready");
+})();
+</script>
+
 </body>
 </html>
 
