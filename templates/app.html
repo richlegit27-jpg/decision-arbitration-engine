@@ -1124,6 +1124,39 @@
 
 
 
+
+    // NOVA_DESKTOP_ATTACHMENT_PROMPT_CLARITY_20260610
+    function clarifyAttachmentPrompt(text, attachments) {
+      const clean = String(text || "").trim();
+      const hasAttachment = Array.isArray(attachments) && attachments.length > 0;
+
+      if (!hasAttachment) return clean;
+
+      const lower = clean.toLowerCase();
+
+      const vagueAttachmentPrompts = [
+        "what is this",
+        "what is this?",
+        "what's this",
+        "whats this",
+        "summarize this",
+        "summarize this file",
+        "read this",
+        "explain this",
+        "what does this say",
+        "what does this file say"
+      ];
+
+      if (!clean) {
+        return "Summarize the attached file.";
+      }
+
+      if (vagueAttachmentPrompts.indexOf(lower) !== -1) {
+        return clean + " attached file.";
+      }
+
+      return clean;
+    }
     // NOVA_DESKTOP_ATTACH_UPLOAD_20260610
     function showDesktopAttachmentChip(text) {
       if (!desktopAttachmentChip) return;
@@ -1218,8 +1251,9 @@
     }
 
     async function sendText(textOverride) {
-      const text = String(textOverride || input.value || "").trim();
+      const rawText = String(textOverride || input.value || "").trim();
       const attachments = pendingDesktopAttachments.slice();
+      const text = clarifyAttachmentPrompt(rawText, attachments);
       if (!text && !attachments.length) return;
 
       ensureLocalSessionId();
@@ -1412,6 +1446,7 @@
   </script>
 </body>
 </html>
+
 
 
 
