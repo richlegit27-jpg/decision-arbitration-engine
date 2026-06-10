@@ -2042,19 +2042,32 @@
   }
 
   function classifyDesktopAction(el) {
+    // NOVA_FIX_DESKTOP_CLICK_TRACE_CLASSIFIER_20260610
     var target = findClickableTarget(el);
-    var haystack = describeElement(target) + " " + describeElement(target && target.parentElement);
+    if (!target) return "";
 
-    if (haystack.indexOf("new session") !== -1 || haystack.indexOf("new chat") !== -1) {
-      return "new-session";
+    // Do not hijack actual session-list rows. Their own click handler loads messages.
+    if (target.classList && target.classList.contains("desktop-session-item")) {
+      return "";
     }
 
-    if (haystack.indexOf("sessions") !== -1 || haystack.indexOf("session") !== -1) {
+    // Exact IDs must win before any fuzzy text matching.
+    if (target.id === "openSessionsBtn") return "sessions";
+    if (target.id === "openMemoryBtn") return "memory";
+    if (target.id === "newSessionBtn") return "new-session";
+
+    var haystack = describeElement(target);
+
+    if (haystack.indexOf("sessions") !== -1) {
       return "sessions";
     }
 
     if (haystack.indexOf("memory") !== -1 || haystack.indexOf("memories") !== -1) {
       return "memory";
+    }
+
+    if (haystack.indexOf("new session") !== -1 || haystack.indexOf("new chat") !== -1) {
+      return "new-session";
     }
 
     return "";
