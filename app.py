@@ -1264,6 +1264,164 @@ def api_sessions():
     )
 
 
+
+# NOVA_SESSION_CONTEXT_ATTACHMENT_QUARANTINE_20260609
+def _nova_strip_attachment_poison_from_context_20260609(value):
+    import re
+
+    text = str(value or "")
+
+    if not any(marker in text.lower() for marker in [
+        "[current uploaded text attachments]",
+        "attachment file content:",
+        "session attachment memory:",
+        "\\nova\\uploads\\",
+        "/api/uploads/",
+        "re-upload the image/file",
+        "uploaded attachment content appears related",
+    ]):
+        return text
+
+    # Remove full uploaded attachment blocks.
+    text = re.sub(
+        r"(?is)\[CURRENT UPLOADED TEXT ATTACHMENTS\].*?\[/CURRENT UPLOADED TEXT ATTACHMENTS\]",
+        "",
+        text,
+    )
+
+    # Remove attachment-file sections.
+    text = re.sub(
+        r"(?is)Attachment file content:.*?(?=\n- \[(user|assistant)\]|\nRecent session context:|\nRelevant persistent memory:|\nProject-aware context for Nova:|\Z)",
+        "",
+        text,
+    )
+
+    # Remove assistant lines that are poisoned by attachment summaries.
+    clean_lines = []
+    for line in text.splitlines():
+        low = line.lower()
+
+        if "[current uploaded text attachments]" in low:
+            continue
+
+        if "attachment file content:" in low:
+            continue
+
+        if "\\nova\\uploads\\" in low or "/api/uploads/" in low:
+            continue
+
+        if "uploaded attachment content appears related" in low:
+            continue
+
+        if "i see you are asking about an uploaded attachment" in low:
+            continue
+
+        if "re-upload the image/file" in low:
+            continue
+
+        clean_lines.append(line)
+
+    text = "\n".join(clean_lines)
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+
+    return text
+
+
+# NOVA_SKIP_PROJECT_CONTEXT_FOR_GENERAL_QUESTIONS_20260609
+def _nova_should_skip_project_context_for_general_question_20260609(user_text, attachments=None):
+    text = str(user_text or "").strip().lower()
+    attachments = attachments if isinstance(attachments, list) else []
+
+    if attachments:
+        return False
+
+    if not text:
+        return True
+
+    nova_terms = [
+        "nova",
+        "app.py",
+        "chat_service",
+        "backend",
+        "frontend",
+        "flask",
+        "route",
+        "api/",
+        "/api",
+        "session",
+        "memory",
+        "artifact",
+        "execution",
+        "planner",
+        "mobile",
+        "css",
+        "javascript",
+        "python",
+        "powershell",
+        "git",
+        "smff",
+        "file path",
+        "patch",
+        "debug",
+        "fix this",
+        "fix the",
+        "code",
+        "project",
+    ]
+
+    attachment_terms = [
+        "summarize this",
+        "summarise this",
+        "sumarize this",
+        "analyze this",
+        "analyse this",
+        "what does this say",
+        "what is this file",
+        "what is this image",
+        "read this",
+        "read the file",
+        "uploaded",
+        "attachment",
+        "docx",
+        "pdf",
+        "image",
+        "picture",
+        "photo",
+    ]
+
+    if any(term in text for term in nova_terms):
+        return False
+
+    if any(term in text for term in attachment_terms):
+        return False
+
+    general_question_starters = [
+        "what is ",
+        "what are ",
+        "who is ",
+        "who are ",
+        "when is ",
+        "where is ",
+        "why is ",
+        "why are ",
+        "how big",
+        "how much",
+        "how many",
+        "tell me ",
+        "explain ",
+        "give me ",
+        "is ",
+        "are ",
+        "do ",
+        "does ",
+        "can ",
+    ]
+
+    if any(text.startswith(starter) for starter in general_question_starters):
+        return True
+
+    return False
+
 # PROJECT_AWARE_MEMORY_CONTEXT_LOCK
 def _nova_pa_read_json_file(path):
     try:
@@ -1626,11 +1784,17 @@ def _nova_build_project_aware_context(
     if not context_lines:
         return ""
 
-    return "\n".join([
+    _nova_project_context_text = "\n".join([
         "",
         "Project-aware context for Nova:",
         *context_lines,
     ]).strip()
+
+    _nova_project_context_text = _nova_strip_attachment_poison_from_context_20260609(
+        _nova_project_context_text
+    )
+
+    return _nova_project_context_text
 
 
 # PROJECT_FOCUS_MEMORY_SAVE_RECALL_LOCK
@@ -4443,8 +4607,14 @@ def api_chat():
             "thank you",
         }
         _nova_skip_project_context = (
-            len(_nova_original_user_text_before_project_context) <= 16
-            and _nova_original_user_text_before_project_context.lower() in _nova_short_casual_messages
+            (
+                len(_nova_original_user_text_before_project_context) <= 16
+                and _nova_original_user_text_before_project_context.lower() in _nova_short_casual_messages
+            )
+            or _nova_should_skip_project_context_for_general_question_20260609(
+                _nova_original_user_text_before_project_context,
+                attachments=attachments,
+            )
         )
 
         if _nova_skip_project_context:
