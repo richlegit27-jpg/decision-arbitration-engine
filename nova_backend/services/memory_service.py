@@ -7,6 +7,54 @@ from nova_backend.utils.file_utils import load_json_file, save_json_file
 from nova_backend.utils.time_utils import iso_now
 
 
+
+# NOVA_BAD_MEMORY_SAVE_GUARD_SAFE_20260610
+_BAD_MEMORY_SAVE_MARKERS_20260610 = (
+    "Project-aware context for Nova:",
+    "Recent session context:",
+    "Relevant persistent memory:",
+    "Attachment received:",
+    "Key points:",
+    "[CURRENT UPLOADED",
+    "python app.py Project-aware context",
+)
+
+def _nova_should_reject_memory_item_20260610(item):
+    if not isinstance(item, dict):
+        return False
+
+    value = str(
+        item.get("text")
+        or item.get("content")
+        or item.get("value")
+        or item.get("memory")
+        or ""
+    ).strip()
+
+    kind = str(
+        item.get("type")
+        or item.get("category")
+        or item.get("kind")
+        or ""
+    ).lower()
+
+    if not value:
+        return True
+
+    if any(marker in value for marker in _BAD_MEMORY_SAVE_MARKERS_20260610):
+        return True
+
+    if kind == "user_fact" and len(value) > 500:
+        return True
+
+    lowered = value.lower()
+    transcript_markers = lowered.count("- [user]") + lowered.count("- [assistant]") + lowered.count("[note]")
+    if transcript_markers >= 2:
+        return True
+
+    return False
+
+
 class MemoryService:
     def __init__(self, memory_file: str):
         self.memory_file = Path(memory_file)
@@ -149,6 +197,10 @@ class MemoryService:
         return strong[-100:]
 
     def add_memory(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        # NOVA_BAD_MEMORY_SAVE_GUARD_SAFE_20260610_ENTRY
+        if _nova_should_reject_memory_item_20260610(item):
+            return item
+
         data = self._read_store()
         memory = data.get("memory", [])
 
