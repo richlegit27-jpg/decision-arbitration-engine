@@ -546,7 +546,7 @@
 
     if (!inputEl) return;
 
-    function autoResizeInput() {
+    function autoResizeInput() { if (window.__NOVA_FINAL_COMPOSER_LAYOUT_ACTIVE_20260609) { return; }
         inputEl.style.height = "36px";
         inputEl.style.height = Math.min(inputEl.scrollHeight, 140) + "px";
     }
@@ -752,7 +752,7 @@
 
     window.NovaMobileRuntimeInputHeightLockInstalled = true;
 
-    function lockInputHeight() {
+    function lockInputHeight() { if (window.__NOVA_FINAL_COMPOSER_LAYOUT_ACTIVE_20260609) { return; }
         var inputs = Array.from(document.querySelectorAll(
             "#mobileInput, " +
             "#mobileMessageInput, " +
@@ -909,7 +909,7 @@
 
     window.NovaMobileCompactInputFinalInstalled = true;
 
-    function compactInputFinal() {
+    function compactInputFinal() { if (window.__NOVA_FINAL_COMPOSER_LAYOUT_ACTIVE_20260609) { return; }
         var input = document.getElementById("nova-mobile-input");
 
         if (input) {
@@ -984,7 +984,7 @@
         setTimeout(compactInputFinal, 0);
     });
 
-    setInterval(compactInputFinal, 1000);
+    // NOVA_STOP_MESSAGE_BAR_FIGHTING_LOOPS_20260609: disabled compactInputFinal interval
 
     window.NovaMobileCompactInputFinal = compactInputFinal;
 
@@ -2097,7 +2097,7 @@
         return true;
     }
 
-    function run() {
+    function run() { if (window.__NOVA_FINAL_COMPOSER_LAYOUT_ACTIVE_20260609) { return; }
         fixComposer();
     }
 
@@ -2123,7 +2123,73 @@
         setTimeout(run, 0);
     }, true);
 
-    setInterval(run, 1000);
+    // NOVA_STOP_MESSAGE_BAR_FIGHTING_LOOPS_20260609: disabled Runtime Message Bar Fix interval
 
     console.log("[Nova Mobile Runtime Message Bar Fix] ready");
 })();
+
+// NOVA_FINAL_INPUT_HEIGHT_OVERRIDE_20260609
+(function () {
+    "use strict";
+
+    function forceFinalInputHeight() { window.__NOVA_FINAL_COMPOSER_LAYOUT_ACTIVE_20260609 = true;
+        var input = document.getElementById("nova-mobile-input");
+        var composer = document.getElementById("nova-mobile-composer") || document.querySelector(".mobile-composer");
+
+        if (!input || !composer) {
+            return;
+        }
+
+        composer.style.setProperty("height", "132px", "important");
+        composer.style.setProperty("min-height", "132px", "important");
+        composer.style.setProperty("max-height", "132px", "important");
+        composer.style.setProperty("display", "flex", "important");
+        composer.style.setProperty("flex-wrap", "wrap", "important");
+        composer.style.setProperty("align-items", "center", "important");
+
+        input.style.setProperty("flex", "0 0 100%", "important");
+        input.style.setProperty("width", "100%", "important");
+        input.style.setProperty("min-width", "100%", "important");
+        input.style.setProperty("max-width", "100%", "important");
+        input.style.setProperty("height", "68px", "important");
+        input.style.setProperty("min-height", "68px", "important");
+        input.style.setProperty("max-height", "68px", "important");
+        input.style.setProperty("padding", "14px", "important");
+        input.style.setProperty("line-height", "21px", "important");
+        input.style.setProperty("box-sizing", "border-box", "important");
+        input.style.setProperty("resize", "none", "important");
+
+        composer.querySelectorAll("button, .mobile-composer-btn, .mobile-icon-action").forEach(function (button) {
+            button.style.setProperty("flex", "0 0 42px", "important");
+            button.style.setProperty("width", "42px", "important");
+            button.style.setProperty("min-width", "42px", "important");
+            button.style.setProperty("max-width", "42px", "important");
+            button.style.setProperty("height", "42px", "important");
+            button.style.setProperty("min-height", "42px", "important");
+            button.style.setProperty("max-height", "42px", "important");
+        });
+
+        document.body.style.setProperty("padding-bottom", "148px", "important");
+    }
+
+    forceFinalInputHeight();
+    setTimeout(forceFinalInputHeight, 50);
+    setTimeout(forceFinalInputHeight, 250);
+    setTimeout(forceFinalInputHeight, 750);
+    setTimeout(forceFinalInputHeight, 1500);
+
+    window.addEventListener("load", forceFinalInputHeight);
+    window.addEventListener("resize", function () {
+        setTimeout(forceFinalInputHeight, 50);
+    });
+
+    window.NovaFinalInputHeightOverride = forceFinalInputHeight;
+
+    console.log("[Nova Final Input Height Override] ready");
+})();
+
+// NOVA_STOP_MESSAGE_BAR_FIGHTING_LOOPS_20260609
+console.log("[Nova Stop Message Bar Fighting Loops] ready");
+
+// NOVA_GUARD_OLD_COMPOSER_RESIZERS_20260609
+console.log("[Nova Guard Old Composer Resizers] ready");
