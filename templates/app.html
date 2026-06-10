@@ -1582,6 +1582,295 @@
     refreshSummaryMeta();
     refreshDesktopPanels();
   </script>
+
+<script>
+(function () {
+  "use strict";
+
+  // NOVA_DESKTOP_CLICK_RESCUE_20260610
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function textOf(el) {
+    return String(
+      (el && (el.innerText || el.textContent || el.getAttribute("aria-label") || el.title || el.id || el.className)) || ""
+    ).toLowerCase();
+  }
+
+  function forceShow(el) {
+    if (!el) return;
+
+    el.hidden = false;
+    el.removeAttribute("hidden");
+    el.setAttribute("aria-hidden", "false");
+
+    el.classList.remove("hidden");
+    el.classList.remove("is-hidden");
+    el.classList.add("is-open");
+    el.classList.add("open");
+    el.classList.add("active");
+
+    el.style.display = "block";
+    el.style.visibility = "visible";
+    el.style.opacity = "1";
+    el.style.pointerEvents = "auto";
+  }
+
+  function revealAround(el) {
+    var node = el;
+    var steps = 0;
+
+    while (node && steps < 8) {
+      forceShow(node);
+      node = node.parentElement;
+      steps += 1;
+    }
+  }
+
+  function findLikelyPanel(kind) {
+    var ids = kind === "memory"
+      ? ["desktopMemoryPanel", "memoryPanel", "memoryDrawer", "memoryPane", "desktopMemory"]
+      : ["desktopSessionsPanel", "desktopSessionPanel", "sessionsPanel", "sessionPanel", "sessionsDrawer", "desktopSessions"];
+
+    for (var i = 0; i < ids.length; i += 1) {
+      var found = $(ids[i]);
+      if (found) return found;
+    }
+
+    var list = kind === "memory" ? $("desktopMemoryList") : $("desktopSessionList");
+    if (list) return list.closest("aside, section, dialog, .panel, .drawer, .sidebar, div") || list.parentElement;
+
+    return null;
+  }
+
+  function setStatusSafe(message) {
+    var el =
+      $("status") ||
+      $("desktopStatus") ||
+      document.querySelector(".status") ||
+      document.querySelector("[data-status]");
+
+    if (el) el.textContent = message;
+  }
+
+  function getSessionIdSafe() {
+    return (
+      localStorage.getItem("nova_desktop_session_id") ||
+      localStorage.getItem("nova_session_id") ||
+      localStorage.getItem("session_id") ||
+      "desktop_" + Date.now().toString(16) + "_" + Math.random().toString(16).slice(2)
+    );
+  }
+
+  function setSessionIdSafe(sid) {
+    localStorage.setItem("nova_desktop_session_id", sid);
+    localStorage.setItem("nova_session_id", sid);
+    localStorage.setItem("session_id", sid);
+  }
+
+  function normalizeMemoryPayload(data) {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.memory)) return data.memory;
+    if (Array.isArray(data.items)) return data.items;
+    if (data.data && Array.isArray(data.data.memory)) return data.data.memory;
+    if (data.data && Array.isArray(data.data.items)) return data.data.items;
+    return [];
+  }
+
+  function renderMemoryFallback(data) {
+    var list = $("desktopMemoryList");
+    var count = $("desktopMemoryCount");
+    var items = normalizeMemoryPayload(data);
+
+    if (count) count.textContent = String(items.length);
+
+    if (!list) return;
+
+    list.innerHTML = "";
+
+    if (!items.length) {
+      var empty = document.createElement("div");
+      empty.className = "session-placeholder";
+      empty.textContent = "No memory items found.";
+      list.appendChild(empty);
+      return;
+    }
+
+    items.slice(0, 20).forEach(function (item) {
+      var row = document.createElement("div");
+      row.className = "desktop-memory-item";
+
+      var title = document.createElement("div");
+      title.className = "desktop-memory-title";
+      title.textContent = item.kind || item.category || item.type || item.title || "Memory";
+
+      var body = document.createElement("div");
+      body.className = "desktop-memory-body";
+      body.textContent = item.text || item.value || item.content || item.summary || JSON.stringify(item);
+
+      row.appendChild(title);
+      row.appendChild(body);
+      list.appendChild(row);
+    });
+  }
+
+  async function openMemoryRescue() {
+    var panel = findLikelyPanel("memory");
+    var list = $("desktopMemoryList");
+
+    if (panel) forceShow(panel);
+    if (list) revealAround(list);
+
+    setStatusSafe("loading memory...");
+
+    try {
+      var res = await fetch("/api/memory", { headers: { "Accept": "application/json" } });
+      var data = await res.json();
+      renderMemoryFallback(data);
+      setStatusSafe("memory loaded");
+    } catch (error) {
+      if (list) {
+        list.innerHTML = "";
+        var failed = document.createElement("div");
+        failed.className = "session-placeholder";
+        failed.textContent = "Could not load memory.";
+        list.appendChild(failed);
+      }
+      setStatusSafe("memory failed");
+      console.warn("[Nova Desktop Rescue] memory failed", error);
+    }
+  }
+
+  function normalizeSessionPayload(data) {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.sessions)) return data.sessions;
+    if (data.data && Array.isArray(data.data.sessions)) return data.data.sessions;
+    if (Array.isArray(data.items)) return data.items;
+    return [];
+  }
+
+  function renderSessionsFallback(data) {
+    var list = $("desktopSessionList");
+    var sessions = normalizeSessionPayload(data);
+
+    if (!list) return;
+
+    list.innerHTML = "";
+
+    if (!sessions.length) {
+      var empty = document.createElement("div");
+      empty.className = "session-placeholder";
+      empty.textContent = "No saved sessions yet.";
+      list.appendChild(empty);
+      return;
+    }
+
+    sessions.slice(0, 30).forEach(function (session) {
+      var sid = session.id || session.session_id || session.key || "";
+      var titleText = session.title || session.name || sid || "Session";
+
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "desktop-session-item";
+      button.textContent = titleText;
+
+      button.addEventListener("click", function () {
+        if (sid) setSessionIdSafe(sid);
+        setStatusSafe("session selected");
+      });
+
+      list.appendChild(button);
+    });
+  }
+
+  async function openSessionsRescue() {
+    var panel = findLikelyPanel("sessions");
+    var list = $("desktopSessionList");
+
+    if (panel) forceShow(panel);
+    if (list) revealAround(list);
+
+    setStatusSafe("loading sessions...");
+
+    try {
+      var res = await fetch("/api/sessions", { headers: { "Accept": "application/json" } });
+      var data = await res.json();
+      renderSessionsFallback(data);
+      setStatusSafe("sessions loaded");
+    } catch (error) {
+      if (list) {
+        list.innerHTML = "";
+        var failed = document.createElement("div");
+        failed.className = "session-placeholder";
+        failed.textContent = "Could not load sessions.";
+        list.appendChild(failed);
+      }
+      setStatusSafe("sessions failed");
+      console.warn("[Nova Desktop Rescue] sessions failed", error);
+    }
+  }
+
+  function newSessionRescue() {
+    var sid = "desktop_" + Date.now().toString(16) + "_" + Math.random().toString(16).slice(2);
+    setSessionIdSafe(sid);
+
+    var input = $("prompt") || $("desktopPrompt") || document.querySelector("textarea") || document.querySelector("input[type='text']");
+    if (input) input.value = "";
+
+    var messages =
+      $("messages") ||
+      $("chatMessages") ||
+      $("desktopMessages") ||
+      document.querySelector(".messages") ||
+      document.querySelector(".chat-messages");
+
+    if (messages) messages.innerHTML = "";
+
+    setStatusSafe("new local session");
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target && event.target.closest
+      ? event.target.closest("button, a, [role='button'], [data-action], [data-panel]")
+      : null;
+
+    if (!target) return;
+
+    var t = textOf(target);
+
+    if (t.indexOf("memory") !== -1) {
+      event.preventDefault();
+      event.stopPropagation();
+      openMemoryRescue();
+      return;
+    }
+
+    if (t.indexOf("session") !== -1 && t.indexOf("new") === -1) {
+      event.preventDefault();
+      event.stopPropagation();
+      openSessionsRescue();
+      return;
+    }
+
+    if ((t.indexOf("new") !== -1 && t.indexOf("session") !== -1) || t.indexOf("new chat") !== -1) {
+      event.preventDefault();
+      event.stopPropagation();
+      newSessionRescue();
+      return;
+    }
+  }, true);
+
+  window.NovaDesktopOpenMemoryRescue = openMemoryRescue;
+  window.NovaDesktopOpenSessionsRescue = openSessionsRescue;
+  window.NovaDesktopNewSessionRescue = newSessionRescue;
+
+  console.log("[Nova Desktop Rescue] click rescue ready");
+})();
+</script>
+
 </body>
 </html>
 
