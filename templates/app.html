@@ -3073,8 +3073,250 @@ main,
   console.log("[Nova Desktop Quick Buttons Final] ready");
 })();
 </script>
+
+<!-- NOVA_DESKTOP_VOICE_TTS_FINAL_20260610 -->
+<script>
+(function () {
+  "use strict";
+
+  var recognition = null;
+  var listening = false;
+  var speaking = false;
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function inputBox() {
+    return $("messageInput") ||
+      $("desktopInput") ||
+      $("promptInput") ||
+      $("input") ||
+      document.querySelector("textarea") ||
+      document.querySelector("input[type='text']");
+  }
+
+  function sendButton() {
+    return $("sendBtn");
+  }
+
+  function composer() {
+    var send = sendButton();
+    if (send && send.parentElement) return send.parentElement;
+
+    var attach = $("attachBtn");
+    if (attach && attach.parentElement) return attach.parentElement;
+
+    return document.querySelector(".composer") || document.body;
+  }
+
+  function latestAssistantText() {
+    var chat = $("chat") || document.querySelector("#chat") || document.body;
+    var candidates = Array.from(chat.querySelectorAll(".msg.assistant .bubble, .assistant .bubble, .msg.assistant, [data-role='assistant']"));
+
+    if (!candidates.length) {
+      candidates = Array.from(chat.querySelectorAll(".bubble, .msg"));
+    }
+
+    for (var i = candidates.length - 1; i >= 0; i--) {
+      var text = String(candidates[i].innerText || candidates[i].textContent || "").trim();
+      text = text.replace(/^ASSISTANT\s*/i, "").trim();
+      if (text && text.length > 2) return text;
+    }
+
+    return "";
+  }
+
+  function ensureButton(id, text, title) {
+    var existing = $(id);
+    if (existing) return existing;
+
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = id;
+    btn.textContent = text;
+    btn.title = title || text;
+    btn.className = "desktop-voice-tts-button";
+    btn.style.cssText = "min-height:38px;padding:0 12px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);color:inherit;cursor:pointer;";
+
+    var host = composer();
+    var send = sendButton();
+
+    if (send && send.parentElement === host) {
+      host.insertBefore(btn, send);
+    } else {
+      host.appendChild(btn);
+    }
+
+    return btn;
+  }
+
+  function setVoiceButtonState(btn) {
+    if (!btn) return;
+    btn.textContent = listening ? "Stop Voice" : "Voice";
+    btn.style.opacity = listening ? "1" : "";
+  }
+
+  function toggleVoice() {
+    var btn = $("desktopVoiceBtn");
+
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice input is not supported in this browser.");
+      return;
+    }
+
+    if (listening && recognition) {
+      recognition.stop();
+      listening = false;
+      setVoiceButtonState(btn);
+      return;
+    }
+
+    var input = inputBox();
+    if (!input) {
+      alert("Message input not found.");
+      return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = true;
+    recognition.continuous = false;
+
+    recognition.onstart = function () {
+      listening = true;
+      setVoiceButtonState(btn);
+    };
+
+    recognition.onend = function () {
+      listening = false;
+      setVoiceButtonState(btn);
+    };
+
+    recognition.onerror = function (event) {
+      listening = false;
+      setVoiceButtonState(btn);
+      console.warn("[Nova Desktop Voice] error", event);
+      alert("Voice input failed or microphone permission was blocked.");
+    };
+
+    recognition.onresult = function (event) {
+      var finalText = "";
+      var interimText = "";
+
+      for (var i = event.resultIndex; i < event.results.length; i++) {
+        var chunk = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalText += chunk;
+        } else {
+          interimText += chunk;
+        }
+      }
+
+      var existing = String(input.value || "").trim();
+      var spoken = String(finalText || interimText || "").trim();
+
+      if (spoken) {
+        input.value = existing ? existing + " " + spoken : spoken;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.focus();
+      }
+    };
+
+    recognition.start();
+  }
+
+  function stopSpeech() {
+    try {
+      window.speechSynthesis.cancel();
+    } catch (e) {}
+    speaking = false;
+    var btn = $("desktopSpeakBtn");
+    if (btn) btn.textContent = "Speak";
+  }
+
+  function toggleSpeak() {
+    var btn = $("desktopSpeakBtn");
+
+    if (!("speechSynthesis" in window)) {
+      alert("Text-to-speech is not supported in this browser.");
+      return;
+    }
+
+    if (speaking) {
+      stopSpeech();
+      return;
+    }
+
+    var text = latestAssistantText();
+    if (!text) {
+      alert("No assistant message found to speak.");
+      return;
+    }
+
+    stopSpeech();
+
+    var utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1;
+    utterance.pitch = 1;
+
+    utterance.onstart = function () {
+      speaking = true;
+      if (btn) btn.textContent = "Stop Speak";
+    };
+
+    utterance.onend = function () {
+      speaking = false;
+      if (btn) btn.textContent = "Speak";
+    };
+
+    utterance.onerror = function () {
+      speaking = false;
+      if (btn) btn.textContent = "Speak";
+    };
+
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function wire() {
+    var voice = ensureButton("desktopVoiceBtn", "Voice", "Dictate into the message box");
+    var speak = ensureButton("desktopSpeakBtn", "Speak", "Read the latest assistant reply aloud");
+
+    if (voice.dataset.novaVoiceWired !== "true") {
+      voice.dataset.novaVoiceWired = "true";
+      voice.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleVoice();
+      }, true);
+    }
+
+    if (speak.dataset.novaSpeakWired !== "true") {
+      speak.dataset.novaSpeakWired = "true";
+      speak.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleSpeak();
+      }, true);
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", wire);
+  } else {
+    wire();
+  }
+
+  setTimeout(wire, 500);
+  setTimeout(wire, 1500);
+
+  console.log("[Nova Desktop Voice/TTS Final] ready");
+})();
+</script>
 </body>
 </html>
+
 
 
 
