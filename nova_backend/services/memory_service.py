@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -149,6 +149,10 @@ class MemoryService:
         return strong[-100:]
 
     def add_memory(self, item: Dict[str, Any]) -> Dict[str, Any]:
+    # NOVA_BAD_MEMORY_SAVE_GUARD_20260610_ENTRY
+    _candidate_memory_text = locals().get('text') or locals().get('content') or locals().get('value') or locals().get('memory') or locals().get('user_text') or ''
+    if _nova_should_reject_memory_text_20260610(_candidate_memory_text):
+        return None
         data = self._read_store()
         memory = data.get("memory", [])
 
@@ -160,7 +164,7 @@ class MemoryService:
         new_kind = str(item.get("kind") or "note").strip().lower()
         pinned = bool(item.get("pinned"))
 
-        # 🔥 CONFLICT RESOLUTION (newer overrides older)
+        # ðŸ”¥ CONFLICT RESOLUTION (newer overrides older)
         conflict_groups = [
             ("short answers", "long answers"),
             ("concise", "detailed"),
@@ -191,7 +195,7 @@ class MemoryService:
             "prefers to be called",
         )
 
-        # 🔥 KEYED PREFERENCE REPLACEMENT
+        # ðŸ”¥ KEYED PREFERENCE REPLACEMENT
         for key in preference_keys:
             if key in new_text_key:
                 for i, existing in enumerate(memory):
@@ -209,7 +213,7 @@ class MemoryService:
                         self._write_store(data)
                         return existing
 
-        # 🔥 DUPLICATE REINFORCEMENT
+        # ðŸ”¥ DUPLICATE REINFORCEMENT
         for i, existing in enumerate(memory):
             existing = dict(existing or {})
             existing_text = str(existing.get("text") or "").strip().lower()
@@ -224,7 +228,7 @@ class MemoryService:
                 existing["updated_at"] = now
                 existing["created_at"] = existing.get("created_at") or now
 
-                # 🔥 DECAY BEFORE BOOST
+                # ðŸ”¥ DECAY BEFORE BOOST
                 try:
                     from datetime import datetime, UTC
                     created_at = existing.get("created_at")
@@ -239,7 +243,7 @@ class MemoryService:
                 except Exception:
                     pass
 
-                # 🔥 IMPORTANCE BOOST
+                # ðŸ”¥ IMPORTANCE BOOST
                 boost = 1.25
                 if existing.get("pinned"):
                     boost = 0.5
@@ -257,7 +261,7 @@ class MemoryService:
                 self._write_store(data)
                 return existing
 
-        # 🔥 NEW MEMORY
+        # ðŸ”¥ NEW MEMORY
         if not item.get("id"):
             import uuid
             item["id"] = f"memory_{uuid.uuid4().hex}"
@@ -268,7 +272,7 @@ class MemoryService:
 
         memory.append(item)
 
-        # 🔥 CLEANUP WEAK MEMORY
+        # ðŸ”¥ CLEANUP WEAK MEMORY
         memory = [
             m for m in memory
             if float(m.get("weight", 1.0)) > 0.5
@@ -451,3 +455,4 @@ class MemoryService:
             "kept": promote_result.get("kept", 0),
             "memory": self.all(),
         }
+

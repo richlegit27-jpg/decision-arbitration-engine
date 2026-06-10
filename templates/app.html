@@ -2601,8 +2601,122 @@ main,
 })();
 </script>
 
+
+<!-- NOVA_DESKTOP_MEMORY_BUTTON_WIRE_20260610 -->
+<script>
+(function () {
+  "use strict";
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function showMemoryPanel() {
+    var panel =
+      $("memoryPanel") ||
+      $("nova-memory-panel") ||
+      $("desktopMemoryPanel") ||
+      document.querySelector("[data-memory-panel]") ||
+      document.querySelector(".memory-panel");
+
+    if (!panel) {
+      alert("Memory panel not found in this page.");
+      return;
+    }
+
+    panel.style.display = "block";
+    panel.style.visibility = "visible";
+    panel.style.opacity = "1";
+    panel.hidden = false;
+    panel.removeAttribute("hidden");
+    panel.classList.add("is-open", "open", "active");
+
+    if (typeof window.loadMemory === "function") {
+      window.loadMemory();
+    } else if (typeof window.loadMemories === "function") {
+      window.loadMemories();
+    } else if (typeof window.NovaLoadMemory === "function") {
+      window.NovaLoadMemory();
+    } else {
+      fetch("/api/memory")
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var target =
+            $("memoryList") ||
+            $("nova-memory-list") ||
+            panel.querySelector("[data-memory-list]") ||
+            panel.querySelector(".memory-list");
+
+          if (!target) {
+            console.log("[Nova Desktop Memory] loaded", data);
+            return;
+          }
+
+          var items = data.items || data.memories || data.memory || [];
+          if (!Array.isArray(items)) items = [];
+
+          target.innerHTML = "";
+
+          if (!items.length) {
+            target.innerHTML = '<div class="session-placeholder">No memory items yet.</div>';
+            return;
+          }
+
+          items.slice(0, 50).forEach(function (item) {
+            var row = document.createElement("div");
+            row.className = "memory-item";
+            row.textContent =
+              item.text ||
+              item.content ||
+              item.value ||
+              item.memory ||
+              JSON.stringify(item);
+            target.appendChild(row);
+          });
+        })
+        .catch(function (err) {
+          console.error("[Nova Desktop Memory] failed", err);
+          alert("Memory failed to load. Check console/server log.");
+        });
+    }
+  }
+
+  function wireMemoryButton() {
+    var buttons = Array.from(document.querySelectorAll("button, a, [role='button']"));
+
+    buttons.forEach(function (button) {
+      var text = String(button.textContent || button.getAttribute("aria-label") || button.title || "").trim().toLowerCase();
+
+      if (text === "memory" || text.indexOf("memory") !== -1) {
+        if (button.dataset.novaMemoryWired === "true") return;
+        button.dataset.novaMemoryWired = "true";
+
+        button.addEventListener("click", function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          showMemoryPanel();
+        }, true);
+      }
+    });
+
+    window.NovaOpenDesktopMemory = showMemoryPanel;
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", wireMemoryButton);
+  } else {
+    wireMemoryButton();
+  }
+
+  setTimeout(wireMemoryButton, 500);
+  setTimeout(wireMemoryButton, 1500);
+
+  console.log("[Nova Desktop Memory Button Wire] ready");
+})();
+</script>
 </body>
 </html>
+
 
 
 
