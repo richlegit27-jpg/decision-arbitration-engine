@@ -636,10 +636,22 @@
         <div class="execution-card">
           <div class="metric">
             <span>Status</span>
-            <strong id="executionStatusLabel">idle</strong>
+            <strong id="executionStatusLabel">loading</strong>
           </div>
-          <div class="execution-note">
-            Execution controls will connect here. For now, use chat commands like continue, next, run step, or stop.
+          <div class="metric">
+            <span>Execution</span>
+            <strong id="executionPercentLabel">...</strong>
+          </div>
+          <div class="metric">
+            <span>Planner</span>
+            <strong id="plannerPercentLabel">...</strong>
+          </div>
+          <div class="metric">
+            <span>Overall</span>
+            <strong id="overallReadinessLabel">...</strong>
+          </div>
+          <div class="execution-note" id="executionNote">
+            Execution status is loading from backend readiness.
           </div>
         </div>
       </section>
@@ -902,6 +914,41 @@
         list.appendChild(failed);
       }
     }
+
+    // NOVA_DESKTOP_EXECUTION_STATUS_20260610
+    async function loadDesktopExecutionStatus() {
+      const statusLabel = $("executionStatusLabel");
+      const executionPercent = $("executionPercentLabel");
+      const plannerPercent = $("plannerPercentLabel");
+      const overallReadiness = $("overallReadinessLabel");
+      const note = $("executionNote");
+
+      try {
+        const response = await fetch("/api/backend/readiness");
+        const data = await response.json();
+
+        const exec = Number(data.execution_percent || 0);
+        const planner = Number(data.planner_percent || 0);
+        const overall = Number(data.overall_backend_readiness || 0);
+
+        if (statusLabel) {
+          statusLabel.textContent = exec >= 100 ? "ready" : "partial";
+        }
+
+        if (executionPercent) executionPercent.textContent = String(exec) + "%";
+        if (plannerPercent) plannerPercent.textContent = String(planner) + "%";
+        if (overallReadiness) overallReadiness.textContent = String(overall) + "%";
+
+        if (note) {
+          note.textContent = exec >= 100
+            ? "Execution backend is ready. Use chat commands like continue, next, run step, run all, stop, or retry."
+            : "Execution backend is partially ready. Chat commands may still work, but status is not fully green.";
+        }
+      } catch (error) {
+        if (statusLabel) statusLabel.textContent = "offline";
+        if (note) note.textContent = "Could not load execution readiness.";
+      }
+    }
     async function loadDesktopSessions() {
       const list = $("desktopSessionList");
       if (!list) return;
@@ -945,9 +992,11 @@
             setStatus("session selected");
             loadDesktopSessions();
     loadDesktopMemory();
+    loadDesktopExecutionStatus();
             refreshSummaryMeta();
     loadDesktopSessions();
     loadDesktopMemory();
+    loadDesktopExecutionStatus();
           });
 
           list.appendChild(button);
@@ -1000,6 +1049,7 @@
       await refreshSummaryMeta();
       loadDesktopSessions();
     loadDesktopMemory();
+    loadDesktopExecutionStatus();
     }
 
     async function summarizeNow() {
@@ -1166,6 +1216,7 @@
         await refreshSummaryMeta();
       loadDesktopSessions();
     loadDesktopMemory();
+    loadDesktopExecutionStatus();
       } catch (e) {
         setStatus("fallback...");
 
@@ -1192,6 +1243,7 @@
           await refreshSummaryMeta();
       loadDesktopSessions();
     loadDesktopMemory();
+    loadDesktopExecutionStatus();
         } catch (fallbackError) {
           assistantBubble.textContent = "Error: " + (fallbackError.message || fallbackError);
           setStatus("error");
@@ -1239,9 +1291,11 @@
     refreshSummaryMeta();
     loadDesktopSessions();
     loadDesktopMemory();
+    loadDesktopExecutionStatus();
   </script>
 </body>
 </html>
+
 
 
 
