@@ -1,4 +1,4 @@
-﻿<!-- NOVA_DESKTOP_APP_UI_V1_20260610 -->
+<!-- NOVA_DESKTOP_APP_UI_V1_20260610 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -2602,7 +2602,7 @@ main,
 </script>
 
 
-<!-- NOVA_DESKTOP_MEMORY_BUTTON_WIRE_20260610 -->
+<!-- NOVA_DESKTOP_MEMORY_FINAL_RENDERER_20260610 -->
 <script>
 (function () {
   "use strict";
@@ -2611,200 +2611,17 @@ main,
     return document.getElementById(id);
   }
 
-  function showMemoryPanel() {
-    var panel =
-      $("memoryPanel") ||
-      $("nova-memory-panel") ||
-      $("desktopMemoryPanel") ||
-      document.querySelector("[data-memory-panel]") ||
-      document.querySelector(".memory-panel");
-
-    if (!panel) {
-      alert("Memory panel not found in this page.");
-      return;
-    }
-
-    panel.style.display = "block";
-    panel.style.visibility = "visible";
-    panel.style.opacity = "1";
-    panel.hidden = false;
-    panel.removeAttribute("hidden");
-    panel.classList.add("is-open", "open", "active");
-
-    if (typeof window.loadMemory === "function") {
-      window.loadMemory();
-    } else if (typeof window.loadMemories === "function") {
-      window.loadMemories();
-    } else if (typeof window.NovaLoadMemory === "function") {
-      window.NovaLoadMemory();
-    } else {
-      fetch("/api/memory")
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          var target =
-            $("memoryList") ||
-            $("nova-memory-list") ||
-            panel.querySelector("[data-memory-list]") ||
-            panel.querySelector(".memory-list");
-
-          if (!target) {
-            console.log("[Nova Desktop Memory] loaded", data);
-            return;
-          }
-
-          var items = data.items || data.memories || data.memory || [];
-          if (!Array.isArray(items)) items = [];
-
-          target.innerHTML = "";
-
-          if (!items.length) {
-            target.innerHTML = '<div class="session-placeholder">No memory items yet.</div>';
-            return;
-          }
-
-          items.slice(0, 50).forEach(function (item) {
-            var row = document.createElement("div");
-            row.className = "memory-item";
-            row.textContent =
-              item.text ||
-              item.content ||
-              item.value ||
-              item.memory ||
-              JSON.stringify(item);
-            target.appendChild(row);
-          });
-        })
-        .catch(function (err) {
-          console.error("[Nova Desktop Memory] failed", err);
-          alert("Memory failed to load. Check console/server log.");
-        });
-    }
+  function memorySection() {
+    return document.querySelector(".tools-section.memory-section");
   }
 
-  function wireMemoryButton() {
-    var buttons = Array.from(document.querySelectorAll("button, a, [role='button']"));
-
-    buttons.forEach(function (button) {
-      var text = String(button.textContent || button.getAttribute("aria-label") || button.title || "").trim().toLowerCase();
-
-      if (text === "memory" || text.indexOf("memory") !== -1) {
-        if (button.dataset.novaMemoryWired === "true") return;
-        button.dataset.novaMemoryWired = "true";
-
-        button.addEventListener("click", function (event) {
-          event.preventDefault();
-          event.stopPropagation();
-          showMemoryPanel();
-        }, true);
-      }
-    });
-
-    window.NovaOpenDesktopMemory = showMemoryPanel;
+  function memoryList() {
+    return $("desktopMemoryList");
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", wireMemoryButton);
-  } else {
-    wireMemoryButton();
-  }
-
-  setTimeout(wireMemoryButton, 500);
-  setTimeout(wireMemoryButton, 1500);
-
-  console.log("[Nova Desktop Memory Button Wire] ready");
-})();
-</script>
-
-<!-- NOVA_DESKTOP_MEMORY_EMPTY_STATE_20260610 -->
-<script>
-(function () {
-  "use strict";
-
-  function findMemoryPanel() {
-    return document.getElementById("memoryPanel") ||
-      document.getElementById("nova-memory-panel") ||
-      document.getElementById("desktopMemoryPanel") ||
-      document.querySelector("[data-memory-panel]") ||
-      document.querySelector(".memory-panel");
-  }
-
-  function normalizeMemoryPayload(data) {
-    if (!data) return [];
-    if (Array.isArray(data)) return data;
-    if (data.data && Array.isArray(data.data.memory)) return data.data.memory;
-    if (data.data && Array.isArray(data.data.items)) return data.data.items;
-    if (Array.isArray(data.memory)) return data.memory;
-    if (Array.isArray(data.items)) return data.items;
-    if (Array.isArray(data.memories)) return data.memories;
-    return [];
-  }
-
-  function renderMemoryEmptyState(panel, count) {
-    panel.innerHTML = [
-      '<div style="padding:18px;">',
-      '  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;">',
-      '    <div>',
-      '      <div style="font-size:18px;font-weight:700;">Memory</div>',
-      '      <div style="opacity:.72;font-size:13px;">' + count + ' item' + (count === 1 ? '' : 's') + '</div>',
-      '    </div>',
-      '    <button type="button" onclick="this.closest(\\'.memory-panel, [data-memory-panel], #memoryPanel, #nova-memory-panel, #desktopMemoryPanel\\').style.display=\\'none\\'">Close</button>',
-      '  </div>',
-      '  <div style="padding:14px;border:1px solid rgba(255,255,255,.12);border-radius:12px;opacity:.82;">',
-      '    No memory items yet.<br>',
-      '    <span style="font-size:13px;opacity:.75;">Nova will show saved facts, preferences, and project notes here.</span>',
-      '  </div>',
-      '</div>'
-    ].join("");
-  }
-
-  function refreshMemoryEmptyState() {
-    var panel = findMemoryPanel();
-    if (!panel) return;
-
-    fetch("/api/memory")
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        var items = normalizeMemoryPayload(data);
-        if (items.length === 0) {
-          renderMemoryEmptyState(panel, 0);
-        }
-      })
-      .catch(function (err) {
-        console.error("[Nova Desktop Memory Empty State] failed", err);
-      });
-  }
-
-  var oldOpen = window.NovaOpenDesktopMemory;
-  window.NovaOpenDesktopMemory = function () {
-    if (typeof oldOpen === "function") oldOpen();
-    setTimeout(refreshMemoryEmptyState, 100);
-  };
-
-  document.addEventListener("click", function (event) {
-    var button = event.target.closest("button, a, [role='button']");
-    if (!button) return;
-
-    var label = String(button.textContent || button.getAttribute("aria-label") || button.title || "").trim().toLowerCase();
-    if (label.indexOf("memory") !== -1) {
-      setTimeout(refreshMemoryEmptyState, 150);
-    }
-  }, true);
-
-  console.log("[Nova Desktop Memory Empty State] ready");
-})();
-</script>
-
-<!-- NOVA_DESKTOP_MEMORY_LOADING_RENDER_FIX_20260610 -->
-<script>
-(function () {
-  "use strict";
-
-  function findMemoryPanel() {
-    return document.getElementById("memoryPanel") ||
-      document.getElementById("nova-memory-panel") ||
-      document.getElementById("desktopMemoryPanel") ||
-      document.querySelector("[data-memory-panel]") ||
-      document.querySelector(".memory-panel");
+  function memoryMetric() {
+    var section = memorySection();
+    return section ? section.querySelector(".metric") : null;
   }
 
   function normalizeMemoryItems(payload) {
@@ -2838,65 +2655,64 @@ main,
     );
   }
 
-  function renderMemoryPanel(payload) {
-    var panel = findMemoryPanel();
+  function setVisible() {
+    var section = memorySection();
+    if (!section) return;
 
-    if (!panel) {
-      console.warn("[Nova Desktop Memory Render Fix] panel not found");
-      return;
-    }
+    section.style.display = "block";
+    section.style.visibility = "visible";
+    section.style.opacity = "1";
+    section.hidden = false;
+    section.removeAttribute("hidden");
+    section.classList.add("is-open", "open", "active");
+  }
 
+  function renderMemory(payload) {
+    var list = memoryList();
+    var metric = memoryMetric();
     var items = normalizeMemoryItems(payload);
-    var count = items.length;
 
-    panel.style.display = "block";
-    panel.style.visibility = "visible";
-    panel.style.opacity = "1";
-    panel.hidden = false;
-    panel.removeAttribute("hidden");
-    panel.classList.add("is-open", "open", "active");
+    setVisible();
 
-    panel.innerHTML = [
-      '<div style="padding:18px;display:flex;flex-direction:column;gap:12px;">',
-      '  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">',
-      '    <div>',
-      '      <div style="font-size:18px;font-weight:800;">Memory</div>',
-      '      <div style="font-size:13px;opacity:.72;">' + count + ' item' + (count === 1 ? '' : 's') + '</div>',
-      '    </div>',
-      '    <button type="button" data-nova-memory-close="true">Close</button>',
-      '  </div>',
-      '  <div data-nova-memory-body="true"></div>',
-      '</div>'
-    ].join("");
+    if (metric) {
+      metric.textContent = String(items.length);
+    }
 
-    var body = panel.querySelector("[data-nova-memory-body]");
-
-    if (!count) {
-      body.innerHTML = [
-        '<div style="padding:14px;border:1px solid rgba(255,255,255,.12);border-radius:12px;opacity:.86;">',
-        '  <div style="font-weight:700;margin-bottom:4px;">No memory items yet.</div>',
-        '  <div style="font-size:13px;opacity:.75;">Saved facts, preferences, and project notes will show here.</div>',
-        '</div>'
-      ].join("");
+    if (!list) {
+      console.warn("[Nova Desktop Memory Final Renderer] #desktopMemoryList not found");
       return;
     }
 
-    body.innerHTML = "";
+    list.innerHTML = "";
+
+    if (!items.length) {
+      var empty = document.createElement("div");
+      empty.className = "session-placeholder";
+      empty.innerHTML = [
+        "<strong>No memory items yet.</strong>",
+        "<br>",
+        "<span>Saved facts, preferences, and project notes will show here.</span>"
+      ].join("");
+      list.appendChild(empty);
+      return;
+    }
 
     items.slice(0, 50).forEach(function (item) {
       var row = document.createElement("div");
-      row.style.cssText = "padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-bottom:10px;white-space:pre-wrap;word-break:break-word;";
+      row.className = "memory-item";
+      row.style.cssText = "padding:10px 12px;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-bottom:10px;white-space:pre-wrap;word-break:break-word;";
       row.textContent = itemText(item);
-      body.appendChild(row);
+      list.appendChild(row);
     });
   }
 
-  function loadDesktopMemoryNow() {
-    var panel = findMemoryPanel();
+  function loadDesktopMemory() {
+    var list = memoryList();
 
-    if (panel) {
-      panel.style.display = "block";
-      panel.innerHTML = '<div style="padding:18px;">Loading memory...</div>';
+    setVisible();
+
+    if (list) {
+      list.innerHTML = '<div class="session-placeholder">Loading memory...</div>';
     }
 
     fetch("/api/memory", { cache: "no-store" })
@@ -2904,49 +2720,46 @@ main,
         return response.json();
       })
       .then(function (payload) {
-        renderMemoryPanel(payload);
+        renderMemory(payload);
       })
       .catch(function (error) {
-        console.error("[Nova Desktop Memory Render Fix] failed", error);
-        if (panel) {
-          panel.innerHTML = '<div style="padding:18px;">Memory failed to load. Check console/server log.</div>';
+        console.error("[Nova Desktop Memory Final Renderer] failed", error);
+        if (list) {
+          list.innerHTML = '<div class="session-placeholder">Memory failed to load.</div>';
         }
       });
   }
 
-  window.NovaOpenDesktopMemory = loadDesktopMemoryNow;
-  window.NovaLoadMemory = loadDesktopMemoryNow;
-  window.loadMemory = loadDesktopMemoryNow;
-  window.loadMemories = loadDesktopMemoryNow;
+  function wire() {
+    var button = $("openMemoryBtn");
+    if (!button || button.dataset.novaMemoryFinalWired === "true") return;
 
-  document.addEventListener("click", function (event) {
-    var close = event.target.closest("[data-nova-memory-close]");
-    if (close) {
-      var panel = findMemoryPanel();
-      if (panel) panel.style.display = "none";
-      return;
-    }
-
-    var button = event.target.closest("button, a, [role='button']");
-    if (!button) return;
-
-    var label = String(
-      button.textContent ||
-      button.getAttribute("aria-label") ||
-      button.title ||
-      ""
-    ).trim().toLowerCase();
-
-    if (label.indexOf("memory") !== -1) {
+    button.dataset.novaMemoryFinalWired = "true";
+    button.addEventListener("click", function (event) {
       event.preventDefault();
       event.stopPropagation();
-      loadDesktopMemoryNow();
-    }
-  }, true);
+      loadDesktopMemory();
+    }, true);
+  }
 
-  console.log("[Nova Desktop Memory Loading Render Fix] ready");
+  window.NovaOpenDesktopMemory = loadDesktopMemory;
+  window.NovaLoadMemory = loadDesktopMemory;
+  window.loadMemory = loadDesktopMemory;
+  window.loadMemories = loadDesktopMemory;
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", wire);
+  } else {
+    wire();
+  }
+
+  setTimeout(wire, 500);
+  setTimeout(wire, 1500);
+
+  console.log("[Nova Desktop Memory Final Renderer] ready");
 })();
 </script>
+
 </body>
 </html>
 
