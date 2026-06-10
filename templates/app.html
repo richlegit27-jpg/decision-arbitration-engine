@@ -1685,14 +1685,45 @@
 
   // NOVA_DESKTOP_SESSION_SELECT_LOAD_MESSAGES_20260610
   function getDesktopMessagesContainerRescue() {
-    return (
+    // NOVA_DESKTOP_RESCUE_MESSAGE_CONTAINER_20260610
+    var existing =
       document.getElementById("messages") ||
       document.getElementById("chatMessages") ||
       document.getElementById("desktopMessages") ||
+      document.getElementById("nova-desktop-rescue-messages") ||
       document.querySelector(".messages") ||
       document.querySelector(".chat-messages") ||
-      document.querySelector("[data-messages]")
-    );
+      document.querySelector("[data-messages]");
+
+    if (existing) return existing;
+
+    var title = document.querySelector(".chat-title");
+    var host =
+      (title && title.parentElement) ||
+      document.querySelector("main") ||
+      document.querySelector(".chat") ||
+      document.body;
+
+    var box = document.createElement("div");
+    box.id = "nova-desktop-rescue-messages";
+    box.className = "messages chat-messages desktop-rescue-messages";
+    box.setAttribute("data-messages", "true");
+
+    box.style.minHeight = "320px";
+    box.style.maxHeight = "60vh";
+    box.style.overflowY = "auto";
+    box.style.padding = "16px";
+    box.style.margin = "12px 0";
+    box.style.border = "1px solid rgba(255,255,255,0.12)";
+    box.style.borderRadius = "16px";
+
+    if (title && title.nextSibling) {
+      title.parentElement.insertBefore(box, title.nextSibling);
+    } else {
+      host.appendChild(box);
+    }
+
+    return box;
   }
 
   function normalizeDesktopChatMessagesRescue(data) {
