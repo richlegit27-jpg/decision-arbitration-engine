@@ -716,6 +716,85 @@ aside,
 }
 </style>
 
+
+<style>
+/* NOVA_DESKTOP_BUTTON_VISIBILITY_FIX_20260610 */
+
+/* Keep the main desktop action buttons usable and visible. */
+#newSessionBtn,
+#openSessionsBtn,
+#openMemoryBtn,
+#attachBtn,
+#sendBtn,
+#summarizeBtn {
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 36px !important;
+  position: relative !important;
+  z-index: 10000 !important;
+}
+
+/* Restore quick prompt buttons if their parent got collapsed. */
+.quick-prompts,
+.quick-prompts-container,
+.prompt-grid,
+.utility-panel,
+.desktop-quick-prompts {
+  display: grid !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  min-height: 1px !important;
+  max-height: none !important;
+  overflow: visible !important;
+  pointer-events: auto !important;
+}
+
+/* Continue / Summarize / Improve / Next buttons. */
+.quick-prompts button,
+.quick-prompts-container button,
+.prompt-grid button,
+.utility-panel button,
+.desktop-quick-prompts button {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  min-height: 42px !important;
+}
+
+/* Make the composer/control area reachable instead of cut off. */
+.composer,
+.desktop-composer,
+.chat-composer,
+.input-row,
+.prompt-row,
+.chat-input-row,
+form {
+  visibility: visible !important;
+  opacity: 1 !important;
+  overflow: visible !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 9000 !important;
+}
+
+/* More bottom room so controls are not hidden below the viewport. */
+html,
+body {
+  overflow-y: auto !important;
+}
+
+body {
+  padding-bottom: 220px !important;
+}
+</style>
+
 </head>
 <body>
   <div class="shell">
