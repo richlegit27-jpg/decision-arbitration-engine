@@ -1825,6 +1825,9 @@
       button.textContent = titleText;
 
       button.addEventListener("click", function () {
+        // NOVA_LOG_DESKTOP_SESSION_ROW_CLICKS_20260610
+        console.log("[Nova Desktop Session Row] clicked", sid, titleText);
+
         if (sid) {
           setSessionIdSafe(sid);
           loadDesktopSessionMessagesRescue(sid);
