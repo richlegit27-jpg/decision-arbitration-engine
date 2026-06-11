@@ -10137,9 +10137,218 @@ _nova_install_login_page_routes_20260610()
 
 
 
+# NOVA_SLIM_API_SESSIONS_PAYLOAD_20260611
+@app.after_request
+def nova_slim_api_sessions_payload_20260611(response):
+    try:
+        path = str(request.path or "")
+
+        if path != "/api/sessions":
+            return response
+
+        try:
+            payload = response.get_json(silent=True)
+        except Exception:
+            payload = None
+
+        if not isinstance(payload, dict):
+            return response
+
+        # The sessions drawer does not need full artifact records.
+        # Full artifact/gallery APIs can serve those separately.
+        if "artifacts" in payload:
+            payload["artifacts"] = []
+
+        if "artifact" in payload:
+            payload.pop("artifact", None)
+
+        sessions = payload.get("sessions")
+        if isinstance(sessions, list):
+            slim_sessions = []
+
+            for item in sessions:
+                if not isinstance(item, dict):
+                    continue
+
+                messages = item.get("messages")
+                message_count = len(messages) if isinstance(messages, list) else 0
+
+                slim = {
+                    "id": item.get("id"),
+                    "title": item.get("title") or "New Chat",
+                    "created_at": item.get("created_at"),
+                    "updated_at": item.get("updated_at"),
+                    "pinned": bool(item.get("pinned")),
+                    "message_count": message_count,
+                    "user_id": item.get("user_id"),
+                    "username": item.get("username"),
+                    "meta": item.get("meta") if isinstance(item.get("meta"), dict) else {},
+                    "working_state": item.get("working_state") if isinstance(item.get("working_state"), dict) else {},
+                    "active_execution": item.get("active_execution") if isinstance(item.get("active_execution"), dict) else {},
+                }
+
+                slim_sessions.append(slim)
+
+            payload["sessions"] = slim_sessions
+
+        session_obj = payload.get("session")
+        if isinstance(session_obj, dict):
+            messages = session_obj.get("messages")
+            message_count = len(messages) if isinstance(messages, list) else 0
+
+            payload["session"] = {
+                "id": session_obj.get("id"),
+                "title": session_obj.get("title") or "New Chat",
+                "created_at": session_obj.get("created_at"),
+                "updated_at": session_obj.get("updated_at"),
+                "pinned": bool(session_obj.get("pinned")),
+                "message_count": message_count,
+                "user_id": session_obj.get("user_id"),
+                "username": session_obj.get("username"),
+                "meta": session_obj.get("meta") if isinstance(session_obj.get("meta"), dict) else {},
+                "working_state": session_obj.get("working_state") if isinstance(session_obj.get("working_state"), dict) else {},
+                "active_execution": session_obj.get("active_execution") if isinstance(session_obj.get("active_execution"), dict) else {},
+            }
+
+        payload.setdefault("ok", True)
+        payload["slim_sessions_payload"] = True
+
+        body = json.dumps(payload, ensure_ascii=False)
+        response.set_data(body)
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        response.headers["Content-Length"] = str(len(body.encode("utf-8")))
+
+        return response
+
+    except Exception as exc:
+        try:
+            app.logger.warning("[Nova Slim Sessions Payload] failed: %s", exc)
+        except Exception:
+            pass
+        return response
 
 
-# NOVA_REMOVE_OLD_SESSIONS_AFTER_REQUEST_20260611
+
+
+# NOVA_BEFORE_REQUEST_SLIM_API_SESSIONS_20260611
+@app.before_request
+def nova_before_request_slim_api_sessions_20260611():
+    try:
+        if request.path != "/api/sessions" or request.method != "GET":
+            return None
+
+        raw_sessions = []
+
+        for method_name in (
+            "list_sessions",
+            "get_sessions",
+            "all_sessions",
+            "load_sessions",
+            "all",
+        ):
+            try:
+                method = getattr(session_service, method_name, None)
+                if callable(method):
+                    candidate = method()
+                    if isinstance(candidate, list):
+                        raw_sessions = candidate
+                        break
+                    if isinstance(candidate, dict):
+                        if isinstance(candidate.get("sessions"), list):
+                            raw_sessions = candidate.get("sessions") or []
+                            break
+                        if isinstance(candidate.get("data"), dict) and isinstance(candidate["data"].get("sessions"), list):
+                            raw_sessions = candidate["data"].get("sessions") or []
+                            break
+            except Exception:
+                pass
+
+        # NOVA_SLIM_SESSIONS_DIRECT_JSON_FALLBACK_20260611
+        if not raw_sessions:
+            try:
+                sessions_path = os.path.join(app.root_path, "data", "nova_sessions.json")
+                with open(sessions_path, "r", encoding="utf-8") as handle:
+                    sessions_payload = json.load(handle)
+
+                if isinstance(sessions_payload, dict):
+                    active_session_id = str(sessions_payload.get("active_session_id") or "").strip()
+
+                    if isinstance(sessions_payload.get("sessions"), list):
+                        raw_sessions = sessions_payload.get("sessions") or []
+                    elif isinstance(sessions_payload.get("data"), dict) and isinstance(sessions_payload["data"].get("sessions"), list):
+                        raw_sessions = sessions_payload["data"].get("sessions") or []
+                elif isinstance(sessions_payload, list):
+                    raw_sessions = sessions_payload
+            except Exception as exc:
+                try:
+                    app.logger.warning("[Nova Slim Sessions Direct JSON Fallback] failed: %s", exc)
+                except Exception:
+                    pass
+
+        slim_sessions = []
+
+        for item in raw_sessions:
+            if not isinstance(item, dict):
+                continue
+
+            messages = item.get("messages")
+            message_count = len(messages) if isinstance(messages, list) else int(item.get("message_count") or 0)
+
+            slim_sessions.append({
+                "id": item.get("id") or item.get("session_id") or "",
+                "title": item.get("title") or "New Chat",
+                "created_at": item.get("created_at") or "",
+                "updated_at": item.get("updated_at") or "",
+                "pinned": bool(item.get("pinned")),
+                "message_count": message_count,
+                "user_id": item.get("user_id") or "",
+                "username": item.get("username") or "",
+                "meta": item.get("meta") if isinstance(item.get("meta"), dict) else {},
+                "working_state": item.get("working_state") if isinstance(item.get("working_state"), dict) else {},
+                "active_execution": item.get("active_execution") if isinstance(item.get("active_execution"), dict) else {},
+            })
+
+        def _updated_key_20260611(item):
+            return str(item.get("updated_at") or item.get("created_at") or "")
+
+        slim_sessions.sort(key=_updated_key_20260611, reverse=True)
+
+        active_session_id = ""
+        try:
+            active_session_id = str(
+                request.cookies.get("nova_active_session_id")
+                or request.cookies.get("active_session_id")
+                or request.cookies.get("session_id")
+                or ""
+            ).strip()
+        except Exception:
+            active_session_id = ""
+
+        if not active_session_id and slim_sessions:
+            active_session_id = str(slim_sessions[0].get("id") or "")
+
+        return jsonify({
+            "ok": True,
+            "active_session_id": active_session_id,
+            "sessions": slim_sessions[:50],
+            "artifacts": [],
+            "slim_sessions_payload": True,
+            "debug": {
+                "route": "before_request_slim_api_sessions",
+                "route_taken": "slim_sessions_payload",
+                "raw_session_count": len(raw_sessions),
+                "returned_session_count": len(slim_sessions[:50]),
+            },
+        })
+
+    except Exception as exc:
+        try:
+            app.logger.warning("[Nova Before Request Slim Sessions] failed: %s", exc)
+        except Exception:
+            pass
+        return None
+
+
 # NOVA_SESSION_AUTH_SCOPE_20260610
 # App-level session ownership bridge.
 # Keeps legacy unowned sessions safe, then claims them for the logged-in local user.
