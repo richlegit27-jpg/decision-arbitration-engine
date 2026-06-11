@@ -10975,6 +10975,162 @@ def nova_before_request_favorite_recall_guard_20260611():
         return None
 
 
+
+
+# NOVA_BEFORE_REQUEST_MEMORY_SUMMARY_GUARD_20260611
+@app.before_request
+def nova_before_request_memory_summary_guard_20260611():
+    try:
+        if request.path != "/api/chat" or request.method != "POST":
+            return None
+
+        payload = request.get_json(silent=True) or {}
+        raw_user_text = str(
+            payload.get("user_text")
+            or payload.get("text")
+            or payload.get("message")
+            or ""
+        ).strip()
+
+        clean_question = " ".join(raw_user_text.lower().replace("?", " ").split())
+
+        summary_questions = {
+            "what do you remember about me",
+            "what memory do you have",
+            "what memories do you have",
+            "show my memories",
+            "show me my memories",
+            "list my memories",
+            "what do you know about me",
+            "what have you remembered",
+            "what have you saved about me",
+        }
+
+        if clean_question not in summary_questions:
+            return None
+
+        memories = []
+        try:
+            memories = memory_service.all() or []
+        except Exception:
+            memories = []
+
+        clean_memories = []
+        seen = set()
+
+        for item in memories:
+            if not isinstance(item, dict):
+                continue
+
+            text_value = str(item.get("text") or "").strip()
+            if not text_value:
+                continue
+
+            key = text_value.lower()
+            if key in seen:
+                continue
+
+            seen.add(key)
+
+            kind = str(item.get("kind") or "memory").strip() or "memory"
+            clean_memories.append({
+                "kind": kind,
+                "text": text_value,
+                "source": str(item.get("source") or "").strip(),
+                "weight": item.get("weight"),
+                "updated_at": str(item.get("updated_at") or item.get("created_at") or "").strip(),
+            })
+
+        def sort_key(item):
+            try:
+                weight = float(item.get("weight") or 0)
+            except Exception:
+                weight = 0
+            return (weight, item.get("updated_at") or "")
+
+        clean_memories.sort(key=sort_key, reverse=True)
+
+        if clean_memories:
+            lines = []
+            for item in clean_memories[:12]:
+                kind = item.get("kind") or "memory"
+                text_value = item.get("text") or ""
+                lines.append(f"- [{kind}] {text_value}")
+
+            assistant_text = "Here is what I remember:\n\n" + "\n".join(lines)
+        else:
+            assistant_text = "I do not have any saved memories yet."
+
+        session_id = str(
+            payload.get("session_id")
+            or payload.get("client_session_id")
+            or ""
+        ).strip()
+
+        if not session_id:
+            session_id = "session_" + uuid.uuid4().hex
+
+        user_msg = {
+            "role": "user",
+            "text": raw_user_text,
+            "attachments": [],
+            "meta": {},
+        }
+
+        assistant_msg = {
+            "role": "assistant",
+            "text": assistant_text,
+            "attachments": [],
+            "memory_used": clean_memories[:12],
+            "meta": {
+                "mode": "memory_summary",
+                "route": "memory_summary_recall",
+                "before_request_guard": True,
+                "memory_used_count": len(clean_memories[:12]),
+            },
+        }
+
+        try:
+            if hasattr(session_service, "add_message"):
+                session_service.add_message(session_id, user_msg)
+                session_service.add_message(session_id, assistant_msg)
+        except Exception:
+            pass
+
+        try:
+            session_obj = session_service.get_session(session_id)
+        except Exception:
+            session_obj = None
+
+        return jsonify({
+            "ok": True,
+            "active_session_id": session_id,
+            "assistant_message": assistant_msg,
+            "attachment_debug": {
+                "requested_session_id": session_id,
+                "active_session_id": session_id,
+                "session_attachments_count": 0,
+            },
+            "debug": {
+                "route": "before_request_memory_summary_guard",
+                "route_taken": "memory_summary_recall",
+            },
+            "runtime": {},
+            "session": session_obj or {
+                "id": session_id,
+                "messages": [user_msg, assistant_msg],
+            },
+            "session_attachments": [],
+        })
+
+    except Exception as exc:
+        try:
+            app.logger.warning("[before_request memory summary guard] failed: %s", exc)
+        except Exception:
+            pass
+        return None
+
+
 # NOVA_CHAT_STREAM_SSE_BRIDGE_20260611
 @app.route("/api/chat/stream", methods=["POST"])
 def nova_chat_stream_post_bridge_20260611():
