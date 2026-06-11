@@ -10263,6 +10263,28 @@ def nova_before_request_slim_api_sessions_20260611():
             except Exception:
                 pass
 
+        # NOVA_SLIM_SESSIONS_DIRECT_JSON_FALLBACK_20260611
+        if not raw_sessions:
+            try:
+                sessions_path = os.path.join(app.root_path, "data", "nova_sessions.json")
+                with open(sessions_path, "r", encoding="utf-8") as handle:
+                    sessions_payload = json.load(handle)
+
+                if isinstance(sessions_payload, dict):
+                    active_session_id = str(sessions_payload.get("active_session_id") or "").strip()
+
+                    if isinstance(sessions_payload.get("sessions"), list):
+                        raw_sessions = sessions_payload.get("sessions") or []
+                    elif isinstance(sessions_payload.get("data"), dict) and isinstance(sessions_payload["data"].get("sessions"), list):
+                        raw_sessions = sessions_payload["data"].get("sessions") or []
+                elif isinstance(sessions_payload, list):
+                    raw_sessions = sessions_payload
+            except Exception as exc:
+                try:
+                    app.logger.warning("[Nova Slim Sessions Direct JSON Fallback] failed: %s", exc)
+                except Exception:
+                    pass
+
         slim_sessions = []
 
         for item in raw_sessions:
