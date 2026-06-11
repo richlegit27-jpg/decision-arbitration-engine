@@ -3960,8 +3960,16 @@ def api_chat():
             _nova_image_fastpath_text,
         )
 
+        # NOVA_IMAGE_FASTPATH_STRIP_SLASH_COMMAND_20260610
+        # Keep the image route, but remove the literal /image prefix from the prompt.
+        _nova_image_fastpath_prompt = _nova_image_fastpath_text
+        if _nova_image_fastpath_lower.startswith("/image"):
+            _nova_image_fastpath_prompt = _nova_image_fastpath_text[6:].strip() or "image"
+
+        _nova_image_fastpath_service_text = "generate image " + _nova_image_fastpath_prompt
+
         result = chat_service.handle(
-            user_text=_nova_image_fastpath_text,
+            user_text=_nova_image_fastpath_service_text,
             session_id=session_id,
             attachments=[],
         )
