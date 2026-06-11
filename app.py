@@ -10135,6 +10135,99 @@ _nova_install_login_page_routes_20260610()
 
 
 
+
+
+# NOVA_SLIM_API_SESSIONS_PAYLOAD_20260611
+@app.after_request
+def nova_slim_api_sessions_payload_20260611(response):
+    try:
+        path = str(request.path or "")
+
+        if path != "/api/sessions":
+            return response
+
+        try:
+            payload = response.get_json(silent=True)
+        except Exception:
+            payload = None
+
+        if not isinstance(payload, dict):
+            return response
+
+        # The sessions drawer does not need full artifact records.
+        # Full artifact/gallery APIs can serve those separately.
+        if "artifacts" in payload:
+            payload["artifacts"] = []
+
+        if "artifact" in payload:
+            payload.pop("artifact", None)
+
+        sessions = payload.get("sessions")
+        if isinstance(sessions, list):
+            slim_sessions = []
+
+            for item in sessions:
+                if not isinstance(item, dict):
+                    continue
+
+                messages = item.get("messages")
+                message_count = len(messages) if isinstance(messages, list) else 0
+
+                slim = {
+                    "id": item.get("id"),
+                    "title": item.get("title") or "New Chat",
+                    "created_at": item.get("created_at"),
+                    "updated_at": item.get("updated_at"),
+                    "pinned": bool(item.get("pinned")),
+                    "message_count": message_count,
+                    "user_id": item.get("user_id"),
+                    "username": item.get("username"),
+                    "meta": item.get("meta") if isinstance(item.get("meta"), dict) else {},
+                    "working_state": item.get("working_state") if isinstance(item.get("working_state"), dict) else {},
+                    "active_execution": item.get("active_execution") if isinstance(item.get("active_execution"), dict) else {},
+                }
+
+                slim_sessions.append(slim)
+
+            payload["sessions"] = slim_sessions
+
+        session_obj = payload.get("session")
+        if isinstance(session_obj, dict):
+            messages = session_obj.get("messages")
+            message_count = len(messages) if isinstance(messages, list) else 0
+
+            payload["session"] = {
+                "id": session_obj.get("id"),
+                "title": session_obj.get("title") or "New Chat",
+                "created_at": session_obj.get("created_at"),
+                "updated_at": session_obj.get("updated_at"),
+                "pinned": bool(session_obj.get("pinned")),
+                "message_count": message_count,
+                "user_id": session_obj.get("user_id"),
+                "username": session_obj.get("username"),
+                "meta": session_obj.get("meta") if isinstance(session_obj.get("meta"), dict) else {},
+                "working_state": session_obj.get("working_state") if isinstance(session_obj.get("working_state"), dict) else {},
+                "active_execution": session_obj.get("active_execution") if isinstance(session_obj.get("active_execution"), dict) else {},
+            }
+
+        payload.setdefault("ok", True)
+        payload["slim_sessions_payload"] = True
+
+        body = json.dumps(payload, ensure_ascii=False)
+        response.set_data(body)
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        response.headers["Content-Length"] = str(len(body.encode("utf-8")))
+
+        return response
+
+    except Exception as exc:
+        try:
+            app.logger.warning("[Nova Slim Sessions Payload] failed: %s", exc)
+        except Exception:
+            pass
+        return response
+
+
 # NOVA_SESSION_AUTH_SCOPE_20260610
 # App-level session ownership bridge.
 # Keeps legacy unowned sessions safe, then claims them for the logged-in local user.
