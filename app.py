@@ -10716,6 +10716,143 @@ def nova_blog_page_20260611():
     return render_template("blog.html")
 
 
+
+
+# NOVA_BEFORE_REQUEST_EXPLICIT_MEMORY_GUARD_20260611
+@app.before_request
+def nova_before_request_explicit_memory_guard_20260611():
+    try:
+        if request.path != "/api/chat" or request.method != "POST":
+            return None
+
+        payload = request.get_json(silent=True) or {}
+        raw_user_text = str(
+            payload.get("user_text")
+            or payload.get("text")
+            or payload.get("message")
+            or ""
+        ).strip()
+
+        lowered = raw_user_text.lower().strip()
+
+        prefixes = (
+            "remember that ",
+            "remember this ",
+            "remember ",
+            "save that ",
+            "save this ",
+            "store that ",
+            "store this ",
+            "note that ",
+            "memorize that ",
+            "add to memory that ",
+            "add this to memory ",
+        )
+
+        clean = ""
+        for prefix in prefixes:
+            if lowered.startswith(prefix):
+                clean = raw_user_text[len(prefix):].strip(" .\n\r\t")
+                break
+
+        if not clean:
+            return None
+
+        session_id = str(
+            payload.get("session_id")
+            or payload.get("client_session_id")
+            or ""
+        ).strip()
+
+        if not session_id:
+            session_id = "session_" + uuid.uuid4().hex
+
+        clean_lc = clean.lower()
+        kind = "fact"
+
+        if (
+            "favorite color" in clean_lc
+            or "favourite color" in clean_lc
+            or "prefer" in clean_lc
+            or "from now on" in clean_lc
+            or "always" in clean_lc
+            or "call me" in clean_lc
+            or "my name is" in clean_lc
+        ):
+            kind = "preference"
+
+        memory_service.add_memory({
+            "text": clean,
+            "kind": kind,
+            "source": "explicit_memory_command_clean",
+            "session_id": session_id,
+        })
+
+        assistant_text = f"Saved to memory: {clean}"
+
+        user_msg = {
+            "role": "user",
+            "text": raw_user_text,
+            "attachments": [],
+            "meta": {},
+        }
+
+        assistant_msg = {
+            "role": "assistant",
+            "text": assistant_text,
+            "attachments": [],
+            "memory_used": [],
+            "meta": {
+                "mode": "explicit_memory_command",
+                "route": "memory_save",
+                "save_memory": True,
+                "use_memory": True,
+                "before_request_guard": True,
+            },
+        }
+
+        try:
+            if hasattr(session_service, "add_message"):
+                session_service.add_message(session_id, user_msg)
+                session_service.add_message(session_id, assistant_msg)
+        except Exception:
+            pass
+
+        session_obj = None
+        try:
+            session_obj = session_service.get_session(session_id)
+        except Exception:
+            session_obj = None
+
+        return jsonify({
+            "ok": True,
+            "active_session_id": session_id,
+            "assistant_message": assistant_msg,
+            "attachment_debug": {
+                "requested_session_id": session_id,
+                "active_session_id": session_id,
+                "session_attachments_count": 0,
+            },
+            "debug": {
+                "route": "before_request_explicit_memory_guard",
+                "route_taken": "memory_save",
+            },
+            "runtime": {},
+            "session": session_obj or {
+                "id": session_id,
+                "messages": [user_msg, assistant_msg],
+            },
+            "session_attachments": [],
+        })
+
+    except Exception as exc:
+        try:
+            app.logger.warning("[before_request explicit memory guard] failed: %s", exc)
+        except Exception:
+            pass
+        return None
+
+
 # NOVA_CHAT_STREAM_SSE_BRIDGE_20260611
 @app.route("/api/chat/stream", methods=["POST"])
 def nova_chat_stream_post_bridge_20260611():
