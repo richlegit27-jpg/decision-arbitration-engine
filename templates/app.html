@@ -1449,14 +1449,22 @@ body {
       return String(value);
     }
     function normalizeFallbackResponse(j) {
-      return safeRenderText(j.response
-        || j.assistant_message
+      // NOVA_DESKTOP_MEMORY_DIRECT_CHAT_20260611
+      if (j && typeof j.assistant_message === "object" && j.assistant_message) {
+        return safeRenderText(j.assistant_message.text
+          || j.assistant_message.content
+          || j.assistant_message.message
+          || j.assistant_message.response
+          || "");
+      }
+
+      return safeRenderText((j && (j.response
         || j.message
         || j.text
         || j.answer
         || j.content
         || j.output
-        || j.result
+        || j.result))
         || j);
     }
 
@@ -1473,6 +1481,61 @@ body {
         uploaded_attachments: attachments || [],
         raw_injection_attachments: attachments || []
       };
+    }
+
+
+    function isDesktopDirectMemoryMessage(text) {
+      const clean = String(text || "").trim().toLowerCase();
+
+      if (!clean) return false;
+
+      return (
+        clean.startsWith("remember that ") ||
+        clean.startsWith("remember this ") ||
+        clean.startsWith("remember ") ||
+        clean.startsWith("save this ") ||
+        clean.startsWith("save to memory ") ||
+        clean.startsWith("store this ") ||
+        clean.startsWith("note that ") ||
+        clean.startsWith("add to memory ") ||
+        clean.includes("what is my current nova focus") ||
+        clean.includes("what's my current nova focus") ||
+        clean.includes("what is my nova focus") ||
+        clean.includes("what's my nova focus") ||
+        clean.includes("what is my current project focus") ||
+        clean.includes("what's my current project focus") ||
+        clean.includes("what are we focused on") ||
+        clean.includes("what am i focused on")
+      );
+    }
+
+    async function sendDesktopDirectChat(text, attachments, assistantBubble) {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": API_KEY
+        },
+        body: JSON.stringify(buildDesktopChatPayload(text, attachments))
+      });
+
+      const raw = await response.text();
+      let data = null;
+
+      try {
+        data = JSON.parse(raw);
+      } catch (error) {
+        data = { response: raw };
+      }
+
+      if (data.session_id) setSessionId(data.session_id);
+      if (data.active_session_id) setSessionId(data.active_session_id);
+
+      assistantBubble.textContent = safeRenderText(normalizeFallbackResponse(data));
+      setStatus("done");
+      clearDesktopAttachments();
+      await refreshSummaryMeta();
+      refreshDesktopPanels();
     }
 
     async function sendDesktopAttachmentDirect(text, attachments, assistantBubble) {
@@ -1522,6 +1585,11 @@ body {
       try {
         if (attachments.length) {
           await sendDesktopAttachmentDirect(text, attachments, assistantBubble);
+          return;
+        }
+
+        if (isDesktopDirectMemoryMessage(text)) {
+          await sendDesktopDirectChat(text, attachments, assistantBubble);
           return;
         }
 

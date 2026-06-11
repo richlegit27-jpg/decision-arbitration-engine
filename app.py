@@ -2594,7 +2594,7 @@ def _nova_casual_chat_guard():
     try:
         from flask import request, jsonify
 
-        if request.path != "/api/chat" or request.method != "POST":
+        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
             return None
 
         payload = request.get_json(silent=True) or {}
@@ -9657,7 +9657,7 @@ def _nova_attachment_followup_recall_gate():
         import json
         from pathlib import Path
 
-        if request.path != "/api/chat" or request.method != "POST":
+        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
             return None
 
         payload = request.get_json(silent=True) or {}
@@ -9758,7 +9758,7 @@ def _nova_stop_fake_attachment_chat_gate():
     try:
         from flask import request, jsonify
 
-        if request.path != "/api/chat" or request.method != "POST":
+        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
             return None
 
         payload = request.get_json(silent=True) or {}
@@ -11040,7 +11040,7 @@ def nova_blog_page_20260611():
 @app.before_request
 def nova_before_request_explicit_memory_guard_20260611():
     try:
-        if request.path != "/api/chat" or request.method != "POST":
+        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
             return None
 
         payload = request.get_json(silent=True) or {}
@@ -11178,7 +11178,7 @@ def nova_before_request_explicit_memory_guard_20260611():
 @app.before_request
 def nova_before_request_favorite_recall_guard_20260611():
     try:
-        if request.path != "/api/chat" or request.method != "POST":
+        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
             return None
 
         payload = request.get_json(silent=True) or {}
@@ -11299,7 +11299,7 @@ def nova_before_request_favorite_recall_guard_20260611():
 @app.before_request
 def nova_before_request_memory_summary_guard_20260611():
     try:
-        if request.path != "/api/chat" or request.method != "POST":
+        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
             return None
 
         payload = request.get_json(silent=True) or {}
@@ -11497,7 +11497,7 @@ def nova_chat_stream_post_bridge_20260611():
 @app.before_request
 def nova_memory_command_before_web_20260611():
     try:
-        if request.path != "/api/chat" or request.method != "POST":
+        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
             return None
 
         data = request.get_json(silent=True) or {}
@@ -11681,7 +11681,7 @@ def nova_memory_command_before_web_20260611():
 @app.before_request
 def nova_focus_recall_before_web_20260611():
     try:
-        if request.path != "/api/chat" or request.method != "POST":
+        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
             return None
 
         data = request.get_json(silent=True) or {}
@@ -11883,3 +11883,6 @@ if __name__ == "__main__":
 
 
 
+
+
+# NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611
