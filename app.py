@@ -3908,6 +3908,127 @@ def api_chat():
                 "error": str(exc),
             },
         })
+    # NOVA_EXECUTION_COMMAND_TOP_GUARD_20260611
+    # Explicit execution controls must beat web/news/search routing.
+    try:
+        _nova_exec_payload2 = request.get_json(silent=True) or {}
+        _nova_exec_text2 = str(
+            _nova_exec_payload2.get("user_text")
+            or _nova_exec_payload2.get("text")
+            or _nova_exec_payload2.get("message")
+            or ""
+        ).strip()
+        _nova_exec_clean2 = " ".join(_nova_exec_text2.lower().split())
+
+        _nova_exec_session_id2 = str(
+            _nova_exec_payload2.get("session_id")
+            or _nova_exec_payload2.get("client_session_id")
+            or _nova_exec_payload2.get("conversation_id")
+            or "default"
+        ).strip() or "default"
+
+        _nova_exec_commands2 = {
+            "next": "next",
+            "nex": "next",
+            "continue": "next",
+            "continue on": "next",
+            "keep going": "next",
+            "go": "next",
+            "run next": "next",
+            "next step": "next",
+            "run step": "next",
+            "run_step": "next",
+            "run all": "run_all",
+            "run_all": "run_all",
+            "run it": "run_all",
+            "execute": "run_all",
+            "execute all": "run_all",
+            "auto": "run_all",
+            "auto mode": "run_all",
+            "autopilot": "run_all",
+            "retry": "retry",
+            "retry failed": "retry",
+            "retry_failed": "retry",
+            "try again": "retry",
+            "rerun failed": "retry",
+            "stop": "cancel",
+            "cancel": "cancel",
+        }
+
+        if _nova_exec_clean2 in _nova_exec_commands2:
+            _nova_exec_action2 = _nova_exec_commands2[_nova_exec_clean2]
+
+            if _nova_exec_action2 == "run_all":
+                _nova_exec_state2 = chat_execution_service.run_all(_nova_exec_session_id2)
+            elif _nova_exec_action2 == "cancel":
+                _nova_exec_state2 = chat_execution_service.cancel(_nova_exec_session_id2)
+            else:
+                _nova_exec_state2 = chat_execution_service.advance(_nova_exec_session_id2)
+
+            # NOVA_EXECUTION_GUARD_INLINE_FORMATTER_20260611
+            _nova_exec_status2 = str(_nova_exec_state2.get("status") or "").strip().lower()
+            _nova_exec_goal2 = str(_nova_exec_state2.get("goal") or "").strip()
+            _nova_exec_error2 = str(_nova_exec_state2.get("error") or "").strip()
+            _nova_exec_steps2 = _nova_exec_state2.get("steps") or []
+            _nova_exec_current2 = str(_nova_exec_state2.get("current_step") or "").strip()
+            _nova_exec_index2 = int(_nova_exec_state2.get("current_index") or 0)
+
+            if _nova_exec_status2 in {"idle", "none", ""}:
+                _nova_exec_reply2 = _nova_exec_error2 or "No active execution mission. Start one with: auto-plan <goal>"
+            elif _nova_exec_status2 in {"complete", "completed"}:
+                if _nova_exec_goal2:
+                    _nova_exec_reply2 = "Execution complete: " + _nova_exec_goal2
+                else:
+                    _nova_exec_reply2 = "Execution complete."
+            elif _nova_exec_status2 in {"failed", "error"}:
+                _nova_exec_reply2 = _nova_exec_error2 or "Execution failed."
+            else:
+                _nova_exec_total2 = len(_nova_exec_steps2)
+                _nova_exec_step_num2 = min(_nova_exec_index2 + 1, _nova_exec_total2) if _nova_exec_total2 else 1
+                if not _nova_exec_current2 and _nova_exec_steps2:
+                    _nova_exec_current2 = str(_nova_exec_steps2[_nova_exec_index2] if _nova_exec_index2 < _nova_exec_total2 else _nova_exec_steps2[-1])
+                _nova_exec_reply2 = (
+                    "Execution waiting. "
+                    + "Step "
+                    + str(_nova_exec_step_num2)
+                    + "/"
+                    + str(_nova_exec_total2 or "?")
+                    + ": "
+                    + (_nova_exec_current2 or "Next step")
+                )
+
+            return jsonify({
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": _nova_exec_reply2,
+                    "content": _nova_exec_reply2,
+                },
+                "execution_state": _nova_exec_state2,
+                "debug": {
+                    "route": "execution_command_top_guard",
+                    "command": _nova_exec_clean2,
+                    "action": _nova_exec_action2,
+                    "session_id": _nova_exec_session_id2,
+                },
+            })
+    except Exception as exc:
+        return jsonify({
+            "ok": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": "Execution command guard failed: " + str(exc),
+                "content": "Execution command guard failed: " + str(exc),
+            },
+            "execution_state": {
+                "status": "failed",
+                "error": str(exc),
+            },
+            "debug": {
+                "route": "execution_command_top_guard_failed",
+            },
+        })
+
     data = request_json()
 
     user_text = str(data.get("user_text") or "").strip()
@@ -5898,6 +6019,127 @@ def api_session_by_id(session_id: str):
 
 @app.post("/api/sessions/new")
 def api_sessions_new():
+    # NOVA_EXECUTION_COMMAND_TOP_GUARD_20260611
+    # Explicit execution controls must beat web/news/search routing.
+    try:
+        _nova_exec_payload2 = request.get_json(silent=True) or {}
+        _nova_exec_text2 = str(
+            _nova_exec_payload2.get("user_text")
+            or _nova_exec_payload2.get("text")
+            or _nova_exec_payload2.get("message")
+            or ""
+        ).strip()
+        _nova_exec_clean2 = " ".join(_nova_exec_text2.lower().split())
+
+        _nova_exec_session_id2 = str(
+            _nova_exec_payload2.get("session_id")
+            or _nova_exec_payload2.get("client_session_id")
+            or _nova_exec_payload2.get("conversation_id")
+            or "default"
+        ).strip() or "default"
+
+        _nova_exec_commands2 = {
+            "next": "next",
+            "nex": "next",
+            "continue": "next",
+            "continue on": "next",
+            "keep going": "next",
+            "go": "next",
+            "run next": "next",
+            "next step": "next",
+            "run step": "next",
+            "run_step": "next",
+            "run all": "run_all",
+            "run_all": "run_all",
+            "run it": "run_all",
+            "execute": "run_all",
+            "execute all": "run_all",
+            "auto": "run_all",
+            "auto mode": "run_all",
+            "autopilot": "run_all",
+            "retry": "retry",
+            "retry failed": "retry",
+            "retry_failed": "retry",
+            "try again": "retry",
+            "rerun failed": "retry",
+            "stop": "cancel",
+            "cancel": "cancel",
+        }
+
+        if _nova_exec_clean2 in _nova_exec_commands2:
+            _nova_exec_action2 = _nova_exec_commands2[_nova_exec_clean2]
+
+            if _nova_exec_action2 == "run_all":
+                _nova_exec_state2 = chat_execution_service.run_all(_nova_exec_session_id2)
+            elif _nova_exec_action2 == "cancel":
+                _nova_exec_state2 = chat_execution_service.cancel(_nova_exec_session_id2)
+            else:
+                _nova_exec_state2 = chat_execution_service.advance(_nova_exec_session_id2)
+
+            # NOVA_EXECUTION_GUARD_INLINE_FORMATTER_20260611
+            _nova_exec_status2 = str(_nova_exec_state2.get("status") or "").strip().lower()
+            _nova_exec_goal2 = str(_nova_exec_state2.get("goal") or "").strip()
+            _nova_exec_error2 = str(_nova_exec_state2.get("error") or "").strip()
+            _nova_exec_steps2 = _nova_exec_state2.get("steps") or []
+            _nova_exec_current2 = str(_nova_exec_state2.get("current_step") or "").strip()
+            _nova_exec_index2 = int(_nova_exec_state2.get("current_index") or 0)
+
+            if _nova_exec_status2 in {"idle", "none", ""}:
+                _nova_exec_reply2 = _nova_exec_error2 or "No active execution mission. Start one with: auto-plan <goal>"
+            elif _nova_exec_status2 in {"complete", "completed"}:
+                if _nova_exec_goal2:
+                    _nova_exec_reply2 = "Execution complete: " + _nova_exec_goal2
+                else:
+                    _nova_exec_reply2 = "Execution complete."
+            elif _nova_exec_status2 in {"failed", "error"}:
+                _nova_exec_reply2 = _nova_exec_error2 or "Execution failed."
+            else:
+                _nova_exec_total2 = len(_nova_exec_steps2)
+                _nova_exec_step_num2 = min(_nova_exec_index2 + 1, _nova_exec_total2) if _nova_exec_total2 else 1
+                if not _nova_exec_current2 and _nova_exec_steps2:
+                    _nova_exec_current2 = str(_nova_exec_steps2[_nova_exec_index2] if _nova_exec_index2 < _nova_exec_total2 else _nova_exec_steps2[-1])
+                _nova_exec_reply2 = (
+                    "Execution waiting. "
+                    + "Step "
+                    + str(_nova_exec_step_num2)
+                    + "/"
+                    + str(_nova_exec_total2 or "?")
+                    + ": "
+                    + (_nova_exec_current2 or "Next step")
+                )
+
+            return jsonify({
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": _nova_exec_reply2,
+                    "content": _nova_exec_reply2,
+                },
+                "execution_state": _nova_exec_state2,
+                "debug": {
+                    "route": "execution_command_top_guard",
+                    "command": _nova_exec_clean2,
+                    "action": _nova_exec_action2,
+                    "session_id": _nova_exec_session_id2,
+                },
+            })
+    except Exception as exc:
+        return jsonify({
+            "ok": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": "Execution command guard failed: " + str(exc),
+                "content": "Execution command guard failed: " + str(exc),
+            },
+            "execution_state": {
+                "status": "failed",
+                "error": str(exc),
+            },
+            "debug": {
+                "route": "execution_command_top_guard_failed",
+            },
+        })
+
     data = request_json()
     title = str(data.get("title") or "New Chat").strip() or "New Chat"
 
@@ -5914,6 +6156,127 @@ def api_sessions_new():
 
 @app.post("/api/sessions/switch")
 def api_sessions_switch():
+    # NOVA_EXECUTION_COMMAND_TOP_GUARD_20260611
+    # Explicit execution controls must beat web/news/search routing.
+    try:
+        _nova_exec_payload2 = request.get_json(silent=True) or {}
+        _nova_exec_text2 = str(
+            _nova_exec_payload2.get("user_text")
+            or _nova_exec_payload2.get("text")
+            or _nova_exec_payload2.get("message")
+            or ""
+        ).strip()
+        _nova_exec_clean2 = " ".join(_nova_exec_text2.lower().split())
+
+        _nova_exec_session_id2 = str(
+            _nova_exec_payload2.get("session_id")
+            or _nova_exec_payload2.get("client_session_id")
+            or _nova_exec_payload2.get("conversation_id")
+            or "default"
+        ).strip() or "default"
+
+        _nova_exec_commands2 = {
+            "next": "next",
+            "nex": "next",
+            "continue": "next",
+            "continue on": "next",
+            "keep going": "next",
+            "go": "next",
+            "run next": "next",
+            "next step": "next",
+            "run step": "next",
+            "run_step": "next",
+            "run all": "run_all",
+            "run_all": "run_all",
+            "run it": "run_all",
+            "execute": "run_all",
+            "execute all": "run_all",
+            "auto": "run_all",
+            "auto mode": "run_all",
+            "autopilot": "run_all",
+            "retry": "retry",
+            "retry failed": "retry",
+            "retry_failed": "retry",
+            "try again": "retry",
+            "rerun failed": "retry",
+            "stop": "cancel",
+            "cancel": "cancel",
+        }
+
+        if _nova_exec_clean2 in _nova_exec_commands2:
+            _nova_exec_action2 = _nova_exec_commands2[_nova_exec_clean2]
+
+            if _nova_exec_action2 == "run_all":
+                _nova_exec_state2 = chat_execution_service.run_all(_nova_exec_session_id2)
+            elif _nova_exec_action2 == "cancel":
+                _nova_exec_state2 = chat_execution_service.cancel(_nova_exec_session_id2)
+            else:
+                _nova_exec_state2 = chat_execution_service.advance(_nova_exec_session_id2)
+
+            # NOVA_EXECUTION_GUARD_INLINE_FORMATTER_20260611
+            _nova_exec_status2 = str(_nova_exec_state2.get("status") or "").strip().lower()
+            _nova_exec_goal2 = str(_nova_exec_state2.get("goal") or "").strip()
+            _nova_exec_error2 = str(_nova_exec_state2.get("error") or "").strip()
+            _nova_exec_steps2 = _nova_exec_state2.get("steps") or []
+            _nova_exec_current2 = str(_nova_exec_state2.get("current_step") or "").strip()
+            _nova_exec_index2 = int(_nova_exec_state2.get("current_index") or 0)
+
+            if _nova_exec_status2 in {"idle", "none", ""}:
+                _nova_exec_reply2 = _nova_exec_error2 or "No active execution mission. Start one with: auto-plan <goal>"
+            elif _nova_exec_status2 in {"complete", "completed"}:
+                if _nova_exec_goal2:
+                    _nova_exec_reply2 = "Execution complete: " + _nova_exec_goal2
+                else:
+                    _nova_exec_reply2 = "Execution complete."
+            elif _nova_exec_status2 in {"failed", "error"}:
+                _nova_exec_reply2 = _nova_exec_error2 or "Execution failed."
+            else:
+                _nova_exec_total2 = len(_nova_exec_steps2)
+                _nova_exec_step_num2 = min(_nova_exec_index2 + 1, _nova_exec_total2) if _nova_exec_total2 else 1
+                if not _nova_exec_current2 and _nova_exec_steps2:
+                    _nova_exec_current2 = str(_nova_exec_steps2[_nova_exec_index2] if _nova_exec_index2 < _nova_exec_total2 else _nova_exec_steps2[-1])
+                _nova_exec_reply2 = (
+                    "Execution waiting. "
+                    + "Step "
+                    + str(_nova_exec_step_num2)
+                    + "/"
+                    + str(_nova_exec_total2 or "?")
+                    + ": "
+                    + (_nova_exec_current2 or "Next step")
+                )
+
+            return jsonify({
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": _nova_exec_reply2,
+                    "content": _nova_exec_reply2,
+                },
+                "execution_state": _nova_exec_state2,
+                "debug": {
+                    "route": "execution_command_top_guard",
+                    "command": _nova_exec_clean2,
+                    "action": _nova_exec_action2,
+                    "session_id": _nova_exec_session_id2,
+                },
+            })
+    except Exception as exc:
+        return jsonify({
+            "ok": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": "Execution command guard failed: " + str(exc),
+                "content": "Execution command guard failed: " + str(exc),
+            },
+            "execution_state": {
+                "status": "failed",
+                "error": str(exc),
+            },
+            "debug": {
+                "route": "execution_command_top_guard_failed",
+            },
+        })
+
     data = request_json()
     session_id = str(data.get("session_id") or "").strip()
 
@@ -5933,6 +6296,127 @@ def api_sessions_switch():
 
 @app.post("/api/sessions/rename")
 def api_sessions_rename():
+    # NOVA_EXECUTION_COMMAND_TOP_GUARD_20260611
+    # Explicit execution controls must beat web/news/search routing.
+    try:
+        _nova_exec_payload2 = request.get_json(silent=True) or {}
+        _nova_exec_text2 = str(
+            _nova_exec_payload2.get("user_text")
+            or _nova_exec_payload2.get("text")
+            or _nova_exec_payload2.get("message")
+            or ""
+        ).strip()
+        _nova_exec_clean2 = " ".join(_nova_exec_text2.lower().split())
+
+        _nova_exec_session_id2 = str(
+            _nova_exec_payload2.get("session_id")
+            or _nova_exec_payload2.get("client_session_id")
+            or _nova_exec_payload2.get("conversation_id")
+            or "default"
+        ).strip() or "default"
+
+        _nova_exec_commands2 = {
+            "next": "next",
+            "nex": "next",
+            "continue": "next",
+            "continue on": "next",
+            "keep going": "next",
+            "go": "next",
+            "run next": "next",
+            "next step": "next",
+            "run step": "next",
+            "run_step": "next",
+            "run all": "run_all",
+            "run_all": "run_all",
+            "run it": "run_all",
+            "execute": "run_all",
+            "execute all": "run_all",
+            "auto": "run_all",
+            "auto mode": "run_all",
+            "autopilot": "run_all",
+            "retry": "retry",
+            "retry failed": "retry",
+            "retry_failed": "retry",
+            "try again": "retry",
+            "rerun failed": "retry",
+            "stop": "cancel",
+            "cancel": "cancel",
+        }
+
+        if _nova_exec_clean2 in _nova_exec_commands2:
+            _nova_exec_action2 = _nova_exec_commands2[_nova_exec_clean2]
+
+            if _nova_exec_action2 == "run_all":
+                _nova_exec_state2 = chat_execution_service.run_all(_nova_exec_session_id2)
+            elif _nova_exec_action2 == "cancel":
+                _nova_exec_state2 = chat_execution_service.cancel(_nova_exec_session_id2)
+            else:
+                _nova_exec_state2 = chat_execution_service.advance(_nova_exec_session_id2)
+
+            # NOVA_EXECUTION_GUARD_INLINE_FORMATTER_20260611
+            _nova_exec_status2 = str(_nova_exec_state2.get("status") or "").strip().lower()
+            _nova_exec_goal2 = str(_nova_exec_state2.get("goal") or "").strip()
+            _nova_exec_error2 = str(_nova_exec_state2.get("error") or "").strip()
+            _nova_exec_steps2 = _nova_exec_state2.get("steps") or []
+            _nova_exec_current2 = str(_nova_exec_state2.get("current_step") or "").strip()
+            _nova_exec_index2 = int(_nova_exec_state2.get("current_index") or 0)
+
+            if _nova_exec_status2 in {"idle", "none", ""}:
+                _nova_exec_reply2 = _nova_exec_error2 or "No active execution mission. Start one with: auto-plan <goal>"
+            elif _nova_exec_status2 in {"complete", "completed"}:
+                if _nova_exec_goal2:
+                    _nova_exec_reply2 = "Execution complete: " + _nova_exec_goal2
+                else:
+                    _nova_exec_reply2 = "Execution complete."
+            elif _nova_exec_status2 in {"failed", "error"}:
+                _nova_exec_reply2 = _nova_exec_error2 or "Execution failed."
+            else:
+                _nova_exec_total2 = len(_nova_exec_steps2)
+                _nova_exec_step_num2 = min(_nova_exec_index2 + 1, _nova_exec_total2) if _nova_exec_total2 else 1
+                if not _nova_exec_current2 and _nova_exec_steps2:
+                    _nova_exec_current2 = str(_nova_exec_steps2[_nova_exec_index2] if _nova_exec_index2 < _nova_exec_total2 else _nova_exec_steps2[-1])
+                _nova_exec_reply2 = (
+                    "Execution waiting. "
+                    + "Step "
+                    + str(_nova_exec_step_num2)
+                    + "/"
+                    + str(_nova_exec_total2 or "?")
+                    + ": "
+                    + (_nova_exec_current2 or "Next step")
+                )
+
+            return jsonify({
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": _nova_exec_reply2,
+                    "content": _nova_exec_reply2,
+                },
+                "execution_state": _nova_exec_state2,
+                "debug": {
+                    "route": "execution_command_top_guard",
+                    "command": _nova_exec_clean2,
+                    "action": _nova_exec_action2,
+                    "session_id": _nova_exec_session_id2,
+                },
+            })
+    except Exception as exc:
+        return jsonify({
+            "ok": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": "Execution command guard failed: " + str(exc),
+                "content": "Execution command guard failed: " + str(exc),
+            },
+            "execution_state": {
+                "status": "failed",
+                "error": str(exc),
+            },
+            "debug": {
+                "route": "execution_command_top_guard_failed",
+            },
+        })
+
     data = request_json()
     session_id = str(data.get("session_id") or "").strip()
     title = str(data.get("title") or "").strip()
@@ -5953,6 +6437,127 @@ def api_sessions_rename():
 
 @app.post("/api/sessions/pin")
 def api_sessions_pin():
+    # NOVA_EXECUTION_COMMAND_TOP_GUARD_20260611
+    # Explicit execution controls must beat web/news/search routing.
+    try:
+        _nova_exec_payload2 = request.get_json(silent=True) or {}
+        _nova_exec_text2 = str(
+            _nova_exec_payload2.get("user_text")
+            or _nova_exec_payload2.get("text")
+            or _nova_exec_payload2.get("message")
+            or ""
+        ).strip()
+        _nova_exec_clean2 = " ".join(_nova_exec_text2.lower().split())
+
+        _nova_exec_session_id2 = str(
+            _nova_exec_payload2.get("session_id")
+            or _nova_exec_payload2.get("client_session_id")
+            or _nova_exec_payload2.get("conversation_id")
+            or "default"
+        ).strip() or "default"
+
+        _nova_exec_commands2 = {
+            "next": "next",
+            "nex": "next",
+            "continue": "next",
+            "continue on": "next",
+            "keep going": "next",
+            "go": "next",
+            "run next": "next",
+            "next step": "next",
+            "run step": "next",
+            "run_step": "next",
+            "run all": "run_all",
+            "run_all": "run_all",
+            "run it": "run_all",
+            "execute": "run_all",
+            "execute all": "run_all",
+            "auto": "run_all",
+            "auto mode": "run_all",
+            "autopilot": "run_all",
+            "retry": "retry",
+            "retry failed": "retry",
+            "retry_failed": "retry",
+            "try again": "retry",
+            "rerun failed": "retry",
+            "stop": "cancel",
+            "cancel": "cancel",
+        }
+
+        if _nova_exec_clean2 in _nova_exec_commands2:
+            _nova_exec_action2 = _nova_exec_commands2[_nova_exec_clean2]
+
+            if _nova_exec_action2 == "run_all":
+                _nova_exec_state2 = chat_execution_service.run_all(_nova_exec_session_id2)
+            elif _nova_exec_action2 == "cancel":
+                _nova_exec_state2 = chat_execution_service.cancel(_nova_exec_session_id2)
+            else:
+                _nova_exec_state2 = chat_execution_service.advance(_nova_exec_session_id2)
+
+            # NOVA_EXECUTION_GUARD_INLINE_FORMATTER_20260611
+            _nova_exec_status2 = str(_nova_exec_state2.get("status") or "").strip().lower()
+            _nova_exec_goal2 = str(_nova_exec_state2.get("goal") or "").strip()
+            _nova_exec_error2 = str(_nova_exec_state2.get("error") or "").strip()
+            _nova_exec_steps2 = _nova_exec_state2.get("steps") or []
+            _nova_exec_current2 = str(_nova_exec_state2.get("current_step") or "").strip()
+            _nova_exec_index2 = int(_nova_exec_state2.get("current_index") or 0)
+
+            if _nova_exec_status2 in {"idle", "none", ""}:
+                _nova_exec_reply2 = _nova_exec_error2 or "No active execution mission. Start one with: auto-plan <goal>"
+            elif _nova_exec_status2 in {"complete", "completed"}:
+                if _nova_exec_goal2:
+                    _nova_exec_reply2 = "Execution complete: " + _nova_exec_goal2
+                else:
+                    _nova_exec_reply2 = "Execution complete."
+            elif _nova_exec_status2 in {"failed", "error"}:
+                _nova_exec_reply2 = _nova_exec_error2 or "Execution failed."
+            else:
+                _nova_exec_total2 = len(_nova_exec_steps2)
+                _nova_exec_step_num2 = min(_nova_exec_index2 + 1, _nova_exec_total2) if _nova_exec_total2 else 1
+                if not _nova_exec_current2 and _nova_exec_steps2:
+                    _nova_exec_current2 = str(_nova_exec_steps2[_nova_exec_index2] if _nova_exec_index2 < _nova_exec_total2 else _nova_exec_steps2[-1])
+                _nova_exec_reply2 = (
+                    "Execution waiting. "
+                    + "Step "
+                    + str(_nova_exec_step_num2)
+                    + "/"
+                    + str(_nova_exec_total2 or "?")
+                    + ": "
+                    + (_nova_exec_current2 or "Next step")
+                )
+
+            return jsonify({
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": _nova_exec_reply2,
+                    "content": _nova_exec_reply2,
+                },
+                "execution_state": _nova_exec_state2,
+                "debug": {
+                    "route": "execution_command_top_guard",
+                    "command": _nova_exec_clean2,
+                    "action": _nova_exec_action2,
+                    "session_id": _nova_exec_session_id2,
+                },
+            })
+    except Exception as exc:
+        return jsonify({
+            "ok": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": "Execution command guard failed: " + str(exc),
+                "content": "Execution command guard failed: " + str(exc),
+            },
+            "execution_state": {
+                "status": "failed",
+                "error": str(exc),
+            },
+            "debug": {
+                "route": "execution_command_top_guard_failed",
+            },
+        })
+
     data = request_json()
     session_id = str(data.get("session_id") or "").strip()
     pinned = bool(data.get("pinned"))
@@ -5973,6 +6578,127 @@ def api_sessions_pin():
 
 @app.post("/api/sessions/delete")
 def api_sessions_delete():
+    # NOVA_EXECUTION_COMMAND_TOP_GUARD_20260611
+    # Explicit execution controls must beat web/news/search routing.
+    try:
+        _nova_exec_payload2 = request.get_json(silent=True) or {}
+        _nova_exec_text2 = str(
+            _nova_exec_payload2.get("user_text")
+            or _nova_exec_payload2.get("text")
+            or _nova_exec_payload2.get("message")
+            or ""
+        ).strip()
+        _nova_exec_clean2 = " ".join(_nova_exec_text2.lower().split())
+
+        _nova_exec_session_id2 = str(
+            _nova_exec_payload2.get("session_id")
+            or _nova_exec_payload2.get("client_session_id")
+            or _nova_exec_payload2.get("conversation_id")
+            or "default"
+        ).strip() or "default"
+
+        _nova_exec_commands2 = {
+            "next": "next",
+            "nex": "next",
+            "continue": "next",
+            "continue on": "next",
+            "keep going": "next",
+            "go": "next",
+            "run next": "next",
+            "next step": "next",
+            "run step": "next",
+            "run_step": "next",
+            "run all": "run_all",
+            "run_all": "run_all",
+            "run it": "run_all",
+            "execute": "run_all",
+            "execute all": "run_all",
+            "auto": "run_all",
+            "auto mode": "run_all",
+            "autopilot": "run_all",
+            "retry": "retry",
+            "retry failed": "retry",
+            "retry_failed": "retry",
+            "try again": "retry",
+            "rerun failed": "retry",
+            "stop": "cancel",
+            "cancel": "cancel",
+        }
+
+        if _nova_exec_clean2 in _nova_exec_commands2:
+            _nova_exec_action2 = _nova_exec_commands2[_nova_exec_clean2]
+
+            if _nova_exec_action2 == "run_all":
+                _nova_exec_state2 = chat_execution_service.run_all(_nova_exec_session_id2)
+            elif _nova_exec_action2 == "cancel":
+                _nova_exec_state2 = chat_execution_service.cancel(_nova_exec_session_id2)
+            else:
+                _nova_exec_state2 = chat_execution_service.advance(_nova_exec_session_id2)
+
+            # NOVA_EXECUTION_GUARD_INLINE_FORMATTER_20260611
+            _nova_exec_status2 = str(_nova_exec_state2.get("status") or "").strip().lower()
+            _nova_exec_goal2 = str(_nova_exec_state2.get("goal") or "").strip()
+            _nova_exec_error2 = str(_nova_exec_state2.get("error") or "").strip()
+            _nova_exec_steps2 = _nova_exec_state2.get("steps") or []
+            _nova_exec_current2 = str(_nova_exec_state2.get("current_step") or "").strip()
+            _nova_exec_index2 = int(_nova_exec_state2.get("current_index") or 0)
+
+            if _nova_exec_status2 in {"idle", "none", ""}:
+                _nova_exec_reply2 = _nova_exec_error2 or "No active execution mission. Start one with: auto-plan <goal>"
+            elif _nova_exec_status2 in {"complete", "completed"}:
+                if _nova_exec_goal2:
+                    _nova_exec_reply2 = "Execution complete: " + _nova_exec_goal2
+                else:
+                    _nova_exec_reply2 = "Execution complete."
+            elif _nova_exec_status2 in {"failed", "error"}:
+                _nova_exec_reply2 = _nova_exec_error2 or "Execution failed."
+            else:
+                _nova_exec_total2 = len(_nova_exec_steps2)
+                _nova_exec_step_num2 = min(_nova_exec_index2 + 1, _nova_exec_total2) if _nova_exec_total2 else 1
+                if not _nova_exec_current2 and _nova_exec_steps2:
+                    _nova_exec_current2 = str(_nova_exec_steps2[_nova_exec_index2] if _nova_exec_index2 < _nova_exec_total2 else _nova_exec_steps2[-1])
+                _nova_exec_reply2 = (
+                    "Execution waiting. "
+                    + "Step "
+                    + str(_nova_exec_step_num2)
+                    + "/"
+                    + str(_nova_exec_total2 or "?")
+                    + ": "
+                    + (_nova_exec_current2 or "Next step")
+                )
+
+            return jsonify({
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": _nova_exec_reply2,
+                    "content": _nova_exec_reply2,
+                },
+                "execution_state": _nova_exec_state2,
+                "debug": {
+                    "route": "execution_command_top_guard",
+                    "command": _nova_exec_clean2,
+                    "action": _nova_exec_action2,
+                    "session_id": _nova_exec_session_id2,
+                },
+            })
+    except Exception as exc:
+        return jsonify({
+            "ok": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": "Execution command guard failed: " + str(exc),
+                "content": "Execution command guard failed: " + str(exc),
+            },
+            "execution_state": {
+                "status": "failed",
+                "error": str(exc),
+            },
+            "debug": {
+                "route": "execution_command_top_guard_failed",
+            },
+        })
+
     data = request_json()
     session_id = str(data.get("session_id") or "").strip()
 
@@ -6298,6 +7024,127 @@ def api_web_fetch():
 
 @app.post("/api/recon/analyze")
 def api_recon_analyze():
+    # NOVA_EXECUTION_COMMAND_TOP_GUARD_20260611
+    # Explicit execution controls must beat web/news/search routing.
+    try:
+        _nova_exec_payload2 = request.get_json(silent=True) or {}
+        _nova_exec_text2 = str(
+            _nova_exec_payload2.get("user_text")
+            or _nova_exec_payload2.get("text")
+            or _nova_exec_payload2.get("message")
+            or ""
+        ).strip()
+        _nova_exec_clean2 = " ".join(_nova_exec_text2.lower().split())
+
+        _nova_exec_session_id2 = str(
+            _nova_exec_payload2.get("session_id")
+            or _nova_exec_payload2.get("client_session_id")
+            or _nova_exec_payload2.get("conversation_id")
+            or "default"
+        ).strip() or "default"
+
+        _nova_exec_commands2 = {
+            "next": "next",
+            "nex": "next",
+            "continue": "next",
+            "continue on": "next",
+            "keep going": "next",
+            "go": "next",
+            "run next": "next",
+            "next step": "next",
+            "run step": "next",
+            "run_step": "next",
+            "run all": "run_all",
+            "run_all": "run_all",
+            "run it": "run_all",
+            "execute": "run_all",
+            "execute all": "run_all",
+            "auto": "run_all",
+            "auto mode": "run_all",
+            "autopilot": "run_all",
+            "retry": "retry",
+            "retry failed": "retry",
+            "retry_failed": "retry",
+            "try again": "retry",
+            "rerun failed": "retry",
+            "stop": "cancel",
+            "cancel": "cancel",
+        }
+
+        if _nova_exec_clean2 in _nova_exec_commands2:
+            _nova_exec_action2 = _nova_exec_commands2[_nova_exec_clean2]
+
+            if _nova_exec_action2 == "run_all":
+                _nova_exec_state2 = chat_execution_service.run_all(_nova_exec_session_id2)
+            elif _nova_exec_action2 == "cancel":
+                _nova_exec_state2 = chat_execution_service.cancel(_nova_exec_session_id2)
+            else:
+                _nova_exec_state2 = chat_execution_service.advance(_nova_exec_session_id2)
+
+            # NOVA_EXECUTION_GUARD_INLINE_FORMATTER_20260611
+            _nova_exec_status2 = str(_nova_exec_state2.get("status") or "").strip().lower()
+            _nova_exec_goal2 = str(_nova_exec_state2.get("goal") or "").strip()
+            _nova_exec_error2 = str(_nova_exec_state2.get("error") or "").strip()
+            _nova_exec_steps2 = _nova_exec_state2.get("steps") or []
+            _nova_exec_current2 = str(_nova_exec_state2.get("current_step") or "").strip()
+            _nova_exec_index2 = int(_nova_exec_state2.get("current_index") or 0)
+
+            if _nova_exec_status2 in {"idle", "none", ""}:
+                _nova_exec_reply2 = _nova_exec_error2 or "No active execution mission. Start one with: auto-plan <goal>"
+            elif _nova_exec_status2 in {"complete", "completed"}:
+                if _nova_exec_goal2:
+                    _nova_exec_reply2 = "Execution complete: " + _nova_exec_goal2
+                else:
+                    _nova_exec_reply2 = "Execution complete."
+            elif _nova_exec_status2 in {"failed", "error"}:
+                _nova_exec_reply2 = _nova_exec_error2 or "Execution failed."
+            else:
+                _nova_exec_total2 = len(_nova_exec_steps2)
+                _nova_exec_step_num2 = min(_nova_exec_index2 + 1, _nova_exec_total2) if _nova_exec_total2 else 1
+                if not _nova_exec_current2 and _nova_exec_steps2:
+                    _nova_exec_current2 = str(_nova_exec_steps2[_nova_exec_index2] if _nova_exec_index2 < _nova_exec_total2 else _nova_exec_steps2[-1])
+                _nova_exec_reply2 = (
+                    "Execution waiting. "
+                    + "Step "
+                    + str(_nova_exec_step_num2)
+                    + "/"
+                    + str(_nova_exec_total2 or "?")
+                    + ": "
+                    + (_nova_exec_current2 or "Next step")
+                )
+
+            return jsonify({
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": _nova_exec_reply2,
+                    "content": _nova_exec_reply2,
+                },
+                "execution_state": _nova_exec_state2,
+                "debug": {
+                    "route": "execution_command_top_guard",
+                    "command": _nova_exec_clean2,
+                    "action": _nova_exec_action2,
+                    "session_id": _nova_exec_session_id2,
+                },
+            })
+    except Exception as exc:
+        return jsonify({
+            "ok": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": "Execution command guard failed: " + str(exc),
+                "content": "Execution command guard failed: " + str(exc),
+            },
+            "execution_state": {
+                "status": "failed",
+                "error": str(exc),
+            },
+            "debug": {
+                "route": "execution_command_top_guard_failed",
+            },
+        })
+
     data = request_json()
     url = str(data.get("url") or "").strip()
 
@@ -9742,6 +10589,48 @@ def nova_help_page_20260611():
 def nova_blog_page_20260611():
     return render_template("blog.html")
 
+
+# NOVA_CHAT_STREAM_SSE_BRIDGE_20260611
+@app.route("/api/chat/stream", methods=["POST"])
+def nova_chat_stream_post_bridge_20260611():
+    # Desktop/mobile clients may try stream first.
+    # Return text/event-stream so stream clients do not collapse the answer to "Done."
+    import json
+
+    response = api_chat()
+
+    try:
+        payload = response.get_json(silent=True) or {}
+    except Exception:
+        payload = {}
+
+    assistant = payload.get("assistant_message") or {}
+    text = (
+        assistant.get("text")
+        or assistant.get("content")
+        or payload.get("text")
+        or payload.get("content")
+        or "Done."
+    )
+
+    def generate():
+        yield "data: " + json.dumps({
+            "type": "message",
+            "text": text,
+            "content": text,
+            "assistant_message": {
+                "role": "assistant",
+                "text": text,
+                "content": text,
+            },
+            "payload": payload,
+        }) + "\n\n"
+        yield "data: " + json.dumps({
+            "type": "done",
+            "done": True,
+        }) + "\n\n"
+
+    return Response(generate(), mimetype="text/event-stream")
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
@@ -9749,6 +10638,10 @@ if __name__ == "__main__":
         port=5001,
         debug=True,
     )
+
+
+
+
 
 
 

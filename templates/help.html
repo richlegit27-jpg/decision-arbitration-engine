@@ -1,0 +1,232 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Nova Help</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #0b0f19;
+            --panel: #111827;
+            --panel2: #172033;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+            --line: rgba(255,255,255,.12);
+            --accent: #8b5cf6;
+        }
+
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.45;
+        }
+
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 16px;
+            background: rgba(11, 15, 25, .94);
+            border-bottom: 1px solid var(--line);
+            backdrop-filter: blur(12px);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 18px;
+        }
+
+        header a {
+            color: var(--text);
+            text-decoration: none;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 8px 11px;
+            background: rgba(255,255,255,.06);
+            font-size: 13px;
+        }
+
+        main {
+            max-width: 920px;
+            margin: 0 auto;
+            padding: 18px 14px 80px;
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            padding: 16px;
+            margin: 12px 0;
+        }
+
+        h2 {
+            margin: 0 0 10px;
+            font-size: 17px;
+            color: #ffffff;
+        }
+
+        p {
+            margin: 8px 0;
+            color: var(--muted);
+        }
+
+        code, .cmd {
+            display: inline-block;
+            font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+            background: var(--panel2);
+            color: #e9d5ff;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 2px 6px;
+            margin: 2px 0;
+        }
+
+        ul {
+            margin: 8px 0 0;
+            padding-left: 20px;
+        }
+
+        li {
+            margin: 6px 0;
+            color: var(--muted);
+        }
+
+        strong {
+            color: var(--text);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 12px;
+        }
+
+        .pill {
+            display: inline-block;
+            margin: 3px 4px 3px 0;
+            padding: 5px 8px;
+            border-radius: 999px;
+            background: rgba(139, 92, 246, .16);
+            border: 1px solid rgba(139, 92, 246, .35);
+            color: #ddd6fe;
+            font-size: 12px;
+        }
+
+        .warning {
+            border-color: rgba(251, 191, 36, .35);
+            background: rgba(251, 191, 36, .08);
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1>Nova Help</h1>
+    <nav>
+        <a href="/mobile">Mobile</a>
+        <a href="/">Desktop</a>
+        <a href="/logout">Logout</a>
+    </nav>
+</header>
+
+<main>
+    <div class="card">
+        <h2>What Nova is</h2>
+        <p>Nova is your local AI workspace. It can chat, remember project context, manage sessions, analyze uploads, help with coding, and run simple execution missions through auto-plan.</p>
+    </div>
+
+    <div class="grid">
+        <section class="card">
+            <h2>Chat</h2>
+            <ul>
+                <li>Type a message and press <strong>Enter</strong> or tap <strong>Send</strong>.</li>
+                <li>Use <span class="cmd">k</span>, <span class="cmd">ok</span>, <span class="cmd">next</span>, or <span class="cmd">continue</span> when Nova is waiting for the next step.</li>
+                <li>Use <span class="cmd">summarize this</span> to get a short summary of the current context.</li>
+            </ul>
+        </section>
+
+        <section class="card">
+            <h2>Uploads / Images</h2>
+            <ul>
+                <li>Tap <strong>Attach</strong> to upload an image or file.</li>
+                <li>Ask <span class="cmd">what is this image</span> after attaching an image.</li>
+                <li>Ask <span class="cmd">summarize this file</span> after attaching a document.</li>
+                <li>If the answer says only “Attachment received,” the attachment reached the chat but analysis routing may need checking.</li>
+            </ul>
+        </section>
+
+        <section class="card">
+            <h2>Sessions</h2>
+            <ul>
+                <li><strong>New</strong> starts a fresh chat.</li>
+                <li><strong>Sessions</strong> opens saved chats.</li>
+                <li>Sessions are scoped to the logged-in local user.</li>
+                <li>Duplicate empty sessions are pruned automatically.</li>
+            </ul>
+        </section>
+
+        <section class="card">
+            <h2>Memory</h2>
+            <ul>
+                <li><strong>Memory</strong> shows saved project/context items.</li>
+                <li>Memory is used to remember project focus, blockers, active files, and recent state.</li>
+                <li>Direct endpoint: <span class="cmd">/api/memory</span></li>
+            </ul>
+        </section>
+
+        <section class="card">
+            <h2>Tools / Execution</h2>
+            <ul>
+                <li>Start a mission with <span class="cmd">auto-plan &lt;goal&gt;</span>.</li>
+                <li>Example: <span class="cmd">auto-plan build a simple password generator</span></li>
+                <li>Advance one step with <span class="cmd">next</span> or <span class="cmd">run step</span>.</li>
+                <li>Run the whole mission with <span class="cmd">run all</span>.</li>
+                <li>Cancel with <span class="cmd">cancel</span> or <span class="cmd">stop</span>.</li>
+            </ul>
+        </section>
+
+        <section class="card">
+            <h2>Quick buttons</h2>
+            <ul>
+                <li><strong>Go</strong> means continue from where we left off.</li>
+                <li><strong>Sum</strong> means summarize the current situation.</li>
+                <li><strong>Fix</strong> means improve/clean up the current thing.</li>
+                <li><strong>Next</strong> means move to the next step.</li>
+            </ul>
+        </section>
+
+        <section class="card">
+            <h2>Login</h2>
+            <ul>
+                <li>Local username: <span class="cmd">richard</span></li>
+                <li>Use <span class="cmd">/login</span> to sign in.</li>
+                <li>Use <span class="cmd">/logout</span> to sign out.</li>
+            </ul>
+        </section>
+
+        <section class="card">
+            <h2>Useful URLs</h2>
+            <ul>
+                <li><span class="cmd">/</span> desktop page</li>
+                <li><span class="cmd">/mobile</span> phone/mobile page</li>
+                <li><span class="cmd">/help</span> this help page</li>
+                <li><span class="cmd">/api/health</span> backend health</li>
+                <li><span class="cmd">/api/backend/readiness</span> readiness score</li>
+            </ul>
+        </section>
+    </div>
+
+    <div class="card warning">
+        <h2>Known note</h2>
+        <p>If <span class="cmd">run all</span> returns web/news results, execution command routing is being stolen by the web route. That is a routing priority bug, not a user error.</p>
+    </div>
+</main>
+</body>
+</html>
