@@ -11875,3 +11875,56 @@ main {
     max-height: 58px !important;
     z-index: 2147483645 !important;
 }
+
+/* NOVA_MOBILE_AUTH_OVERLAY_FIX_20260610
+   Keep auth/login state from covering mobile top-right controls. */
+@media (max-width: 900px) {
+    #nova-mobile-auth-chip,
+    #nova-mobile-auth-status,
+    #nova-mobile-auth-bar,
+    #nova-mobile-user-chip,
+    #nova-mobile-logout,
+    .nova-mobile-auth-chip,
+    .nova-mobile-auth-status,
+    .nova-mobile-auth-bar,
+    .nova-mobile-user-chip,
+    .nova-mobile-logout,
+    [data-nova-mobile-auth],
+    [data-nova-auth-chip],
+    [data-nova-logout] {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+    }
+
+    .mobile-header,
+    .nova-mobile-header,
+    #nova-mobile-header,
+    .mobile-topbar,
+    .nova-mobile-topbar,
+    #nova-mobile-topbar {
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 2147483000 !important;
+        pointer-events: auto !important;
+    }
+
+    .mobile-header button,
+    .nova-mobile-header button,
+    #nova-mobile-header button,
+    .mobile-topbar button,
+    .nova-mobile-topbar button,
+    #nova-mobile-topbar button,
+    #mobileNewChat,
+    #mobileCopyButton,
+    #mobileSessionsButton,
+    #nova-mobile-new-chat,
+    #nova-mobile-copy,
+    #nova-mobile-sessions {
+        display: inline-flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        z-index: 2147483001 !important;
+    }
+}
