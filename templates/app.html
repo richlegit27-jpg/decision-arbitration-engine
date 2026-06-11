@@ -795,6 +795,54 @@ body {
 }
 </style>
 
+
+<style>
+/* NOVA_DESKTOP_AUTH_WIDGET_20260611 */
+.nova-auth-widget {
+    position: fixed;
+    top: 12px;
+    right: 14px;
+    z-index: 2147483000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border: 1px solid rgba(168, 85, 247, 0.35);
+    border-radius: 999px;
+    background: rgba(16, 16, 24, 0.82);
+    color: #f5f3ff;
+    font-size: 12px;
+    line-height: 1;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    backdrop-filter: blur(12px);
+}
+
+.nova-auth-widget a,
+.nova-auth-widget button {
+    color: #f5f3ff;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    padding: 5px 8px;
+    text-decoration: none;
+    font: inherit;
+    cursor: pointer;
+}
+
+.nova-auth-widget a:hover,
+.nova-auth-widget button:hover {
+    background: rgba(168, 85, 247, 0.30);
+}
+
+.nova-auth-widget .nova-auth-user {
+    opacity: 0.9;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+</style>
+
 </head>
 <body>
   <div class="shell">
@@ -3491,6 +3539,115 @@ main,
 <script>
   console.log("[Nova Desktop Button Animation Safe] ready");
 </script>
+
+<script>
+/* NOVA_DESKTOP_AUTH_WIDGET_20260611 */
+(function () {
+    "use strict";
+
+    function ensureAuthWidget() {
+        var existing = document.getElementById("nova-desktop-auth-widget");
+        if (existing) return existing;
+
+        var widget = document.createElement("div");
+        widget.id = "nova-desktop-auth-widget";
+        widget.className = "nova-auth-widget";
+        widget.innerHTML = '<span class="nova-auth-user">Checking account...</span>';
+        document.body.appendChild(widget);
+        return widget;
+    }
+
+    function userLabel(user) {
+        if (!user) return "Guest";
+        return user.username || user.email || user.id || "Signed in";
+    }
+
+    function renderAuthWidget(data) {
+        var widget = ensureAuthWidget();
+        var authenticated = !!(data && data.authenticated);
+        var user = data && data.user;
+
+        window.NovaAuth = {
+            authenticated: authenticated,
+            user: user || null,
+            checked_at: new Date().toISOString()
+        };
+
+        if (authenticated) {
+            widget.innerHTML = [
+                '<span class="nova-auth-user">Account: ',
+                escapeHtml(userLabel(user)),
+                '</span>',
+                '<button type="button" id="nova-desktop-logout-btn">Logout</button>'
+            ].join("");
+
+            var logout = document.getElementById("nova-desktop-logout-btn");
+            if (logout) {
+                logout.addEventListener("click", async function () {
+                    logout.disabled = true;
+                    logout.textContent = "Logging out...";
+                    try {
+                        await fetch("/api/auth/logout", {
+                            method: "POST",
+                            headers: { "Accept": "application/json" },
+                            credentials: "same-origin"
+                        });
+                    } catch (error) {
+                        console.warn("[Nova Auth] logout failed", error);
+                    }
+                    window.NovaAuth = {
+                        authenticated: false,
+                        user: null,
+                        checked_at: new Date().toISOString()
+                    };
+                    refreshAuthStatus();
+                });
+            }
+        } else {
+            widget.innerHTML = [
+                '<span class="nova-auth-user">Guest</span>',
+                '<a href="/login">Login</a>',
+                '<a href="/register">Register</a>'
+            ].join("");
+        }
+    }
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    async function refreshAuthStatus() {
+        try {
+            var response = await fetch("/api/auth/status", {
+                headers: { "Accept": "application/json" },
+                credentials: "same-origin",
+                cache: "no-store"
+            });
+            var data = await response.json();
+            renderAuthWidget(data || {});
+        } catch (error) {
+            console.warn("[Nova Auth] status failed", error);
+            renderAuthWidget({ authenticated: false, user: null });
+        }
+    }
+
+    window.NovaRefreshAuthStatus = refreshAuthStatus;
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", refreshAuthStatus);
+    } else {
+        refreshAuthStatus();
+    }
+
+    setInterval(refreshAuthStatus, 60000);
+})();
+</script>
+
 </body>
 </html>
 
