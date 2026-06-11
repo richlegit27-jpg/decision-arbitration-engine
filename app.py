@@ -9730,6 +9730,18 @@ def _nova_install_attachment_shape_normalizer_20260610():
 _nova_install_attachment_shape_normalizer_20260610()
 
 
+
+# NOVA_HELP_PAGE_ROUTE_20260611
+@app.route("/help")
+def nova_help_page_20260611():
+    return render_template("help.html")
+
+
+# NOVA_BLOG_PAGE_ROUTE_20260611
+@app.route("/blog")
+def nova_blog_page_20260611():
+    return render_template("blog.html")
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
@@ -9737,6 +9749,8 @@ if __name__ == "__main__":
         port=5001,
         debug=True,
     )
+
+
 
 
 
