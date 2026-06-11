@@ -10770,9 +10770,10 @@ def nova_before_request_explicit_memory_guard_20260611():
         clean_lc = clean.lower()
         kind = "fact"
 
+        # NOVA_MEMORY_KIND_GENERAL_FAVORITE_20260611
         if (
-            "favorite color" in clean_lc
-            or "favourite color" in clean_lc
+            "favorite " in clean_lc
+            or "favourite " in clean_lc
             or "prefer" in clean_lc
             or "from now on" in clean_lc
             or "always" in clean_lc
