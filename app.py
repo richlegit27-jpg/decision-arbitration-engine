@@ -10154,6 +10154,12 @@ def nova_slim_api_sessions_payload_20260611(response):
         if not isinstance(payload, dict):
             return response
 
+        # NOVA_SKIP_AFTER_REQUEST_FOR_SLIM_SESSIONS_20260611
+        # The before_request slim sessions route already returns the final payload.
+        # Do not re-slim it here, because this old hook can collapse sessions to [].
+        if payload.get("slim_sessions_payload") is True and payload.get("debug", {}).get("route_taken") == "slim_sessions_payload":
+            return response
+
         # The sessions drawer does not need full artifact records.
         # Full artifact/gallery APIs can serve those separately.
         if "artifacts" in payload:
