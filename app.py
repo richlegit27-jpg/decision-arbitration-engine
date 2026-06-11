@@ -600,6 +600,103 @@ def api_state():
     )
 
 
+
+
+# NOVA_API_CHAT_EARLY_EXPLICIT_MEMORY_GUARD_LIVE_ANCHOR_20260611
+def _nova_api_chat_extract_explicit_memory_live_20260611(user_text):
+    raw = str(user_text or "").strip()
+    lowered = raw.lower().strip()
+
+    prefixes = (
+        "remember that ",
+        "remember this ",
+        "remember ",
+        "save that ",
+        "save this ",
+        "store that ",
+        "store this ",
+        "note that ",
+        "memorize that ",
+        "add to memory that ",
+        "add this to memory ",
+    )
+
+    for prefix in prefixes:
+        if lowered.startswith(prefix):
+            return raw[len(prefix):].strip(" .\n\r\t")
+
+    return ""
+
+
+def _nova_api_chat_memory_kind_live_20260611(clean):
+    lowered = str(clean or "").lower()
+
+    if (
+        "favorite color" in lowered
+        or "favourite color" in lowered
+        or "prefer" in lowered
+        or "from now on" in lowered
+        or "always" in lowered
+        or "call me" in lowered
+        or "my name is" in lowered
+    ):
+        return "preference"
+
+    return "fact"
+
+
+def _nova_api_chat_memory_response_live_20260611(raw_user_text, session_id, clean):
+    assistant_text = f"Saved to memory: {clean}"
+
+    user_msg = {
+        "role": "user",
+        "text": raw_user_text,
+        "attachments": [],
+        "meta": {},
+    }
+
+    assistant_msg = {
+        "role": "assistant",
+        "text": assistant_text,
+        "attachments": [],
+        "memory_used": [],
+        "meta": {
+            "mode": "explicit_memory_command",
+            "route": "memory_save",
+            "save_memory": True,
+            "use_memory": True,
+            "early_api_guard": True,
+        },
+    }
+
+    try:
+        session_service.add_message(session_id, user_msg)
+        session_service.add_message(session_id, assistant_msg)
+    except Exception:
+        pass
+
+    return {
+        "ok": True,
+        "active_session_id": session_id,
+        "assistant_message": assistant_msg,
+        "attachment_debug": {
+            "requested_session_id": session_id,
+            "active_session_id": session_id,
+            "session_attachments_count": 0,
+        },
+        "debug": {
+            "route": "api_chat_early_explicit_memory_guard",
+            "route_taken": "memory_save",
+        },
+        "runtime": {},
+        "session": session_service.get_session(session_id) or {
+            "id": session_id,
+            "messages": [user_msg, assistant_msg],
+        },
+        "session_attachments": [],
+    }
+
+
 # -----------------------
 # CHAT
 # -----------------------
@@ -5437,6 +5534,35 @@ def api_chat():
                 "[ImageAttachmentPreHandle] failed; falling through to chat_service.handle: %s",
                 _image_attachment_prehandle_error,
             )
+
+        # NOVA_API_CHAT_EARLY_EXPLICIT_MEMORY_GUARD_LIVE_ANCHOR_20260611_CALL
+        try:
+            _nova_raw_user_text = str(
+                data.get("user_text")
+                or data.get("text")
+                or data.get("message")
+                or user_text
+                or ""
+            ).strip()
+            _nova_explicit_memory_text = _nova_api_chat_extract_explicit_memory_live_20260611(_nova_raw_user_text)
+
+            if _nova_explicit_memory_text:
+                memory_service.add_memory({
+                    "text": _nova_explicit_memory_text,
+                    "kind": _nova_api_chat_memory_kind_live_20260611(_nova_explicit_memory_text),
+                    "source": "explicit_memory_command_clean",
+                    "session_id": session_id or "",
+                })
+
+                return jsonify(
+                    _nova_api_chat_memory_response_live_20260611(
+                        raw_user_text=_nova_raw_user_text,
+                        session_id=session_id,
+                        clean=_nova_explicit_memory_text,
+                    )
+                )
+        except Exception as _nova_early_memory_error:
+            app.logger.warning("[api_chat early explicit memory guard live] failed: %s", _nova_early_memory_error)
 
         app.logger.info(
             "[api_chat] calling chat_service.handle session_id=%s attachments_count=%s",
