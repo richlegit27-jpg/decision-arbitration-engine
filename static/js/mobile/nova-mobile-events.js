@@ -240,7 +240,7 @@
             text: "Summarize the current situation in plain English and tell me what matters most."
         },
         {
-            label: "Improve",
+            label: "Fix",
             text: "Improve this and make it cleaner, more direct, and more useful."
         },
         {
@@ -364,6 +364,11 @@
     }
 
     function installQuickPrompts() {
+        // NOVA_DISABLE_DUPLICATE_QUICK_PROMPTS_20260610
+        // Quick prompts are now owned by templates/mobile.html:
+        // Go / Sum / Fix / Next with class .mobile-quick-action.
+        // Do not inject the duplicate Cont. / Sum. / Fix / Next row.
+        return true;
         var composer = findComposer();
         if (!composer) return false;
 
@@ -412,5 +417,7 @@
         boot();
     }
 })();
+
+
 
 
