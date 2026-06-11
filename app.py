@@ -3914,6 +3914,23 @@ def api_chat():
     requested_session_id = str(data.get("session_id") or "").strip()
     session_id = requested_session_id
 
+    # NOVA_EMPTY_SESSION_CREATE_GUARD_EXACT_20260610
+    # Normalize attachments before session creation so blank frontend pings do not create stored sessions.
+    attachments = normalize_attachments(data.get("attachments"))
+    if not user_text and not attachments:
+        return jsonify({
+            "ok": True,
+            "session_id": session_id,
+            "active_session_id": session_id,
+            "assistant_message": {
+                "role": "assistant",
+                "text": "",
+            },
+            "text": "",
+            "empty_request": True,
+            "no_session_created": True,
+        })
+
     # MOBILE_SESSION_FORCE_LOCK_20260606
     # Honor mobile-provided session ids instead of letting backend drift to random session_* ids.
     if requested_session_id:
@@ -3933,7 +3950,6 @@ def api_chat():
     except Exception:
         app.logger.exception("[api_chat] failed to force active mobile session id")
 
-    attachments = normalize_attachments(data.get("attachments"))
 
     attachments = normalize_attachments(request.json.get("attachments", []))
 
