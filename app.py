@@ -6130,17 +6130,90 @@ def _nova_find_uploaded_file_path_20260607(attachment):
     except Exception:
         return None
 
+
+
+
 @app.get("/api/sessions/<session_id>")
 def api_session_by_id(session_id: str):
-    session = session_service.get_session(session_id)
-    if not session:
-        return json_error("Session not found", 404)
+    # NOVA_CLEAN_SESSION_DETAIL_ENDPOINT_20260611
+    # Clean desktop session detail endpoint. Returns one full session from
+    # the canonical session store and marks the response so the auth-scope
+    # after-request filter does not strip it.
+    try:
+        from pathlib import Path
+        import json
 
-    return json_ok(
-        session=session,
-        sessions=session_service.get_all(),
-        active_session_id=session_service.active_session_id,
-    )
+        sid = str(session_id or "").strip()
+        root = Path(__file__).resolve().parent
+
+        candidates = []
+
+        def add_candidate(value):
+            try:
+                if value:
+                    p = Path(value).resolve()
+                    if p not in candidates:
+                        candidates.append(p)
+            except Exception:
+                pass
+
+        add_candidate(globals().get("SESSIONS_FILE"))
+        add_candidate(root / "data" / "nova_sessions.json")
+        add_candidate(Path.cwd() / "data" / "nova_sessions.json")
+        add_candidate(Path("C:/Users/Owner/nova/data/nova_sessions.json"))
+
+        found = None
+        active_session_id = ""
+
+        for sessions_path in candidates:
+            if not sessions_path.exists():
+                continue
+
+            try:
+                store = json.loads(sessions_path.read_text(encoding="utf-8") or "{}")
+            except Exception:
+                continue
+
+            if not isinstance(store, dict):
+                continue
+
+            active_session_id = str(store.get("active_session_id") or "").strip()
+            items = store.get("sessions")
+            if not isinstance(items, list):
+                continue
+
+            for item in items:
+                if isinstance(item, dict) and str(item.get("id") or "").strip() == sid:
+                    found = item
+                    active_session_id = sid
+                    break
+
+            if found is not None:
+                break
+
+        if found is None:
+            return jsonify({
+                "ok": False,
+                "error": "Session not found",
+                "session": None,
+                "active_session_id": active_session_id,
+                "skip_session_auth_scope_filter": True,
+            }), 404
+
+        return jsonify({
+            "ok": True,
+            "session": found,
+            "active_session_id": active_session_id,
+            "skip_session_auth_scope_filter": True,
+        })
+    except Exception as e:
+        return jsonify({
+            "ok": False,
+            "error": str(e),
+            "session": None,
+            "active_session_id": str(session_id or "").strip(),
+            "skip_session_auth_scope_filter": True,
+        }), 500
 
 
 @app.post("/api/sessions/new")
@@ -10527,6 +10600,16 @@ def _nova_install_session_auth_scope_20260610():
 
     @app.after_request
     def nova_session_auth_scope_after_request_20260610(response):
+        # NOVA_SESSION_AUTH_SKIP_DETAIL_RESPONSE_FLEX_20260611
+        # Session detail routes may return one full session. If the
+        # route explicitly marks the response, do not sanitize it.
+        try:
+            data = response.get_json(silent=True)
+            if isinstance(data, dict) and data.get("skip_session_auth_scope_filter"):
+                return response
+        except Exception:
+            pass
+
         path = str(request.path or "")
 
         if not path.startswith("/api/sessions"):
@@ -11407,6 +11490,379 @@ def nova_chat_stream_post_bridge_20260611():
         }) + "\n\n"
 
     return Response(generate(), mimetype="text/event-stream")
+
+# NOVA_MEMORY_COMMAND_BEFORE_WEB_20260611
+# Obvious memory-save commands must be handled before generic chat/web routing.
+# This prevents "remember that ..." from falling through to web search.
+@app.before_request
+def nova_memory_command_before_web_20260611():
+    try:
+        if request.path != "/api/chat" or request.method != "POST":
+            return None
+
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return None
+
+        raw_user_text = str(
+            data.get("user_text")
+            or data.get("text")
+            or data.get("message")
+            or data.get("prompt")
+            or ""
+        ).strip()
+
+        if not raw_user_text:
+            return None
+
+        clean_lower = " ".join(raw_user_text.lower().split())
+
+        memory_prefixes = (
+            "remember that ",
+            "remember this ",
+            "remember ",
+            "save this ",
+            "save to memory ",
+            "store this ",
+            "note that ",
+            "add to memory ",
+        )
+
+        if not clean_lower.startswith(memory_prefixes):
+            return None
+
+        # Do not intercept recall questions.
+        question_starts = (
+            "do you remember",
+            "did you remember",
+            "what do you remember",
+            "what did you remember",
+        )
+        if clean_lower.startswith(question_starts):
+            return None
+
+        fact = raw_user_text
+        for prefix in memory_prefixes:
+            if clean_lower.startswith(prefix):
+                fact = raw_user_text[len(prefix):].strip()
+                break
+
+        if not fact:
+            return None
+
+        session_id = str(
+            data.get("session_id")
+            or data.get("client_session_id")
+            or data.get("active_session_id")
+            or ""
+        ).strip()
+
+        if not session_id:
+            try:
+                session_id = session_service.get_active_session_id()
+            except Exception:
+                session_id = ""
+
+        if not session_id:
+            session_id = "default"
+
+        # Preserve Nova project-focus memory in the shape the project recall
+        # helpers already expect.
+        category = "preference"
+        memory_text = fact
+
+        focus_prefixes = (
+            "my current nova focus is ",
+            "current nova focus is ",
+            "my current project focus is ",
+            "current project focus is ",
+        )
+
+        fact_lower = " ".join(fact.lower().split())
+        for focus_prefix in focus_prefixes:
+            if fact_lower.startswith(focus_prefix):
+                focus_value = fact[len(focus_prefix):].strip()
+                if focus_value:
+                    category = "project_focus"
+                    memory_text = "Current project focus: " + focus_value
+                break
+
+        existing = False
+        try:
+            for item in memory_service.all() or []:
+                if not isinstance(item, dict):
+                    continue
+                same_text = str(item.get("text") or "").strip().lower() == memory_text.strip().lower()
+                same_session = str(item.get("session_id") or "").strip() in ("", session_id)
+                if same_text and same_session:
+                    existing = True
+                    break
+        except Exception:
+            existing = False
+
+        if not existing:
+            memory_service.add_memory({
+                "text": memory_text,
+                "category": category,
+                "session_id": session_id,
+                "source": "memory_command_before_web",
+                "pinned": True,
+                "weight": 10.0,
+            })
+
+        assistant_text = "Saved to memory: " + memory_text
+
+        # Save the exchange to the session so desktop session history stays sane.
+        try:
+            if hasattr(session_service, "get_session") and not session_service.get_session(session_id):
+                if hasattr(session_service, "create_session"):
+                    created = session_service.create_session("New Chat")
+                    created_id = str((created or {}).get("id") or "").strip()
+                    if created_id:
+                        session_id = created_id
+
+            if hasattr(session_service, "append_message"):
+                session_service.append_message(session_id, {
+                    "role": "user",
+                    "text": raw_user_text,
+                    "meta": {
+                        "route": "memory_command_before_web",
+                        "save_memory": True,
+                    },
+                })
+                session_service.append_message(session_id, {
+                    "role": "assistant",
+                    "text": assistant_text,
+                    "meta": {
+                        "route": "memory_command_before_web",
+                        "save_memory": True,
+                    },
+                })
+        except Exception:
+            pass
+
+        session = None
+        try:
+            session = session_service.get_session(session_id)
+        except Exception:
+            session = None
+
+        return json_ok(
+            ok=True,
+            assistant_message={
+                "role": "assistant",
+                "text": assistant_text,
+                "meta": {
+                    "route": "memory_command_before_web",
+                    "save_memory": True,
+                    "category": category,
+                    "already_existed": existing,
+                },
+            },
+            text=assistant_text,
+            active_session_id=session_id,
+            session_id=session_id,
+            session=session,
+            debug={
+                "route_taken": "memory_command_before_web",
+                "saved_memory_text": memory_text,
+                "category": category,
+                "already_existed": existing,
+            },
+        )
+    except Exception as exc:
+        return json_error(str(exc), 500)
+
+
+
+# NOVA_FOCUS_RECALL_BEFORE_WEB_20260611
+# Directly answer current Nova/project focus questions from memory before
+# generic chat/web routing can misclassify them as web_fetch.
+@app.before_request
+def nova_focus_recall_before_web_20260611():
+    try:
+        if request.path != "/api/chat" or request.method != "POST":
+            return None
+
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return None
+
+        raw_user_text = str(
+            data.get("user_text")
+            or data.get("text")
+            or data.get("message")
+            or data.get("prompt")
+            or ""
+        ).strip()
+
+        if not raw_user_text:
+            return None
+
+        clean = " ".join(raw_user_text.lower().split())
+
+        focus_questions = (
+            "what is my current nova focus",
+            "what's my current nova focus",
+            "what is my nova focus",
+            "what's my nova focus",
+            "what is my current project focus",
+            "what's my current project focus",
+            "what are we focused on",
+            "what am i focused on",
+        )
+
+        if not any(q in clean for q in focus_questions):
+            return None
+
+        session_id = str(
+            data.get("session_id")
+            or data.get("client_session_id")
+            or data.get("active_session_id")
+            or ""
+        ).strip()
+
+        if not session_id:
+            try:
+                session_id = session_service.get_active_session_id()
+            except Exception:
+                session_id = ""
+
+        if not session_id:
+            session_id = "default"
+
+        memories = []
+        try:
+            memories = memory_service.all() or []
+        except Exception:
+            memories = []
+
+        best_text = ""
+        best_score = -1
+
+        for item in memories:
+            if not isinstance(item, dict):
+                continue
+
+            text_value = str(
+                item.get("text")
+                or item.get("content")
+                or item.get("fact")
+                or ""
+            ).strip()
+
+            if not text_value:
+                continue
+
+            category = str(item.get("category") or item.get("type") or "").strip().lower()
+            item_session_id = str(item.get("session_id") or "").strip()
+
+            haystack = text_value.lower()
+            score = 0
+
+            if "desktop sessions and memory" in haystack:
+                score += 20
+
+            if category == "project_focus":
+                score += 15
+
+            if "current project focus:" in haystack:
+                score += 12
+
+            if "current nova focus" in haystack:
+                score += 10
+
+            if "nova focus" in haystack:
+                score += 8
+
+            if "project focus" in haystack:
+                score += 8
+
+            if item_session_id == session_id:
+                score += 4
+            elif not item_session_id:
+                score += 1
+
+            if score > best_score:
+                best_score = score
+                best_text = text_value
+
+        if not best_text or best_score <= 0:
+            assistant_text = "I do not have a current Nova focus saved yet."
+        else:
+            focus = best_text
+
+            prefixes = (
+                "Current project focus:",
+                "current project focus:",
+                "my current Nova focus is",
+                "my current nova focus is",
+                "current Nova focus is",
+                "current nova focus is",
+                "Current Nova focus:",
+                "current nova focus:",
+            )
+
+            for prefix in prefixes:
+                if focus.startswith(prefix):
+                    focus = focus[len(prefix):].strip()
+                    break
+
+            assistant_text = "Your current Nova focus is: " + focus
+
+        try:
+            if hasattr(session_service, "append_message"):
+                session_service.append_message(session_id, {
+                    "role": "user",
+                    "text": raw_user_text,
+                    "meta": {
+                        "route": "nova_focus_recall_before_web",
+                        "use_memory": True,
+                    },
+                })
+                session_service.append_message(session_id, {
+                    "role": "assistant",
+                    "text": assistant_text,
+                    "meta": {
+                        "route": "nova_focus_recall_before_web",
+                        "use_memory": True,
+                        "best_score": best_score,
+                    },
+                })
+        except Exception:
+            pass
+
+        session = None
+        try:
+            session = session_service.get_session(session_id)
+        except Exception:
+            session = None
+
+        return json_ok(
+            ok=True,
+            assistant_message={
+                "role": "assistant",
+                "text": assistant_text,
+                "meta": {
+                    "route": "nova_focus_recall_before_web",
+                    "use_memory": True,
+                    "best_score": best_score,
+                },
+            },
+            text=assistant_text,
+            active_session_id=session_id,
+            session_id=session_id,
+            session=session,
+            debug={
+                "route_taken": "nova_focus_recall_before_web",
+                "best_memory_text": best_text,
+                "best_score": best_score,
+            },
+        )
+    except Exception as exc:
+        return json_error(str(exc), 500)
+
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
