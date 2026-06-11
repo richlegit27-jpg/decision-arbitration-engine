@@ -3314,8 +3314,118 @@ main,
   console.log("[Nova Desktop Voice/TTS Final] ready");
 })();
 </script>
+
+<!-- NOVA_DESKTOP_BUTTON_ANIMATION_SAFE_20260610 -->
+<style>
+  @keyframes novaDesktopButtonGlow {
+    0% {
+      box-shadow: 0 0 0 rgba(168, 85, 247, 0);
+    }
+    50% {
+      box-shadow: 0 0 18px rgba(168, 85, 247, 0.26);
+    }
+    100% {
+      box-shadow: 0 0 0 rgba(168, 85, 247, 0);
+    }
+  }
+
+  @keyframes novaDesktopButtonPulse {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.025);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  button,
+  .primary-side-button,
+  .footer-mini-button,
+  .nova-current-session-manager-btn,
+  .attach-button,
+  .desktop-voice-tts-button,
+  #sendBtn {
+    transition:
+      transform 140ms ease,
+      box-shadow 180ms ease,
+      border-color 180ms ease,
+      background 180ms ease,
+      opacity 180ms ease !important;
+  }
+
+  button:hover,
+  .primary-side-button:hover,
+  .footer-mini-button:hover,
+  .nova-current-session-manager-btn:hover,
+  .attach-button:hover,
+  .desktop-voice-tts-button:hover,
+  #sendBtn:hover {
+    transform: translateY(-1px) scale(1.015) !important;
+    box-shadow: 0 8px 22px rgba(168, 85, 247, 0.20) !important;
+    border-color: rgba(216, 180, 254, 0.62) !important;
+  }
+
+  button:active,
+  .primary-side-button:active,
+  .footer-mini-button:active,
+  .nova-current-session-manager-btn:active,
+  .attach-button:active,
+  .desktop-voice-tts-button:active,
+  #sendBtn:active {
+    transform: translateY(0) scale(0.97) !important;
+    opacity: 0.86 !important;
+  }
+
+  button:focus-visible,
+  .primary-side-button:focus-visible,
+  .footer-mini-button:focus-visible,
+  .nova-current-session-manager-btn:focus-visible,
+  .attach-button:focus-visible,
+  .desktop-voice-tts-button:focus-visible,
+  #sendBtn:focus-visible {
+    outline: 2px solid rgba(216, 180, 254, 0.85) !important;
+    outline-offset: 2px !important;
+    animation: novaDesktopButtonGlow 900ms ease 1 !important;
+  }
+
+  #sendBtn:hover,
+  .desktop-voice-tts-button:hover {
+    animation: novaDesktopButtonGlow 1100ms ease infinite !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    button,
+    .primary-side-button,
+    .footer-mini-button,
+    .nova-current-session-manager-btn,
+    .attach-button,
+    .desktop-voice-tts-button,
+    #sendBtn {
+      transition: none !important;
+      animation: none !important;
+    }
+
+    button:hover,
+    .primary-side-button:hover,
+    .footer-mini-button:hover,
+    .nova-current-session-manager-btn:hover,
+    .attach-button:hover,
+    .desktop-voice-tts-button:hover,
+    #sendBtn:hover {
+      transform: none !important;
+      animation: none !important;
+    }
+  }
+</style>
+<script>
+  console.log("[Nova Desktop Button Animation Safe] ready");
+</script>
 </body>
 </html>
+
 
 
 
