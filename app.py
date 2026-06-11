@@ -3989,6 +3989,50 @@ def api_chat():
         result["session_id"] = result.get("session_id") or session_id
         result["active_session_id"] = result.get("active_session_id") or result.get("session_id") or session_id
 
+        # NOVA_IMAGE_FASTPATH_RESPONSE_CLEANUP_20260610
+        # Normalize echoed image-command text so the user sees only the real prompt.
+        def _nova_clean_image_echo_text(value):
+            value = str(value or "").strip()
+            prefix = "Generated image for:"
+            if not value.startswith(prefix):
+                return value
+
+            prompt = value[len(prefix):].strip()
+            lowered = prompt.lower()
+
+            cleanup_prefixes = [
+                "/image",
+                "generate an image of ",
+                "generate image of ",
+                "generate an image ",
+                "generate image ",
+                "create an image of ",
+                "create image of ",
+                "create an image ",
+                "create image ",
+                "make an image of ",
+                "make image of ",
+                "make an image ",
+                "make image ",
+                "draw ",
+            ]
+
+            if lowered == "/image":
+                prompt = "image"
+            else:
+                for item in cleanup_prefixes:
+                    if lowered.startswith(item):
+                        prompt = prompt[len(item):].strip() or "image"
+                        break
+
+            return f"Generated image for: {prompt}"
+
+        result["text"] = _nova_clean_image_echo_text(result.get("text"))
+        assistant_message = result.get("assistant_message")
+        if isinstance(assistant_message, dict):
+            assistant_message["text"] = _nova_clean_image_echo_text(assistant_message.get("text"))
+            result["assistant_message"] = assistant_message
+
         return jsonify(result)
 
     # MOBILE_SESSION_FORCE_LOCK_20260606
