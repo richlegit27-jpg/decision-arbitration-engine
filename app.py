@@ -10532,6 +10532,12 @@ def _nova_install_session_auth_scope_20260610():
         if not path.startswith("/api/sessions"):
             return response
 
+        # NOVA_SKIP_AUTH_SCOPE_FOR_SLIM_SESSIONS_20260611
+        # The direct slim sessions route already built the final clean payload.
+        # Do not owner-filter it here, because unauth/local mode can collapse sessions to [].
+        if response.headers.get("X-Nova-Slim-Sessions") == "1":
+            return response
+
         user = getattr(g, "nova_auth_user", None) or current_auth_user()
         store, visible = normalize_store_for_user(user)
 
