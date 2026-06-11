@@ -12015,3 +12015,80 @@ main {
         text-align: center !important;
     }
 }
+
+/* NOVA_MOBILE_REAL_CONTROLS_VISIBLE_20260611
+   Use the real mobile controls only. Keep auth/logout from blocking them. */
+@media (max-width: 900px) {
+    .mobile-header,
+    .nova-mobile-header,
+    #mobileHeader,
+    #nova-mobile-header,
+    .mobile-topbar,
+    .nova-mobile-topbar,
+    #mobileTopbar,
+    #nova-mobile-topbar {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 2147483000 !important;
+    }
+
+    .mobile-header button,
+    .nova-mobile-header button,
+    #mobileHeader button,
+    #nova-mobile-header button,
+    .mobile-topbar button,
+    .nova-mobile-topbar button,
+    #mobileTopbar button,
+    #nova-mobile-topbar button,
+    [aria-label="Menu"],
+    [aria-label="Memory"],
+    [aria-label="Sessions"],
+    [aria-label="Export"],
+    [aria-label="Copy"],
+    [aria-label="New"],
+    [data-action="menu"],
+    [data-action="memory"],
+    [data-action="sessions"],
+    [data-action="export"],
+    [data-action="copy"],
+    [data-action="new-chat"] {
+        display: inline-flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        position: relative !important;
+        z-index: 2147483001 !important;
+        min-width: 36px !important;
+        min-height: 36px !important;
+    }
+
+    #nova-mobile-fallback-controls {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+    }
+
+    a[href="/logout"],
+    a[href="/api/auth/logout"],
+    button[data-action="logout"],
+    [data-nova-logout],
+    [data-auth-action="logout"],
+    #nova-mobile-logout,
+    .nova-mobile-logout,
+    #nova-mobile-auth-chip,
+    .nova-mobile-auth-chip,
+    #nova-mobile-user-chip,
+    .nova-mobile-user-chip {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        width: 0 !important;
+        height: 0 !important;
+        overflow: hidden !important;
+        opacity: 0 !important;
+    }
+}
