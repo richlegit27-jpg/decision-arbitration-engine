@@ -10143,6 +10143,10 @@ def nova_slim_api_sessions_payload_20260611(response):
     try:
         path = str(request.path or "")
 
+        # NOVA_HEADER_SKIP_SLIM_SESSIONS_RESPONSE_20260611
+        if response.headers.get("X-Nova-Slim-Sessions") == "1":
+            return response
+
         if path != "/api/sessions":
             return response
 
@@ -10333,19 +10337,24 @@ def nova_before_request_slim_api_sessions_20260611():
         if not active_session_id and slim_sessions:
             active_session_id = str(slim_sessions[0].get("id") or "")
 
-        return jsonify({
+        returned_sessions = slim_sessions[:50]
+
+        slim_response = jsonify({
             "ok": True,
             "active_session_id": active_session_id,
-            "sessions": slim_sessions[:50],
+            "sessions": returned_sessions,
+            "items": returned_sessions,
             "artifacts": [],
             "slim_sessions_payload": True,
             "debug": {
                 "route": "before_request_slim_api_sessions",
                 "route_taken": "slim_sessions_payload",
                 "raw_session_count": len(raw_sessions),
-                "returned_session_count": len(slim_sessions[:50]),
+                "returned_session_count": len(returned_sessions),
             },
         })
+        slim_response.headers["X-Nova-Slim-Sessions"] = "1"
+        return slim_response
 
     except Exception as exc:
         try:
