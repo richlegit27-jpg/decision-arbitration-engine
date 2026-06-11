@@ -572,3 +572,75 @@
     console.log("[Nova Mobile Upload Hard Store] ready");
 })();
 
+
+// NOVA_MOBILE_CLEAR_ATTACHMENT_AFTER_SEND_20260611
+// Clears composer attachment state and preview after a mobile message is sent.
+(function () {
+    "use strict";
+
+    if (window.NovaMobileClearAttachmentAfterSendInstalled) {
+        return;
+    }
+    window.NovaMobileClearAttachmentAfterSendInstalled = true;
+
+    function clearMobileAttachmentsAfterSend() {
+        try {
+            var state = window.NovaMobileState || window.mobileState || window.state || null;
+
+            if (state && Array.isArray(state.pendingAttachments)) {
+                state.pendingAttachments.length = 0;
+            }
+
+            if (Array.isArray(window.NovaMobilePendingAttachments)) {
+                window.NovaMobilePendingAttachments.length = 0;
+            }
+
+            if (Array.isArray(window.NovaPendingAttachments)) {
+                window.NovaPendingAttachments.length = 0;
+            }
+
+            if (Array.isArray(window.pendingAttachments)) {
+                window.pendingAttachments.length = 0;
+            }
+
+            window.NovaMobileAttachments = [];
+            window.NovaPendingAttachments = [];
+            window.pendingAttachments = [];
+
+            try {
+                localStorage.removeItem("nova_mobile_pending_attachments");
+                localStorage.removeItem("nova-mobile-pending-attachments");
+                localStorage.removeItem("nova_pending_attachments");
+                localStorage.removeItem("novaPendingAttachments");
+            } catch (storageError) {}
+
+            var previewBoxes = [
+                document.getElementById("nova-mobile-attachment-preview"),
+                document.querySelector(".nova-clean-attachment-preview"),
+                document.querySelector("[data-nova-attachment-preview='true']")
+            ].filter(Boolean);
+
+            previewBoxes.forEach(function (box) {
+                box.innerHTML = "";
+                box.setAttribute("data-nova-empty", "true");
+                box.setAttribute("data-empty", "true");
+            });
+
+            if (typeof window.NovaRenderComposerInlinePreview === "function") {
+                window.NovaRenderComposerInlinePreview();
+            }
+
+            window.dispatchEvent(new CustomEvent("nova-mobile-attachments-cleared"));
+        } catch (error) {
+            console.warn("[Nova Mobile Clear Attachment After Send] failed", error);
+        }
+    }
+
+    window.NovaClearMobileAttachmentsAfterSend = clearMobileAttachmentsAfterSend;
+
+    window.addEventListener("nova-mobile-after-send", clearMobileAttachmentsAfterSend);
+    window.addEventListener("nova-mobile-message-sent", clearMobileAttachmentsAfterSend);
+    window.addEventListener("nova-mobile-send-complete", clearMobileAttachmentsAfterSend);
+
+    console.log("[Nova Mobile Clear Attachment After Send] ready");
+})();
