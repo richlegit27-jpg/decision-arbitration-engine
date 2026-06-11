@@ -10854,6 +10854,127 @@ def nova_before_request_explicit_memory_guard_20260611():
         return None
 
 
+
+
+# NOVA_BEFORE_REQUEST_FAVORITE_RECALL_GUARD_20260611
+@app.before_request
+def nova_before_request_favorite_recall_guard_20260611():
+    try:
+        if request.path != "/api/chat" or request.method != "POST":
+            return None
+
+        payload = request.get_json(silent=True) or {}
+        raw_user_text = str(
+            payload.get("user_text")
+            or payload.get("text")
+            or payload.get("message")
+            or ""
+        ).strip()
+
+        clean_question = " ".join(raw_user_text.lower().replace("?", " ").split())
+
+        prefix = "what is my favorite "
+        if not clean_question.startswith(prefix):
+            return None
+
+        favorite_key = clean_question[len(prefix):].strip()
+        if not favorite_key:
+            return None
+
+        target_start = f"my favorite {favorite_key} is "
+
+        best_item = None
+        for item in memory_service.all() or []:
+            if not isinstance(item, dict):
+                continue
+
+            item_text = str(item.get("text") or "").strip()
+            item_lc = item_text.lower()
+
+            if item_lc.startswith(target_start):
+                best_item = item
+                break
+
+        if not best_item:
+            return None
+
+        item_text = str(best_item.get("text") or "").strip()
+        answer_value = item_text[len(target_start):].strip()
+        if not answer_value:
+            return None
+
+        session_id = str(
+            payload.get("session_id")
+            or payload.get("client_session_id")
+            or ""
+        ).strip()
+
+        if not session_id:
+            session_id = "session_" + uuid.uuid4().hex
+
+        assistant_text = f"Your favorite {favorite_key} is {answer_value}."
+
+        user_msg = {
+            "role": "user",
+            "text": raw_user_text,
+            "attachments": [],
+            "meta": {},
+        }
+
+        assistant_msg = {
+            "role": "assistant",
+            "text": assistant_text,
+            "attachments": [],
+            "memory_used": [best_item],
+            "meta": {
+                "mode": "memory_recall",
+                "route": "favorite_memory_recall",
+                "before_request_guard": True,
+                "memory_used_count": 1,
+            },
+        }
+
+        try:
+            if hasattr(session_service, "add_message"):
+                session_service.add_message(session_id, user_msg)
+                session_service.add_message(session_id, assistant_msg)
+        except Exception:
+            pass
+
+        try:
+            session_obj = session_service.get_session(session_id)
+        except Exception:
+            session_obj = None
+
+        return jsonify({
+            "ok": True,
+            "active_session_id": session_id,
+            "assistant_message": assistant_msg,
+            "attachment_debug": {
+                "requested_session_id": session_id,
+                "active_session_id": session_id,
+                "session_attachments_count": 0,
+            },
+            "debug": {
+                "route": "before_request_favorite_recall_guard",
+                "route_taken": "favorite_memory_recall",
+            },
+            "runtime": {},
+            "session": session_obj or {
+                "id": session_id,
+                "messages": [user_msg, assistant_msg],
+            },
+            "session_attachments": [],
+        })
+
+    except Exception as exc:
+        try:
+            app.logger.warning("[before_request favorite recall guard] failed: %s", exc)
+        except Exception:
+            pass
+        return None
+
+
 # NOVA_CHAT_STREAM_SSE_BRIDGE_20260611
 @app.route("/api/chat/stream", methods=["POST"])
 def nova_chat_stream_post_bridge_20260611():
