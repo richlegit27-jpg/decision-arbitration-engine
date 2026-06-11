@@ -3931,6 +3931,58 @@ def api_chat():
             "no_session_created": True,
         })
 
+    # NOVA_IMAGE_COMMAND_FASTPATH_BEFORE_ATTACHMENT_PIPELINE_20260610
+    # Explicit image commands must route to image generation before any attachment analysis/prehandle logic.
+    _nova_image_fastpath_text = str(
+        data.get("user_text")
+        or data.get("text")
+        or data.get("message")
+        or user_text
+        or ""
+    ).strip()
+
+    _nova_image_fastpath_lower = _nova_image_fastpath_text.lower()
+
+    _nova_is_image_fastpath = (
+        _nova_image_fastpath_lower.startswith("/image")
+        or _nova_image_fastpath_lower.startswith("image ")
+        or _nova_image_fastpath_lower.startswith("generate image")
+        or _nova_image_fastpath_lower.startswith("generate an image")
+        or _nova_image_fastpath_lower.startswith("draw ")
+        or _nova_image_fastpath_lower.startswith("create image")
+        or _nova_image_fastpath_lower.startswith("make image")
+    )
+
+    if _nova_is_image_fastpath:
+        app.logger.info(
+            "[ImageCommandFastPath] routing before attachment pipeline session_id=%s text=%r",
+            session_id,
+            _nova_image_fastpath_text,
+        )
+
+        result = chat_service.handle(
+            user_text=_nova_image_fastpath_text,
+            session_id=session_id,
+            attachments=[],
+        )
+
+        if not isinstance(result, dict):
+            result = {
+                "ok": True,
+                "session_id": session_id,
+                "active_session_id": session_id,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": str(result or ""),
+                },
+                "text": str(result or ""),
+            }
+
+        result["session_id"] = result.get("session_id") or session_id
+        result["active_session_id"] = result.get("active_session_id") or result.get("session_id") or session_id
+
+        return jsonify(result)
+
     # MOBILE_SESSION_FORCE_LOCK_20260606
     # Honor mobile-provided session ids instead of letting backend drift to random session_* ids.
     if requested_session_id:
@@ -5043,6 +5095,29 @@ def api_chat():
         # IMAGE_ATTACHMENT_PREHANDLE_LOCK
         # Current image attachments must beat web/source-open routing.
         try:
+            # NOVA_IMAGE_COMMAND_SKIP_IMAGE_ATTACHMENT_PREHANDLE_20260610
+            # Explicit image generation commands must not be converted into attachment-received replies.
+            _nova_image_prehandle_command_text = str(
+                data.get("user_text")
+                or data.get("text")
+                or data.get("message")
+                or user_text
+                or ""
+            ).strip().lower()
+
+            _nova_skip_image_attachment_prehandle = (
+                _nova_image_prehandle_command_text.startswith("/image")
+                or _nova_image_prehandle_command_text.startswith("image ")
+                or _nova_image_prehandle_command_text.startswith("generate image")
+                or _nova_image_prehandle_command_text.startswith("generate an image")
+                or _nova_image_prehandle_command_text.startswith("draw ")
+                or _nova_image_prehandle_command_text.startswith("create image")
+                or _nova_image_prehandle_command_text.startswith("make image")
+            )
+
+            if _nova_skip_image_attachment_prehandle:
+                raise RuntimeError("skip image attachment prehandle for explicit image command")
+
             current_attachments = list(attachments or [])
             image_attachments = []
 
