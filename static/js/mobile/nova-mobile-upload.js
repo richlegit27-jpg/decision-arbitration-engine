@@ -391,3 +391,184 @@
 
     console.log("[Nova Mobile Hard Attach Button Bridge] ready");
 })();
+
+
+/* NOVA_MOBILE_UPLOAD_HARD_STORE_PAYLOAD_20260610 */
+(function () {
+    "use strict";
+
+    if (window.NovaMobileUploadHardStorePayloadInstalled) {
+        return;
+    }
+    window.NovaMobileUploadHardStorePayloadInstalled = true;
+
+    function normalizeUploadPayload(data, file) {
+        data = data && typeof data === "object" ? data : {};
+        file = file && typeof file === "object" ? file : {};
+
+        var filename = String(
+            data.filename ||
+            data.name ||
+            data.original_filename ||
+            data.stored_name ||
+            data.saved_name ||
+            file.name ||
+            ""
+        ).trim();
+
+        var storedName = String(
+            data.stored_name ||
+            data.saved_name ||
+            data.filename ||
+            filename ||
+            ""
+        ).trim();
+
+        var url = String(
+            data.url ||
+            data.file_url ||
+            data.path ||
+            (storedName ? "/api/uploads/" + storedName : "")
+        ).trim();
+
+        var mimeType = String(
+            data.mime_type ||
+            data.content_type ||
+            data.type ||
+            file.type ||
+            "application/octet-stream"
+        ).trim();
+
+        var size = data.size || data.size_bytes || file.size || 0;
+
+        return {
+            id: String(data.id || data.upload_id || "").trim(),
+            filename: filename || storedName || "attachment",
+            name: filename || storedName || "attachment",
+            original_filename: String(data.original_filename || file.name || filename || "").trim(),
+            stored_name: storedName || filename,
+            saved_name: storedName || filename,
+            mime_type: mimeType,
+            content_type: mimeType,
+            size: size,
+            size_bytes: size,
+            url: url,
+            file_url: url
+        };
+    }
+
+    function storeUploadPayload(data, file) {
+        var item = normalizeUploadPayload(data, file);
+
+        if (!item.url && !item.file_url && !item.filename) {
+            return null;
+        }
+
+        if (typeof window.NovaMobileHardAttachmentPayloadStore === "function") {
+            try {
+                window.NovaMobileHardAttachmentPayloadStore(item);
+            } catch (e) {}
+        }
+
+        var current = [];
+
+        try {
+            if (Array.isArray(window.NovaMobilePendingAttachments)) {
+                current = current.concat(window.NovaMobilePendingAttachments);
+            }
+        } catch (e) {}
+
+        try {
+            if (Array.isArray(window.__novaMobilePendingAttachments)) {
+                current = current.concat(window.__novaMobilePendingAttachments);
+            }
+        } catch (e) {}
+
+        try {
+            var fromStorage = JSON.parse(localStorage.getItem("nova_mobile_pending_attachments") || "[]");
+            if (Array.isArray(fromStorage)) {
+                current = current.concat(fromStorage);
+            }
+        } catch (e) {}
+
+        current.push(item);
+
+        var seen = {};
+        var clean = [];
+
+        current.forEach(function (entry) {
+            if (!entry || typeof entry !== "object") {
+                return;
+            }
+
+            var key = String(entry.url || entry.file_url || entry.stored_name || entry.filename || "").toLowerCase();
+            if (!key || seen[key]) {
+                return;
+            }
+
+            seen[key] = true;
+
+            var normalized = normalizeUploadPayload(entry, {});
+            clean.push(normalized);
+        });
+
+        window.NovaMobilePendingAttachments = clean;
+        window.__novaMobilePendingAttachments = clean;
+
+        try {
+            localStorage.setItem("nova_mobile_pending_attachments", JSON.stringify(clean));
+            localStorage.setItem("nova_mobile_last_uploaded_attachment", JSON.stringify(item));
+        } catch (e) {}
+
+        try {
+            window.dispatchEvent(new CustomEvent("nova-mobile-upload-complete", { detail: item }));
+            window.dispatchEvent(new CustomEvent("nova-mobile-attachments-changed", { detail: clean }));
+        } catch (e) {}
+
+        try {
+            if (typeof window.NovaRenderComposerInlinePreview === "function") {
+                window.NovaRenderComposerInlinePreview();
+            }
+        } catch (e) {}
+
+        console.log("[Nova Mobile Upload Hard Store] stored upload payload", item);
+
+        return item;
+    }
+
+    var originalFetch = window.fetch;
+
+    window.fetch = function (input, init) {
+        var url = "";
+        try {
+            url = typeof input === "string" ? input : String((input && input.url) || "");
+        } catch (e) {
+            url = "";
+        }
+
+        var maybeFile = null;
+        try {
+            if (init && init.body && typeof FormData !== "undefined" && init.body instanceof FormData) {
+                var formFile = init.body.get("file");
+                if (formFile) {
+                    maybeFile = formFile;
+                }
+            }
+        } catch (e) {}
+
+        return originalFetch.apply(this, arguments).then(function (response) {
+            if (url.indexOf("/api/upload") !== -1 && response && response.clone) {
+                response.clone().json().then(function (data) {
+                    storeUploadPayload(data, maybeFile);
+                }).catch(function () {});
+            }
+
+            return response;
+        });
+    };
+
+    window.NovaMobileUploadHardStorePayload = storeUploadPayload;
+
+    console.log("[Nova Mobile Upload Hard Store] ready");
+})();
+
