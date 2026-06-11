@@ -8935,6 +8935,225 @@ def nova_desktop_app_fixed_20260610():
     return render_template("app.html")
 
 
+
+# NOVA_LOCAL_AUTH_ROUTES_20260610
+# Local dev auth API: /api/auth/status, /api/auth/register, /api/auth/login, /api/auth/logout
+def _nova_install_local_auth_routes_20260610():
+    import os
+    import json
+    import secrets
+    import hashlib
+    from pathlib import Path
+    from flask import request, jsonify, session
+
+    data_dir = Path(__file__).resolve().parent / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    secret_path = data_dir / "nova_flask_secret.key"
+    if not getattr(app, "secret_key", None):
+        if secret_path.exists():
+            app.secret_key = secret_path.read_text(encoding="utf-8").strip()
+        else:
+            secret = secrets.token_hex(32)
+            secret_path.write_text(secret, encoding="utf-8")
+            app.secret_key = secret
+
+    users_path = data_dir / "nova_auth_users.json"
+
+    def route_exists(rule):
+        return any(str(r.rule) == rule for r in app.url_map.iter_rules())
+
+    def load_users():
+        if not users_path.exists():
+            return {"users": []}
+        try:
+            data = json.loads(users_path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                return {"users": []}
+            if not isinstance(data.get("users"), list):
+                data["users"] = []
+            return data
+        except Exception:
+            return {"users": []}
+
+    def save_users(data):
+        users_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    def clean(value):
+        return str(value or "").strip()
+
+    def hash_password(password, salt):
+        raw = (str(salt) + "::" + str(password)).encode("utf-8")
+        return hashlib.sha256(raw).hexdigest()
+
+    def public_user(user):
+        return {
+            "id": user.get("id"),
+            "username": user.get("username"),
+            "email": user.get("email"),
+        }
+
+    def find_user(identifier):
+        ident = clean(identifier).lower()
+        for user in load_users().get("users", []):
+            if clean(user.get("username")).lower() == ident:
+                return user
+            if clean(user.get("email")).lower() == ident:
+                return user
+        return None
+
+    def current_user():
+        uid = session.get("nova_user_id")
+        if not uid:
+            return None
+        for user in load_users().get("users", []):
+            if user.get("id") == uid:
+                return user
+        return None
+
+    def auth_status():
+        user = current_user()
+        return jsonify({
+            "ok": True,
+            "authenticated": bool(user),
+            "user": public_user(user) if user else None,
+            "mode": "local",
+        })
+
+    def auth_register():
+        payload = request.get_json(silent=True) or {}
+        username = clean(payload.get("username") or payload.get("name"))
+        email = clean(payload.get("email"))
+        password = str(payload.get("password") or "")
+
+        if not username and email:
+            username = email.split("@", 1)[0]
+
+        if not username:
+            return jsonify({"ok": False, "error": "Username is required."}), 400
+        if len(password) < 4:
+            return jsonify({"ok": False, "error": "Password must be at least 4 characters."}), 400
+
+        data = load_users()
+
+        if find_user(username) or (email and find_user(email)):
+            return jsonify({"ok": False, "error": "User already exists."}), 409
+
+        salt = secrets.token_hex(16)
+        user = {
+            "id": "user_" + secrets.token_hex(12),
+            "username": username,
+            "email": email,
+            "salt": salt,
+            "password_hash": hash_password(password, salt),
+        }
+
+        data["users"].append(user)
+        save_users(data)
+
+        session["nova_user_id"] = user["id"]
+
+        return jsonify({
+            "ok": True,
+            "authenticated": True,
+            "user": public_user(user),
+        })
+
+    def auth_login():
+        payload = request.get_json(silent=True) or {}
+        identifier = clean(payload.get("username") or payload.get("email") or payload.get("login"))
+        password = str(payload.get("password") or "")
+
+        user = find_user(identifier)
+        if not user:
+            return jsonify({"ok": False, "error": "Invalid username or password."}), 401
+
+        expected = user.get("password_hash")
+        actual = hash_password(password, user.get("salt", ""))
+
+        if not expected or actual != expected:
+            return jsonify({"ok": False, "error": "Invalid username or password."}), 401
+
+        session["nova_user_id"] = user["id"]
+
+        return jsonify({
+            "ok": True,
+            "authenticated": True,
+            "user": public_user(user),
+        })
+
+    def auth_logout():
+        session.pop("nova_user_id", None)
+        return jsonify({
+            "ok": True,
+            "authenticated": False,
+            "user": None,
+        })
+
+    if not route_exists("/api/auth/status"):
+        app.add_url_rule("/api/auth/status", "nova_auth_status_20260610", auth_status, methods=["GET"])
+
+    if not route_exists("/api/auth/register"):
+        app.add_url_rule("/api/auth/register", "nova_auth_register_20260610", auth_register, methods=["POST"])
+
+    if not route_exists("/api/auth/login"):
+        app.add_url_rule("/api/auth/login", "nova_auth_login_20260610", auth_login, methods=["POST"])
+
+    if not route_exists("/api/auth/logout"):
+        app.add_url_rule("/api/auth/logout", "nova_auth_logout_20260610", auth_logout, methods=["POST"])
+
+    # Compatibility aliases in case the frontend calls the shorter paths.
+    if not route_exists("/api/login"):
+        app.add_url_rule("/api/login", "nova_api_login_20260610", auth_login, methods=["POST"])
+
+    if not route_exists("/api/logout"):
+        app.add_url_rule("/api/logout", "nova_api_logout_20260610", auth_logout, methods=["POST"])
+
+    if not route_exists("/api/register"):
+        app.add_url_rule("/api/register", "nova_api_register_20260610", auth_register, methods=["POST"])
+
+
+_nova_install_local_auth_routes_20260610()
+
+
+
+# NOVA_LOGIN_PAGE_ROUTES_20260610
+# Page routes for local auth screens.
+def _nova_install_login_page_routes_20260610():
+    from flask import render_template, redirect, url_for, request
+
+    def route_exists(rule):
+        return any(str(r.rule) == rule for r in app.url_map.iter_rules())
+
+    def login_page():
+        return render_template(
+            "login.html",
+            active_tab="login",
+            prefill_username=request.args.get("username", ""),
+            prefill_register_username="",
+        )
+
+    def register_page():
+        return render_template(
+            "login.html",
+            active_tab="register",
+            prefill_username="",
+            prefill_register_username=request.args.get("username", ""),
+        )
+
+    if not route_exists("/login"):
+        app.add_url_rule("/login", "nova_login_page_20260610", login_page, methods=["GET"])
+
+    if not route_exists("/register"):
+        app.add_url_rule("/register", "nova_register_page_20260610", register_page, methods=["GET"])
+
+    if not route_exists("/logout"):
+        app.add_url_rule("/logout", "nova_logout_page_20260610", lambda: redirect("/login"), methods=["GET"])
+
+
+_nova_install_login_page_routes_20260610()
+
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
@@ -8942,4 +9161,6 @@ if __name__ == "__main__":
         port=5001,
         debug=True,
     )
+
+
 
