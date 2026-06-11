@@ -4708,6 +4708,31 @@ def api_chat():
         # If attachment text was already extracted into user_text, hand off to chat_service as plain text.
         # This prevents chat_service attachment guards from returning canned attachment responses.
         attachments_for_chat_service = list(attachments or [])
+
+        # NOVA_IMAGE_COMMAND_ATTACHMENT_BYPASS_20260610
+        # Explicit image generation commands must not be hijacked by stale/current attachment gates.
+        _nova_image_command_text = str(data.get("user_text") or data.get("text") or data.get("message") or "").strip().lower()
+        _nova_is_image_command = (
+            _nova_image_command_text.startswith("/image")
+            or _nova_image_command_text.startswith("image ")
+            or _nova_image_command_text.startswith("generate image")
+            or _nova_image_command_text.startswith("generate an image")
+            or _nova_image_command_text.startswith("draw ")
+            or _nova_image_command_text.startswith("create image")
+            or _nova_image_command_text.startswith("make image")
+        )
+
+        if _nova_is_image_command:
+            attachments = []
+            remembered_session_attachments = []
+            attachment_content_lines = []
+            attachments_for_chat_service = []
+            app.logger.info(
+                "[ImageCommandAttachmentBypass] cleared attachment state for image command session_id=%s text=%r",
+                session_id,
+                _nova_image_command_text,
+            )
+
         if attachment_content_lines:
             attachments_for_chat_service = attachments or []
             app.logger.info(
