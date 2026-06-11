@@ -849,11 +849,119 @@
 })();
 </script>
     <script src="{{ url_for('static', filename='js/mobile/nova-mobile-auth.js') }}?v=mobile-auth-20260610185330"></script>
+
+<!-- NOVA_HIDE_MOBILE_LOGOUT_OVERLAY_20260611 -->
+<style>
+@media (max-width: 900px) {
+    a[href="/logout"],
+    a[href="/api/auth/logout"],
+    button[data-action="logout"],
+    [data-nova-logout],
+    [data-auth-action="logout"],
+    #nova-mobile-logout,
+    .nova-mobile-logout,
+    #nova-mobile-auth-chip,
+    .nova-mobile-auth-chip,
+    #nova-mobile-user-chip,
+    .nova-mobile-user-chip {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        width: 0 !important;
+        height: 0 !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        max-width: 0 !important;
+        max-height: 0 !important;
+        overflow: hidden !important;
+        opacity: 0 !important;
+    }
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    function killOnlyMobileLogoutOverlay() {
+        if (window.innerWidth > 900) return;
+
+        var selectors = [
+            'a[href="/logout"]',
+            'a[href="/api/auth/logout"]',
+            'button[data-action="logout"]',
+            '[data-nova-logout]',
+            '[data-auth-action="logout"]',
+            '#nova-mobile-logout',
+            '.nova-mobile-logout',
+            '#nova-mobile-auth-chip',
+            '.nova-mobile-auth-chip',
+            '#nova-mobile-user-chip',
+            '.nova-mobile-user-chip'
+        ];
+
+        selectors.forEach(function (selector) {
+            document.querySelectorAll(selector).forEach(function (el) {
+                el.remove();
+            });
+        });
+
+        document.querySelectorAll("button, a, div, span").forEach(function (el) {
+            var text = String(el.textContent || "").trim().toLowerCase();
+            if (text !== "logout" && text !== "log out" && text !== "@richard" && text !== "richard") {
+                return;
+            }
+
+            var rect = el.getBoundingClientRect();
+
+            // Only remove the top overlay area, never body messages or panels.
+            if (rect.top >= 0 && rect.top < 110) {
+                el.remove();
+            }
+        });
+
+        // Make sure real header controls stay clickable above anything else.
+        document.querySelectorAll("button, a").forEach(function (el) {
+            var text = String(el.textContent || "").trim().toLowerCase();
+            var label = String(el.getAttribute("aria-label") || "").trim().toLowerCase();
+
+            if (
+                text === "sessions" ||
+                text === "export" ||
+                text === "new" ||
+                text === "copy" ||
+                label.indexOf("session") !== -1 ||
+                label.indexOf("export") !== -1 ||
+                label.indexOf("new") !== -1 ||
+                label.indexOf("copy") !== -1
+            ) {
+                el.style.setProperty("position", "relative", "important");
+                el.style.setProperty("z-index", "2147483647", "important");
+                el.style.setProperty("pointer-events", "auto", "important");
+                el.style.setProperty("visibility", "visible", "important");
+                el.style.setProperty("opacity", "1", "important");
+            }
+        });
+    }
+
+    window.NovaKillOnlyMobileLogoutOverlay = killOnlyMobileLogoutOverlay;
+
+    killOnlyMobileLogoutOverlay();
+    document.addEventListener("DOMContentLoaded", killOnlyMobileLogoutOverlay);
+    window.addEventListener("load", killOnlyMobileLogoutOverlay);
+    window.addEventListener("resize", killOnlyMobileLogoutOverlay);
+    window.addEventListener("orientationchange", killOnlyMobileLogoutOverlay);
+    setInterval(killOnlyMobileLogoutOverlay, 500);
+
+    console.log("[Nova Mobile Logout Overlay Hide] ready");
+})();
+</script>
 </body>
 </html>
 
 
 <!-- FIX_MOBILE_SCRIPT_BLOCK_HARD_LOCK -->
+
 
 
 
