@@ -9120,7 +9120,7 @@ _nova_install_local_auth_routes_20260610()
 # NOVA_LOGIN_PAGE_ROUTES_20260610
 # Page routes for local auth screens.
 def _nova_install_login_page_routes_20260610():
-    from flask import render_template, redirect, url_for, request
+    from flask import render_template, redirect, url_for, request, session
 
     def route_exists(rule):
         return any(str(r.rule) == rule for r in app.url_map.iter_rules())
@@ -9147,8 +9147,15 @@ def _nova_install_login_page_routes_20260610():
     if not route_exists("/register"):
         app.add_url_rule("/register", "nova_register_page_20260610", register_page, methods=["GET"])
 
+    # NOVA_LOGOUT_PAGE_CLEARS_SESSION_20260610
+    def logout_page():
+        session.pop("nova_user_id", None)
+        return redirect("/login")
+
     if not route_exists("/logout"):
-        app.add_url_rule("/logout", "nova_logout_page_20260610", lambda: redirect("/login"), methods=["GET"])
+        app.add_url_rule("/logout", "nova_logout_page_20260610", logout_page, methods=["GET"])
+    else:
+        app.view_functions["nova_logout_page_20260610"] = logout_page
 
 
 _nova_install_login_page_routes_20260610()
@@ -9161,6 +9168,7 @@ if __name__ == "__main__":
         port=5001,
         debug=True,
     )
+
 
 
 
