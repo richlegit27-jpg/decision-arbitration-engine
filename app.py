@@ -12764,64 +12764,221 @@ _nova_install_api_chat_attachment_view_wrapper_20260611()
 
 
 
-# NOVA_WEB_FETCH_PERSIST_REQUESTED_SESSION_20260612
-# Force all web-fetch responses to persist into requested session
-try:
-    if getattr(response, "status_code", 500) < 400 and request.path == "/api/chat":
+# NOVA_WEB_FETCH_BRIDGE_JSON_IMPORT_FIX_20260612
+# Ensure this late bridge can rewrite Flask response JSON even if json was not imported globally.
+import json as json
+
+# NOVA_WEB_FETCH_REQUESTED_SESSION_BRIDGE_SAFE_20260612
+# Registers before the existing target-session bridge.
+# Rewrites successful web_fetch /api/chat responses to the requested session id
+# and includes a response session object so the UI can render source cards even
+# if /api/sessions/<id> filtering is still strict.
+@app.after_request
+def nova_web_fetch_requested_session_bridge_safe_20260612(response):
+    try:
+        if request.path != "/api/chat" or request.method != "POST":
+            return response
+
+        if getattr(response, "status_code", 500) >= 400:
+            return response
+
         payload = request.get_json(silent=True) or {}
         if not isinstance(payload, dict):
-            payload = {}
+            return response
 
         target_session_id = str(
             payload.get("session_id")
             or payload.get("client_session_id")
             or payload.get("active_session_id")
             or ""
-        )
+        ).strip()
+
+        if not target_session_id:
+            return response
+
+        user_text = str(
+            payload.get("user_text")
+            or payload.get("message")
+            or payload.get("text")
+            or ""
+        ).strip()
+
+        if not user_text:
+            return response
 
         response_json = response.get_json(silent=True) or {}
-        assistant_message = response_json.get("assistant_message") or {}
+        if not isinstance(response_json, dict) or not response_json.get("ok", False):
+            return response
 
-        # Append to requested session even if web_fetch route generated session_*
-        from nova_backend.services import session_service
+        debug = response_json.get("debug") if isinstance(response_json.get("debug"), dict) else {}
+        assistant_message = response_json.get("assistant_message")
+        assistant_meta = {}
+
+        if isinstance(assistant_message, dict) and isinstance(assistant_message.get("meta"), dict):
+            assistant_meta.update(assistant_message.get("meta") or {})
+
+        route_text = " ".join([
+            str(debug.get("route") or ""),
+            str(debug.get("route_taken") or ""),
+            str(assistant_meta.get("route") or ""),
+            str(assistant_meta.get("strategy") or ""),
+        ]).lower()
+
+        is_web_fetch = (
+            "web_fetch" in route_text
+            or assistant_meta.get("route") == "web"
+            or assistant_meta.get("strategy") == "web_fetch"
+            or isinstance(assistant_meta.get("sources"), list)
+            or isinstance(assistant_meta.get("source_urls"), list)
+        )
+
+        if not is_web_fetch:
+            return response
+
+        assistant_text = ""
+        assistant_attachments = []
+
+        if isinstance(assistant_message, dict):
+            assistant_text = str(
+                assistant_message.get("text")
+                or assistant_message.get("content")
+                or ""
+            ).strip()
+
+            if isinstance(assistant_message.get("attachments"), list):
+                assistant_attachments = assistant_message.get("attachments") or []
+
+        if not assistant_text:
+            assistant_text = str(
+                response_json.get("text")
+                or response_json.get("response")
+                or response_json.get("answer")
+                or ""
+            ).strip()
+
+        if not assistant_text:
+            return response
+
+        bridge_meta = dict(assistant_meta)
+        bridge_meta.update({
+            "route": "web_fetch_requested_session_bridge_safe",
+            "target_session_id": target_session_id,
+            "response_active_session_id": str(response_json.get("active_session_id") or ""),
+            "response_session_id": str(response_json.get("session_id") or ""),
+            "web_fetch_session_bridge": True,
+        })
+
+        user_message = {
+            "role": "user",
+            "text": user_text,
+            "content": user_text,
+            "attachments": payload.get("attachments") if isinstance(payload.get("attachments"), list) else [],
+            "meta": {
+                "route": "web_fetch_requested_session_bridge_safe",
+                "target_session_id": target_session_id,
+            },
+        }
+
+        assistant_saved = {
+            "role": "assistant",
+            "text": assistant_text,
+            "content": assistant_text,
+            "attachments": assistant_attachments,
+            "meta": bridge_meta,
+        }
+
+        # Best-effort persistence.
         try:
-            # User message
-            user_text = str(payload.get("user_text") or "").strip()
-            if user_text:
-                session_service.append_message(target_session_id, {
-                    "role": "user",
-                    "text": user_text,
-                    "attachments": payload.get("attachments") if isinstance(payload.get("attachments"), list) else [],
-                    "meta": {"route": "web_fetch_append_bridge"}
-                })
+            existing = session_service.get_session(target_session_id)
+        except Exception:
+            existing = None
 
-            # Assistant message
-            assistant_text = str(assistant_message.get("text") or assistant_message.get("content") or "").strip()
-            assistant_meta = assistant_message.get("meta") if isinstance(assistant_message.get("meta"), dict) else {}
-            assistant_attachments = assistant_message.get("attachments") if isinstance(assistant_message.get("attachments"), list) else []
+        existing_blob = str(existing or "")
 
-            session_service.append_message(target_session_id, {
-                "role": "assistant",
-                "text": assistant_text,
-                "attachments": assistant_attachments,
-                "meta": assistant_meta
-            })
+        try:
+            if user_text not in existing_blob:
+                session_service.append_message(target_session_id, user_message)
 
-            # Rewrite response IDs to requested session
-            response_json["session_id"] = target_session_id
-            response_json["active_session_id"] = target_session_id
-            if isinstance(response_json.get("assistant_message"), dict):
-                response_json["assistant_message"]["session_id"] = target_session_id
-                response_json["assistant_message"]["active_session_id"] = target_session_id
+            if assistant_text not in existing_blob:
+                session_service.append_message(target_session_id, assistant_saved)
+        except Exception as persist_error:
+            try:
+                app.logger.warning(
+                    "[WebFetchRequestedSessionBridgeSafe] persistence failed: %s",
+                    persist_error,
+                )
+            except Exception:
+                pass
 
-            response.set_data(json.dumps(response_json, ensure_ascii=False))
-            response.headers["Content-Length"] = str(len(response.get_data()))
-            response.headers["Content-Type"] = "application/json"
+        try:
+            final_session = session_service.get_session(target_session_id)
+        except Exception:
+            final_session = None
 
-        except Exception as web_fetch_bridge_error:
-            app.logger.warning("[WebFetchTargetSessionBridge] failed: %s", web_fetch_bridge_error)
-except Exception as web_fetch_outer_error:
-    app.logger.warning("[WebFetchTargetSessionBridgeOuter] failed: %s", web_fetch_outer_error)# NOVA_API_CHAT_TARGET_SESSION_APPEND_BRIDGE_20260611
+        if not final_session:
+            final_session = {
+                "id": target_session_id,
+                "messages": [user_message, assistant_saved],
+                "session_attachments": [],
+                "meta": {},
+            }
+
+        response_json["session_id"] = target_session_id
+        response_json["active_session_id"] = target_session_id
+        response_json["target_session_append_bridge"] = True
+        response_json["web_fetch_requested_session_bridge"] = True
+        response_json["session"] = final_session
+
+        if isinstance(response_json.get("assistant_message"), dict):
+            response_json["assistant_message"]["session_id"] = target_session_id
+            response_json["assistant_message"]["active_session_id"] = target_session_id
+
+        response.set_data(json.dumps(response_json, ensure_ascii=False))
+        response.headers["Content-Length"] = str(len(response.get_data()))
+        response.headers["Content-Type"] = "application/json"
+
+    except Exception as error:
+        try:
+            app.logger.warning(
+                "[WebFetchRequestedSessionBridgeSafe] failed: %s",
+                error,
+            )
+        except Exception:
+            pass
+
+    return response
+
+# NOVA_FORCE_WEB_FETCH_BRIDGE_RUNS_LAST_20260612
+# Flask executes after_request hooks in reverse registration order.
+# Force the safe web-fetch bridge to index 0 so it runs last and cannot be
+# overwritten by older response-normalizer hooks.
+try:
+    _nova_after_hooks = app.after_request_funcs.get(None, [])
+    _nova_bridge_name = "nova_web_fetch_requested_session_bridge_safe_20260612"
+    _nova_bridge_func = None
+
+    for _nova_hook in list(_nova_after_hooks):
+        if getattr(_nova_hook, "__name__", "") == _nova_bridge_name:
+            _nova_bridge_func = _nova_hook
+            try:
+                _nova_after_hooks.remove(_nova_hook)
+            except ValueError:
+                pass
+            break
+
+    if _nova_bridge_func is not None:
+        _nova_after_hooks.insert(0, _nova_bridge_func)
+        app.after_request_funcs[None] = _nova_after_hooks
+        print("[NOVA_WEB_FETCH_BRIDGE_ORDER] forced bridge to run last")
+    else:
+        print("[NOVA_WEB_FETCH_BRIDGE_ORDER] bridge function not found")
+except Exception as _nova_bridge_order_error:
+    try:
+        app.logger.warning("[NOVA_WEB_FETCH_BRIDGE_ORDER] failed: %s", _nova_bridge_order_error)
+    except Exception:
+        pass
+
+# NOVA_API_CHAT_TARGET_SESSION_APPEND_BRIDGE_20260611
 # Ensures /api/chat persists user+assistant exchanges into the explicit
 # request session_id/client_session_id/active_session_id instead of silently
 # creating or returning a different active session.
@@ -12980,6 +13137,12 @@ if __name__ == "__main__":
 
 
 # NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611
+
+
+
+
+
+
 
 
 
