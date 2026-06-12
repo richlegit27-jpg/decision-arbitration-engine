@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 import re
@@ -713,7 +713,7 @@ def _nova_replace_weak_backend_reply(user_text, result):
     from being returned as the final assistant response.
 
     Also catches mojibake variants like:
-    "IÃ¢â‚¬â„¢m ready. What are we working on?"
+    "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢m ready. What are we working on?"
     """
     try:
         if not isinstance(result, dict):
@@ -732,13 +732,13 @@ def _nova_replace_weak_backend_reply(user_text, result):
         normalized = (
             text
             .lower()
-            .replace("’", "'")
-            .replace("`", "'")
-            .replace("´", "'")
             .replace("â€™", "'")
-            .replace("ã¢â‚¬â„¢", "'")
-            .replace("iã¢â‚¬â„¢m", "i'm")
-            .replace("iâ€™m", "i'm")
+            .replace("`", "'")
+            .replace("Â´", "'")
+            .replace("Ã¢â‚¬â„¢", "'")
+            .replace("Ã£Â¢Ã¢â€šÂ¬Ã¢â€žÂ¢", "'")
+            .replace("iÃ£Â¢Ã¢â€šÂ¬Ã¢â€žÂ¢m", "i'm")
+            .replace("iÃ¢â‚¬â„¢m", "i'm")
         )
 
         compact = " ".join(normalized.split())
@@ -772,8 +772,8 @@ def _nova_replace_weak_backend_reply(user_text, result):
         else:
             replacement = (
         
-                "I’m here. The active Nova phase is frontend/mobile polish. "
-                "Give me the next task and I’ll move directly on it."
+                "Iâ€™m here. The active Nova phase is frontend/mobile polish. "
+                "Give me the next task and Iâ€™ll move directly on it."
             )
 
         assistant["text"] = replacement
@@ -853,12 +853,12 @@ def _nova_safe_clean_attachment_text(raw_text, max_chars=6000):
         "url removed from extracted attachment text",
         "wayfair.ca",
         "sponsored",
-        "ad ·",
-        "ads ·",
-        "shop ›",
-        "wall art ›",
+        "ad Â·",
+        "ads Â·",
+        "shop â€º",
+        "wall art â€º",
         "free_shipping",
-        "furniture & décor",
+        "furniture & dÃ©cor",
         "kitchen appliances",
         "prices you'll love",
         "eye-catching prints",
@@ -875,7 +875,7 @@ def _nova_safe_clean_attachment_text(raw_text, max_chars=6000):
         if not line:
             continue
 
-        low = line.lower().strip(" :;-•*|")
+        low = line.lower().strip(" :;-â€¢*|")
         low_compact = re.sub(r"[^a-z0-9]+", " ", low).strip()
 
         if low_compact in noisy_exact:
@@ -2440,7 +2440,7 @@ def _nova_prevent_bad_exact_pong_response(assistant_text, user_text):
     if clean_user in allowed_pong_requests:
         return clean_answer
 
-    return "I’m here. The active Nova phase is frontend/mobile polish. Give me the next task and I’ll move directly on it."
+    return "Iâ€™m here. The active Nova phase is frontend/mobile polish. Give me the next task and Iâ€™ll move directly on it."
 
 
 def _nova_try_project_state_direct_recall(user_text, session_id):
@@ -2627,12 +2627,12 @@ def _nova_casual_chat_guard():
             "hey": "Hey.",
             "hello": "Hey.",
             "yo": "Yo.",
-            "sup": "I’m here.",
-            "how are you": "I’m good. Ready when you are.",
-            "how are u": "I’m good. Ready when you are.",
-            "how you doing": "I’m good. Ready when you are.",
-            "whats up": "I’m here. Ready for the next move.",
-            "what's up": "I’m here. Ready for the next move.",
+            "sup": "Iâ€™m here.",
+            "how are you": "Iâ€™m good. Ready when you are.",
+            "how are u": "Iâ€™m good. Ready when you are.",
+            "how you doing": "Iâ€™m good. Ready when you are.",
+            "whats up": "Iâ€™m here. Ready for the next move.",
+            "what's up": "Iâ€™m here. Ready for the next move.",
         }
 
         if clean not in casual_replies:
@@ -4374,11 +4374,11 @@ def api_chat():
             current_compact = " ".join(
                 current_text
                 .lower()
-                .replace("’", "'")
                 .replace("â€™", "'")
-                .replace("ã¢â‚¬â„¢", "'")
-                .replace("iã¢â‚¬â„¢m", "i'm")
-                .replace("iâ€™m", "i'm")
+                .replace("Ã¢â‚¬â„¢", "'")
+                .replace("Ã£Â¢Ã¢â€šÂ¬Ã¢â€žÂ¢", "'")
+                .replace("iÃ£Â¢Ã¢â€šÂ¬Ã¢â€žÂ¢m", "i'm")
+                .replace("iÃ¢â‚¬â„¢m", "i'm")
                 .split()
             )
             if (
@@ -4487,7 +4487,7 @@ def api_chat():
             for index, item in enumerate(image_attachments[:5], start=1):
                 line = f"{index}. {item.get('name') or 'image attachment'} ({item.get('mime') or 'image/*'})"
                 if item.get("url"):
-                    line += f" — {item.get('url')}"
+                    line += f" â€” {item.get('url')}"
                 lines.append(line)
 
             lines.append("")
@@ -5136,7 +5136,7 @@ def api_chat():
                     "eye-catching prints",
                     "url removed from extracted attachment text",
                     "free_shipping",
-                    "furniture & décor",
+                    "furniture & dÃ©cor",
                     "kitchen appliances",
                     "love, horror and more themes",
                     "plain field in front of mountain peak",
@@ -5157,7 +5157,7 @@ def api_chat():
                     if not _nova_line:
                         continue
 
-                    _nova_low = _nova_line.lower().strip(" :;-•*|")
+                    _nova_low = _nova_line.lower().strip(" :;-â€¢*|")
                     _nova_low_compact = _nova_prehandle_re.sub(r"[^a-z0-9]+", " ", _nova_low).strip()
 
                     if _nova_low_compact in _nova_noise_exact:
@@ -5256,7 +5256,62 @@ def api_chat():
                 or len(_intent_text.strip()) <= 40
             )
 
-            if False and _has_current_attachment and _is_attachment_action:  # DISABLED_20260605 let chat_service summarize attachments
+            # NOVA_ENABLE_ATTACHMENT_LINES_PREHANDLE_SAFE_20260611
+            # Text attachments should answer immediately for summarize/continue/next/improve
+            # instead of falling through to stale web/source/image routing.
+            _has_image_like_attachment = False
+            try:
+                for _att in _request_attachments:
+                    if not isinstance(_att, dict):
+                        continue
+                    _mime = str(_att.get("mime_type") or _att.get("type") or "").lower()
+                    _name = str(_att.get("filename") or _att.get("original_filename") or "").lower()
+                    if (
+                        _mime.startswith("image/")
+                        or _name.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"))
+                    ):
+                        _has_image_like_attachment = True
+                        break
+            except Exception:
+                _has_image_like_attachment = False
+
+            _attachment_web_probe = " ".join(str(user_text or "").lower().split())
+            _attachment_is_web_intent = (
+                request.environ.get("NOVA_FORCE_WEB_INTENT_20260609") == "1"
+                or request.environ.get("NOVA_IGNORE_STALE_ATTACHMENTS_20260609") == "1"
+                or any(term in _attachment_web_probe for term in (
+                    "latest news",
+                    "news about",
+                    "today in",
+                    "what happened today",
+                    "current news",
+                    "breaking news",
+                    "recent news",
+                    "latest tech news",
+                    "latest sports",
+                    "weather",
+                    "forecast",
+                    "current events",
+                ))
+            )
+
+            _attachment_is_image_command = str(user_text or "").lower().strip().startswith((
+                "/image",
+                "image ",
+                "generate image",
+                "generate an image",
+                "draw ",
+                "create image",
+                "make image",
+            ))
+
+            if (
+                _has_current_attachment
+                and _is_attachment_action
+                and not _has_image_like_attachment
+                and not _attachment_web_intent
+                and not _attachment_is_image_command
+            ):
                 _raw_text = "\n".join(str(x or "") for x in _attachment_lines).strip()
                 if not _raw_text:
                     _raw_text = str(user_text or "").strip()
@@ -5293,7 +5348,7 @@ def api_chat():
                     "eye-catching prints",
                     "url removed from extracted attachment text",
                     "free_shipping",
-                    "furniture & décor",
+                    "furniture & dÃ©cor",
                     "kitchen appliances",
                     "love, horror and more themes",
                     "plain field in front of mountain peak",
@@ -5314,7 +5369,7 @@ def api_chat():
                     if not _line:
                         continue
 
-                    _low = _line.lower().strip(" :;-•*|")
+                    _low = _line.lower().strip(" :;-â€¢*|")
                     _compact = _nova_attach_re.sub(r"[^a-z0-9]+", " ", _low).strip()
 
                     if _compact in _noise_exact:
@@ -5513,7 +5568,7 @@ def api_chat():
 
                     line = f"{index}. {label} ({mime})"
                     if url:
-                        line += f" — {url}"
+                        line += f" â€” {url}"
                     lines.append(line)
 
                 lines.append("")
@@ -5732,7 +5787,7 @@ def api_chat():
                             def _nova_weak_guard_clean_line(value):
                                 line = str(value or "").strip()
                                 line = _nova_weak_guard_re.sub(r"^\\s*\\d+\\.\\s*", "", line).strip()
-                                line = line.replace("", "").strip()
+                                line = line.replace("îº", "").strip()
                                 line = line.replace("Attachment <unknown>", "uploaded attachment")
                                 line = _nova_weak_guard_re.sub(r"\\s+", " ", line).strip()
                                 return line
@@ -5774,7 +5829,7 @@ def api_chat():
                                 if not line:
                                     return ""
 
-                                low = line.lower().strip(" :;-•*|")
+                                low = line.lower().strip(" :;-â€¢*|")
                                 compact = _nova_weak_guard_re.sub(r"[^a-z0-9]+", " ", low).strip()
 
                                 if low in _nova_weak_bad_exact or compact in _nova_weak_bad_exact:
@@ -8939,14 +8994,14 @@ def api_attachment_summarize():
 
         def _nova_endpoint_keep_attachment_line(value):
             line = str(value or "").strip()
-            line = line.replace("", "").strip()
+            line = line.replace("îº", "").strip()
             line = _nova_endpoint_re.sub(r"^\\s*\\d+\\.\\s*", "", line).strip()
             line = _nova_endpoint_re.sub(r"\\s+", " ", line).strip()
 
             if not line:
                 return ""
 
-            low = line.lower().strip(" :;-•*|")
+            low = line.lower().strip(" :;-â€¢*|")
             compact = _nova_endpoint_re.sub(r"[^a-z0-9]+", " ", low).strip()
 
             bad_exact = {
@@ -8977,7 +9032,7 @@ def api_attachment_summarize():
                 "bath",
                 "amazon",
                 "related content",
-                "furniture décor",
+                "furniture dÃ©cor",
                 "kitchen appliances",
             }
 
@@ -8993,8 +9048,8 @@ def api_attachment_summarize():
                 "free stock photo",
                 "https://www.amazon.",
                 "https://www.wayfair.",
-                "› shop ›",
-                "› wall art ›",
+                "â€º shop â€º",
+                "â€º wall art â€º",
             )
 
             if low in bad_exact or compact in bad_exact:
@@ -9340,12 +9395,12 @@ def _nova_clean_attachment_analysis_response(response):
             "eye-catching prints",
             "url removed from extracted attachment text",
             "free_shipping",
-            "furniture & décor",
+            "furniture & dÃ©cor",
             "kitchen appliances",
             "love, horror and more themes",
             "plain field in front of mountain peak",
             "free stock photo",
-            "6000 ×",
+            "6000 Ã—",
             "jpeg",
         )
 
@@ -9362,7 +9417,7 @@ def _nova_clean_attachment_analysis_response(response):
             if not cleaned:
                 continue
 
-            low = cleaned.lower().strip(" :;-•*|")
+            low = cleaned.lower().strip(" :;-â€¢*|")
             low_compact = re.sub(r"[^a-z0-9]+", " ", low).strip()
 
             if low_compact in noisy_exact:
@@ -9495,7 +9550,7 @@ def _nova_final_attachment_output_noise_cleanup(response):
             "eye-catching prints",
             "url removed from extracted attachment text",
             "free_shipping",
-            "furniture & décor",
+            "furniture & dÃ©cor",
             "kitchen appliances",
             "related content",
         )
@@ -9505,14 +9560,14 @@ def _nova_final_attachment_output_noise_cleanup(response):
 
         for raw_line in text_value.splitlines():
             line = re.sub(r"^\s*\d+\.\s*", "", str(raw_line or "")).strip()
-            line = line.replace("", "").strip()
+            line = line.replace("îº", "").strip()
             line = line.replace("Attachment <unknown>", "uploaded attachment")
             line = re.sub(r"\s+", " ", line).strip()
 
             if not line:
                 continue
 
-            low = line.lower().strip(" :;-•*|")
+            low = line.lower().strip(" :;-â€¢*|")
             compact = re.sub(r"[^a-z0-9]+", " ", low).strip()
 
             if low.startswith("attachment analysis"):
@@ -9656,13 +9711,13 @@ def _nova_attachment_double_summary_cleanup(response):
         for raw_line in text_value.splitlines():
             line = str(raw_line or "").strip()
             line = re.sub(r"^\s*\d+\.\s*", "", line).strip()
-            line = line.replace("", "").strip()
+            line = line.replace("îº", "").strip()
             line = re.sub(r"\s+", " ", line).strip()
 
             if not line:
                 continue
 
-            low = line.lower().strip(" :;-•*|")
+            low = line.lower().strip(" :;-â€¢*|")
             compact = re.sub(r"[^a-z0-9]+", " ", low).strip()
 
             if low in bad_exact or compact in bad_exact:
@@ -10210,7 +10265,7 @@ def _nova_stop_fake_attachment_chat_gate():
             "ok": True,
             "assistant_message": {
                 "role": "assistant",
-                "text": "I’m good. Ready when you are.",
+                "text": "Iâ€™m good. Ready when you are.",
                 "attachments": [],
                 "meta": {
                     "route": "normal_chat_casual_gate"
@@ -12791,3 +12846,5 @@ if __name__ == "__main__":
 
 
 # NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611
+
+

@@ -196,6 +196,37 @@
 
         renderGeneratedImagePayload(payload);
 
+        // NOVA_STREAM_CLEAR_ATTACHMENTS_AFTER_SUCCESS_20260611
+        // The real JSON fallback path must clear composer attachment state after
+        // a successful /api/chat response, otherwise fetch wrappers can re-inject
+        // stale attachments into later messages.
+        try {
+            if (typeof window.NovaClearMobileAttachmentsAfterSend === "function") {
+                window.NovaClearMobileAttachmentsAfterSend();
+            } else {
+                try { localStorage.removeItem("nova_mobile_pending_attachments"); } catch (_) {}
+                try { localStorage.removeItem("nova_mobile_last_uploaded_attachment"); } catch (_) {}
+                try { localStorage.removeItem("nova_mobile_latest_attachments"); } catch (_) {}
+                window.NovaMobileSharedAttachments = [];
+                window.NovaMobilePendingAttachments = [];
+                window.__novaMobilePendingAttachments = [];
+                window.NovaPendingAttachments = [];
+                window.__novaPendingAttachments = [];
+                window.pendingAttachments = [];
+
+                try {
+                    window.dispatchEvent(new CustomEvent("nova-mobile-attachments-cleared", {
+                        detail: {
+                            source: "nova-mobile-stream-success",
+                            pendingAttachments: []
+                        }
+                    }));
+                } catch (_) {}
+            }
+        } catch (clearError) {
+            console.warn("[Nova Mobile Stream] failed to clear attachments after send", clearError);
+        }
+
         return payload;
     }
 
@@ -244,3 +275,4 @@
     // Expose globally for render calls
     window.NovaAttachBubbleActions = attachBubbleActions;
 })();
+
