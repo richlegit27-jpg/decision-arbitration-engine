@@ -11205,6 +11205,27 @@ if (not attachments) and (__name__ == "__main__"):
         # This intentionally does NOT override attachments or execution yet.
         # NOVA_FIX_INTERPRETATION_ORIGINAL_USER_TEXT_20260612
         original_user_text = self._safe_str(user_text).strip()
+
+        # NOVA_CLEAN_INPUT_BEFORE_INTERPRETATION_20260612
+        # Some older Nova layers append project/session memory into user_text before routing.
+        # The interpretation layer must see only the user's actual request, not injected context.
+        clean_interpretation_text = original_user_text
+        for _nova_context_marker in (
+            "Project-aware context for Nova:",
+            "Relevant persistent memory:",
+            "Session context:",
+            "[RANKED MEMORY + WORKING STATE]",
+            "HIGH PRIORITY MEMORY:",
+        ):
+            if _nova_context_marker in clean_interpretation_text:
+                clean_interpretation_text = clean_interpretation_text.split(
+                    _nova_context_marker,
+                    1,
+                )[0].strip()
+
+        if not clean_interpretation_text:
+            clean_interpretation_text = original_user_text
+
         interpretation = {}
         try:
             from nova_backend.services.interpretation_service import interpret_user_text
@@ -11233,7 +11254,7 @@ if (not attachments) and (__name__ == "__main__"):
                 )
 
             interpretation = interpret_user_text(
-                original_user_text,
+                clean_interpretation_text,
                 has_active_execution=_has_active_execution,
                 has_attachments=bool(attachments),
                 has_active_session=bool(session_id),
@@ -11272,6 +11293,7 @@ if (not attachments) and (__name__ == "__main__"):
             try:
                 self._last_interpretation = interpretation
                 self._last_original_user_text = original_user_text
+                self._last_clean_interpretation_text = clean_interpretation_text
                 self._last_interpreted_user_text = _interpreted_web_query
                 self._skip_project_context_for_interpreted_news = (
                     isinstance(interpretation, dict)
