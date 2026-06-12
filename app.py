@@ -6184,6 +6184,7 @@ def _nova_find_uploaded_file_path_20260607(attachment):
 @app.get("/api/sessions/<session_id>")
 def api_session_by_id(session_id: str):
     # NOVA_CLEAN_SESSION_DETAIL_ENDPOINT_20260611
+    # NOVA_SESSION_JSON_UTF8_SIG_READ_FIX_20260611
     # Clean desktop session detail endpoint. Returns one full session from
     # the canonical session store and marks the response so the auth-scope
     # after-request filter does not strip it.
@@ -6218,7 +6219,7 @@ def api_session_by_id(session_id: str):
                 continue
 
             try:
-                store = json.loads(sessions_path.read_text(encoding="utf-8") or "{}")
+                store = json.loads(sessions_path.read_text(encoding="utf-8-sig") or "{}")
             except Exception:
                 continue
 
@@ -9853,7 +9854,7 @@ def _nova_load_session_attachment_memory_20260611():
         path = _nova_session_attachment_memory_path_20260611()
         if not path.exists():
             return {}
-        data = json.loads(path.read_text(encoding="utf-8") or "{}")
+        data = json.loads(path.read_text(encoding="utf-8-sig") or "{}")
         return data if isinstance(data, dict) else {}
     except Exception:
         return {}
@@ -10293,7 +10294,7 @@ def nova_mobile_direct_session_persist_20260609():
         sessions_path.parent.mkdir(parents=True, exist_ok=True)
 
         if sessions_path.exists():
-            raw = sessions_path.read_text(encoding="utf-8").strip()
+            raw = sessions_path.read_text(encoding="utf-8-sig").strip()
             data = json.loads(raw) if raw else {"sessions": []}
         else:
             data = {"sessions": []}
@@ -11191,7 +11192,7 @@ def _nova_install_empty_session_spam_pruner_20260610():
         try:
             if not sessions_path.exists():
                 return {"active_session_id": "", "sessions": []}
-            data = json.loads(sessions_path.read_text(encoding="utf-8"))
+            data = json.loads(sessions_path.read_text(encoding="utf-8-sig"))
             if not isinstance(data, dict):
                 return {"active_session_id": "", "sessions": []}
             if not isinstance(data.get("sessions"), list):
@@ -11348,7 +11349,7 @@ def _nova_install_attachment_shape_normalizer_20260610():
         try:
             if not sessions_path.exists():
                 return {"active_session_id": "", "sessions": []}
-            data = json.loads(sessions_path.read_text(encoding="utf-8"))
+            data = json.loads(sessions_path.read_text(encoding="utf-8-sig"))
             if not isinstance(data, dict):
                 return {"active_session_id": "", "sessions": []}
             if not isinstance(data.get("sessions"), list):
