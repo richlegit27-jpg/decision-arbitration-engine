@@ -11191,6 +11191,99 @@ if (not attachments) and (__name__ == "__main__"):
 
         lowered = self._safe_str(user_text).lower().strip()
 
+        # NOVA_CENTRAL_INTERPRETATION_WEB_ROUTE_20260612
+        # Central pre-router interpretation, phase 2:
+        # safely force messy news/current-events prompts into the web route.
+        # This intentionally does NOT override attachments or execution yet.
+        interpretation = {}
+        try:
+            from nova_backend.services.interpretation_service import interpret_user_text
+
+            _active_execution_state = {}
+            try:
+                _active_execution_state = (
+                    self._load_execution_state(session_id)
+                    or self._get_session_meta(session_id, "execution_state")
+                    or self._get_session_meta(session_id, "active_execution")
+                    or {}
+                )
+            except Exception:
+                _active_execution_state = {}
+
+            _has_active_execution = False
+            if isinstance(_active_execution_state, dict):
+                _exec_status = self._safe_str(_active_execution_state.get("status")).lower()
+                _has_active_execution = any(
+                    [
+                        bool(_active_execution_state.get("steps")),
+                        bool(_active_execution_state.get("current_step")),
+                        bool(_active_execution_state.get("current_step_title")),
+                        _exec_status in {"running", "waiting", "failed"},
+                    ]
+                )
+
+            interpretation = interpret_user_text(
+                original_user_text,
+                has_active_execution=_has_active_execution,
+                has_attachments=bool(attachments),
+                has_active_session=bool(session_id),
+            )
+
+            self._last_interpretation = interpretation
+        except Exception as _nova_interpret_err:
+            interpretation = {
+                "intent": "interpretation_error",
+                "route_hint": "",
+                "rewritten_text": original_user_text,
+                "reason": str(_nova_interpret_err),
+            }
+            try:
+                exec_debug("INTERPRETATION_LAYER_ERROR:", _nova_interpret_err)
+            except Exception:
+                pass
+
+        if (
+            not attachments
+            and isinstance(interpretation, dict)
+            and interpretation.get("route_hint") == "web"
+            and self._safe_str(interpretation.get("rewritten_text") or original_user_text).strip()
+        ):
+            _interpreted_web_query = self._safe_str(
+                interpretation.get("rewritten_text") or original_user_text
+            ).strip()
+
+            try:
+                _web_result = self._execute_web_fetch(
+                    user_text=_interpreted_web_query,
+                    session_id=session_id,
+                    attachments=[],
+                    memory_context="",
+                )
+
+                if isinstance(_web_result, dict):
+                    _web_result.setdefault("debug", {})
+                    if isinstance(_web_result.get("debug"), dict):
+                        _web_result["debug"]["interpretation"] = interpretation
+                        _web_result["debug"]["original_user_text"] = original_user_text
+                        _web_result["debug"]["interpreted_user_text"] = _interpreted_web_query
+
+                    _assistant = _web_result.get("assistant_message")
+                    if isinstance(_assistant, dict):
+                        _assistant.setdefault("meta", {})
+                        if isinstance(_assistant.get("meta"), dict):
+                            _assistant["meta"]["interpretation"] = interpretation
+                            _assistant["meta"]["original_user_text"] = original_user_text
+                            _assistant["meta"]["interpreted_user_text"] = _interpreted_web_query
+                            _assistant["meta"]["route"] = _assistant["meta"].get("route") or "web"
+
+                return _web_result
+            except Exception as _nova_interpret_web_err:
+                try:
+                    exec_debug("INTERPRETATION_WEB_ROUTE_ERROR:", _nova_interpret_web_err)
+                except Exception:
+                    pass
+
+
         # TOP_LEVEL_SHORT_COMMAND_INTERCEPT_LOCK
         if lowered in {"k", "kk", "go"}:
             working_state = self._get_working_state(session_id)
