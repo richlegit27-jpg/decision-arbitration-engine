@@ -2237,6 +2237,79 @@ body {
     return [];
   }
 
+  // NOVA_DESKTOP_RESCUE_SOURCE_CARDS_20260611
+  function novaDesktopRescueSourceCards_20260611(msg) {
+    try {
+      var meta = msg && typeof msg === "object" && msg.meta && typeof msg.meta === "object"
+        ? msg.meta
+        : {};
+
+      var sources = Array.isArray(meta.sources) ? meta.sources : [];
+
+      if (!sources.length && Array.isArray(msg && msg.sources)) {
+        sources = msg.sources;
+      }
+
+      if (!sources.length) return null;
+
+      var wrap = document.createElement("div");
+      wrap.className = "nova-source-cards nova-desktop-rescue-source-cards";
+      wrap.style.marginTop = "10px";
+      wrap.style.display = "grid";
+      wrap.style.gap = "8px";
+
+      sources.slice(0, 8).forEach(function (src, index) {
+        src = src || {};
+
+        var url = String(src.url || src.link || src.href || src.file_url || "").trim();
+        var title = String(src.title || src.name || src.label || src.source || ("Source " + (index + 1))).trim();
+        var snippet = String(src.snippet || src.text || src.description || src.summary || "").trim();
+
+        var card = document.createElement(url ? "a" : "div");
+        card.className = "nova-source-card nova-desktop-rescue-source-card";
+        card.style.display = "block";
+        card.style.padding = "10px 12px";
+        card.style.border = "1px solid rgba(255,255,255,.14)";
+        card.style.borderRadius = "12px";
+        card.style.background = "rgba(255,255,255,.06)";
+        card.style.color = "inherit";
+        card.style.textDecoration = "none";
+
+        if (url) {
+          card.href = url;
+          card.target = "_blank";
+          card.rel = "noopener noreferrer";
+        }
+
+        var titleEl = document.createElement("div");
+        titleEl.className = "nova-source-title";
+        titleEl.textContent = title;
+        titleEl.style.fontWeight = "700";
+        titleEl.style.fontSize = "13px";
+
+        card.appendChild(titleEl);
+
+        if (snippet) {
+          var snippetEl = document.createElement("div");
+          snippetEl.className = "nova-source-snippet";
+          snippetEl.textContent = snippet;
+          snippetEl.style.marginTop = "4px";
+          snippetEl.style.opacity = ".78";
+          snippetEl.style.fontSize = "12px";
+          snippetEl.style.lineHeight = "1.35";
+          card.appendChild(snippetEl);
+        }
+
+        wrap.appendChild(card);
+      });
+
+      return wrap;
+    } catch (err) {
+      console.warn("[Nova Desktop Rescue] source cards render failed", err);
+      return null;
+    }
+  }
+
   function renderDesktopChatMessagesRescue(messages) {
     var box = getDesktopMessagesContainerRescue();
     if (!box) return false;
@@ -2268,6 +2341,14 @@ body {
       var row = document.createElement("div");
       row.className = "message " + (role.indexOf("user") !== -1 ? "user" : "assistant");
       row.textContent = String(text || "").trim() || JSON.stringify(msg);
+
+      if (role.indexOf("user") === -1) {
+        var sourceCards = novaDesktopRescueSourceCards_20260611(msg);
+        if (sourceCards) {
+          row.appendChild(sourceCards);
+        }
+      }
+
       box.appendChild(row);
     });
 
