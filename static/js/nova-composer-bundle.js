@@ -2547,6 +2547,53 @@ function renderMarkdown(text) {
   return html;
 }
 
+
+// NOVA_FORCE_DESKTOP_SOURCE_CARDS_20260611
+function novaForceSourceCardsHtml_20260611(message) {
+  try {
+    const meta =
+      message &&
+      message.meta &&
+      typeof message.meta === "object"
+        ? message.meta
+        : {};
+
+    const sources = Array.isArray(meta.sources) ? meta.sources : [];
+
+    if (!sources.length) {
+      return "";
+    }
+
+    const cards = sources.map(function (item, index) {
+      item = item && typeof item === "object" ? item : {};
+
+      const title = String(item.title || item.headline || item.name || "Source").trim();
+      const url = String(item.url || item.source_url || item.link || "").trim();
+      const domain = String(item.source || item.domain || item.publisher || "").trim();
+      const snippet = String(item.snippet || item.preview || item.description || "").trim();
+
+      return (
+        '<a class="nova-source-card source-card nova-forced-source-card" ' +
+        'data-no-chat-action="1" ' +
+        'href="' + escapeHtml(url || "#") + '" ' +
+        'target="_blank" rel="noreferrer noopener">' +
+          '<div class="nova-source-card-top">' +
+            '<span class="nova-source-number">' + escapeHtml(String(index + 1)) + '</span>' +
+            '<span class="nova-source-domain">' + escapeHtml(domain || "source") + '</span>' +
+          '</div>' +
+          '<div class="nova-source-title">' + escapeHtml(title) + '</div>' +
+          (snippet ? '<div class="nova-source-snippet">' + escapeHtml(snippet) + '</div>' : '') +
+        '</a>'
+      );
+    }).join("");
+
+    return '<div class="nova-source-grid nova-forced-source-grid">' + cards + '</div>';
+  } catch (err) {
+    console.warn("[Nova Desktop] forced source card render failed", err);
+    return "";
+  }
+}
+
 function renderMessageCard(message) {
   if (!message || typeof message !== "object") {
     console.warn("renderMessageCard received invalid message", message);
@@ -2606,6 +2653,18 @@ function renderMessageCard(message) {
       : renderMarkdown(rawText);
 
   // Source cards already rendered by renderSources().
+  // NOVA_FORCE_DESKTOP_SOURCE_CARDS_20260611
+  try {
+    if (
+      role === "assistant" &&
+      hasMetaSources &&
+      String(renderedText || "").indexOf("nova-source-card") < 0
+    ) {
+      renderedText = String(renderedText || "") + novaForceSourceCardsHtml_20260611(message);
+    }
+  } catch (err) {
+    console.warn("[Nova Desktop] source card fallback skipped", err);
+  }
 
   renderedText = String(renderedText || "")
     .replace(/alt="[^"]*"<\/p>/gi, "")
@@ -6639,6 +6698,165 @@ async function consumeChatStreamStable(payload) {
       }
 
       applyStatePayload(data);
+
+      // NOVA_FORCE_DESKTOP_SOURCE_CARDS_20260611
+      try {
+        const assistantMessage =
+          data &&
+          data.assistant_message &&
+          typeof data.assistant_message === "object"
+            ? data.assistant_message
+            : null;
+
+        const assistantMeta =
+          assistantMessage &&
+          assistantMessage.meta &&
+          typeof assistantMessage.meta === "object"
+            ? assistantMessage.meta
+            : {};
+
+        const sources = Array.isArray(assistantMeta.sources) ? assistantMeta.sources : [];
+
+        if (assistantMessage && sources.length && Array.isArray(state.messages)) {
+          const assistantText = String(
+            assistantMessage.text ||
+            assistantMessage.content ||
+            data.text ||
+            ""
+          ).trim();
+
+          for (let i = state.messages.length - 1; i >= 0; i -= 1) {
+            const msg = state.messages[i];
+            if (!msg || String(msg.role || "") !== "assistant") {
+              continue;
+            }
+
+            const msgText = String(msg.text || msg.content || "").trim();
+
+            if (
+              !assistantText ||
+              msgText === assistantText ||
+              msgText.indexOf(assistantText.slice(0, 64)) >= 0 ||
+              assistantText.indexOf(msgText.slice(0, 64)) >= 0
+            ) {
+              msg.meta = msg.meta && typeof msg.meta === "object" ? msg.meta : {};
+              msg.meta.sources = sources;
+
+              if (Array.isArray(assistantMeta.source_urls)) {
+                msg.meta.source_urls = assistantMeta.source_urls;
+              }
+
+              msg.meta.route = assistantMeta.route || msg.meta.route || "web";
+              msg.meta.strategy = assistantMeta.strategy || msg.meta.strategy || "web_fetch";
+              break;
+            }
+          }
+        }
+
+        if (typeof renderMessages === "function") {
+          renderMessages();
+        }
+      } catch (err) {
+        console.warn("[Nova Desktop] source meta preserve failed", err);
+      }
+
+
+      // NOVA_DESKTOP_WEB_SOURCE_META_BRIDGE_20260611
+      // Preserve assistant_message.meta.sources so desktop web/source cards render.
+      try {
+        const assistantMessage =
+          data &&
+          data.assistant_message &&
+          typeof data.assistant_message === "object"
+            ? data.assistant_message
+            : null;
+
+        const assistantMeta =
+          assistantMessage &&
+          assistantMessage.meta &&
+          typeof assistantMessage.meta === "object"
+            ? assistantMessage.meta
+            : {};
+
+        const sourceList = Array.isArray(assistantMeta.sources)
+          ? assistantMeta.sources
+          : [];
+
+        if (assistantMessage && sourceList.length) {
+          const assistantText = String(
+            assistantMessage.text ||
+            assistantMessage.content ||
+            data.text ||
+            ""
+          ).trim();
+
+          let patchedExisting = false;
+
+          if (Array.isArray(state.messages)) {
+            for (let i = state.messages.length - 1; i >= 0; i -= 1) {
+              const message = state.messages[i];
+              if (!message || String(message.role || "") !== "assistant") {
+                continue;
+              }
+
+              const messageText = String(message.text || message.content || "").trim();
+              const messageHasSources =
+                message.meta &&
+                Array.isArray(message.meta.sources) &&
+                message.meta.sources.length > 0;
+
+              if (
+                messageText === assistantText ||
+                (!messageHasSources && assistantText && messageText.indexOf(assistantText.slice(0, 80)) >= 0)
+              ) {
+                message.meta =
+                  message.meta && typeof message.meta === "object"
+                    ? message.meta
+                    : {};
+
+                message.meta.sources = sourceList;
+                message.meta.source_urls = Array.isArray(assistantMeta.source_urls)
+                  ? assistantMeta.source_urls
+                  : sourceList.map(function (item) {
+                      return item && item.url ? item.url : "";
+                    }).filter(Boolean);
+
+                message.meta.route = assistantMeta.route || message.meta.route || "web";
+                message.meta.strategy = assistantMeta.strategy || message.meta.strategy || "web_fetch";
+
+                if (!message.text && assistantText) {
+                  message.text = assistantText;
+                }
+
+                patchedExisting = true;
+                break;
+              }
+            }
+          }
+
+          if (!patchedExisting && typeof upsertMessage === "function") {
+            upsertMessage({
+              id: assistantMessage.id || makeId("assistant_web"),
+              role: "assistant",
+              text: assistantText,
+              content: assistantText,
+              meta: assistantMeta,
+              attachments: Array.isArray(assistantMessage.attachments)
+                ? assistantMessage.attachments
+                : [],
+            });
+          }
+
+          if (typeof renderMessages === "function") {
+            renderMessages();
+          } else if (typeof renderAll === "function") {
+            renderAll();
+          }
+        }
+      } catch (err) {
+        console.warn("[Nova Desktop] web source meta bridge skipped", err);
+      }
+
 
       finishStreamUi({
         statusText: "Complete",
