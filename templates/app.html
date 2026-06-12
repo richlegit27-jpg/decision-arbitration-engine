@@ -5116,8 +5116,137 @@ main,
   wrap();
 })();
 </script>
+
+<!-- NOVA_DESKTOP_SOURCE_CARD_OBSERVER_PRUNE_20260612 -->
+<script>
+(function () {
+  "use strict";
+
+  var MARKER = "NOVA_DESKTOP_SOURCE_CARD_OBSERVER_PRUNE_20260612";
+  var pruneQueued = false;
+
+  function log() {
+    try {
+      console.log.apply(console, ["[Nova Source Card Observer Prune]"].concat([].slice.call(arguments)));
+    } catch (_) {}
+  }
+
+  function getGroups() {
+    try {
+      return Array.from(
+        document.querySelectorAll("[data-nova-forced-source-cards='true'], .nova-source-cards")
+      ).filter(function (node) {
+        return node && node.parentNode;
+      });
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function pruneNow() {
+    pruneQueued = false;
+
+    try {
+      var groups = getGroups();
+
+      if (groups.length <= 1) {
+        return;
+      }
+
+      // Keep the latest group in document order. Remove every older group.
+      groups.slice(0, -1).forEach(function (node) {
+        try {
+          node.remove();
+        } catch (_) {}
+      });
+    } catch (err) {
+      console.warn("[Nova Source Card Observer Prune] prune failed", err);
+    }
+  }
+
+  function queuePrune() {
+    if (pruneQueued) {
+      return;
+    }
+
+    pruneQueued = true;
+
+    try {
+      requestAnimationFrame(pruneNow);
+    } catch (_) {
+      setTimeout(pruneNow, 0);
+    }
+  }
+
+  function installObserver() {
+    try {
+      pruneNow();
+      setTimeout(pruneNow, 25);
+      setTimeout(pruneNow, 100);
+      setTimeout(pruneNow, 250);
+      setTimeout(pruneNow, 750);
+
+      var observer = new MutationObserver(function (mutations) {
+        for (var i = 0; i < mutations.length; i += 1) {
+          var mutation = mutations[i];
+
+          if (!mutation.addedNodes || !mutation.addedNodes.length) {
+            continue;
+          }
+
+          for (var j = 0; j < mutation.addedNodes.length; j += 1) {
+            var node = mutation.addedNodes[j];
+
+            if (!node || node.nodeType !== 1) {
+              continue;
+            }
+
+            if (
+              (node.matches && (
+                node.matches("[data-nova-forced-source-cards='true']") ||
+                node.matches(".nova-source-cards") ||
+                node.matches(".nova-source-card")
+              )) ||
+              (node.querySelector && (
+                node.querySelector("[data-nova-forced-source-cards='true']") ||
+                node.querySelector(".nova-source-cards") ||
+                node.querySelector(".nova-source-card")
+              ))
+            ) {
+              queuePrune();
+              return;
+            }
+          }
+        }
+      });
+
+      observer.observe(document.documentElement || document.body, {
+        childList: true,
+        subtree: true
+      });
+
+      window.__novaDesktopSourceCardObserverPrune20260612 = {
+        marker: MARKER,
+        pruneNow: pruneNow,
+        observer: observer
+      };
+
+      log("ready", MARKER);
+    } catch (err) {
+      console.warn("[Nova Source Card Observer Prune] observer install failed", err);
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", installObserver, { once: true });
+  } else {
+    installObserver();
+  }
+})();
+</script>
 </body>
 </html>
+
 
 
 
