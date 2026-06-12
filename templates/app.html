@@ -4804,8 +4804,137 @@ main,
   log("ready", MARKER);
 })();
 </script>
+
+<!-- NOVA_FORCE_DESKTOP_SOURCE_CARDS_DEDUPE_20260612 -->
+<script>
+(function () {
+  "use strict";
+
+  var MARKER = "NOVA_FORCE_DESKTOP_SOURCE_CARDS_DEDUPE_20260612";
+
+  function log() {
+    try {
+      console.log.apply(console, ["[Nova Source Card Dedupe]"].concat([].slice.call(arguments)));
+    } catch (_) {}
+  }
+
+  function messageKey(msg, index) {
+    if (!msg || typeof msg !== "object") return "unknown_" + index;
+    return String(msg.id || msg.message_id || msg.created_at || msg.text || ("assistant_" + index));
+  }
+
+  function normalizeSources(msg) {
+    if (!msg || typeof msg !== "object") return [];
+
+    var meta = msg.meta && typeof msg.meta === "object" ? msg.meta : {};
+    var sources = [];
+
+    if (Array.isArray(meta.sources)) sources = meta.sources;
+    else if (Array.isArray(meta.web_sources)) sources = meta.web_sources;
+    else if (Array.isArray(meta.citations)) sources = meta.citations;
+    else if (Array.isArray(msg.sources)) sources = msg.sources;
+
+    return sources.filter(function (src) {
+      if (!src) return false;
+      if (typeof src === "string") return !!src.trim();
+      if (typeof src === "object") return !!(src.url || src.href || src.link || src.title || src.name);
+      return false;
+    });
+  }
+
+  function getMessages() {
+    try {
+      var session = window.NovaCurrentSessionManager && window.NovaCurrentSessionManager.currentSession;
+      if (session && Array.isArray(session.messages)) return session.messages;
+    } catch (_) {}
+
+    return [];
+  }
+
+  function cleanupDuplicates() {
+    var seen = {};
+
+    Array.from(document.querySelectorAll("[data-nova-forced-source-cards='true']")).forEach(function (node) {
+      var key = node.getAttribute("data-nova-source-message-key") || "";
+
+      if (!key) {
+        node.remove();
+        return;
+      }
+
+      if (seen[key]) {
+        node.remove();
+        return;
+      }
+
+      seen[key] = true;
+    });
+  }
+
+  function patchExistingRenderer() {
+    if (typeof window.novaForceDesktopSourceCardsDOM_20260612 !== "function") {
+      return false;
+    }
+
+    if (window.novaForceDesktopSourceCardsDOM_20260612.__novaDedupeWrapped) {
+      return true;
+    }
+
+    var original = window.novaForceDesktopSourceCardsDOM_20260612;
+
+    var wrapped = function () {
+      var messages = getMessages();
+      var assistantWithSources = messages.filter(function (m) {
+        return m && m.role === "assistant" && normalizeSources(m).length;
+      });
+
+      var beforeKeys = {};
+      Array.from(document.querySelectorAll("[data-nova-forced-source-cards='true']")).forEach(function (node) {
+        var key = node.getAttribute("data-nova-source-message-key") || "";
+        if (key) beforeKeys[key] = true;
+      });
+
+      var result = original.apply(this, arguments);
+
+      Array.from(document.querySelectorAll("[data-nova-forced-source-cards='true']")).forEach(function (node, i) {
+        var existing = node.getAttribute("data-nova-source-message-key");
+        if (existing) return;
+
+        var msg = assistantWithSources[i] || assistantWithSources[assistantWithSources.length - 1];
+        node.setAttribute("data-nova-source-message-key", messageKey(msg, i));
+      });
+
+      cleanupDuplicates();
+
+      return result;
+    };
+
+    wrapped.__novaDedupeWrapped = true;
+    window.novaForceDesktopSourceCardsDOM_20260612 = wrapped;
+
+    log("wrapped forced source card renderer", MARKER);
+    return true;
+  }
+
+  function boot() {
+    if (!patchExistingRenderer()) {
+      setTimeout(boot, 250);
+      return;
+    }
+
+    try {
+      window.novaForceDesktopSourceCardsDOM_20260612();
+    } catch (_) {}
+
+    cleanupDuplicates();
+  }
+
+  boot();
+})();
+</script>
 </body>
 </html>
+
 
 
 
