@@ -1,4 +1,4 @@
-﻿<!-- NOVA_DESKTOP_APP_UI_V1_20260610 -->
+<!-- NOVA_DESKTOP_APP_UI_V1_20260610 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -4206,6 +4206,208 @@ main,
 
   window.novaDesktopFinalSourceCardsReady = true;
   console.log("[Nova Desktop Final Source Cards] ready");
+})();
+</script>
+
+
+
+<!-- NOVA_DESKTOP_RESCUE_FETCH_MISSING_SESSION_20260611 -->
+<script>
+(function () {
+  "use strict";
+
+  const MARKER = "NOVA_DESKTOP_RESCUE_FETCH_MISSING_SESSION_20260611";
+
+  function esc(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, function (ch) {
+      return {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[ch] || ch;
+    });
+  }
+
+  function getActiveSessionId() {
+    try {
+      return String(
+        window.NovaDesktopActiveSessionId ||
+        window.novaDesktopActiveSessionId ||
+        window.currentSessionId ||
+        window.activeSessionId ||
+        localStorage.getItem("nova_active_session_id") ||
+        localStorage.getItem("active_session_id") ||
+        ""
+      ).trim();
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function getRescueBox() {
+    let box = document.getElementById("nova-desktop-rescue-messages");
+    if (box) return box;
+
+    const host =
+      document.querySelector(".desktop-chat-container") ||
+      document.querySelector("#desktopChatMessages") ||
+      document.querySelector("main") ||
+      document.body;
+
+    box = document.createElement("div");
+    box.id = "nova-desktop-rescue-messages";
+    box.className = "messages chat-messages desktop-rescue-messages";
+    box.style.minHeight = "320px";
+    box.style.maxHeight = "60vh";
+    box.style.overflowY = "auto";
+    box.style.padding = "16px";
+    box.style.margin = "12px 0";
+    box.style.borderRadius = "18px";
+    box.style.background = "rgba(255,255,255,.04)";
+    host.appendChild(box);
+    return box;
+  }
+
+  function attachmentName(attachment) {
+    if (!attachment || typeof attachment !== "object") return "";
+    return String(
+      attachment.original_filename ||
+      attachment.filename ||
+      attachment.name ||
+      attachment.stored_name ||
+      "attachment"
+    );
+  }
+
+  function sourceCardsHtml(message) {
+    try {
+      const meta = message && typeof message === "object" ? (message.meta || {}) : {};
+      const sources = Array.isArray(meta.sources) ? meta.sources : [];
+      if (!sources.length) return "";
+
+      return [
+        '<div class="nova-source-cards" style="margin-top:10px;display:grid;gap:8px;">',
+        sources.map(function (src) {
+          const title = esc(src.title || src.source || src.url || "Source");
+          const url = esc(src.url || "");
+          const snippet = esc(src.snippet || "");
+          const source = esc(src.source || "");
+          const titleHtml = url
+            ? '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + title + '</a>'
+            : title;
+
+          return [
+            '<div class="nova-source-card" style="padding:10px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);">',
+            '<div style="font-weight:700;">' + titleHtml + '</div>',
+            source ? '<div style="opacity:.7;font-size:12px;margin-top:2px;">' + source + '</div>' : '',
+            snippet ? '<div style="opacity:.85;font-size:13px;margin-top:6px;">' + snippet + '</div>' : '',
+            '</div>'
+          ].join("");
+        }).join(""),
+        '</div>'
+      ].join("");
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function renderMessagesDirect(session) {
+    const box = getRescueBox();
+    const messages = Array.isArray(session && session.messages) ? session.messages : [];
+
+    if (!messages.length) {
+      box.innerHTML = '<div class="session-placeholder">No messages in this session.</div>';
+      return 0;
+    }
+
+    box.innerHTML = messages.map(function (message) {
+      const role = esc(message.role || "message");
+      const id = esc(message.id || "");
+      const text = esc(message.text || "");
+      const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+      const attachmentHtml = attachments.length
+        ? '<div class="nova-message-attachments" style="margin-top:10px;opacity:.75;font-size:12px;">Attachments: ' +
+          esc(attachments.map(attachmentName).filter(Boolean).join(", ")) +
+          '</div>'
+        : "";
+
+      return [
+        '<div class="chat-message message ' + role + '" data-message-id="' + id + '" style="padding:14px;margin:10px 0;border-radius:14px;background:rgba(255,255,255,.06);">',
+        '<div style="opacity:.65;font-size:12px;margin-bottom:6px;">' + role + (id ? " · " + id : "") + '</div>',
+        '<div style="white-space:pre-wrap;">' + text + '</div>',
+        attachmentHtml,
+        sourceCardsHtml(message),
+        '</div>'
+      ].join("");
+    }).join("");
+
+    box.scrollTop = box.scrollHeight;
+    return messages.length;
+  }
+
+  async function fetchAndRenderSession(sessionId) {
+    if (!sessionId) return false;
+
+    const response = await fetch("/api/sessions/" + encodeURIComponent(sessionId), {
+      headers: { "Accept": "application/json" }
+    });
+
+    const data = await response.json().catch(function () {
+      return null;
+    });
+
+    if (!response.ok || !data || !data.ok || !data.session) {
+      console.warn("[Nova Desktop Rescue] session detail fallback failed", sessionId, data);
+      return false;
+    }
+
+    const rendered = renderMessagesDirect(data.session);
+    console.log("[Nova Desktop Rescue] fetched missing session and rendered messages", {
+      session_id: sessionId,
+      rendered: rendered
+    });
+    return rendered > 0;
+  }
+
+  function installWrapper() {
+    if (window.__novaDesktopRescueFetchMissingSessionInstalled) return;
+    window.__novaDesktopRescueFetchMissingSessionInstalled = true;
+
+    const original = typeof window.renderDesktopChatMessagesRescue === "function"
+      ? window.renderDesktopChatMessagesRescue
+      : null;
+
+    window.renderDesktopChatMessagesRescue = function () {
+      const result = original ? original.apply(this, arguments) : true;
+
+      setTimeout(function () {
+        try {
+          const sessionId = getActiveSessionId();
+          const box = getRescueBox();
+          const renderedCount = box.querySelectorAll("[data-message-id]").length;
+          const hasText = String(box.innerText || "").trim().length > 20;
+
+          if (sessionId && (!renderedCount || !hasText)) {
+            fetchAndRenderSession(sessionId);
+          }
+        } catch (err) {
+          console.warn("[Nova Desktop Rescue] missing-session fallback skipped", err);
+        }
+      }, 80);
+
+      return result;
+    };
+
+    console.log("[Nova Desktop Rescue] fetch missing session fallback ready", MARKER);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", installWrapper);
+  } else {
+    installWrapper();
+  }
 })();
 </script>
 
