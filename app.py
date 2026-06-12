@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import os
 import re
@@ -12627,6 +12627,145 @@ def _nova_install_api_chat_attachment_view_wrapper_20260611():
 
 
 _nova_install_api_chat_attachment_view_wrapper_20260611()
+
+
+
+
+
+# NOVA_API_CHAT_TARGET_SESSION_APPEND_BRIDGE_20260611
+# Ensures /api/chat persists user+assistant exchanges into the explicit
+# request session_id/client_session_id/active_session_id instead of silently
+# creating or returning a different active session.
+@app.after_request
+def nova_api_chat_target_session_append_bridge_20260611(response):
+    try:
+        if request.path != "/api/chat" or request.method != "POST":
+            return response
+
+        if getattr(response, "status_code", 500) >= 400:
+            return response
+
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return response
+
+        target_session_id = str(
+            payload.get("session_id")
+            or payload.get("client_session_id")
+            or payload.get("active_session_id")
+            or ""
+        ).strip()
+
+        if not target_session_id:
+            return response
+
+        user_text = str(
+            payload.get("message")
+            or payload.get("user_text")
+            or payload.get("text")
+            or payload.get("prompt")
+            or ""
+        ).strip()
+
+        if not user_text:
+            return response
+
+        response_json = response.get_json(silent=True) or {}
+        if not isinstance(response_json, dict) or not response_json.get("ok", False):
+            return response
+
+        assistant_message = response_json.get("assistant_message")
+        assistant_text = ""
+
+        if isinstance(assistant_message, dict):
+            assistant_text = str(
+                assistant_message.get("text")
+                or assistant_message.get("content")
+                or ""
+            ).strip()
+
+        if not assistant_text:
+            assistant_text = str(
+                response_json.get("text")
+                or response_json.get("response")
+                or response_json.get("answer")
+                or ""
+            ).strip()
+
+        if not assistant_text:
+            return response
+
+        try:
+            target_session = session_service.get_session(target_session_id)
+        except Exception:
+            target_session = None
+
+        if not target_session:
+            return response
+
+        try:
+            existing_blob = json.dumps(target_session, ensure_ascii=False)
+        except Exception:
+            existing_blob = str(target_session)
+
+        # Idempotency guard. If a normal route already saved this exact user
+        # text into the target session, do not duplicate it.
+        if user_text in existing_blob:
+            return response
+
+        request_meta = {
+            "route": "api_chat_target_session_append_bridge",
+            "target_session_id": target_session_id,
+            "response_active_session_id": str(response_json.get("active_session_id") or ""),
+            "response_session_id": str(response_json.get("session_id") or ""),
+        }
+
+        try:
+            session_service.append_message(target_session_id, {
+                "role": "user",
+                "text": user_text,
+                "attachments": payload.get("attachments") if isinstance(payload.get("attachments"), list) else [],
+                "meta": request_meta,
+            })
+
+            assistant_meta = {}
+            assistant_attachments = []
+
+            if isinstance(assistant_message, dict):
+                if isinstance(assistant_message.get("meta"), dict):
+                    assistant_meta.update(assistant_message.get("meta") or {})
+                if isinstance(assistant_message.get("attachments"), list):
+                    assistant_attachments = assistant_message.get("attachments") or []
+
+            assistant_meta.update(request_meta)
+
+            session_service.append_message(target_session_id, {
+                "role": "assistant",
+                "text": assistant_text,
+                "attachments": assistant_attachments,
+                "meta": assistant_meta,
+            })
+
+            response_json["session_id"] = target_session_id
+            response_json["active_session_id"] = target_session_id
+            response_json["target_session_append_bridge"] = True
+
+            try:
+                response.set_data(json.dumps(response_json, ensure_ascii=False))
+                response.mimetype = "application/json"
+            except Exception:
+                pass
+
+        except Exception as exc:
+            try:
+                app.logger.warning("[Nova API Chat Target Session Append Bridge] skipped: %s", exc)
+            except Exception:
+                pass
+
+        return response
+
+    except Exception:
+        return response
 
 
 if __name__ == "__main__":
