@@ -2356,6 +2356,16 @@ body {
     return true;
   }
 
+  // NOVA_DESKTOP_RESCUE_GLOBAL_EXPORT_20260611
+  try {
+    window.renderDesktopChatMessagesRescue = renderDesktopChatMessagesRescue;
+    window.getDesktopMessagesContainerRescue = getDesktopMessagesContainerRescue;
+    window.novaDesktopRescueSourceCards_20260611 = novaDesktopRescueSourceCards_20260611;
+    console.log("[Nova Desktop Rescue] global renderer export ready");
+  } catch (err) {
+    console.warn("[Nova Desktop Rescue] global renderer export failed", err);
+  }
+
   async function loadDesktopSessionMessagesRescue(sid) {
     if (!sid) return;
 
