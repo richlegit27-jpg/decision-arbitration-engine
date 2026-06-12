@@ -5197,7 +5197,15 @@ if (not attachments) and (__name__ == "__main__"):
                 x in text_lc for x in execution_keywords
             )
 
-            if memory_brain and should_attach_operational_context:
+            # NOVA_SKIP_PROJECT_CONTEXT_FOR_INTERPRETED_NEWS_20260612
+            # Clean public news/web queries must not be polluted with Nova project memory.
+            # Example bad query before this guard:
+            # "latest tucker carlson project aware context for nova ... news today"
+            _skip_project_context_for_news = bool(
+                getattr(self, "_skip_project_context_for_interpreted_news", False)
+            )
+
+            if memory_brain and should_attach_operational_context and not _skip_project_context_for_news:
                 brain_context = "\n".join(memory_brain)
 
                 user_text = (
@@ -11265,6 +11273,10 @@ if (not attachments) and (__name__ == "__main__"):
                 self._last_interpretation = interpretation
                 self._last_original_user_text = original_user_text
                 self._last_interpreted_user_text = _interpreted_web_query
+                self._skip_project_context_for_interpreted_news = (
+                    isinstance(interpretation, dict)
+                    and interpretation.get("intent") == "fresh_web_news"
+                )
                 exec_debug(
                     "INTERPRETATION_REWROTE_WEB_QUERY:",
                     original_user_text,
