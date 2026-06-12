@@ -843,6 +843,211 @@ body {
 }
 </style>
 
+
+
+<!-- NOVA_DESKTOP_VISUAL_POLISH_LOCK_20260611 -->
+<style>
+    /* Desktop-only visual polish. No backend/session/auth logic touched. */
+    @media (min-width: 769px) {
+        body {
+            text-rendering: optimizeLegibility;
+        }
+
+        .chat-message,
+        .message,
+        .nova-message,
+        [data-message-role],
+        .assistant-message,
+        .user-message {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        .chat-message pre,
+        .message pre,
+        .nova-message pre,
+        .assistant-message pre,
+        .user-message pre {
+            max-width: 100%;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+
+        .chat-message code,
+        .message code,
+        .nova-message code,
+        .assistant-message code,
+        .user-message code {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        .attachment,
+        .attachment-chip,
+        .attachment-preview,
+        .nova-attachment,
+        [data-attachment],
+        .file-chip,
+        .file-preview {
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            border-radius: 12px;
+        }
+
+        .attachment a,
+        .attachment-chip a,
+        .attachment-preview a,
+        .nova-attachment a,
+        [data-attachment] a,
+        .file-chip a,
+        .file-preview a {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        button,
+        .button,
+        [role="button"],
+        input[type="button"],
+        input[type="submit"] {
+            touch-action: manipulation;
+        }
+
+        textarea,
+        input[type="text"],
+        input[type="search"],
+        input[type="password"] {
+            line-height: 1.35;
+        }
+
+        #chatMessages,
+        #desktopChatMessages,
+        #messages,
+        .chat-messages,
+        .messages,
+        .chat-scroll,
+        .conversation,
+        .nova-chat {
+            scroll-behavior: smooth;
+        }
+
+        #authStatus,
+        #desktopAuthStatus,
+        .auth-status,
+        .desktop-auth-status,
+        .account-widget,
+        .user-widget {
+            white-space: nowrap;
+        }
+
+        #desktopSessionList,
+        .desktop-session-list,
+        .session-list {
+            scrollbar-width: thin;
+        }
+
+        .desktop-session-item,
+        .session-item,
+        [data-session-id] {
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    }
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    var marker = "NOVA_DESKTOP_VISUAL_POLISH_LOCK_20260611";
+
+    if (window[marker]) {
+        return;
+    }
+    window[marker] = true;
+
+    function isDesktop() {
+        return window.matchMedia && window.matchMedia("(min-width: 769px)").matches;
+    }
+
+    function scrollMainChatToBottom() {
+        if (!isDesktop()) {
+            return;
+        }
+
+        var candidates = [
+            document.getElementById("chatMessages"),
+            document.getElementById("desktopChatMessages"),
+            document.getElementById("messages"),
+            document.querySelector(".chat-messages"),
+            document.querySelector(".messages"),
+            document.querySelector(".chat-scroll"),
+            document.querySelector(".conversation"),
+            document.querySelector(".nova-chat")
+        ].filter(Boolean);
+
+        candidates.forEach(function (el) {
+            try {
+                var distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+                if (distanceFromBottom < 240) {
+                    el.scrollTop = el.scrollHeight;
+                }
+            } catch (err) {}
+        });
+    }
+
+    function normalizeAttachmentTitles() {
+        if (!isDesktop()) {
+            return;
+        }
+
+        var nodes = document.querySelectorAll(
+            ".attachment, .attachment-chip, .attachment-preview, .nova-attachment, [data-attachment], .file-chip, .file-preview"
+        );
+
+        nodes.forEach(function (node) {
+            if (!node || node.getAttribute("data-nova-title-polished") === "true") {
+                return;
+            }
+
+            var text = (node.textContent || "").trim().replace(/\s+/g, " ");
+            if (text) {
+                node.title = text;
+            }
+
+            node.setAttribute("data-nova-title-polished", "true");
+        });
+    }
+
+    function polishDesktop() {
+        if (!isDesktop()) {
+            return;
+        }
+
+        normalizeAttachmentTitles();
+        scrollMainChatToBottom();
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", polishDesktop);
+    } else {
+        polishDesktop();
+    }
+
+    var observer = new MutationObserver(function () {
+        polishDesktop();
+    });
+
+    observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true
+    });
+
+    window.addEventListener("resize", polishDesktop);
+})();
+</script>
+
 </head>
 <body>
   <div class="shell">
