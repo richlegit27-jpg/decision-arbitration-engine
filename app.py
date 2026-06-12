@@ -10828,8 +10828,12 @@ def _nova_install_auth_compat_alias_routes_safe_20260611():
                 "auth_register",
             ])
 
+        # NOVA_AUTH_ME_STATUS_ALIASES_20260612
         routes = [
             ("/api/auth/status", "nova_api_auth_status_safe_20260611", auth_status, ["GET"]),
+            ("/api/auth/me", "nova_api_auth_me_safe_20260612", auth_status, ["GET"]),
+            ("/api/me", "nova_api_me_safe_20260612", auth_status, ["GET"]),
+            ("/auth/status", "nova_auth_status_page_safe_20260612", auth_status, ["GET"]),
             ("/api/auth/logout", "nova_api_auth_logout_safe_20260611", auth_logout_alias, ["POST", "GET"]),
             ("/api/auth/login", "nova_api_auth_login_safe_20260611", auth_login_alias, ["POST"]),
             ("/api/auth/register", "nova_api_auth_register_safe_20260611", auth_register_alias, ["POST"]),
