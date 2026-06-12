@@ -11244,6 +11244,10 @@ if (not attachments) and (__name__ == "__main__"):
             except Exception:
                 pass
 
+        # NOVA_INTERPRETATION_REWRITE_BEFORE_LEGACY_WEB_20260612
+        # Do not bypass the existing web pipeline. Rewrite the prompt first,
+        # then let the legacy decision/router/finalizer preserve sessions,
+        # source cards, and response shape.
         if (
             not attachments
             and isinstance(interpretation, dict)
@@ -11254,36 +11258,21 @@ if (not attachments) and (__name__ == "__main__"):
                 interpretation.get("rewritten_text") or original_user_text
             ).strip()
 
+            user_text = _interpreted_web_query
+            lowered = self._safe_str(user_text).lower().strip()
+
             try:
-                _web_result = self._execute_web_fetch(
-                    user_text=_interpreted_web_query,
-                    session_id=session_id,
-                    attachments=[],
-                    memory_context="",
+                self._last_interpretation = interpretation
+                self._last_original_user_text = original_user_text
+                self._last_interpreted_user_text = _interpreted_web_query
+                exec_debug(
+                    "INTERPRETATION_REWROTE_WEB_QUERY:",
+                    original_user_text,
+                    "=>",
+                    _interpreted_web_query,
                 )
-
-                if isinstance(_web_result, dict):
-                    _web_result.setdefault("debug", {})
-                    if isinstance(_web_result.get("debug"), dict):
-                        _web_result["debug"]["interpretation"] = interpretation
-                        _web_result["debug"]["original_user_text"] = original_user_text
-                        _web_result["debug"]["interpreted_user_text"] = _interpreted_web_query
-
-                    _assistant = _web_result.get("assistant_message")
-                    if isinstance(_assistant, dict):
-                        _assistant.setdefault("meta", {})
-                        if isinstance(_assistant.get("meta"), dict):
-                            _assistant["meta"]["interpretation"] = interpretation
-                            _assistant["meta"]["original_user_text"] = original_user_text
-                            _assistant["meta"]["interpreted_user_text"] = _interpreted_web_query
-                            _assistant["meta"]["route"] = _assistant["meta"].get("route") or "web"
-
-                return _web_result
-            except Exception as _nova_interpret_web_err:
-                try:
-                    exec_debug("INTERPRETATION_WEB_ROUTE_ERROR:", _nova_interpret_web_err)
-                except Exception:
-                    pass
+            except Exception:
+                pass
 
 
         # TOP_LEVEL_SHORT_COMMAND_INTERCEPT_LOCK
