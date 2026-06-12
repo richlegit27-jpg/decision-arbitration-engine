@@ -5352,6 +5352,159 @@ main,
 })();
 </script>
 
+
+
+<!-- NOVA_DESKTOP_HARD_ID_ALIASES_20260612 -->
+<script>
+(function(){
+  "use strict";
+
+  var map = {
+    desktopSessionsButton: "openSessionsBtn",
+    desktopMemoryButton: "openMemoryBtn",
+    desktopChatInput: "input",
+    desktopSendButton: "sendBtn"
+  };
+
+  for (const alias in map) {
+    if (!document.getElementById(alias)) {
+      const real = document.getElementById(map[alias]);
+      if (real) {
+        const dummy = document.createElement("div");
+        dummy.id = alias;
+        dummy.style.display = "none";
+        // Attach a pointer to real element for easy access
+        dummy._real = real;
+        real.parentNode.insertBefore(dummy, real.nextSibling);
+      }
+    }
+  }
+
+  console.log("[Nova Desktop Hard ID Aliases] ready");
+})();
+</script>
+
+
+
+<!-- NOVA_DESKTOP_HARD_PROXY_ID_ALIASES_20260612 -->
+<script>
+(function () {
+  "use strict";
+
+  if (window.__novaDesktopHardProxyAliasesInstalled) return;
+  window.__novaDesktopHardProxyAliasesInstalled = true;
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function hide(el) {
+    el.style.position = "fixed";
+    el.style.left = "-99999px";
+    el.style.top = "-99999px";
+    el.style.width = "1px";
+    el.style.height = "1px";
+    el.style.opacity = "0";
+    el.style.pointerEvents = "none";
+    el.setAttribute("aria-hidden", "true");
+    return el;
+  }
+
+  function installButtonAlias(aliasId, realId, fallbackFnName) {
+    if ($(aliasId)) return;
+
+    var alias = hide(document.createElement("button"));
+    alias.id = aliasId;
+    alias.type = "button";
+
+    alias.addEventListener("click", function () {
+      var real = $(realId);
+      if (real && typeof real.click === "function") {
+        real.click();
+        return;
+      }
+
+      if (fallbackFnName && typeof window[fallbackFnName] === "function") {
+        window[fallbackFnName]();
+      }
+    });
+
+    document.body.appendChild(alias);
+  }
+
+  function installInputAlias(aliasId, realId) {
+    if ($(aliasId)) return;
+
+    var alias = hide(document.createElement("textarea"));
+    alias.id = aliasId;
+
+    Object.defineProperty(alias, "value", {
+      get: function () {
+        var real = $(realId);
+        return real ? real.value : "";
+      },
+      set: function (value) {
+        var real = $(realId);
+        if (!real) return;
+
+        real.value = value;
+        real.dispatchEvent(new Event("input", { bubbles: true }));
+        real.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    });
+
+    alias.focus = function () {
+      var real = $(realId);
+      if (real && typeof real.focus === "function") real.focus();
+    };
+
+    document.body.appendChild(alias);
+  }
+
+  function installAliases() {
+    installButtonAlias("desktopSessionsButton", "openSessionsBtn", "NovaDesktopOpenSessionsRescue");
+    installButtonAlias("desktopMemoryButton", "openMemoryBtn", "NovaDesktopOpenMemoryRescue");
+    installInputAlias("desktopChatInput", "input");
+    installButtonAlias("desktopSendButton", "sendBtn", "");
+
+    if (typeof window.NovaOpenDesktopSessions !== "function") {
+      window.NovaOpenDesktopSessions = function () {
+        var btn = $("desktopSessionsButton");
+        if (btn) {
+          btn.click();
+          return true;
+        }
+        return false;
+      };
+    }
+
+    if (typeof window.NovaOpenDesktopMemory !== "function") {
+      window.NovaOpenDesktopMemory = function () {
+        var btn = $("desktopMemoryButton");
+        if (btn) {
+          btn.click();
+          return true;
+        }
+        return false;
+      };
+    }
+
+    window.NovaDesktopHardProxyAliasesReady = true;
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", installAliases);
+  } else {
+    installAliases();
+  }
+
+  setTimeout(installAliases, 250);
+  setTimeout(installAliases, 1200);
+
+  console.log("[Nova Desktop Hard Proxy ID Aliases] ready");
+})();
+</script>
+
 </body>
 </html>
 
