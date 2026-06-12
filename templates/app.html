@@ -3944,6 +3944,160 @@ main,
 })();
 </script>
 
+
+<!-- NOVA_DESKTOP_GLOBAL_SOURCE_CARD_RENDERER_20260611 -->
+<script>
+(function () {
+  "use strict";
+
+  function getDesktopMessageBox() {
+    var existing =
+      document.getElementById("nova-desktop-rescue-messages") ||
+      document.getElementById("messages") ||
+      document.getElementById("chatMessages") ||
+      document.getElementById("desktopMessages") ||
+      document.querySelector(".messages") ||
+      document.querySelector(".chat-messages") ||
+      document.querySelector("[data-messages]");
+
+    if (existing) return existing;
+
+    var host =
+      document.querySelector("main") ||
+      document.querySelector(".chat") ||
+      document.querySelector(".chat-panel") ||
+      document.querySelector(".desktop-chat") ||
+      document.body;
+
+    var box = document.createElement("div");
+    box.id = "nova-desktop-rescue-messages";
+    box.className = "messages chat-messages desktop-rescue-messages";
+    box.setAttribute("data-messages", "true");
+
+    box.style.minHeight = "320px";
+    box.style.maxHeight = "60vh";
+    box.style.overflowY = "auto";
+    box.style.padding = "16px";
+    box.style.margin = "12px 0";
+    box.style.borderRadius = "18px";
+    box.style.background = "rgba(255,255,255,.04)";
+
+    host.appendChild(box);
+    return box;
+  }
+
+  function makeSourceCards(msg) {
+    try {
+      var meta = msg && typeof msg === "object" && msg.meta && typeof msg.meta === "object"
+        ? msg.meta
+        : {};
+
+      var sources = Array.isArray(meta.sources) ? meta.sources : [];
+
+      if (!sources.length && Array.isArray(msg && msg.sources)) {
+        sources = msg.sources;
+      }
+
+      if (!sources.length) return null;
+
+      var wrap = document.createElement("div");
+      wrap.className = "nova-source-cards nova-desktop-global-source-cards";
+      wrap.style.marginTop = "10px";
+      wrap.style.display = "grid";
+      wrap.style.gap = "8px";
+
+      sources.slice(0, 8).forEach(function (src, index) {
+        src = src || {};
+
+        var url = String(src.url || src.link || src.href || src.file_url || "").trim();
+        var title = String(src.title || src.name || src.label || src.source || ("Source " + (index + 1))).trim();
+        var snippet = String(src.snippet || src.text || src.description || src.summary || "").trim();
+
+        var card = document.createElement(url ? "a" : "div");
+        card.className = "nova-source-card nova-desktop-global-source-card";
+        card.style.display = "block";
+        card.style.padding = "10px 12px";
+        card.style.border = "1px solid rgba(255,255,255,.14)";
+        card.style.borderRadius = "12px";
+        card.style.background = "rgba(255,255,255,.06)";
+        card.style.color = "inherit";
+        card.style.textDecoration = "none";
+
+        if (url) {
+          card.href = url;
+          card.target = "_blank";
+          card.rel = "noopener noreferrer";
+        }
+
+        var titleEl = document.createElement("div");
+        titleEl.className = "nova-source-title";
+        titleEl.textContent = title;
+        titleEl.style.fontWeight = "700";
+        titleEl.style.fontSize = "13px";
+        card.appendChild(titleEl);
+
+        if (snippet) {
+          var snippetEl = document.createElement("div");
+          snippetEl.className = "nova-source-snippet";
+          snippetEl.textContent = snippet;
+          snippetEl.style.marginTop = "4px";
+          snippetEl.style.opacity = ".78";
+          snippetEl.style.fontSize = "12px";
+          snippetEl.style.lineHeight = "1.35";
+          card.appendChild(snippetEl);
+        }
+
+        wrap.appendChild(card);
+      });
+
+      return wrap;
+    } catch (err) {
+      console.warn("[Nova Desktop Global Source Cards] render failed", err);
+      return null;
+    }
+  }
+
+  window.renderDesktopChatMessagesRescue = function (messages) {
+    var box = getDesktopMessageBox();
+    if (!box) return false;
+
+    box.innerHTML = "";
+
+    (Array.isArray(messages) ? messages : []).forEach(function (msg) {
+      var role = String((msg && (msg.role || msg.sender || msg.type)) || "assistant").toLowerCase();
+      var text = msg && (msg.content || msg.text || msg.message || msg.body || "");
+
+      if (Array.isArray(text)) {
+        text = text.map(function (part) {
+          return typeof part === "string" ? part : (part.text || part.content || JSON.stringify(part));
+        }).join("\\n");
+      }
+
+      if (!text && typeof msg === "string") {
+        text = msg;
+      }
+
+      var row = document.createElement("div");
+      row.className = "message " + (role.indexOf("user") !== -1 ? "user" : "assistant");
+      row.textContent = String(text || "").trim() || JSON.stringify(msg);
+
+      if (role.indexOf("user") === -1) {
+        var sourceCards = makeSourceCards(msg);
+        if (sourceCards) row.appendChild(sourceCards);
+      }
+
+      box.appendChild(row);
+    });
+
+    box.scrollTop = box.scrollHeight;
+    return true;
+  };
+
+  window.novaDesktopGlobalSourceCardsReady = true;
+  console.log("[Nova Desktop Global Source Cards] ready");
+})();
+</script>
+
 </body>
 </html>
 
