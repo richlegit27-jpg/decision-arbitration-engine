@@ -4098,6 +4098,116 @@ main,
 })();
 </script>
 
+
+<!-- NOVA_DESKTOP_FINAL_SOURCE_CARDS_20260611 -->
+<script>
+(function() {
+  'use strict';
+
+  function getDesktopMessageBox() {
+    var box = document.getElementById("nova-desktop-rescue-messages");
+    if (box) return box;
+    var host = document.querySelector(".desktop-chat-container") || document.querySelector("main") || document.body;
+    box = document.createElement("div");
+    box.id = "nova-desktop-rescue-messages";
+    box.className = "messages chat-messages desktop-rescue-messages";
+    box.style.minHeight = "320px";
+    box.style.maxHeight = "60vh";
+    box.style.overflowY = "auto";
+    box.style.padding = "16px";
+    box.style.margin = "12px 0";
+    box.style.borderRadius = "18px";
+    box.style.background = "rgba(255,255,255,.04)";
+    host.appendChild(box);
+    return box;
+  }
+
+  function makeSourceCards(msg) {
+    try {
+      var meta = msg && msg.meta && typeof msg.meta === "object" ? msg.meta : {};
+      var sources = Array.isArray(meta.sources) ? meta.sources : [];
+      if (!sources.length && Array.isArray(msg.sources)) sources = msg.sources;
+      if (!sources.length) return null;
+
+      var wrap = document.createElement("div");
+      wrap.className = "nova-source-cards nova-desktop-global-source-cards";
+      wrap.style.marginTop = "10px";
+      wrap.style.display = "grid";
+      wrap.style.gap = "8px";
+
+      sources.slice(0, 8).forEach(function(src, index) {
+        src = src || {};
+        var url = src.url || src.file_url || "#";
+        var title = src.title || src.name || "Source " + (index+1);
+        var snippet = src.text || src.description || "";
+
+        var card = document.createElement(url ? "a" : "div");
+        card.className = "nova-source-card nova-desktop-global-source-card";
+        card.style.display = "block";
+        card.style.padding = "10px 12px";
+        card.style.border = "1px solid rgba(255,255,255,.14)";
+        card.style.borderRadius = "12px";
+        card.style.background = "rgba(255,255,255,.06)";
+        card.style.color = "inherit";
+        card.style.textDecoration = "none";
+        if (url) { card.href = url; card.target = "_blank"; card.rel = "noopener noreferrer"; }
+
+        var titleEl = document.createElement("div");
+        titleEl.className = "nova-source-title";
+        titleEl.textContent = title;
+        titleEl.style.fontWeight = "700";
+        titleEl.style.fontSize = "13px";
+        card.appendChild(titleEl);
+
+        if (snippet) {
+          var snippetEl = document.createElement("div");
+          snippetEl.className = "nova-source-snippet";
+          snippetEl.textContent = snippet;
+          snippetEl.style.marginTop = "4px";
+          snippetEl.style.opacity = ".78";
+          snippetEl.style.fontSize = "12px";
+          snippetEl.style.lineHeight = "1.35";
+          card.appendChild(snippetEl);
+        }
+
+        wrap.appendChild(card);
+      });
+
+      return wrap;
+    } catch (err) { console.warn("[Nova Desktop Final Source Cards] render failed", err); return null; }
+  }
+
+  window.renderDesktopChatMessagesRescue = function(messages) {
+    var box = getDesktopMessageBox();
+    if (!box) return false;
+    box.innerHTML = "";
+
+    (Array.isArray(messages) ? messages : []).forEach(function(msg) {
+      var role = String((msg.role || msg.sender || "assistant")).toLowerCase();
+      var text = msg.text || msg.content || msg.message || "";
+      if (!text && typeof msg === "string") text = msg;
+
+      var row = document.createElement("div");
+      row.className = "message " + (role.indexOf("user") !== -1 ? "user" : "assistant");
+      row.textContent = String(text).trim() || JSON.stringify(msg);
+
+      if (role.indexOf("user") === -1) {
+        var sourceCards = makeSourceCards(msg);
+        if (sourceCards) row.appendChild(sourceCards);
+      }
+
+      box.appendChild(row);
+    });
+
+    box.scrollTop = box.scrollHeight;
+    return true;
+  };
+
+  window.novaDesktopFinalSourceCardsReady = true;
+  console.log("[Nova Desktop Final Source Cards] ready");
+})();
+</script>
+
 </body>
 </html>
 
