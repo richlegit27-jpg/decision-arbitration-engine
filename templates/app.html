@@ -2372,7 +2372,8 @@ body {
     setStatusSafe("loading session...");
 
     try {
-      var res = await fetch("/api/chat/" + encodeURIComponent(sid), {
+      // NOVA_DESKTOP_SESSION_DETAIL_ENDPOINT_FIX_20260611
+      var res = await fetch("/api/sessions/" + encodeURIComponent(sid), {
         headers: { "Accept": "application/json" }
       });
 
