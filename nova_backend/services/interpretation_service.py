@@ -40,7 +40,36 @@ def _has_any(text: str, phrases: list[str]) -> bool:
 
 
 def _topic_before_news(text: str) -> str:
-    text = text.strip()
+    # NOVA_NEWS_QUERY_PHRASE_CLEANUP_20260612
+    # Convert messy human news phrasing into clean topic text.
+    # Examples:
+    #   "what's going on with fifa" -> "fifa"
+    #   "anything new with trump" -> "trump"
+    #   "updates on vancouver housing" -> "vancouver housing"
+    text = str(text or "").strip().lower()
+
+    cleanup_patterns = [
+        r"^what[' ]?s going on with\s+",
+        r"^what is going on with\s+",
+        r"^whats going on with\s+",
+        r"^what[' ]?s happening with\s+",
+        r"^what is happening with\s+",
+        r"^whats happening with\s+",
+        r"^anything new with\s+",
+        r"^anything new on\s+",
+        r"^any news on\s+",
+        r"^any updates on\s+",
+        r"^updates on\s+",
+        r"^update on\s+",
+        r"^latest on\s+",
+        r"^latest about\s+",
+        r"^news about\s+",
+        r"^news on\s+",
+    ]
+
+    for pattern in cleanup_patterns:
+        text = re.sub(pattern, "", text).strip()
+
     text = re.sub(r"\b(today|latest|current|recent|breaking|updates?|headlines?)\b", " ", text)
     text = re.sub(r"\b(news|newz)\b", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
