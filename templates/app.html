@@ -5244,6 +5244,79 @@ main,
   }
 })();
 </script>
+
+
+<!-- NOVA_DESKTOP_COMPAT_ALIASES_20260612 -->
+<script>
+(function () {
+  "use strict";
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function aliasId(realId, aliasIdValue) {
+    var real = $(realId);
+    if (!real || $(aliasIdValue)) return;
+    try {
+      real.setAttribute("data-nova-compat-alias", aliasIdValue);
+    } catch (_) {}
+  }
+
+  function installCompatAliases() {
+    aliasId("openSessionsBtn", "desktopSessionsButton");
+    aliasId("openMemoryBtn", "desktopMemoryButton");
+    aliasId("input", "desktopChatInput");
+    aliasId("sendBtn", "desktopSendButton");
+
+    if (typeof window.NovaOpenDesktopSessions !== "function") {
+      window.NovaOpenDesktopSessions = function () {
+        if (typeof window.NovaDesktopOpenSessionsRescue === "function") {
+          return window.NovaDesktopOpenSessionsRescue();
+        }
+
+        var button = $("openSessionsBtn");
+        if (button) {
+          button.click();
+          return true;
+        }
+
+        return false;
+      };
+    }
+
+    if (typeof window.NovaOpenDesktopMemory !== "function") {
+      window.NovaOpenDesktopMemory = function () {
+        if (typeof window.NovaDesktopOpenMemoryRescue === "function") {
+          return window.NovaDesktopOpenMemoryRescue();
+        }
+
+        var button = $("openMemoryBtn");
+        if (button) {
+          button.click();
+          return true;
+        }
+
+        return false;
+      };
+    }
+
+    window.NovaDesktopCompatAliasesReady = true;
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", installCompatAliases);
+  } else {
+    installCompatAliases();
+  }
+
+  setTimeout(installCompatAliases, 250);
+  setTimeout(installCompatAliases, 1200);
+
+  console.log("[Nova Desktop Compat Aliases] ready");
+})();
+</script>
+
 </body>
 </html>
 
