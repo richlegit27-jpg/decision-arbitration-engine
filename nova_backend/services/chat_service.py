@@ -8628,7 +8628,6 @@ if (not attachments) and (__name__ == "__main__"):
                 result = self._handle_attachment_analysis(user_text, attachments)
 
                 assistant_msg = self._build_assistant_message(
-                    text=self._safe_str(result.get("text")) or "Attachment analysis completed.",
                     meta={
                         "attachment_analysis": True,
                         "web_fetch_blocked_for_image": True,
@@ -21748,3 +21747,71 @@ try:
     ChatService._execute_attachment_analysis = _nova_execute_attachment_analysis_string_safe_20260608
 except NameError:
     pass
+
+
+# NOVA_CHAT_SERVICE_ATTACHMENT_TEXT_SYNC_HANDLE_20260611
+def _nova_sync_attachment_text_fields_20260611(value):
+    try:
+        if isinstance(value, dict):
+            content = str(value.get("content") or "").strip()
+            text_value = str(value.get("text") or "").strip()
+
+            if (
+                content.startswith("Attachment analysis:")
+                and "Attachment " in content
+                and " content:" in content
+                and content != text_value
+            ):
+                value["text"] = content
+                value["content"] = content
+
+            assistant_message = value.get("assistant_message")
+            if isinstance(assistant_message, dict):
+                content = str(assistant_message.get("content") or "").strip()
+                text_value = str(assistant_message.get("text") or "").strip()
+
+                if (
+                    content.startswith("Attachment analysis:")
+                    and "Attachment " in content
+                    and " content:" in content
+                    and content != text_value
+                ):
+                    assistant_message["text"] = content
+                    assistant_message["content"] = content
+                    value["assistant_message"] = assistant_message
+
+        else:
+            content = str(getattr(value, "content", "") or "").strip()
+            text_value = str(getattr(value, "text", "") or "").strip()
+
+            if (
+                content.startswith("Attachment analysis:")
+                and "Attachment " in content
+                and " content:" in content
+                and content != text_value
+            ):
+                try:
+                    setattr(value, "text", content)
+                    setattr(value, "content", content)
+                except Exception:
+                    pass
+
+    except Exception:
+        pass
+
+    return value
+
+
+try:
+    _nova_original_chat_service_handle_20260611 = ChatService.handle
+
+    def _nova_chat_service_handle_attachment_text_sync_20260611(self, *args, **kwargs):
+        result = _nova_original_chat_service_handle_20260611(self, *args, **kwargs)
+        return _nova_sync_attachment_text_fields_20260611(result)
+
+    _nova_chat_service_handle_attachment_text_sync_20260611._nova_attachment_text_sync_20260611 = True
+    ChatService.handle = _nova_chat_service_handle_attachment_text_sync_20260611
+    print("[NOVA ATTACHMENT SYNC] ChatService.handle attachment text sync installed")
+except Exception as exc:
+    print("[NOVA ATTACHMENT SYNC] ChatService.handle attachment text sync install failed:", exc)
+

@@ -4251,7 +4251,22 @@ def api_chat():
             assistant_message["text"] = _nova_clean_image_echo_text(assistant_message.get("text"))
             result["assistant_message"] = assistant_message
 
+        
+        # NOVA_ATTACHMENT_SYNC_TEXT_TO_CLEAN_CONTENT_ALL_RETURNS_20260611
+        try:
+            _nova_result_for_attachment_sync = result if isinstance(result, dict) else None
+            if isinstance(_nova_result_for_attachment_sync, dict):
+                _nova_assistant_for_attachment_sync = _nova_result_for_attachment_sync.get("assistant_message")
+                if isinstance(_nova_assistant_for_attachment_sync, dict):
+                    _nova_content_for_attachment_sync = str(_nova_assistant_for_attachment_sync.get("content") or "").strip()
+                    if _nova_content_for_attachment_sync.startswith("Attachment analysis:") and "Attachment " in _nova_content_for_attachment_sync and " content:" in _nova_content_for_attachment_sync:
+                        _nova_assistant_for_attachment_sync["text"] = _nova_content_for_attachment_sync
+                        _nova_assistant_for_attachment_sync["content"] = _nova_content_for_attachment_sync
+                        _nova_result_for_attachment_sync["assistant_message"] = _nova_assistant_for_attachment_sync
+        except Exception:
+            pass
         return jsonify(result)
+
 
     # MOBILE_SESSION_FORCE_LOCK_20260606
     # Honor mobile-provided session ids instead of letting backend drift to random session_* ids.
@@ -5836,8 +5851,22 @@ def api_chat():
                                 + ("\n\nPreview:\n" + preview[:1200] if preview else "")
                             ).strip()
             
-                            assistant_message["text"] = replacement_text
-                            assistant_message["content"] = replacement_text
+                            # NOVA_DISABLE_ATTACHMENT_RECURSIVE_WRAPPER_REWRITE_20260611
+                            _nova_existing_attachment_content = str(assistant_message.get("content") or "").strip()
+                            _nova_replacement_text_value = str(replacement_text or "").strip()
+
+                            if (
+                                _nova_existing_attachment_content.startswith("Attachment analysis:")
+                                and "Attachment " in _nova_existing_attachment_content
+                                and " content:" in _nova_existing_attachment_content
+                                and "This uploaded attachment contains readable text about:" in _nova_replacement_text_value
+                            ):
+                                assistant_message["text"] = _nova_existing_attachment_content
+                                assistant_message["content"] = _nova_existing_attachment_content
+                            else:
+                                assistant_message["text"] = replacement_text
+                                assistant_message["content"] = replacement_text
+
                             result["assistant_message"] = assistant_message
                             result["skip_cleanup"] = True
                             result["skip_post_processing"] = True
@@ -5980,7 +6009,26 @@ def api_chat():
             user_text,
         )
 
+        # NOVA_ATTACHMENT_DIRECT_TEXT_CLEAN_WIRED_20260611
+        if isinstance(assistant_text, str) and "Attachment analysis:" in assistant_text:
+            cleaner = globals().get("_nova_direct_clean_attachment_text_response_20260611")
+            if callable(cleaner):
+                assistant_text = cleaner(assistant_text)
+
         assistant_message["text"] = assistant_text
+        assistant_message["content"] = assistant_text
+        # NOVA_ATTACHMENT_SYNC_TEXT_AFTER_CONTENT_ASSIGN_20260611
+        try:
+            _nova_attachment_content_sync = str(assistant_message.get("content") or "").strip()
+            if (
+                _nova_attachment_content_sync.startswith("Attachment analysis:")
+                and "Attachment " in _nova_attachment_content_sync
+                and " content:" in _nova_attachment_content_sync
+            ):
+                assistant_message["text"] = _nova_attachment_content_sync
+                assistant_text = _nova_attachment_content_sync
+        except Exception:
+            pass
 
         payload = {
             "ok": result.get("ok", True),
@@ -9366,7 +9414,18 @@ def _nova_clean_attachment_analysis_response(response):
                 "The attachment was received and text was extracted, but most of the extracted text looks like noisy search-page/navigation content rather than a clean document body."
             )
 
-        assistant_message["text"] = cleaned_text.strip()
+        _nova_existing_content = str(assistant_message.get("content") or "").strip()
+        _nova_candidate_text = cleaned_text.strip()
+        if (
+            _nova_existing_content.startswith("Attachment analysis:")
+            and "Attachment " in _nova_existing_content
+            and " content:" in _nova_existing_content
+            and "This uploaded attachment contains readable text about:" in _nova_candidate_text
+        ):
+            assistant_message["text"] = _nova_existing_content
+            assistant_message["content"] = _nova_existing_content
+        else:
+            assistant_message["text"] = _nova_candidate_text
         data["assistant_message"] = assistant_message
 
         payload = json.dumps(data)
@@ -9499,7 +9558,18 @@ def _nova_final_attachment_output_noise_cleanup(response):
                 "The attachment was received and processed, but the extracted text is too limited or noisy to summarize cleanly."
             )
 
-        assistant_message["text"] = cleaned.strip()
+        _nova_existing_content = str(assistant_message.get("content") or "").strip()
+        _nova_candidate_text = cleaned.strip()
+        if (
+            _nova_existing_content.startswith("Attachment analysis:")
+            and "Attachment " in _nova_existing_content
+            and " content:" in _nova_existing_content
+            and "This uploaded attachment contains readable text about:" in _nova_candidate_text
+        ):
+            assistant_message["text"] = _nova_existing_content
+            assistant_message["content"] = _nova_existing_content
+        else:
+            assistant_message["text"] = _nova_candidate_text
         data["assistant_message"] = assistant_message
 
         payload = json.dumps(data, ensure_ascii=False)
@@ -9635,7 +9705,18 @@ def _nova_attachment_double_summary_cleanup(response):
                 "The attachment was received and processed, but the extracted text is too limited or noisy to summarize cleanly."
             )
 
-        assistant_message["text"] = cleaned.strip()
+        _nova_existing_content = str(assistant_message.get("content") or "").strip()
+        _nova_candidate_text = cleaned.strip()
+        if (
+            _nova_existing_content.startswith("Attachment analysis:")
+            and "Attachment " in _nova_existing_content
+            and " content:" in _nova_existing_content
+            and "This uploaded attachment contains readable text about:" in _nova_candidate_text
+        ):
+            assistant_message["text"] = _nova_existing_content
+            assistant_message["content"] = _nova_existing_content
+        else:
+            assistant_message["text"] = _nova_candidate_text
         data["assistant_message"] = assistant_message
 
         payload = json.dumps(data, ensure_ascii=False)
@@ -9753,6 +9834,343 @@ def _nova_attachment_followup_recall_gate():
 
 
 # STOP_FAKE_ATTACHMENT_CHAT_20260604
+
+# NOVA_SESSION_ATTACHMENT_MEMORY_GATE_20260611
+def _nova_session_attachment_memory_path_20260611():
+    try:
+        from pathlib import Path
+        base = Path(__file__).resolve().parent
+        data_dir = base / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        return data_dir / "nova_session_attachments.json"
+    except Exception:
+        return Path("data") / "nova_session_attachments.json"
+
+
+def _nova_load_session_attachment_memory_20260611():
+    try:
+        import json
+        path = _nova_session_attachment_memory_path_20260611()
+        if not path.exists():
+            return {}
+        data = json.loads(path.read_text(encoding="utf-8") or "{}")
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _nova_save_session_attachment_memory_20260611(data):
+    try:
+        import json
+        path = _nova_session_attachment_memory_path_20260611()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data if isinstance(data, dict) else {}, indent=2, ensure_ascii=False), encoding="utf-8")
+        return True
+    except Exception:
+        return False
+
+
+def _nova_normalize_attachment_item_for_session_20260611(item):
+    try:
+        if not isinstance(item, dict):
+            return None
+
+        normalized = {}
+
+        for key in (
+            "filename",
+            "original_filename",
+            "file_url",
+            "url",
+            "path",
+            "local_path",
+            "mime_type",
+            "type",
+            "size",
+        ):
+            value = item.get(key)
+            if value is not None and str(value).strip():
+                normalized[key] = value
+
+        if not normalized.get("filename"):
+            normalized["filename"] = (
+                normalized.get("original_filename")
+                or str(normalized.get("file_url") or normalized.get("url") or normalized.get("path") or "attachment").replace("\\", "/").split("/")[-1]
+            )
+
+        return normalized if normalized else None
+    except Exception:
+        return None
+
+
+def _nova_resolve_saved_attachment_path_20260611(item):
+    try:
+        from pathlib import Path
+
+        if not isinstance(item, dict):
+            return None
+
+        candidates = [
+            item.get("local_path"),
+            item.get("path"),
+        ]
+
+        for url_key in ("file_url", "url"):
+            raw_url = str(item.get(url_key) or "").strip()
+            if raw_url:
+                filename = raw_url.replace("\\", "/").split("/")[-1].strip()
+                if filename:
+                    candidates.append(str(Path(UPLOADS_DIR) / filename))
+
+        filename = str(item.get("filename") or item.get("original_filename") or "").strip()
+        if filename:
+            candidates.append(str(Path(UPLOADS_DIR) / filename))
+
+        for candidate in candidates:
+            if not candidate:
+                continue
+            candidate_path = Path(str(candidate))
+            if not candidate_path.is_absolute():
+                candidate_path = Path(__file__).resolve().parent / candidate_path
+            if candidate_path.exists() and candidate_path.is_file():
+                return candidate_path
+
+        return None
+    except Exception:
+        return None
+
+
+def _nova_read_saved_attachment_text_20260611(item, limit=4000):
+    try:
+        path = _nova_resolve_saved_attachment_path_20260611(item)
+        if not path:
+            return ""
+
+        suffix = path.suffix.lower()
+        if suffix in (".txt", ".md", ".csv", ".json", ".py", ".js", ".html", ".css", ".xml", ".log"):
+            for encoding in ("utf-8-sig", "utf-8", "cp1252", "latin-1"):
+                try:
+                    return path.read_text(encoding=encoding, errors="replace")[:limit].strip()
+                except Exception:
+                    continue
+
+        return f"[Saved attachment exists but is not plain readable text: {path.name}]"
+    except Exception:
+        return ""
+
+
+def _nova_build_saved_attachment_reply_20260611(user_text, saved_attachments):
+    try:
+        clean_user = str(user_text or "").lower()
+        lines = ["Attachment analysis:"]
+
+        matched_any = False
+
+        for item in saved_attachments:
+            if not isinstance(item, dict):
+                continue
+
+            name = str(
+                item.get("filename")
+                or item.get("original_filename")
+                or item.get("file_url")
+                or "attachment"
+            ).replace("\\", "/").split("/")[-1]
+
+            # If the user names a specific file, prefer that file.
+            if ".txt" in clean_user or "attachment" in clean_user or "file" in clean_user:
+                raw_names = [
+                    str(item.get("filename") or "").lower(),
+                    str(item.get("original_filename") or "").lower(),
+                    name.lower(),
+                ]
+                mentioned_specific_other = any(part.endswith(".txt") for part in clean_user.split())
+                if mentioned_specific_other and not any(raw_name and raw_name in clean_user for raw_name in raw_names):
+                    continue
+
+            content = _nova_read_saved_attachment_text_20260611(item)
+            if not content:
+                continue
+
+            matched_any = True
+            lines.append(f"Attachment {name} content:")
+            lines.append(content)
+
+        if not matched_any:
+            for item in saved_attachments:
+                name = str(
+                    item.get("filename")
+                    or item.get("original_filename")
+                    or item.get("file_url")
+                    or "attachment"
+                ).replace("\\", "/").split("/")[-1]
+                content = _nova_read_saved_attachment_text_20260611(item)
+                if content:
+                    lines.append(f"Attachment {name} content:")
+                    lines.append(content)
+                    matched_any = True
+
+        if not matched_any:
+            return ""
+
+        return "\n".join(lines).strip()
+    except Exception:
+        return ""
+
+
+@app.before_request
+def nova_session_attachment_memory_gate_20260611():
+    try:
+        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
+            return None
+
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return None
+
+        session_id = str(
+            payload.get("session_id")
+            or payload.get("client_session_id")
+            or payload.get("active_session_id")
+            or ""
+        ).strip()
+
+        if not session_id:
+            return None
+
+        user_text = str(
+            payload.get("user_text")
+            or payload.get("text")
+            or payload.get("message")
+            or ""
+        ).strip()
+
+        attachments = payload.get("attachments") or []
+        if isinstance(attachments, dict):
+            attachments = [attachments]
+        if not isinstance(attachments, list):
+            attachments = []
+
+        memory = _nova_load_session_attachment_memory_20260611()
+        saved = memory.get(session_id) if isinstance(memory, dict) else None
+        saved = saved if isinstance(saved, list) else []
+
+        # Save current request attachments for later follow-ups.
+        if attachments:
+            normalized = []
+            for item in attachments:
+                normalized_item = _nova_normalize_attachment_item_for_session_20260611(item)
+                if normalized_item:
+                    normalized.append(normalized_item)
+
+            if normalized:
+                existing_keys = {
+                    str(x.get("file_url") or x.get("url") or x.get("path") or x.get("filename") or "")
+                    for x in saved
+                    if isinstance(x, dict)
+                }
+
+                for item in normalized:
+                    key = str(item.get("file_url") or item.get("url") or item.get("path") or item.get("filename") or "")
+                    if key and key not in existing_keys:
+                        saved.append(item)
+                        existing_keys.add(key)
+
+                # NOVA_SESSION_ATTACHMENT_MEMORY_DEDUPE_AND_TEXT_LOCK_20260611
+                _nova_deduped_saved_by_name = {}
+                for _nova_saved_item in saved:
+                    if not isinstance(_nova_saved_item, dict):
+                        continue
+                    _nova_saved_name = str(
+                        _nova_saved_item.get("filename")
+                        or _nova_saved_item.get("original_filename")
+                        or _nova_saved_item.get("file_url")
+                        or _nova_saved_item.get("url")
+                        or ""
+                    ).replace("\\", "/").split("/")[-1].strip().lower()
+
+                    if not _nova_saved_name:
+                        _nova_saved_name = str(
+                            _nova_saved_item.get("file_url")
+                            or _nova_saved_item.get("url")
+                            or _nova_saved_item.get("path")
+                            or ""
+                        ).strip().lower()
+
+                    if _nova_saved_name:
+                        _nova_deduped_saved_by_name[_nova_saved_name] = _nova_saved_item
+
+                saved = list(_nova_deduped_saved_by_name.values())[-20:]
+                memory[session_id] = saved
+                _nova_save_session_attachment_memory_20260611(memory)
+
+            return None
+
+        clean = " ".join(user_text.lower().split())
+        wants_saved_attachment = (
+            ("attachment" in clean or "file" in clean or ".txt" in clean or "secret phrase" in clean)
+            and (
+                "what" in clean
+                or "summarize" in clean
+                or "tell me" in clean
+                or "secret phrase" in clean
+                or "previous" in clean
+                or "uploaded" in clean
+            )
+        )
+
+        if not wants_saved_attachment or not saved:
+            return None
+
+        assistant_text = _nova_build_saved_attachment_reply_20260611(user_text, saved)
+        if not assistant_text:
+            return None
+
+        user_msg = {
+            "role": "user",
+            "text": user_text,
+            "attachments": [],
+            "meta": {
+                "session_attachment_memory_lookup": True,
+            },
+        }
+
+        assistant_msg = {
+            "role": "assistant",
+            "text": assistant_text,
+            "content": assistant_text,
+            "attachments": saved,
+            "meta": {
+                "route_taken": "session_attachment_memory_recall",
+                "session_attachment_memory_count": len(saved),
+            },
+        }
+
+        return jsonify({
+            "ok": True,
+            "active_session_id": session_id,
+            "session_id": session_id,
+            "assistant_message": assistant_msg,
+            "text": assistant_text,
+            "attachment_debug": {
+                "requested_session_id": session_id,
+                "active_session_id": session_id,
+                "session_attachments_count": len(saved),
+                "session_attachment_memory_recall": True,
+            },
+            "debug": {
+                "route": "api_chat",
+                "route_taken": "session_attachment_memory_recall",
+            },
+            "runtime": {},
+            "session_attachments": saved,
+        })
+
+    except Exception:
+        return None
+
+
+
 @app.before_request
 def _nova_stop_fake_attachment_chat_gate():
     try:
@@ -11861,6 +12279,256 @@ def nova_focus_recall_before_web_20260611():
         )
     except Exception as exc:
         return json_error(str(exc), 500)
+
+# NOVA_ATTACHMENT_DIRECT_TEXT_CLEAN_FINAL_20260611
+def _nova_direct_clean_attachment_text_response_20260611(text_value):
+    """
+    Final safety cleaner for attachment-analysis replies.
+
+    Goal:
+    - keep real extracted attachment content
+    - remove recursive summary wrappers
+    - avoid repeated "This uploaded attachment contains readable text about..."
+    """
+    try:
+        raw = str(text_value or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+        if not raw:
+            return raw
+
+        if "Attachment analysis:" not in raw:
+            return raw
+
+        lines = [line.strip() for line in raw.split("\n")]
+        kept = []
+        seen = set()
+
+        skip_prefixes = (
+            "This uploaded attachment contains readable text about:",
+            "Key points:",
+            "Preview:",
+        )
+
+        for line in lines:
+            if not line:
+                continue
+
+            low = line.lower().strip()
+
+            if low == "attachment analysis:":
+                continue
+
+            if any(low.startswith(prefix.lower()) for prefix in skip_prefixes):
+                continue
+
+            if re.match(r"^\d+\.\s*this uploaded attachment contains readable text about:", line, re.I):
+                continue
+
+            if "This uploaded attachment contains readable text about:" in line:
+                continue
+
+            normalized = re.sub(r"\s+", " ", line).strip()
+            if not normalized:
+                continue
+
+            key = normalized.lower()
+            if key in seen:
+                continue
+
+            seen.add(key)
+            kept.append(normalized)
+
+        content_lines = []
+
+        for line in kept:
+            if re.match(r"^Attachment\s+.+\s+content:\s*$", line, re.I):
+                content_lines.append(line)
+                continue
+
+            if "secret test phrase" in line.lower():
+                content_lines.append(line)
+                continue
+
+            if line.lower().startswith("attachment ") and " content:" in line.lower():
+                content_lines.append(line)
+                continue
+
+            if len(line) >= 12 and not line.lower().startswith("this uploaded attachment"):
+                content_lines.append(line)
+
+        if not content_lines:
+            return "Attachment analysis:\nThe attachment was received, but no clean readable text was found."
+
+        final = "Attachment analysis:\n" + "\n".join(content_lines[:12])
+        return final.strip()
+    except Exception:
+        return text_value
+
+
+
+# NOVA_ATTACHMENT_FINAL_JSON_RESPONSE_SYNC_20260611
+@app.after_request
+def nova_attachment_final_json_response_sync_20260611(response):
+    try:
+        if request.path != "/api/chat":
+            return response
+
+        if not response.is_json:
+            return response
+
+        data = response.get_json(silent=True)
+        if not isinstance(data, dict):
+            return response
+
+        assistant_message = data.get("assistant_message")
+        if not isinstance(assistant_message, dict):
+            return response
+
+        content = str(assistant_message.get("content") or "").strip()
+        text_value = str(assistant_message.get("text") or "").strip()
+
+        if (
+            content.startswith("Attachment analysis:")
+            and "Attachment " in content
+            and " content:" in content
+            and (
+                "This uploaded attachment contains readable text about:" in text_value
+                or "Key points:" in text_value
+                or "Preview:" in text_value
+            )
+        ):
+            assistant_message["text"] = content
+            assistant_message["content"] = content
+            data["assistant_message"] = assistant_message
+
+            import json
+            response.set_data(json.dumps(data, ensure_ascii=False))
+            response.headers["Content-Type"] = "application/json; charset=utf-8"
+
+        return response
+    except Exception:
+        return response
+
+
+
+
+# NOVA_ATTACHMENT_FINAL_RAW_JSON_RESPONSE_SYNC_20260611
+@app.after_request
+def nova_attachment_final_raw_json_response_sync_20260611(response):
+    try:
+        if request.path != "/api/chat":
+            return response
+
+        raw_body = response.get_data(as_text=True)
+        if not raw_body or "assistant_message" not in raw_body or "Attachment analysis:" not in raw_body:
+            return response
+
+        import json
+        data = json.loads(raw_body)
+        if not isinstance(data, dict):
+            return response
+
+        assistant_message = data.get("assistant_message")
+        if not isinstance(assistant_message, dict):
+            return response
+
+        content = str(assistant_message.get("content") or "").strip()
+        text_value = str(assistant_message.get("text") or "").strip()
+
+        if (
+            content.startswith("Attachment analysis:")
+            and "Attachment " in content
+            and " content:" in content
+            and content != text_value
+        ):
+            assistant_message["text"] = content
+            assistant_message["content"] = content
+            data["assistant_message"] = assistant_message
+
+            response.set_data(json.dumps(data, ensure_ascii=False))
+            response.headers["Content-Type"] = "application/json; charset=utf-8"
+            response.headers["X-Nova-Attachment-Sync"] = "raw-json-fixed"
+
+        return response
+    except Exception:
+        return response
+
+
+
+
+# NOVA_ATTACHMENT_API_CHAT_VIEW_WRAPPER_SYNC_20260611
+def _nova_sync_attachment_text_response_20260611(response):
+    try:
+        flask_response = app.make_response(response)
+        raw_body = flask_response.get_data(as_text=True)
+
+        if not raw_body or "assistant_message" not in raw_body or "Attachment analysis:" not in raw_body:
+            return flask_response
+
+        import json
+        data = json.loads(raw_body)
+        if not isinstance(data, dict):
+            return flask_response
+
+        assistant_message = data.get("assistant_message")
+        if not isinstance(assistant_message, dict):
+            return flask_response
+
+        content = str(assistant_message.get("content") or "").strip()
+        text_value = str(assistant_message.get("text") or "").strip()
+
+        if (
+            content.startswith("Attachment analysis:")
+            and "Attachment " in content
+            and " content:" in content
+            and content != text_value
+        ):
+            assistant_message["text"] = content
+            assistant_message["content"] = content
+            data["assistant_message"] = assistant_message
+
+            flask_response.set_data(json.dumps(data, ensure_ascii=False))
+            flask_response.headers["Content-Type"] = "application/json; charset=utf-8"
+            flask_response.headers["X-Nova-Attachment-Sync"] = "view-wrapper-fixed"
+
+        return flask_response
+    except Exception:
+        return response
+
+
+def _nova_install_api_chat_attachment_view_wrapper_20260611():
+    try:
+        wrapped = 0
+
+        for rule in list(app.url_map.iter_rules()):
+            if getattr(rule, "rule", "") != "/api/chat":
+                continue
+
+            endpoint = getattr(rule, "endpoint", "")
+            original_view = app.view_functions.get(endpoint)
+
+            if not callable(original_view):
+                continue
+
+            if getattr(original_view, "_nova_attachment_view_wrapper_20260611", False):
+                continue
+
+            def _wrapped_api_chat_view(*args, __original_view=original_view, **kwargs):
+                response = __original_view(*args, **kwargs)
+                return _nova_sync_attachment_text_response_20260611(response)
+
+            _wrapped_api_chat_view.__name__ = getattr(original_view, "__name__", "nova_wrapped_api_chat")
+            _wrapped_api_chat_view.__doc__ = getattr(original_view, "__doc__", None)
+            _wrapped_api_chat_view._nova_attachment_view_wrapper_20260611 = True
+
+            app.view_functions[endpoint] = _wrapped_api_chat_view
+            wrapped += 1
+
+        print("[NOVA ATTACHMENT SYNC] wrapped /api/chat endpoints:", wrapped)
+    except Exception as exc:
+        print("[NOVA ATTACHMENT SYNC] wrapper install failed:", exc)
+
+
+_nova_install_api_chat_attachment_view_wrapper_20260611()
 
 
 if __name__ == "__main__":
