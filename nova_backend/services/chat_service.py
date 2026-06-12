@@ -11195,6 +11195,8 @@ if (not attachments) and (__name__ == "__main__"):
         # Central pre-router interpretation, phase 2:
         # safely force messy news/current-events prompts into the web route.
         # This intentionally does NOT override attachments or execution yet.
+        # NOVA_FIX_INTERPRETATION_ORIGINAL_USER_TEXT_20260612
+        original_user_text = self._safe_str(user_text).strip()
         interpretation = {}
         try:
             from nova_backend.services.interpretation_service import interpret_user_text
