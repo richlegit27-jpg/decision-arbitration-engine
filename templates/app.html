@@ -4932,8 +4932,126 @@ main,
   boot();
 })();
 </script>
+
+<!-- NOVA_DESKTOP_LATEST_ONLY_SOURCE_CARDS_20260612 -->
+<script>
+(function () {
+  "use strict";
+
+  var MARKER = "NOVA_DESKTOP_LATEST_ONLY_SOURCE_CARDS_20260612";
+
+  function log() {
+    try {
+      console.log.apply(console, ["[Nova Latest Source Cards Only]"].concat([].slice.call(arguments)));
+    } catch (_) {}
+  }
+
+  function hasSources(msg) {
+    if (!msg || msg.role !== "assistant") return false;
+
+    var meta = msg.meta && typeof msg.meta === "object" ? msg.meta : {};
+
+    return !!(
+      (Array.isArray(meta.sources) && meta.sources.length) ||
+      (Array.isArray(meta.web_sources) && meta.web_sources.length) ||
+      (Array.isArray(meta.citations) && meta.citations.length) ||
+      (Array.isArray(msg.sources) && msg.sources.length)
+    );
+  }
+
+  function getLatestAssistantWithSources() {
+    try {
+      var session = window.NovaCurrentSessionManager && window.NovaCurrentSessionManager.currentSession;
+      var messages = session && Array.isArray(session.messages) ? session.messages : [];
+
+      for (var i = messages.length - 1; i >= 0; i -= 1) {
+        if (hasSources(messages[i])) return messages[i];
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  function removeOlderSourceGroups() {
+    var latest = getLatestAssistantWithSources();
+    var latestKey = latest ? String(latest.id || latest.message_id || latest.created_at || latest.text || "") : "";
+
+    var groups = Array.from(document.querySelectorAll("[data-nova-forced-source-cards='true'], .nova-source-cards"));
+
+    if (!latestKey) {
+      groups.forEach(function (node) {
+        node.remove();
+      });
+      return;
+    }
+
+    groups.forEach(function (node, index) {
+      var key = node.getAttribute("data-nova-source-message-key") || "";
+
+      if (!key && index === groups.length - 1) {
+        node.setAttribute("data-nova-source-message-key", latestKey);
+        return;
+      }
+
+      if (key !== latestKey) {
+        node.remove();
+      }
+    });
+
+    var seenLatest = false;
+
+    Array.from(document.querySelectorAll("[data-nova-forced-source-cards='true'], .nova-source-cards")).forEach(function (node) {
+      var key = node.getAttribute("data-nova-source-message-key") || "";
+
+      if (key !== latestKey) {
+        node.remove();
+        return;
+      }
+
+      if (seenLatest) {
+        node.remove();
+        return;
+      }
+
+      seenLatest = true;
+    });
+  }
+
+  function wrapLatestOnly() {
+    if (typeof window.novaForceDesktopSourceCardsDOM_20260612 !== "function") {
+      setTimeout(wrapLatestOnly, 250);
+      return;
+    }
+
+    if (window.novaForceDesktopSourceCardsDOM_20260612.__novaLatestOnlyWrapped) {
+      return;
+    }
+
+    var original = window.novaForceDesktopSourceCardsDOM_20260612;
+
+    var wrapped = function () {
+      var result = original.apply(this, arguments);
+      removeOlderSourceGroups();
+      setTimeout(removeOlderSourceGroups, 50);
+      setTimeout(removeOlderSourceGroups, 200);
+      return result;
+    };
+
+    wrapped.__novaLatestOnlyWrapped = true;
+    wrapped.__novaDedupeWrapped = true;
+
+    window.novaForceDesktopSourceCardsDOM_20260612 = wrapped;
+
+    removeOlderSourceGroups();
+    log("ready", MARKER);
+  }
+
+  wrapLatestOnly();
+})();
+</script>
 </body>
 </html>
+
 
 
 
