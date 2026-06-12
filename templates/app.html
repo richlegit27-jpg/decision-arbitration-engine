@@ -5317,6 +5317,41 @@ main,
 })();
 </script>
 
+
+
+<!-- NOVA_DESKTOP_GETELEMENTBYID_COMPAT_20260612 -->
+<script>
+(function () {
+  "use strict";
+
+  if (window.__novaDesktopGetElementByIdCompatInstalled) return;
+  window.__novaDesktopGetElementByIdCompatInstalled = true;
+
+  var originalGetElementById = Document.prototype.getElementById;
+
+  var aliasMap = {
+    desktopSessionsButton: "openSessionsBtn",
+    desktopMemoryButton: "openMemoryBtn",
+    desktopChatInput: "input",
+    desktopSendButton: "sendBtn"
+  };
+
+  Document.prototype.getElementById = function (id) {
+    var found = originalGetElementById.call(this, id);
+    if (found) return found;
+
+    var realId = aliasMap[id];
+    if (realId) {
+      return originalGetElementById.call(this, realId);
+    }
+
+    return null;
+  };
+
+  console.log("[Nova Desktop getElementById Compat] ready");
+})();
+</script>
+
 </body>
 </html>
 
