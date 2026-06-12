@@ -11226,6 +11226,56 @@ if (not attachments) and (__name__ == "__main__"):
         if not clean_interpretation_text:
             clean_interpretation_text = original_user_text
 
+        # NOVA_TOPIC_RECALL_BEFORE_INTERPRETATION_WEB_20260612
+        # Generic conversation-recall phrases must never be routed to web search.
+        # They belong to the local session/topic carry-forward layer.
+        _conversation_recall_phrases = (
+            "what were we talking about",
+            "what was we talking about",
+            "what did we talk about",
+            "what were we just talking about",
+            "remind me what we were talking about",
+            "where were we",
+        )
+
+        _clean_recall_probe = clean_interpretation_text.lower().strip(" ?.!")
+
+        # NOVA_TOPIC_RECALL_USE_CONTINUITY_CONTEXT_20260612
+        # Use the existing continuity helper. Do not call missing topic/recent-session helpers.
+        if _clean_recall_probe in _conversation_recall_phrases:
+            try:
+                _recall_session = self._get_session_payload(session_id) if session_id else {}
+                _recent_context = self._build_continuity_context(_recall_session)
+            except Exception:
+                _recent_context = ""
+
+            if _recent_context:
+                return {
+                    "ok": True,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": _recent_context,
+                        "meta": {
+                            "route": "topic_recall_before_web",
+                            "memory_used": [],
+                            "sources": [],
+                        },
+                    },
+                }
+
+            return {
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": "Current thread context is minimal. I do not have enough recent session context to summarize.",
+                    "meta": {
+                        "route": "topic_recall_before_web",
+                        "memory_used": [],
+                        "sources": [],
+                    },
+                },
+            }
+
         interpretation = {}
         try:
             from nova_backend.services.interpretation_service import interpret_user_text
