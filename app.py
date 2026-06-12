@@ -12764,7 +12764,64 @@ _nova_install_api_chat_attachment_view_wrapper_20260611()
 
 
 
-# NOVA_API_CHAT_TARGET_SESSION_APPEND_BRIDGE_20260611
+# NOVA_WEB_FETCH_PERSIST_REQUESTED_SESSION_20260612
+# Force all web-fetch responses to persist into requested session
+try:
+    if getattr(response, "status_code", 500) < 400 and request.path == "/api/chat":
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            payload = {}
+
+        target_session_id = str(
+            payload.get("session_id")
+            or payload.get("client_session_id")
+            or payload.get("active_session_id")
+            or ""
+        )
+
+        response_json = response.get_json(silent=True) or {}
+        assistant_message = response_json.get("assistant_message") or {}
+
+        # Append to requested session even if web_fetch route generated session_*
+        from nova_backend.services import session_service
+        try:
+            # User message
+            user_text = str(payload.get("user_text") or "").strip()
+            if user_text:
+                session_service.append_message(target_session_id, {
+                    "role": "user",
+                    "text": user_text,
+                    "attachments": payload.get("attachments") if isinstance(payload.get("attachments"), list) else [],
+                    "meta": {"route": "web_fetch_append_bridge"}
+                })
+
+            # Assistant message
+            assistant_text = str(assistant_message.get("text") or assistant_message.get("content") or "").strip()
+            assistant_meta = assistant_message.get("meta") if isinstance(assistant_message.get("meta"), dict) else {}
+            assistant_attachments = assistant_message.get("attachments") if isinstance(assistant_message.get("attachments"), list) else []
+
+            session_service.append_message(target_session_id, {
+                "role": "assistant",
+                "text": assistant_text,
+                "attachments": assistant_attachments,
+                "meta": assistant_meta
+            })
+
+            # Rewrite response IDs to requested session
+            response_json["session_id"] = target_session_id
+            response_json["active_session_id"] = target_session_id
+            if isinstance(response_json.get("assistant_message"), dict):
+                response_json["assistant_message"]["session_id"] = target_session_id
+                response_json["assistant_message"]["active_session_id"] = target_session_id
+
+            response.set_data(json.dumps(response_json, ensure_ascii=False))
+            response.headers["Content-Length"] = str(len(response.get_data()))
+            response.headers["Content-Type"] = "application/json"
+
+        except Exception as web_fetch_bridge_error:
+            app.logger.warning("[WebFetchTargetSessionBridge] failed: %s", web_fetch_bridge_error)
+except Exception as web_fetch_outer_error:
+    app.logger.warning("[WebFetchTargetSessionBridgeOuter] failed: %s", web_fetch_outer_error)# NOVA_API_CHAT_TARGET_SESSION_APPEND_BRIDGE_20260611
 # Ensures /api/chat persists user+assistant exchanges into the explicit
 # request session_id/client_session_id/active_session_id instead of silently
 # creating or returning a different active session.
@@ -12923,6 +12980,7 @@ if __name__ == "__main__":
 
 
 # NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611
+
 
 
 
