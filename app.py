@@ -2587,7 +2587,6 @@ def _nova_filter_current_attachments_only(candidate_attachments, current_attachm
 
     return filtered
 
-
 # CASUAL_CHAT_GUARD_20260604
 @app.before_request
 def _nova_casual_chat_guard():
@@ -3295,6 +3294,38 @@ def api_chat():
 
         _nova_attachments = _nova_payload.get("attachments") or []
 
+        # 🚨 IMAGE FASTPATH SAFETY GUARD
+        if str(user_text or "").strip().lower().startswith("/image"):
+            _nova_attachments = []
+
+        _nova_image = None
+
+        if isinstance(_nova_attachments, list):
+            for _nova_item in _nova_attachments:
+                if not isinstance(_nova_item, dict):
+                    continue
+
+                _nova_mime = str(
+                    _nova_item.get("mime_type")
+                    or _nova_item.get("type")
+                    or ""
+                ).lower()
+
+                _nova_name_probe = str(
+                    _nova_item.get("filename")
+                    or _nova_item.get("original_filename")
+                    or _nova_item.get("name")
+                    or _nova_item.get("url")
+                    or _nova_item.get("file_url")
+                    or ""
+                ).lower()
+
+                if (
+                    _nova_mime.startswith("image/")
+                    or any(ext in _nova_name_probe for ext in (".jpg", ".jpeg", ".png", ".webp", ".gif"))
+                ):
+                    _nova_image = _nova_item
+                    break
         # NOVA_WEB_INTENT_STRIPS_CURRENT_ATTACHMENTS_20260609
         # Web/news prompts must ignore stale mobile attachment payload before the image gate scans it.
         _nova_image_gate_clean = " ".join(str(_nova_user_text or "").lower().split())
@@ -4129,6 +4160,9 @@ def api_chat():
     data = request_json()
 
     user_text = str(data.get("user_text") or "").strip()
+
+    _nova_user_text_lower = str(user_text or "").strip().lower()
+
     requested_session_id = str(data.get("session_id") or "").strip()
     session_id = requested_session_id
 
@@ -4148,61 +4182,6 @@ def api_chat():
             "empty_request": True,
             "no_session_created": True,
         })
-
-    # NOVA_IMAGE_COMMAND_FASTPATH_BEFORE_ATTACHMENT_PIPELINE_20260610
-    # Explicit image commands must route to image generation before any attachment analysis/prehandle logic.
-    _nova_image_fastpath_text = str(
-        data.get("user_text")
-        or data.get("text")
-        or data.get("message")
-        or user_text
-        or ""
-    ).strip()
-
-    _nova_image_fastpath_lower = _nova_image_fastpath_text.lower()
-
-    _nova_is_image_fastpath = (
-        _nova_image_fastpath_lower.startswith("/image")
-        or _nova_image_fastpath_lower.startswith("image ")
-        or _nova_image_fastpath_lower.startswith("generate image")
-        or _nova_image_fastpath_lower.startswith("generate an image")
-        or _nova_image_fastpath_lower.startswith("draw ")
-        or _nova_image_fastpath_lower.startswith("create image")
-        or _nova_image_fastpath_lower.startswith("make image")
-    )
-
-    if _nova_is_image_fastpath:
-        app.logger.info(
-            "[ImageCommandFastPath] routing before attachment pipeline session_id=%s text=%r",
-            session_id,
-            _nova_image_fastpath_text,
-        )
-
-        # NOVA_IMAGE_FASTPATH_STRIP_SLASH_COMMAND_20260610
-        # Keep the image route, but remove the literal /image prefix from the prompt.
-        _nova_image_fastpath_prompt = _nova_image_fastpath_text
-        if _nova_image_fastpath_lower.startswith("/image"):
-            _nova_image_fastpath_prompt = _nova_image_fastpath_text[6:].strip() or "image"
-
-        _nova_image_fastpath_service_text = "generate image " + _nova_image_fastpath_prompt
-
-        result = chat_service.handle(
-            user_text=_nova_image_fastpath_service_text,
-            session_id=session_id,
-            attachments=[],
-        )
-
-        if not isinstance(result, dict):
-            result = {
-                "ok": True,
-                "session_id": session_id,
-                "active_session_id": session_id,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": str(result or ""),
-                },
-                "text": str(result or ""),
-            }
 
         result["session_id"] = result.get("session_id") or session_id
         result["active_session_id"] = result.get("active_session_id") or result.get("session_id") or session_id
@@ -5099,24 +5078,35 @@ def api_chat():
                 project_aware_context = ""
             else:
                 project_aware_context = _nova_build_project_aware_context(
-                user_text,
-                session_id=session_id,
-                requested_session_id=requested_session_id,
-            )
+                    user_text,
+                    session_id=session_id,
+                    requested_session_id=requested_session_id,
+                )
         except Exception:
             project_aware_context = ""
             app.logger.exception("[api_chat] failed to build project-aware memory context")
 
         if project_aware_context:
-            user_text = f"{user_text}\n\n{project_aware_context}" if user_text else project_aware_context
+            raw_user_text = user_text
+            clean_probe = str(raw_user_text or "").strip().lower()
 
-            app.logger.info(
-                "[api_chat] injected project-aware memory context chars=%s session_id=%s requested_session_id=%s",
-                len(project_aware_context),
-                session_id,
-                requested_session_id,
+            is_image_request = (
+                clean_probe.startswith("/image")
+                or clean_probe.startswith("draw ")
+                or clean_probe.startswith("generate image")
+                or clean_probe.startswith("make image")
+                or clean_probe.startswith("create image")
             )
 
+            if not is_image_request:
+                user_text = f"{user_text}\n\n{project_aware_context}" if user_text else project_aware_context
+
+                app.logger.info(
+                    "[api_chat] injected project-aware memory context chars=%s session_id=%s requested_session_id=%s",
+                    len(project_aware_context),
+                    session_id,
+                    requested_session_id,
+                )
 
         # FORCE_EXTRACTED_TEXT_CHAT_HANDOFF_LOCK
         # If attachment text was already extracted into user_text, hand off to chat_service as plain text.
@@ -5148,12 +5138,14 @@ def api_chat():
             )
 
         if attachment_content_lines:
-            attachments_for_chat_service = attachments or []
+            attachments_for_chat_service = []
+
             app.logger.info(
-                "[AttachmentContentGate] extracted attachment text handoff active; raw attachments suppressed for chat_service session_id=%s extracted_count=%s",
+                "[AttachmentContentGate] extracted attachment text active; suppressing raw attachments session_id=%s extracted_count=%s",
                 session_id,
                 len(attachment_content_lines),
             )
+
         # APP_ATTACHMENT_PREHANDLE_REAL_ANCHOR_LOCK
         # Attachment requests are answered here after extracted text is injected,
         # but before chat_service/web routing can hijack the prompt.
@@ -5793,12 +5785,47 @@ def api_chat():
                 except Exception:
                     pass
 
+        image_command_user_text = user_text
+
+        if user_text.lower().startswith("/image"):
+            image_command_user_text = "generate image " + (user_text[6:].strip() or "image")
+
+        app.logger.info(
+            "[api_chat] calling chat_service.handle session_id=%s attachments_count=%s",
+            session_id,
+            len(attachments_for_chat_service or []),
+        )
+
         result = chat_service.handle(
-            user_text=user_text,
+            user_text=image_command_user_text,
             session_id=session_id,
             attachments=attachments_for_chat_service,
         )
 
+        # =========================
+        # IMAGE NORMALIZATION BLOCK
+        # =========================
+        if isinstance(result, dict):
+            assistant = result.get("assistant_message") or {}
+
+            if isinstance(assistant, dict):
+                prompt = result.get("prompt") or assistant.get("text") or ""
+
+                if isinstance(prompt, str) and prompt.startswith("generate image "):
+                    clean_prompt = prompt[len("generate image "):].strip()
+
+                    result["prompt"] = clean_prompt
+                    assistant["text"] = f"Generated image for: {clean_prompt}"
+                    assistant["content"] = assistant["text"]
+
+                    if "image_url" in assistant:
+                        result["image_url"] = assistant["image_url"]
+
+                    result["assistant_message"] = assistant
+
+        # =========================
+        # SAFE LOGGING
+        # =========================
         try:
             app.logger.info(
                 "[api_chat] chat_service.handle result ok=%s active_session_id=%s keys=%s",
@@ -5806,8 +5833,11 @@ def api_chat():
                 result.get("active_session_id") if isinstance(result, dict) else None,
                 sorted(list(result.keys())) if isinstance(result, dict) else type(result).__name__,
             )
+        except Exception:
+            pass
+
             # NOVA_SAFE_API_CHAT_WEAK_GUARD_AFTER_HANDLE_LOCK
-            result = _nova_replace_weak_backend_reply(user_text, result)
+            result = _nova_replace_weak_backend_reply(image_command_user_text, result)
 
             # AFTER_WEAK_GUARD_ATTACHMENT_SUMMARY_LOCK
             # Final safety: if attachment text was extracted but the reply is still the old canned
@@ -9863,6 +9893,9 @@ def _nova_attachment_double_summary_cleanup(response):
 
 
 
+
+
+
 # ATTACHMENT_FOLLOWUP_RECALL_LOCK_20260604
 @app.before_request
 def _nova_attachment_followup_recall_gate():
@@ -11392,6 +11425,9 @@ def _nova_install_empty_session_spam_pruner_20260610():
         username = str(item.get("username") or "").strip().lower()
         return user_id or username or "legacy_unowned"
 
+
+
+
     def sort_key(item):
         return str(item.get("updated_at") or item.get("created_at") or "")
 
@@ -11686,14 +11722,13 @@ def nova_blog_page_20260611():
     return render_template("blog.html")
 
 
-
-
 # NOVA_BEFORE_REQUEST_EXPLICIT_MEMORY_GUARD_20260611
 @app.before_request
 def nova_before_request_explicit_memory_guard_20260611():
     try:
         if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
             return None
+
 
         payload = request.get_json(silent=True) or {}
         raw_user_text = str(
@@ -11944,9 +11979,6 @@ def nova_before_request_favorite_recall_guard_20260611():
             pass
         return None
 
-
-
-
 # NOVA_BEFORE_REQUEST_MEMORY_SUMMARY_GUARD_20260611
 @app.before_request
 def nova_before_request_memory_summary_guard_20260611():
@@ -12101,51 +12133,70 @@ def nova_before_request_memory_summary_guard_20260611():
         return None
 
 
-# NOVA_CHAT_STREAM_SSE_BRIDGE_20260611
+# NOVA_CHAT_STREAM_REAL_20260613
+
 @app.route("/api/chat/stream", methods=["POST"])
-def nova_chat_stream_post_bridge_20260611():
-    # Desktop/mobile clients may try stream first.
-    # Return text/event-stream so stream clients do not collapse the answer to "Done."
+def nova_chat_stream():
+
     import json
-
-    response = api_chat()
-
-    try:
-        payload = response.get_json(silent=True) or {}
-    except Exception:
-        payload = {}
-
-    assistant = payload.get("assistant_message") or {}
-    text = (
-        assistant.get("text")
-        or assistant.get("content")
-        or payload.get("text")
-        or payload.get("content")
-        or "Done."
-    )
+    from flask import Response
 
     def generate():
+
+        try:
+            result = api_chat()
+
+            # --- FORCE NORMALIZATION ---
+            if isinstance(result, dict):
+                payload = result
+            else:
+                try:
+                    payload = result.get_json() or {}
+                except Exception:
+                    payload = {}
+
+            assistant = payload.get("assistant_message") or {}
+
+            text = (
+                assistant.get("content")
+                or assistant.get("text")
+                or payload.get("content")
+                or payload.get("text")
+                or str(result)  # 🔥 fallback hard safety
+            )
+
+        except Exception as e:
+            yield "data: " + json.dumps({
+                "type": "error",
+                "content": str(e)
+            }) + "\n\n"
+            return
+
+        if not text:
+            text = "No response generated."
+
+        full = ""
+
+        for chunk in text.split():
+            full += chunk + " "
+
+            yield "data: " + json.dumps({
+                "type": "token",
+                "content": chunk + " "
+            }) + "\n\n"
+
         yield "data: " + json.dumps({
             "type": "message",
-            "text": text,
-            "content": text,
-            "assistant_message": {
-                "role": "assistant",
-                "text": text,
-                "content": text,
-            },
-            "payload": payload,
+            "content": full.strip()
         }) + "\n\n"
+
         yield "data: " + json.dumps({
             "type": "done",
-            "done": True,
+            "done": True
         }) + "\n\n"
 
     return Response(generate(), mimetype="text/event-stream")
 
-# NOVA_MEMORY_COMMAND_BEFORE_WEB_20260611
-# Obvious memory-save commands must be handled before generic chat/web routing.
-# This prevents "remember that ..." from falling through to web search.
 @app.before_request
 def nova_memory_command_before_web_20260611():
     try:
@@ -12183,16 +12234,6 @@ def nova_memory_command_before_web_20260611():
         if not clean_lower.startswith(memory_prefixes):
             return None
 
-        # Do not intercept recall questions.
-        question_starts = (
-            "do you remember",
-            "did you remember",
-            "what do you remember",
-            "what did you remember",
-        )
-        if clean_lower.startswith(question_starts):
-            return None
-
         fact = raw_user_text
         for prefix in memory_prefixes:
             if clean_lower.startswith(prefix):
@@ -12210,16 +12251,8 @@ def nova_memory_command_before_web_20260611():
         ).strip()
 
         if not session_id:
-            try:
-                session_id = session_service.get_active_session_id()
-            except Exception:
-                session_id = ""
-
-        if not session_id:
             session_id = "default"
 
-        # Preserve Nova project-focus memory in the shape the project recall
-        # helpers already expect.
         category = "preference"
         memory_text = fact
 
@@ -12231,9 +12264,9 @@ def nova_memory_command_before_web_20260611():
         )
 
         fact_lower = " ".join(fact.lower().split())
-        for focus_prefix in focus_prefixes:
-            if fact_lower.startswith(focus_prefix):
-                focus_value = fact[len(focus_prefix):].strip()
+        for prefix in focus_prefixes:
+            if fact_lower.startswith(prefix):
+                focus_value = fact[len(prefix):].strip()
                 if focus_value:
                     category = "project_focus"
                     memory_text = "Current project focus: " + focus_value
@@ -12242,13 +12275,10 @@ def nova_memory_command_before_web_20260611():
         existing = False
         try:
             for item in memory_service.all() or []:
-                if not isinstance(item, dict):
-                    continue
-                same_text = str(item.get("text") or "").strip().lower() == memory_text.strip().lower()
-                same_session = str(item.get("session_id") or "").strip() in ("", session_id)
-                if same_text and same_session:
-                    existing = True
-                    break
+                if isinstance(item, dict):
+                    if str(item.get("text") or "").strip().lower() == memory_text.lower():
+                        existing = True
+                        break
         except Exception:
             existing = False
 
@@ -12262,76 +12292,15 @@ def nova_memory_command_before_web_20260611():
                 "weight": 10.0,
             })
 
-        assistant_text = "Saved to memory: " + memory_text
+        return None
 
-        # Save the exchange to the session so desktop session history stays sane.
-        try:
-            if hasattr(session_service, "get_session") and not session_service.get_session(session_id):
-                if hasattr(session_service, "create_session"):
-                    created = session_service.create_session("New Chat")
-                    created_id = str((created or {}).get("id") or "").strip()
-                    if created_id:
-                        session_id = created_id
+    except Exception:
+        return None
 
-            if hasattr(session_service, "append_message"):
-                session_service.append_message(session_id, {
-                    "role": "user",
-                    "text": raw_user_text,
-                    "meta": {
-                        "route": "memory_command_before_web",
-                        "save_memory": True,
-                    },
-                })
-                session_service.append_message(session_id, {
-                    "role": "assistant",
-                    "text": assistant_text,
-                    "meta": {
-                        "route": "memory_command_before_web",
-                        "save_memory": True,
-                    },
-                })
-        except Exception:
-            pass
-
-        session = None
-        try:
-            session = session_service.get_session(session_id)
-        except Exception:
-            session = None
-
-        return json_ok(
-            ok=True,
-            assistant_message={
-                "role": "assistant",
-                "text": assistant_text,
-                "meta": {
-                    "route": "memory_command_before_web",
-                    "save_memory": True,
-                    "category": category,
-                    "already_existed": existing,
-                },
-            },
-            text=assistant_text,
-            active_session_id=session_id,
-            session_id=session_id,
-            session=session,
-            debug={
-                "route_taken": "memory_command_before_web",
-                "saved_memory_text": memory_text,
-                "category": category,
-                "already_existed": existing,
-            },
-        )
-    except Exception as exc:
-        return json_error(str(exc), 500)
-
-
-
-# NOVA_FOCUS_RECALL_BEFORE_WEB_20260611
-# Directly answer current Nova/project focus questions from memory before
-# generic chat/web routing can misclassify them as web_fetch.
 @app.before_request
 def nova_focus_recall_before_web_20260611():
+    return None
+
     try:
         if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
             return None
@@ -12462,57 +12431,19 @@ def nova_focus_recall_before_web_20260611():
 
             assistant_text = "Your current Nova focus is: " + focus
 
-        try:
-            if hasattr(session_service, "append_message"):
-                session_service.append_message(session_id, {
-                    "role": "user",
-                    "text": raw_user_text,
-                    "meta": {
-                        "route": "nova_focus_recall_before_web",
-                        "use_memory": True,
-                    },
-                })
-                session_service.append_message(session_id, {
-                    "role": "assistant",
-                    "text": assistant_text,
-                    "meta": {
-                        "route": "nova_focus_recall_before_web",
-                        "use_memory": True,
-                        "best_score": best_score,
-                    },
-                })
-        except Exception:
-            pass
+        # 🔒 IMPORTANT: DO NOT RETURN RESPONSE
+        # Only attach data to request for downstream handler
+        request.nova_focus_recall = {
+            "session_id": session_id,
+            "assistant_text": assistant_text,
+            "best_score": best_score,
+        }
 
-        session = None
-        try:
-            session = session_service.get_session(session_id)
-        except Exception:
-            session = None
+        return None
 
-        return json_ok(
-            ok=True,
-            assistant_message={
-                "role": "assistant",
-                "text": assistant_text,
-                "meta": {
-                    "route": "nova_focus_recall_before_web",
-                    "use_memory": True,
-                    "best_score": best_score,
-                },
-            },
-            text=assistant_text,
-            active_session_id=session_id,
-            session_id=session_id,
-            session=session,
-            debug={
-                "route_taken": "nova_focus_recall_before_web",
-                "best_memory_text": best_text,
-                "best_score": best_score,
-            },
-        )
-    except Exception as exc:
-        return json_error(str(exc), 500)
+    except Exception:
+        return None
+
 
 # NOVA_ATTACHMENT_DIRECT_TEXT_CLEAN_FINAL_20260611
 def _nova_direct_clean_attachment_text_response_20260611(text_value):
@@ -12763,9 +12694,6 @@ def _nova_install_api_chat_attachment_view_wrapper_20260611():
 
 
 _nova_install_api_chat_attachment_view_wrapper_20260611()
-
-
-
 
 
 # NOVA_WEB_FETCH_BRIDGE_JSON_IMPORT_FIX_20260612

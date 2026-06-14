@@ -440,7 +440,11 @@
     `;
   }
 
-  function renderMessages(messages = []) {
+function renderMessages(messages = []) {
+  if (renderMessages.__lock) return;
+  renderMessages.__lock = true;
+
+  try {
     const root = getMessagesRoot();
     if (!root) return;
 
@@ -463,6 +467,37 @@
       .map((message, index) => {
         const role = messageRoleClass(message?.role);
         const content = extractMessageText(message);
+
+        const imageHtml = message?.image_url
+          ? `<div style="margin-top:10px;">
+               <img src="${escapeHtml(message.image_url)}"
+                    style="max-width:100%;border-radius:14px;">
+             </div>`
+          : "";
+
+        return `
+          <div class="message ${role}">
+            <div class="message-content">${content}</div>
+            ${imageHtml}
+          </div>
+        `;
+      })
+      .join("");
+
+    setSending(false);
+
+  } finally {
+    renderMessages.__lock = false;
+  }
+}
+
+    root.innerHTML = state.messages
+      .map((message, index) => {
+        const role = messageRoleClass(message?.role);
+        const content = extractMessageText(message);
+        const imageHtml = message?.image_url
+          ? `<div style="margin-top:10px;"><img src="${escapeHtml(message.image_url)}" style="max-width:100%;border-radius:14px;"></div>`
+          : "";
         const attachments = safeArray(
           message?.attachments ||
           message?.files ||
@@ -472,7 +507,7 @@
         return `
           <div class="message message-${role}" data-role="${role}">
             <div class="message-bubble">
-              <div class="message-content">${formatText(content)}</div>
+              <div class="message-content">${formatText(content)}${imageHtml}</div>
               ${role === "user" ? renderAttachmentPreviewList(attachments) : ""}
               ${buildMessageActions(message, index)}
             </div>
@@ -485,6 +520,42 @@
     scrollToBottom(true);
     setSending(false);
   }
+
+function getOrCreateStreamingBubble(root) {
+  let last = root.lastElementChild;
+
+  // if no messages yet or last isn't assistant, create one
+  if (!last || !last.classList.contains("assistant")) {
+    const div = document.createElement("div");
+    div.className = "message assistant";
+
+    div.innerHTML = `<div class="message-content"></div>`;
+    root.appendChild(div);
+    return div.querySelector(".message-content");
+  }
+
+  return last.querySelector(".message-content");
+}
+
+function appendStreamToken(token) {
+  const root = getMessagesRoot();
+  if (!root) return;
+
+  const target = getOrCreateStreamingBubble(root);
+  target.textContent += token;
+
+  root.scrollTop = root.scrollHeight;
+}
+
+function finalizeStream() {
+  const root = getMessagesRoot();
+  if (!root) return;
+
+  const target = root.querySelector(".message.assistant:last-child .message-content");
+  if (!target) return;
+
+  target.innerHTML = target.textContent; // optional: markdown step later
+}
 
   function bindMessageActions(root) {
     root.querySelectorAll('[data-action="copy-message"]').forEach((btn) => {
@@ -548,8 +619,10 @@
       content: String(content || ""),
       ...meta,
     });
-    renderMessages(state.messages);
-  }
+
+requestAnimationFrame(() => {
+  renderMessages(state.messages);
+});
 
   function upsertStreamingAssistant(content = "") {
     const last = state.messages[state.messages.length - 1];
@@ -683,7 +756,7 @@ async function readStreamResponse(res) {
 
         if (delta) {
           assistantText += delta;
-          upsertStreamingAssistant(assistantText);
+          appendStreamToken(delta);
         }
 
         continue;
@@ -713,21 +786,20 @@ async function readStreamResponse(res) {
             imageAssistant.image_url ||
             "";
 
-          if (imageUrl) {
-            finalText =
-              imageAssistant.text ||
-              payload.content ||
-              payload.text ||
-              "Generated image.";
+if (imageUrl) {
+  const finalText =
+    imageAssistant?.text ||
+    payload?.text ||
+    "Generated image";
 
-            finalizeStreamingAssistant(finalText);
+  finalizeStreamingAssistant(finalText);
 
-            return {
-              mode: "image",
-              text: finalText,
-              image_url: imageUrl,
-            };
-          }
+  return {
+    mode: "image",
+    text: finalText,
+    image_url: imageUrl,
+  };
+}
 
           // ---------------------------------
           // NORMAL FINALIZATION
@@ -925,14 +997,30 @@ async function readStreamResponse(res) {
 
       const result = await readStreamResponse(res);
 
+if (result.mode === "image" && result.image_url) {
+  finalizeStreamingAssistant(result.text || "Generated image");
+
+  state.messages.push({
+    role: "assistant",
+    content: result.text || "Generated image",
+    image_url: result.image_url
+  });
+
+  requestAnimationFrame(() => renderMessages(state.messages));
+
+  return;
+}
+
       if (!result.text) {
         upsertStreamingAssistant("No response received.");
         finalizeStreamingAssistant("No response received.");
       }
 
-      if (!useLastAttachments) {
-        await clearComposerAttachments();
-      }
+if (!useLastAttachments) {
+  requestAnimationFrame(() => {
+    clearComposerAttachments();
+  });
+}
 
       if (Nova.sessions && typeof Nova.sessions.refresh === "function") {
         await Nova.sessions.refresh();

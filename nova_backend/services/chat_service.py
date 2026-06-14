@@ -254,6 +254,8 @@ class ChatService:
 
         return text in blocked
 
+
+
     def _update_working_state(self, session_id: str, patch: dict) -> dict:
         session_id = self._safe_str(session_id).strip()
 
@@ -10528,9 +10530,32 @@ if (not attachments) and (__name__ == "__main__"):
         # CHAT EXIT PATH
         if action == "chat" and text not in execution_keywords:
 
+            if route == "execution":
+                return self._process_execution_command(
+                    command=user_text,
+                    session_id=session_id,
+                    execution_state={}
+                )
+
+            if route == "attachment":
+                return self._handle_attachment(
+                    user_text=user_text,
+                    attachments=attachments,
+                    session_id=session_id
+                )
+
+            if route == "web":
+                return self._execute_web_fetch(
+                    user_text=user_text,
+                    session_id=session_id,
+                    attachments=attachments
+                )
+
             chat_result = self._execute_general_chat(
                 user_text=user_text,
                 session_id=session_id,
+                attachments=attachments,
+                decision={"route": "chat"}
             )
 
             if isinstance(chat_result, dict):
@@ -10948,6 +10973,73 @@ if (not attachments) and (__name__ == "__main__"):
             "uploaded pdf attachment",
         )
         return any(marker in value for marker in markers)
+
+    def _single_router(self, user_text, session_id="", attachments=None):
+
+        text = self._safe_str(user_text)
+        lowered = text.lower().strip()
+        attachments = attachments or []
+
+        # ─────────────────────────────
+        # LOAD EXECUTION STATE
+        # ─────────────────────────────
+        execution_state = (
+            self._get_session_meta(session_id, "execution_state")
+            or self._get_session_meta(session_id, "active_execution")
+            or {}
+        )
+
+        execution_active = bool(
+            execution_state.get("steps")
+            or execution_state.get("current_step")
+            or execution_state.get("status") in {"running", "waiting"}
+        )
+
+        execution_commands = {
+            "next", "continue", "resume",
+            "run step", "run all", "execute",
+            "retry", "run it"
+        }
+
+        # ─────────────────────────────
+        # 1. EXECUTION MODE
+        # ─────────────────────────────
+        if execution_active:
+            if lowered in execution_commands:
+                return ("execution", "run")
+            return ("chat", "escape_execution")
+
+        # ─────────────────────────────
+        # 2. ATTACHMENTS
+        # ─────────────────────────────
+        if attachments:
+            return ("attachment", "analyze")
+
+        # ─────────────────────────────
+        # 3. WEB (STRICT ONLY)
+        # ─────────────────────────────
+        web_keywords = (
+            "news",
+            "weather",
+            "search",
+            "latest",
+            "find information",
+            "look up",
+        )
+
+        if any(keyword in lowered for keyword in web_keywords):
+            return ("web", "fetch")
+
+        # ─────────────────────────────
+        # 4. START EXECUTION
+        # ─────────────────────────────
+        if lowered.startswith(("auto-plan", "build", "create", "fix", "implement", "upgrade")):
+            return ("execution", "start")
+
+        # ─────────────────────────────
+        # 5. DEFAULT (IMPORTANT FIX)
+        # ─────────────────────────────
+        return ("chat", "normal")
 
     def handle(self, user_text: str, session_id: str = "", attachments=None):
 
@@ -11674,52 +11766,79 @@ if (not attachments) and (__name__ == "__main__"):
         if auto_fix_result is not None:
             return auto_fix_result
 
-        decision = self._decide_route(
-            user_text=user_text,
-            attachments=attachments,
-            session_id=session_id,
+
+
+
+
+
+        # ================================
+        # NOVA SINGLE ROUTER ENFORCEMENT
+        # ================================
+
+        execution_state = (
+            self._get_session_meta(session_id, "execution_state")
+            or self._get_session_meta(session_id, "active_execution")
+            or {}
         )
 
-        if (
-            isinstance(decision, dict)
-            and decision.get("route") == "resume_empty_state_guard"
-        ):
-
-            return {
-                "ok": True,
-                "assistant_message": self._build_assistant_message(
-                    "No active work to resume."
-                ),
-                "skip_rewrite": True,
-                "debug": {
-                    "route_taken": "resume_empty_state_guard",
-                },
-            }
-
-        result = self._execute_general_chat(
-            decision=decision,
-            user_text=user_text,
-            session_id=session_id,
-            attachments=attachments,
+        execution_active = bool(
+            execution_state.get("steps")
+            or execution_state.get("current_step")
+            or execution_state.get("status") in {"running", "waiting"}
         )
 
-        if isinstance(result, dict) and result.get("skip_rewrite"):
-            return result
+        execution_commands = {
+            "next", "continue", "resume",
+            "run step", "run all", "execute",
+            "retry", "run it"
+        }
 
-        if result is None:
-            return {
-                "ok": False,
-                "assistant_message": self._build_assistant_message(
-                    "No response generated (null pipeline result)."
-                ),
-                "debug": {"error": "null_result"},
-            }
+        lowered = self._safe_str(user_text).lower().strip()
 
-        return result
+        # 🚨 HARD RULE: execution cannot be bypassed by other routers
+        # ─────────────────────────────
+        # SAFE ROUTE DISPATCH (FIXED)
+        # ─────────────────────────────
 
-        # =========================
-        # BLOCK GENERAL CHAT FAKE EXECUTION
-        # =========================
+        route, command = self._single_router(
+            user_text,
+            session_id,
+            attachments
+        )
+
+        # HARD RULE: execution must not leak into chat fallback
+        if execution_active and route != "execution":
+            route = "chat"
+
+        # SINGLE DISPATCH AUTHORITY
+        if route == "execution":
+            return self._process_execution_command(
+                command=user_text,
+                session_id=session_id,
+                execution_state={}
+            )
+
+        elif route == "attachment":
+            return self._handle_attachment(
+                user_text=user_text,
+                attachments=attachments,
+                session_id=session_id
+            )
+
+        elif route == "web":
+            return self._execute_web_fetch(
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments
+            )
+
+        else:
+            return self._execute_general_chat(
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
+                decision={"route": "chat"}
+            )
 
     def _process_goal_and_plan(self, user_text: str, session_id: str):
         user_text = self._safe_str(user_text).strip()
@@ -15074,6 +15193,29 @@ Auto-fix result:
                 "save_artifact": True,
                 "save_memory": False,
                 "use_memory": False,
+            }
+
+        simple_chat_inputs = {
+            "hi",
+            "hello",
+            "hey",
+            "yo",
+            "sup",
+            "test",
+            "ok",
+            "okay",
+            "k",
+        }
+
+        if lower_text.strip() in simple_chat_inputs:
+            return {
+                "route": self.ROUTE_GENERAL_CHAT,
+                "mode": "chat",
+                "confidence": 1.0,
+                "reasons": ["simple_chat_input_guard"],
+                "save_artifact": False,
+                "save_memory": False,
+                "use_memory": True,
             }
 
         wants_live_web = any(trigger in lower_text for trigger in live_web_triggers)
@@ -19051,23 +19193,26 @@ def _save_artifact_fallback(self, artifact: dict):
 
             first = result.data[0] if getattr(result, "data", None) else None
             image_b64 = getattr(first, "b64_json", None) if first else None
+            remote_image_url = getattr(first, "url", None) if first else None
 
-            if not image_b64:
-                raise ValueError("Image API returned no b64_json")
+            if remote_image_url:
+                image_url = remote_image_url
+            else:
+                if not image_b64:
+                    raise ValueError("Image API returned no image data")
 
-            image_bytes = base64.b64decode(image_b64)
+                image_bytes = base64.b64decode(image_b64)
+                filename = f"generated_{uuid.uuid4().hex}.png"
 
-            filename = f"generated_{uuid.uuid4().hex}.png"
+                save_path = os.path.join(
+                    self.uploads_dir,
+                    filename,
+                )
 
-            save_path = os.path.join(
-                self.uploads_dir,
-                filename,
-            )
+                with open(save_path, "wb") as f:
+                    f.write(image_bytes)
 
-            with open(save_path, "wb") as f:
-                f.write(image_bytes)
-
-            image_url = f"/api/uploads/{filename}"
+                image_url = f"/api/uploads/{filename}"
 
             saved_artifact = None
 
@@ -21091,18 +21236,22 @@ def _nova_runtime_handle_image_generation(
 
         first = result.data[0] if getattr(result, "data", None) else None
         image_b64 = getattr(first, "b64_json", None) if first else None
+        remote_image_url = getattr(first, "url", None) if first else None
 
-        if not image_b64:
-            raise ValueError("Image API returned no b64_json")
+        if remote_image_url:
+            image_url = remote_image_url
+        else:
+            if not image_b64:
+                raise ValueError("Image API returned no image data")
 
-        image_bytes = base64.b64decode(image_b64)
-        filename = f"generated_{uuid.uuid4().hex}.png"
-        filepath = self.uploads_dir / filename
+            image_bytes = base64.b64decode(image_b64)
+            filename = f"generated_{uuid.uuid4().hex}.png"
+            filepath = self.uploads_dir / filename
 
-        with open(filepath, "wb") as f:
-            f.write(image_bytes)
+            with open(filepath, "wb") as f:
+                f.write(image_bytes)
 
-        image_url = f"/api/uploads/{filename}"
+            image_url = f"/api/uploads/{filename}"
 
         if self._safe_str(prompt).strip().lower() not in regen_commands:
             self._set_session_meta(

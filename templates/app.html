@@ -1031,18 +1031,20 @@ body {
 
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", polishDesktop);
+
+
     } else {
         polishDesktop();
     }
 
-    var observer = new MutationObserver(function () {
-        polishDesktop();
-    });
+var observer = new MutationObserver(function () {
+    polishDesktop();
+});
 
-    observer.observe(document.documentElement, {
-        childList: true,
-        subtree: true
-    });
+observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true
+});
 
     window.addEventListener("resize", polishDesktop);
 })();
@@ -1111,11 +1113,11 @@ body {
         </div>
       </section>
 
-      <div id="desktopAttachmentChip" class="desktop-attachment-chip" hidden></div>
-
       <div class="composer">
         <input id="desktopFileInput" type="file" hidden />
-        <button id="attachBtn" class="attach-button" type="button">Attach</button>
+        <button id="attachBtn" class="attach-button" type="button" aria-label="Attach file">
+  <span class="attach-icon">📎</span>
+</button>
         <textarea id="input" placeholder="Message Nova... Enter sends, Shift+Enter makes a new line"></textarea>
         <button id="sendBtn" type="button">Send</button>
       </div>
@@ -1237,6 +1239,15 @@ body {
     const newSessionBtn = $("newSessionBtn");
     const summarizeBtn = $("summarizeBtn");
     const openMemoryBtn = $("openMemoryBtn");
+
+function esc(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 
     function setStatus(s) {
       status.textContent = "status: " + s;
@@ -1554,9 +1565,9 @@ body {
         messages.innerHTML = "";
       }
 
-      await refreshSummaryMeta();
-      refreshDesktopPanels();
-    }
+refreshSummaryMeta();
+refreshDesktopPanels();
+}
 
     async function summarizeNow() {
       if (!getSessionId()) {
@@ -1784,7 +1795,14 @@ body {
       if (data.session_id) setSessionId(data.session_id);
       if (data.active_session_id) setSessionId(data.active_session_id);
 
-      assistantBubble.textContent = safeRenderText(normalizeFallbackResponse(data));
+      const renderedText = safeRenderText(normalizeFallbackResponse(data));
+      const imageUrl =
+        data.image_url ||
+        (data.assistant_message && data.assistant_message.image_url) ||
+        "";
+
+// no UI rendering here
+
       setStatus("done");
       clearDesktopAttachments();
       await refreshSummaryMeta();
@@ -1812,152 +1830,196 @@ body {
 
       if (data.session_id) setSessionId(data.session_id);
 
-      assistantBubble.textContent = safeRenderText(normalizeFallbackResponse(data));
+      const renderedText = safeRenderText(normalizeFallbackResponse(data));
+      const imageUrl =
+        data.image_url ||
+        (data.assistant_message && data.assistant_message.image_url) ||
+        "";
+
+      assistantBubble.innerHTML = esc(renderedText);
+
+      if (imageUrl) {
+        assistantBubble.innerHTML +=
+          '<div style="margin-top:10px;"><img src="' +
+          esc(imageUrl) +
+          '" style="max-width:100%;border-radius:14px;display:block;"></div>';
+      }
+
       setStatus("done attachment");
       clearDesktopAttachments();
-      await refreshSummaryMeta();
-      refreshDesktopPanels();
+await refreshSummaryMeta();
+refreshDesktopPanels();
+}
+
+function resetDesktopUIState() {
+    pendingDesktopAttachments = [];
+    clearDesktopAttachments?.();
+
+    const chip = document.getElementById("desktopAttachmentChip");
+    if (chip) {
+        chip.hidden = true;
+        chip.innerHTML = "";
     }
-    async function sendText(textOverride) {
-      const rawText = String(textOverride || input.value || "").trim();
-      const attachments = pendingDesktopAttachments.slice();
-      const text = clarifyAttachmentPrompt(rawText, attachments);
-      if (!text && !attachments.length) return;
+}
 
-      ensureLocalSessionId();
+function openMemoryRescue() {
+  const panel =
+    document.getElementById("memoryPanel") ||
+    document.querySelector(".memory-panel");
 
-      input.value = "";
-      input.style.height = "auto";
+  if (!panel) {
+    console.warn("Memory panel not found");
+    return;
+  }
 
-      setStatus("streaming...");
-      sendBtn.disabled = true;
+  panel.classList.toggle("open");
+  panel.style.display = "block";
+}
+async function sendText(textOverride) {
+  resetDesktopUIState();
 
-      addMsg("user", text);
-      const assistantBubble = addMsg("assistant", "");
+  const rawText = String(textOverride || input.value || "").trim();
 
-      try {
-        if (attachments.length) {
-          await sendDesktopAttachmentDirect(text, attachments, assistantBubble);
-          return;
-        }
+  clearDesktopAttachments();
+  pendingDesktopAttachments = [];
 
-        if (isDesktopDirectMemoryMessage(text)) {
-          await sendDesktopDirectChat(text, attachments, assistantBubble);
-          return;
-        }
+  const attachments = pendingDesktopAttachments.slice();
+  const text = clarifyAttachmentPrompt(rawText, attachments);
 
-        const response = await fetch("/api/chat/stream", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": API_KEY
-          },
-          body: JSON.stringify(buildDesktopChatPayload(text, attachments))
-        });
+  if (!text && !attachments.length) return;
 
-        if (!response.ok || !response.body) {
-          throw new Error("stream failed: " + response.status);
-        }
+  ensureLocalSessionId();
 
-        const sidHdr = response.headers.get("x-nova-session-id");
-        if (sidHdr) setSessionId(sidHdr);
+  input.value = "";
+  input.style.height = "auto";
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        let rendered = "";
+  setStatus("streaming...");
+  sendBtn.disabled = true;
 
-        while (true) {
-          const chunk = await reader.read();
-          if (chunk.done) break;
+  addMsg("user", text);
+  const assistantBubble = addMsg("assistant", "");
 
-          buffer += decoder.decode(chunk.value, { stream: true });
+  let rendered = "";
 
-          const parts = buffer.split("\n\n");
-          buffer = parts.pop() || "";
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": API_KEY
+      },
+      body: JSON.stringify(buildDesktopChatPayload(text, attachments))
+    });
 
-          for (const part of parts) {
-            const line = part
-              .split("\n")
-              .find((x) => x.startsWith("data:"));
+    if (!response.ok || !response.body) {
+      throw new Error("stream failed: " + response.status);
+    }
 
-            if (!line) continue;
+const data = await response.json();
 
-            const payload = line.slice(5).trim();
-            if (!payload || payload === "[DONE]") continue;
+if (data.session_id) setSessionId(data.session_id);
+if (data.active_session_id) setSessionId(data.active_session_id);
 
-            let msg = null;
-            try {
-              msg = JSON.parse(payload);
-            } catch (e) {
-              rendered += payload;
-              assistantBubble.textContent = rendered;
-              autoScroll();
-              continue;
-            }
+rendered = safeRenderText(normalizeFallbackResponse(data));
+assistantBubble.innerHTML = esc(rendered);
 
-            const ev = msg.ev || msg.event || msg.type;
-            const data = msg.payload || msg.data || msg;
+const imageUrl =
+  data.image_url ||
+  (data.assistant_message && data.assistant_message.image_url) ||
+  "";
 
-            if (ev === "token" || ev === "delta" || data.token || data.delta) {
-              rendered += safeRenderText(data.token || data.delta || "");
-              assistantBubble.textContent = rendered;
-              autoScroll();
-            } else if (ev === "message" || data.response || data.text || data.assistant_message) {
-              rendered = safeRenderText(data.response || data.text || data.assistant_message || data.message || data.content || data.output || data.result || rendered);
-              assistantBubble.textContent = rendered;
-              autoScroll();
-            } else if (ev === "done") {
-              if (data.session_id) setSessionId(data.session_id);
-              setStatus("done");
-            }
-          }
-        }
+if (imageUrl) {
+  assistantBubble.innerHTML +=
+    '<div style="margin-top:10px;"><img src="' +
+    esc(imageUrl) +
+    '" style="max-width:100%;border-radius:14px;display:block;"></div>';
+}
 
-        if (!assistantBubble.textContent.trim()) {
-          assistantBubble.textContent = rendered || "Done.";
-        }
+autoScroll();
 
-        setStatus("done");
-        clearDesktopAttachments();
-        await refreshSummaryMeta();
-      refreshDesktopPanels();
-      } catch (e) {
-        setStatus("fallback...");
+    if (!assistantBubble.textContent || !assistantBubble.textContent.trim()) {
+      assistantBubble.textContent =
+        rendered && rendered.trim()
+          ? rendered
+          : "[No response received]";
+    }
 
-        try {
-          const fb = await fetch("/api/chat", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-api-key": API_KEY
-            },
-            body: JSON.stringify({
-              text: text,
-              user_text: text,
-              message: text,
-              session_id: getSessionId(),
-              client_session_id: getSessionId()
-            })
-          });
+    setStatus("done");
+    clearDesktopAttachments();
+    await refreshSummaryMeta();
+    refreshDesktopPanels();
 
-          const j = await fb.json();
-          if (j.session_id) setSessionId(j.session_id);
-          assistantBubble.textContent = safeRenderText(normalizeFallbackResponse(j));
-          setStatus("done fallback");
-          clearDesktopAttachments();
-          await refreshSummaryMeta();
-      refreshDesktopPanels();
-        } catch (fallbackError) {
-          assistantBubble.textContent = "Error: " + (fallbackError.message || fallbackError);
-          setStatus("error");
-        }
-      } finally {
-        sendBtn.disabled = false;
+  } catch (e) {
+    setStatus("fallback...");
+
+    try {
+      const fb = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": API_KEY
+        },
+        body: JSON.stringify({
+          text,
+          user_text: text,
+          message: text,
+          session_id: getSessionId(),
+          client_session_id: getSessionId()
+        })
+      });
+
+      const data = await fb.json();
+
+      const assistantText =
+        data.response ||
+        data.text ||
+        data.message ||
+        (data.assistant_message && (data.assistant_message.text || data.assistant_message.content)) ||
+        "[No response received]";
+
+      const imageUrl =
+        data.image_url ||
+        (data.assistant_message && data.assistant_message.image_url) ||
+        "";
+
+      assistantBubble.innerHTML = esc(assistantText);
+
+      if (imageUrl) {
+        assistantBubble.innerHTML +=
+          '<div style="margin-top:10px;"><img src="' +
+          esc(imageUrl) +
+          '" style="max-width:100%;border-radius:14px;display:block;"></div>';
       }
+
+      setStatus("done");
+
+    } catch (fallbackError) {
+      console.warn("fallback error:", fallbackError);
+      assistantBubble.textContent = "Error generating response";
+      setStatus("error");
     }
 
-    sendBtn.addEventListener("click", () => sendText());
+  } finally {
+    sendBtn.disabled = false;
+  }
+}
+
+// SAFE ENTRY POINT ONLY
+function handleSendClick() {
+  sendText().catch(err => {
+    console.error("sendText failed:", err);
+  });
+}
+
+// EVENTS
+sendBtn.addEventListener("click", handleSendClick);
+
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    handleSendClick();
+  }
+});
 
     if (openMemoryBtn) {
       openMemoryBtn.addEventListener("click", openDesktopMemoryPanel);
@@ -2010,9 +2072,9 @@ body {
       if (saved) setSessionId(saved);
     } catch (e) {}
 
-    refreshSummaryMeta();
-    refreshDesktopPanels();
-  </script>
+refreshSummaryMeta();
+refreshDesktopPanels();
+</script>
 
 <script>
 (function () {
@@ -2147,32 +2209,32 @@ body {
     });
   }
 
-  async function openMemoryRescue() {
-    var panel = findLikelyPanel("memory");
-    var list = $("desktopMemoryList");
+async function loadMemory() {
+  try {
+    var res = await fetch("/api/memory", {
+      headers: { "Accept": "application/json" }
+    });
 
-    if (panel) forceShow(panel);
-    if (list) revealAround(list);
+    var data = await res.json();
 
-    setStatusSafe("loading memory...");
+    renderMemoryFallback(data);
+    setStatusSafe("memory loaded");
 
-    try {
-      var res = await fetch("/api/memory", { headers: { "Accept": "application/json" } });
-      var data = await res.json();
-      renderMemoryFallback(data);
-      setStatusSafe("memory loaded");
-    } catch (error) {
-      if (list) {
-        list.innerHTML = "";
-        var failed = document.createElement("div");
-        failed.className = "session-placeholder";
-        failed.textContent = "Could not load memory.";
-        list.appendChild(failed);
-      }
-      setStatusSafe("memory failed");
-      console.warn("[Nova Desktop Rescue] memory failed", error);
+  } catch (error) {
+    if (list) {
+      list.innerHTML = "";
+
+      var failed = document.createElement("div");
+      failed.className = "session-placeholder";
+      failed.textContent = "Could not load memory.";
+
+      list.appendChild(failed);
     }
+
+    setStatusSafe("memory failed");
+    console.warn("[Nova Desktop Rescue] memory failed", error);
   }
+}
 
   function normalizeSessionPayload(data) {
     if (!data) return [];
@@ -4321,12 +4383,28 @@ main,
       box.innerHTML = '<div class="session-placeholder">No messages in this session.</div>';
       return 0;
     }
-
     box.innerHTML = messages.map(function (message) {
       const role = esc(message.role || "message");
       const id = esc(message.id || "");
-      const text = esc(message.text || "");
+const text = esc(
+  message.text ||
+  (message.assistant_message && message.assistant_message.text) ||
+  ""
+);
+
+const imageUrl =
+  message.image_url ||
+  (message.assistant_message && message.assistant_message.image_url) ||
+  "";
+
+const imageHtml = imageUrl
+  ? `<div style="margin-top:10px;">
+       <img src="${esc(imageUrl)}"
+            style="max-width:100%;border-radius:14px;display:block;">
+     </div>`
+  : "";
       const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+
       const attachmentHtml = attachments.length
         ? '<div class="nova-message-attachments" style="margin-top:10px;opacity:.75;font-size:12px;">Attachments: ' +
           esc(attachments.map(attachmentName).filter(Boolean).join(", ")) +
@@ -4336,7 +4414,7 @@ main,
       return [
         '<div class="chat-message message ' + role + '" data-message-id="' + id + '" style="padding:14px;margin:10px 0;border-radius:14px;background:rgba(255,255,255,.06);">',
         '<div style="opacity:.65;font-size:12px;margin-bottom:6px;">' + role + (id ? " Â· " + id : "") + '</div>',
-        '<div style="white-space:pre-wrap;">' + text + '</div>',
+        '<div style="white-space:pre-wrap;">' + text + imageHtml + '</div>',
         attachmentHtml,
         sourceCardsHtml(message),
         '</div>'
@@ -4505,10 +4583,10 @@ main,
     }
 
     try {
-      if (typeof window.renderDesktopChatMessages === "function") {
-        window.renderDesktopChatMessages(session.messages);
-        return;
-      }
+if (typeof window.renderDesktopChatMessages === "function") {
+  window.renderDesktopChatMessagesRescue(session.messages);
+  return;
+}
     } catch (err2) {
       console.warn("[Nova Desktop Active Session Recovery] desktop render failed", err2);
     }
@@ -5507,27 +5585,6 @@ main,
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

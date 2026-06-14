@@ -37,69 +37,74 @@
         });
     }
 
-    async function readChatStream(response, thinking) {
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder("utf-8");
+async function readChatStream(response, thinking) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
 
-        let buffer = "";
+    let buffer = "";
 
-        const textOutRef = {
-            value: "",
-            renderScheduled: false
-        };
+    const textOutRef = {
+        value: "",
+        renderScheduled: false
+    };
 
-        while (true) {
-            const part = await reader.read();
+    while (true) {
+        const part = await reader.read();
 
-            if (part.done) break;
+        if (part.done) break;
 
-            buffer += decoder.decode(part.value || new Uint8Array(), {
-                stream: true
-            });
+        buffer += decoder.decode(part.value || new Uint8Array(), {
+            stream: true
+        });
 
-            const blocks = buffer.split("\n\n");
-            buffer = blocks.pop() || "";
+        const blocks = buffer.split("\n\n");
+        buffer = blocks.pop() || "";
 
-            blocks.forEach(function (block) {
-                const dataLine = block
-                    .split(/\r?\n/)
-                    .find(function (line) {
-                        return line.startsWith("data:");
-                    });
+        blocks.forEach(function (block) {
+            const dataLine = block
+                .split(/\r?\n/)
+                .find(function (line) {
+                    return line.startsWith("data:");
+                });
 
-                if (!dataLine) return;
+            if (!dataLine) return;
 
-                const raw = dataLine.slice(5).trim();
+            const raw = dataLine.slice(5).trim();
 
-                if (!raw || raw === "[DONE]") {
+            if (!raw || raw === "[DONE]") return;
+
+            try {
+                const data = JSON.parse(raw);
+
+                window.NovaMobileBridge.syncSessionFromResponse(data);
+
+                if (typeof window.renderWebSourcesFromPayload === "function") {
+                    window.renderWebSourcesFromPayload(data);
+                }
+
+                if (data.type === "token") {
+                    appendStreamDelta(thinking, textOutRef, data.content || "");
                     return;
                 }
 
-                try {
-                    const data = JSON.parse(raw);
-
-                    window.NovaMobileBridge.syncSessionFromResponse(data);
-
-                    if (typeof window.renderWebSourcesFromPayload === "function") {
-                        window.renderWebSourcesFromPayload(data);
-                    }
-
-                    const delta =
-                        data.delta ||
-                        data.content ||
-                        data.response ||
-                        data.text ||
-                        "";
-
-                    appendStreamDelta(thinking, textOutRef, delta);
-                } catch {
-                    appendStreamDelta(thinking, textOutRef, raw);
+                if (data.type === "message") {
+                    textOutRef.value = "";
+                    appendStreamDelta(thinking, textOutRef, data.content || "");
+                    return;
                 }
-            });
-        }
 
-        return textOutRef.value;
+                if (data.type === "done") {
+                    return;
+                }
+
+            } catch (e) {
+                console.warn("[Nova Stream Parse Error]", e, raw);
+            }
+        });
     }
+
+    return textOutRef.value;
+}
 
     function pickGeneratedImageUrl(payload) {
         if (!payload || typeof payload !== "object") {
