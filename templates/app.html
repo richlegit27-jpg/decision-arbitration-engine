@@ -1699,8 +1699,19 @@ async function uploadDesktopAttachment(file) {
     throw new Error(data?.error || "Upload failed");
   }
 
-  const attachment = normalizeUploadedAttachment(data, file);
+const attachment = normalizeUploadedAttachment
+  ? normalizeUploadedAttachment(data, file)
+  : {
+      filename: data.filename || data.stored || file.name,
+      original_filename: data.original_filename || file.name,
+      name: file.name,
+      mime_type: data.mime_type || file.type,
+      size: data.size || file.size,
+      url: data.url || data.file_url,
+      file_url: data.file_url || data.url
+    };
 
+console.log("📎 NORMALIZED ATTACHMENT", attachment);
   pendingDesktopAttachments = pendingDesktopAttachments || [];
 pendingDesktopAttachments.push(attachment);
 console.log("📎 ATTACHMENT STORED", pendingDesktopAttachments);
