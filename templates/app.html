@@ -1638,7 +1638,6 @@ refreshDesktopPanels();
       return clean;
     }
     // NOVA_DESKTOP_ATTACH_UPLOAD_20260610
-
 function showDesktopAttachmentChip(text) {
   let chip = document.getElementById("desktopAttachmentChip") || desktopAttachmentChip;
 
@@ -1655,10 +1654,7 @@ function showDesktopAttachmentChip(text) {
   }
 
   chip.hidden = false;
-  chip.style.display = "flex";
-  chip.style.alignItems = "center";
-  chip.style.justifyContent = "space-between";
-  chip.style.gap = "10px";
+  chip.style.display = "block";
   chip.style.width = "100%";
   chip.style.boxSizing = "border-box";
   chip.style.margin = "8px 0";
@@ -1667,24 +1663,7 @@ function showDesktopAttachmentChip(text) {
   chip.style.borderRadius = "10px";
   chip.style.fontSize = "13px";
   chip.style.opacity = "0.9";
-
-  chip.innerHTML = `
-    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${text}</span>
-    <button type="button" id="desktopAttachmentDeleteBtn" title="Remove attachment"
-      style="border:0;border-radius:8px;padding:4px 8px;cursor:pointer;background:rgba(255,255,255,.14);color:inherit;">
-      ✕
-    </button>
-  `;
-
-  const deleteBtn = document.getElementById("desktopAttachmentDeleteBtn");
-  if (deleteBtn) {
-    deleteBtn.onclick = function (event) {
-      event.preventDefault();
-      event.stopPropagation();
-      clearDesktopAttachments();
-      console.log("📎 ATTACHMENT REMOVED");
-    };
-  }
+  chip.innerHTML = text;
 
   console.log("📎 CHIP SHOWN", chip);
 }
@@ -1692,13 +1671,10 @@ function showDesktopAttachmentChip(text) {
 function clearDesktopAttachments() {
   pendingDesktopAttachments = [];
 
-const chip = document.getElementById("desktopAttachmentChip") || desktopAttachmentChip;
-
-if (chip) {
-  chip.hidden = true;
-  chip.style.display = "none";
-  chip.innerHTML = "";
-}
+  if (desktopAttachmentChip) {
+    desktopAttachmentChip.hidden = true;
+    desktopAttachmentChip.textContent = "";
+  }
 
   if (desktopFileInput) {
     desktopFileInput.value = "";
@@ -1977,77 +1953,16 @@ function renderAssistantMessage(assistantBubble, data) {
     image: data.image_url || data.assistant_message?.image_url || null
   };
 
-assistantBubble.innerHTML = "";
+  assistantBubble.innerHTML = esc(assistantMessage.text);
 
-const textWrap = document.createElement("div");
-textWrap.innerHTML = esc(assistantMessage.text || "");
-assistantBubble.appendChild(textWrap);
-
-const actions = document.createElement("div");
-actions.style.marginTop = "8px";
-actions.style.display = "flex";
-actions.style.gap = "8px";
-
-const copyBtn = document.createElement("button");
-copyBtn.type = "button";
-copyBtn.textContent = "Copy";
-copyBtn.style.border = "0";
-copyBtn.style.borderRadius = "8px";
-copyBtn.style.padding = "4px 8px";
-copyBtn.style.cursor = "pointer";
-
-copyBtn.onclick = async () => {
-  try {
-    await navigator.clipboard.writeText(assistantMessage.text || "");
-    copyBtn.textContent = "Copied";
-    setTimeout(() => {
-      copyBtn.textContent = "Copy";
-    }, 900);
-  } catch (e) {
-    console.warn("copy failed", e);
-    copyBtn.textContent = "Copy failed";
+  if (assistantMessage.image) {
+    assistantBubble.innerHTML += `
+      <div style="margin-top:10px;">
+        <img src="${esc(assistantMessage.image)}"
+             style="max-width:100%;border-radius:14px;">
+      </div>
+    `;
   }
-};
-
-const regenBtn = document.createElement("button");
-regenBtn.type = "button";
-regenBtn.textContent = "Regen";
-regenBtn.style.border = "0";
-regenBtn.style.borderRadius = "8px";
-regenBtn.style.padding = "4px 8px";
-regenBtn.style.cursor = "pointer";
-
-regenBtn.onclick = () => {
-  const lastUser = [...document.querySelectorAll(".message.user, .user")]
-    .map(node => node.textContent.trim())
-    .filter(Boolean)
-    .pop();
-
-  if (!lastUser) {
-    console.warn("regen failed: no last user text found");
-    return;
-  }
-
-  input.value = lastUser;
-  handleSendClick(lastUser);
-};
-
-actions.appendChild(copyBtn);
-actions.appendChild(regenBtn);
-assistantBubble.appendChild(actions);
-
-if (assistantMessage.image) {
-  const imageWrap = document.createElement("div");
-  imageWrap.style.marginTop = "10px";
-
-  const img = document.createElement("img");
-  img.src = assistantMessage.image;
-  img.style.maxWidth = "100%";
-  img.style.borderRadius = "14px";
-
-  imageWrap.appendChild(img);
-  assistantBubble.appendChild(imageWrap);
-}
 
   const sources = assistantMessage.meta.sources || [];
 
@@ -2118,6 +2033,7 @@ console.log("CLICK FIRED", sendBtn, input);
 
 refreshSummaryMeta();
 refreshDesktopPanels();
+
 
 // -------------------------
 // EVENT BINDING
@@ -5337,6 +5253,7 @@ try {
 
 </body>
 </html>
+
 
 
 
