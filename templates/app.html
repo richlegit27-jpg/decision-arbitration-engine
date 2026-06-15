@@ -957,6 +957,8 @@ body {
 </style>
 
 <script>
+
+
 (function () {
     "use strict";
 
@@ -1240,6 +1242,8 @@ observer.observe(document.documentElement, {
     const summarizeBtn = $("summarizeBtn");
     const openMemoryBtn = $("openMemoryBtn");
 
+let __nova_send_lock = false;
+
 function esc(value) {
   return String(value || "")
     .replace(/&/g, "&amp;")
@@ -1263,24 +1267,27 @@ function esc(value) {
       } catch (e) {}
     }
 
-    function addMsg(role, text) {
-      const wrap = document.createElement("div");
-      wrap.className = "msg " + role;
+function addMsg(role, text, meta = {}) {
+  const wrap = document.createElement("div");
+  wrap.className = "msg " + role;
 
-      const r = document.createElement("div");
-      r.className = "role";
-      r.textContent = role;
+  const r = document.createElement("div");
+  r.className = "role";
+  r.textContent = role;
 
-      const b = document.createElement("div");
-      b.className = "bubble";
-      b.textContent = text || "";
+  const b = document.createElement("div");
+  b.className = "bubble";
+  b.textContent = text || "";
 
-      wrap.appendChild(r);
-      wrap.appendChild(b);
-      chat.appendChild(wrap);
-      autoScroll();
-      return b;
-    }
+  // attach meta for source system
+  wrap._meta = meta;
+
+  wrap.appendChild(r);
+  wrap.appendChild(b);
+  chat.appendChild(wrap);
+  autoScroll();
+  return wrap;
+}
 
     function getSessionId() {
       return (sidEl.value || "").trim();
@@ -1309,28 +1316,28 @@ function esc(value) {
       return sid;
     }
 
-
-
     // NOVA_DESKTOP_FIX_SESSION_ENDPOINTS_20260610
 
     // NOVA_REMOVE_BROKEN_DESKTOP_LOCAL_BLOCK_20260610
     // NOVA_DESKTOP_SAFE_JSON_AND_MEMORY_OPEN_20260610
-    async function fetchJsonOrNull(url, options) {
-      const response = await fetch(url, options || {});
-      const raw = await response.text();
 
-      if (!response.ok) {
-        console.warn("[Nova Desktop] non-OK JSON endpoint", response.status, url, raw.slice(0, 120));
-        return null;
-      }
 
-      try {
-        return JSON.parse(raw);
-      } catch (error) {
-        console.warn("[Nova Desktop] endpoint returned non-JSON", url, raw.slice(0, 120));
-        return null;
-      }
-    }
+async function fetchJsonOrNull(url, options) {
+  const response = await fetch(url, options || {});
+  const raw = await response.text();
+
+  if (!response.ok) {
+    console.warn("[Nova Desktop] non-OK JSON endpoint", response.status, url, raw.slice(0, 120));
+    return null;
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    console.warn("[Nova Desktop] endpoint returned non-JSON", url, raw.slice(0, 120));
+    return null;
+  }
+}
 
     function openDesktopMemoryPanel() {
       const panel = document.querySelector(".tools");
@@ -1598,7 +1605,6 @@ refreshDesktopPanels();
 
 
 
-
     // NOVA_DESKTOP_ATTACHMENT_PROMPT_CLARITY_20260610
     function clarifyAttachmentPrompt(text, attachments) {
       const clean = String(text || "").trim();
@@ -1638,16 +1644,18 @@ refreshDesktopPanels();
       desktopAttachmentChip.innerHTML = text;
     }
 
-    function clearDesktopAttachments() {
-      pendingDesktopAttachments = [];
-      if (desktopAttachmentChip) {
-        desktopAttachmentChip.hidden = true;
-        desktopAttachmentChip.textContent = "";
-      }
-      if (desktopFileInput) {
-        desktopFileInput.value = "";
-      }
-    }
+function clearDesktopAttachments() {
+  pendingDesktopAttachments = [];
+
+  if (desktopAttachmentChip) {
+    desktopAttachmentChip.hidden = true;
+    desktopAttachmentChip.textContent = "";
+  }
+
+  if (desktopFileInput) {
+    desktopFileInput.value = "";
+  }
+}
 
     function normalizeUploadedAttachment(data, file) {
       const uploaded = data || {};
@@ -1662,194 +1670,94 @@ refreshDesktopPanels();
       };
     }
 
-    async function uploadDesktopAttachment(file) {
-      if (!file) return;
+async function uploadDesktopAttachment(file) {
+  if (!file) {
+    console.warn("No file passed to uploadDesktopAttachment");
+    return;
+  }
 
-      showDesktopAttachmentChip("Uploading <strong>" + file.name + "</strong>...");
+  console.log("UPLOAD FILE:", file);
 
-      const form = new FormData();
-      form.append("file", file);
+  const formData = new FormData();
+  formData.append("file", file);
 
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: form
-      });
+  const response = await fetch("/api/upload", {
+    method: "POST",
+    body: formData
+  });
 
-      const data = await response.json();
+  const raw = await response.text();
+  let data = null;
 
-      if (!response.ok || data.ok === false) {
-        throw new Error(data.error || data.message || "Upload failed");
-      }
+  try {
+    data = JSON.parse(raw);
+  } catch (e) {
+    console.warn("Non-JSON response:", raw);
+  }
 
-      const attachment = normalizeUploadedAttachment(data, file);
-      pendingDesktopAttachments = [attachment];
+  if (!response.ok || data?.ok === false) {
+    throw new Error(data?.error || "Upload failed");
+  }
 
-      showDesktopAttachmentChip("Attached: <strong>" + (attachment.original_filename || attachment.filename || file.name) + "</strong>");
-    }
-    // NOVA_DESKTOP_SAFE_RENDER_TEXT_20260610
-    function safeRenderText(value) {
-      if (value === null || value === undefined) return "";
+  const attachment = normalizeUploadedAttachment(data, file);
 
-      if (typeof value === "string") return value;
-      if (typeof value === "number" || typeof value === "boolean") return String(value);
+  pendingDesktopAttachments = pendingDesktopAttachments || [];
+pendingDesktopAttachments.push(attachment);
+console.log("📎 ATTACHMENT STORED", pendingDesktopAttachments);
 
-      if (Array.isArray(value)) {
-        return value.map(safeRenderText).filter(Boolean).join("\n");
-      }
+  showDesktopAttachmentChip(
+    "Attached: <strong>" + (file.name || "file") + "</strong>"
+  );
 
-      if (typeof value === "object") {
-        return value.response
-          || value.assistant_message
-          || value.message
-          || value.text
-          || value.answer
-          || value.content
-          || value.output
-          || value.result
-          || value.summary
-          || JSON.stringify(value, null, 2);
-      }
-
-      return String(value);
-    }
-    function normalizeFallbackResponse(j) {
-      // NOVA_DESKTOP_MEMORY_DIRECT_CHAT_20260611
-      if (j && typeof j.assistant_message === "object" && j.assistant_message) {
-        return safeRenderText(j.assistant_message.text
-          || j.assistant_message.content
-          || j.assistant_message.message
-          || j.assistant_message.response
-          || "");
-      }
-
-      return safeRenderText((j && (j.response
-        || j.message
-        || j.text
-        || j.answer
-        || j.content
-        || j.output
-        || j.result))
-        || j);
-    }
-
-
-    // NOVA_DESKTOP_ATTACHMENT_DIRECT_CHAT_20260610
-    function buildDesktopChatPayload(text, attachments) {
-      return {
-        text: text,
-        user_text: text,
-        message: text,
-        session_id: getSessionId(),
-        client_session_id: getSessionId(),
-        attachments: attachments || [],
-        uploaded_attachments: attachments || [],
-        raw_injection_attachments: attachments || []
-      };
-    }
-
-
-    function isDesktopDirectMemoryMessage(text) {
-      const clean = String(text || "").trim().toLowerCase();
-
-      if (!clean) return false;
-
-      return (
-        clean.startsWith("remember that ") ||
-        clean.startsWith("remember this ") ||
-        clean.startsWith("remember ") ||
-        clean.startsWith("save this ") ||
-        clean.startsWith("save to memory ") ||
-        clean.startsWith("store this ") ||
-        clean.startsWith("note that ") ||
-        clean.startsWith("add to memory ") ||
-        clean.includes("what is my current nova focus") ||
-        clean.includes("what's my current nova focus") ||
-        clean.includes("what is my nova focus") ||
-        clean.includes("what's my nova focus") ||
-        clean.includes("what is my current project focus") ||
-        clean.includes("what's my current project focus") ||
-        clean.includes("what are we focused on") ||
-        clean.includes("what am i focused on")
-      );
-    }
-
-    async function sendDesktopDirectChat(text, attachments, assistantBubble) {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": API_KEY
-        },
-        body: JSON.stringify(buildDesktopChatPayload(text, attachments))
-      });
-
-      const raw = await response.text();
-      let data = null;
-
-      try {
-        data = JSON.parse(raw);
-      } catch (error) {
-        data = { response: raw };
-      }
-
-      if (data.session_id) setSessionId(data.session_id);
-      if (data.active_session_id) setSessionId(data.active_session_id);
-
-      const renderedText = safeRenderText(normalizeFallbackResponse(data));
-      const imageUrl =
-        data.image_url ||
-        (data.assistant_message && data.assistant_message.image_url) ||
-        "";
-
-// no UI rendering here
-
-      setStatus("done");
-      clearDesktopAttachments();
-      await refreshSummaryMeta();
-      refreshDesktopPanels();
-    }
-
-    async function sendDesktopAttachmentDirect(text, attachments, assistantBubble) {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": API_KEY
-        },
-        body: JSON.stringify(buildDesktopChatPayload(text, attachments))
-      });
-
-      const raw = await response.text();
-      let data = null;
-
-      try {
-        data = JSON.parse(raw);
-      } catch (error) {
-        data = { response: raw };
-      }
-
-      if (data.session_id) setSessionId(data.session_id);
-
-      const renderedText = safeRenderText(normalizeFallbackResponse(data));
-      const imageUrl =
-        data.image_url ||
-        (data.assistant_message && data.assistant_message.image_url) ||
-        "";
-
-      assistantBubble.innerHTML = esc(renderedText);
-
-      if (imageUrl) {
-        assistantBubble.innerHTML +=
-          '<div style="margin-top:10px;"><img src="' +
-          esc(imageUrl) +
-          '" style="max-width:100%;border-radius:14px;display:block;"></div>';
-      }
-
-      setStatus("done attachment");
-      clearDesktopAttachments();
-await refreshSummaryMeta();
-refreshDesktopPanels();
+  return attachment;
 }
+
+function buildDesktopChatPayload(text, attachments) {
+  return {
+    text: text,
+    user_text: text,
+    message: text,
+    session_id: getSessionId(),
+    client_session_id: getSessionId(),
+    attachments: attachments || []
+  };
+}
+
+
+// ==========================
+// MEMORY DETECTION (FIXED)
+// ==========================
+function isDesktopDirectMemoryMessage(text) {
+  const clean = String(text || "").trim().toLowerCase();
+
+  if (!clean) return false;
+
+  return (
+    clean.startsWith("remember that ") ||
+    clean.startsWith("remember this ") ||
+    clean.startsWith("remember ") ||
+    clean.startsWith("save this ") ||
+    clean.startsWith("save to memory ") ||
+    clean.startsWith("store this ") ||
+    clean.startsWith("note that ") ||
+    clean.startsWith("add to memory ") ||
+    clean.includes("what is my current nova focus") ||
+    clean.includes("what's my current nova focus") ||
+    clean.includes("what is my current project focus") ||
+    clean.includes("what's my current project focus") ||
+    clean.includes("what are we focused on") ||
+    clean.includes("what am i focused on")
+  );
+}
+
+// REMOVED: duplicate chat pipeline (non-streaming)
+// All requests now go through sendText() unified streaming system
+
+// REMOVED: broken duplicate attachment chat pipeline
+// All chat now handled by sendText() streaming system
+
+resetDesktopUIState?.();
+clearDesktopAttachments?.();
 
 function resetDesktopUIState() {
     pendingDesktopAttachments = [];
@@ -1862,29 +1770,87 @@ function resetDesktopUIState() {
     }
 }
 
-function openMemoryRescue() {
-  const panel =
-    document.getElementById("memoryPanel") ||
-    document.querySelector(".memory-panel");
+function updateAssistantStream(node, text) {
+  node._streamBuffer = text;
 
-  if (!panel) {
-    console.warn("Memory panel not found");
-    return;
+  const bubble = node.querySelector(".bubble");
+  if (!bubble) return;
+
+  // cancel any existing typing safely
+  if (bubble._typingAbort) {
+    bubble._typingAbort();
   }
 
-  panel.classList.toggle("open");
-  panel.style.display = "block";
+  bubble.textContent = "";
+
+  setTimeout(() => {
+    typeText(bubble, text);
+  }, 150);
 }
+
+function typeText(node, text) {
+  if (node._typingTimer) {
+    clearTimeout(node._typingTimer);
+  }
+
+  let i = 0;
+  const words = String(text || "").split(" ");
+  let aborted = false;
+
+  node.textContent = "";
+
+  node._typingAbort = () => {
+    aborted = true;
+    clearTimeout(node._typingTimer);
+  };
+
+  function delay(word, index) {
+    if (index === 0) return 160;
+    if (/[.,!?]$/.test(word)) return 140;
+    if (word.length > 10) return 90;
+    return 35;
+  }
+
+  function tick() {
+    if (aborted) return;
+
+    if (i < words.length) {
+      node.textContent += (i === 0 ? "" : " ") + words[i];
+
+      const d = delay(words[i], i);
+      i++;
+
+      node._typingTimer = setTimeout(tick, d);
+    }
+  }
+
+  tick();
+}
+
+function showThinking(node) {
+  let dots = 0;
+  node.textContent = "thinking";
+
+  const interval = setInterval(() => {
+    dots = (dots + 1) % 4;
+    node.textContent = "thinking" + ".".repeat(dots);
+  }, 300);
+
+  return () => clearInterval(interval);
+}
+
 async function sendText(textOverride) {
-  resetDesktopUIState();
+  console.log("🟢 sendText TRIGGERED");
 
-  const rawText = String(textOverride || input.value || "").trim();
-
-  clearDesktopAttachments();
-  pendingDesktopAttachments = [];
-
+  const liveInput = document.getElementById("input") || document.querySelector("textarea");
+  const capturedText = window.__novaLastInputBeforeSend || "";
+const rawText = String(textOverride || capturedText || liveInput?.value || "").trim();
+  window.__novaLastInputBeforeSend = "";
   const attachments = pendingDesktopAttachments.slice();
   const text = clarifyAttachmentPrompt(rawText, attachments);
+  console.log("🧪 SEND SNAPSHOT", { rawText, text, attachments });
+
+
 
   if (!text && !attachments.length) return;
 
@@ -1893,15 +1859,15 @@ async function sendText(textOverride) {
   input.value = "";
   input.style.height = "auto";
 
-  setStatus("streaming...");
+  setStatus("loading...");
   sendBtn.disabled = true;
 
   addMsg("user", text);
-  const assistantBubble = addMsg("assistant", "");
-
-  let rendered = "";
+  const assistantNode = addMsg("assistant", "");
 
   try {
+    console.log("🔥 CHAT REQUEST START", { text, attachments });
+
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: {
@@ -1911,145 +1877,103 @@ async function sendText(textOverride) {
       body: JSON.stringify(buildDesktopChatPayload(text, attachments))
     });
 
-    if (!response.ok || !response.body) {
-      throw new Error("stream failed: " + response.status);
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText);
     }
 
-const data = await response.json();
+    const raw = await response.text();
 
-if (data.session_id) setSessionId(data.session_id);
-if (data.active_session_id) setSessionId(data.active_session_id);
-
-rendered = safeRenderText(normalizeFallbackResponse(data));
-assistantBubble.innerHTML = esc(rendered);
-
-const imageUrl =
-  data.image_url ||
-  (data.assistant_message && data.assistant_message.image_url) ||
-  "";
-
-if (imageUrl) {
-  assistantBubble.innerHTML +=
-    '<div style="margin-top:10px;"><img src="' +
-    esc(imageUrl) +
-    '" style="max-width:100%;border-radius:14px;display:block;"></div>';
-}
-
-autoScroll();
-
-    if (!assistantBubble.textContent || !assistantBubble.textContent.trim()) {
-      assistantBubble.textContent =
-        rendered && rendered.trim()
-          ? rendered
-          : "[No response received]";
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (e) {
+      throw new Error("Invalid JSON from server: " + raw.slice(0, 200));
     }
+
+    assistantNode.textContent =
+      data?.assistant_message?.text ||
+      data?.text ||
+      data?.response ||
+      "No response";
 
     setStatus("done");
     clearDesktopAttachments();
-    await refreshSummaryMeta();
+    refreshSummaryMeta();
     refreshDesktopPanels();
 
   } catch (e) {
-    setStatus("fallback...");
-
-    try {
-      const fb = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": API_KEY
-        },
-        body: JSON.stringify({
-          text,
-          user_text: text,
-          message: text,
-          session_id: getSessionId(),
-          client_session_id: getSessionId()
-        })
-      });
-
-      const data = await fb.json();
-
-      const assistantText =
-        data.response ||
-        data.text ||
-        data.message ||
-        (data.assistant_message && (data.assistant_message.text || data.assistant_message.content)) ||
-        "[No response received]";
-
-      const imageUrl =
-        data.image_url ||
-        (data.assistant_message && data.assistant_message.image_url) ||
-        "";
-
-      assistantBubble.innerHTML = esc(assistantText);
-
-      if (imageUrl) {
-        assistantBubble.innerHTML +=
-          '<div style="margin-top:10px;"><img src="' +
-          esc(imageUrl) +
-          '" style="max-width:100%;border-radius:14px;display:block;"></div>';
-      }
-
-      setStatus("done");
-
-    } catch (fallbackError) {
-      console.warn("fallback error:", fallbackError);
-      assistantBubble.textContent = "Error generating response";
-      setStatus("error");
-    }
+    console.warn("sendText error:", e);
+    assistantNode.textContent = "Error generating response";
+    setStatus("error");
 
   } finally {
     sendBtn.disabled = false;
+    setStatus("ready");
   }
 }
 
-// SAFE ENTRY POINT ONLY
-function handleSendClick() {
-  sendText().catch(err => {
-    console.error("sendText failed:", err);
-  });
+function renderAssistantMessage(assistantBubble, data) {
+  const assistantMessage = {
+    text: data.assistant_message?.text || data.text || data.response || "",
+    meta: {
+      sources: data.assistant_message?.meta?.sources || data.sources || []
+    },
+    image: data.image_url || data.assistant_message?.image_url || null
+  };
+
+  assistantBubble.innerHTML = esc(assistantMessage.text);
+
+  if (assistantMessage.image) {
+    assistantBubble.innerHTML += `
+      <div style="margin-top:10px;">
+        <img src="${esc(assistantMessage.image)}"
+             style="max-width:100%;border-radius:14px;">
+      </div>
+    `;
+  }
+
+  const sources = assistantMessage.meta.sources || [];
+
+  if (sources.length) {
+    const wrap = document.createElement("div");
+    wrap.style.marginTop = "10px";
+    wrap.style.display = "grid";
+    wrap.style.gap = "8px";
+
+    sources.forEach((src) => {
+      const card = document.createElement("div");
+      card.style.padding = "10px";
+      card.style.border = "1px solid rgba(255,255,255,.15)";
+      card.style.borderRadius = "12px";
+      card.style.fontSize = "12px";
+      card.style.opacity = "0.85";
+
+      card.textContent = src.title || src.name || src.url || "source";
+      wrap.appendChild(card);
+    });
+
+    assistantBubble.appendChild(wrap);
+  }
 }
 
-// EVENTS
-sendBtn.addEventListener("click", handleSendClick);
+function handleSendClick(prompt = "") {
+  if (__nova_send_lock) return;
 
-input.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    handleSendClick();
-  }
-});
+  __nova_send_lock = true;
 
-    if (openMemoryBtn) {
-      openMemoryBtn.addEventListener("click", openDesktopMemoryPanel);
-    }
+console.log("CLICK FIRED", sendBtn, input);
 
-    if (attachBtn && desktopFileInput) {
-      attachBtn.addEventListener("click", () => desktopFileInput.click());
-
-      desktopFileInput.addEventListener("change", () => {
-        const file = desktopFileInput.files && desktopFileInput.files[0];
-        if (!file) return;
-
-        uploadDesktopAttachment(file).catch((error) => {
-          clearDesktopAttachments();
-          addMsg("assistant", "Upload error: " + (error.message || error));
-        });
-      });
-    }
-
-    input.addEventListener("input", () => {
-      input.style.height = "auto";
-      input.style.height = Math.min(input.scrollHeight, 180) + "px";
+  sendText(prompt)
+    .catch(err => {
+      console.error("sendText failed:", err);
+    })
+    .finally(() => {
+      setTimeout(() => {
+        __nova_send_lock = false;
+      }, 250);
     });
-
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        sendText();
-      }
-    });
+}
 
     newSessionBtn.addEventListener("click", () => newSession().catch(e => {
       setStatus("error");
@@ -2063,7 +1987,7 @@ input.addEventListener("keydown", (e) => {
 
     document.querySelectorAll("[data-prompt]").forEach((button) => {
       button.addEventListener("click", () => {
-        sendText(button.getAttribute("data-prompt") || "");
+        handleSendClick(button.getAttribute("data-prompt") || "");
       });
     });
 
@@ -2072,105 +1996,100 @@ input.addEventListener("keydown", (e) => {
       if (saved) setSessionId(saved);
     } catch (e) {}
 
+// =========================
+// SAFE FINAL INIT BLOCK
+// =========================
+
 refreshSummaryMeta();
 refreshDesktopPanels();
-</script>
 
-<script>
-(function () {
-  "use strict";
+// -------------------------
+// EVENT BINDING
+// -------------------------
 
-  // NOVA_DESKTOP_CLICK_RESCUE_20260610
-  function $(id) {
-    return document.getElementById(id);
-  }
+if (sendBtn && input) {
+  sendBtn.addEventListener("mousedown", () => {
+    const liveInput = document.getElementById("input") || document.querySelector("textarea");
+    window.__novaLastInputBeforeSend = liveInput ? liveInput.value : "";
+    console.log("🧲 CAPTURE BEFORE CLICK", window.__novaLastInputBeforeSend);
+  }, true);
 
-  function textOf(el) {
-    return String(
-      (el && (el.innerText || el.textContent || el.getAttribute("aria-label") || el.title || el.id || el.className)) || ""
-    ).toLowerCase();
-  }
+  sendBtn.addEventListener("click", () => handleSendClick());
 
-  function forceShow(el) {
-    if (!el) return;
-
-    el.hidden = false;
-    el.removeAttribute("hidden");
-    el.setAttribute("aria-hidden", "false");
-
-    el.classList.remove("hidden");
-    el.classList.remove("is-hidden");
-    el.classList.add("is-open");
-    el.classList.add("open");
-    el.classList.add("active");
-
-    el.style.display = "block";
-    el.style.visibility = "visible";
-    el.style.opacity = "1";
-    el.style.pointerEvents = "auto";
-  }
-
-  function revealAround(el) {
-    var node = el;
-    var steps = 0;
-
-    while (node && steps < 8) {
-      forceShow(node);
-      node = node.parentElement;
-      steps += 1;
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendClick();
     }
-  }
+  });
+}
 
-  function findLikelyPanel(kind) {
-    var ids = kind === "memory"
-      ? ["desktopMemoryPanel", "memoryPanel", "memoryDrawer", "memoryPane", "desktopMemory"]
-      : ["desktopSessionsPanel", "desktopSessionPanel", "sessionsPanel", "sessionPanel", "sessionsDrawer", "desktopSessions"];
+if (newSessionBtn) {
+  newSessionBtn.addEventListener("click", () =>
+    newSession().catch(e => {
+      setStatus("error");
+      alert(e.message || e);
+    })
+  );
+}
 
-    for (var i = 0; i < ids.length; i += 1) {
-      var found = $(ids[i]);
-      if (found) return found;
-    }
+if (summarizeBtn) {
+  summarizeBtn.addEventListener("click", () =>
+    summarizeNow().catch(e => {
+      setStatus("error");
+      alert(e.message || e);
+    })
+  );
+}
 
-    var list = kind === "memory" ? $("desktopMemoryList") : $("desktopSessionList");
-    if (list) return list.closest("aside, section, dialog, .panel, .drawer, .sidebar, div") || list.parentElement;
+if (attachBtn && desktopFileInput) {
+  attachBtn.addEventListener("click", () => {
+    desktopFileInput.value = "";
+    desktopFileInput.click();
+  });
 
-    return null;
-  }
+  desktopFileInput.addEventListener("change", () => {
+    const file = desktopFileInput.files && desktopFileInput.files[0];
+    if (!file) return;
 
-  function setStatusSafe(message) {
-    var el =
-      $("status") ||
-      $("desktopStatus") ||
-      document.querySelector(".status") ||
-      document.querySelector("[data-status]");
+    uploadDesktopAttachment(file).catch((error) => {
+      clearDesktopAttachments();
+      addMsg("assistant", "Upload error: " + (error.message || error));
+    });
+  });
+}
 
-    if (el) el.textContent = message;
-  }
+// safe data-prompt binding
+document.querySelectorAll("[data-prompt]").forEach((button) => {
+  button.addEventListener("click", () => {
+    handleSendClick(button.getAttribute("data-prompt") || "");
+  });
+});
 
-  function getSessionIdSafe() {
-    return (
-      localStorage.getItem("nova_desktop_session_id") ||
-      localStorage.getItem("nova_session_id") ||
-      localStorage.getItem("session_id") ||
-      "desktop_" + Date.now().toString(16) + "_" + Math.random().toString(16).slice(2)
-    );
-  }
+// session restore safe
+try {
+  const saved = localStorage.getItem(LS_SID);
+  if (saved) setSessionId(saved);
+} catch (e) {}
 
-  function setSessionIdSafe(sid) {
-    localStorage.setItem("nova_desktop_session_id", sid);
-    localStorage.setItem("nova_session_id", sid);
-    localStorage.setItem("session_id", sid);
-  }
+refreshSummaryMeta();
+refreshDesktopPanels();
 
-  function normalizeMemoryPayload(data) {
-    if (!data) return [];
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data.memory)) return data.memory;
-    if (Array.isArray(data.items)) return data.items;
-    if (data.data && Array.isArray(data.data.memory)) return data.data.memory;
-    if (data.data && Array.isArray(data.data.items)) return data.data.items;
-    return [];
-  }
+
+// =========================
+// SAFE UTILITY FUNCTIONS
+// (NO IIFE, NO BRACES PROBLEMS)
+// =========================
+
+function normalizeMemoryPayload(data) {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.memory)) return data.memory;
+  if (Array.isArray(data.items)) return data.items;
+  if (data.data && Array.isArray(data.data.memory)) return data.data.memory;
+  if (data.data && Array.isArray(data.data.items)) return data.data.items;
+  return [];
+}
 
   function renderMemoryFallback(data) {
     var list = $("desktopMemoryList");
@@ -2299,7 +2218,15 @@ async function loadMemory() {
     return [];
   }
 
-  // NOVA_DESKTOP_RESCUE_SOURCE_CARDS_20260611
+</script>
+
+<script>
+(function () {
+  "use strict";
+
+  // =========================
+  // SOURCE CARDS
+  // =========================
   function novaDesktopRescueSourceCards_20260611(msg) {
     try {
       var meta = msg && typeof msg === "object" && msg.meta && typeof msg.meta === "object"
@@ -2315,7 +2242,7 @@ async function loadMemory() {
       if (!sources.length) return null;
 
       var wrap = document.createElement("div");
-      wrap.className = "nova-source-cards nova-desktop-rescue-source-cards";
+      wrap.className = "nova-source-cards";
       wrap.style.marginTop = "10px";
       wrap.style.display = "grid";
       wrap.style.gap = "8px";
@@ -2323,342 +2250,86 @@ async function loadMemory() {
       sources.slice(0, 8).forEach(function (src, index) {
         src = src || {};
 
-        var url = String(src.url || src.link || src.href || src.file_url || "").trim();
-        var title = String(src.title || src.name || src.label || src.source || ("Source " + (index + 1))).trim();
-        var snippet = String(src.snippet || src.text || src.description || src.summary || "").trim();
+        var url = String(src.url || src.link || src.href || "").trim();
+        var title = String(src.title || src.name || ("Source " + (index + 1)));
+        var snippet = String(src.snippet || src.text || "");
 
         var card = document.createElement(url ? "a" : "div");
-        card.className = "nova-source-card nova-desktop-rescue-source-card";
+        card.className = "nova-source-card";
         card.style.display = "block";
-        card.style.padding = "10px 12px";
+        card.style.padding = "10px";
         card.style.border = "1px solid rgba(255,255,255,.14)";
-        card.style.borderRadius = "12px";
-        card.style.background = "rgba(255,255,255,.06)";
-        card.style.color = "inherit";
-        card.style.textDecoration = "none";
+        card.style.borderRadius = "10px";
 
         if (url) {
           card.href = url;
           card.target = "_blank";
-          card.rel = "noopener noreferrer";
         }
 
-        var titleEl = document.createElement("div");
-        titleEl.className = "nova-source-title";
-        titleEl.textContent = title;
-        titleEl.style.fontWeight = "700";
-        titleEl.style.fontSize = "13px";
+        var t = document.createElement("div");
+        t.textContent = title;
+        t.style.fontWeight = "700";
 
-        card.appendChild(titleEl);
+        card.appendChild(t);
 
         if (snippet) {
-          var snippetEl = document.createElement("div");
-          snippetEl.className = "nova-source-snippet";
-          snippetEl.textContent = snippet;
-          snippetEl.style.marginTop = "4px";
-          snippetEl.style.opacity = ".78";
-          snippetEl.style.fontSize = "12px";
-          snippetEl.style.lineHeight = "1.35";
-          card.appendChild(snippetEl);
+          var s = document.createElement("div");
+          s.textContent = snippet;
+          s.style.opacity = ".75";
+          s.style.fontSize = "12px";
+          card.appendChild(s);
         }
 
         wrap.appendChild(card);
       });
 
       return wrap;
-    } catch (err) {
-      console.warn("[Nova Desktop Rescue] source cards render failed", err);
+    } catch (e) {
       return null;
     }
   }
 
+  // =========================
+  // MESSAGE RENDERER (SINGLE VERSION ONLY)
+  // =========================
   function renderDesktopChatMessagesRescue(messages) {
     var box = getDesktopMessagesContainerRescue();
     if (!box) return false;
 
     box.innerHTML = "";
 
-    if (!messages.length) {
-      var empty = document.createElement("div");
-      empty.className = "message assistant";
-      empty.textContent = "No messages in this session yet.";
-      box.appendChild(empty);
+    if (!messages || !messages.length) {
+      box.innerHTML = "<div class='message assistant'>No messages yet.</div>";
       return true;
     }
 
     messages.forEach(function (msg) {
-      var role = String(msg.role || msg.sender || msg.type || "assistant").toLowerCase();
-      var text = msg.content || msg.text || msg.message || msg.body || "";
-
-      if (Array.isArray(text)) {
-        text = text.map(function (part) {
-          return typeof part === "string" ? part : (part.text || part.content || JSON.stringify(part));
-        }).join("\n");
-      }
-
-      if (!text && typeof msg === "string") {
-        text = msg;
-      }
+      var role = String(msg.role || "assistant");
+      var text = msg.content || msg.text || msg.message || "";
 
       var row = document.createElement("div");
-      row.className = "message " + (role.indexOf("user") !== -1 ? "user" : "assistant");
-      row.textContent = String(text || "").trim() || JSON.stringify(msg);
+      row.className = "message " + (role.includes("user") ? "user" : "assistant");
+      row.textContent = String(text);
 
-      if (role.indexOf("user") === -1) {
-        var sourceCards = novaDesktopRescueSourceCards_20260611(msg);
-        if (sourceCards) {
-          row.appendChild(sourceCards);
-        }
+      if (!role.includes("user")) {
+        var cards = novaDesktopRescueSourceCards_20260611(msg);
+        if (cards) row.appendChild(cards);
       }
 
       box.appendChild(row);
     });
 
-    box.scrollTop = box.scrollHeight;
     return true;
   }
 
-  // NOVA_DESKTOP_RESCUE_GLOBAL_EXPORT_20260611
-  try {
-    window.renderDesktopChatMessagesRescue = renderDesktopChatMessagesRescue;
-    window.getDesktopMessagesContainerRescue = getDesktopMessagesContainerRescue;
-    window.novaDesktopRescueSourceCards_20260611 = novaDesktopRescueSourceCards_20260611;
-    console.log("[Nova Desktop Rescue] global renderer export ready");
-  } catch (err) {
-    console.warn("[Nova Desktop Rescue] global renderer export failed", err);
-  }
+  // =========================
+  // EXPORTS (ONLY ONCE)
+  // =========================
+  window.renderDesktopChatMessagesRescue = renderDesktopChatMessagesRescue;
+  window.novaDesktopRescueSourceCards_20260611 = novaDesktopRescueSourceCards_20260611;
 
-  async function loadDesktopSessionMessagesRescue(sid) {
-    if (!sid) return;
-
-    setStatusSafe("loading session...");
-
-    try {
-      // NOVA_DESKTOP_SESSION_DETAIL_ENDPOINT_FIX_20260611
-      var res = await fetch("/api/sessions/" + encodeURIComponent(sid), {
-        headers: { "Accept": "application/json" }
-      });
-
-      if (!res.ok) {
-        throw new Error("session load failed: " + res.status);
-      }
-
-      var data = await res.json();
-      var messages = normalizeDesktopChatMessagesRescue(data);
-      renderDesktopChatMessagesRescue(messages);
-      setStatusSafe("session loaded");
-    } catch (error) {
-      setStatusSafe("session selected, messages unavailable");
-      console.warn("[Nova Desktop Rescue] session messages load failed", error);
-    }
-  }
-
-
-  function renderSessionsFallback(data) {
-    var list = $("desktopSessionList");
-    var sessions = normalizeSessionPayload(data);
-
-    if (!list) return;
-
-    list.innerHTML = "";
-
-    if (!sessions.length) {
-      var empty = document.createElement("div");
-      empty.className = "session-placeholder";
-      empty.textContent = "No saved sessions yet.";
-      list.appendChild(empty);
-      return;
-    }
-
-    sessions.slice(0, 30).forEach(function (session) {
-      var sid = session.id || session.session_id || session.key || "";
-      var titleText = session.title || session.name || sid || "Session";
-
-      var button = document.createElement("button");
-      button.type = "button";
-      button.className = "desktop-session-item";
-      button.textContent = titleText;
-
-      button.addEventListener("click", function () {
-        // NOVA_LOG_DESKTOP_SESSION_ROW_CLICKS_20260610
-        console.log("[Nova Desktop Session Row] clicked", sid, titleText);
-
-        if (sid) {
-          setSessionIdSafe(sid);
-          loadDesktopSessionMessagesRescue(sid);
-        } else {
-          setStatusSafe("session selected");
-        }
-      });
-
-      list.appendChild(button);
-    });
-  }
-
-  async function openSessionsRescue() {
-    var panel = findLikelyPanel("sessions");
-    var list = $("desktopSessionList");
-
-    if (panel) forceShow(panel);
-    if (list) revealAround(list);
-
-    setStatusSafe("loading sessions...");
-
-    try {
-      var res = await fetch("/api/sessions", { headers: { "Accept": "application/json" } });
-      var data = await res.json();
-      renderSessionsFallback(data);
-      setStatusSafe("sessions loaded");
-    } catch (error) {
-      if (list) {
-        list.innerHTML = "";
-        var failed = document.createElement("div");
-        failed.className = "session-placeholder";
-        failed.textContent = "Could not load sessions.";
-        list.appendChild(failed);
-      }
-      setStatusSafe("sessions failed");
-      console.warn("[Nova Desktop Rescue] sessions failed", error);
-    }
-  }
-
-  function newSessionRescue() {
-    var sid = "desktop_" + Date.now().toString(16) + "_" + Math.random().toString(16).slice(2);
-    setSessionIdSafe(sid);
-
-    var input = $("prompt") || $("desktopPrompt") || document.querySelector("textarea") || document.querySelector("input[type='text']");
-    if (input) input.value = "";
-
-    var messages =
-      $("messages") ||
-      $("chatMessages") ||
-      $("desktopMessages") ||
-      document.querySelector(".messages") ||
-      document.querySelector(".chat-messages");
-
-    if (messages) messages.innerHTML = "";
-
-    setStatusSafe("new local session");
-  }
-
-  document.addEventListener("click", function (event) {
-    var target = event.target && event.target.closest
-      ? event.target.closest("button, a, [role='button'], [data-action], [data-panel]")
-      : null;
-
-    if (!target) return;
-
-    var t = textOf(target);
-
-    if (t.indexOf("memory") !== -1) {
-      event.preventDefault();
-      event.stopPropagation();
-      openMemoryRescue();
-      return;
-    }
-
-    if (t.indexOf("session") !== -1 && t.indexOf("new") === -1) {
-      event.preventDefault();
-      event.stopPropagation();
-      openSessionsRescue();
-      return;
-    }
-
-    if ((t.indexOf("new") !== -1 && t.indexOf("session") !== -1) || t.indexOf("new chat") !== -1) {
-      event.preventDefault();
-      event.stopPropagation();
-      newSessionRescue();
-      return;
-    }
-  }, true);
-
-  window.NovaDesktopOpenMemoryRescue = openMemoryRescue;
-  window.NovaDesktopOpenSessionsRescue = openSessionsRescue;
-  window.NovaDesktopNewSessionRescue = newSessionRescue;
-
-  console.log("[Nova Desktop Rescue] click rescue ready");
 })();
 </script>
-
-
-<script>
-(function () {
-  "use strict";
-
-  // NOVA_DESKTOP_DIRECT_BUTTON_BIND_20260610
-  function labelOf(el) {
-    return String(
-      (el && (
-        el.innerText ||
-        el.textContent ||
-        el.getAttribute("aria-label") ||
-        el.getAttribute("title") ||
-        el.id ||
-        el.className
-      )) || ""
-    ).toLowerCase().trim();
-  }
-
-  function bindDesktopButtonRescue() {
-    document.querySelectorAll("button, a, [role='button']").forEach(function (el) {
-      var label = labelOf(el);
-      if (!label) return;
-
-      if (el.dataset.novaDesktopDirectBound === "true") return;
-
-      if (label.indexOf("sessions") !== -1 || label === "session") {
-        el.dataset.novaDesktopDirectBound = "true";
-        el.addEventListener("click", function (event) {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          if (typeof window.NovaDesktopOpenSessionsRescue === "function") {
-            window.NovaDesktopOpenSessionsRescue();
-          }
-        }, true);
-      }
-
-      if (label.indexOf("memory") !== -1) {
-        el.dataset.novaDesktopDirectBound = "true";
-        el.addEventListener("click", function (event) {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          if (typeof window.NovaDesktopOpenMemoryRescue === "function") {
-            window.NovaDesktopOpenMemoryRescue();
-          }
-        }, true);
-      }
-
-      if (label.indexOf("new session") !== -1 || label.indexOf("new chat") !== -1) {
-        el.dataset.novaDesktopDirectBound = "true";
-        el.addEventListener("click", function (event) {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          if (typeof window.NovaDesktopNewSessionRescue === "function") {
-            window.NovaDesktopNewSessionRescue();
-          }
-        }, true);
-      }
-    });
-  }
-
-  bindDesktopButtonRescue();
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", bindDesktopButtonRescue);
-  } else {
-    setTimeout(bindDesktopButtonRescue, 0);
-  }
-
-  setInterval(bindDesktopButtonRescue, 1000);
-
-  window.NovaDesktopBindButtonsRescue = bindDesktopButtonRescue;
-  console.log("[Nova Desktop Direct Bind] ready");
-})();
-</script>
-
-
-
-
 
 <script>
 (function () {
@@ -2766,10 +2437,6 @@ async function loadMemory() {
 })();
 </script>
 
-
-
-
-
 <style>
 /* NOVA_DESKTOP_COMPACT_RECENT_SCROLL_CHAT_20260610 */
 
@@ -2814,6 +2481,9 @@ main,
 }
 </style>
 
+})();
+</script>
+
 <script>
 (function () {
   "use strict";
@@ -2839,13 +2509,7 @@ main,
     }, 250);
   }
 
-  document.addEventListener("click", function (event) {
-    if (event.target.closest && event.target.closest(".desktop-session-item")) {
-      scrollToDesktopChatSoon();
-    }
-  }, true);
 
-  console.log("[Nova Desktop Layout] compact recent + scroll chat ready");
 })();
 </script>
 
@@ -2896,6 +2560,9 @@ main,
 }
 </style>
 
+})();
+</script>
+
 <script>
 (function () {
   "use strict";
@@ -2926,9 +2593,14 @@ main,
       body: JSON.stringify(payload || {})
     });
 
-    var data = await response.json().catch(function () {
-      return {};
-    });
+const raw = await response.text();
+
+let data = {};
+try {
+  data = JSON.parse(raw);
+} catch (e) {
+  console.warn("Non-JSON response:", raw);
+}
 
     if (!response.ok || data.ok === false) {
       throw new Error(data.error || data.message || "Request failed");
@@ -2948,8 +2620,14 @@ main,
       headers: { "Accept": "application/json" }
     });
 
-    var data = await response.json();
+const raw = await response.text();
 
+var data = {};
+try {
+  data = JSON.parse(raw);
+} catch (e) {
+  console.warn("Non-JSON response:", raw);
+}
     if (!response.ok || data.ok === false) {
       throw new Error(data.error || data.message || "Could not load current session.");
     }
@@ -3074,11 +2752,6 @@ main,
 
   window.NovaInstallCurrentSessionManager = installManager;
 })();
-</script>
-
-
-<!-- NOVA_DESKTOP_MEMORY_FINAL_RENDERER_20260610 -->
-<script>
 (function () {
   "use strict";
 
@@ -3176,7 +2849,7 @@ main,
       var row = document.createElement("div");
       row.className = "memory-item";
       row.style.cssText = "padding:10px 12px;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-bottom:10px;white-space:pre-wrap;word-break:break-word;";
-      row.textContent = itemText(item);
+      row._meta = msg.meta || {};
       list.appendChild(row);
     });
   }
@@ -3190,10 +2863,20 @@ main,
       list.innerHTML = '<div class="session-placeholder">Loading memory...</div>';
     }
 
-    fetch("/api/memory", { cache: "no-store" })
-      .then(function (response) {
-        return response.json();
-      })
+fetch("/api/memory", { cache: "no-store" })
+  .then(async function (response) {
+    const raw = await response.text();
+
+    let data = null;
+    try {
+      data = JSON.parse(raw);
+    } catch (e) {
+      console.warn("Non-JSON response from /api/memory:", raw);
+    }
+
+    return data;
+  })
+
       .then(function (payload) {
         renderMemory(payload);
       })
@@ -3233,11 +2916,6 @@ main,
 
   console.log("[Nova Desktop Memory Final Renderer] ready");
 })();
-</script>
-
-
-<!-- NOVA_DESKTOP_EXECUTION_FINAL_RENDERER_20260610 -->
-<script>
 (function () {
   "use strict";
 
@@ -3302,10 +2980,20 @@ main,
       note.textContent = "Loading execution status...";
     }
 
-    fetch("/api/backend/readiness", { cache: "no-store" })
-      .then(function (response) {
-        return response.json();
-      })
+fetch("/api/backend/readiness", { cache: "no-store" })
+  .then(async function (response) {
+    const raw = await response.text();
+
+    let data = null;
+    try {
+      data = JSON.parse(raw);
+    } catch (e) {
+      console.warn("Non-JSON response from /api/backend/readiness:", raw);
+    }
+
+    return data;
+  })
+
       .then(function (payload) {
         renderExecution(payload || {});
       })
@@ -3330,10 +3018,6 @@ main,
 
   console.log("[Nova Desktop Execution Final Renderer] ready");
 })();
-</script>
-
-<!-- NOVA_DESKTOP_MEMORY_LOADING_HARDLOCK_20260610 -->
-<script>
 (function () {
   "use strict";
 
@@ -3419,30 +3103,8 @@ main,
   window.loadMemory = load;
   window.loadMemories = load;
 
-  document.addEventListener("click", function (event) {
-    var button = event.target.closest("#openMemoryBtn");
-    if (!button) return;
-    event.preventDefault();
-    event.stopPropagation();
-    load();
-  }, true);
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", hardlock);
-  } else {
-    hardlock();
-  }
-
-  setTimeout(hardlock, 500);
-  setTimeout(load, 1000);
-  setTimeout(load, 2000);
-
-  console.log("[Nova Desktop Memory Loading Hardlock] ready");
 })();
-</script>
-
-<!-- NOVA_DESKTOP_QUICK_BUTTONS_FINAL_20260610 -->
-<script>
 (function () {
   "use strict";
 
@@ -3546,11 +3208,8 @@ main,
   setTimeout(wire, 1500);
 
   console.log("[Nova Desktop Quick Buttons Final] ready");
-})();
-</script>
 
-<!-- NOVA_DESKTOP_VOICE_TTS_FINAL_20260610 -->
-<script>
+})();
 (function () {
   "use strict";
 
@@ -3895,13 +3554,16 @@ main,
     }
   }
 </style>
-<script>
-  console.log("[Nova Desktop Button Animation Safe] ready");
+})();
 </script>
 
 <script>
-/* NOVA_DESKTOP_AUTH_WIDGET_20260611 */
 (function () {
+  "use strict";
+
+  console.log("[Nova Desktop Button Animation Safe] ready");
+
+  /* NOVA_DESKTOP_AUTH_WIDGET_20260611 */
     "use strict";
 
     function ensureAuthWidget() {
@@ -3987,8 +3649,18 @@ main,
                 credentials: "same-origin",
                 cache: "no-store"
             });
-            var data = await response.json();
-            renderAuthWidget(data || {});
+
+const raw = await response.text();
+
+let data = {};
+try {
+  data = JSON.parse(raw);
+} catch (error) {
+  console.warn("[Nova Auth] Non-JSON response:", raw);
+}
+
+renderAuthWidget(data || {});
+
         } catch (error) {
             console.warn("[Nova Auth] status failed", error);
             renderAuthWidget({ authenticated: false, user: null });
@@ -4005,11 +3677,6 @@ main,
 
     setInterval(refreshAuthStatus, 60000);
 })();
-</script>
-
-
-<!-- NOVA_DESKTOP_GLOBAL_SOURCE_CARD_RENDERER_20260611 -->
-<script>
 (function () {
   "use strict";
 
@@ -4120,44 +3787,6 @@ main,
     }
   }
 
-  window.renderDesktopChatMessagesRescue = function (messages) {
-    var box = getDesktopMessageBox();
-    if (!box) return false;
-
-    box.innerHTML = "";
-
-    (Array.isArray(messages) ? messages : []).forEach(function (msg) {
-      var role = String((msg && (msg.role || msg.sender || msg.type)) || "assistant").toLowerCase();
-      var text = msg && (msg.content || msg.text || msg.message || msg.body || "");
-
-      if (Array.isArray(text)) {
-        text = text.map(function (part) {
-          return typeof part === "string" ? part : (part.text || part.content || JSON.stringify(part));
-        }).join("\\n");
-      }
-
-      if (!text && typeof msg === "string") {
-        text = msg;
-      }
-
-      var row = document.createElement("div");
-      row.className = "message " + (role.indexOf("user") !== -1 ? "user" : "assistant");
-      row.textContent = String(text || "").trim() || JSON.stringify(msg);
-
-      if (role.indexOf("user") === -1) {
-        var sourceCards = makeSourceCards(msg);
-        if (sourceCards) row.appendChild(sourceCards);
-      }
-
-      box.appendChild(row);
-    });
-
-    box.scrollTop = box.scrollHeight;
-    return true;
-  };
-
-  window.novaDesktopGlobalSourceCardsReady = true;
-  console.log("[Nova Desktop Global Source Cards] ready");
 })();
 </script>
 
@@ -4269,12 +3898,6 @@ main,
   window.novaDesktopFinalSourceCardsReady = true;
   console.log("[Nova Desktop Final Source Cards] ready");
 })();
-</script>
-
-
-
-<!-- NOVA_DESKTOP_RESCUE_FETCH_MISSING_SESSION_20260611 -->
-<script>
 (function () {
   "use strict";
 
@@ -4356,9 +3979,11 @@ main,
           const url = esc(src.url || "");
           const snippet = esc(src.snippet || "");
           const source = esc(src.source || "");
-          const titleHtml = url
-            ? '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + title + '</a>'
-            : title;
+
+const titleHtml = url
+  ? '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + title + '</a>'
+  : title;
+
 
           return [
             '<div class="nova-source-card" style="padding:10px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);">',
@@ -4384,37 +4009,35 @@ main,
       return 0;
     }
     box.innerHTML = messages.map(function (message) {
-      const role = esc(message.role || "message");
-      const id = esc(message.id || "");
+
+const role = esc(message.role || "message");
+const id = esc(message.id || "");
+
 const text = esc(
   message.text ||
   (message.assistant_message && message.assistant_message.text) ||
   ""
 );
 
-const imageUrl =
-  message.image_url ||
-  (message.assistant_message && message.assistant_message.image_url) ||
-  "";
-
-const imageHtml = imageUrl
+const imageHtml = (message.imageUrl || message.image)
   ? `<div style="margin-top:10px;">
-       <img src="${esc(imageUrl)}"
+       <img src="${esc(message.imageUrl || message.image)}"
             style="max-width:100%;border-radius:14px;display:block;">
      </div>`
   : "";
-      const attachments = Array.isArray(message.attachments) ? message.attachments : [];
 
-      const attachmentHtml = attachments.length
-        ? '<div class="nova-message-attachments" style="margin-top:10px;opacity:.75;font-size:12px;">Attachments: ' +
-          esc(attachments.map(attachmentName).filter(Boolean).join(", ")) +
-          '</div>'
-        : "";
+const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+
+const attachmentHtml = attachments.length
+  ? '<div class="nova-message-attachments" style="margin-top:10px;opacity:.75;font-size:12px;">Attachments: ' +
+    esc(attachments.map(attachmentName).filter(Boolean).join(", ")) +
+    '</div>'
+  : "";
 
       return [
         '<div class="chat-message message ' + role + '" data-message-id="' + id + '" style="padding:14px;margin:10px 0;border-radius:14px;background:rgba(255,255,255,.06);">',
         '<div style="opacity:.65;font-size:12px;margin-bottom:6px;">' + role + (id ? " Â· " + id : "") + '</div>',
-        '<div style="white-space:pre-wrap;">' + text + imageHtml + '</div>',
+'<div style="white-space:pre-wrap;">' + esc(text) + imageHtml + '</div>',
         attachmentHtml,
         sourceCardsHtml(message),
         '</div>'
@@ -4432,9 +4055,15 @@ const imageHtml = imageUrl
       headers: { "Accept": "application/json" }
     });
 
-    const data = await response.json().catch(function () {
-      return null;
-    });
+const raw = await response.text();
+
+let data = null;
+try {
+  data = JSON.parse(raw);
+} catch (e) {
+  console.warn("Non-JSON response from server:", raw);
+  data = null;
+}
 
     if (!response.ok || !data || !data.ok || !data.session) {
       console.warn("[Nova Desktop Rescue] session detail fallback failed", sessionId, data);
@@ -4487,11 +4116,6 @@ const imageHtml = imageUrl
     installWrapper();
   }
 })();
-</script>
-
-
-<!-- NOVA_DESKTOP_ACTIVE_SESSION_404_RECOVERY_20260612 -->
-<script>
 (function () {
   "use strict";
 
@@ -4603,12 +4227,15 @@ if (typeof window.renderDesktopChatMessages === "function") {
       }
     });
 
-    var data = null;
-    try {
-      data = await response.json();
-    } catch (_) {
-      data = null;
-    }
+const raw = await response.text();
+
+var data = null;
+try {
+  data = JSON.parse(raw);
+} catch (e) {
+  console.warn("Non-JSON response:", raw);
+  data = null;
+}
 
     if (response.status === 404 && data && data.active_session_id && data.active_session_id !== sessionId) {
       log("stale session recovered", sessionId, "=>", data.active_session_id);
@@ -4651,10 +4278,6 @@ if (typeof window.renderDesktopChatMessages === "function") {
 
   log("ready", MARKER);
 })();
-</script>
-
-<!-- NOVA_FORCE_DESKTOP_SOURCE_CARDS_DOM_20260612 -->
-<script>
 (function () {
   "use strict";
 
@@ -4881,10 +4504,6 @@ if (typeof window.renderDesktopChatMessages === "function") {
 
   log("ready", MARKER);
 })();
-</script>
-
-<!-- NOVA_FORCE_DESKTOP_SOURCE_CARDS_DEDUPE_20260612 -->
-<script>
 (function () {
   "use strict";
 
@@ -5009,10 +4628,6 @@ if (typeof window.renderDesktopChatMessages === "function") {
 
   boot();
 })();
-</script>
-
-<!-- NOVA_DESKTOP_LATEST_ONLY_SOURCE_CARDS_20260612 -->
-<script>
 (function () {
   "use strict";
 
@@ -5125,11 +4740,8 @@ if (typeof window.renderDesktopChatMessages === "function") {
   }
 
   wrapLatestOnly();
-})();
-</script>
 
-<!-- NOVA_DESKTOP_LATEST_ONLY_POST_PRUNE_SOURCE_CARDS_20260612 -->
-<script>
+})();
 (function () {
   "use strict";
 
@@ -5193,10 +4805,6 @@ if (typeof window.renderDesktopChatMessages === "function") {
 
   wrap();
 })();
-</script>
-
-<!-- NOVA_DESKTOP_SOURCE_CARD_OBSERVER_PRUNE_20260612 -->
-<script>
 (function () {
   "use strict";
 
@@ -5320,12 +4928,9 @@ if (typeof window.renderDesktopChatMessages === "function") {
   } else {
     installObserver();
   }
+
 })();
-</script>
 
-
-<!-- NOVA_DESKTOP_COMPAT_ALIASES_20260612 -->
-<script>
 (function () {
   "use strict";
 
@@ -5354,12 +4959,7 @@ if (typeof window.renderDesktopChatMessages === "function") {
         }
 
         var button = $("openSessionsBtn");
-        if (button) {
-          button.click();
-          return true;
-        }
-
-        return false;
+        if (button) return button.click();
       };
     }
 
@@ -5370,35 +4970,26 @@ if (typeof window.renderDesktopChatMessages === "function") {
         }
 
         var button = $("openMemoryBtn");
-        if (button) {
-          button.click();
-          return true;
-        }
-
-        return false;
+        if (button) return button.click();
       };
     }
 
     window.NovaDesktopCompatAliasesReady = true;
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", installCompatAliases);
-  } else {
+  function boot() {
     installCompatAliases();
   }
 
-  setTimeout(installCompatAliases, 250);
-  setTimeout(installCompatAliases, 1200);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
 
   console.log("[Nova Desktop Compat Aliases] ready");
+
 })();
-</script>
-
-
-
-<!-- NOVA_DESKTOP_GETELEMENTBYID_COMPAT_20260612 -->
-<script>
 (function () {
   "use strict";
 
@@ -5458,13 +5049,9 @@ if (typeof window.renderDesktopChatMessages === "function") {
     }
   }
 
-  console.log("[Nova Desktop Hard ID Aliases] ready");
 })();
 </script>
 
-
-
-<!-- NOVA_DESKTOP_HARD_PROXY_ID_ALIASES_20260612 -->
 <script>
 (function () {
   "use strict";
@@ -5539,53 +5126,101 @@ if (typeof window.renderDesktopChatMessages === "function") {
     document.body.appendChild(alias);
   }
 
-  function installAliases() {
-    installButtonAlias("desktopSessionsButton", "openSessionsBtn", "NovaDesktopOpenSessionsRescue");
-    installButtonAlias("desktopMemoryButton", "openMemoryBtn", "NovaDesktopOpenMemoryRescue");
-    installInputAlias("desktopChatInput", "input");
-    installButtonAlias("desktopSendButton", "sendBtn", "");
+  if (window.__NOVA_CORE_INSTALLED__) return;
+  window.__NOVA_CORE_INSTALLED__ = true;
 
-    if (typeof window.NovaOpenDesktopSessions !== "function") {
-      window.NovaOpenDesktopSessions = function () {
-        var btn = $("desktopSessionsButton");
-        if (btn) {
-          btn.click();
-          return true;
-        }
-        return false;
-      };
+  // =========================
+  // ELEMENT ACCESS LAYER
+  // =========================
+  const DOM = {
+    get(id) {
+      return document.getElementById(id);
     }
+  };
 
-    if (typeof window.NovaOpenDesktopMemory !== "function") {
-      window.NovaOpenDesktopMemory = function () {
-        var btn = $("desktopMemoryButton");
-        if (btn) {
-          btn.click();
-          return true;
-        }
-        return false;
-      };
-    }
+  // =========================
+  // ALIAS MAP (ONLY ONE)
+  // =========================
+  const ALIASES = {
+    desktopSessionsButton: "openSessionsBtn",
+    desktopMemoryButton: "openMemoryBtn",
+    desktopChatInput: "input",
+    desktopSendButton: "sendBtn"
+  };
 
-    window.NovaDesktopHardProxyAliasesReady = true;
+  function resolve(id) {
+    return DOM.get(id) || DOM.get(ALIASES[id]);
+  }
+
+  // =========================
+  // SAFE EVENT BINDING
+  // =========================
+  function bindOnce(el, event, handler) {
+    if (!el || el.__bound) return;
+    el.__bound = true;
+    el.addEventListener(event, handler, true);
+  }
+
+  // =========================
+  // CORE BUTTON HOOKS
+  // =========================
+  function initButtons() {
+    const sendBtn = resolve("desktopSendButton");
+    const memoryBtn = resolve("desktopMemoryButton");
+    const sessionsBtn = resolve("desktopSessionsButton");
+
+    bindOnce(sendBtn, "click", () => {
+      console.log("[NOVA] send clicked");
+    });
+
+    bindOnce(memoryBtn, "click", () => {
+      console.log("[NOVA] memory clicked");
+    });
+
+    bindOnce(sessionsBtn, "click", () => {
+      console.log("[NOVA] sessions clicked");
+    });
+  }
+
+  // =========================
+  // SINGLE OBSERVER (NO DUPES)
+  // =========================
+  function initObserver() {
+    if (window.__NOVA_OBSERVER__) return;
+
+    const observer = new MutationObserver(() => {
+      initButtons();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    window.__NOVA_OBSERVER__ = observer;
+  }
+
+  // =========================
+  // BOOT SEQUENCE
+  // =========================
+  function boot() {
+    initButtons();
+    initObserver();
+
+    console.log("[NOVA CORE] initialized");
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", installAliases);
+    document.addEventListener("DOMContentLoaded", boot);
   } else {
-    installAliases();
+    boot();
   }
 
-  setTimeout(installAliases, 250);
-  setTimeout(installAliases, 1200);
-
-  console.log("[Nova Desktop Hard Proxy ID Aliases] ready");
 })();
 </script>
 
 </body>
 </html>
-
 
 
 
