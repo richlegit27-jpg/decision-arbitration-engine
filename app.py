@@ -5383,7 +5383,7 @@ def api_chat():
                 _has_current_attachment
                 and _is_attachment_action
                 and not _has_image_like_attachment
-                and not _attachment_web_intent
+                and not bool(locals().get("_attachment_web_intent", False))
                 and not _attachment_is_image_command
             ):
                 _raw_text = "\n".join(str(x or "") for x in _attachment_lines).strip()
@@ -10570,7 +10570,6 @@ def nova_desktop_app_fixed_20260610():
     return render_template("app.html")
 
 
-
 # NOVA_LOCAL_AUTH_ROUTES_20260610
 # Local dev auth API: /api/auth/status, /api/auth/register, /api/auth/login, /api/auth/logout
 def _nova_install_local_auth_routes_20260610():
@@ -12166,7 +12165,6 @@ def nova_chat_stream():
 
             text = assistant.get("text", "")
             
-
             if not isinstance(text, str):
                 text = ""
 
@@ -13369,6 +13367,7 @@ if __name__ == "__main__":
 
 
 # NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611
+
 
 
 
