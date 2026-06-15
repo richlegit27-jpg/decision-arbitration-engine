@@ -1262,6 +1262,10 @@ def _nova_phase1_append_text_attachments_to_user_text(user_text, attachments, lo
             logger.warning("[Phase1TextAttachmentReader] append failed error=%s", error)
         return user_text
 
+@app.route("/api/chat", methods=["POST"])
+def api_chat_route():
+    return api_chat()
+
 @app.route("/api/runtime/summary", methods=["GET"])
 def api_runtime_summary():
     return jsonify({"ok": True})
@@ -3279,6 +3283,9 @@ def api_chat():
         import os as _nova_os
 
         _nova_payload = request.get_json(silent=True) or {}
+
+
+
         _nova_user_text = str(
             _nova_payload.get("user_text")
             or _nova_payload.get("text")
@@ -3295,7 +3302,7 @@ def api_chat():
         _nova_attachments = _nova_payload.get("attachments") or []
 
         # 🚨 IMAGE FASTPATH SAFETY GUARD
-        if str(user_text or "").strip().lower().startswith("/image"):
+        if str(_nova_user_text or "").strip().lower().startswith("/image"):
             _nova_attachments = []
 
         _nova_image = None
@@ -3350,8 +3357,6 @@ def api_chat():
                 request.environ["NOVA_IGNORE_STALE_ATTACHMENTS_20260609"] = "1"
             except Exception:
                 pass
-
-        _nova_image = None
 
         if isinstance(_nova_attachments, list):
             for _nova_item in _nova_attachments:
@@ -12147,23 +12152,23 @@ def nova_chat_stream():
             result = api_chat()
 
             # --- FORCE NORMALIZATION ---
+            payload = None
+
             if isinstance(result, dict):
                 payload = result
-            else:
-                try:
-                    payload = result.get_json() or {}
-                except Exception:
-                    payload = {}
+            elif hasattr(result, "get_json"):
+                payload = result.get_json(silent=True)
+
+            if not isinstance(payload, dict):
+                payload = {}
 
             assistant = payload.get("assistant_message") or {}
 
-            text = (
-                assistant.get("content")
-                or assistant.get("text")
-                or payload.get("content")
-                or payload.get("text")
-                or str(result)  # 🔥 fallback hard safety
-            )
+            text = assistant.get("text", "")
+            
+
+            if not isinstance(text, str):
+                text = ""
 
         except Exception as e:
             yield "data: " + json.dumps({
