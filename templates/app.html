@@ -1638,6 +1638,7 @@ refreshDesktopPanels();
       return clean;
     }
     // NOVA_DESKTOP_ATTACH_UPLOAD_20260610
+
 function showDesktopAttachmentChip(text) {
   let chip = document.getElementById("desktopAttachmentChip") || desktopAttachmentChip;
 
@@ -1654,7 +1655,10 @@ function showDesktopAttachmentChip(text) {
   }
 
   chip.hidden = false;
-  chip.style.display = "block";
+  chip.style.display = "flex";
+  chip.style.alignItems = "center";
+  chip.style.justifyContent = "space-between";
+  chip.style.gap = "10px";
   chip.style.width = "100%";
   chip.style.boxSizing = "border-box";
   chip.style.margin = "8px 0";
@@ -1663,7 +1667,24 @@ function showDesktopAttachmentChip(text) {
   chip.style.borderRadius = "10px";
   chip.style.fontSize = "13px";
   chip.style.opacity = "0.9";
-  chip.innerHTML = text;
+
+  chip.innerHTML = `
+    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${text}</span>
+    <button type="button" id="desktopAttachmentDeleteBtn" title="Remove attachment"
+      style="border:0;border-radius:8px;padding:4px 8px;cursor:pointer;background:rgba(255,255,255,.14);color:inherit;">
+      ✕
+    </button>
+  `;
+
+  const deleteBtn = document.getElementById("desktopAttachmentDeleteBtn");
+  if (deleteBtn) {
+    deleteBtn.onclick = function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      clearDesktopAttachments();
+      console.log("📎 ATTACHMENT REMOVED");
+    };
+  }
 
   console.log("📎 CHIP SHOWN", chip);
 }
@@ -1671,10 +1692,13 @@ function showDesktopAttachmentChip(text) {
 function clearDesktopAttachments() {
   pendingDesktopAttachments = [];
 
-  if (desktopAttachmentChip) {
-    desktopAttachmentChip.hidden = true;
-    desktopAttachmentChip.textContent = "";
-  }
+const chip = document.getElementById("desktopAttachmentChip") || desktopAttachmentChip;
+
+if (chip) {
+  chip.hidden = true;
+  chip.style.display = "none";
+  chip.innerHTML = "";
+}
 
   if (desktopFileInput) {
     desktopFileInput.value = "";
