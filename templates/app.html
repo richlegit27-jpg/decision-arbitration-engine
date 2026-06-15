@@ -1638,11 +1638,35 @@ refreshDesktopPanels();
       return clean;
     }
     // NOVA_DESKTOP_ATTACH_UPLOAD_20260610
-    function showDesktopAttachmentChip(text) {
-      if (!desktopAttachmentChip) return;
-      desktopAttachmentChip.hidden = false;
-      desktopAttachmentChip.innerHTML = text;
+function showDesktopAttachmentChip(text) {
+  let chip = document.getElementById("desktopAttachmentChip") || desktopAttachmentChip;
+
+  if (!chip) {
+    chip = document.createElement("div");
+    chip.id = "desktopAttachmentChip";
+
+    const composer = document.querySelector(".composer") || input?.parentElement || document.body;
+    if (composer && composer.parentElement) {
+      composer.parentElement.insertBefore(chip, composer);
+    } else {
+      document.body.appendChild(chip);
     }
+  }
+
+  chip.hidden = false;
+  chip.style.display = "block";
+  chip.style.width = "100%";
+  chip.style.boxSizing = "border-box";
+  chip.style.margin = "8px 0";
+  chip.style.padding = "8px 10px";
+  chip.style.border = "1px solid rgba(255,255,255,.2)";
+  chip.style.borderRadius = "10px";
+  chip.style.fontSize = "13px";
+  chip.style.opacity = "0.9";
+  chip.innerHTML = text;
+
+  console.log("📎 CHIP SHOWN", chip);
+}
 
 function clearDesktopAttachments() {
   pendingDesktopAttachments = [];
