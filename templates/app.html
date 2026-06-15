@@ -1977,7 +1977,11 @@ function renderAssistantMessage(assistantBubble, data) {
     image: data.image_url || data.assistant_message?.image_url || null
   };
 
-  assistantBubble.innerHTML = esc(assistantMessage.text);
+assistantBubble.innerHTML = "";
+
+const textWrap = document.createElement("div");
+textWrap.innerHTML = esc(assistantMessage.text || "");
+assistantBubble.appendChild(textWrap);
 
 const actions = document.createElement("div");
 actions.style.marginTop = "8px";
@@ -2005,17 +2009,45 @@ copyBtn.onclick = async () => {
   }
 };
 
+const regenBtn = document.createElement("button");
+regenBtn.type = "button";
+regenBtn.textContent = "Regen";
+regenBtn.style.border = "0";
+regenBtn.style.borderRadius = "8px";
+regenBtn.style.padding = "4px 8px";
+regenBtn.style.cursor = "pointer";
+
+regenBtn.onclick = () => {
+  const lastUser = [...document.querySelectorAll(".message.user, .user")]
+    .map(node => node.textContent.trim())
+    .filter(Boolean)
+    .pop();
+
+  if (!lastUser) {
+    console.warn("regen failed: no last user text found");
+    return;
+  }
+
+  input.value = lastUser;
+  handleSendClick(lastUser);
+};
+
 actions.appendChild(copyBtn);
+actions.appendChild(regenBtn);
 assistantBubble.appendChild(actions);
 
-  if (assistantMessage.image) {
-    assistantBubble.innerHTML += `
-      <div style="margin-top:10px;">
-        <img src="${esc(assistantMessage.image)}"
-             style="max-width:100%;border-radius:14px;">
-      </div>
-    `;
-  }
+if (assistantMessage.image) {
+  const imageWrap = document.createElement("div");
+  imageWrap.style.marginTop = "10px";
+
+  const img = document.createElement("img");
+  img.src = assistantMessage.image;
+  img.style.maxWidth = "100%";
+  img.style.borderRadius = "14px";
+
+  imageWrap.appendChild(img);
+  assistantBubble.appendChild(imageWrap);
+}
 
   const sources = assistantMessage.meta.sources || [];
 
