@@ -1979,6 +1979,35 @@ function renderAssistantMessage(assistantBubble, data) {
 
   assistantBubble.innerHTML = esc(assistantMessage.text);
 
+const actions = document.createElement("div");
+actions.style.marginTop = "8px";
+actions.style.display = "flex";
+actions.style.gap = "8px";
+
+const copyBtn = document.createElement("button");
+copyBtn.type = "button";
+copyBtn.textContent = "Copy";
+copyBtn.style.border = "0";
+copyBtn.style.borderRadius = "8px";
+copyBtn.style.padding = "4px 8px";
+copyBtn.style.cursor = "pointer";
+
+copyBtn.onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(assistantMessage.text || "");
+    copyBtn.textContent = "Copied";
+    setTimeout(() => {
+      copyBtn.textContent = "Copy";
+    }, 900);
+  } catch (e) {
+    console.warn("copy failed", e);
+    copyBtn.textContent = "Copy failed";
+  }
+};
+
+actions.appendChild(copyBtn);
+assistantBubble.appendChild(actions);
+
   if (assistantMessage.image) {
     assistantBubble.innerHTML += `
       <div style="margin-top:10px;">
