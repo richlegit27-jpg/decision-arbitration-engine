@@ -1926,11 +1926,7 @@ const rawText = String(textOverride || capturedText || liveInput?.value || "").t
       throw new Error("Invalid JSON from server: " + raw.slice(0, 200));
     }
 
-    assistantNode.textContent =
-      data?.assistant_message?.text ||
-      data?.text ||
-      data?.response ||
-      "No response";
+ renderAssistantMessage(assistantNode, data);
 
     setStatus("done");
     clearDesktopAttachments();
