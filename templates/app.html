@@ -2049,28 +2049,69 @@ if (assistantMessage.image) {
   assistantBubble.appendChild(imageWrap);
 }
 
-  const sources = assistantMessage.meta.sources || [];
+const latestUserText = [...document.querySelectorAll(".message.user, .user")]
+  .map(node => node.textContent.trim().toLowerCase())
+  .filter(Boolean)
+  .pop() || "";
 
-  if (sources.length) {
-    const wrap = document.createElement("div");
-    wrap.style.marginTop = "10px";
-    wrap.style.display = "grid";
-    wrap.style.gap = "8px";
+const wantsSources =
+  latestUserText.startsWith("search ") ||
+  latestUserText.includes("search web") ||
+  latestUserText.includes("latest ") ||
+  latestUserText.includes("news");
 
-    sources.forEach((src) => {
-      const card = document.createElement("div");
-      card.style.padding = "10px";
-      card.style.border = "1px solid rgba(255,255,255,.15)";
-      card.style.borderRadius = "12px";
-      card.style.fontSize = "12px";
-      card.style.opacity = "0.85";
+const sources = wantsSources ? (assistantMessage.meta.sources || []) : [];
 
-      card.textContent = src.title || src.name || src.url || "source";
-      wrap.appendChild(card);
-    });
+if (sources.length) {
+  const wrap = document.createElement("div");
+  wrap.style.marginTop = "12px";
+  wrap.style.display = "grid";
+  wrap.style.gap = "8px";
 
-    assistantBubble.appendChild(wrap);
-  }
+  sources.forEach((src) => {
+console.log("SOURCE CARD SRC", src);
+    src = src || {};
+
+    const url = String(src.url || src.link || src.href || "").trim();
+    const title = String(src.title || src.name || url || "Source");
+    const domain = url ? new URL(url).hostname.replace("www.", "") : "";
+
+    const card = document.createElement(url ? "a" : "div");
+
+    if (url) {
+      card.href = url;
+      card.target = "_blank";
+      card.rel = "noopener noreferrer";
+    }
+
+    card.style.display = "block";
+    card.style.textDecoration = "none";
+    card.style.color = "inherit";
+    card.style.padding = "10px 12px";
+    card.style.border = "1px solid rgba(255,255,255,.16)";
+    card.style.borderRadius = "12px";
+    card.style.background = "rgba(255,255,255,.06)";
+    card.style.cursor = url ? "pointer" : "default";
+
+    const titleEl = document.createElement("div");
+    titleEl.textContent = title;
+    titleEl.style.fontSize = "13px";
+    titleEl.style.fontWeight = "600";
+
+    const domainEl = document.createElement("div");
+    domainEl.textContent = domain || "source";
+    domainEl.style.marginTop = "4px";
+    domainEl.style.fontSize = "11px";
+    domainEl.style.opacity = "0.65";
+
+    card.appendChild(titleEl);
+    card.appendChild(domainEl);
+    wrap.appendChild(card);
+  });
+
+  assistantBubble.appendChild(wrap);
+}
+
 }
 
 function handleSendClick(prompt = "") {
