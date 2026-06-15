@@ -4974,6 +4974,7 @@ def api_chat():
 
         allow_remembered_attachment_injection = bool(current_request_attachments)
 
+
         if not allow_remembered_attachment_injection:
             attachment_content_lines = []
             remembered_session_attachments = []
@@ -5014,7 +5015,7 @@ def api_chat():
             and not attachments
         )
 
-        if remembered_session_attachments and not skip_remembered_attachment_context:
+        if False and remembered_session_attachments and not skip_remembered_attachment_context:
             attachment_context_lines = [
                 "",
                 "Session attachment memory:",
