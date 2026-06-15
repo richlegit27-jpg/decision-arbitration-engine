@@ -4972,10 +4972,7 @@ def api_chat():
             "summarize this file",
         )
 
-        allow_remembered_attachment_injection = (
-            bool(current_request_attachments)
-            or any(word in attachment_gate_text for word in attachment_intent_words)
-        )
+        allow_remembered_attachment_injection = bool(current_request_attachments)
 
         if not allow_remembered_attachment_injection:
             attachment_content_lines = []
