@@ -9229,6 +9229,7 @@ if (not attachments) and (__name__ == "__main__"):
             if "today" not in query.lower():
                 query = query + " today"
 
+
         self._last_web_query = query
 
         web_result = {"results": []}
@@ -10123,9 +10124,6 @@ if (not attachments) and (__name__ == "__main__"):
         image_words = ["image", "picture", "photo", "art", "scene", "visual"]
 
         if any(k in text for k in keywords) and any(i in text for i in image_words):
-            return True
-
-        if any(k in text for k in keywords):
             return True
 
         return False
@@ -15133,7 +15131,6 @@ Auto-fix result:
         # =========================
 
         image_triggers = (
-            "generate ",
             "generate an image",
             "make an image",
             "create an image",
@@ -22153,5 +22150,4 @@ try:
     print("[NOVA ATTACHMENT SYNC] ChatService.handle attachment text sync installed")
 except Exception as exc:
     print("[NOVA ATTACHMENT SYNC] ChatService.handle attachment text sync install failed:", exc)
-
 
