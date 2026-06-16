@@ -1473,6 +1473,7 @@ async function fetchJsonOrNull(url, options) {
         if (note) note.textContent = "Could not load execution readiness.";
       }
     }
+
     async function loadDesktopSessions() {
       const list = $("desktopSessionList");
       if (!list) return;
@@ -1510,11 +1511,16 @@ async function fetchJsonOrNull(url, options) {
           button.appendChild(title);
           button.appendChild(meta);
 
-          button.addEventListener("click", () => {
+          button.addEventListener("click", async () => {
             if (!sid) return;
             setSessionId(sid);
+            setStatus("loading session...");
+
+if (typeof window.NovaDesktopFetchSession === "function") {
+  await window.NovaDesktopFetchSession(sid);
+}
+
             setStatus("session selected");
-            refreshDesktopPanels();
             refreshSummaryMeta();
           });
 
@@ -1529,8 +1535,7 @@ async function fetchJsonOrNull(url, options) {
       }
     }
 
-    // NOVA_DESKTOP_REFRESH_HELPER_20260610
-    
+window.loadDesktopSessions = loadDesktopSessions;    
     
     function refreshDesktopPanels() {
       // NOVA_REFRESH_DESKTOP_PANELS_NOOP_20260610
@@ -2525,9 +2530,13 @@ async function loadMemory() {
             console.log("[Nova Desktop Sessions Button] sessions opened");
           })
           .catch(console.error);
+      } else if (typeof window.loadDesktopSessions === "function") {
+        window.loadDesktopSessions();
+        console.log("[Nova Desktop Sessions Button] loaded sessions directly");
       } else {
-        console.warn("[Nova Desktop Sessions Button] rescue function missing");
+        console.warn("[Nova Desktop Sessions Button] no session loader available");
       }
+
     }, true);
 
     if (newButton && newButton.nextSibling) {
@@ -4430,6 +4439,7 @@ try {
   }
 
   window.novaDesktopRecoverActiveSession_20260612 = recoverDesktopSession;
+window.NovaDesktopFetchSession = fetchSession;
 
   setTimeout(recoverDesktopSession, 250);
   setTimeout(recoverDesktopSession, 1200);
@@ -4604,12 +4614,12 @@ try {
       node.remove();
     });
 
-    if (!assistantMessages.length) {
-if (window.NOVA_DEBUG_SOURCE_CARDS) {
-  log("no assistant messages with sources");
+if (!assistantMessages.length) {
+  if (window.NOVA_DEBUG_SOURCE_CARDS) {
+    log("no assistant messages with sources");
+  }
+  return 0;
 }
-      return 0;
-    }
 
     var assistantNodes = findAssistantNodes();
     var rendered = 0;
