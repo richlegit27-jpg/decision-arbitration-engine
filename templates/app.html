@@ -2544,7 +2544,6 @@ async function loadMemory() {
   window.renderDesktopChatMessagesRescue = renderDesktopChatMessagesRescue;
   window.novaDesktopRescueSourceCards_20260611 = novaDesktopRescueSourceCards_20260611;
 
-})();
 </script>
 
 <script>
@@ -2619,14 +2618,28 @@ async function loadMemory() {
         if (typeof window.NovaDesktopOpenMemoryRescue === "function") {
           var result = window.NovaDesktopOpenMemoryRescue();
 
+          function showMemoryPanel() {
+            var tools = document.querySelector(".tools");
+            var memory = document.querySelector(".memory-section");
+
+            if (tools) {
+              tools.style.display = "flex";
+            }
+
+            if (memory) {
+              memory.style.display = "block";
+              memory.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+
+            console.log("[Nova Desktop Exact Bind] memory opened");
+          }
+
           if (result && typeof result.then === "function") {
             result
-              .then(function () {
-                console.log("[Nova Desktop Exact Bind] memory opened");
-              })
+              .then(showMemoryPanel)
               .catch(console.error);
           } else {
-            console.log("[Nova Desktop Exact Bind] memory opened");
+            showMemoryPanel();
           }
         }
 
@@ -3347,15 +3360,26 @@ fetch("/api/backend/readiness", { cache: "no-store" })
     load();
   }
 
-window.NovaDesktopMemoryHardlock = load;
-window.NovaOpenDesktopMemory = load;
-window.NovaDesktopOpenMemoryRescue = load;
-window.NovaLoadMemory = load;
-window.loadMemory = load;
-window.loadMemories = load;
+  window.NovaDesktopMemoryHardlock = load;
+  window.NovaOpenDesktopMemory = load;
+  window.NovaDesktopOpenMemoryRescue = load;
+  window.NovaLoadMemory = load;
+  window.loadMemory = load;
+  window.loadMemories = load;
 
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", hardlock);
+  } else {
+    hardlock();
+  }
 
+  setTimeout(hardlock, 500);
+  setTimeout(hardlock, 1500);
+
+  console.log("[Nova Desktop Memory Hardlock] ready");
 })();
+
+
 (function () {
   "use strict";
 
