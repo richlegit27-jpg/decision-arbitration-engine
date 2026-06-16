@@ -2617,12 +2617,19 @@ async function loadMemory() {
         console.log("[Nova Desktop Exact Bind] memory clicked");
 
         if (typeof window.NovaDesktopOpenMemoryRescue === "function") {
-          window.NovaDesktopOpenMemoryRescue()
-            .then(function () {
-              console.log("[Nova Desktop Exact Bind] memory opened");
-            })
-            .catch(console.error);
+          var result = window.NovaDesktopOpenMemoryRescue();
+
+          if (result && typeof result.then === "function") {
+            result
+              .then(function () {
+                console.log("[Nova Desktop Exact Bind] memory opened");
+              })
+              .catch(console.error);
+          } else {
+            console.log("[Nova Desktop Exact Bind] memory opened");
+          }
         }
+
       }, true);
     }
 
@@ -5217,6 +5224,7 @@ if (!assistantMessages.length) {
 
     if (typeof window.NovaOpenDesktopMemory !== "function") {
       window.NovaOpenDesktopMemory = function () {
+
         if (typeof window.NovaDesktopOpenMemoryRescue === "function") {
           return window.NovaDesktopOpenMemoryRescue();
         }
