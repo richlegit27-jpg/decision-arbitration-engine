@@ -2084,14 +2084,15 @@ console.log("SOURCE CARD SRC", src);
       card.rel = "noopener noreferrer";
     }
 
-    card.style.display = "block";
-    card.style.textDecoration = "none";
-    card.style.color = "inherit";
-    card.style.padding = "10px 12px";
-    card.style.border = "1px solid rgba(255,255,255,.16)";
-    card.style.borderRadius = "12px";
-    card.style.background = "rgba(255,255,255,.06)";
-    card.style.cursor = url ? "pointer" : "default";
+card.style.display = "block";
+card.style.textDecoration = "none";
+card.style.color = "#ffffff";
+card.style.padding = "10px 12px";
+card.style.border = "1px solid rgba(255,255,255,.22)";
+card.style.borderRadius = "12px";
+card.style.background = "rgba(80, 60, 140, .35)";
+card.style.boxShadow = "0 8px 22px rgba(0,0,0,.22)";
+card.style.cursor = url ? "pointer" : "default";
 
     const titleEl = document.createElement("div");
     titleEl.textContent = title;
@@ -2102,7 +2103,7 @@ console.log("SOURCE CARD SRC", src);
     domainEl.textContent = domain || "source";
     domainEl.style.marginTop = "4px";
     domainEl.style.fontSize = "11px";
-    domainEl.style.opacity = "0.65";
+    domainEl.style.color = "rgba(255,255,255,.72)";
 
     card.appendChild(titleEl);
     card.appendChild(domainEl);
@@ -4604,7 +4605,9 @@ try {
     });
 
     if (!assistantMessages.length) {
-      log("no assistant messages with sources");
+if (window.NOVA_DEBUG_SOURCE_CARDS) {
+  log("no assistant messages with sources");
+}
       return 0;
     }
 

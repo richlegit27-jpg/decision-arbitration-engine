@@ -9203,7 +9203,29 @@ if (not attachments) and (__name__ == "__main__"):
             "updates",
         ]
 
-        if any(word in query.lower() for word in freshness_words):
+        sports_history_words = [
+            "knicks",
+            "spurs",
+            "nba finals",
+            "finals",
+            "game 5",
+            "viewership",
+            "watched",
+            "ratings",
+        ]
+
+        is_sports_history_query = any(
+            word in query.lower()
+            for word in sports_history_words
+        )
+
+        if is_sports_history_query:
+            query = query.replace(" today", "").strip()
+
+        if (
+            not is_sports_history_query
+            and any(word in query.lower() for word in freshness_words)
+        ):
             if "today" not in query.lower():
                 query = query + " today"
 
@@ -22131,4 +22153,5 @@ try:
     print("[NOVA ATTACHMENT SYNC] ChatService.handle attachment text sync installed")
 except Exception as exc:
     print("[NOVA ATTACHMENT SYNC] ChatService.handle attachment text sync install failed:", exc)
+
 

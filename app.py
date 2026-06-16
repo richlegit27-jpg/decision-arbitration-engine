@@ -5016,6 +5016,7 @@ def api_chat():
         )
 
         if False and remembered_session_attachments and not skip_remembered_attachment_context:
+
             attachment_context_lines = [
                 "",
                 "Session attachment memory:",
@@ -5266,17 +5267,11 @@ def api_chat():
                 _nova_top = _nova_lines[:8]
 
                 if _nova_top:
-                    _nova_topic = "; ".join(_nova_top[:3])
-                    _nova_reply = "Attachment analysis:\n"
-                    _nova_reply += f"This uploaded attachment contains readable text about: {_nova_topic}.\n\n"
-                    _nova_reply += "Key points:\n"
-                    for _nova_index, _nova_item in enumerate(_nova_top, start=1):
-                        _nova_reply += f"{_nova_index}. {_nova_item}\n"
-                    _nova_reply += "\nPreview:\n" + "\n".join(_nova_top[:6])
+                    _nova_reply = "Attachment content:\n" + "\n".join(_nova_top[:12])
                 else:
                     _nova_reply = (
-                        "Attachment analysis:\n"
-                        "The attachment was received and text was extracted, but the available extraction looks too noisy to summarize cleanly."
+                        "Attachment content:\n"
+                        "The attachment was received, but no clean readable text was found."
                     )
 
                 app.logger.info(
@@ -9591,7 +9586,9 @@ def _nova_clean_attachment_analysis_response(response):
             assistant_message["text"] = _nova_existing_content
             assistant_message["content"] = _nova_existing_content
         else:
-            assistant_message["text"] = _nova_candidate_text
+            # DISABLED_RECURSIVE_ATTACHMENT_TEXT_REWRITE_20260615
+            # assistant_message["text"] = _nova_candidate_text
+            pass
         data["assistant_message"] = assistant_message
 
         payload = json.dumps(data)
@@ -9735,7 +9732,9 @@ def _nova_final_attachment_output_noise_cleanup(response):
             assistant_message["text"] = _nova_existing_content
             assistant_message["content"] = _nova_existing_content
         else:
-            assistant_message["text"] = _nova_candidate_text
+            # DISABLED_RECURSIVE_ATTACHMENT_TEXT_REWRITE_20260615
+            # assistant_message["text"] = _nova_candidate_text
+            pass
         data["assistant_message"] = assistant_message
 
         payload = json.dumps(data, ensure_ascii=False)
@@ -9882,7 +9881,9 @@ def _nova_attachment_double_summary_cleanup(response):
             assistant_message["text"] = _nova_existing_content
             assistant_message["content"] = _nova_existing_content
         else:
-            assistant_message["text"] = _nova_candidate_text
+            # DISABLED_RECURSIVE_ATTACHMENT_TEXT_REWRITE_20260615
+            # assistant_message["text"] = _nova_candidate_text
+            pass
         data["assistant_message"] = assistant_message
 
         payload = json.dumps(data, ensure_ascii=False)
@@ -9893,11 +9894,6 @@ def _nova_attachment_double_summary_cleanup(response):
 
     except Exception:
         return response
-
-
-
-
-
 
 # ATTACHMENT_FOLLOWUP_RECALL_LOCK_20260604
 @app.before_request
@@ -9929,78 +9925,10 @@ def _nova_attachment_followup_recall_gate():
         if not wants_attachment or attachments or not session_id:
             return None
 
-        store_path = Path(__file__).resolve().parent / "data" / "nova_sessions.json"
-        if not store_path.exists():
-            return None
-
-        data = json.loads(store_path.read_text(encoding="utf-8"))
-        sessions = data.get("sessions") if isinstance(data, dict) else data
-        if not isinstance(sessions, list):
-            return None
-
-        session = None
-        for item in sessions:
-            if isinstance(item, dict) and str(item.get("id") or "") == session_id:
-                session = item
-                break
-
-        if not isinstance(session, dict):
-            return None
-
-        messages = session.get("messages") or []
-        found_text = ""
-
-        for msg in reversed(messages):
-            if not isinstance(msg, dict):
-                continue
-
-            text_value = str(msg.get("text") or "")
-            if "Attachment " not in text_value or " content:" not in text_value:
-                continue
-
-            if "[Attachment file was remembered, but readable text content was not available on disk.]" in text_value:
-                continue
-
-            marker_index = text_value.find("Attachment ")
-            found_text = text_value[marker_index:].strip()
-
-            for stop_marker in [
-                "\n\nSession attachment memory:",
-                "\n\nProject-aware context for Nova:",
-                "\n\nRelevant persistent memory:",
-            ]:
-                if stop_marker in found_text:
-                    found_text = found_text.split(stop_marker, 1)[0].strip()
-
-            break
-
-        if not found_text:
-            return None
-
-        answer = "The last readable attachment content I found in this session was:\n\n" + found_text
-
-        return jsonify({
-            "ok": True,
-            "active_session_id": session_id,
-            "session_id": session_id,
-            "assistant_message": {
-                "role": "assistant",
-                "text": answer,
-                "attachments": [],
-                "meta": {
-                    "route": "attachment_followup_recall_gate"
-                }
-            },
-            "debug": {
-                "route": "attachment_followup_recall_gate"
-            },
-            "session_attachments": []
-        })
+        return None
 
     except Exception:
         return None
-
-
 
 # STOP_FAKE_ATTACHMENT_CHAT_20260604
 
@@ -13365,6 +13293,8 @@ if __name__ == "__main__":
 
 
 # NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611
+
+
 
 
 

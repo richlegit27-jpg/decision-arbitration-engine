@@ -191,6 +191,10 @@ function createController(deps = {}){
       return null
     }
 
+sources: Array.isArray(message.sources)
+  ? message.sources
+  : (message.meta?.sources || [])
+
     return {
       id: String(message.id || message.message_id || crypto.randomUUID()),
       role: String(message.role || "assistant"),
@@ -229,7 +233,7 @@ function createController(deps = {}){
 
       const bubble = document.createElement("div")
       bubble.className = "message-bubble"
-      bubble.textContent = message.content || ""
+      bubble.innerHTML = escapeHtml(message.content || "")
 
       row.appendChild(bubble)
       fragment.appendChild(row)
