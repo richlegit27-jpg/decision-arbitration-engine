@@ -2919,16 +2919,38 @@ try {
 
       if (!confirm("Delete current session?\n\n" + title)) return;
 
-      await postJson("/api/sessions/delete", {
+      var result = await postJson("/api/sessions/delete", {
         session_id: sid
       });
 
+      var nextId = result && result.active_session_id ? result.active_session_id : "";
+
       localStorage.removeItem("nova_desktop_session_id");
-      localStorage.removeItem("nova_session_id");
       localStorage.removeItem("session_id");
+
+      if (nextId) {
+        localStorage.setItem("nova.session_id", nextId);
+        localStorage.setItem("nova_session_id", nextId);
+        localStorage.setItem("nova_active_session_id", nextId);
+
+        var sidInput = document.getElementById("sid");
+        if (sidInput) sidInput.value = nextId;
+
+        if (typeof window.NovaDesktopFetchSession === "function") {
+          await window.NovaDesktopFetchSession(nextId);
+        }
+      } else {
+        localStorage.removeItem("nova.session_id");
+        localStorage.removeItem("nova_session_id");
+        localStorage.removeItem("nova_active_session_id");
+
+        var chat = document.getElementById("chat");
+        if (chat) chat.innerHTML = "";
+      }
 
       setStatus("Deleted session: " + title);
       await refreshSessionsIfPossible();
+
     } catch (error) {
       setStatus(error.message || "Delete failed.");
     }
@@ -3121,6 +3143,7 @@ fetch("/api/memory", { cache: "no-store" })
   }
 
   window.NovaOpenDesktopMemory = loadDesktopMemory;
+  window.NovaDesktopOpenMemoryRescue = loadDesktopMemory;
   window.NovaLoadMemory = loadDesktopMemory;
   window.loadMemory = loadDesktopMemory;
   window.loadMemories = loadDesktopMemory;
@@ -3317,11 +3340,12 @@ fetch("/api/backend/readiness", { cache: "no-store" })
     load();
   }
 
-  window.NovaDesktopMemoryHardlock = load;
-  window.NovaOpenDesktopMemory = load;
-  window.NovaLoadMemory = load;
-  window.loadMemory = load;
-  window.loadMemories = load;
+window.NovaDesktopMemoryHardlock = load;
+window.NovaOpenDesktopMemory = load;
+window.NovaDesktopOpenMemoryRescue = load;
+window.NovaLoadMemory = load;
+window.loadMemory = load;
+window.loadMemories = load;
 
 
 })();
@@ -5459,20 +5483,33 @@ if (!assistantMessages.length) {
     const sidInput = document.getElementById("sid");
     if (sidInput) sidInput.value = sid;
 
+window.NOVA_DISABLE_SOURCE_CARD_RENDER_ON_EMPTY_CHAT = true;
+
     const input = document.getElementById("input");
     if (input) input.value = "";
 
-    const chat = document.getElementById("chat");
-    if (chat) {
-      chat.innerHTML = `
-        <div class="nova-empty-chat">
-          <div>
-            <div class="nova-empty-chat-title">Nova is ready</div>
-            <div class="nova-empty-chat-subtitle">Send a message to begin.</div>
-          </div>
-        </div>
-      `;
-    }
+const emptyHtml = `
+  <div class="nova-empty-chat">
+    <div>
+      <div class="nova-empty-chat-title">Nova is ready</div>
+      <div class="nova-empty-chat-subtitle">Send a message to begin.</div>
+    </div>
+  </div>
+`;
+
+[
+  document.getElementById("chat"),
+  document.getElementById("messages"),
+  document.getElementById("chatMessages"),
+  document.getElementById("desktopMessages"),
+  document.getElementById("nova-desktop-rescue-messages")
+].filter(Boolean).forEach(function (node) {
+  node.innerHTML = emptyHtml;
+});
+
+document.querySelectorAll("[data-nova-forced-source-cards='true'], .nova-source-cards").forEach(function (node) {
+  node.remove();
+});
 
     document.querySelectorAll("[data-nova-forced-source-cards='true']").forEach(function (node) {
       node.remove();
