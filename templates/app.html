@@ -956,13 +956,35 @@ body {
     }
 </style>
 
+<style>
+/* NOVA_DESKTOP_RECENT_TITLE_READABILITY_20260615 */
+.desktop-session-item {
+  min-height: 52px !important;
+  padding: 10px 12px !important;
+  text-align: left !important;
+}
+
+.desktop-session-title {
+  font-size: 14px !important;
+  line-height: 1.35 !important;
+  white-space: normal !important;
+  overflow: hidden !important;
+  text-overflow: unset !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+}
+
+.desktop-session-meta {
+  font-size: 10px !important;
+  opacity: 0.65 !important;
+}
+</style>
+
 <script>
-
-
 (function () {
-    "use strict";
-
-    var marker = "NOVA_DESKTOP_VISUAL_POLISH_LOCK_20260611";
+  "use strict";
+  var marker = "NOVA_DESKTOP_VISUAL_POLISH_LOCK_20260611";
 
     if (window[marker]) {
         return;
@@ -1557,29 +1579,60 @@ window.loadDesktopSessions = loadDesktopSessions;
       return null;
     }
 
-    
     async function newSession() {
-      const sid = createDesktopLocalSessionId();
+      const sid = "desktop_" + Date.now();
       setSessionId(sid);
-      setStatus("new local session");
 
-      const input = $("prompt");
-      if (input) input.value = "";
+      try {
+        localStorage.setItem(LS_SID, sid);
+        localStorage.setItem("nova_active_session_id", sid);
+        localStorage.setItem("nova_session_id", sid);
+        sessionStorage.setItem("nova_active_session_id", sid);
+        sessionStorage.setItem("nova_session_id", sid);
+      } catch (e) {}
+
+      pendingDesktopAttachments = [];
+      renderDesktopAttachmentChip();
+
+      if (input) {
+        input.value = "";
+        input.style.height = "auto";
+      }
+
+      if (window.NovaCurrentSessionManager) {
+        window.NovaCurrentSessionManager.currentSession = {
+          id: sid,
+          session_id: sid,
+          messages: []
+        };
+      }
 
       const messages =
+        $("chat") ||
         $("messages") ||
         $("chatMessages") ||
         $("desktopMessages") ||
+        document.querySelector(".chat-log") ||
         document.querySelector(".messages") ||
         document.querySelector(".chat-messages");
 
       if (messages) {
-        messages.innerHTML = "";
+        messages.innerHTML = `
+          <div class="nova-empty-chat">
+            <div>
+              <div class="nova-empty-chat-title">Nova is ready</div>
+              <div class="nova-empty-chat-subtitle">Send a message to begin.</div>
+            </div>
+          </div>
+        `;
       }
 
-refreshSummaryMeta();
-refreshDesktopPanels();
-}
+      setStatus("new chat ready");
+      refreshSummaryMeta();
+      refreshDesktopPanels();
+    }
+
+    window.NovaDesktopNewSessionRescue = newSession;
 
     async function summarizeNow() {
       if (!getSessionId()) {
@@ -4404,11 +4457,16 @@ try {
   data = null;
 }
 
-    if (response.status === 404 && data && data.active_session_id && data.active_session_id !== sessionId) {
-      log("stale session recovered", sessionId, "=>", data.active_session_id);
-      storeSessionId(data.active_session_id);
-      return fetchSession(data.active_session_id);
-    }
+if (response.status === 404 && data && data.active_session_id && data.active_session_id !== sessionId) {
+  if (String(sessionId || "").startsWith("desktop_")) {
+    log("new desktop session not recovered", sessionId);
+    return null;
+  }
+
+  log("stale session recovered", sessionId, "=>", data.active_session_id);
+  storeSessionId(data.active_session_id);
+  return fetchSession(data.active_session_id);
+}
 
     if (!response.ok) {
       log("session fetch failed", response.status, data);
@@ -4446,9 +4504,9 @@ window.NovaDesktopFetchSession = fetchSession;
 
   log("ready", MARKER);
 })();
+
 (function () {
   "use strict";
-
   var MARKER = "NOVA_FORCE_DESKTOP_SOURCE_CARDS_DOM_20260612";
 
   function log() {
@@ -5389,8 +5447,58 @@ if (!assistantMessages.length) {
 })();
 </script>
 
+<script>
+(function () {
+  function forceNewChat() {
+    const sid = "desktop_" + Date.now();
+
+    localStorage.setItem("nova.session_id", sid);
+    localStorage.setItem("nova_active_session_id", sid);
+    localStorage.setItem("nova_session_id", sid);
+
+    const sidInput = document.getElementById("sid");
+    if (sidInput) sidInput.value = sid;
+
+    const input = document.getElementById("input");
+    if (input) input.value = "";
+
+    const chat = document.getElementById("chat");
+    if (chat) {
+      chat.innerHTML = `
+        <div class="nova-empty-chat">
+          <div>
+            <div class="nova-empty-chat-title">Nova is ready</div>
+            <div class="nova-empty-chat-subtitle">Send a message to begin.</div>
+          </div>
+        </div>
+      `;
+    }
+
+    document.querySelectorAll("[data-nova-forced-source-cards='true']").forEach(function (node) {
+      node.remove();
+    });
+
+    console.log("[Nova Force New Chat] created", sid);
+  }
+
+  const btn = document.getElementById("newSessionBtn");
+
+  if (btn) {
+    btn.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      forceNewChat();
+    }, true);
+  }
+
+  window.NovaDesktopNewSessionRescue = forceNewChat;
+})();
+</script>
+
 </body>
 </html>
+
 
 
 
