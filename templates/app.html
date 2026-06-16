@@ -1174,6 +1174,7 @@ observer.observe(document.documentElement, {
         <a href="/">Home</a>
         <a href="/mobile">Mobile</a>
         <button class="footer-mini-button" id="openMemoryBtn" type="button">Memory</button>
+        <button class="footer-mini-button" id="openArtifactsBtn" type="button">Artifacts</button>
       </div>
     </aside>
 
@@ -1242,6 +1243,25 @@ observer.observe(document.documentElement, {
           </div>
         </div>
       </section>
+
+<section class="tools-section artifacts-section">
+  <h3>Artifacts</h3>
+
+  <div class="memory-card-shell">
+    <div class="metric">
+      <span>Artifacts</span>
+      <strong id="desktopArtifactCount">0</strong>
+    </div>
+
+    <div id="desktopArtifactList" class="desktop-memory-list">
+      <div class="execution-note">Click Artifacts to load.</div>
+    </div>
+
+    <button type="button" id="openArtifactsBtn" class="footer-mini-button">
+      Load Artifacts
+    </button>
+  </div>
+</section>
 
       <section class="tools-section">
         <h3>Quick Actions</h3>
@@ -5621,8 +5641,116 @@ document.querySelectorAll("[data-nova-forced-source-cards='true'], .nova-source-
 })();
 </script>
 
+<script>
+(function () {
+  "use strict";
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+async function loadDesktopArtifacts() {
+  const box = $("desktopArtifactList");
+  const count = $("desktopArtifactCount");
+
+  if (box) box.textContent = "Loading...";
+
+  try {
+    const res = await fetch("/api/artifacts", { cache: "no-store" });
+    const data = await res.json();
+
+    const artifacts =
+      data.artifacts ||
+      data.items ||
+      data.data ||
+      data.payload?.artifacts ||
+      data.payload?.items ||
+      [];
+
+    if (count) count.textContent = artifacts.length;
+    if (!box) return;
+
+    if (!artifacts.length) {
+      box.innerHTML = "<div>No artifacts yet.</div>";
+      return;
+    }
+
+    box.innerHTML = artifacts.slice(0, 30).map(function (a) {
+      const imageUrl = a.image_url || a.preview || (a.viewer && a.viewer.image_url) || "";
+      const title = a.title || "Artifact";
+      const kind = a.kind || a.type || "";
+      const summary = a.summary || a.body || a.prompt || "";
+      const id = a.id || "";
+
+      return `
+        <div class="memory-item" data-artifact-id="${id}" style="cursor:pointer;padding:10px 12px;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-bottom:10px;overflow:hidden;">
+          ${imageUrl ? `<img src="${imageUrl}" style="width:100%;max-height:none;object-fit:contain;border-radius:10px;margin-bottom:8px;">` : ""}
+          <div><strong>${title}</strong></div>
+          <div style="font-size:11px;opacity:.7;">${kind}</div>
+          <div style="font-size:12px;opacity:.82;margin-top:6px;">${String(summary).slice(0, 180)}</div>
+        </div>
+      `;
+    }).join("");
+
+  } catch (e) {
+    console.warn("[Nova Desktop Artifacts] failed", e);
+    if (box) box.innerHTML = "<div>Failed to load artifacts.</div>";
+  }
+}
+
+document.addEventListener("click", function (event) {
+  const card = event.target.closest("[data-artifact-id]");
+  if (!card) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  const id = card.getAttribute("data-artifact-id");
+  if (id) {
+    window.open("/api/artifacts/" + encodeURIComponent(id), "_blank");
+  }
+}, true);
+
+  function wireDesktopArtifacts() {
+    const btn = $("openArtifactsBtn");
+    if (!btn || btn.dataset.novaArtifactsWired === "true") return;
+
+    btn.dataset.novaArtifactsWired = "true";
+    btn.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const tools = document.querySelector(".tools");
+      const section = document.querySelector(".artifacts-section");
+
+      if (tools) tools.style.display = "flex";
+      if (section) {
+        section.style.display = "block";
+        section.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      loadDesktopArtifacts();
+    }, true);
+  }
+
+  window.NovaLoadDesktopArtifacts = loadDesktopArtifacts;
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", wireDesktopArtifacts);
+  } else {
+    wireDesktopArtifacts();
+  }
+
+  setTimeout(wireDesktopArtifacts, 500);
+  setTimeout(wireDesktopArtifacts, 1500);
+
+  console.log("[Nova Desktop Artifacts] ready");
+})();
+</script>
+
 </body>
 </html>
+
 
 
 
