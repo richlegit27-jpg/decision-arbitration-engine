@@ -5294,69 +5294,6 @@ document.addEventListener("nova:message:rendered", renderForcedSourceCards);
 (function () {
   "use strict";
 
-  var MARKER = "NOVA_DESKTOP_LATEST_ONLY_POST_PRUNE_SOURCE_CARDS_20260612";
-
-  function log() {
-    try {
-      console.log.apply(console, ["[Nova Latest Source Cards Post Prune]"].concat([].slice.call(arguments)));
-    } catch (_) {}
-  }
-
-  function pruneToLatestGroup() {
-    try {
-      var groups = Array.from(
-        document.querySelectorAll("[data-nova-forced-source-cards='true'], .nova-source-cards")
-      );
-
-      if (groups.length <= 1) return;
-
-      groups.slice(0, -1).forEach(function (node) {
-        node.remove();
-      });
-    } catch (err) {
-      console.warn("[Nova Latest Source Cards Post Prune] prune failed", err);
-    }
-  }
-
-  function wrap() {
-    if (typeof window.novaForceDesktopSourceCardsDOM_20260612 !== "function") {
-      setTimeout(wrap, 250);
-      return;
-    }
-
-    if (window.novaForceDesktopSourceCardsDOM_20260612.__novaLatestOnlyPostPruneWrapped) {
-      return;
-    }
-
-    var original = window.novaForceDesktopSourceCardsDOM_20260612;
-
-    var wrapped = function () {
-      var result = original.apply(this, arguments);
-
-      pruneToLatestGroup();
-      setTimeout(pruneToLatestGroup, 25);
-      setTimeout(pruneToLatestGroup, 100);
-      setTimeout(pruneToLatestGroup, 250);
-
-      return result;
-    };
-
-    wrapped.__novaDedupeWrapped = true;
-    wrapped.__novaLatestOnlyWrapped = true;
-    wrapped.__novaLatestOnlyPostPruneWrapped = true;
-
-    window.novaForceDesktopSourceCardsDOM_20260612 = wrapped;
-
-    pruneToLatestGroup();
-
-    log("ready", MARKER);
-  }
-
-  wrap();
-})();
-(function () {
-  "use strict";
-
   var MARKER = "NOVA_DESKTOP_SOURCE_CARD_OBSERVER_PRUNE_20260612";
   var pruneQueued = false;
 
