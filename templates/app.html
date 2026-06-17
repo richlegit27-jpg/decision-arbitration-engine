@@ -1230,7 +1230,7 @@ observer.observe(document.documentElement, {
       <div class="composer">
         <input id="desktopFileInput" type="file" hidden />
         <button id="attachBtn" class="attach-button" type="button" aria-label="Attach file">
-  <span class="attach-icon">📎</span>
+  <span class="attach-icon">??</span>
 </button>
         <textarea id="input" placeholder="Message Nova... Enter sends, Shift+Enter makes a new line"></textarea>
         <button id="sendBtn" type="button">Send</button>
@@ -1923,7 +1923,7 @@ function showDesktopAttachmentChip(text) {
     <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${text}</span>
     <button type="button" id="desktopAttachmentDeleteBtn" title="Remove attachment"
       style="border:0;border-radius:8px;padding:4px 8px;cursor:pointer;background:rgba(255,255,255,.14);color:inherit;">
-      ✕
+      ?
     </button>
   `;
 
@@ -1933,11 +1933,11 @@ function showDesktopAttachmentChip(text) {
       event.preventDefault();
       event.stopPropagation();
       clearDesktopAttachments();
-      console.log("📎 ATTACHMENT REMOVED");
+      console.log("?? ATTACHMENT REMOVED");
     };
   }
 
-  console.log("📎 CHIP SHOWN", chip);
+  console.log("?? CHIP SHOWN", chip);
 }
 
 function clearDesktopAttachments() {
@@ -2011,10 +2011,10 @@ const attachment = normalizeUploadedAttachment
       file_url: data.file_url || data.url
     };
 
-console.log("📎 NORMALIZED ATTACHMENT", attachment);
+console.log("?? NORMALIZED ATTACHMENT", attachment);
   pendingDesktopAttachments = pendingDesktopAttachments || [];
 pendingDesktopAttachments.push(attachment);
-console.log("📎 ATTACHMENT STORED", pendingDesktopAttachments);
+console.log("?? ATTACHMENT STORED", pendingDesktopAttachments);
 
   showDesktopAttachmentChip(
     "Attached: <strong>" + (file.name || "file") + "</strong>"
@@ -2165,7 +2165,7 @@ function showThinking(node) {
 }
 
 async function sendText(textOverride) {
-  console.log("🟢 sendText TRIGGERED");
+  console.log("?? sendText TRIGGERED");
 
   const liveInput = document.getElementById("input") || document.querySelector("textarea");
   const capturedText = window.__novaLastInputBeforeSend || "";
@@ -2176,7 +2176,7 @@ async function sendText(textOverride) {
   const attachments = pendingDesktopAttachments.slice();
   const text = clarifyAttachmentPrompt(rawText, attachments);
 
-  console.log("🧪 SEND SNAPSHOT", { rawText, text, attachments });
+  console.log("?? SEND SNAPSHOT", { rawText, text, attachments });
 
   if (!text && !attachments.length) return;
 
@@ -2190,7 +2190,7 @@ async function sendText(textOverride) {
   const assistantNode = addMsg("assistant", "");
 
   try {
-    console.log("🔥 CHAT REQUEST START", { text, attachments });
+    console.log("?? CHAT REQUEST START", { text, attachments });
 
 const forcingNewSession = window.NOVA_FORCE_NEW_SESSION_ON_NEXT_SEND === true;
 
@@ -2456,7 +2456,7 @@ if (sendBtn && input) {
   sendBtn.addEventListener("mousedown", () => {
     const liveInput = document.getElementById("input") || document.querySelector("textarea");
     window.__novaLastInputBeforeSend = liveInput ? liveInput.value : "";
-    console.log("🧲 CAPTURE BEFORE CLICK", window.__novaLastInputBeforeSend);
+    console.log("?? CAPTURE BEFORE CLICK", window.__novaLastInputBeforeSend);
   }, true);
 
   sendBtn.addEventListener("click", () => handleSendClick());
@@ -2741,14 +2741,22 @@ async function loadMemory() {
       return true;
     }
 
-    messages.forEach(function (msg) {
+    messages.forEach(function (msg, index) {
       var role = String(msg.role || "assistant");
       var text = msg.content || msg.text || msg.message || "";
 
       var row = document.createElement("div");
       row.className = "message " + (role.includes("user") ? "user" : "assistant");
-      row.textContent = String(text);
+row.setAttribute(
+  "data-message-id",
+  msg.id || msg.message_id || "rescue_" + index
+);
 
+const bubble = document.createElement("div");
+bubble.className = "bubble";
+bubble.textContent = String(text);
+
+row.appendChild(bubble);
       if (!role.includes("user")) {
         var cards = novaDesktopRescueSourceCards_20260611(msg);
         if (cards) row.appendChild(cards);
@@ -4389,21 +4397,29 @@ renderAuthWidget(data || {});
     });
   }
 
-  function getActiveSessionId() {
-    try {
-      return String(
-        window.NovaDesktopActiveSessionId ||
-        window.novaDesktopActiveSessionId ||
-        window.currentSessionId ||
-        window.activeSessionId ||
-        localStorage.getItem("nova_active_session_id") ||
-        localStorage.getItem("active_session_id") ||
-        ""
-      ).trim();
-    } catch (_) {
-      return "";
-    }
+function getActiveSessionId() {
+  try {
+    const sidInput = document.getElementById("sid");
+    const sidValue = sidInput && sidInput.value ? sidInput.value : "";
+
+    return String(
+      (typeof window.getSessionId === "function" && window.getSessionId()) ||
+      sidValue ||
+      localStorage.getItem("nova_session_id") ||
+      localStorage.getItem("nova_active_session_id") ||
+      sessionStorage.getItem("nova_session_id") ||
+      sessionStorage.getItem("nova_active_session_id") ||
+      window.NovaDesktopActiveSessionId ||
+      window.novaDesktopActiveSessionId ||
+      window.currentSessionId ||
+      window.activeSessionId ||
+      localStorage.getItem("active_session_id") ||
+      ""
+    ).trim();
+  } catch (_) {
+    return "";
   }
+}
 
   function getRescueBox() {
     let box = document.getElementById("nova-desktop-rescue-messages");
@@ -5023,12 +5039,17 @@ if (!assistantMessages.length) {
 
   window.novaForceDesktopSourceCardsDOM_20260612 = renderForcedSourceCards;
 
-  wrapRenderFunction("renderDesktopChatMessagesRescue");
-  wrapRenderFunction("renderDesktopChatMessages");
+wrapRenderFunction("renderDesktopChatMessagesRescue", {
+  deferSourceCards: true
+});
+
+wrapRenderFunction("renderDesktopChatMessages", {
+  deferSourceCards: true
+});
 
   setTimeout(renderForcedSourceCards, 500);
   setTimeout(renderForcedSourceCards, 1500);
-  setInterval(renderForcedSourceCards, 4000);
+document.addEventListener("nova:message:rendered", renderForcedSourceCards);
 
   log("ready", MARKER);
 })();
@@ -6004,3 +6025,4 @@ document.addEventListener("click", function (event) {
 <script src="/static/js/nova-desktop-sessions.js?v=external-new-session-1"></script>
 </body>
 </html>
+
