@@ -4594,10 +4594,18 @@ try {
       ? window.renderDesktopChatMessagesRescue
       : null;
 
-    window.renderDesktopChatMessagesRescue = function () {
-      const result = original ? original.apply(this, arguments) : true;
+window.renderDesktopChatMessagesRescue = function () {
+  const result = original ? original.apply(this, arguments) : true;
 
-      setTimeout(function () {
+  const box = getRescueBox();
+  const renderedCount = box ? box.querySelectorAll("[data-message-id]").length : 0;
+  const hasText = box ? String(box.innerText || "").trim().length > 20 : false;
+
+  if (renderedCount > 0 && hasText) {
+    return result;
+  }
+
+  setTimeout(function () {
         try {
           const sessionId = getActiveSessionId();
           const box = getRescueBox();
