@@ -4737,11 +4737,11 @@ if (
       console.warn("[Nova Desktop Active Session Recovery] rescue render failed", err);
     }
 
-    try {
 if (typeof window.renderDesktopChatMessages === "function") {
-  window.renderDesktopChatMessagesRescue(session.messages);
+  window.renderDesktopChatMessages(session.messages);
   return;
 }
+
     } catch (err2) {
       console.warn("[Nova Desktop Active Session Recovery] desktop render failed", err2);
     }
@@ -4842,7 +4842,6 @@ if (response.status === 404 && data && data.active_session_id && data.active_ses
 window.NovaDesktopFetchSession = fetchSession;
 
   setTimeout(recoverDesktopSession, 250);
-  setTimeout(recoverDesktopSession, 1200);
 
   log("ready", MARKER);
 })();
