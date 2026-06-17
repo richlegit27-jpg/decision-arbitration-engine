@@ -4737,15 +4737,16 @@ if (
       console.warn("[Nova Desktop Active Session Recovery] rescue render failed", err);
     }
 
-if (typeof window.renderDesktopChatMessages === "function") {
-  window.renderDesktopChatMessages(session.messages);
-  return;
-}
-
+    try {
+      if (typeof window.renderDesktopChatMessages === "function") {
+        window.renderDesktopChatMessages(session.messages);
+        return;
+      }
     } catch (err2) {
       console.warn("[Nova Desktop Active Session Recovery] desktop render failed", err2);
     }
   }
+
 
 function startSSE() {
   const source = new EventSource("/api/events/stream");
