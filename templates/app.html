@@ -4494,6 +4494,24 @@ const titleHtml = url
     const box = getRescueBox();
     const messages = Array.isArray(session && session.messages) ? session.messages : [];
 
+    const existingCount = box.querySelectorAll("[data-message-id]").length;
+    const sessionId = session && (session.id || session.session_id || session.client_session_id);
+    const activeId = getActiveSessionId();
+
+    if (
+      sessionId &&
+      activeId &&
+      sessionId === activeId &&
+      Math.abs(existingCount - messages.length) <= 1
+    ) {
+      console.log("[Nova Desktop Rescue] skipped stale direct render", {
+        session_id: sessionId,
+        existing: existingCount,
+        incoming: messages.length
+      });
+      return existingCount;
+    }
+
     if (!messages.length) {
       box.innerHTML = '<div class="session-placeholder">No messages in this session.</div>';
       return 0;
