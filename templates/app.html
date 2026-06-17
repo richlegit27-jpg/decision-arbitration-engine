@@ -1400,7 +1400,11 @@ function esc(value) {
 
 function addMsg(role, text, meta = {}) {
   const wrap = document.createElement("div");
-  wrap.className = "msg " + role;
+wrap.className = "msg " + role;
+wrap.setAttribute(
+  "data-message-id",
+  "live_" + Date.now() + "_" + Math.random().toString(16).slice(2)
+);
 
   const r = document.createElement("div");
   r.className = "role";
@@ -4583,6 +4587,7 @@ if (
 ) {
     fetchAndRenderSession(sessionId);
 }
+
         } catch (err) {
           console.warn("[Nova Desktop Rescue] missing-session fallback skipped", err);
         }
