@@ -638,8 +638,10 @@ class ChatService:
                         or ""
                     ).strip()
 
-                    if role and text:
+                    if "Generated image for:" in text:
+                        continue
 
+                    if role and text:
                         lines.append(f"{role}: {text[:800]}")
 
         except Exception as e:
