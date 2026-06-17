@@ -1039,7 +1039,9 @@ body {
 </style>
 
 <script>
+
 (function () {
+
   "use strict";
   var marker = "NOVA_DESKTOP_VISUAL_POLISH_LOCK_20260611";
 
@@ -1388,38 +1390,39 @@ function addMsg(role, text, meta = {}) {
   return wrap;
 }
 
-    function getSessionId() {
-      return (sidEl.value || "").trim();
-    }
+function getSessionId() {
+  const el = document.getElementById("sid");
+  return (el && el.value ? el.value : "").trim();
+}
 
-    function setSessionId(v) {
-      sidEl.value = v || "";
-      try {
-        localStorage.setItem(LS_SID, sidEl.value);
-      } catch (e) {}
-    }
+function setSessionId(v) {
+  const sid = (v || "").trim();
 
-    function ensureLocalSessionId() {
-      let sid = getSessionId();
-      if (sid) return sid;
+  const el = document.getElementById("sid");
+  if (el) el.value = sid;
 
-      try {
-        sid = localStorage.getItem(LS_SID) || "";
-      } catch (e) {}
+  try {
+    localStorage.setItem(LS_SID, sid);
+    localStorage.setItem("nova_active_session_id", sid);
+    localStorage.setItem("nova_session_id", sid);
+    sessionStorage.setItem("nova_active_session_id", sid);
+  } catch (e) {}
 
-      if (!sid) {
-        sid = "desktop_" + Date.now().toString(16) + "_" + Math.random().toString(16).slice(2);
-      }
+  window.__NOVA_ACTIVE_SESSION_ID = sid;
+}
 
-      setSessionId(sid);
-      return sid;
-    }
+function ensureLocalSessionId() {
+  const sid = getSessionId();
+  if (sid) return sid;
 
-    // NOVA_DESKTOP_FIX_SESSION_ENDPOINTS_20260610
+  const saved = localStorage.getItem(LS_SID);
+  if (saved) {
+    setSessionId(saved);
+    return saved;
+  }
 
-    // NOVA_REMOVE_BROKEN_DESKTOP_LOCAL_BLOCK_20260610
-    // NOVA_DESKTOP_SAFE_JSON_AND_MEMORY_OPEN_20260610
-
+  return "";
+}
 
 async function fetchJsonOrNull(url, options) {
   const response = await fetch(url, options || {});
@@ -1573,69 +1576,136 @@ async function fetchJsonOrNull(url, options) {
       }
     }
 
-    async function loadDesktopSessions() {
-      const list = $("desktopSessionList");
-      if (!list) return;
+function renderSessions(list, sessions, activeId) {
+  if (!list) return;
 
-      try {
-        const data = await fetchJsonOrNull("/api/sessions");
-        if (!data) throw new Error("Sessions endpoint did not return JSON");
-        const sessions = normalizeSessionListPayload(data);
-        const activeId = data.active_session_id || getSessionId();
+  list.innerHTML = "";
 
-        list.innerHTML = "";
+  if (!sessions || !sessions.length) {
+    const empty = document.createElement("div");
+    empty.className = "session-placeholder";
+    empty.textContent = "No saved sessions yet.";
+    list.appendChild(empty);
+    return;
+  }
 
-        if (!sessions.length) {
-          const empty = document.createElement("div");
-          empty.className = "session-placeholder";
-          empty.textContent = "No saved sessions yet.";
-          list.appendChild(empty);
-          return;
-        }
+  sessions.slice(0, 20).forEach((session) => {
+    const sid = getSessionIdFromObject(session);
+    if (!sid) return;
 
-        sessions.slice(0, 20).forEach((session) => {
-          const sid = getSessionIdFromObject(session);
-          const button = document.createElement("button");
-          button.type = "button";
-          button.className = "desktop-session-item" + (sid && sid === activeId ? " is-active" : "");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className =
+      "desktop-session-item" + (sid === activeId ? " is-active" : "");
+    button.setAttribute("data-sid", sid);
 
-          const title = document.createElement("div");
-          title.className = "desktop-session-title";
-          title.textContent = getSessionTitle(session);
+    const title = document.createElement("div");
+    title.className = "desktop-session-title";
+    title.textContent = getSessionTitle(session);
 
-          const meta = document.createElement("div");
-          meta.className = "desktop-session-meta";
-          meta.textContent = sid || "no session id";
+    const meta = document.createElement("div");
+    meta.className = "desktop-session-meta";
+    meta.textContent = sid;
 
-          button.appendChild(title);
-          button.appendChild(meta);
+    button.appendChild(title);
+    button.appendChild(meta);
 
-          button.addEventListener("click", async () => {
-            if (!sid) return;
-            setSessionId(sid);
-            setStatus("loading session...");
+    button.addEventListener("click", async () => {
+      setSessionId(sid);
+      setStatus("loading session...");
 
-if (typeof window.NovaDesktopFetchSession === "function") {
-  await window.NovaDesktopFetchSession(sid);
+      if (typeof window.NovaDesktopFetchSession === "function") {
+        await window.NovaDesktopFetchSession(sid);
+      }
+
+      setStatus("session selected");
+      refreshSummaryMeta();
+    });
+
+    list.appendChild(button);
+  });
 }
 
-            setStatus("session selected");
-            refreshSummaryMeta();
-          });
+async function loadDesktopSessions() {
+  const list = document.getElementById("desktopSessionList");
+  if (!list) return;
 
-          list.appendChild(button);
-        });
-      } catch (error) {
-        list.innerHTML = "";
-        const failed = document.createElement("div");
-        failed.className = "session-placeholder";
-        failed.textContent = "Could not load sessions.";
-        list.appendChild(failed);
-      }
+  try {
+    const data = await fetch("/api/sessions").then(r => r.json());
+
+    const sessions = (data.sessions || data.items || []);
+
+    list.innerHTML = "";
+
+    sessions.forEach(session => {
+      const sid = session.id;
+      const btn = document.createElement("button");
+      btn.className = "desktop-session-item";
+
+      btn.innerHTML = `
+        <div class="desktop-session-title">${session.title || "Untitled"}</div>
+        <div class="desktop-session-meta">${sid}</div>
+      `;
+
+      btn.onclick = () => {
+        setSessionId(sid);
+        console.log("[session selected]", sid);
+      };
+
+      list.appendChild(btn);
+    });
+
+    console.log("[sessions rendered]", sessions.length);
+
+  } catch (e) {
+    console.warn("[loadDesktopSessions failed]", e);
+  }
+}
+window.loadDesktopSessions = loadDesktopSessions;
+
+function startDesktopSessionSync() {
+  window.__novaEvents = window.__novaEvents || {
+    listeners: {},
+    emit(event, data) {
+      (this.listeners[event] || []).forEach(fn => fn(data));
+    },
+    on(event, fn) {
+      if (!this.listeners[event]) this.listeners[event] = [];
+      this.listeners[event].push(fn);
     }
+  };
 
-window.loadDesktopSessions = loadDesktopSessions;    
-    
+  window.__novaEvents.on("sessions:updated", async () => {
+    try {
+      const data = await fetchJsonOrNull("/api/sessions");
+      if (!data) return;
+
+      const sessions =
+        normalizeSessionListPayload(data) ||
+        data?.sessions ||
+        data?.items ||
+        data?.data ||
+        (Array.isArray(data) ? data : []);
+
+      __desktopSessionCache = sessions;
+      __desktopSessionCacheReady = true;
+
+      const list = $("desktopSessionList");
+      if (list) renderSessions(list, sessions);
+
+    } catch (e) {
+      console.warn("[SessionSync event] failed", e);
+    }
+  });
+}
+
+function stopDesktopSessionSync() {
+  if (__sessionSyncTimer) {
+    clearInterval(__sessionSyncTimer);
+    __sessionSyncTimer = null;
+  }
+}
+
     function refreshDesktopPanels() {
       // NOVA_REFRESH_DESKTOP_PANELS_NOOP_20260610
       // Intentionally no-op. Sessions and memory are opened by the desktop rescue handlers.
@@ -1656,64 +1726,62 @@ window.loadDesktopSessions = loadDesktopSessions;
       return null;
     }
 
-    async function newSession() {
-      const sid = "desktop_" + Date.now();
-      setSessionId(sid);
+async function newSession() {
+  setSessionId("");
 
-      try {
-        localStorage.setItem(LS_SID, sid);
-        localStorage.setItem("nova_active_session_id", sid);
-        localStorage.setItem("nova_session_id", sid);
-        sessionStorage.setItem("nova_active_session_id", sid);
-        sessionStorage.setItem("nova_session_id", sid);
-      } catch (e) {}
+  try {
+    localStorage.removeItem(LS_SID);
+    localStorage.removeItem("nova_active_session_id");
+    localStorage.removeItem("nova_session_id");
+    sessionStorage.removeItem("nova_active_session_id");
+    sessionStorage.removeItem("nova_session_id");
+  } catch (e) {}
 
-      pendingDesktopAttachments = [];
-      renderDesktopAttachmentChip();
+  pendingDesktopAttachments = [];
+  renderDesktopAttachmentChip();
 
-      if (input) {
-        input.value = "";
-        input.style.height = "auto";
-      }
+  if (input) {
+    input.value = "";
+    input.style.height = "auto";
+  }
 
-      if (window.NovaCurrentSessionManager) {
-        window.NovaCurrentSessionManager.currentSession = {
-          id: sid,
-          session_id: sid,
-          messages: []
-        };
-      }
+  if (window.NovaCurrentSessionManager) {
+    window.NovaCurrentSessionManager.currentSession = {
+      id: "",
+      session_id: "",
+      messages: []
+    };
+  }
 
-      const messages =
-        $("chat") ||
-        $("messages") ||
-        $("chatMessages") ||
-        $("desktopMessages") ||
-        document.querySelector(".chat-log") ||
-        document.querySelector(".messages") ||
-        document.querySelector(".chat-messages");
+  const messages =
+    $("chat") ||
+    $("messages") ||
+    $("chatMessages") ||
+    $("desktopMessages") ||
+    document.querySelector(".chat-log") ||
+    document.querySelector(".messages") ||
+    document.querySelector(".chat-messages");
 
-      if (messages) {
-        messages.innerHTML = `
-          <div class="nova-empty-chat">
-            <div>
-              <div class="nova-empty-chat-title">Nova is ready</div>
-              <div class="nova-empty-chat-subtitle">Send a message to begin.</div>
-            </div>
-          </div>
-        `;
-      }
+  if (messages) {
+    messages.innerHTML = `
+      <div class="nova-empty-chat">
+        <div>
+          <div class="nova-empty-chat-title">Nova is ready</div>
+          <div class="nova-empty-chat-subtitle">Send a message to begin.</div>
+        </div>
+      </div>
+    `;
+  }
 
-      setStatus("new chat ready");
-      refreshSummaryMeta();
-      refreshDesktopPanels();
-    }
-
+  setStatus("new chat ready");
+  refreshSummaryMeta();
+  refreshDesktopPanels();
+}
     window.NovaDesktopNewSessionRescue = newSession;
 
     async function summarizeNow() {
       if (!getSessionId()) {
-        ensureLocalSessionId();
+        // do not create fake frontend session ids
       }
 
       setStatus("summarizing...");
@@ -1737,8 +1805,6 @@ window.loadDesktopSessions = loadDesktopSessions;
         summarizeBtn.disabled = false;
       }
     }
-
-
 
     // NOVA_DESKTOP_ATTACHMENT_PROMPT_CLARITY_20260610
     function clarifyAttachmentPrompt(text, attachments) {
@@ -1906,6 +1972,7 @@ console.log("📎 ATTACHMENT STORED", pendingDesktopAttachments);
   return attachment;
 }
 
+
 function buildDesktopChatPayload(text, attachments) {
   return {
     text: text,
@@ -1916,7 +1983,6 @@ function buildDesktopChatPayload(text, attachments) {
     attachments: attachments || []
   };
 }
-
 
 // ==========================
 // MEMORY DETECTION (FIXED)
@@ -2045,10 +2111,9 @@ const rawText = String(textOverride || capturedText || liveInput?.value || "").t
   console.log("🧪 SEND SNAPSHOT", { rawText, text, attachments });
 
 
-
   if (!text && !attachments.length) return;
 
-  ensureLocalSessionId();
+// session handled by backend
 
   input.value = "";
   input.style.height = "auto";
@@ -4567,6 +4632,42 @@ if (typeof window.renderDesktopChatMessages === "function") {
     }
   }
 
+function startSSE() {
+  const source = new EventSource("/api/events/stream");
+
+  source.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data || "{}");
+
+      if (data.type === "sessions:updated") {
+        window.__novaEvents.emit("sessions:updated");
+      }
+
+    } catch (e) {}
+  };
+
+  source.onerror = () => {
+    console.warn("[SSE] disconnected, retrying...");
+  };
+}
+
+function wrapSessionMutation(fn) {
+  return async function (...args) {
+    const result = await fn.apply(this, args);
+
+    // always notify AFTER successful mutation
+    window.__novaEvents.emit("sessions:updated");
+    window.__novaChannel?.postMessage({ type: "sessions:updated" });
+
+    return result;
+  };
+}
+
+function notifySessionsChanged() {
+  window.__novaEvents.emit("sessions:updated");
+  window.__novaChannel?.postMessage({ type: "sessions:updated" });
+}
+
   async function fetchSession(sessionId) {
     if (!sessionId) return null;
 
@@ -4589,11 +4690,6 @@ try {
 }
 
 if (response.status === 404 && data && data.active_session_id && data.active_session_id !== sessionId) {
-  if (String(sessionId || "").startsWith("desktop_")) {
-    log("new desktop session not recovered", sessionId);
-    return null;
-  }
-
   log("stale session recovered", sessionId, "=>", data.active_session_id);
   storeSessionId(data.active_session_id);
   return fetchSession(data.active_session_id);
@@ -5581,20 +5677,20 @@ if (!assistantMessages.length) {
 
 <script>
 (function () {
-  function forceNewChat() {
-    const sid = "desktop_" + Date.now();
 
-    localStorage.setItem("nova.session_id", sid);
-    localStorage.setItem("nova_active_session_id", sid);
-    localStorage.setItem("nova_session_id", sid);
+async function forceNewChat() {
+  window.NOVA_DISABLE_SOURCE_CARD_RENDER_ON_EMPTY_CHAT = true;
 
-    const sidInput = document.getElementById("sid");
-    if (sidInput) sidInput.value = sid;
+  try {
+const sidInput = document.getElementById("sid");
+if (sidInput) sidInput.value = "";
 
-window.NOVA_DISABLE_SOURCE_CARD_RENDER_ON_EMPTY_CHAT = true;
+localStorage.removeItem("nova.session_id");
+localStorage.removeItem("nova_active_session_id");
+localStorage.removeItem("nova_session_id");
 
-    const input = document.getElementById("input");
-    if (input) input.value = "";
+const input = document.getElementById("input");
+if (input) input.value = "";
 
 const emptyHtml = `
   <div class="nova-empty-chat">
@@ -5615,16 +5711,18 @@ const emptyHtml = `
   node.innerHTML = emptyHtml;
 });
 
-document.querySelectorAll("[data-nova-forced-source-cards='true'], .nova-source-cards").forEach(function (node) {
+document.querySelectorAll(
+  "[data-nova-forced-source-cards='true'], .nova-source-cards"
+).forEach(function (node) {
   node.remove();
 });
 
-    document.querySelectorAll("[data-nova-forced-source-cards='true']").forEach(function (node) {
-      node.remove();
-    });
+console.log("[Nova Force New Chat] cleared chat");
 
-    console.log("[Nova Force New Chat] created", sid);
+  } catch (error) {
+    console.warn("[Nova Force New Chat] failed", error);
   }
+}
 
   const btn = document.getElementById("newSessionBtn");
 
@@ -5638,6 +5736,7 @@ document.querySelectorAll("[data-nova-forced-source-cards='true'], .nova-source-
   }
 
   window.NovaDesktopNewSessionRescue = forceNewChat;
+
 })();
 </script>
 
@@ -5748,10 +5847,67 @@ document.addEventListener("click", function (event) {
 })();
 </script>
 
+<style>
+
+.side-footer-links .footer-mini-button,
+.side-footer-links button {
+  display: flex !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  width: 100% !important;
+  padding-left: 10px !important;
+}
+
+/* Fix Mobile button alignment in sidebar */
+.side-footer-links a[href="/mobile"],
+.side-footer-links a[href*="mobile"],
+#mobileBtn {
+  text-align: left !important;
+  justify-content: flex-start !important;
+  display: flex !important;
+  width: 100% !important;
+  padding-left: 10px !important;
+}
+
+#desktopArtifactList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.memory-item {
+  height: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.memory-item img {
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.sidebar {
+  overflow-y: auto;
+  padding-bottom: 20px;
+}
+
+.side-footer-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.side-footer-links button,
+.side-footer-links a {
+  width: 100%;
+  text-align: left;
+  padding-left: 10px;
+}
+</style>
+
 </body>
 </html>
-
-
-
-
-
