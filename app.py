@@ -2858,7 +2858,7 @@ def _nova_direct_save_mobile_exchange(session_id, user_text, assistant_text, att
 
         messages.append({
             "role": "user",
-            "text": str(user_text or "").strip(),
+            "text": _nova_strip_project_context_from_visible_text(user_text),
             "attachments": attachments or [],
             "created_at": now,
             "meta": {
@@ -2900,7 +2900,7 @@ def _nova_save_mobile_exchange(session_id, user_text, assistant_text, attachment
             target_session_id,
             {
                 "role": "user",
-                "text": str(user_text or "").strip(),
+                "text": _nova_strip_project_context_from_visible_text(user_text),
                 "attachments": attachments or [],
                 "meta": {
                     "route": route
@@ -3273,6 +3273,21 @@ def _nova_plain_attachment_text_summary_20260609(file_name, file_path, content, 
         body.append(f"File path: {path}")
 
     return "\n".join(body).strip()
+
+def _nova_strip_project_context_from_visible_text(text):
+    clean = str(text or "")
+
+    markers = (
+        "\n\nProject-aware context for Nova:",
+        "\nProject-aware context for Nova:",
+        "Project-aware context for Nova:",
+    )
+
+    for marker in markers:
+        if marker in clean:
+            clean = clean.split(marker, 1)[0].strip()
+
+    return clean
 
 def api_chat():
     # NOVA_API_CHAT_IMAGE_VISION_GATE_20260607
@@ -4466,7 +4481,9 @@ def api_chat():
 
         return jsonify(_nova_replace_weak_backend_reply(user_text, result))
 
-    if not session_id:
+    force_new_session = bool(data.get("force_new_session") or data.get("new_session"))
+
+    if not session_id and not force_new_session:
         active = session_service.get_active()
         if active:
             session_id = str(active.get("id") or "").strip()
@@ -8698,7 +8715,6 @@ except Exception as _nova_route_repair_error:
     print(f"[NOVA ROUTE REPAIR FAILED] {_nova_route_repair_error}")
 
 
-
 # ATTACHMENT_EXTRACT_ENDPOINT_LOCK
 @app.route("/api/attachment/extract", methods=["POST"])
 def api_attachment_extract():
@@ -9025,8 +9041,6 @@ def _nova_clean_attachment_endpoint_payload(local_summary: dict, cleaned_text: o
         "preview": preview.strip(),
     }
 
-
-
 @app.route("/api/attachment/summarize", methods=["POST"])
 def api_attachment_summarize():
     """
@@ -9350,7 +9364,6 @@ def _nova_attachment_keypoints_from_text(text, max_points=10):
             break
 
     return points
-
 
 @app.route("/api/attachment/keypoints", methods=["POST"])
 def api_attachment_keypoints():
@@ -10323,7 +10336,6 @@ def _nova_stop_fake_attachment_chat_gate():
         return None
 
 
-
 # NOVA_BACKEND_READINESS_ROUTE_20260609
 # Live local backend readiness endpoint.
 try:
@@ -10341,7 +10353,6 @@ except Exception as _nova_backend_readiness_route_error_20260609:
             "error": "backend_readiness_route_failed",
             "detail": str(_nova_backend_readiness_route_error_20260609),
         }, 500
-
 
 
 # NOVA_MOBILE_DIRECT_SESSION_PERSIST_ENDPOINT_20260609
@@ -11639,7 +11650,6 @@ def _nova_install_attachment_shape_normalizer_20260610():
 _nova_install_attachment_shape_normalizer_20260610()
 
 
-
 # NOVA_HELP_PAGE_ROUTE_20260611
 @app.route("/help")
 def nova_help_page_20260611():
@@ -11787,8 +11797,6 @@ def nova_before_request_explicit_memory_guard_20260611():
         except Exception:
             pass
         return None
-
-
 
 
 # NOVA_BEFORE_REQUEST_FAVORITE_RECALL_GUARD_20260611
@@ -12062,8 +12070,17 @@ def nova_before_request_memory_summary_guard_20260611():
             pass
         return None
 
-
 # NOVA_CHAT_STREAM_REAL_20260613
+
+@app.route("/api/events/stream")
+def stream_events():
+    def event_stream():
+        while True:
+            # keep connection alive
+            yield "data: {}\n\n"
+            time.sleep(15)
+
+    return Response(event_stream(), mimetype="text/event-stream")
 
 @app.route("/api/chat/stream", methods=["POST"])
 def nova_chat_stream():
@@ -12915,9 +12932,11 @@ def nova_api_chat_target_session_append_bridge_20260611(response):
         except Exception:
             existing_blob = str(target_session)
 
+        visible_user_text = _nova_strip_project_context_from_visible_text(user_text)
+
         # Idempotency guard. If a normal route already saved this exact user
         # text into the target session, do not duplicate it.
-        if user_text in existing_blob:
+        if visible_user_text in existing_blob:
             return response
 
         request_meta = {
@@ -12930,7 +12949,7 @@ def nova_api_chat_target_session_append_bridge_20260611(response):
         try:
             session_service.append_message(target_session_id, {
                 "role": "user",
-                "text": user_text,
+                "text": visible_user_text,
                 "attachments": payload.get("attachments") if isinstance(payload.get("attachments"), list) else [],
                 "meta": request_meta,
             })
@@ -13165,7 +13184,21 @@ def nova_final_session_detail_response_cache_20260612(response):
                     },
                 })
 
-            if assistant_text and assistant_text not in json.dumps(messages, ensure_ascii=False):
+            assistant_id = ""
+            if isinstance(assistant_message, dict):
+                assistant_id = str(assistant_message.get("id") or "").strip()
+
+            existing_messages_blob = json.dumps(messages, ensure_ascii=False)
+
+            assistant_already_saved = False
+
+            if assistant_id and assistant_id in existing_messages_blob:
+                assistant_already_saved = True
+
+            if assistant_text and assistant_text in existing_messages_blob:
+                assistant_already_saved = True
+
+            if assistant_text and not assistant_already_saved:
                 saved_assistant = assistant_message if isinstance(assistant_message, dict) else {}
                 saved_assistant = dict(saved_assistant)
                 saved_assistant["role"] = "assistant"
@@ -13178,6 +13211,24 @@ def nova_final_session_detail_response_cache_20260612(response):
                 session_meta["route"] = session_meta.get("route") or "final_session_detail_response_cache"
                 session_meta["session_id"] = session_id
                 messages.append(saved_assistant)
+
+            cleaned_messages = []
+
+            for msg in messages:
+                if not isinstance(msg, dict):
+                    continue
+
+                clean_msg = dict(msg)
+
+                if clean_msg.get("role") == "user":
+                    clean_msg["text"] = _nova_strip_project_context_from_visible_text(
+                        clean_msg.get("text") or clean_msg.get("content") or ""
+                    )
+                    clean_msg["content"] = clean_msg["text"]
+
+                cleaned_messages.append(clean_msg)
+
+            messages = cleaned_messages
 
             session_obj["messages"] = messages
             session_obj["message_count"] = len(messages)
