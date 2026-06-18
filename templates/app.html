@@ -825,7 +825,7 @@ body {
 .nova-auth-widget {
     position: fixed;
     top: 12px;
-    right: 14px;
+    right: 52px;
     z-index: 2147483000;
     display: flex;
     align-items: center;
@@ -1054,16 +1054,21 @@ body {
 }
 
 .desktop-session-item {
-  min-height: 46px !important;
-  flex-shrink: 0 !important;
+    min-height: 46px !important;
+    max-height: 46px !important;
+    flex-shrink: 0 !important;
+    display: grid !important;
+    grid-template-rows: 18px 14px !important;
+    gap: 3px !important;
 }
 
 .desktop-session-title,
 .desktop-session-meta {
-  display: block !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
+    display: block !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    min-width: 0 !important;
 }
 
 </style>
@@ -1230,7 +1235,7 @@ observer.observe(document.documentElement, {
       <div class="composer">
         <input id="desktopFileInput" type="file" hidden />
         <button id="attachBtn" class="attach-button" type="button" aria-label="Attach file">
-  <span class="attach-icon">??</span>
+  <span class="attach-icon">📎</span>
 </button>
         <textarea id="input" placeholder="Message Nova... Enter sends, Shift+Enter makes a new line"></textarea>
         <button id="sendBtn" type="button">Send</button>
@@ -4724,6 +4729,7 @@ if (
       return null;
     }
   }
+
 function renderSession(session) {
   if (!session || !Array.isArray(session.messages)) return;
 
