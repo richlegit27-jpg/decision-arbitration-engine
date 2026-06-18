@@ -54,6 +54,36 @@ def _nova_should_reject_memory_item_20260610(item):
 
     return False
 
+def _nova_memory_semantic_key_20260618(text: str) -> str:
+    import re
+
+    value = str(text or "").strip().lower()
+
+    value = re.sub(r"[^a-z0-9\s]", " ", value)
+    value = re.sub(r"\s+", " ", value).strip()
+
+    replacements = {
+        "my favourite color is": "favorite color",
+        "my favorite color is": "favorite color",
+        "favourite color is": "favorite color",
+        "favorite color is": "favorite color",
+        "fav color is": "favorite color",
+        "fav color": "favorite color",
+        "i like": "likes",
+        "i prefer": "prefers",
+        "richard likes": "likes",
+        "rich likes": "likes",
+    }
+
+    for old, new in replacements.items():
+        value = value.replace(old, new)
+
+    words = [
+        word for word in value.split()
+        if word not in {"my", "the", "a", "an", "is", "are", "to", "that"}
+    ]
+
+    return " ".join(words)
 
 class MemoryService:
     def __init__(self, memory_file: str):
@@ -320,12 +350,15 @@ class MemoryService:
 
         # NOVA_MEMORY_DEDUPE_LOCK_20260618
         normalized_text = str(item.get("text") or "").strip().lower()
+        semantic_text = _nova_memory_semantic_key_20260618(normalized_text)
 
         for i, existing in enumerate(memory):
             existing = dict(existing or {})
             existing_text = str(existing.get("text") or "").strip().lower()
+            existing_semantic_text = _nova_memory_semantic_key_20260618(existing_text)
 
-            if existing_text == normalized_text:
+            if existing_text == normalized_text or existing_semantic_text == semantic_text:
+
                 existing["updated_at"] = now
                 existing["last_seen_at"] = now
                 existing["count"] = int(existing.get("count") or 1) + 1
