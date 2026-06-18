@@ -5971,6 +5971,18 @@ document.addEventListener("click", function (event) {
   padding-left: 10px;
 }
 
+/* FINAL FOOTER ALIGNMENT LOCK */
+.side-footer-links a,
+.side-footer-links button,
+.side-footer-links .footer-mini-button {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+    width: 100% !important;
+    padding-left: 10px !important;
+}
+
 /* NOVA FIX: New Session button text stays readable */
 #newSessionBtn.primary-side-button {
   white-space: nowrap !important;
@@ -5995,6 +6007,27 @@ document.addEventListener("click", function (event) {
     font-size: 12px !important;
     min-width: 88px !important;
   }
+}
+
+/* MEMORY BUTTON HARDLOCK */
+#openMemoryBtn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+    padding-left: 10px !important;
+}
+
+/* FINAL RECENT SESSION CLEANUP */
+.desktop-session-meta {
+    display: none !important;
+}
+
+.desktop-session-item {
+    min-height: 44px !important;
+    max-height: 44px !important;
+    grid-template-rows: 1fr !important;
+    align-items: center !important;
 }
 
 </style>
