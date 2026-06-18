@@ -4102,10 +4102,37 @@ if (not attachments) and (__name__ == "__main__"):
 
         session_id = self._ensure_session_id(session_id)
 
+        memory_written = False
+
         try:
-            self._maybe_write_memory(decision, user_text, session_id)
+            memory_written = self._maybe_write_memory(decision, user_text, session_id)
         except Exception as e:
             exec_debug("FINALIZE_MEMORY_WRITE_ERROR:", e)
+
+        # NOVA_DIRECT_MEMORY_SAVE_RESPONSE_LOCK_20260618
+        if memory_written and self._should_save_memory_text(user_text):
+            memory_text = self._safe_str(user_text).strip()
+
+            assistant_msg = {
+                "role": "assistant",
+                "text": f"Stored memory: {memory_text}.",
+                "content": f"Stored memory: {memory_text}.",
+                "meta": {
+                    "sources": [],
+                    "source_urls": [],
+                },
+            }
+
+            decision["route"] = "memory_save"
+            decision["mode"] = "memory_save"
+            decision["save_memory"] = False
+            decision["use_memory"] = False
+            decision["sources"] = []
+            decision["source_urls"] = []
+
+            self._last_web_source_urls = []
+            self._last_web_sources = []
+
 
         if isinstance(assistant_msg, dict):
             existing_meta = assistant_msg.get("meta")
