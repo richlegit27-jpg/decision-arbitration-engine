@@ -4578,19 +4578,20 @@ const titleHtml = url
     const sessionId = session && (session.id || session.session_id || session.client_session_id);
     const activeId = getActiveSessionId();
 
-    if (
-      sessionId &&
-      activeId &&
-      sessionId === activeId &&
-      Math.abs(existingCount - messages.length) <= 1
-    ) {
-      console.log("[Nova Desktop Rescue] skipped stale direct render", {
-        session_id: sessionId,
-        existing: existingCount,
-        incoming: messages.length
-      });
-      return existingCount;
-    }
+// Skip only stale/non-active session payloads.
+if (
+  sessionId &&
+  activeId &&
+  sessionId !== activeId
+) {
+  console.log("[Nova Desktop Rescue] skipped non-active direct render", {
+    session_id: sessionId,
+    active_id: activeId,
+    existing: existingCount,
+    incoming: messages.length
+  });
+  return existingCount;
+}
 
     if (!messages.length) {
       box.innerHTML = '<div class="session-placeholder">No messages in this session.</div>';
@@ -4625,7 +4626,8 @@ const attachmentHtml = attachments.length
       return [
         '<div class="chat-message message ' + role + '" data-message-id="' + id + '" style="padding:14px;margin:10px 0;border-radius:14px;background:rgba(255,255,255,.06);">',
         '<div style="opacity:.65;font-size:12px;margin-bottom:6px;">' + role + (id ? " · " + id : "") + '</div>',
-'<div style="white-space:pre-wrap;">' + esc(text) + imageHtml + '</div>',
+'<div style="white-space:pre-wrap;">' + text + '</div>',
+imageHtml,
         attachmentHtml,
         sourceCardsHtml(message),
         '</div>'
