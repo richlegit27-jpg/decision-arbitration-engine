@@ -318,6 +318,30 @@ class MemoryService:
         item["created_at"] = item.get("created_at") or now
         item["count"] = int(item.get("count") or 1)
 
+        # NOVA_MEMORY_DEDUPE_LOCK_20260618
+        normalized_text = str(item.get("text") or "").strip().lower()
+
+        for i, existing in enumerate(memory):
+            existing = dict(existing or {})
+            existing_text = str(existing.get("text") or "").strip().lower()
+
+            if existing_text == normalized_text:
+                existing["updated_at"] = now
+                existing["last_seen_at"] = now
+                existing["count"] = int(existing.get("count") or 1) + 1
+
+                if item.get("weight"):
+                    existing["weight"] = max(
+                        float(existing.get("weight") or 1.0),
+                        float(item.get("weight") or 1.0),
+                    )
+
+                memory[i] = existing
+                data["memory"] = memory
+                self._write_store(data)
+                return existing
+
+        memory.append(item)
         memory.append(item)
 
         # 🔥 CLEANUP WEAK MEMORY
