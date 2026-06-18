@@ -2255,18 +2255,6 @@ if (typeof loadDesktopSessions === "function") {
       }, 250);
     }
 
-    if (typeof window.NovaLoadMemory === "function") {
-      setTimeout(() => {
-        window.NovaLoadMemory();
-      }, 250);
-    }
-
-    if (typeof window.NovaLoadMemory === "function") {
-      setTimeout(() => {
-        window.NovaLoadMemory();
-      }, 250);
-    }
-
   } catch (e) {
     console.warn("sendText error:", e);
     assistantNode.textContent = "Error generating response";
