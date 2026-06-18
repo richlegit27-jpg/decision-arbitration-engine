@@ -4724,29 +4724,33 @@ if (
       return null;
     }
   }
+function renderSession(session) {
+  if (!session || !Array.isArray(session.messages)) return;
 
-  function renderSession(session) {
-    if (!session || !Array.isArray(session.messages)) return;
+  console.log("[Nova RenderSession] rendering", session.id);
 
-    try {
-      if (typeof window.renderDesktopChatMessagesRescue === "function") {
-        window.renderDesktopChatMessagesRescue(session.messages);
-        return;
-      }
-    } catch (err) {
-      console.warn("[Nova Desktop Active Session Recovery] rescue render failed", err);
+  try {
+    // PRIMARY renderer FIRST
+    if (typeof window.renderDesktopChatMessages === "function") {
+      window.renderDesktopChatMessages(session.messages);
+      return;
     }
-
-    try {
-      if (typeof window.renderDesktopChatMessages === "function") {
-        window.renderDesktopChatMessages(session.messages);
-        return;
-      }
-    } catch (err2) {
-      console.warn("[Nova Desktop Active Session Recovery] desktop render failed", err2);
-    }
+  } catch (err) {
+    console.warn("[Nova RenderSession] primary render failed", err);
   }
 
+  try {
+    // RESCUE renderer ONLY if primary fails
+    if (typeof window.renderDesktopChatMessagesRescue === "function") {
+      window.renderDesktopChatMessagesRescue(session.messages);
+      return;
+    }
+  } catch (err) {
+    console.warn("[Nova RenderSession] rescue render failed", err);
+  }
+
+  console.warn("[Nova RenderSession] all renderers failed");
+}
 
 function startSSE() {
   const source = new EventSource("/api/events/stream");
