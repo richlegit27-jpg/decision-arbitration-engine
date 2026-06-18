@@ -1,4 +1,4 @@
-﻿<!-- NOVA_DESKTOP_APP_UI_V1_20260610 -->
+<!-- NOVA_DESKTOP_APP_UI_V1_20260610 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -1237,7 +1237,7 @@ observer.observe(document.documentElement, {
       <div class="composer">
         <input id="desktopFileInput" type="file" hidden />
         <button id="attachBtn" class="attach-button" type="button" aria-label="Attach file">
-  <span class="attach-icon">📎</span>
+  <span class="attach-icon">??</span>
 </button>
         <textarea id="input" placeholder="Message Nova... Enter sends, Shift+Enter makes a new line"></textarea>
         <button id="sendBtn" type="button">Send</button>
@@ -3451,7 +3451,7 @@ fetch("/api/memory", { cache: "no-store" })
         '<br>',
         '<span>Overall backend readiness: ' + String(overall ?? 0) + '%</span>',
         '<br>',
-        '<span>Planner: ' + String(payload.planner_percent ?? 0) + '% Â· Memory: ' + String(payload.memory_percent ?? 0) + '% Â· Sessions: ' + String(payload.session_percent ?? 0) + '%</span>'
+        '<span>Planner: ' + String(payload.planner_percent ?? 0) + '% · Memory: ' + String(payload.memory_percent ?? 0) + '% · Sessions: ' + String(payload.session_percent ?? 0) + '%</span>'
       ].join("");
     }
   }
@@ -4624,7 +4624,7 @@ const attachmentHtml = attachments.length
 
       return [
         '<div class="chat-message message ' + role + '" data-message-id="' + id + '" style="padding:14px;margin:10px 0;border-radius:14px;background:rgba(255,255,255,.06);">',
-        '<div style="opacity:.65;font-size:12px;margin-bottom:6px;">' + role + (id ? " Â· " + id : "") + '</div>',
+        '<div style="opacity:.65;font-size:12px;margin-bottom:6px;">' + role + (id ? " · " + id : "") + '</div>',
 '<div style="white-space:pre-wrap;">' + esc(text) + imageHtml + '</div>',
         attachmentHtml,
         sourceCardsHtml(message),
@@ -5049,7 +5049,7 @@ window.NovaDesktopFetchSession = fetchSession;
 
       card.innerHTML =
         '<div style="font-size:12px;opacity:.72;margin-bottom:3px;">Source' +
-        (host ? " · " + escapeText(host) : "") +
+        (host ? " � " + escapeText(host) : "") +
         '</div>' +
         '<div style="font-size:14px;font-weight:650;line-height:1.25;">' +
         escapeText(title) +
@@ -5783,9 +5783,6 @@ document.addEventListener("nova:message:rendered", renderForcedSourceCards);
       console.log("[NOVA] memory clicked");
     });
 
-    bindOnce(sessionsBtn, "click", () => {
-      console.log("[NOVA] sessions clicked");
-    });
   }
 
   // =========================
@@ -6197,3 +6194,4 @@ async function loadDesktopArtifacts() {
 <script src="/static/js/nova-desktop-sessions.js?v=external-new-session-1"></script>
 </body>
 </html>
+
