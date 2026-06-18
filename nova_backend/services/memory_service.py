@@ -48,6 +48,24 @@ def _nova_should_reject_memory_item_20260610(item):
         return True
 
     lowered = value.lower()
+    question_starters = (
+        "what is ",
+        "what's ",
+        "whats ",
+        "who is ",
+        "where is ",
+        "when is ",
+        "why is ",
+        "how is ",
+        "how do ",
+        "do i ",
+        "did i ",
+        "can you ",
+        "tell me ",
+    )
+
+    if lowered.endswith("?") or lowered.startswith(question_starters):
+        return True
     transcript_markers = lowered.count("- [user]") + lowered.count("- [assistant]") + lowered.count("[note]")
     if transcript_markers >= 2:
         return True
@@ -520,6 +538,25 @@ class MemoryService:
 
         for item in items:
             text = str(item.get("text") or "").lower()
+            question_starters = (
+                "what is ",
+                "what's ",
+                "whats ",
+                "who is ",
+                "where is ",
+                "when is ",
+                "why is ",
+                "how is ",
+                "how do ",
+                "do i ",
+                "did i ",
+                "can you ",
+                "tell me ",
+            )
+
+            if text.endswith("?") or text.startswith(question_starters):
+                removed.append(item)
+                continue
 
             if any(pattern in text for pattern in junk_patterns):
                 removed.append(item)
