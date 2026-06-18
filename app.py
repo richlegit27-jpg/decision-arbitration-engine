@@ -3951,7 +3951,7 @@ def api_chat():
                     "Inspect the mobile UI file and identify the broken layout target",
                     "Patch the smallest CSS or JS issue without touching stable backend logic",
                     "Verify mobile layout, composer buttons, and session behavior",
-                ]10:49 PM 2026-06-17
+                ]
             elif "web" in _nova_goal_lower or "fetch" in _nova_goal_lower or "search" in _nova_goal_lower:
                 _nova_exec_steps = [
                     "Inspect the web fetch route, ranking path, and displayed source output",
