@@ -4152,7 +4152,22 @@ if (not attachments) and (__name__ == "__main__"):
             exec_debug("FINALIZE_MEMORY_WRITE_ERROR:", e)
 
         # NOVA_DIRECT_MEMORY_SAVE_RESPONSE_LOCK_20260618
-        if memory_written and self._should_save_memory_text(clean_memory_user_text):
+        clean_memory_lc = " ".join(clean_memory_user_text.lower().split())
+        memory_recall_or_forget = clean_memory_lc.startswith((
+            "what is ",
+            "what's ",
+            "whats ",
+            "do you remember ",
+            "forget ",
+            "delete ",
+            "remove ",
+        ))
+
+        if (
+            memory_written
+            and not memory_recall_or_forget
+            and self._should_save_memory_text(clean_memory_user_text)
+        ):
             memory_text = clean_memory_user_text
 
             assistant_msg = {
