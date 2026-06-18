@@ -2603,7 +2603,7 @@ def _nova_casual_chat_guard():
         payload = request.get_json(silent=True) or {}
         user_text = str(payload.get("user_text") or "").strip()
         # NOVA_AUTO_PLAN_EXECUTION_START_GUARD_20260607
-        auto_plan_execution_result = _nova_try_auto_plan_execution_start_20260607(session_id, user_text)
+        auto_plan_execution_result = None
         if auto_plan_execution_result is not None:
             return jsonify(auto_plan_execution_result)
         # NOVA_EXECUTION_STATUS_GUARD_20260607
@@ -2611,7 +2611,7 @@ def _nova_casual_chat_guard():
         if execution_status_result is not None:
             return jsonify(execution_status_result)
         # NOVA_EXECUTION_AUTOPLAN_START_GUARD_20260607
-        execution_start_result = _nova_try_execution_autoplan_start_20260607(session_id, user_text)
+        execution_start_result = None
         if execution_start_result is not None:
             return jsonify(execution_start_result)
         # NOVA_EXECUTION_TRIGGER_GUARD_20260607
@@ -3922,9 +3922,19 @@ def api_chat():
                 "skip_post_processing": True,
                 "skip_rewrite": True,
             })
+
+        print("DEBUG GOAL:", _nova_exec_user_text)
+        print("DEBUG CLEAN:", _nova_exec_clean)
+
         if _nova_exec_clean.startswith("auto-plan "):
-            _nova_exec_goal = _nova_exec_user_text[len("auto-plan "):].strip() or "Untitled execution mission"
+            _nova_exec_goal = (
+                _nova_exec_user_text[len("auto-plan "):].strip()
+                or "Untitled execution mission"
+            )
+
             _nova_goal_lower = _nova_exec_goal.lower()
+
+            print("DEBUG LOWER:", _nova_goal_lower)
 
             if "attachment" in _nova_goal_lower or "upload" in _nova_goal_lower or "preview" in _nova_goal_lower:
                 _nova_exec_steps = [
@@ -3932,7 +3942,11 @@ def api_chat():
                     "Patch the smallest broken link between upload capture and preview rendering",
                     "Test upload preview, send payload, and attachment summary behavior",
                 ]
-            elif "mobile" in _nova_goal_lower or "ui" in _nova_goal_lower or "css" in _nova_goal_lower:
+            elif (
+                "mobile" in _nova_goal_lower
+                or " css" in _nova_goal_lower
+                or " ui " in f" {_nova_goal_lower} "
+            ):
                 _nova_exec_steps = [
                     "Inspect the mobile UI file and identify the broken layout target",
                     "Patch the smallest CSS or JS issue without touching stable backend logic",
@@ -4035,10 +4049,7 @@ def api_chat():
             or "default"
         ).strip() or "default"
 
-        _nova_early_auto_plan_result = _nova_try_auto_plan_execution_start_20260607(
-            _nova_early_session_id,
-            _nova_early_user_text,
-        )
+        _nova_early_auto_plan_result = None
 
         if _nova_early_auto_plan_result is not None:
             return jsonify(_nova_early_auto_plan_result)
