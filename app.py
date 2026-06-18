@@ -3951,7 +3951,7 @@ def api_chat():
                     "Inspect the mobile UI file and identify the broken layout target",
                     "Patch the smallest CSS or JS issue without touching stable backend logic",
                     "Verify mobile layout, composer buttons, and session behavior",
-                ]
+                ]10:49 PM 2026-06-17
             elif "web" in _nova_goal_lower or "fetch" in _nova_goal_lower or "search" in _nova_goal_lower:
                 _nova_exec_steps = [
                     "Inspect the web fetch route, ranking path, and displayed source output",
@@ -5715,7 +5715,7 @@ def api_chat():
                 memory_service.add_memory({
                     "text": _nova_explicit_memory_text,
                     "kind": _nova_api_chat_memory_kind_live_20260611(_nova_explicit_memory_text),
-                    "source": "explicit_memory_command_clean",
+                    "source": "app_explicit_memory_command",
                     "session_id": session_id or "",
                 })
 
@@ -11741,7 +11741,7 @@ def nova_before_request_explicit_memory_guard_20260611():
         memory_service.add_memory({
             "text": clean,
             "kind": kind,
-            "source": "explicit_memory_command_clean",
+            "source": "app_explicit_memory_command",
             "session_id": session_id,
         })
 
