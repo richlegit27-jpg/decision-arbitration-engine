@@ -4105,13 +4105,29 @@ if (not attachments) and (__name__ == "__main__"):
         memory_written = False
 
         try:
-            memory_written = self._maybe_write_memory(decision, user_text, session_id)
+            memory_written = self._maybe_write_memory(
+                decision,
+                user_text,
+                session_id,
+            )
         except Exception as e:
             exec_debug("FINALIZE_MEMORY_WRITE_ERROR:", e)
 
         # NOVA_DIRECT_MEMORY_SAVE_RESPONSE_LOCK_20260618
         if memory_written and self._should_save_memory_text(user_text):
-            memory_text = self._safe_str(user_text).strip()
+            memory_text = self._safe_str(
+                locals().get("original_user_text") or user_text
+            ).strip()
+
+            for marker in (
+                "Project-aware context for Nova:",
+                "Relevant persistent memory:",
+                "Recent session context:",
+                "[RECENT SESSION CONTEXT]",
+                "[RANKED MEMORY + WORKING STATE]",
+            ):
+                if marker in memory_text:
+                    memory_text = memory_text.split(marker, 1)[0].strip()
 
             assistant_msg = {
                 "role": "assistant",

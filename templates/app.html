@@ -586,15 +586,15 @@
       color: var(--text);
       border-color: rgba(167,139,250,.65);
     }
-    @media (max-width: 1100px) {
-      .shell {
-        grid-template-columns: 260px minmax(0, 1fr);
-      }
+@media (max-width: 1100px) {
+  .shell {
+    grid-template-columns: 260px minmax(0, 1fr) 320px;
+  }
 
-      .tools {
-        display: none;
-      }
-    }
+  .tools {
+    display: flex !important;
+  }
+}
 
     @media (max-width: 760px) {
       html,
@@ -1210,12 +1210,11 @@ observer.observe(document.documentElement, {
         </div>
       </section>
 
-      <div class="side-footer-links">
-        <a href="/">Home</a>
-        <a href="/mobile">Mobile</a>
-        <button class="footer-mini-button" id="openMemoryBtn" type="button">Memory</button>
-        <button class="footer-mini-button" id="openArtifactsBtn" type="button">Artifacts</button>
-      </div>
+<div class="side-footer-links">
+  <a href="/">Home</a>
+  <a href="/mobile">Mobile</a>
+<button class="footer-mini-button" id="openArtifactsBtn" type="button">Artifacts</button>
+</div>
     </aside>
 
     <main class="panel chat-panel">
@@ -1271,18 +1270,18 @@ observer.observe(document.documentElement, {
         </div>
       </section>
 
-      <section class="tools-section memory-section">
-        <h3>Memory</h3>
-        <div class="memory-card-shell">
-          <div class="metric">
-            <span>Memory</span>
-            <strong id="desktopMemoryCount">loading</strong>
-          </div>
-          <div id="desktopMemoryList" class="desktop-memory-list">
-            <div class="execution-note">Loading memory...</div>
-          </div>
-        </div>
-      </section>
+<section class="tools-section memory-section">
+  <h3>Memory</h3>
+  <div class="memory-card-shell">
+    <div class="metric">
+      <span>Memory</span>
+      <strong id="desktopMemoryCount">loading</strong>
+    </div>
+    <div id="desktopMemoryList" class="desktop-memory-list">
+      <div class="execution-note">Loading memory...</div>
+    </div>
+  </div>
+</section>
 
 <section class="tools-section artifacts-section">
   <h3>Artifacts</h3>
@@ -1296,10 +1295,6 @@ observer.observe(document.documentElement, {
     <div id="desktopArtifactList" class="desktop-memory-list">
       <div class="execution-note">Click Artifacts to load.</div>
     </div>
-
-<h3>Artifacts</h3>
-<count>
-<artifact list>
   </div>
 </section>
 
@@ -3300,9 +3295,10 @@ try {
 
     setVisible();
 
-    if (metric) {
-      metric.textContent = String(items.length);
-    }
+var countEl = document.getElementById("desktopMemoryCount");
+if (countEl) {
+  countEl.textContent = String(items.length);
+}
 
     if (!list) {
       console.warn("[Nova Desktop Memory Final Renderer] #desktopMemoryList not found");
@@ -3520,33 +3516,103 @@ fetch("/api/backend/readiness", { cache: "no-store" })
     return [];
   }
 
-  function render(payload) {
-    var box = list();
-    var countBox = metric();
-    if (!box) return;
+function render(payload) {
+  var box = list();
+  var countEl = document.getElementById("desktopMemoryCount");
+  if (!box) return;
 
-    var items = normalize(payload);
+  var rawItems = normalize(payload);
 
-    if (countBox) countBox.textContent = String(items.length);
+  if (countEl) countEl.textContent = String(rawItems.length);
 
-    box.innerHTML = "";
-
-    if (!items.length) {
-      var empty = document.createElement("div");
-      empty.className = "session-placeholder";
-      empty.innerHTML = "<strong>No memory items yet.</strong><br><span>Saved facts, preferences, and project notes will show here.</span>";
-      box.appendChild(empty);
-      return;
-    }
-
-    items.forEach(function (item) {
-      var row = document.createElement("div");
-      row.className = "memory-item";
-      row.style.cssText = "padding:10px 12px;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-bottom:10px;white-space:pre-wrap;word-break:break-word;";
-      row.textContent = String(item.text || item.content || item.value || item.memory || JSON.stringify(item));
-      box.appendChild(row);
-    });
+  function itemText(item) {
+    return String(
+      item.text ||
+      item.content ||
+      item.value ||
+      item.memory ||
+      item.summary ||
+      item.note ||
+      JSON.stringify(item)
+    );
   }
+
+  function itemType(item, text) {
+    return String(
+      item.type ||
+      item.kind ||
+      item.category ||
+      item.tag ||
+      ""
+    ).toLowerCase() || text.toLowerCase();
+  }
+
+  function priority(item) {
+    var text = itemText(item).toLowerCase();
+    var type = itemType(item, text);
+
+    if (item.pinned || text.includes("[pinned]")) return 1000;
+    if (type.includes("project_state") || text.includes("current task") || text.includes("blocker") || text.includes("active file") || text.includes("last checkpoint")) return 900;
+    if (type.includes("project_focus") || text.includes("current project focus")) return 850;
+    if (type.includes("preference") || text.includes("[preference]")) return 700;
+    if (type.includes("project")) return 650;
+
+    return 100;
+  }
+
+  function cleanText(text) {
+    return String(text || "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+      .slice(0, 360);
+  }
+
+  var seen = {};
+  var items = rawItems
+    .filter(function (item) {
+      var key = cleanText(itemText(item)).toLowerCase();
+      if (!key || seen[key]) return false;
+      seen[key] = true;
+      return true;
+    })
+    .sort(function (a, b) {
+      return priority(b) - priority(a);
+    });
+
+  box.innerHTML = "";
+
+  if (!items.length) {
+    var empty = document.createElement("div");
+    empty.className = "session-placeholder";
+    empty.innerHTML = "<strong>No memory items yet.</strong><br><span>Saved facts, preferences, and project notes will show here.</span>";
+    box.appendChild(empty);
+    return;
+  }
+
+  items.slice(0, 40).forEach(function (item) {
+    var text = cleanText(itemText(item));
+    var type = itemType(item, text);
+
+    var row = document.createElement("div");
+    row.className = "memory-item";
+    row.style.cssText = "padding:10px 12px;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-bottom:10px;white-space:pre-wrap;word-break:break-word;";
+
+    var label = document.createElement("div");
+    label.style.cssText = "font-size:11px;opacity:.7;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;";
+    label.textContent =
+      priority(item) >= 900 ? "PROJECT STATE" :
+      priority(item) >= 850 ? "PROJECT FOCUS" :
+      priority(item) >= 700 ? "PREFERENCE" :
+      type ? type.slice(0, 32) : "MEMORY";
+
+    var body = document.createElement("div");
+    body.textContent = text;
+
+    row.appendChild(label);
+    row.appendChild(body);
+    box.appendChild(row);
+  });
+}
 
   function load() {
     fetch("/api/memory", { cache: "no-store" })
@@ -5041,13 +5107,21 @@ if (!assistantMessages.length) {
       var cards = makeCards(msg);
       if (!cards) return;
 
-      var target = assistantNodes[index] || assistantNodes[assistantNodes.length - 1] || fallbackContainer();
+var target = assistantNodes[index];
 
-      if (target && target !== document.body && target.appendChild) {
-        target.appendChild(cards);
-      } else {
-        fallbackContainer().appendChild(cards);
-      }
+if (!target || target === document.body || !target.appendChild) {
+  return;
+}
+
+if (target.closest && target.closest(".memory-section")) {
+  return;
+}
+
+if (target.querySelector("[data-nova-forced-source-cards='true']")) {
+  return;
+}
+
+target.appendChild(cards);
 
       rendered += 1;
     });
@@ -5815,7 +5889,14 @@ async function loadDesktopArtifacts() {
   const box = $("desktopArtifactList");
   const count = $("desktopArtifactCount");
 
-  if (box) box.textContent = "Loading...";
+  console.log("[Nova Desktop Artifacts] load start", { box, count });
+
+  if (!box) {
+    console.error("[Nova Desktop Artifacts] missing #desktopArtifactList");
+    return;
+  }
+
+  box.innerHTML = "<div class='execution-note'>Loading artifacts...</div>";
 
   try {
     const res = await fetch("/api/artifacts", { cache: "no-store" });
@@ -5829,49 +5910,71 @@ async function loadDesktopArtifacts() {
       data.payload?.items ||
       [];
 
-    if (count) count.textContent = artifacts.length;
-    if (!box) return;
+    console.log("[Nova Desktop Artifacts] loaded", artifacts.length, artifacts);
+
+    if (count) count.textContent = String(artifacts.length);
+
+    box.innerHTML = "";
 
     if (!artifacts.length) {
-      box.innerHTML = "<div>No artifacts yet.</div>";
+      box.innerHTML = "<div class='execution-note'>No artifacts yet.</div>";
       return;
     }
 
-    box.innerHTML = artifacts.slice(0, 30).map(function (a) {
+    artifacts.slice(0, 30).forEach(function (a) {
       const imageUrl = a.image_url || a.preview || (a.viewer && a.viewer.image_url) || "";
       const title = a.title || "Artifact";
       const kind = a.kind || a.type || "";
-      const summary = a.summary || a.body || a.prompt || "";
-      const id = a.id || "";
+      const summary = String(a.summary || a.body || a.prompt || "").slice(0, 180);
 
-      return `
-        <div class="memory-item" data-artifact-id="${id}" style="cursor:pointer;padding:10px 12px;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-bottom:10px;overflow:hidden;">
-          ${imageUrl ? `<img src="${imageUrl}" style="width:100%;max-height:none;object-fit:contain;border-radius:10px;margin-bottom:8px;">` : ""}
-          <div><strong>${title}</strong></div>
-          <div style="font-size:11px;opacity:.7;">${kind}</div>
-          <div style="font-size:12px;opacity:.82;margin-top:6px;">${String(summary).slice(0, 180)}</div>
-        </div>
-      `;
-    }).join("");
+      const card = document.createElement("div");
+      card.className = "memory-item";
+      card.style.cursor = "pointer";
+      card.style.padding = "10px 12px";
+      card.style.border = "1px solid rgba(255,255,255,.12)";
+      card.style.borderRadius = "12px";
+      card.style.marginBottom = "10px";
+      card.style.overflow = "hidden";
+
+      if (imageUrl) {
+        const img = document.createElement("img");
+        img.src = imageUrl;
+        img.style.width = "100%";
+        img.style.objectFit = "contain";
+        img.style.borderRadius = "10px";
+        img.style.marginBottom = "8px";
+        card.appendChild(img);
+      }
+
+      const titleEl = document.createElement("div");
+      titleEl.innerHTML = "<strong></strong>";
+      titleEl.querySelector("strong").textContent = title;
+      card.appendChild(titleEl);
+
+      const kindEl = document.createElement("div");
+      kindEl.style.fontSize = "11px";
+      kindEl.style.opacity = ".7";
+      kindEl.textContent = kind;
+      card.appendChild(kindEl);
+
+      const summaryEl = document.createElement("div");
+      summaryEl.style.fontSize = "12px";
+      summaryEl.style.opacity = ".82";
+      summaryEl.style.marginTop = "6px";
+      summaryEl.textContent = summary;
+      card.appendChild(summaryEl);
+
+      box.appendChild(card);
+    });
 
   } catch (e) {
-    console.warn("[Nova Desktop Artifacts] failed", e);
-    if (box) box.innerHTML = "<div>Failed to load artifacts.</div>";
+    console.error("[Nova Desktop Artifacts] failed", e);
+    box.innerHTML =
+      "<pre style='white-space:pre-wrap;color:#ff8080;'>" +
+      String(e && e.stack ? e.stack : e) +
+      "</pre>";
   }
 }
-
-document.addEventListener("click", function (event) {
-  const card = event.target.closest("[data-artifact-id]");
-  if (!card) return;
-
-  event.preventDefault();
-  event.stopPropagation();
-
-  const id = card.getAttribute("data-artifact-id");
-  if (id) {
-    window.open("/api/artifacts/" + encodeURIComponent(id), "_blank");
-  }
-}, true);
 
   function wireDesktopArtifacts() {
     const btn = $("openArtifactsBtn");
@@ -6009,15 +6112,6 @@ document.addEventListener("click", function (event) {
   }
 }
 
-/* MEMORY BUTTON HARDLOCK */
-#openMemoryBtn {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
-    text-align: left !important;
-    padding-left: 10px !important;
-}
-
 /* FINAL RECENT SESSION CLEANUP */
 .desktop-session-meta {
     display: none !important;
@@ -6030,8 +6124,70 @@ document.addEventListener("click", function (event) {
     align-items: center !important;
 }
 
+.memory-load-button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 10px;
+    margin: 8px 0 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,.14);
+    background: rgba(255,255,255,.06);
+    color: inherit;
+    cursor: pointer;
+}
+
+/* =========================
+   NOVA RIGHT PANEL FIX (SMFF)
+   ========================= */
+
+/* FINAL RIGHT PANEL HARD SWITCH */
+
+#openMemoryBtn.memory-load-button {
+    position: static !important;
+    z-index: auto !important;
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    padding: 8px 10px !important;
+    margin: 8px 0 12px !important;
+}
+
 </style>
+
+<script>
+(function () {
+    document.addEventListener("click", function (event) {
+        const btn = event.target.closest("#openArtifactsBtn");
+        if (!btn) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        console.log("[Nova Artifacts Force Click] clicked");
+
+        const tools = document.querySelector(".tools");
+        if (tools) {
+        }
+
+        if (typeof window.NovaLoadDesktopArtifacts === "function") {
+            window.NovaLoadDesktopArtifacts();
+        }
+
+        const section = document.querySelector(".artifacts-section");
+        if (section) {
+            section.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+
+        return false;
+    }, true);
+})();
+</script>
+
 <script src="/static/js/nova-desktop-sessions.js?v=external-new-session-1"></script>
 </body>
 </html>
-
