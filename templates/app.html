@@ -1,4 +1,4 @@
-<!-- NOVA_DESKTOP_APP_UI_V1_20260610 -->
+﻿<!-- NOVA_DESKTOP_APP_UI_V1_20260610 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -1237,7 +1237,7 @@ observer.observe(document.documentElement, {
       <div class="composer">
         <input id="desktopFileInput" type="file" hidden />
         <button id="attachBtn" class="attach-button" type="button" aria-label="Attach file">
-  <span class="attach-icon">??</span>
+  <span class="attach-icon">&#128206;</span>
 </button>
         <textarea id="input" placeholder="Message Nova... Enter sends, Shift+Enter makes a new line"></textarea>
         <button id="sendBtn" type="button">Send</button>
@@ -1936,11 +1936,11 @@ function showDesktopAttachmentChip(text) {
       event.preventDefault();
       event.stopPropagation();
       clearDesktopAttachments();
-      console.log("?? ATTACHMENT REMOVED");
+      console.log("&#128206; ATTACHMENT REMOVED");
     };
   }
 
-  console.log("?? CHIP SHOWN", chip);
+  console.log("&#128206; CHIP SHOWN", chip);
 }
 
 function clearDesktopAttachments() {
@@ -2014,10 +2014,10 @@ const attachment = normalizeUploadedAttachment
       file_url: data.file_url || data.url
     };
 
-console.log("?? NORMALIZED ATTACHMENT", attachment);
+console.log("&#128206; NORMALIZED ATTACHMENT", attachment);
   pendingDesktopAttachments = pendingDesktopAttachments || [];
 pendingDesktopAttachments.push(attachment);
-console.log("?? ATTACHMENT STORED", pendingDesktopAttachments);
+console.log("&#128206; ATTACHMENT STORED", pendingDesktopAttachments);
 
   showDesktopAttachmentChip(
     "Attached: <strong>" + (file.name || "file") + "</strong>"
@@ -2168,7 +2168,7 @@ function showThinking(node) {
 }
 
 async function sendText(textOverride) {
-  console.log("?? sendText TRIGGERED");
+  console.log("&#128206; sendText TRIGGERED");
 
   const liveInput = document.getElementById("input") || document.querySelector("textarea");
   const capturedText = window.__novaLastInputBeforeSend || "";
@@ -2179,7 +2179,7 @@ async function sendText(textOverride) {
   const attachments = pendingDesktopAttachments.slice();
   const text = clarifyAttachmentPrompt(rawText, attachments);
 
-  console.log("?? SEND SNAPSHOT", { rawText, text, attachments });
+  console.log("&#128206; SEND SNAPSHOT", { rawText, text, attachments });
 
   if (!text && !attachments.length) return;
 
@@ -2193,7 +2193,7 @@ async function sendText(textOverride) {
   const assistantNode = addMsg("assistant", "");
 
   try {
-    console.log("?? CHAT REQUEST START", { text, attachments });
+    console.log("&#128206; CHAT REQUEST START", { text, attachments });
 
 const forcingNewSession = window.NOVA_FORCE_NEW_SESSION_ON_NEXT_SEND === true;
 
@@ -2465,7 +2465,7 @@ if (sendBtn && input) {
   sendBtn.addEventListener("mousedown", () => {
     const liveInput = document.getElementById("input") || document.querySelector("textarea");
     window.__novaLastInputBeforeSend = liveInput ? liveInput.value : "";
-    console.log("?? CAPTURE BEFORE CLICK", window.__novaLastInputBeforeSend);
+    console.log("&#128206; CAPTURE BEFORE CLICK", window.__novaLastInputBeforeSend);
   }, true);
 
   sendBtn.addEventListener("click", () => handleSendClick());
@@ -5049,7 +5049,7 @@ window.NovaDesktopFetchSession = fetchSession;
 
       card.innerHTML =
         '<div style="font-size:12px;opacity:.72;margin-bottom:3px;">Source' +
-        (host ? " � " + escapeText(host) : "") +
+        (host ? " · " + escapeText(host) : "") +
         '</div>' +
         '<div style="font-size:14px;font-weight:650;line-height:1.25;">' +
         escapeText(title) +
@@ -5940,12 +5940,23 @@ async function loadDesktopArtifacts() {
       card.style.overflow = "hidden";
 
       if (imageUrl) {
+        card.addEventListener("click", function () {
+          window.open(imageUrl, "_blank", "noopener,noreferrer");
+        });
+
         const img = document.createElement("img");
         img.src = imageUrl;
         img.style.width = "100%";
         img.style.objectFit = "contain";
         img.style.borderRadius = "10px";
         img.style.marginBottom = "8px";
+        img.style.cursor = "zoom-in";
+        img.title = "Open full image";
+        img.addEventListener("click", function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          window.open(imageUrl, "_blank", "noopener,noreferrer");
+        });
         card.appendChild(img);
       }
 
