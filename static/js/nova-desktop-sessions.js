@@ -135,7 +135,7 @@ btn.onclick = () => {
   openSession(sid);
 };
 
-    list.appendChild(btn);
+list.appendChild(btn);
   });
 
   console.log("[Nova Sessions External] rendered", sessions.length);
@@ -179,9 +179,10 @@ async function newSessionExternal() {
   } catch (error) {
     console.warn("[Nova Desktop Sessions External] new session failed", error);
     window.setStatus?.("new session failed");
+  }
+}
 
-
-  function wireButtons() {
+function wireButtons() {
     const sessionsBtn =
       $("desktopSessionsButton") ||
       $("openSessionsBtn") ||
