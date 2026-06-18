@@ -342,7 +342,6 @@ class MemoryService:
                 return existing
 
         memory.append(item)
-        memory.append(item)
 
         # 🔥 CLEANUP WEAK MEMORY
         memory = [
@@ -350,12 +349,25 @@ class MemoryService:
             if float(m.get("weight", 1.0)) > 0.5
         ]
 
-        MAX_MEMORY_ITEMS = 100
+        MAX_MEMORY_ITEMS = 300
         memory = self.summarize_memory_list(memory)
-        memory = memory[-MAX_MEMORY_ITEMS:]
+
+        memory.sort(
+            key=lambda m: (
+                bool(m.get("pinned")),
+                float(m.get("weight") or 1.0),
+                int(m.get("count") or 1),
+                str(m.get("updated_at") or ""),
+            ),
+            reverse=True,
+        )
+
+        memory = memory[:MAX_MEMORY_ITEMS]
 
         data["memory"] = memory
         self._write_store(data)
+
+        return item
 
     def save_memory(self, item: Dict[str, Any]) -> Dict[str, Any]:
         data = self._read_store()
@@ -388,8 +400,19 @@ class MemoryService:
         if not replaced:
             memory.append(item)
 
-        MAX_MEMORY_ITEMS = 100
-        memory = memory[-MAX_MEMORY_ITEMS:]
+        MAX_MEMORY_ITEMS = 300
+
+        memory.sort(
+            key=lambda m: (
+                bool(m.get("pinned")),
+                float(m.get("weight") or 1.0),
+                int(m.get("count") or 1),
+                str(m.get("updated_at") or ""),
+            ),
+            reverse=True,
+        )
+
+        memory = memory[:MAX_MEMORY_ITEMS]
 
         data["memory"] = memory
         self._write_store(data)
