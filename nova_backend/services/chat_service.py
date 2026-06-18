@@ -1718,12 +1718,34 @@ Current step:
             return False
 
         if not self._should_save_memory_text(text):
+            exec_debug("MEMORY_REJECTED_TEXT =", text)
             return False
+
+        memory_kind = "user_fact"
+
+        if any(
+            marker in text.lower()
+            for marker in (
+                "favorite color",
+                "favourite color",
+                "favorite movie",
+                "favourite movie",
+                "favorite drink",
+                "favourite drink",
+                "favorite animal",
+                "favourite animal",
+                "i prefer",
+                "call me",
+                "my name is",
+            )
+        ):
+            memory_kind = "preference"
 
         payload = {
             "text": text,
-            "kind": "user_fact",
+            "kind": memory_kind,
             "session_id": session_id,
+            "source": "chat_service_memory_save",
         }
 
         for method_name in (
@@ -4104,30 +4126,34 @@ if (not attachments) and (__name__ == "__main__"):
 
         memory_written = False
 
+        clean_memory_user_text = self._safe_str(
+            locals().get("original_user_text") or user_text
+        ).strip()
+
+        for marker in (
+            "Project-aware context for Nova:",
+            "Relevant persistent memory:",
+            "Recent session context:",
+            "[RECENT SESSION CONTEXT]",
+            "[RANKED MEMORY + WORKING STATE]",
+        ):
+            if marker in clean_memory_user_text:
+                clean_memory_user_text = (
+                    clean_memory_user_text.split(marker, 1)[0].strip()
+                )
+
         try:
             memory_written = self._maybe_write_memory(
                 decision,
-                user_text,
+                clean_memory_user_text,
                 session_id,
             )
         except Exception as e:
             exec_debug("FINALIZE_MEMORY_WRITE_ERROR:", e)
 
         # NOVA_DIRECT_MEMORY_SAVE_RESPONSE_LOCK_20260618
-        if memory_written and self._should_save_memory_text(user_text):
-            memory_text = self._safe_str(
-                locals().get("original_user_text") or user_text
-            ).strip()
-
-            for marker in (
-                "Project-aware context for Nova:",
-                "Relevant persistent memory:",
-                "Recent session context:",
-                "[RECENT SESSION CONTEXT]",
-                "[RANKED MEMORY + WORKING STATE]",
-            ):
-                if marker in memory_text:
-                    memory_text = memory_text.split(marker, 1)[0].strip()
+        if memory_written and self._should_save_memory_text(clean_memory_user_text):
+            memory_text = clean_memory_user_text
 
             assistant_msg = {
                 "role": "assistant",
@@ -4148,7 +4174,6 @@ if (not attachments) and (__name__ == "__main__"):
 
             self._last_web_source_urls = []
             self._last_web_sources = []
-
 
         if isinstance(assistant_msg, dict):
             existing_meta = assistant_msg.get("meta")
@@ -14662,6 +14687,15 @@ Auto-fix result:
             "remember",
             "from now on",
             "going forward",
+
+            "favorite color",
+            "favourite color",
+            "favorite movie",
+            "favourite movie",
+            "favorite drink",
+            "favourite drink",
+            "favorite animal",
+            "favourite animal",
         )
 
         return any(s in lowered for s in weak_signals)
