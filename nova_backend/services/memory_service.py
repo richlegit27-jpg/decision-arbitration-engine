@@ -545,13 +545,34 @@ class MemoryService:
             "copy regenerate",
         )
 
+        preference_keys = (
+            "favorite color",
+            "favourite color",
+            "favorite drink",
+            "favourite drink",
+            "favorite snack",
+            "favourite snack",
+            "favorite food",
+            "favourite food",
+            "favorite movie",
+            "favourite movie",
+            "favorite show",
+            "favourite show",
+            "favorite song",
+            "favourite song",
+            "favorite game",
+            "favourite game",
+        )
+
         items = self.all()
         cleaned = []
         removed = []
         seen_keys = set()
+        latest_preference_by_key = {}
 
         for item in items:
             text = str(item.get("text") or "").lower()
+
             question_starters = (
                 "what is ",
                 "what's ",
@@ -584,7 +605,33 @@ class MemoryService:
 
             seen_keys.add(semantic_key)
 
+            matched_preference_key = None
+            for key in preference_keys:
+                if key in text:
+                    matched_preference_key = key.replace("favourite", "favorite")
+                    break
+
+            if matched_preference_key:
+                existing = latest_preference_by_key.get(matched_preference_key)
+
+                if existing:
+                    existing_time = str(existing.get("updated_at") or existing.get("created_at") or "")
+                    item_time = str(item.get("updated_at") or item.get("created_at") or "")
+
+                    if item_time > existing_time:
+                        removed.append(existing)
+                        latest_preference_by_key[matched_preference_key] = item
+                    else:
+                        removed.append(item)
+
+                    continue
+
+                latest_preference_by_key[matched_preference_key] = item
+                continue
+
             cleaned.append(item)
+
+        cleaned.extend(latest_preference_by_key.values())
 
         self._write_store({"memory": cleaned})
 
