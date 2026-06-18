@@ -516,6 +516,7 @@ class MemoryService:
         items = self.all()
         cleaned = []
         removed = []
+        seen_keys = set()
 
         for item in items:
             text = str(item.get("text") or "").lower()
@@ -523,6 +524,14 @@ class MemoryService:
             if any(pattern in text for pattern in junk_patterns):
                 removed.append(item)
                 continue
+
+            semantic_key = _nova_memory_semantic_key_20260618(text)
+
+            if semantic_key in seen_keys:
+                removed.append(item)
+                continue
+
+            seen_keys.add(semantic_key)
 
             cleaned.append(item)
 
