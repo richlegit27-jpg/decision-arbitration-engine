@@ -411,6 +411,7 @@
       border-top: 1px solid var(--line);
       display: flex;
       gap: 10px;
+      11:17 PM 2026-06-17align-items: center;
     }
 
     .side-footer-links a {
@@ -566,18 +567,20 @@
       color: var(--text);
     }
 
-    .footer-mini-button {
-      flex: 1;
-      text-align: center;
-      color: var(--muted);
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 8px 10px;
-      background: rgba(255,255,255,.045);
-      font-size: 12px;
-      font-weight: 800;
-      cursor: pointer;
-    }
+.footer-mini-button {
+  flex: 1;
+  text-align: center;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,.045);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  line-height: normal;
+  min-height: auto;
+}
 
     .footer-mini-button:hover {
       color: var(--text);
@@ -1294,9 +1297,9 @@ observer.observe(document.documentElement, {
       <div class="execution-note">Click Artifacts to load.</div>
     </div>
 
-    <button type="button" id="openArtifactsBtn" class="footer-mini-button">
-      Load Artifacts
-    </button>
+<h3>Artifacts</h3>
+<count>
+<artifact list>
   </div>
 </section>
 
