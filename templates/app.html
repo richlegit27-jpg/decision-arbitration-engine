@@ -8319,5 +8319,96 @@ code,
   }
 </style>
 
+
+<!-- NOVA_SCROLLBAR_FINISH_POLISH_20260620 -->
+<style>
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(168, 85, 247, 0.55) rgba(15, 23, 42, 0.55);
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.55);
+    border-radius: 999px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: linear-gradient(
+      180deg,
+      rgba(168, 85, 247, 0.72),
+      rgba(126, 34, 206, 0.62)
+    );
+    border: 2px solid rgba(15, 23, 42, 0.72);
+    border-radius: 999px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(
+      180deg,
+      rgba(216, 180, 254, 0.82),
+      rgba(168, 85, 247, 0.72)
+    );
+  }
+
+  ::selection {
+    background: rgba(168, 85, 247, 0.42);
+    color: #ffffff;
+  }
+
+  body {
+    background:
+      radial-gradient(circle at top left, rgba(168, 85, 247, 0.13), transparent 34rem),
+      radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.08), transparent 32rem),
+      #0b0f19 !important;
+  }
+
+  a {
+    color: #d8b4fe !important;
+  }
+
+  a:hover {
+    color: #f0abfc !important;
+  }
+
+  input,
+  textarea,
+  button,
+  select {
+    font-family: inherit !important;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  a:focus-visible {
+    outline: 2px solid rgba(216, 180, 254, 0.72) !important;
+    outline-offset: 2px !important;
+  }
+
+  .empty-state,
+  .panel-empty,
+  .execution-note,
+  .memory-note,
+  .artifact-note {
+    background: rgba(15, 23, 42, 0.54) !important;
+    border: 1px dashed rgba(168, 85, 247, 0.28) !important;
+    border-radius: 14px !important;
+    padding: 0.85rem !important;
+  }
+
+  .loading,
+  .thinking,
+  .typing,
+  .status-loading {
+    color: #d8b4fe !important;
+  }
+</style>
+
 </body>
 </html>
