@@ -1448,6 +1448,12 @@ function setSessionId(v) {
   window.__NOVA_ACTIVE_SESSION_ID = sid;
 }
 
+function cleanVisibleAssistantText(text) {
+  return String(text || "")
+    .replace(/<[^>]*>/g, "")
+    .trim();
+}
+
 function ensureLocalSessionId() {
   const sid = getSessionId();
   if (sid) return sid;
@@ -2177,6 +2183,8 @@ function showThinking(node) {
   return () => clearInterval(interval);
 }
 
+
+
 async function sendText(textOverride) {
   console.log("&#128206; sendText TRIGGERED");
 
@@ -2357,6 +2365,7 @@ copy.textContent = "Copy";
         container.appendChild(pre);
     });
 }
+
 /* =========================================================
    renderAssistantMessage
    SINGLE SOURCE OF TRUTH (CLEAN SMFF VERSION)
@@ -2369,26 +2378,25 @@ function renderAssistantMessage(assistantBubble, data) {
 
     assistantBubble.dataset.rendered = "1";
 
-    const assistantMessage = {
-        text: cleanVisibleAssistantText(
-            data.assistant_message?.text ||
-            data.text ||
-            data.response ||
-            ""
-        ),
+const assistantMessage = {
+    text:
+        data.assistant_message?.text ||
+        data.text ||
+        data.response ||
+        "",
 
-        meta: {
-            sources:
-                data.assistant_message?.meta?.sources ||
-                data.sources ||
-                []
-        },
+    meta: {
+        sources:
+            data.assistant_message?.meta?.sources ||
+            data.sources ||
+            []
+    },
 
-        image:
-            data.image_url ||
-            data.assistant_message?.image_url ||
-            null
-    };
+    image:
+        data.image_url ||
+        data.assistant_message?.image_url ||
+        null
+};
 
     let bubble = assistantBubble.querySelector(".bubble");
 
@@ -2460,25 +2468,23 @@ renderMessageWithCodeBlocks(bubble, assistantMessage.text || "");
    ========================= */
 
 function handleSendClick(prompt = "") {
-  if (__nova_send_lock) {
-    console.warn("[NOVA send] blocked duplicate send");
+  if (window.__NOVA_HANDLE_SEND_LOCK__) {
+    console.warn("[NOVA send] blocked duplicate handleSendClick");
     return;
   }
 
-  __nova_send_lock = true;
+  window.__NOVA_HANDLE_SEND_LOCK__ = true;
 
   Promise.resolve(sendText(prompt))
-    .catch(function (error) {
-      console.warn("[NOVA send] failed", error);
+    .catch((e) => {
+      console.warn("[NOVA send] failed", e);
     })
-    .finally(function () {
-      setTimeout(function () {
-        __nova_send_lock = false;
+    .finally(() => {
+      setTimeout(() => {
+        window.__NOVA_HANDLE_SEND_LOCK__ = false;
       }, 500);
     });
 }
-
-// disabled duplicate newSessionBtn listener
 
     summarizeBtn.addEventListener("click", () => summarizeNow().catch(e => {
       setStatus("error");
@@ -2514,8 +2520,19 @@ if (sendBtn && input) {
     console.log("&#128206; CAPTURE BEFORE CLICK", window.__novaLastInputBeforeSend);
   }, true);
 
-  sendBtn.addEventListener("click", () => handleSendClick());
+sendBtn.addEventListener("click", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
 
+  if (window.__NOVA_SEND_CLICK_LOCK__) return;
+  window.__NOVA_SEND_CLICK_LOCK__ = true;
+
+  handleSendClick();
+
+  setTimeout(() => {
+    window.__NOVA_SEND_CLICK_LOCK__ = false;
+  }, 1200);
+}, true);
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -2832,7 +2849,7 @@ function renderDesktopChatMessagesRescue(messages) {
         var role = String(msg.role || "assistant");
         var text = msg.content || msg.text || msg.message || "";
 
-        text = cleanVisibleAssistantText(text);
+        text = String(text || "");
 
         if (!String(text || "").trim() && !msg.image_url && !msg.image) {
             return;
@@ -4699,9 +4716,6 @@ box.innerHTML = "";
 
 messages.forEach(function (message) {
 
-messages.forEach(function (message)
-
- {
   const role = esc(message.role || "message");
   const id = esc(message.id || "");
 
@@ -4717,10 +4731,11 @@ messages.forEach(function (message)
 
   const textDiv = document.createElement("div");
   textDiv.style.whiteSpace = "pre-wrap";
-  textDiv.textContent =
-    message.text ||
-    (message.assistant_message && message.assistant_message.text) ||
-    "";
+textDiv.textContent = (
+  message.text ||
+  (message.assistant_message && message.assistant_message.text) ||
+  ""
+);
 
   wrapper.appendChild(header);
   wrapper.appendChild(textDiv);
@@ -4778,6 +4793,7 @@ try {
     return rendered > 0;
   }
 
+
   function installWrapper() {
     if (window.__novaDesktopRescueFetchMissingSessionInstalled) return;
     window.__novaDesktopRescueFetchMissingSessionInstalled = true;
@@ -4787,51 +4803,6 @@ try {
         ? window.renderDesktopChatMessagesRescue
         : null;
 
-    window.renderDesktopChatMessagesRescue = function () {
-      const result = original ? original.apply(this, arguments) : true;
-
-      const box = getRescueBox();
-      const renderedCount = box ? box.querySelectorAll("[data-message-id]").length : 0;
-      const hasText = box ? String(box.innerText || "").trim().length > 20 : false;
-
-      if (renderedCount > 0 && hasText) {
-        return result;
-      }
-
-      setTimeout(function () {
-        try {
-          const sessionId = getActiveSessionId();
-          const box = getRescueBox();
-          if (!box) return;
-
-          const renderedCount = box.querySelectorAll("[data-message-id]").length;
-          const hasText = String(box.innerText || "").trim().length > 20;
-
-          const currentSessionId =
-            (typeof window.getSessionId === "function" && window.getSessionId()) ||
-            localStorage.getItem("nova_session_id") ||
-            "";
-
-          const inputSessionId =
-            (document.getElementById("sid") && document.getElementById("sid").value) ||
-            "";
-
-          if (
-            sessionId &&
-            sessionId === currentSessionId &&
-            sessionId === inputSessionId &&
-            (!renderedCount || !hasText)
-          ) {
-            fetchAndRenderSession(sessionId);
-          }
-        } catch (e) {
-          console.warn("[Nova Desktop Rescue] missing session fallback failed", e);
-        }
-      }, 150);
-
-      return result;
-    };
-
     console.log("[Nova Desktop Rescue] fetch missing session fallback ready", MARKER);
   }
 
@@ -4840,6 +4811,7 @@ try {
   } else {
     installWrapper();
   }
+
 })();
 (function () {
   "use strict";
@@ -5272,9 +5244,6 @@ target.appendChild(cards);
 
   window.novaForceDesktopSourceCardsDOM_20260612 = renderForcedSourceCards;
 
-wrapRenderFunction("renderDesktopChatMessagesRescue", {
-  deferSourceCards: true
-});
 
 wrapRenderFunction("renderDesktopChatMessages", {
   deferSourceCards: true
@@ -6852,6 +6821,199 @@ async function loadDesktopArtifacts() {
     letter-spacing: .05em;
 }
 
+/* NOVA_SESSION_TITLE_NO_VERTICAL_WRAP_FINAL */
+#desktopSessionList,
+.desktop-session-list {
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+}
+
+#desktopSessionList .desktop-session-item,
+.desktop-session-list .desktop-session-item {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+}
+
+#desktopSessionList .desktop-session-title,
+.desktop-session-list .desktop-session-title {
+    display: block !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    line-height: 18px !important;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+}
+
+#desktopSessionList .desktop-session-meta,
+.desktop-session-list .desktop-session-meta {
+    display: none !important;
+}
+
+/* NOVA_CHAT_VERTICAL_STACK_FINAL */
+#chat,
+.chat,
+.chat-container,
+.messages,
+.message-list {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+}
+
+.msg,
+.message,
+.assistant,
+.user,
+.assistant-message,
+.user-message {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    clear: both !important;
+    float: none !important;
+}
+
+.bubble {
+    max-width: 720px !important;
+    min-width: 0 !important;
+    overflow-wrap: break-word !important;
+}
+
+.user .bubble,
+.user-message .bubble {
+    align-self: flex-end !important;
+}
+
+.assistant .bubble,
+.assistant-message .bubble {
+    align-self: flex-start !important;
+}
+
+pre,
+code,
+.code-block,
+.nova-code-block {
+    max-width: 100% !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    white-space: pre-wrap !important;
+    overflow-x: auto !important;
+}
+
+.bubble pre,
+.bubble .code-block,
+.bubble .nova-code-block {
+    display: block !important;
+    margin-top: 10px !important;
+}
+
+/* NOVA_CHAT_BOTTOM_SPACE_FINAL */
+#chat,
+.chat,
+.chat-container,
+.messages,
+.message-list {
+    padding-bottom: 140px !important;
+    scroll-padding-bottom: 140px !important;
+    box-sizing: border-box !important;
+}
+
+.chat-panel,
+.chat-main,
+.main-chat {
+    overflow-y: auto !important;
+}
+
+/* NOVA_COMPOSER_SAFE_SPACE_FINAL */
+.chat-panel,
+.chat-main,
+.desktop-chat,
+.desktop-main {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+}
+
+#chat,
+.chat-container,
+.messages,
+.message-list {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    padding-bottom: 90px !important;
+    box-sizing: border-box !important;
+}
+
+.composer,
+.chat-composer,
+.desktop-composer {
+    position: relative !important;
+    flex: 0 0 auto !important;
+    z-index: 2 !important;
+}
+
+/* NOVA_CODE_COLOR_POLISH_FINAL */
+.bubble pre,
+.bubble .code-block,
+.bubble .nova-code-block {
+    background: #120a1f !important;
+    border: 1px solid rgba(168, 85, 247, 0.45) !important;
+    border-radius: 14px !important;
+    padding: 14px !important;
+    margin: 12px 0 !important;
+    color: #e9d5ff !important;
+    font-family: Consolas, Monaco, "Courier New", monospace !important;
+    font-size: 13px !important;
+    line-height: 1.55 !important;
+    overflow-x: auto !important;
+    white-space: pre !important;
+}
+
+.bubble code {
+    color: #f0abfc !important;
+    background: rgba(168, 85, 247, 0.16) !important;
+    border: 1px solid rgba(168, 85, 247, 0.25) !important;
+    border-radius: 6px !important;
+    padding: 2px 5px !important;
+    font-family: Consolas, Monaco, "Courier New", monospace !important;
+}
+
+.bubble pre code {
+    background: transparent !important;
+    border: 0 !important;
+    padding: 0 !important;
+    color: #e9d5ff !important;
+    white-space: inherit !important;
+}
+
+:root {
+  --nova-accent: #a855f7;
+  --nova-accent-soft: rgba(168, 85, 247, 0.18);
+  --nova-accent-strong: rgba(168, 85, 247, 0.38);
+
+  --nova-bg: #0b0f19;
+  --nova-panel: #111827;
+  --nova-text: #f9fafb;
+  --nova-muted: #9ca3af;
+
+  --nova-code-bg: #020617;
+  --nova-code-border: rgba(168, 85, 247, 0.28);
+}
+
 </style>
 
 <script>
@@ -6886,6 +7048,816 @@ async function loadDesktopArtifacts() {
 
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="/static/js/nova-desktop-sessions.js?v=external-new-session-1"></script>
+
+<!-- NOVA_TEXT_COLOR_POLISH_20260620 -->
+<style>
+  :root {
+    --nova-text-main: #f8f4ff;
+    --nova-text-soft: #d9c8ff;
+    --nova-text-muted: #a998c9;
+    --nova-purple: #a855f7;
+    --nova-purple-soft: rgba(168, 85, 247, 0.28);
+    --nova-code-bg: #12081f;
+    --nova-code-border: rgba(168, 85, 247, 0.34);
+  }
+
+  .assistant-bubble,
+  .assistant-message,
+  .message.assistant,
+  .msg.assistant,
+  .desktop-message.assistant,
+  [data-role="assistant"] {
+    color: var(--nova-text-main) !important;
+    line-height: 1.58 !important;
+    letter-spacing: 0.01em;
+  }
+
+  .user-bubble,
+  .user-message,
+  .message.user,
+  .msg.user,
+  .desktop-message.user,
+  [data-role="user"] {
+    color: #ffffff !important;
+    line-height: 1.5 !important;
+  }
+
+  .assistant-bubble p,
+  .assistant-message p,
+  .message.assistant p,
+  .msg.assistant p,
+  .desktop-message.assistant p {
+    margin: 0.45rem 0 !important;
+  }
+
+  .assistant-bubble ul,
+  .assistant-bubble ol,
+  .assistant-message ul,
+  .assistant-message ol,
+  .message.assistant ul,
+  .message.assistant ol {
+    margin-top: 0.45rem !important;
+    margin-bottom: 0.65rem !important;
+    padding-left: 1.35rem !important;
+  }
+
+  .assistant-bubble li,
+  .assistant-message li,
+  .message.assistant li {
+    margin: 0.25rem 0 !important;
+  }
+
+  .assistant-bubble strong,
+  .assistant-message strong,
+  .message.assistant strong {
+    color: #ffffff !important;
+    font-weight: 700 !important;
+  }
+
+  .assistant-bubble a,
+  .assistant-message a,
+  .message.assistant a {
+    color: #d8b4fe !important;
+    text-decoration: none !important;
+    border-bottom: 1px solid rgba(216, 180, 254, 0.35);
+  }
+
+  .assistant-bubble code:not(pre code),
+  .assistant-message code:not(pre code),
+  .message.assistant code:not(pre code) {
+    color: #f0abfc !important;
+    background: rgba(168, 85, 247, 0.16) !important;
+    border: 1px solid rgba(168, 85, 247, 0.24) !important;
+    border-radius: 7px !important;
+    padding: 0.12rem 0.35rem !important;
+    font-size: 0.92em !important;
+  }
+
+  .assistant-bubble pre,
+  .assistant-message pre,
+  .message.assistant pre,
+  .msg.assistant pre,
+  .desktop-message.assistant pre {
+    position: relative !important;
+    background: var(--nova-code-bg) !important;
+    color: #f8f4ff !important;
+    border: 1px solid var(--nova-code-border) !important;
+    border-radius: 14px !important;
+    padding: 2.5rem 1rem 1rem 1rem !important;
+    margin: 0.85rem 0 !important;
+    overflow-x: auto !important;
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.24) !important;
+  }
+
+  .assistant-bubble pre code,
+  .assistant-message pre code,
+  .message.assistant pre code {
+    color: #f8f4ff !important;
+    background: transparent !important;
+    border: 0 !important;
+    padding: 0 !important;
+    white-space: pre !important;
+    font-size: 13.5px !important;
+    line-height: 1.58 !important;
+    font-family: Consolas, Monaco, "Courier New", monospace !important;
+  }
+
+  .nova-code-copy {
+    position: absolute;
+    top: 0.55rem;
+    right: 0.6rem;
+    border: 1px solid rgba(216, 180, 254, 0.26);
+    background: rgba(168, 85, 247, 0.16);
+    color: #f8f4ff;
+    border-radius: 9px;
+    padding: 0.32rem 0.58rem;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .nova-code-copy:hover {
+    background: rgba(168, 85, 247, 0.28);
+  }
+
+  .nova-token-comment {
+    color: #9ca3af !important;
+  }
+
+  .nova-token-string {
+    color: #86efac !important;
+  }
+
+  .nova-token-number {
+    color: #fbbf24 !important;
+  }
+
+  .nova-token-keyword {
+    color: #c084fc !important;
+    font-weight: 700;
+  }
+
+  .nova-token-function {
+    color: #93c5fd !important;
+  }
+
+  .nova-token-tag {
+    color: #f0abfc !important;
+  }
+
+  .nova-token-attr {
+    color: #fde68a !important;
+  }
+
+  .nova-token-css {
+    color: #67e8f9 !important;
+  }
+</style>
+
+<script>
+(function () {
+  "use strict";
+
+  if (window.__NOVA_TEXT_COLOR_POLISH_20260620__) return;
+  window.__NOVA_TEXT_COLOR_POLISH_20260620__ = true;
+
+  function escapeHtml(text) {
+    return String(text || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function token(type, text) {
+    return '<span class="nova-token-' + type + '">' + escapeHtml(text) + '</span>';
+  }
+
+  function colorize(code) {
+    const keywords = new Set([
+      "function", "const", "let", "var", "return", "if", "else", "for", "while",
+      "async", "await", "try", "catch", "class", "new", "this", "true", "false",
+      "null", "undefined", "import", "from", "export", "def", "print", "pass",
+      "in", "and", "or", "not"
+    ]);
+
+    const pattern =
+      /(\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->|\/\/[^\n]*|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`|<\/?[a-zA-Z][^>\n]*>|\b\d+(?:\.\d+)?\b|\b[a-zA-Z_$][\w$]*\b)/g;
+
+    let output = "";
+    let lastIndex = 0;
+    let match;
+
+    while ((match = pattern.exec(code)) !== null) {
+      const raw = match[0];
+      const index = match.index;
+
+      output += escapeHtml(code.slice(lastIndex, index));
+
+      if (
+        raw.startsWith("//") ||
+        raw.startsWith("/*") ||
+        raw.startsWith("<!--")
+      ) {
+        output += token("comment", raw);
+      } else if (
+        raw.startsWith('"') ||
+        raw.startsWith("'") ||
+        raw.startsWith("`")
+      ) {
+        output += token("string", raw);
+      } else if (raw.startsWith("<")) {
+        output += token("tag", raw);
+      } else if (/^\d/.test(raw)) {
+        output += token("number", raw);
+      } else if (keywords.has(raw)) {
+        output += token("keyword", raw);
+      } else {
+        const after = code.slice(index + raw.length);
+        if (/^\s*\(/.test(after)) {
+          output += token("function", raw);
+        } else {
+          output += escapeHtml(raw);
+        }
+      }
+
+      lastIndex = index + raw.length;
+    }
+
+    output += escapeHtml(code.slice(lastIndex));
+    return output;
+  }
+
+  function addCopyButton(pre, code) {
+    if (pre.querySelector(".nova-code-copy")) return;
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "nova-code-copy";
+    btn.textContent = "Copy";
+
+    btn.addEventListener("click", async function () {
+      try {
+        await navigator.clipboard.writeText(code.textContent || "");
+        btn.textContent = "Copied";
+
+        setTimeout(function () {
+          btn.textContent = "Copy";
+        }, 900);
+      } catch (e) {
+        btn.textContent = "Failed";
+
+        setTimeout(function () {
+          btn.textContent = "Copy";
+        }, 900);
+      }
+    });
+
+    pre.appendChild(btn);
+  }
+
+  function polishCodeBlocks(root) {
+    const scope = root || document;
+
+    scope.querySelectorAll("pre code").forEach(function (code) {
+      const pre = code.closest("pre");
+      if (!pre) return;
+
+      addCopyButton(pre, code);
+
+      if (code.dataset.novaColorized === "1") return;
+
+      const raw = code.textContent || "";
+      code.innerHTML = colorize(raw);
+      code.dataset.novaColorized = "1";
+    });
+  }
+
+  function polishAll() {
+    polishCodeBlocks(document);
+  }
+
+  polishAll();
+
+  const observer = new MutationObserver(function () {
+    polishAll();
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  console.log("[Nova Text Color Polish] ready");
+})();
+</script>
+
+<!-- NOVA_MESSAGE_SPACING_POLISH_20260620 -->
+<style>
+  .chat,
+  .chat-log,
+  .messages,
+  #messages,
+  #chat,
+  .desktop-chat,
+  .chat-container {
+    scroll-behavior: smooth;
+  }
+
+  .message,
+  .msg,
+  .desktop-message,
+  .chat-message {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .assistant-bubble,
+  .assistant-message,
+  .message.assistant,
+  .msg.assistant,
+  .desktop-message.assistant,
+  [data-role="assistant"] {
+    max-width: min(780px, calc(100vw - 340px)) !important;
+    width: fit-content !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    word-wrap: break-word !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .user-bubble,
+  .user-message,
+  .message.user,
+  .msg.user,
+  .desktop-message.user,
+  [data-role="user"] {
+    max-width: min(680px, calc(100vw - 360px)) !important;
+    width: fit-content !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    word-wrap: break-word !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .message.assistant,
+  .msg.assistant,
+  .desktop-message.assistant,
+  [data-role="assistant"] {
+    margin-right: auto !important;
+  }
+
+  .message.user,
+  .msg.user,
+  .desktop-message.user,
+  [data-role="user"] {
+    margin-left: auto !important;
+  }
+
+  .assistant-bubble,
+  .user-bubble,
+  .assistant-message,
+  .user-message,
+  .message.assistant,
+  .message.user,
+  .msg.assistant,
+  .msg.user,
+  .desktop-message.assistant,
+  .desktop-message.user {
+    margin-bottom: 0.85rem !important;
+  }
+
+  .assistant-bubble pre,
+  .assistant-message pre,
+  .message.assistant pre,
+  .msg.assistant pre,
+  .desktop-message.assistant pre {
+    max-width: 100% !important;
+  }
+
+  .assistant-bubble img,
+  .assistant-message img,
+  .message.assistant img,
+  .msg.assistant img,
+  .desktop-message.assistant img,
+  .user-bubble img,
+  .user-message img,
+  .message.user img,
+  .msg.user img,
+  .desktop-message.user img {
+    max-width: 100% !important;
+    height: auto !important;
+    border-radius: 12px !important;
+  }
+
+  @media (max-width: 900px) {
+    .assistant-bubble,
+    .assistant-message,
+    .message.assistant,
+    .msg.assistant,
+    .desktop-message.assistant,
+    [data-role="assistant"],
+    .user-bubble,
+    .user-message,
+    .message.user,
+    .msg.user,
+    .desktop-message.user,
+    [data-role="user"] {
+      max-width: calc(100vw - 42px) !important;
+    }
+  }
+
+  @media (min-width: 901px) {
+    .assistant-bubble,
+    .assistant-message,
+    .message.assistant,
+    .msg.assistant,
+    .desktop-message.assistant,
+    [data-role="assistant"] {
+      max-width: 760px !important;
+    }
+
+    .user-bubble,
+    .user-message,
+    .message.user,
+    .msg.user,
+    .desktop-message.user,
+    [data-role="user"] {
+      max-width: 640px !important;
+    }
+  }
+</style>
+
+<!-- NOVA_RESCUE_CONTAINER_SHIM_20260620 -->
+<script>
+(function () {
+  "use strict";
+
+  if (window.__NOVA_RESCUE_CONTAINER_SHIM_20260620__) return;
+  window.__NOVA_RESCUE_CONTAINER_SHIM_20260620__ = true;
+
+  window.getDesktopMessagesContainerRescue =
+    window.getDesktopMessagesContainerRescue ||
+    function () {
+      return (
+        document.getElementById("messages") ||
+        document.getElementById("chat") ||
+        document.querySelector("#messages") ||
+        document.querySelector(".messages") ||
+        document.querySelector(".chat-messages") ||
+        document.querySelector(".desktop-messages") ||
+        document.querySelector(".chat-log") ||
+        document.querySelector(".chat-container")
+      );
+    };
+
+  console.log("[Nova Rescue Container Shim] ready");
+})();
+</script>
+
+<!-- NOVA_CODE_BLOCK_HEADER_POLISH_20260620 -->
+<style>
+  .assistant-bubble pre,
+  .assistant-message pre,
+  .message.assistant pre,
+  .msg.assistant pre,
+  .desktop-message.assistant pre {
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .nova-codebar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+    min-height: 38px !important;
+    padding: 0.45rem 0.65rem !important;
+    border-bottom: 1px solid rgba(168, 85, 247, 0.24) !important;
+    background: rgba(168, 85, 247, 0.10) !important;
+    box-sizing: border-box !important;
+  }
+
+  .nova-code-lang {
+    color: #d8b4fe !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+  }
+
+  .nova-codebar .nova-code-copy {
+    position: static !important;
+    top: auto !important;
+    right: auto !important;
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    padding: 0.28rem 0.58rem !important;
+    font-size: 12px !important;
+    line-height: 1 !important;
+  }
+
+  .assistant-bubble pre code,
+  .assistant-message pre code,
+  .message.assistant pre code,
+  .msg.assistant pre code,
+  .desktop-message.assistant pre code {
+    display: block !important;
+    padding: 1rem !important;
+    overflow-x: auto !important;
+  }
+</style>
+
+<script>
+(function () {
+  "use strict";
+
+  if (window.__NOVA_CODE_BLOCK_HEADER_POLISH_20260620__) return;
+  window.__NOVA_CODE_BLOCK_HEADER_POLISH_20260620__ = true;
+
+  function prettyLang(raw) {
+    raw = String(raw || "").trim();
+
+    if (!raw) return "CODE";
+
+    raw = raw
+      .replace(/^language-/i, "")
+      .replace(/^lang-/i, "")
+      .replace(/^hljs/i, "")
+      .trim();
+
+    const map = {
+      js: "JavaScript",
+      javascript: "JavaScript",
+      py: "Python",
+      python: "Python",
+      html: "HTML",
+      css: "CSS",
+      json: "JSON",
+      bash: "Bash",
+      shell: "Shell",
+      powershell: "PowerShell",
+      ps1: "PowerShell"
+    };
+
+    return map[raw.toLowerCase()] || raw || "CODE";
+  }
+
+  function getLang(code) {
+    const className = String(code.className || "");
+    const match = className.match(/(?:language-|lang-)([a-zA-Z0-9_-]+)/);
+
+    if (match && match[1]) {
+      return prettyLang(match[1]);
+    }
+
+    return "CODE";
+  }
+
+  function ensureCopyButton(pre, code) {
+    let btn = pre.querySelector(".nova-code-copy");
+
+    if (btn) return btn;
+
+    btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "nova-code-copy";
+    btn.textContent = "Copy";
+
+    btn.addEventListener("click", async function () {
+      try {
+        await navigator.clipboard.writeText(code.textContent || "");
+        btn.textContent = "Copied";
+
+        setTimeout(function () {
+          btn.textContent = "Copy";
+        }, 900);
+      } catch (e) {
+        btn.textContent = "Failed";
+
+        setTimeout(function () {
+          btn.textContent = "Copy";
+        }, 900);
+      }
+    });
+
+    return btn;
+  }
+
+  function polishPre(pre) {
+    if (!pre || pre.dataset.novaCodeHeaderPolished === "1") return;
+
+    const code = pre.querySelector("code");
+    if (!code) return;
+
+    const bar = document.createElement("div");
+    bar.className = "nova-codebar";
+
+    const lang = document.createElement("span");
+    lang.className = "nova-code-lang";
+    lang.textContent = getLang(code);
+
+    const copy = ensureCopyButton(pre, code);
+
+    bar.appendChild(lang);
+    bar.appendChild(copy);
+
+    pre.insertBefore(bar, pre.firstChild);
+    pre.dataset.novaCodeHeaderPolished = "1";
+  }
+
+  function polishAll() {
+    document.querySelectorAll("pre").forEach(polishPre);
+  }
+
+  polishAll();
+
+  const observer = new MutationObserver(function () {
+    polishAll();
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  console.log("[Nova Code Block Header Polish] ready");
+})();
+</script>
+
+
+<!-- NOVA_REGEN_BUTTON_REPAIR_V2_20260620 -->
+<script>
+(function () {
+  "use strict";
+
+  if (window.__NOVA_REGEN_BUTTON_REPAIR_V2_20260620__) return;
+  window.__NOVA_REGEN_BUTTON_REPAIR_V2_20260620__ = true;
+
+  function cleanMessageText(value) {
+    return String(value || "")
+      .replace(/\bCopy\b/g, "")
+      .replace(/\bRegen\b/g, "")
+      .replace(/^user\s*/i, "")
+      .replace(/^assistant\s*/i, "")
+      .trim();
+  }
+
+  function isRegenButton(btn) {
+    const raw = String(btn && btn.textContent || "").trim().toLowerCase();
+    return raw === "regen" || raw === "regenerate";
+  }
+
+  function isUserNode(node) {
+    if (!node) return false;
+
+    const role = String(node.getAttribute && node.getAttribute("data-role") || "").toLowerCase();
+    const cls = String(node.className || "").toLowerCase();
+
+    return (
+      role === "user" ||
+      cls.includes("user-bubble") ||
+      cls.includes("user-message") ||
+      cls.includes("message user") ||
+      cls.includes("msg user") ||
+      cls.includes("desktop-message user")
+    );
+  }
+
+  function findPreviousUserText(fromButton) {
+    let node =
+      fromButton.closest(".message.assistant") ||
+      fromButton.closest(".msg.assistant") ||
+      fromButton.closest(".desktop-message.assistant") ||
+      fromButton.closest("[data-role='assistant']") ||
+      fromButton.closest(".assistant-bubble") ||
+      fromButton.closest(".assistant-message");
+
+    while (node && node.previousElementSibling) {
+      node = node.previousElementSibling;
+
+      if (isUserNode(node)) {
+        return cleanMessageText(node.innerText || node.textContent || "");
+      }
+
+      const nested = node.querySelector &&
+        node.querySelector(".user-bubble, .user-message, .message.user, .msg.user, .desktop-message.user, [data-role='user']");
+
+      if (nested) {
+        return cleanMessageText(nested.innerText || nested.textContent || "");
+      }
+    }
+
+    const users = Array.from(document.querySelectorAll(
+      ".user-bubble, .user-message, .message.user, .msg.user, .desktop-message.user, [data-role='user']"
+    ));
+
+    if (!users.length) return "";
+
+    return cleanMessageText(users[users.length - 1].innerText || users[users.length - 1].textContent || "");
+  }
+
+  function runRegen(text) {
+    const input = document.getElementById("input") || document.querySelector("textarea");
+    const sendBtn = document.getElementById("sendBtn");
+
+    if (!text) {
+      console.warn("[Nova Regen V2] no previous user text found");
+      return;
+    }
+
+    console.log("[Nova Regen V2] regenerating:", text);
+
+    if (input) {
+      input.value = text;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+
+    if (typeof window.handleSendClick === "function") {
+      window.handleSendClick(text);
+      return;
+    }
+
+    if (typeof window.sendText === "function") {
+      window.sendText(text);
+      return;
+    }
+
+    if (sendBtn && typeof sendBtn.click === "function") {
+      sendBtn.click();
+      return;
+    }
+
+    console.warn("[Nova Regen V2] no send function or send button found");
+  }
+
+  document.addEventListener("click", function (event) {
+    const btn = event.target.closest("button");
+    if (!btn || !isRegenButton(btn)) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+
+    runRegen(findPreviousUserText(btn));
+  }, true);
+
+  console.log("[Nova Regen Button Repair V2] ready");
+})();
+</script>
+
+<!-- NOVA_ACTION_BUTTON_POLISH_20260620 -->
+<style>
+  .assistant-bubble button,
+  .assistant-message button,
+  .message.assistant button,
+  .msg.assistant button,
+  .desktop-message.assistant button {
+    border: 1px solid rgba(216, 180, 254, 0.24) !important;
+    background: rgba(168, 85, 247, 0.12) !important;
+    color: #f8f4ff !important;
+    border-radius: 999px !important;
+    padding: 0.32rem 0.68rem !important;
+    font-size: 12px !important;
+    font-weight: 650 !important;
+    line-height: 1.1 !important;
+    cursor: pointer !important;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease !important;
+  }
+
+  .assistant-bubble button:hover,
+  .assistant-message button:hover,
+  .message.assistant button:hover,
+  .msg.assistant button:hover,
+  .desktop-message.assistant button:hover {
+    background: rgba(168, 85, 247, 0.22) !important;
+    border-color: rgba(216, 180, 254, 0.42) !important;
+    transform: translateY(-1px) !important;
+  }
+
+  .assistant-bubble button:active,
+  .assistant-message button:active,
+  .message.assistant button:active,
+  .msg.assistant button:active,
+  .desktop-message.assistant button:active {
+    transform: translateY(0) !important;
+  }
+
+  .assistant-bubble .message-actions,
+  .assistant-message .message-actions,
+  .message.assistant .message-actions,
+  .msg.assistant .message-actions,
+  .desktop-message.assistant .message-actions {
+    display: flex !important;
+    gap: 0.45rem !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    margin-top: 0.65rem !important;
+  }
+
+  .nova-codebar button,
+  .nova-code-copy {
+    border-radius: 8px !important;
+  }
+</style>
+
 </body>
 </html>
-
