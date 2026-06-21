@@ -1664,6 +1664,7 @@ function renderSessions(list, sessions, activeId) {
 }
 
 async function loadDesktopSessions() {
+console.log("[SESSION LOAD]", new Date().toISOString(), new Error().stack);
   const list = document.getElementById("desktopSessionList");
   if (!list) return;
 
@@ -1697,9 +1698,12 @@ sessions.forEach(session => {
         const data = await fetch("/api/sessions/" + encodeURIComponent(sid)).then(r => r.json());
         const sessionData = data.session || data;
 
-        if (typeof renderDesktopChatMessagesRescue === "function") {
-          renderDesktopChatMessagesRescue(sessionData.messages || []);
-        }
+if (typeof renderDesktopChatMessagesRescue === "function" && !window.__NOVA_RENDER_LOCK_GLOBAL) {
+    window.__NOVA_RENDER_LOCK_GLOBAL = true;
+    setTimeout(() => window.__NOVA_RENDER_LOCK_GLOBAL = false, 200);
+
+    renderDesktopChatMessagesRescue(sessionData.messages || []);
+}
       }
 
       setStatus("session selected");
@@ -1818,20 +1822,26 @@ async function newSession() {
       input.style.height = "auto";
     }
 
-    if (typeof renderDesktopChatMessagesRescue === "function") {
+    if (typeof renderDesktopChatMessagesRescue === "function" &&
+        !window.__NOVA_RENDER_LOCK_GLOBAL) {
+
+      window.__NOVA_RENDER_LOCK_GLOBAL = true;
+      setTimeout(() => window.__NOVA_RENDER_LOCK_GLOBAL = false, 200);
+
       renderDesktopChatMessagesRescue([]);
     }
 
     await loadDesktopSessions();
-
     setStatus("new session ready");
     refreshSummaryMeta();
     refreshDesktopPanels();
+
   } catch (error) {
     console.warn("[newSession failed]", error);
     setStatus("new session failed");
   }
 }
+
     async function summarizeNow() {
       if (!getSessionId()) {
         // do not create fake frontend session ids
@@ -2266,152 +2276,188 @@ if (typeof loadDesktopSessions === "function") {
   }
 }
 
-function renderAssistantMessage(assistantBubble, data) {
-  const assistantMessage = {
-    text: data.assistant_message?.text || data.text || data.response || "",
-    meta: {
-      sources: data.assistant_message?.meta?.sources || data.sources || []
-    },
-    image: data.image_url || data.assistant_message?.image_url || null
-  };
+function renderMessageWithCodeBlocks(container, text) {
+    container.innerHTML = "";
 
-assistantBubble.innerHTML = "";
+    const raw = String(text || "");
 
-const textWrap = document.createElement("div");
-textWrap.innerHTML = esc(assistantMessage.text || "");
-assistantBubble.appendChild(textWrap);
-
-const actions = document.createElement("div");
-actions.style.marginTop = "8px";
-actions.style.display = "flex";
-actions.style.gap = "8px";
-
-const copyBtn = document.createElement("button");
-copyBtn.type = "button";
-copyBtn.textContent = "Copy";
-copyBtn.style.border = "0";
-copyBtn.style.borderRadius = "8px";
-copyBtn.style.padding = "4px 8px";
-copyBtn.style.cursor = "pointer";
-
-copyBtn.onclick = async () => {
-  try {
-    await navigator.clipboard.writeText(assistantMessage.text || "");
-    copyBtn.textContent = "Copied";
-    setTimeout(() => {
-      copyBtn.textContent = "Copy";
-    }, 900);
-  } catch (e) {
-    console.warn("copy failed", e);
-    copyBtn.textContent = "Copy failed";
-  }
-};
-
-const regenBtn = document.createElement("button");
-regenBtn.type = "button";
-regenBtn.textContent = "Regen";
-regenBtn.style.border = "0";
-regenBtn.style.borderRadius = "8px";
-regenBtn.style.padding = "4px 8px";
-regenBtn.style.cursor = "pointer";
-
-regenBtn.onclick = () => {
-  const lastUser = [...document.querySelectorAll(".message.user, .user")]
-    .map(node => node.textContent.trim())
-    .filter(Boolean)
-    .pop();
-
-  if (!lastUser) {
-    console.warn("regen failed: no last user text found");
-    return;
-  }
-
-  input.value = lastUser;
-  handleSendClick(lastUser);
-};
-
-actions.appendChild(copyBtn);
-actions.appendChild(regenBtn);
-assistantBubble.appendChild(actions);
-
-if (assistantMessage.image) {
-  const imageWrap = document.createElement("div");
-  imageWrap.style.marginTop = "10px";
-
-  const img = document.createElement("img");
-  img.src = assistantMessage.image;
-  img.style.maxWidth = "100%";
-  img.style.borderRadius = "14px";
-
-  imageWrap.appendChild(img);
-  assistantBubble.appendChild(imageWrap);
-}
-
-const latestUserText = [...document.querySelectorAll(".message.user, .user")]
-  .map(node => node.textContent.trim().toLowerCase())
-  .filter(Boolean)
-  .pop() || "";
-
-const wantsSources =
-  latestUserText.startsWith("search ") ||
-  latestUserText.includes("search web") ||
-  latestUserText.includes("latest ") ||
-  latestUserText.includes("news");
-
-const sources = wantsSources ? (assistantMessage.meta.sources || []) : [];
-
-if (sources.length) {
-  const wrap = document.createElement("div");
-  wrap.style.marginTop = "12px";
-  wrap.style.display = "grid";
-  wrap.style.gap = "8px";
-
-  sources.forEach((src) => {
-console.log("SOURCE CARD SRC", src);
-    src = src || {};
-
-    const url = String(src.url || src.link || src.href || "").trim();
-    const title = String(src.title || src.name || url || "Source");
-    const domain = url ? new URL(url).hostname.replace("www.", "") : "";
-
-    const card = document.createElement(url ? "a" : "div");
-
-    if (url) {
-      card.href = url;
-      card.target = "_blank";
-      card.rel = "noopener noreferrer";
+    function safeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
     }
 
-card.style.display = "block";
-card.style.textDecoration = "none";
-card.style.color = "#ffffff";
-card.style.padding = "10px 12px";
-card.style.border = "1px solid rgba(255,255,255,.22)";
-card.style.borderRadius = "12px";
-card.style.background = "rgba(80, 60, 140, .35)";
-card.style.boxShadow = "0 8px 22px rgba(0,0,0,.22)";
-card.style.cursor = url ? "pointer" : "default";
+    function renderMarkdownChunk(value) {
+        const chunk = String(value || "");
 
-    const titleEl = document.createElement("div");
-    titleEl.textContent = title;
-    titleEl.style.fontSize = "13px";
-    titleEl.style.fontWeight = "600";
+        if (window.marked && typeof window.marked.parse === "function") {
+            return window.marked.parse(chunk);
+        }
 
-    const domainEl = document.createElement("div");
-    domainEl.textContent = domain || "source";
-    domainEl.style.marginTop = "4px";
-    domainEl.style.fontSize = "11px";
-    domainEl.style.color = "rgba(255,255,255,.72)";
+        return safeHtml(chunk)
+            .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+            .replace(/\*(.*?)\*/g, "<em>$1</em>")
+            .replace(/`([^`]+)`/g, "<code>$1</code>")
+            .replace(/\n/g, "<br>");
+    }
 
-    card.appendChild(titleEl);
-    card.appendChild(domainEl);
-    wrap.appendChild(card);
-  });
+    const parts = raw.split(/```([\s\S]*?)```/g);
 
-  assistantBubble.appendChild(wrap);
+    parts.forEach((part, index) => {
+        if (index % 2 === 0) {
+            const div = document.createElement("div");
+            div.className = "nova-markdown";
+            div.innerHTML = renderMarkdownChunk(part);
+            container.appendChild(div);
+            return;
+        }
+
+        const firstLine = part.split("\n")[0].trim();
+        const hasLang = /^[a-zA-Z0-9_-]+$/.test(firstLine);
+        const lang = hasLang ? firstLine : "none";
+        const codeText = hasLang ? part.split("\n").slice(1).join("\n") : part;
+
+        const pre = document.createElement("pre");
+        pre.className = "nova-code-block";
+
+        const code = document.createElement("code");
+        code.className = lang !== "none" ? "language-" + lang : "";
+
+if (window.Prism && lang !== "none") {
+    code.textContent = codeText;
+    setTimeout(() => Prism.highlightElement(code), 0);
+} else {
+    if (typeof fallbackHighlight === "function") {
+        code.innerHTML = fallbackHighlight(codeText, lang);
+    } else {
+        code.textContent = codeText;
+    }
 }
 
+const badge = document.createElement("div");
+badge.className = "nova-code-lang";
+badge.textContent = (lang || "TEXT").toUpperCase();
+
+pre.appendChild(badge);
+
+const copy = document.createElement("button");
+copy.type = "button";
+copy.className = "nova-code-copy";
+copy.textContent = "Copy";
+
+        copy.onclick = async () => {
+            await navigator.clipboard.writeText(codeText || "");
+            copy.textContent = "Copied";
+            setTimeout(() => copy.textContent = "Copy", 900);
+        };
+
+        pre.appendChild(copy);
+        pre.appendChild(code);
+        container.appendChild(pre);
+    });
 }
+/* =========================================================
+   renderAssistantMessage
+   SINGLE SOURCE OF TRUTH (CLEAN SMFF VERSION)
+   ========================================================= */
+
+function renderAssistantMessage(assistantBubble, data) {
+    if (!assistantBubble || assistantBubble.dataset.rendered === "1") {
+        return;
+    }
+
+    assistantBubble.dataset.rendered = "1";
+
+    const assistantMessage = {
+        text: cleanVisibleAssistantText(
+            data.assistant_message?.text ||
+            data.text ||
+            data.response ||
+            ""
+        ),
+
+        meta: {
+            sources:
+                data.assistant_message?.meta?.sources ||
+                data.sources ||
+                []
+        },
+
+        image:
+            data.image_url ||
+            data.assistant_message?.image_url ||
+            null
+    };
+
+    let bubble = assistantBubble.querySelector(".bubble");
+
+    if (!bubble) {
+        bubble = document.createElement("div");
+        bubble.className = "bubble";
+        assistantBubble.appendChild(bubble);
+    }
+
+renderMessageWithCodeBlocks(bubble, assistantMessage.text || "");
+
+    const actions = document.createElement("div");
+    actions.className = "message-actions";
+    actions.style.marginTop = "8px";
+    actions.style.display = "flex";
+    actions.style.gap = "8px";
+
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.textContent = "Copy";
+
+    copyBtn.onclick = async () => {
+        try {
+            await navigator.clipboard.writeText(assistantMessage.text || "");
+            copyBtn.textContent = "Copied";
+            setTimeout(() => {
+                copyBtn.textContent = "Copy";
+            }, 900);
+        } catch (e) {
+            copyBtn.textContent = "Copy failed";
+        }
+    };
+
+    const regenBtn = document.createElement("button");
+    regenBtn.type = "button";
+    regenBtn.textContent = "Regen";
+
+    regenBtn.onclick = () => {
+        const inputEl = document.getElementById("input");
+        if (!inputEl) return;
+
+        const lastUser = window.__NOVA_LAST_USER_MESSAGE || inputEl.value || "";
+        if (!lastUser) return;
+
+        inputEl.value = lastUser;
+        handleSendClick(lastUser);
+    };
+
+    actions.appendChild(copyBtn);
+    actions.appendChild(regenBtn);
+    assistantBubble.appendChild(actions);
+
+    if (assistantMessage.image) {
+        const imageWrap = document.createElement("div");
+        imageWrap.style.marginTop = "10px";
+
+        const img = document.createElement("img");
+        img.src = assistantMessage.image;
+        img.style.maxWidth = "100%";
+        img.style.borderRadius = "14px";
+
+        imageWrap.appendChild(img);
+        assistantBubble.appendChild(imageWrap);
+    }
+}
+
+/* =========================
+   END renderAssistantMessage
+   ========================= */
 
 function handleSendClick(prompt = "") {
   if (__nova_send_lock) {
@@ -2739,43 +2785,92 @@ async function loadMemory() {
   // =========================
   // MESSAGE RENDERER (SINGLE VERSION ONLY)
   // =========================
-  function renderDesktopChatMessagesRescue(messages) {
+
+function dedupeNovaMessages(messages) {
+    const seen = new Set();
+
+    return (Array.isArray(messages) ? messages : []).filter(function (message) {
+        const id =
+            message?.id ||
+            message?.message_id ||
+            message?.created_at + ":" + message?.role + ":" + message?.text;
+
+        if (!id) return true;
+
+        const key = String(id);
+
+        if (seen.has(key)) return false;
+
+        seen.add(key);
+        return true;
+    });
+}
+
+function renderDesktopChatMessagesRescue(messages) {
+
+    if (window.__NOVA_RESCUE_RENDER_LOCK__) return false;
+    window.__NOVA_RESCUE_RENDER_LOCK__ = true;
+
+    setTimeout(() => {
+        window.__NOVA_RESCUE_RENDER_LOCK__ = false;
+    }, 150);
+
     var box = getDesktopMessagesContainerRescue();
     if (!box) return false;
+
+    messages = dedupeNovaMessages(messages);
 
     box.innerHTML = "";
 
     if (!messages || !messages.length) {
-      box.innerHTML = "<div class='message assistant'>No messages yet.</div>";
-      return true;
+        box.innerHTML = "<div class='message assistant'>No messages yet.</div>";
+        return true;
     }
 
     messages.forEach(function (msg, index) {
-      var role = String(msg.role || "assistant");
-      var text = msg.content || msg.text || msg.message || "";
 
-      var row = document.createElement("div");
-      row.className = "message " + (role.includes("user") ? "user" : "assistant");
-row.setAttribute(
-  "data-message-id",
-  msg.id || msg.message_id || "rescue_" + index
-);
+        var role = String(msg.role || "assistant");
+        var text = msg.content || msg.text || msg.message || "";
 
-const bubble = document.createElement("div");
-bubble.className = "bubble";
-bubble.textContent = String(text);
+        text = cleanVisibleAssistantText(text);
 
-row.appendChild(bubble);
-      if (!role.includes("user")) {
-        var cards = novaDesktopRescueSourceCards_20260611(msg);
-        if (cards) row.appendChild(cards);
-      }
+        if (!String(text || "").trim() && !msg.image_url && !msg.image) {
+            return;
+        }
 
-      box.appendChild(row);
+        var row = document.createElement("div");
+        row.className = "message " + (role.includes("user") ? "user" : "assistant");
+
+        row.setAttribute(
+            "data-message-id",
+            msg.id || msg.message_id || "rescue_" + index
+        );
+
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+
+        if (typeof renderMessageWithCodeBlocks === "function" && role.indexOf("user") === -1) {
+            renderMessageWithCodeBlocks(bubble, String(text));
+        } else {
+            bubble.textContent = String(text);
+        }
+
+        row.appendChild(bubble);
+
+        if (!role.includes("user")) {
+            var existingCards = row.querySelector(".nova-source-cards");
+
+            if (!existingCards) {
+                var cards = novaDesktopRescueSourceCards_20260611(msg);
+                if (cards) row.appendChild(cards);
+            }
+        }
+
+        box.appendChild(row);
     });
 
     return true;
-  }
+}
 
   // =========================
   // EXPORTS (ONLY ONCE)
@@ -4431,35 +4526,38 @@ renderAuthWidget(data || {});
     } catch (err) { console.warn("[Nova Desktop Final Source Cards] render failed", err); return null; }
   }
 
-  window.renderDesktopChatMessagesRescue = function(messages) {
+/*
+window.renderDesktopChatMessagesRescue = function(messages) {
     var box = getDesktopMessageBox();
     if (!box) return false;
     box.innerHTML = "";
 
     (Array.isArray(messages) ? messages : []).forEach(function(msg) {
-      var role = String((msg.role || msg.sender || "assistant")).toLowerCase();
-      var text = msg.text || msg.content || msg.message || "";
-      if (!text && typeof msg === "string") text = msg;
+        var role = String((msg.role || msg.sender || "assistant")).toLowerCase();
+        var text = msg.text || msg.content || msg.message || "";
+        if (!text && typeof msg === "string") text = msg;
 
-      var row = document.createElement("div");
-      row.className = "message " + (role.indexOf("user") !== -1 ? "user" : "assistant");
-      row.textContent = String(text).trim() || JSON.stringify(msg);
+        var row = document.createElement("div");
+        row.className = "message " + (role.indexOf("user") !== -1 ? "user" : "assistant");
+        row.textContent = String(text).trim() || JSON.stringify(msg);
 
-      if (role.indexOf("user") === -1) {
-        var sourceCards = makeSourceCards(msg);
-        if (sourceCards) row.appendChild(sourceCards);
-      }
+        if (role.indexOf("user") === -1) {
+            var sourceCards = makeSourceCards(msg);
+            if (sourceCards) row.appendChild(sourceCards);
+        }
 
-      box.appendChild(row);
+        box.appendChild(row);
     });
 
     box.scrollTop = box.scrollHeight;
     return true;
-  };
+};
+*/
 
-  window.novaDesktopFinalSourceCardsReady = true;
-  console.log("[Nova Desktop Final Source Cards] ready");
+window.novaDesktopFinalSourceCardsReady = true;
+console.log("[Nova Desktop Final Source Cards] ready");
 })();
+
 (function () {
   "use strict";
 
@@ -4597,42 +4695,54 @@ if (
       box.innerHTML = '<div class="session-placeholder">No messages in this session.</div>';
       return 0;
     }
-    box.innerHTML = messages.map(function (message) {
+box.innerHTML = "";
 
-const role = esc(message.role || "message");
-const id = esc(message.id || "");
+messages.forEach(function (message) {
 
-const text = esc(
-  message.text ||
-  (message.assistant_message && message.assistant_message.text) ||
-  ""
-);
+messages.forEach(function (message)
 
-const imageHtml = (message.imageUrl || message.image)
-  ? `<div style="margin-top:10px;">
-       <img src="${esc(message.imageUrl || message.image)}"
-            style="max-width:100%;border-radius:14px;display:block;">
-     </div>`
-  : "";
+ {
+  const role = esc(message.role || "message");
+  const id = esc(message.id || "");
 
-const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+  const wrapper = document.createElement("div");
+  wrapper.className = "chat-message message " + role;
+  wrapper.setAttribute("data-message-id", id);
+  wrapper.style.cssText =
+    "padding:14px;margin:10px 0;border-radius:14px;background:rgba(255,255,255,.06);";
 
-const attachmentHtml = attachments.length
-  ? '<div class="nova-message-attachments" style="margin-top:10px;opacity:.75;font-size:12px;">Attachments: ' +
-    esc(attachments.map(attachmentName).filter(Boolean).join(", ")) +
-    '</div>'
-  : "";
+  const header = document.createElement("div");
+  header.style.cssText = "opacity:.65;font-size:12px;margin-bottom:6px;";
+  header.textContent = role + (id ? " · " + id : "");
 
-      return [
-        '<div class="chat-message message ' + role + '" data-message-id="' + id + '" style="padding:14px;margin:10px 0;border-radius:14px;background:rgba(255,255,255,.06);">',
-        '<div style="opacity:.65;font-size:12px;margin-bottom:6px;">' + role + (id ? " · " + id : "") + '</div>',
-'<div style="white-space:pre-wrap;">' + text + '</div>',
-imageHtml,
-        attachmentHtml,
-        sourceCardsHtml(message),
-        '</div>'
-      ].join("");
-    }).join("");
+  const textDiv = document.createElement("div");
+  textDiv.style.whiteSpace = "pre-wrap";
+  textDiv.textContent =
+    message.text ||
+    (message.assistant_message && message.assistant_message.text) ||
+    "";
+
+  wrapper.appendChild(header);
+  wrapper.appendChild(textDiv);
+
+  const imgSrc = message.imageUrl || message.image;
+  if (imgSrc) {
+    const img = document.createElement("img");
+    img.src = imgSrc;
+    img.style.cssText = "max-width:100%;border-radius:14px;display:block;margin-top:10px;";
+    wrapper.appendChild(img);
+  }
+
+  const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+  if (attachments.length) {
+    const attach = document.createElement("div");
+    attach.style.cssText = "margin-top:10px;opacity:.75;font-size:12px;";
+    attach.textContent = "Attachments: " + attachments.join(", ");
+    wrapper.appendChild(attach);
+  }
+
+  box.appendChild(wrapper);
+});
 
     box.scrollTop = box.scrollHeight;
     return messages.length;
@@ -4672,50 +4782,52 @@ try {
     if (window.__novaDesktopRescueFetchMissingSessionInstalled) return;
     window.__novaDesktopRescueFetchMissingSessionInstalled = true;
 
-    const original = typeof window.renderDesktopChatMessagesRescue === "function"
-      ? window.renderDesktopChatMessagesRescue
-      : null;
+    const original =
+      typeof window.renderDesktopChatMessagesRescue === "function"
+        ? window.renderDesktopChatMessagesRescue
+        : null;
 
-window.renderDesktopChatMessagesRescue = function () {
-  const result = original ? original.apply(this, arguments) : true;
+    window.renderDesktopChatMessagesRescue = function () {
+      const result = original ? original.apply(this, arguments) : true;
 
-  const box = getRescueBox();
-  const renderedCount = box ? box.querySelectorAll("[data-message-id]").length : 0;
-  const hasText = box ? String(box.innerText || "").trim().length > 20 : false;
+      const box = getRescueBox();
+      const renderedCount = box ? box.querySelectorAll("[data-message-id]").length : 0;
+      const hasText = box ? String(box.innerText || "").trim().length > 20 : false;
 
-  if (renderedCount > 0 && hasText) {
-    return result;
-  }
+      if (renderedCount > 0 && hasText) {
+        return result;
+      }
 
-  setTimeout(function () {
+      setTimeout(function () {
         try {
           const sessionId = getActiveSessionId();
           const box = getRescueBox();
+          if (!box) return;
+
           const renderedCount = box.querySelectorAll("[data-message-id]").length;
           const hasText = String(box.innerText || "").trim().length > 20;
 
-const currentSessionId =
-    (typeof window.getSessionId === "function" && window.getSessionId()) ||
-    localStorage.getItem("nova_session_id") ||
-    "";
+          const currentSessionId =
+            (typeof window.getSessionId === "function" && window.getSessionId()) ||
+            localStorage.getItem("nova_session_id") ||
+            "";
 
-const inputSessionId =
-    (document.getElementById("sid") && document.getElementById("sid").value) ||
-    "";
+          const inputSessionId =
+            (document.getElementById("sid") && document.getElementById("sid").value) ||
+            "";
 
-if (
-    sessionId &&
-    sessionId === currentSessionId &&
-    sessionId === inputSessionId &&
-    (!renderedCount || !hasText)
-) {
-    fetchAndRenderSession(sessionId);
-}
-
-        } catch (err) {
-          console.warn("[Nova Desktop Rescue] missing-session fallback skipped", err);
+          if (
+            sessionId &&
+            sessionId === currentSessionId &&
+            sessionId === inputSessionId &&
+            (!renderedCount || !hasText)
+          ) {
+            fetchAndRenderSession(sessionId);
+          }
+        } catch (e) {
+          console.warn("[Nova Desktop Rescue] missing session fallback failed", e);
         }
-      }, 80);
+      }, 150);
 
       return result;
     };
@@ -5664,8 +5776,8 @@ document.addEventListener("nova:message:rendered", renderForcedSourceCards);
 (function () {
   "use strict";
 
-  if (window.__novaDesktopHardProxyAliasesInstalled) return;
-  window.__novaDesktopHardProxyAliasesInstalled = true;
+  if (window.__NOVA_CORE_INSTALLED__) return;
+  window.__NOVA_CORE_INSTALLED__ = true;
 
   function $(id) {
     return document.getElementById(id);
@@ -5692,6 +5804,7 @@ document.addEventListener("nova:message:rendered", renderForcedSourceCards);
 
     alias.addEventListener("click", function () {
       var real = $(realId);
+
       if (real && typeof real.click === "function") {
         real.click();
         return;
@@ -5734,21 +5847,33 @@ document.addEventListener("nova:message:rendered", renderForcedSourceCards);
     document.body.appendChild(alias);
   }
 
-  if (window.__NOVA_CORE_INSTALLED__) return;
-  window.__NOVA_CORE_INSTALLED__ = true;
+  function installCompatAliases() {
+    installButtonAlias("desktopSessionsButton", "openSessionsBtn", "NovaDesktopOpenSessionsRescue");
+    installButtonAlias("desktopMemoryButton", "openMemoryBtn", "NovaDesktopOpenMemoryRescue");
+    installInputAlias("desktopChatInput", "input");
+    installButtonAlias("desktopSendButton", "sendBtn", null);
 
-  // =========================
-  // ELEMENT ACCESS LAYER
-  // =========================
-  const DOM = {
-    get(id) {
-      return document.getElementById(id);
-    }
-  };
+    window.NovaOpenDesktopSessions = window.NovaOpenDesktopSessions || function () {
+      var button = $("openSessionsBtn");
+      if (button) return button.click();
 
-  // =========================
-  // ALIAS MAP (ONLY ONE)
-  // =========================
+      if (typeof window.NovaDesktopOpenSessionsRescue === "function") {
+        return window.NovaDesktopOpenSessionsRescue();
+      }
+    };
+
+    window.NovaOpenDesktopMemory = window.NovaOpenDesktopMemory || function () {
+      var button = $("openMemoryBtn");
+      if (button) return button.click();
+
+      if (typeof window.NovaDesktopOpenMemoryRescue === "function") {
+        return window.NovaDesktopOpenMemoryRescue();
+      }
+    };
+
+    window.NovaDesktopCompatAliasesReady = true;
+  }
+
   const ALIASES = {
     desktopSessionsButton: "openSessionsBtn",
     desktopMemoryButton: "openMemoryBtn",
@@ -5757,43 +5882,37 @@ document.addEventListener("nova:message:rendered", renderForcedSourceCards);
   };
 
   function resolve(id) {
-    return DOM.get(id) || DOM.get(ALIASES[id]);
+    return document.getElementById(id) || document.getElementById(ALIASES[id]);
   }
 
-  // =========================
-  // SAFE EVENT BINDING
-  // =========================
-  function bindOnce(el, event, handler) {
-    if (!el || el.__bound) return;
-    el.__bound = true;
+  function bindOnce(el, key, event, handler) {
+    if (!el) return;
+
+    var boundKey = "__novaBound_" + key;
+
+    if (el[boundKey]) return;
+    el[boundKey] = true;
+
     el.addEventListener(event, handler, true);
   }
 
-  // =========================
-  // CORE BUTTON HOOKS
-  // =========================
   function initButtons() {
     const sendBtn = resolve("desktopSendButton");
     const memoryBtn = resolve("desktopMemoryButton");
-    const sessionsBtn = resolve("desktopSessionsButton");
 
-    bindOnce(sendBtn, "click", () => {
+    bindOnce(sendBtn, "sendClickLog", "click", function () {
       console.log("[NOVA] send clicked");
     });
 
-    bindOnce(memoryBtn, "click", () => {
+    bindOnce(memoryBtn, "memoryClickLog", "click", function () {
       console.log("[NOVA] memory clicked");
     });
-
   }
 
-  // =========================
-  // SINGLE OBSERVER (NO DUPES)
-  // =========================
   function initObserver() {
     if (window.__NOVA_OBSERVER__) return;
 
-    const observer = new MutationObserver(() => {
+    const observer = new MutationObserver(function () {
       initButtons();
     });
 
@@ -5805,18 +5924,19 @@ document.addEventListener("nova:message:rendered", renderForcedSourceCards);
     window.__NOVA_OBSERVER__ = observer;
   }
 
-  // =========================
-  // BOOT SEQUENCE
-  // =========================
   function boot() {
+    if (window.__NOVA_BOOT_DONE__) return;
+    window.__NOVA_BOOT_DONE__ = true;
+
+    installCompatAliases();
     initButtons();
     initObserver();
 
-    console.log("[NOVA CORE] initialized");
+    console.log("[NOVA CORE] initialized once");
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", boot);
+    document.addEventListener("DOMContentLoaded", boot, { once: true });
   } else {
     boot();
   }
@@ -6172,6 +6292,566 @@ async function loadDesktopArtifacts() {
     margin: 8px 0 12px !important;
 }
 
+.message {
+  max-width: 70%;
+  padding: 10px 14px;
+  margin: 6px 10px;
+  border-radius: 18px;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  line-height: 1.4;
+  font-size: 14px;
+  display: inline-block;
+}
+
+.message.assistant {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f1f1f1;
+  margin-right: auto;
+  margin-left: 10px;
+  border-top-left-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+}
+
+#chat {
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  overflow-y: auto;
+  gap: 2px;
+}
+
+.message.user {
+  background: rgba(120, 90, 255, 0.28);
+  color: #ffffff;
+  margin-left: auto;
+  margin-right: 10px;
+  border-top-right-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+}
+
+.message {
+  animation: fadeInUp 0.18s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+#chat {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.message.assistant {
+  background: rgba(255, 255, 255, 0.07);
+  color: #f1f1f1;
+  margin-right: auto;
+  border-radius: 16px 16px 16px 6px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+}
+
+.message.user {
+  background: rgba(120, 90, 255, 0.32);
+  color: #ffffff;
+  margin-left: auto;
+  border-radius: 16px 16px 6px 16px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+}
+
+.message {
+  font-size: 14px;
+  line-height: 1.5;
+  letter-spacing: 0.2px;
+}
+
+#chat {
+  scroll-behavior: smooth;
+}
+
+.message {
+  max-width: 75%;
+  padding: 10px 14px;
+  margin: 6px 10px;
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  animation: popIn 0.15s ease-out;
+}
+
+.message.assistant {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f1f1f1;
+  margin-right: auto;
+  border-radius: 18px 18px 18px 6px;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.message.user {
+  background: linear-gradient(135deg, rgba(120,90,255,0.35), rgba(140,110,255,0.2));
+  color: white;
+  margin-left: auto;
+  border-radius: 18px 18px 6px 18px;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+#chat {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 6px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+.msg.user {
+  align-self: flex-end;
+}
+
+.msg.assistant {
+  align-self: flex-start;
+}
+
+.bubble {
+  max-width: 75%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.msg.assistant .bubble {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 18px 18px 18px 6px;
+}
+
+.msg.user .bubble {
+  background: linear-gradient(135deg, rgba(120,90,255,0.35), rgba(140,110,255,0.2));
+  border-radius: 18px 18px 6px 18px;
+}
+
+#chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+.msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 78%;
+}
+
+.msg.user {
+  align-self: flex-end;
+}
+
+.msg.assistant {
+  align-self: flex-start;
+}
+
+.bubble {
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.55;
+  border-radius: 18px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  animation: popIn 0.14s ease-out;
+}
+
+.msg.assistant .bubble {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.92);
+  border-radius: 18px 18px 18px 6px;
+}
+
+.msg.user .bubble {
+  background: linear-gradient(135deg, rgba(120,90,255,0.38), rgba(140,110,255,0.22));
+  border: 1px solid rgba(255,255,255,0.12);
+  color: white;
+  border-radius: 18px 18px 6px 18px;
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bubble:hover {
+  box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+  transition: 0.15s ease;
+}
+
+/* NOVA_CHAT_BUBBLE_WIDTH_FIX_20260620 */
+#chat .msg {
+    max-width: 78% !important;
+    width: fit-content !important;
+    min-width: 44px !important;
+}
+
+#chat pre {
+    position: relative !important;
+    background: #0d1117 !important;
+    font-size: 13px !important;
+    line-height: 1.55 !important;
+    white-space: pre !important;
+
+    padding: 42px 14px 14px !important;
+
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+}
+
+#chat .msg.user {
+    align-self: flex-end !important;
+}
+
+#chat .msg.assistant {
+    align-self: flex-start !important;
+}
+
+/* NOVA_TEXT_COLOR_FIX_20260620 */
+
+#chat .bubble {
+    color: rgba(255,255,255,0.92);
+}
+
+#chat .msg.user .bubble {
+    color: #ffffff;
+}
+
+#chat .msg.assistant .bubble {
+    color: rgba(255,255,255,0.92);
+}
+
+#chat a {
+    color: #9ecbff;
+}
+
+/* NOVA_CODEBLOCK_POLISH_20260620 */
+
+#chat pre {
+    background: #111827;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 12px;
+    padding: 14px;
+    overflow-x: auto;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+#chat code {
+    font-family: Consolas, Monaco, monospace;
+    font-size: 13px;
+}
+
+#chat pre code {
+    color: #e5e7eb;
+}
+
+#chat :not(pre) > code {
+    background: rgba(255,255,255,.08);
+    padding: 2px 6px;
+    border-radius: 6px;
+}
+
+/* NOVA_CODE_BLOCK_FINAL_20260620 */
+#chat pre {
+    position: relative;
+    background: #0f172a;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 14px;
+    padding: 42px 14px 14px;
+    overflow-x: auto;
+    margin: 12px 0;
+}
+
+#chat pre code {
+    color: #e5e7eb;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.nova-code-copy {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 8px;
+    background: rgba(255,255,255,.10);
+    color: white;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+#chat .bubble {
+    color: rgba(255,255,255,.94);
+}
+
+/* NOVA_CHATGPT_CODE_LEVEL_20260620 */
+#chat pre {
+    position: relative !important;
+    background: #0d1117 !important;
+    border: 1px solid rgba(255,255,255,.12) !important;
+    border-radius: 14px !important;
+    padding: 44px 14px 14px !important;
+    overflow-x: auto !important;
+    margin: 12px 0 !important;
+}
+
+#chat pre {
+    position: relative !important;
+    background: #0d1117 !important;
+    font-size: 13px !important;
+    line-height: 1.55 !important;
+    white-space: pre !important;
+
+    padding: 42px 14px 14px !important;
+}
+
+#chat .nova-code-copy {
+    position: absolute !important;
+    top: 8px !important;
+    right: 8px !important;
+    z-index: 3 !important;
+    border: 1px solid rgba(255,255,255,.18) !important;
+    border-radius: 8px !important;
+    background: rgba(255,255,255,.10) !important;
+    color: white !important;
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+    cursor: pointer !important;
+}
+
+#chat .nova-code-copy:hover {
+    background: rgba(255,255,255,.18) !important;
+}
+
+/* NOVA_CODE_FALLBACK_COLORS_20260620 */
+#chat .tok-keyword {
+    color: #c084fc !important;
+    font-weight: 700 !important;
+}
+
+#chat .tok-string {
+    color: #86efac !important;
+}
+
+#chat .tok-number {
+    color: #facc15 !important;
+}
+
+#chat .token.keyword,
+#chat .token.function {
+    color: #c084fc !important;
+}
+
+#chat .token.string {
+    color: #86efac !important;
+}
+
+#chat .token.number {
+    color: #facc15 !important;
+}
+
+/* NOVA_TEXT_POLISH_20260620 */
+
+.bubble {
+    line-height: 1.65;
+}
+
+.bubble h1,
+.bubble h2,
+.bubble h3 {
+    margin: 14px 0 8px;
+    line-height: 1.25;
+}
+
+.bubble p {
+    margin: 8px 0;
+}
+
+.bubble code:not(pre code) {
+    background: rgba(255,255,255,.10);
+    border: 1px solid rgba(255,255,255,.10);
+    padding: 2px 6px;
+    border-radius: 7px;
+    font-family: Consolas, monospace;
+    font-size: .92em;
+}
+
+.bubble blockquote {
+    border-left: 4px solid #8b5cf6;
+    margin: 12px 0;
+    padding: 8px 14px;
+    background: rgba(139,92,246,.10);
+    border-radius: 0 10px 10px 0;
+}
+
+.bubble table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    overflow: hidden;
+    border-radius: 10px;
+}
+
+.bubble th,
+.bubble td {
+    border: 1px solid rgba(255,255,255,.14);
+    padding: 8px 10px;
+    text-align: left;
+}
+
+.bubble th {
+    background: rgba(255,255,255,.08);
+}
+
+.bubble ul,
+.bubble ol {
+    margin: 8px 0 8px 22px;
+}
+
+.bubble li {
+    margin: 4px 0;
+}
+
+/* NOVA_MESSAGE_ACTIONS_POLISH_20260620 */
+
+.msg .message-actions,
+.msg-actions,
+.bubble-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    opacity: .75;
+}
+
+.msg button,
+.message-actions button,
+.bubble-actions button {
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.07);
+    color: inherit;
+    border-radius: 9px;
+    padding: 5px 9px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.msg button:hover,
+.message-actions button:hover,
+.bubble-actions button:hover {
+    background: rgba(255,255,255,.12);
+    opacity: 1;
+}
+
+/* NOVA_CHAT_BUBBLE_POLISH_20260620 */
+
+.msg {
+    animation: novaMsgFadeIn .16s ease-out;
+}
+
+.msg.assistant .bubble {
+    max-width: 900px;
+    padding: 12px 14px;
+    line-height: 1.65;
+}
+
+.msg.user .bubble {
+    max-width: 760px;
+    padding: 10px 12px;
+}
+
+@keyframes novaMsgFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* NOVA_SOURCE_CARD_POLISH_20260620 */
+
+.nova-source-card,
+.source-card {
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.06);
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-top: 10px;
+}
+
+.nova-source-title,
+.source-title {
+    font-weight: 700;
+}
+
+.nova-source-snippet,
+.source-snippet {
+    opacity: .78;
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+.nova-code-lang {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 3;
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 8px;
+    background: rgba(255,255,255,.08);
+    color: rgba(255,255,255,.82);
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .05em;
+}
+
 </style>
 
 <script>
@@ -6204,6 +6884,7 @@ async function loadDesktopArtifacts() {
 })();
 </script>
 
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="/static/js/nova-desktop-sessions.js?v=external-new-session-1"></script>
 </body>
 </html>
