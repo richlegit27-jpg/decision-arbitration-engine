@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 if (window.__novaStuckThinkingGuardLoaded) {
@@ -129,3 +129,4 @@ if (document.readyState === "loading") {
   init();
 }
 })();
+

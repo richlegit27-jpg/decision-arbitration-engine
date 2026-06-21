@@ -1,4 +1,4 @@
-// KB v3 manager UI
+﻿// KB v3 manager UI
 // - lists docs + jobs
 // - search with modes
 // - scope selection per session (doc checkboxes)
@@ -86,7 +86,7 @@ function kbDocRow(doc) {
   const name = kbEl("div", "font-semibold text-zinc-100 truncate");
   name.textContent = `#${doc.id} ${doc.filename}`;
   const meta = kbEl("div", "text-xs text-zinc-400 mt-1");
-  meta.textContent = `${doc.ext} • ${doc.bytes} bytes • ${doc.status}${doc.error ? " • " + doc.error : ""}`;
+  meta.textContent = `${doc.ext} â€¢ ${doc.bytes} bytes â€¢ ${doc.status}${doc.error ? " â€¢ " + doc.error : ""}`;
 
   left.appendChild(name);
   left.appendChild(meta);
@@ -161,7 +161,7 @@ async function kbShowChunks(docId) {
   if (!modal || !body || !title) return;
 
   title.textContent = `Doc #${docId} chunks`;
-  body.innerHTML = `<div class="text-sm text-zinc-400">Loading…</div>`;
+  body.innerHTML = `<div class="text-sm text-zinc-400">Loadingâ€¦</div>`;
   modal.classList.remove("hidden");
 
   const j = await kbJson(`/api/kb/docs/${docId}/chunks?limit=400&offset=0`);
@@ -180,7 +180,7 @@ async function kbShowChunks(docId) {
   chunks.forEach(c => {
     const card = kbEl("div", "rounded-xl border border-zinc-800 bg-zinc-950/40 p-3");
     const head = kbEl("div", "text-xs text-zinc-400");
-    head.textContent = `chunk ${c.chunk_index}` + (c.page ? ` • p.${c.page}` : "");
+    head.textContent = `chunk ${c.chunk_index}` + (c.page ? ` â€¢ p.${c.page}` : "");
     const txt = kbEl("div", "mt-2 text-sm text-zinc-200 whitespace-pre-wrap");
     txt.textContent = (c.text || "");
     card.appendChild(head);
@@ -250,7 +250,7 @@ async function kbSearch() {
   sources.forEach((s, idx) => {
     const card = kbEl("div", "rounded-xl border border-zinc-800 bg-zinc-950/40 p-3");
     const head = kbEl("div", "text-xs text-zinc-300 font-semibold");
-    head.textContent = `${idx + 1}. ${s.filename}` + (s.page ? ` (p.${s.page})` : "") + ` • doc #${s.doc_id}`;
+    head.textContent = `${idx + 1}. ${s.filename}` + (s.page ? ` (p.${s.page})` : "") + ` â€¢ doc #${s.doc_id}`;
     const snip = kbEl("div", "mt-2 text-sm text-zinc-200 whitespace-pre-wrap");
     snip.textContent = (s.snippet || "");
     card.appendChild(head);
@@ -291,7 +291,7 @@ async function kbRefresh() {
       const ul = kbEl("ul", "space-y-2");
       top.forEach(j => {
         const li = kbEl("li", "text-xs text-zinc-400");
-        li.textContent = `#${j.id} • ${j.status} • doc #${j.doc_id} • ${j.filename}`;
+        li.textContent = `#${j.id} â€¢ ${j.status} â€¢ doc #${j.doc_id} â€¢ ${j.filename}`;
         ul.appendChild(li);
       });
       jobsBox.appendChild(ul);
@@ -329,3 +329,4 @@ function kbWire() {
 }
 
 document.addEventListener("DOMContentLoaded", kbWire);
+

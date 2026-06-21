@@ -1,4 +1,4 @@
-\# Nova Landing Page Layout
+﻿\# Nova Landing Page Layout
 
 
 
@@ -177,4 +177,5 @@ Close the page cleanly and make the product feel complete.
 Do not overcomplicate the first landing page.
 
 Make it clean, clear, and real first.
+
 

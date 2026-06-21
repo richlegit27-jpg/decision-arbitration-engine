@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat\input.js
+﻿// C:\Users\Owner\nova\static\js\chat\input.js
 
 (() => {
   const app = window.NovaApp;
@@ -94,3 +94,4 @@
   window.NovaApp = window.NovaApp || {};
   window.NovaApp.input = inputMod;
 })();
+

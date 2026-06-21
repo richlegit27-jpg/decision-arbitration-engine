@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg: #0a0d12;
   --bg-2: #0f141b;
   --bg-3: #131a23;
@@ -114,7 +114,7 @@ audio {
   box-shadow: inset -1px 0 0 rgba(255,255,255,0.03);
 }
 
-/* ===== RIGHT RAIL — REAL LIVE DOM ===== */
+/* ===== RIGHT RAIL â€” REAL LIVE DOM ===== */
 
 .nova-right-rail {
   border-left: 1px solid var(--border);

@@ -1,4 +1,4 @@
-class RuntimeWorldModelService:
+﻿class RuntimeWorldModelService:
     def __init__(self):
         self.world_state = {
             "prediction_history": [],
@@ -189,3 +189,4 @@ class RuntimeWorldModelService:
             return float(value)
         except Exception:
             return default
+

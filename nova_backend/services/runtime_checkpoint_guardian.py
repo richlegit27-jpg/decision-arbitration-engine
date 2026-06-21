@@ -1,4 +1,4 @@
-class RuntimeCheckpointGuardian:
+﻿class RuntimeCheckpointGuardian:
 
     def __init__(self):
 
@@ -103,3 +103,4 @@ class RuntimeCheckpointGuardian:
             ),
             "checkpoint": checkpoint,
         }
+

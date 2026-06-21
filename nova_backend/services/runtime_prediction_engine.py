@@ -1,4 +1,4 @@
-class RuntimePredictionEngine:
+﻿class RuntimePredictionEngine:
 
     def predict(
         self,
@@ -116,3 +116,4 @@ class RuntimePredictionEngine:
             "ok": True,
             "prediction": prediction,
         }
+

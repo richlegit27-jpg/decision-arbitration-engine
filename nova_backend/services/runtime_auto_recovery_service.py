@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 
 class RuntimeAutoRecoveryService:
@@ -66,3 +66,4 @@ class RuntimeAutoRecoveryService:
                 recovery_actions
             ),
         }
+

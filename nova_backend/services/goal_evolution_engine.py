@@ -1,4 +1,4 @@
-class GoalEvolutionEngine:
+﻿class GoalEvolutionEngine:
 
     def evolve_goal(
         self,
@@ -102,3 +102,4 @@ class GoalEvolutionEngine:
                 evolved_goals
             ),
         }
+

@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.NovaCore) return;
@@ -402,3 +402,4 @@
     sendMessage,
   };
 })();
+

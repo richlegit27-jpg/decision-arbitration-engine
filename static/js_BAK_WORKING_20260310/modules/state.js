@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\modules\state.js
+﻿// C:\Users\Owner\nova\static\js\modules\state.js
 
 export const state = {
   activeChatId: null,
@@ -35,3 +35,4 @@ export function setEditing(value, messageEl = null) {
   state.isEditing = Boolean(value);
   state.editingMessageEl = messageEl || null;
 }
+

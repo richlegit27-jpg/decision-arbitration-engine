@@ -1,5 +1,5 @@
-document.addEventListener("DOMContentLoaded", () => {
-    console.log("Nova Dashboard Widgets Loaded 📊");
+﻿document.addEventListener("DOMContentLoaded", () => {
+    console.log("Nova Dashboard Widgets Loaded ðŸ“Š");
 
     const memoryItems = JSON.parse(localStorage.getItem(`nova_memory_default`)||"[]");
     const chatMessages = document.getElementById("chatMessages");
@@ -43,3 +43,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Optional: extend to multiple sessions, token count, typing indicators, etc.
 });
+

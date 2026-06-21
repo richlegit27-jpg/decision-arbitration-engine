@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   window.NovaRender = window.NovaRender || {};
@@ -120,3 +120,4 @@
   NovaRender.resizeTextarea = resizeTextarea;
   NovaRender.handleViewportResize = handleViewportResize;
 })();
+

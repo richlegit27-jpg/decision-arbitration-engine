@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     "use strict";
 
     function syncSessionFromResponse(data) {
@@ -45,3 +45,4 @@
     };
 
 })();
+

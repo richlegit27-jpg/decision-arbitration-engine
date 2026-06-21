@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat-app.js
+﻿// C:\Users\Owner\nova\static\js\chat-app.js
 
 (() => {
 "use strict"
@@ -149,7 +149,7 @@ function bindTopbarButtons(){
   const btnTopbarMemory = document.getElementById("btnTopbarMemory")
 
   if(btnTopbarMemory){
-    btnTopbarMemory.title = "Click: Memory • Double-click: Toggle chat background"
+    btnTopbarMemory.title = "Click: Memory â€¢ Double-click: Toggle chat background"
   }
 
   btnWorkspaceFiles?.addEventListener("click", () => {
@@ -288,3 +288,4 @@ window.NovaChatApp = {
 chatBootstrapApi.start(init)
 
 })()
+

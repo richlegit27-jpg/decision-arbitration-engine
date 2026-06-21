@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\render-service.js
+﻿// C:\Users\Owner\nova\static\js\render-service.js
 
 (() => {
 "use strict"
@@ -372,7 +372,7 @@ function createRenderService(options = {}){
   function buildAttachmentMeta(attachment){
     const type = attachment?.content_type || attachment?.type || "file"
     const size = formatBytes(attachment?.size || 0)
-    return `${type} • ${size}`
+    return `${type} â€¢ ${size}`
   }
 
   function formatStatusLabel(status){

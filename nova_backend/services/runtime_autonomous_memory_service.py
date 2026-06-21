@@ -1,4 +1,4 @@
-class RuntimeAutonomousMemoryService:
+﻿class RuntimeAutonomousMemoryService:
 
     name = "runtime_autonomous_memory_service"
 
@@ -148,3 +148,4 @@ class RuntimeAutonomousMemoryService:
             "runtime_autonomous_memory": memory[-100:],
             "runtime_autonomous_actions": historical_actions[-250:],
         }
+

@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 if (window.NovaApp && window.NovaApp.api) {
@@ -309,3 +309,4 @@ app.api = {
 };
 
 })();
+

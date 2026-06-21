@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   if (window.NovaComposerChat) return;
@@ -260,3 +260,4 @@
     });
   }
 })();
+

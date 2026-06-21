@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\workspace-files.js
+﻿// C:\Users\Owner\nova\static\js\workspace-files.js
 
 (() => {
 "use strict"
@@ -250,7 +250,7 @@ async function loadFiles(){
       const name = escapeHtml(file?.name || file?.filename || `File ${index + 1}`)
       const size = formatBytes(file?.size || file?.file_size || 0)
       const createdAt = escapeHtml(file?.created_at || file?.uploaded_at || "")
-      const meta = createdAt ? `${size} • ${createdAt}` : size
+      const meta = createdAt ? `${size} â€¢ ${createdAt}` : size
 
       return `
         <div class="workspace-file-item">

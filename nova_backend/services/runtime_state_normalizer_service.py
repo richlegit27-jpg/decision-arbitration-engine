@@ -1,4 +1,4 @@
-class RuntimeStateNormalizerService:
+﻿class RuntimeStateNormalizerService:
 
     def normalize(
         self,
@@ -54,3 +54,4 @@ class RuntimeStateNormalizerService:
             "normalized": normalized,
             "execution_state": execution_state,
         }
+

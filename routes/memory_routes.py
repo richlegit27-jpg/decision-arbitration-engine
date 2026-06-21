@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -95,3 +95,4 @@ async def memory_remove(memory_id: int, request: Request):
 async def memory_remove_all(request: Request):
     _require_auth(request)
     return delete_all_memory()
+

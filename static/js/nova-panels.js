@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   const PANELS_VERSION = "session-rail-2026-03-31-001";
@@ -53,7 +53,7 @@
       if (!el) return;
       const shownTitle = text(title) || "New Chat";
       const shortId = text(sessionId).slice(0, 8) || "none";
-      el.textContent = `Session: ${shownTitle} · ${shortId}`;
+      el.textContent = `Session: ${shownTitle} Â· ${shortId}`;
     },
 
     renderSessionList(sessions, activeSessionId) {
@@ -89,7 +89,7 @@
             title="${escapeHtml(title)}"
           >
             <div class="nova-session-title">${escapeHtml(title)}</div>
-            <div class="nova-session-meta">${escapeHtml(updated)} · ${escapeHtml(String(count))} messages</div>
+            <div class="nova-session-meta">${escapeHtml(updated)} Â· ${escapeHtml(String(count))} messages</div>
             <div class="nova-session-preview">${escapeHtml(preview || "No preview yet.")}</div>
           </button>
         `;
@@ -144,3 +144,4 @@
 
   NovaPanels.init();
 })();
+

@@ -27,3 +27,4 @@
     return origFetch(input, init);
   };
 })();
+

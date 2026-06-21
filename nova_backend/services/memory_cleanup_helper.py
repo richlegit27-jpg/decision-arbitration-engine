@@ -1,4 +1,4 @@
-# C:\Users\Owner\nova\nova_backend\services\memory_cleanup_helper.py
+﻿# C:\Users\Owner\nova\nova_backend\services\memory_cleanup_helper.py
 # NOVA_MEMORY_CLEANUP_HELPER_20260609
 #
 # Splits large memory entries (like attachments) into smaller usable memory records.
@@ -56,3 +56,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

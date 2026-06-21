@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\state.js
+﻿// C:\Users\Owner\nova\static\js\state.js
 
 (() => {
 "use strict"
@@ -29,3 +29,4 @@ window.NovaState = {
 }
 
 })()
+

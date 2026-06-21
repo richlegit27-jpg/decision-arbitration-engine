@@ -1,4 +1,4 @@
-@app.post("/api/chat")
+﻿@app.post("/api/chat")
 def api_chat()::
     try:
         data = parse_json_body()
@@ -215,3 +215,4 @@ def api_chat()::
             "trace": traceback.format_exc(),
             "route_build": ROUTE_BUILD,
         }), 500
+

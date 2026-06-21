@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import traceback
 from typing import Any, Callable, Tuple
@@ -34,3 +34,4 @@ def guarded_json_route(fn: Callable[..., Tuple[dict, int] | dict]):
     wrapper.__name__ = getattr(fn, "__name__", "guarded_route")
     wrapper.__doc__ = getattr(fn, "__doc__", "")
     return wrapper
+

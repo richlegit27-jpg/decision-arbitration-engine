@@ -1,4 +1,4 @@
-/* C:\Users\Owner\nova\static\css\layout.css */
+﻿/* C:\Users\Owner\nova\static\css\layout.css */
 
 html,
 body{
@@ -790,4 +790,5 @@ body:not(.sidebar-open) .sidebar{
   flex-wrap:wrap;
   margin-top:8px;
 }
+
 

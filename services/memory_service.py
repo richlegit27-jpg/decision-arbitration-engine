@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import uuid
@@ -77,3 +77,4 @@ class MemoryService:
     def clear_memory(self) -> dict[str, Any]:
         self._save([])
         return {"cleared": True}
+

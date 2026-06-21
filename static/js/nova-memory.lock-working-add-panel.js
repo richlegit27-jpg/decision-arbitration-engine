@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   const state = {
@@ -42,7 +42,7 @@
     const text = String(value || "").trim();
     if (!text) return "";
     if (text.length <= maxLen) return text;
-    return text.slice(0, maxLen - 1) + "…";
+    return text.slice(0, maxLen - 1) + "â€¦";
   }
 
   function formatDate(value) {
@@ -215,7 +215,7 @@
 
   async function loadMemory() {
     state.loading = true;
-    setStatus("Loading memory…", "loading");
+    setStatus("Loading memoryâ€¦", "loading");
 
     try {
       const payload = await api("/api/memory");
@@ -245,7 +245,7 @@
       return;
     }
 
-    setStatus("Saving memory…", "loading");
+    setStatus("Saving memoryâ€¦", "loading");
 
     try {
       await api("/api/memory/add", {
@@ -268,7 +268,7 @@
 
   async function deleteMemory(id) {
     if (!id) return;
-    setStatus("Deleting memory…", "loading");
+    setStatus("Deleting memoryâ€¦", "loading");
 
     try {
       await api("/api/memory/delete", {
@@ -433,3 +433,4 @@ function waitForPanelAndBoot() {
 
   tick();
 }
+

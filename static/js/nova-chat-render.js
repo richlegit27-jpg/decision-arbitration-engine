@@ -43,3 +43,4 @@ function renderMessage(msg, role = "assistant") {
 }
 
 window.Nova.renderMessage = renderMessage;
+

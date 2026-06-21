@@ -513,7 +513,7 @@ class ChatService:
                 if text_parts:
                     return "\n".join(text_parts).strip()
 
-            return "Iâ€™m here, but the model returned an empty response."
+            return "I'm here, but the model returned an empty response."
 
         debug = {
             "route": "chat_service.handle",
@@ -983,3 +983,5 @@ class ChatService:
                 return prompt or text
 
         return text or "Generate an image."
+
+

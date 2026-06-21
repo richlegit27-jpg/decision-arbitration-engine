@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaRouterControlLoaded) return;
@@ -88,8 +88,8 @@
             <div id="novaRouterSubtitle" class="nova-router-subtitle">No router data yet</div>
           </div>
           <div class="nova-router-actions">
-            <button id="novaRouterCopyBtn" class="nova-router-icon-btn" type="button" aria-label="Copy router data">⧉</button>
-            <button id="novaRouterCloseBtn" class="nova-router-icon-btn" type="button" aria-label="Close router panel">✕</button>
+            <button id="novaRouterCopyBtn" class="nova-router-icon-btn" type="button" aria-label="Copy router data">â§‰</button>
+            <button id="novaRouterCloseBtn" class="nova-router-icon-btn" type="button" aria-label="Close router panel">âœ•</button>
           </div>
         </div>
         <div id="novaRouterBody" class="nova-router-body">
@@ -120,7 +120,7 @@
       ? new Date(STATE.lastUpdatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
       : "just now";
 
-    return `${meta.mode || "general"} • ${meta.intent || "conversation"} • updated ${when}`;
+    return `${meta.mode || "general"} â€¢ ${meta.intent || "conversation"} â€¢ updated ${when}`;
   }
 
   function buildChips(meta) {

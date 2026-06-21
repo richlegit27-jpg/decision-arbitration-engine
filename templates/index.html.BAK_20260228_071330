@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
 <!-- SERVED_TEST_20260227_215609 :: C:\Users\Owner\nova\templates\index.html -->
@@ -293,13 +293,13 @@
             </span>
             <span class="statusBadge" title="Backend /api/health">
               <span class="led" id="healthLed"></span>
-              <span id="healthText">checking…</span>
+              <span id="healthText">checkingâ€¦</span>
             </span>
           </div>
         </div>
       </div>
       <div class="pills">
-        <div class="pill"><strong>status</strong><span id="statusText">…</span></div>
+        <div class="pill"><strong>status</strong><span id="statusText">â€¦</span></div>
         <div class="pill"><strong>mode</strong><span id="modeText">ask</span></div>
       </div>
     </div>
@@ -312,7 +312,7 @@
         </div>
         <div class="log" id="log"></div>
         <div class="composer" id="composer">
-          <textarea id="input" placeholder="Type here…"></textarea>
+          <textarea id="input" placeholder="Type hereâ€¦"></textarea>
           <button class="btn" id="sendBtn">Send</button>
 </div>
       </div>
@@ -350,7 +350,7 @@
 
           <div class="row">
             <div>
-              <div class="label">Show “circly mouse”</div>
+              <div class="label">Show â€œcircly mouseâ€</div>
               <small>Fun cursor dot overlay.</small>
             </div>
             <div class="toggle">
@@ -457,7 +457,7 @@
           aborter = new AbortController();
 
           sendBtn && (sendBtn.disabled = true);
-          statusText.textContent = "thinking…";
+          statusText.textContent = "thinkingâ€¦";
 
           try{
             const sid = encodeURIComponent(getSession());
@@ -484,6 +484,7 @@
 
             lastReply = reply;
             append("NOVA", reply || JSON.stringify(j
+
 
 
 

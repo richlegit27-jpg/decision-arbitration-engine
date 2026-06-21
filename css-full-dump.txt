@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg: #0b1020;
   --bg-elev-1: #11182d;
   --bg-elev-2: #17213b;
@@ -590,7 +590,7 @@ body.is-shell-locked .nova-composer {
 }
 
 /* =========================================================
-   PHASE 3 — MESSAGE / ACTION PREMIUM POLISH
+   PHASE 3 â€” MESSAGE / ACTION PREMIUM POLISH
    ========================================================= */
 
 .nova-message {
@@ -2958,7 +2958,7 @@ body.is-sidebar-open .nova-sidebar {
 }
 
 /* =========================================================
-   🎥 VIDEO UI POLISH LOCK
+   ðŸŽ¥ VIDEO UI POLISH LOCK
    ========================================================= */
 
 .nova-message-video {
@@ -3032,3 +3032,4 @@ body.is-sidebar-open .nova-sidebar {
   border-bottom-left-radius: 12px;
   border-bottom-right-radius: 12px;
 }
+

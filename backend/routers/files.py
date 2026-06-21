@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import os
@@ -178,3 +178,4 @@ async def auth_status() -> JSONResponse:
 
 app.include_router(chat_stream_router)
 app.include_router(files_router)
+

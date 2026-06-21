@@ -1,4 +1,4 @@
-class MemoryCore:
+﻿class MemoryCore:
     """
     Simple memory system for Nova.
     Stores and retrieves structured context.
@@ -15,3 +15,4 @@ class MemoryCore:
 
     def clear(self):
         self.store = []
+

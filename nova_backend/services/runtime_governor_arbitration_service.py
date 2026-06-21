@@ -1,4 +1,4 @@
-class RuntimeGovernorArbitrationService:
+﻿class RuntimeGovernorArbitrationService:
     def __init__(self):
         self.weights = {
             "repair": 0.80,
@@ -325,3 +325,4 @@ class RuntimeGovernorArbitrationService:
             return float(value)
         except Exception:
             return default
+

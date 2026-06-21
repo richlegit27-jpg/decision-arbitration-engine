@@ -1,4 +1,4 @@
-# C:\Users\Owner\nova\nova_backend\services\memory_cleanup_refined.py
+﻿# C:\Users\Owner\nova\nova_backend\services\memory_cleanup_refined.py
 # NOVA_MEMORY_CLEANUP_REFINED_20260609
 #
 # Collapses line-based memory items into attachment-level items.
@@ -61,3 +61,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

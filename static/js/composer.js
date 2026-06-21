@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+﻿document.addEventListener("DOMContentLoaded", () => {
   const input = document.getElementById("messageInput");
   const sendBtn = document.getElementById("sendBtn");
   const stopBtn = document.getElementById("stopBtn");
@@ -30,8 +30,8 @@ document.addEventListener("DOMContentLoaded", () => {
       .map(
         (file, index) => `
           <div class="mini-chip">
-            <span>📎 ${file.name}</span>
-            <button type="button" data-remove-file="${index}" class="icon-btn" title="Remove file">✕</button>
+            <span>ðŸ“Ž ${file.name}</span>
+            <button type="button" data-remove-file="${index}" class="icon-btn" title="Remove file">âœ•</button>
           </div>
         `
       )
@@ -70,7 +70,7 @@ document.addEventListener("DOMContentLoaded", () => {
         throw new Error("No active chat available.");
       }
 
-      // 🔹 instant UI add
+      // ðŸ”¹ instant UI add
       if (text) {
         window.dispatchEvent(
           new CustomEvent("nova:message-added", {
@@ -104,10 +104,10 @@ document.addEventListener("DOMContentLoaded", () => {
         ? response
         : [];
 
-      // 🔹 sync state
+      // ðŸ”¹ sync state
       window.NovaApp.state.messagesByChatId[chat.id] = serverMessages;
 
-      // 🔥 THIS IS THE FIX
+      // ðŸ”¥ THIS IS THE FIX
       window.dispatchEvent(new Event("nova:messages-changed"));
 
       if (Array.isArray(window.NovaApp.state.chats)) {
@@ -200,3 +200,4 @@ document.addEventListener("DOMContentLoaded", () => {
   autosizeInput();
   renderAttachedFiles();
 });
+

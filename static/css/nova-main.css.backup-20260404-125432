@@ -1003,3 +1003,4 @@ footer.nova-composer-shell {
   overflow-y: auto;
   overflow-x: hidden;
 }
+

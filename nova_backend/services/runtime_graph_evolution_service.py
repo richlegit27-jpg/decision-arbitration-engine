@@ -1,4 +1,4 @@
-class RuntimeGraphEvolutionService:
+﻿class RuntimeGraphEvolutionService:
 
     def __init__(
         self,
@@ -104,3 +104,4 @@ class RuntimeGraphEvolutionService:
             "success_rate": success_rate,
             "report": report,
         }
+

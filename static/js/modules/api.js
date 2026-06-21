@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\modules\api.js
+﻿// C:\Users\Owner\nova\static\js\modules\api.js
 
 export async function getJSON(url) {
   const res = await fetch(url, {
@@ -167,3 +167,4 @@ function parseSSEBlock(block) {
 
   return { event: eventName, data };
 }
+

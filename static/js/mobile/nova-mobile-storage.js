@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     "use strict";
 
     function saveDraft(inputEl) {
@@ -68,3 +68,4 @@
 
     console.log("[Nova Mobile] storage module ready");
 })();
+

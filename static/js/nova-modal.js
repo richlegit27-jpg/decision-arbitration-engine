@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 if (window.NovaModal) {
@@ -261,3 +261,4 @@ window.NovaModal = {
   close: closeActive
 };
 })();
+

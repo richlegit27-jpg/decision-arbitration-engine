@@ -1,4 +1,4 @@
-# C:\Users\Owner\nova\nova_backend\services\chat_service_backend_readiness.py
+﻿# C:\Users\Owner\nova\nova_backend\services\chat_service_backend_readiness.py
 # NOVA_BACKEND_READINESS_ENDPOINT_20260609
 #
 # Simple API helper to return current backend readiness as JSON.
@@ -87,3 +87,4 @@ def get_backend_readiness():
         "memory_items": len(memory.get("memory", [])) if isinstance(memory, dict) else 0,
         "session_records": len(sessions.get("sessions", [])) if isinstance(sessions, dict) else 0,
     })
+

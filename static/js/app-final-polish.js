@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 // --------------------------
@@ -13,7 +13,7 @@ voiceBtn.addEventListener("click", async () => {
     // Stop recording
     mediaRecorder.stop();
     voiceBtn.dataset.recording = "false";
-    voiceBtn.textContent = "🎤 Record";
+    voiceBtn.textContent = "ðŸŽ¤ Record";
   } else {
     // Start recording
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -39,7 +39,7 @@ voiceBtn.addEventListener("click", async () => {
 
     mediaRecorder.start();
     voiceBtn.dataset.recording = "true";
-    voiceBtn.textContent = "⏺ Recording...";
+    voiceBtn.textContent = "âº Recording...";
   }
 });
 
@@ -80,3 +80,4 @@ dropZone.addEventListener("dragover", (e) => {
 dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
 dropZone.addEventListener("drop", (e) => dropZone.classList.remove("dragover"));
 })();
+

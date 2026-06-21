@@ -1,4 +1,4 @@
-# C:\Users\Owner\nova\nova_backend\services\nova_voice_profile.py
+﻿# C:\Users\Owner\nova\nova_backend\services\nova_voice_profile.py
 
 NOVA_VOICE_PROFILE = {
     "style": "direct, sharp, practical, no filler",
@@ -19,3 +19,4 @@ NOVA_VOICE_PROFILE = {
         "execution-first answers",
     ],
 }
+

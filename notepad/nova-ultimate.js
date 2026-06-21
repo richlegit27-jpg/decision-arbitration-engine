@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 if(window.__novaUltimateLoaded){ console.warn("Nova Ultimate already loaded."); return; }
@@ -115,3 +115,4 @@ fileInput.addEventListener("change", e=>{
   });
 });
 })();
+

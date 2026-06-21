@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 
 
 class PatchEngineService:
@@ -109,3 +109,4 @@ class PatchEngineService:
             "target_file": target_file,
             "backup_file": backup_path,
         }
+

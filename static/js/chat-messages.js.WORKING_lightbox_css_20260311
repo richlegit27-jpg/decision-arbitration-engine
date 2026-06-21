@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat-messages.js
+﻿// C:\Users\Owner\nova\static\js\chat-messages.js
 
 (() => {
 "use strict"
@@ -167,7 +167,7 @@ function buildAttachmentMeta(att){
     parts.push(sizeText)
   }
 
-  return parts.join(" • ")
+  return parts.join(" â€¢ ")
 }
 
 function isImageAttachment(att = {}){

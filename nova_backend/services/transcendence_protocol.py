@@ -1,4 +1,4 @@
-class TranscendenceProtocol:
+﻿class TranscendenceProtocol:
 
     def evaluate_transition(
         self,
@@ -125,3 +125,4 @@ class TranscendenceProtocol:
             "ok": True,
             "decisions": decisions,
         }
+

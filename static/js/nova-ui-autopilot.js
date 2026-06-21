@@ -1,10 +1,10 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaAutoPilotLoaded) return;
   window.__novaAutoPilotLoaded = true;
 
-  console.log("🚀 Nova Phase 4 Auto-Pilot Launching...");
+  console.log("ðŸš€ Nova Phase 4 Auto-Pilot Launching...");
 
   const shell = document.querySelector(".nova-app-shell");
   const sidebarBtn = document.getElementById("sidebarToggle");
@@ -13,7 +13,7 @@
   const artifactCards = Array.from(document.querySelectorAll(".nova-artifact-card"));
 
   function log(name, pass) {
-    console.log(`${pass ? "✅" : "❌"} ${name}`);
+    console.log(`${pass ? "âœ…" : "âŒ"} ${name}`);
   }
 
   function enforceMainWidth() {
@@ -86,7 +86,7 @@
           artifactViewerTest(artifactCards, () => {
             mobileLayoutTest(() => {
               selfHealPanels();
-              console.log("🚀 Nova Phase 4 Auto-Pilot Completed!");
+              console.log("ðŸš€ Nova Phase 4 Auto-Pilot Completed!");
             });
           });
         });
@@ -105,3 +105,4 @@
     document.addEventListener("DOMContentLoaded", bootstrap);
   } else bootstrap();
 })();
+

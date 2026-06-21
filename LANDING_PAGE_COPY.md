@@ -1,4 +1,4 @@
-\# Nova Landing Page Copy
+﻿\# Nova Landing Page Copy
 
 
 
@@ -135,6 +135,7 @@ Nova
 Local AI Workspace
 
 Version 0.1
+
 
 
 

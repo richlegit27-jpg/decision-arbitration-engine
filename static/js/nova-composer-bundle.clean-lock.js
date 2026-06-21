@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   const LOG = "[NovaComposerBundle]";
@@ -84,7 +84,7 @@
   function shortText(value, max) {
     const s = String(value || "").trim();
     if (!s) return "";
-    return s.length > max ? s.slice(0, max - 1) + "…" : s;
+    return s.length > max ? s.slice(0, max - 1) + "â€¦" : s;
   }
 
   function setComposerStatus(text, isError) {
@@ -394,7 +394,7 @@
       const preview = escapeHtml(shortText(session.last_message_preview || session.preview || "", 110));
       const updated = escapeHtml(fmtDate(session.updated_at || session.created_at || ""));
       const count = session.message_count != null ? String(session.message_count) : "";
-      const pinGlyph = session.pinned ? "★" : "☆";
+      const pinGlyph = session.pinned ? "â˜…" : "â˜†";
 
       return [
         '<div class="nova-session-card' + (isActive ? ' is-active' : '') + '" data-session-id="' + escapeHtml(session.id || "") + '">',
@@ -402,12 +402,12 @@
         '    <div class="nova-session-card-main">',
         '      <div class="nova-session-title">' + title + "</div>",
         (preview ? '      <div class="nova-session-preview">' + preview + "</div>" : ""),
-        '      <div class="nova-session-meta">' + escapeHtml(count ? count + " msgs" : "") + (updated ? (count ? " · " : "") + updated : "") + "</div>",
+        '      <div class="nova-session-meta">' + escapeHtml(count ? count + " msgs" : "") + (updated ? (count ? " Â· " : "") + updated : "") + "</div>",
         "    </div>",
         '    <div class="nova-session-actions">',
         '      <button class="nova-icon-btn" type="button" data-action="pin" data-session-id="' + escapeHtml(session.id || "") + '" aria-label="Pin session">' + pinGlyph + "</button>",
-        '      <button class="nova-icon-btn" type="button" data-action="rename" data-session-id="' + escapeHtml(session.id || "") + '" aria-label="Rename session">✎</button>',
-        '      <button class="nova-icon-btn" type="button" data-action="delete" data-session-id="' + escapeHtml(session.id || "") + '" aria-label="Delete session">×</button>',
+        '      <button class="nova-icon-btn" type="button" data-action="rename" data-session-id="' + escapeHtml(session.id || "") + '" aria-label="Rename session">âœŽ</button>',
+        '      <button class="nova-icon-btn" type="button" data-action="delete" data-session-id="' + escapeHtml(session.id || "") + '" aria-label="Delete session">Ã—</button>',
         "    </div>",
         "  </div>",
         "</div>"
@@ -563,7 +563,7 @@
       const meta = escapeHtml([
         item.kind || viewer.kind || "",
         fmtDate(item.updated_at || item.created_at || "")
-      ].filter(Boolean).join(" · "));
+      ].filter(Boolean).join(" Â· "));
       const body = escapeHtml(
         shortText(
           item.preview ||
@@ -605,7 +605,7 @@
       const meta = escapeHtml([
         item.domain || "",
         fmtDate(item.updated_at || item.created_at || item.fetched_at || "")
-      ].filter(Boolean).join(" · "));
+      ].filter(Boolean).join(" Â· "));
       const body = escapeHtml(
         shortText(
           item.preview ||
@@ -1315,3 +1315,4 @@
 
   document.addEventListener("DOMContentLoaded", boot);
 })();
+

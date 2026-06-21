@@ -24,3 +24,5 @@ function __novaChatPayload(text){
 
 
 
+
+

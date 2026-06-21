@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat-storage.js
+﻿// C:\Users\Owner\nova\static\js\chat-storage.js
 
 (() => {
 "use strict"
@@ -116,7 +116,7 @@ function cleanAutoTitle(value){
   }
 
   text = text
-    .replace(/^[`"'“”‘’.,:;!?()[\]{}\-_/\\|+=*#~]+/, "")
+    .replace(/^[`"'â€œâ€â€˜â€™.,:;!?()[\]{}\-_/\\|+=*#~]+/, "")
     .replace(/\s+/g, " ")
     .trim()
 
@@ -462,3 +462,4 @@ window.NovaChatStorage = {
   setActiveChat,
 }
 })()
+

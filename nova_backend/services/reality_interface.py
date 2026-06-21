@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import datetime
 import platform
 import psutil
 import os
@@ -101,3 +101,4 @@ class RealityInterface:
             "ok": True,
             "alerts": alerts,
         }
+

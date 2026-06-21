@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\composer-actions.js
+﻿// C:\Users\Owner\nova\static\js\composer-actions.js
 
 (() => {
 "use strict"
@@ -393,3 +393,4 @@ window.NovaComposerActions = {
 }
 
 })()
+

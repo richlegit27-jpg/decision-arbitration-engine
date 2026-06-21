@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\stream-service.js
+﻿// C:\Users\Owner\nova\static\js\stream-service.js
 
 (() => {
 "use strict"
@@ -277,7 +277,7 @@ function createStreamService(options = {}){
             const errorText = String(data.error || data.message || "Stream error.")
 
             messageService.patchMessage(assistantMessage.id, {
-              content: String(messageService.getMessageById(assistantMessage.id)?.content || "") || `⚠️ ${errorText}`,
+              content: String(messageService.getMessageById(assistantMessage.id)?.content || "") || `âš ï¸ ${errorText}`,
               status: "error",
               error: errorText,
             })
@@ -291,7 +291,7 @@ function createStreamService(options = {}){
 
       if(currentAssistant && !String(currentAssistant.content || "").trim() && !receivedAnyStreamEvent){
         messageService.patchMessage(assistantMessage.id, {
-          content: "⚠️ No response was returned from the server.",
+          content: "âš ï¸ No response was returned from the server.",
           status: "error",
           error: "No response was returned from the server.",
         })
@@ -338,12 +338,12 @@ function createStreamService(options = {}){
       console.error("Nova stream sendMessage error:", error)
 
       messageService.patchMessage(assistantMessage.id, {
-        content: String(messageService.getMessageById(assistantMessage.id)?.content || "") || `⚠️ ${error?.message || "Network/stream error."}`,
+        content: String(messageService.getMessageById(assistantMessage.id)?.content || "") || `âš ï¸ ${error?.message || "Network/stream error."}`,
         status: "error",
         error: String(error?.message || "Network/stream error."),
       })
 
-      messageService.addMessage(createSystemMessage(`⚠️ Send failed: ${error?.message || "Unknown error"}`))
+      messageService.addMessage(createSystemMessage(`âš ï¸ Send failed: ${error?.message || "Unknown error"}`))
       rerenderMessages(true)
 
       return {

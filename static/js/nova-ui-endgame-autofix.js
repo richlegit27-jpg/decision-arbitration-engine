@@ -1,7 +1,7 @@
-(() => {
+﻿(() => {
   "use strict";
 
-  console.log("🚀 Phase 4 Endgame Self-Healing Auto-Fix Starting...");
+  console.log("ðŸš€ Phase 4 Endgame Self-Healing Auto-Fix Starting...");
 
   const shell = document.querySelector(".nova-app-shell");
   const sidebarBtn = document.getElementById("sidebarToggle");
@@ -10,7 +10,7 @@
   const artifactCards = Array.from(document.querySelectorAll(".nova-artifact-card"));
 
   function log(name, pass) {
-    console.log(`${pass ? "✅" : "❌"} ${name}`);
+    console.log(`${pass ? "âœ…" : "âŒ"} ${name}`);
   }
 
   function enforceMainWidth() {
@@ -87,7 +87,7 @@
         artifactViewerTest(artifactCards, () => {
           mobileLayoutTest(() => {
             selfHealPanels();
-            console.log("🚀 Phase 4 Endgame Self-Healing Auto-Fix Completed!");
+            console.log("ðŸš€ Phase 4 Endgame Self-Healing Auto-Fix Completed!");
           });
         });
       });
@@ -97,3 +97,4 @@
   window.addEventListener("resize", enforceMainWidth);
   enforceMainWidth();
 })();
+

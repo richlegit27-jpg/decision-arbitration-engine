@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import uuid
 from typing import Any, Dict
@@ -20,7 +20,7 @@ def _trim(text: str, limit: int) -> str:
     value = str(text or "").strip()
     if len(value) <= limit:
         return value
-    return value[:limit].rstrip() + "…"
+    return value[:limit].rstrip() + "â€¦"
 
 
 # -----------------------
@@ -125,3 +125,4 @@ def memory_score(memory: dict, query: str) -> float:
         return score
     except Exception:
         return 0.0
+

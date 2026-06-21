@@ -1,4 +1,4 @@
-(function (global) {
+﻿(function (global) {
   "use strict";
 
   var expandedSteps = {};
@@ -201,9 +201,9 @@
     var stepId = "step_" + step.index;
     var isExpanded = !!expandedSteps[stepId];
 
-    var marker = "•";
-    if (stateClass === "done") marker = "✓";
-    if (stateClass === "current") marker = "➜";
+    var marker = "â€¢";
+    if (stateClass === "done") marker = "âœ“";
+    if (stateClass === "current") marker = "âžœ";
 
     var metaText = "Pending";
     if (stateClass === "done") metaText = "Completed";
@@ -290,3 +290,4 @@
   };
 
 })(window);
+

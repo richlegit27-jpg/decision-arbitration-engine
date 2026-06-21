@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -26,3 +26,4 @@ async def list_models():
         "default_model": DEFAULT_MODEL,
         "models": AVAILABLE_MODELS,
     }
+

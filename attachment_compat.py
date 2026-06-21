@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import re
 import uuid
@@ -248,3 +248,4 @@ def uploaded_file(filename: str):
         return jsonify({"ok": False, "error": "Missing filename."}), 400
 
     return send_from_directory(_upload_dir(), safe_filename, as_attachment=False)
+

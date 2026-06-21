@@ -1,4 +1,4 @@
-import json
+﻿import json
 import uuid
 from pathlib import Path
 from math import sqrt
@@ -53,3 +53,4 @@ def search_memory(query, top_k=5):
         scored.append((sim,m))
     scored.sort(reverse=True, key=lambda x:x[0])
     return [m for _,m in scored[:top_k]]
+

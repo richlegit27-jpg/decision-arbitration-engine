@@ -1,4 +1,4 @@
-/* ===== NOVA_FETCH_NORMALIZE_RESPONSE_V1 ===== */
+﻿/* ===== NOVA_FETCH_NORMALIZE_RESPONSE_V1 ===== */
 (() => {
   try{
     if (window.__NOVA_FETCH_NORMALIZE_RESPONSE_V1__) return;
@@ -148,7 +148,7 @@ const _novaReadBodyV2 = (r) => {
       if(!hint || hint.__nova_stop_added) return;
       hint.__nova_stop_added = true;
 
-      const sp = document.createTextNode(" • ");
+      const sp = document.createTextNode(" â€¢ ");
       const btn = document.createElement("button");
       btn.id = "btnStopGen";
       btn.className = "btnStop";
@@ -260,7 +260,7 @@ const _novaReadBodyV2 = (r) => {
       wrap.appendChild(cb);
       wrap.appendChild(document.createTextNode("Auto-scroll"));
 
-      hint.appendChild(document.createTextNode(" • "));
+      hint.appendChild(document.createTextNode(" â€¢ "));
       hint.appendChild(wrap);
     }
 
@@ -473,7 +473,7 @@ try{
       }
     }catch(e){}
 
-    const header = ts ? (`${whoName} · ${ts}`) : whoName;
+    const header = ts ? (`${whoName} Â· ${ts}`) : whoName;
 
     // default output = header only
     let out = header;
@@ -606,7 +606,7 @@ try{
     // Toast if available
     try{
       if(typeof _novaToastNearCursorV1 === "function"){
-        const label = ev.altKey ? (ev.shiftKey ? "✅ Copied (code quote + source)" : "✅ Copied (quote)") : "✅ Copied (header)";
+        const label = ev.altKey ? (ev.shiftKey ? "âœ… Copied (code quote + source)" : "âœ… Copied (quote)") : "âœ… Copied (header)";
         _novaToastNearCursorV1(ev, label, true);
       }
     }catch(e){}
@@ -735,13 +735,13 @@ try{
     // quick visual ping + toast
 try{
   const label = (typeof fmt !== "undefined" && fmt === "md") ? "Copied (MD)" : "Copied (plain)";
-  _novaToastNearCursorV1(ev, "✅ " + label, true);
+  _novaToastNearCursorV1(ev, "âœ… " + label, true);
 }catch(e){}
 const old = body.style.outline;
 body.style.outline = "2px solid rgba(34,197,94,.45)";
 setTimeout(() => { body.style.outline = old || ""; }, 220);
 }catch(e){
-    try{ _novaToastNearCursorV1(ev, "⚠️ Copy failed", false); }catch(e){}
+    try{ _novaToastNearCursorV1(ev, "âš ï¸ Copy failed", false); }catch(e){}
 const old = body.style.outline;
 body.style.outline = "2px solid rgba(239,68,68,.45)";
 setTimeout(() => { body.style.outline = old || ""; }, 260);
@@ -753,7 +753,7 @@ const copyBtn = document.createElement("button");
 copyBtn.className = "copyBtn";
 copyBtn.type = "button";
 /* ===== NOVA_COPY_ICON_SAFE_V1 ===== */
-copyBtn.textContent = "📋";
+copyBtn.textContent = "ðŸ“‹";
 copyBtn.setAttribute("aria-label","Copy");
 /* ===== /NOVA_COPY_ICON_SAFE_V1 ===== */copyBtn.title = "Copy message";
 
@@ -761,8 +761,8 @@ copyBtn.setAttribute("aria-label","Copy");
 try{
   const _fmt0 = (typeof _novaGetCopyFmtV1 === "function") ? _novaGetCopyFmtV1() : "plain";
   copyBtn.title = (_fmt0 === "md")
-    ? "Copy (MD) — Shift for plain"
-    : "Copy (plain) — Shift for MD";
+    ? "Copy (MD) â€” Shift for plain"
+    : "Copy (plain) â€” Shift for MD";
 }catch(e){}
 /* ===== /NOVA_COPY_ICON_TIP_SAFE_V1 ===== */
 /* ===== NOVA_COPY_MD_TOGGLE_V1 ===== */
@@ -787,7 +787,7 @@ mdBtn.title = "Toggle Markdown copy (MD)";
 
 const _novaSyncMdBtnV1 = () => {
   const on = _novaGetCopyFmtV1() === "md";
-  mdBtn.textContent = on ? "MD✓" : "MD";
+  mdBtn.textContent = on ? "MDâœ“" : "MD";
   mdBtn.classList.toggle("ok", on);
 };
 mdBtn.addEventListener("click", (ev) => {
@@ -831,7 +831,7 @@ try{
       }
     }catch(e){}
 
-    const header = ts ? (`${whoName} · ${ts}`) : whoName;
+    const header = ts ? (`${whoName} Â· ${ts}`) : whoName;
 
     // default output = header only
     let out = header;
@@ -964,7 +964,7 @@ try{
     // Toast if available
     try{
       if(typeof _novaToastNearCursorV1 === "function"){
-        const label = ev.altKey ? (ev.shiftKey ? "✅ Copied (code quote + source)" : "✅ Copied (quote)") : "✅ Copied (header)";
+        const label = ev.altKey ? (ev.shiftKey ? "âœ… Copied (code quote + source)" : "âœ… Copied (quote)") : "âœ… Copied (header)";
         _novaToastNearCursorV1(ev, label, true);
       }
     }catch(e){}
@@ -1000,7 +1000,7 @@ srcBtn.title = "Toggle source footer URL: short/full";
 
 const _novaSyncSrcBtnV1 = () => {
   const full = _novaGetSrcModeV1() === "full";
-  srcBtn.textContent = full ? "SRC✓" : "SRC";
+  srcBtn.textContent = full ? "SRCâœ“" : "SRC";
   srcBtn.classList.toggle("ok", full);
   srcBtn.title = full ? "Source footer: FULL URL" : "Source footer: short URL";
 };
@@ -1019,7 +1019,7 @@ const linkBtn = document.createElement("button");
 linkBtn.className = "copyBtn copyLink";
 linkBtn.type = "button";
 linkBtn.textContent = "LINK";
-linkBtn.title = "Copy page link (respects SRC). Shift+Click: Title — URL. Right-click: other format.";
+linkBtn.title = "Copy page link (respects SRC). Shift+Click: Title â€” URL. Right-click: other format.";
 
 /* ===== NOVA_COPY_TOAST_V1 ===== */
 const _novaToastV1 = (msg) => {
@@ -1082,25 +1082,25 @@ const _novaTitleV1 = () => {
   }catch(e){ return "NOVA"; }
 };
 
-/* LEFT CLICK → normal copy
-   SHIFT+CLICK → copy "Title — URL" */
+/* LEFT CLICK â†’ normal copy
+   SHIFT+CLICK â†’ copy "Title â€” URL" */
 linkBtn.addEventListener("click", (ev) => {
   ev.preventDefault();
   ev.stopPropagation();
 
   const url = _novaShown();
-  const txt = ev.shiftKey ? (_novaTitleV1() + " — " + url) : url;
-  const label = ev.shiftKey ? ("Title — " + _novaModeLabel()) : _novaModeLabel();
+  const txt = ev.shiftKey ? (_novaTitleV1() + " â€” " + url) : url;
+  const label = ev.shiftKey ? ("Title â€” " + _novaModeLabel()) : _novaModeLabel();
 
   _novaCopyTextV1(txt).then(() => {
-    linkBtn.textContent = "LINK✓";
+    linkBtn.textContent = "LINKâœ“";
     linkBtn.classList.add("ok");
     _novaToastV1("Copied ("+label+"): " + txt);
     setTimeout(()=>{ linkBtn.textContent="LINK"; linkBtn.classList.remove("ok"); },900);
   });
 });
 
-/* RIGHT CLICK → copy opposite format */
+/* RIGHT CLICK â†’ copy opposite format */
 linkBtn.addEventListener("contextmenu", (ev) => {
   ev.preventDefault();
   ev.stopPropagation();
@@ -1111,17 +1111,17 @@ linkBtn.addEventListener("contextmenu", (ev) => {
   const label = useFull ? "short (alt)" : "full (alt)";
 
   _novaCopyTextV1(txt).then(() => {
-    linkBtn.textContent = "ALT✓";
+    linkBtn.textContent = "ALTâœ“";
     linkBtn.classList.add("ok");
     _novaToastV1("Copied ("+label+"): " + txt);
     setTimeout(()=>{ linkBtn.textContent="LINK"; linkBtn.classList.remove("ok"); },900);
   });
 });
 
-/* HOVER → show what normal click copies */
+/* HOVER â†’ show what normal click copies */
 linkBtn.addEventListener("mouseenter", () => {
   try{
-    linkBtn.title = "Copy ("+_novaModeLabel()+"): " + _novaShown() + " | Shift: Title — URL | Right-click: other";
+    linkBtn.title = "Copy ("+_novaModeLabel()+"): " + _novaShown() + " | Shift: Title â€” URL | Right-click: other";
   }catch(e){}
 });
 
@@ -1213,7 +1213,7 @@ who.appendChild(linkBtn);
     return ok;
   };
 
-  console.log("✅ NOVA_COPY_ALL_V1 installed");
+  console.log("âœ… NOVA_COPY_ALL_V1 installed");
 })();
 /* ===== /NOVA_COPY_ALL_V1 ===== */
 /* ===== /NOVA_COPY_LINK_BTN_V1 ===== */
@@ -1277,7 +1277,7 @@ try{
       }
     }catch(e){}
 
-    const header = ts ? (`${whoName} · ${ts}`) : whoName;
+    const header = ts ? (`${whoName} Â· ${ts}`) : whoName;
 
     // default output = header only
     let out = header;
@@ -1410,7 +1410,7 @@ try{
     // Toast if available
     try{
       if(typeof _novaToastNearCursorV1 === "function"){
-        const label = ev.altKey ? (ev.shiftKey ? "✅ Copied (code quote + source)" : "✅ Copied (quote)") : "✅ Copied (header)";
+        const label = ev.altKey ? (ev.shiftKey ? "âœ… Copied (code quote + source)" : "âœ… Copied (quote)") : "âœ… Copied (header)";
         _novaToastNearCursorV1(ev, label, true);
       }
     }catch(e){}
@@ -1540,7 +1540,7 @@ try{
     const old = copyBtn.textContent;
     /* ===== NOVA_COPY_TOAST_FMT_V1 ===== */
 /* ===== NOVA_COPY_ICON_OK_SAFE_V1 ===== */
-copyBtn.textContent = "✅";
+copyBtn.textContent = "âœ…";
 try{ copyBtn.title = (fmt === "md") ? "Copied (MD)" : "Copied (plain)"; }catch(e){}
 /* ===== /NOVA_COPY_ICON_OK_SAFE_V1 ===== *//* ===== /NOVA_COPY_TOAST_FMT_V1 ===== */
     setTimeout(() => { copyBtn.textContent = old; copyBtn.classList.remove("ok"); }, 900);
@@ -1549,7 +1549,7 @@ try{ copyBtn.title = (fmt === "md") ? "Copied (MD)" : "Copied (plain)"; }catch(e
     copyBtn.classList.add("fail");
     const old = copyBtn.textContent;
     /* ===== NOVA_COPY_ICON_FAIL_SAFE_V1 ===== */
-copyBtn.textContent = "⚠️";
+copyBtn.textContent = "âš ï¸";
 try{ copyBtn.title = "Copy failed"; }catch(e){}
 /* ===== /NOVA_COPY_ICON_FAIL_SAFE_V1 ===== */setTimeout(() => { copyBtn.textContent = old; copyBtn.classList.remove("fail"); }, 900);
   }
@@ -1607,7 +1607,7 @@ bub.appendChild(who);
       if (userText) addBubble("me", userText);
 
       // Add thinking bubble and replace it when response arrives
-      const thinking = addBubble("ai", "Thinking…", {thinking:true});
+      const thinking = addBubble("ai", "Thinkingâ€¦", {thinking:true});
 
       const resp = _fetch(input, init);
 
@@ -1624,7 +1624,7 @@ bub.appendChild(who);
         }
       } catch(e) {
         if (thinking && thinking.body) {
-          thinking.body.textContent = (e && (e.name==="AbortError")) ? "⏹ Stopped." : "⚠️ Could not read response text.";
+          thinking.body.textContent = (e && (e.name==="AbortError")) ? "â¹ Stopped." : "âš ï¸ Could not read response text.";
         }
       }
 
@@ -1739,7 +1739,7 @@ bub.appendChild(who);
       return _orig(input, init);
     };
 
-    console.log("✅ NOVA_FETCH_SAFE_NORMALIZER_V1 installed");
+    console.log("âœ… NOVA_FETCH_SAFE_NORMALIZER_V1 installed");
   }catch(e){
     console.log("NOVA_FETCH_SAFE_NORMALIZER_V1 error", e);
   }
@@ -2050,7 +2050,7 @@ window.__NOVA_PAL_CLICK_LAST_ID__ = window.__NOVA_PAL_CLICK_LAST_ID__ || '';
   }, { passive:true });
 
   // Kill hover/mouseover selection changes while keyboard nav is active.
-  // This prevents the “skip/jump” when pointer is parked over a row.
+  // This prevents the â€œskip/jumpâ€ when pointer is parked over a row.
   const killHover = (e) => {
     if(!paletteOpen()) return;
     if(!kbLockActive()) return;
@@ -2774,11 +2774,11 @@ try{
   // by now window.fetch should be the TAP-wrapped fetch
   window.NOVA_FETCH_TAP_V1 = window.fetch;
   window.__NOVA_FETCH_TAP_FN_V1__ = window.fetch;
-  console.log("✅ exported TAP to window.NOVA_FETCH_TAP_V1");
+  console.log("âœ… exported TAP to window.NOVA_FETCH_TAP_V1");
 }catch(e){}
 /* === /NOVA_FETCH_TAP_V1 === */
 /* ==========================================================
-   NOVA — FINAL ENDGAME ENGINE (clean build)
+   NOVA â€” FINAL ENDGAME ENGINE (clean build)
    ========================================================== */
 
 const NS='nova_final_20260130_225937';
@@ -3182,7 +3182,7 @@ function editMessage(id){
   if(!m || m.locked) return toast('Locked');
   const t=prompt('Edit message:',m.text);
   if(t==null) return;
-  m.text=t; m.hash='⚠ invalidated'; m.ts=now();
+  m.text=t; m.hash='âš  invalidated'; m.ts=now();
   save(); render();
 }
 
@@ -3406,7 +3406,7 @@ function render(){
           <div class="bwho">${esc(m.who||'')}</div>
           ${actions}
         </div>
-        <small>${esc(m.ts||'')} • ${esc(m.hash||'')}</small>
+        <small>${esc(m.ts||'')} â€¢ ${esc(m.hash||'')}</small>
       `;
 const pre = document.createElement("pre");
 pre.textContent = String((m && m.text != null) ? m.text : "");
@@ -3444,7 +3444,7 @@ function send(){
   .then(() => fakeModel(t))
   .then(() => render())
   .catch(async (e) => {
-    addMessage('Nova', '⚠ ' + (e?.message || String(e)), head);
+    addMessage('Nova', 'âš  ' + (e?.message || String(e)), head);
     render();
   });
 
@@ -3607,7 +3607,7 @@ const body = JSON.stringify({ prompt: String(text||""), model: (window.__NOVA_SE
 
     const inp = document.createElement("input");
     inp.id = "novaMinPaletteInput";
-    inp.placeholder = "Type a command (try: clear, models, help)…";
+    inp.placeholder = "Type a command (try: clear, models, help)â€¦";
     inp.style.cssText = "flex:1;background:#0b0b0b;color:#eee;border:1px solid #333;border-radius:10px;padding:10px 12px;outline:none;";
 
     const btn = document.createElement("button");
@@ -3983,10 +3983,10 @@ const body = JSON.stringify({ prompt: String(text||""), model: (window.__NOVA_SE
       backdrop.innerHTML = `
   <div id="novaMiniPalette" role="dialog" aria-modal="true" aria-label="Command palette">
     <div id="novaMiniPaletteHeader">
-      <input id="novaMiniPaletteInput" autocomplete="off" spellcheck="false" placeholder="Type a command… (try: model, clear, copy, focus)" />
+      <input id="novaMiniPaletteInput" autocomplete="off" spellcheck="false" placeholder="Type a commandâ€¦ (try: model, clear, copy, focus)" />
       <div id="novaMiniPaletteMeta">
         <span>Enter</span><code>run</code>
-        <span>↑↓</span><code>navigate</code>
+        <span>â†‘â†“</span><code>navigate</code>
         <span>Esc</span><code>close</code>
         <span style="margin-left:auto; opacity:.85" id="novaMiniPaletteHint"></span>
       </div>
@@ -4166,9 +4166,9 @@ const body = JSON.stringify({ prompt: String(text||""), model: (window.__NOVA_SE
 
       // Slash helpers (these are optional quick actions)
       const slash = [
-        { name:"/ask …", desc:"Run an /ask prompt (will send immediately)", keys:"", run:()=>runSlash("/ask ") },
-        { name:"/cmd …", desc:"Run a /cmd command (will send immediately)", keys:"", run:()=>runSlash("/cmd ") },
-        { name:"/doctor …", desc:"Run /doctor (will send immediately)", keys:"", run:()=>runSlash("/doctor ") }];
+        { name:"/ask â€¦", desc:"Run an /ask prompt (will send immediately)", keys:"", run:()=>runSlash("/ask ") },
+        { name:"/cmd â€¦", desc:"Run a /cmd command (will send immediately)", keys:"", run:()=>runSlash("/cmd ") },
+        { name:"/doctor â€¦", desc:"Run /doctor (will send immediately)", keys:"", run:()=>runSlash("/doctor ") }];
 
       return base.concat(slash);
     }
@@ -4200,7 +4200,7 @@ const body = JSON.stringify({ prompt: String(text||""), model: (window.__NOVA_SE
 
       const hint = $("novaMiniPaletteHint");
       if(hint){
-        hint.textContent = `models: ${(getModelPicker()?.options?.length||0)} • current: ${currentModel()||"?"}`;
+        hint.textContent = `models: ${(getModelPicker()?.options?.length||0)} â€¢ current: ${currentModel()||"?"}`;
       }
 
       if(!items.length){
@@ -4355,7 +4355,7 @@ row.appendChild(keys);
       closePalette();
       let ok = false;
       try{ ok = !!it.run(); }catch(e){ ok = false; console.warn(e); }
-      toast(ok ? `✅ ${it.name}` : `⚠️ Failed: ${it.name}`);
+      toast(ok ? `âœ… ${it.name}` : `âš ï¸ Failed: ${it.name}`);
     }
 
     function onKeydown(e){
@@ -4481,7 +4481,7 @@ if(e.key === "ArrowUp"){
     if(window.__NOVA_MIN_MOD_LOADER_TTS_V1__) return;
     window.__NOVA_MIN_MOD_LOADER_TTS_V1__ = true;
 
-    // Keep send clean: if any mod checks these flags, they’ll skip wiring send.
+    // Keep send clean: if any mod checks these flags, theyâ€™ll skip wiring send.
     window.__NOVA_ENTER_SEND_V3__ = true;
     window.__NOVA_ENTER_SEND_V5__ = true;
 /* SCRUBBED __NOVA_SEND_BUTTON_FIX_V5__ 20260203_215211 */
@@ -4518,7 +4518,7 @@ if(e.key === "ArrowUp"){
       for(var i=0;i<mods.length;i++){
         load(base + mods[i]);
       }
-      console.log("✅ NOVA_MIN_MOD_LOADER_TTS_V1 loaded", mods.length, "mods");
+      console.log("âœ… NOVA_MIN_MOD_LOADER_TTS_V1 loaded", mods.length, "mods");
     })();
 
   }catch(err){
@@ -4561,7 +4561,7 @@ if(e.key === "ArrowUp"){
               var prompt = text.replace(/^\/image\s*/i,"").trim();
               if(!prompt) return orig(url, init);
 
-              safeAppend("assistant", "🖼 Generating image…");
+              safeAppend("assistant", "ðŸ–¼ Generating imageâ€¦");
 
               var r = fetch("/api/image", {
                 method: "POST",
@@ -4580,7 +4580,7 @@ if(e.key === "ArrowUp"){
                 safeAppend("assistant", "Image error/response: " + (j ? JSON.stringify(j) : ("HTTP " + r.status)));
               }
 
-              // Return an OK-like response so upstream code doesn’t break.
+              // Return an OK-like response so upstream code doesnâ€™t break.
               return new Response("ok\n\n<<__NOVA_DONE__>>\n", {status:200, headers:{"Content-Type":"text/plain"}});
             }
           }catch(e){
@@ -4591,7 +4591,7 @@ if(e.key === "ArrowUp"){
 
         wrapped.__NOVA_IMAGE_WRAPPED__ = true;
         window.NOVA_FETCH_TAP_V1 = wrapped;
-        console.log("✅ NOVA_IMAGE_CMD_REMOVED_REMOVED installed");
+        console.log("âœ… NOVA_IMAGE_CMD_REMOVED_REMOVED installed");
         return true;
       }catch(e){
         console.log("NOVA_IMAGE_CMD_REMOVED_REMOVED wrap error", e);
@@ -4746,7 +4746,7 @@ if(e.key === "ArrowUp"){
                 return new Response("ok\n\n<<__NOVA_DONE__>>\n", {status:200, headers:{"Content-Type":"text/plain"}});
               }
 
-              appendText("🖼 Generating image…");
+              appendText("ðŸ–¼ Generating imageâ€¦");
               const res = callImage(prompt, "1024x1024");
               const dataUrl = extractB64PngToDataUrl(res.text);
 
@@ -4881,7 +4881,7 @@ if(e.key === "ArrowUp"){
     }
 
     function ensureButton(){
-      // find a sensible place: prefer the send button’s parent
+      // find a sensible place: prefer the send buttonâ€™s parent
       const send = $("btnSend") || $("btnSend2");
       if(!send) return false;
 
@@ -4897,7 +4897,7 @@ if(e.key === "ArrowUp"){
       try{ btn.setAttribute("type","button"); }catch(_){ }
 btn.type = "button";
 btn.className = send.className || "btn";
-      btn.textContent = "🖼 Image";
+      btn.textContent = "ðŸ–¼ Image";
       btn.title = "Generate image from the input text";
       btn.style.marginRight = "8px";
 
@@ -4928,7 +4928,7 @@ btn.onclick = async (e) => {
           return;
         }
 
-        appendAssistant("🖼 Generating image…");
+        appendAssistant("ðŸ–¼ Generating imageâ€¦");
         try{
           const res = callImage(prompt);
           const dataUrl = extractB64PngToDataUrl(res.text);
@@ -5151,7 +5151,7 @@ try{
       }
     }catch(e){}
 
-    const header = ts ? (`${whoName} · ${ts}`) : whoName;
+    const header = ts ? (`${whoName} Â· ${ts}`) : whoName;
 
     // default output = header only
     let out = header;
@@ -5284,7 +5284,7 @@ try{
     // Toast if available
     try{
       if(typeof _novaToastNearCursorV1 === "function"){
-        const label = ev.altKey ? (ev.shiftKey ? "✅ Copied (code quote + source)" : "✅ Copied (quote)") : "✅ Copied (header)";
+        const label = ev.altKey ? (ev.shiftKey ? "âœ… Copied (code quote + source)" : "âœ… Copied (quote)") : "âœ… Copied (header)";
         _novaToastNearCursorV1(ev, label, true);
       }
     }catch(e){}
@@ -5382,13 +5382,13 @@ try{
 
     async function callImage(){
       if(window.__NOVA_IMAGE_INFLIGHT__){
-        setImgStatus("🖼 Generating… (already running)");
+        setImgStatus("ðŸ–¼ Generatingâ€¦ (already running)");
         return;
       }
 
       const prompt = getPrompt();
       if(!prompt){
-        setImgStatus("🖼 Type a prompt first.");
+        setImgStatus("ðŸ–¼ Type a prompt first.");
         clearImgStatusSoon(1600);
         return;
       }
@@ -5399,7 +5399,7 @@ try{
       const btn = $("btnImage");
       try{ if(btn){ btn.disabled = true; } }catch(e){}
 
-      setImgStatusHtml('🖼 Generating image… <span style="display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.35);border-top-color:rgba(255,255,255,.9);border-radius:50%;margin-left:6px;vertical-align:-2px;animation:novaSpin 1s linear infinite"></span>');
+      setImgStatusHtml('ðŸ–¼ Generating imageâ€¦ <span style="display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.35);border-top-color:rgba(255,255,255,.9);border-radius:50%;margin-left:6px;vertical-align:-2px;animation:novaSpin 1s linear infinite"></span>');
 
       let j=null, txt="";
       try{
@@ -5411,12 +5411,12 @@ try{
 
         txt = r.text();
         try{ j = JSON.parse(txt); }catch(e){
-          setImgStatus("🖼 Error: non-JSON response.");
+          setImgStatus("ðŸ–¼ Error: non-JSON response.");
           try{ console.warn("[IMG] non-JSON response head:", String(txt).slice(0,200)); }catch(_){}
           return;
         }
       } catch(err){
-        setImgStatus("🖼 Error: request failed.");
+        setImgStatus("ðŸ–¼ Error: request failed.");
         try{ console.warn("[IMG] fetch failed", err); }catch(_){}
         return;
       } finally {
@@ -5426,16 +5426,16 @@ try{
 
       if(!j || !j.ok || !j.b64_png){
         const msg =
-          (j && j.detail && String(j.detail).includes("moderation_blocked")) ? "🖼 Blocked by safety filters. Try a different prompt." :
-          (j && j.error) ? ("🖼 Error: " + j.error) :
-          "🖼 Error: bad response.";
+          (j && j.detail && String(j.detail).includes("moderation_blocked")) ? "ðŸ–¼ Blocked by safety filters. Try a different prompt." :
+          (j && j.error) ? ("ðŸ–¼ Error: " + j.error) :
+          "ðŸ–¼ Error: bad response.";
         setImgStatus(msg);
         try{ console.warn("[IMG] bad response", j); }catch(_){}
         return;
       }
 
       appendImg(j.b64_png);
-      setImgStatus("🖼 Done. (image added below)");
+      setImgStatus("ðŸ–¼ Done. (image added below)");
     }
 
     document.addEventListener("pointerdown", (e)=>{
@@ -5602,7 +5602,7 @@ try{
       // otherwise show server error text
       const txt = r.text();
       try{
-        if(window.appendLine) window.appendLine("system", "🎬 video error: " + txt, true);
+        if(window.appendLine) window.appendLine("system", "ðŸŽ¬ video error: " + txt, true);
       }catch(_){}
       alert("Video error: " + txt);
     }
@@ -5612,14 +5612,14 @@ try{
       ensureCss();
       const b = document.createElement("button");
       b.id="novaVideoFloatBtn";
-      b.textContent="🎬 Video";
+      b.textContent="ðŸŽ¬ Video";
       b.title="Generate video from prompt";
       b.addEventListener("click", async ()=>{
         const inp = $("input");
         const prompt = (inp && inp.value ? inp.value : "").trim() || "5 second video of a red square bouncing";
         b.setAttribute("disabled","disabled");
         try{
-          try{ if(window.appendLine) window.appendLine("system","🎬 video: requesting...",true); }catch(_){}
+          try{ if(window.appendLine) window.appendLine("system","ðŸŽ¬ video: requesting...",true); }catch(_){}
           genVideo(prompt);
         } finally {
           b.removeAttribute("disabled");
@@ -5708,7 +5708,7 @@ try{
         return;
       }
       try{
-        if(window.setStatus) window.setStatus("🎬 video "+(j.progress||0)+"%");
+        if(window.setStatus) window.setStatus("ðŸŽ¬ video "+(j.progress||0)+"%");
       }catch(_){}
       new Promise(r=>setTimeout(r,800));
     }
@@ -5817,9 +5817,9 @@ try{
       return b;
     }
 
-    bar.appendChild(mk("🎬 Video (YouTube 16:9)", "youtube"));
-    bar.appendChild(mk("📱 Video (Shorts 9:16)", "shorts"));
-    bar.appendChild(mk("⬛ Video (Square 1:1)", "square"));
+    bar.appendChild(mk("ðŸŽ¬ Video (YouTube 16:9)", "youtube"));
+    bar.appendChild(mk("ðŸ“± Video (Shorts 9:16)", "shorts"));
+    bar.appendChild(mk("â¬› Video (Square 1:1)", "square"));
 
     
     // Mount in a guaranteed visible place:
@@ -6189,7 +6189,7 @@ console.log('NOVA_BOOT_NO_STT_V1: STT/voice loop removed from boot');
       const out = sendToApiChat(text);
       append("assistant", out);
     }catch(e){
-      append("error", "❌ /api/chat failed: " + String(e && e.message ? e.message : e));
+      append("error", "âŒ /api/chat failed: " + String(e && e.message ? e.message : e));
       try{ console.error(e); }catch(_){}
     }
   }
@@ -6542,9 +6542,9 @@ console.log('NOVA_BOOT_NO_STT_V1: STT/voice loop removed from boot');
     if(!raw){ console.log(TAG,"empty"); return; }
     const text = (mode==="cmd")?("/cmd "+raw):(mode==="doctor")?("/doctor "+raw):raw;
     console.log(TAG,"sending",{mode,text});
-    render("⏳ Sending...");
+    render("â³ Sending...");
     postJson({text}, (err,status,body)=>{
-      if(err){ console.log(TAG,"failed",err); render("❌ "+err.message); return; }
+      if(err){ console.log(TAG,"failed",err); render("âŒ "+err.message); return; }
       console.log(TAG,"response",status);
       render(body);
     });
@@ -6715,7 +6715,7 @@ console.log('NOVA_BOOT_NO_STT_V1: STT/voice loop removed from boot');
     return ok;
   };
 
-  console.log("✅ NOVA_COPY_CODE_V1 installed");
+  console.log("âœ… NOVA_COPY_CODE_V1 installed");
 })();
 /* ===== /NOVA_COPY_CODE_V1 ===== */
 
@@ -6792,7 +6792,7 @@ console.log('NOVA_BOOT_NO_STT_V1: STT/voice loop removed from boot');
     return ok;
   };
 
-  console.log("✅ NOVA_COPY_QUOTE_V1 installed");
+  console.log("âœ… NOVA_COPY_QUOTE_V1 installed");
 })();
 /* ===== /NOVA_COPY_QUOTE_V1 ===== */
 
@@ -6914,7 +6914,7 @@ console.log('NOVA_BOOT_NO_STT_V1: STT/voice loop removed from boot');
     }catch(err){}
   }, true);
 
-  console.log("✅ NOVA_COPY_HOTKEYS_V1 installed (Ctrl+Shift+Q/A/K, toggle Ctrl+Shift+M)");
+  console.log("âœ… NOVA_COPY_HOTKEYS_V1 installed (Ctrl+Shift+Q/A/K, toggle Ctrl+Shift+M)");
 })();
 /* ===== /NOVA_COPY_HOTKEYS_V1 ===== */
 
@@ -7055,7 +7055,7 @@ console.log('NOVA_BOOT_NO_STT_V1: STT/voice loop removed from boot');
     _novaInstallV1();
   }
 
-  console.log("✅ NOVA_COPY_TOOLBAR_V1 installed");
+  console.log("âœ… NOVA_COPY_TOOLBAR_V1 installed");
 })();
 /* ===== /NOVA_COPY_TOOLBAR_V1 ===== */
 
@@ -7261,7 +7261,7 @@ console.log('NOVA_BOOT_NO_STT_V1: STT/voice loop removed from boot');
     try{
       const mo = new MutationObserver(() => _novaScheduleRelayoutV1());
       mo.observe(document.documentElement || document.body, { childList: true, subtree: true });
-      console.log("✅ NOVA_COPY_TOOLBAR_DOCKED_V1 observer active");
+      console.log("âœ… NOVA_COPY_TOOLBAR_DOCKED_V1 observer active");
     }catch(e){}
   };
 
@@ -7271,7 +7271,7 @@ console.log('NOVA_BOOT_NO_STT_V1: STT/voice loop removed from boot');
     _novaInstallV1();
   }
 
-  console.log("✅ NOVA_COPY_TOOLBAR_DOCKED_V1 installed");
+  console.log("âœ… NOVA_COPY_TOOLBAR_DOCKED_V1 installed");
 })();
 /* ===== /NOVA_COPY_TOOLBAR_DOCKED_V1 ===== */
 
@@ -7447,7 +7447,7 @@ console.log('NOVA_BOOT_NO_STT_V1: STT/voice loop removed from boot');
   const _novaFlipBtnV1 = (btn, ok) => {
     try{
       const old = btn.textContent;
-      btn.textContent = ok ? "✓ COPIED" : "✕ FAIL";
+      btn.textContent = ok ? "âœ“ COPIED" : "âœ• FAIL";
       btn.style.opacity = "0.92";
       clearTimeout(btn._t);
       btn._t = setTimeout(() => {
@@ -7600,7 +7600,7 @@ console.log('NOVA_BOOT_NO_STT_V1: STT/voice loop removed from boot');
       const mo = new MutationObserver(() => _novaScheduleRelayoutV1());
       mo.observe(document.documentElement || document.body, { childList: true, subtree: true });
     }catch(e){}
-    console.log("✅ NOVA_COPY_TOOLBAR_QOL_V1 installed");
+    console.log("âœ… NOVA_COPY_TOOLBAR_QOL_V1 installed");
   };
 
   if(document.readyState === "loading"){
@@ -7686,7 +7686,7 @@ console.log('NOVA_BOOT_NO_STT_V1: STT/voice loop removed from boot');
         return true;
       }
     }catch(e){
-      // If this fails, it’s usually permissions or non-secure context.
+      // If this fails, itâ€™s usually permissions or non-secure context.
       if(!_novaClipWarnedV2){
         _novaClipWarnedV2 = true;
         _novaShowBannerV2(
@@ -7700,9 +7700,10 @@ console.log('NOVA_BOOT_NO_STT_V1: STT/voice loop removed from boot');
     return _novaExecCopyV2(s);
   };
 
-  console.log("✅ NOVA_CLIPBOARD_HARDEN_V2 installed (window._novaCopyTextSafeV2)");
+  console.log("âœ… NOVA_CLIPBOARD_HARDEN_V2 installed (window._novaCopyTextSafeV2)");
 })();
 /* ===== /NOVA_CLIPBOARD_HARDEN_V2 ===== */
+
 
 
 

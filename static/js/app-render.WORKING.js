@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 if (window.__novaRenderLoaded) {
@@ -354,3 +354,4 @@ if (document.readyState === "loading") {
 
 console.log("Nova renderer loaded.");
 })();
+

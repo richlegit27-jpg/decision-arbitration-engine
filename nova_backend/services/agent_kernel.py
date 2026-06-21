@@ -1,4 +1,4 @@
-class AgentKernel:
+﻿class AgentKernel:
 
     def __init__(
         self,
@@ -100,3 +100,4 @@ class AgentKernel:
                 .summarize()
             ),
         }
+

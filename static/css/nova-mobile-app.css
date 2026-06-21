@@ -1,4 +1,4 @@
-/* =========================================================
+﻿/* =========================================================
    Nova Mobile CSS - Premium Final Polish
    Path: C:\Users\Owner\nova\static\css\nova-mobile.css
    Purpose: Mobile-only premium Nova chat UI.
@@ -1627,7 +1627,7 @@ body {
    ========================================================= */
 
 .mobile-thinking-bubble::after {
-    content: " ●";
+    content: " â—";
     animation: novaTypingDots 1s infinite;
 }
 
@@ -1987,7 +1987,7 @@ body {
 }
 
 .mobile-chat-message.system .mobile-message-content::before {
-    content: "•";
+    content: "â€¢";
     font-size: 18px;
     line-height: 1;
     animation: novaSystemPulse 1.1s infinite ease-in-out;
@@ -5964,7 +5964,7 @@ body::after {
 }
 
 .mobile-message-content pre::before {
-    content: "●  ●  ●";
+    content: "â—  â—  â—";
 
     position: absolute;
     top: 10px;
@@ -9003,3 +9003,4 @@ html::after,
             rgba(124, 92, 255, 0.90)
         );
 }
+

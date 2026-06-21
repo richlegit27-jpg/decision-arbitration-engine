@@ -489,3 +489,5 @@
 // NOVA_REMOVE_HARD_OPEN_AFTER_DEPS_20260609
 // Removed old hard-open fallback so the rich sessions renderer owns the drawer.
 
+
+

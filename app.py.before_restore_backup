@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import os
@@ -59,7 +59,7 @@ def save_sessions():
             encoding="utf-8",
         )
     except Exception as e:
-        print("❌ Failed saving sessions:", e)
+        print("âŒ Failed saving sessions:", e)
 
 load_sessions()
 
@@ -139,7 +139,7 @@ def api_session_delete():
 
     save_sessions()
 
-    print(f"🗑️ Deleted session: {session_id}")
+    print(f"ðŸ—‘ï¸ Deleted session: {session_id}")
 
     return jsonify({
         "ok": True,
@@ -166,7 +166,7 @@ def api_session_rename():
             s["title"] = title
             save_sessions()
 
-            print(f"✏️ Renamed: {session_id} -> {title}")
+            print(f"âœï¸ Renamed: {session_id} -> {title}")
 
             return jsonify({
                 "ok": True,
@@ -182,5 +182,5 @@ def api_session_rename():
 # =========================================================
 
 if __name__ == "__main__":
-    print("🚀 Nova running at http://127.0.0.1:5001")
+    print("ðŸš€ Nova running at http://127.0.0.1:5001")
     app.run(host="0.0.0.0", port=5001, debug=True)

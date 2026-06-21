@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\nova.js
+﻿// C:\Users\Owner\nova\static\js\nova.js
 // NOVA_JS_STAMP_V6__2026-03-01__REAL_SESSIONS_MESSAGES
 
 (function(){
@@ -92,8 +92,8 @@
         <div class="nova-ssb-top">
           <div class="nova-ssb-title">Sessions</div>
           <div class="nova-ssb-actions">
-            <button id="novaSessNewBtn" class="nova-ssb-btn" title="New session">＋</button>
-            <button id="novaSessRefreshBtn" class="nova-ssb-btn" title="Refresh">↻</button>
+            <button id="novaSessNewBtn" class="nova-ssb-btn" title="New session">ï¼‹</button>
+            <button id="novaSessRefreshBtn" class="nova-ssb-btn" title="Refresh">â†»</button>
           </div>
         </div>
         <div id="novaSessStatus" class="nova-ssb-status"></div>
@@ -180,7 +180,7 @@
 
       div.innerHTML = `
         <div class="t">${esc(t)}</div>
-        ${pv ? `<div class="m">${esc(pv)}</div>` : `<div class="m" style="opacity:.55">—</div>`}
+        ${pv ? `<div class="m">${esc(pv)}</div>` : `<div class="m" style="opacity:.55">â€”</div>`}
         <div class="b">
           <span>${esc(s.id.slice(0,8))}</span>
           <span>${esc(ts)}</span>
@@ -392,7 +392,7 @@
     if(newBtn && !newBtn.__novaBound){
       newBtn.addEventListener("click", async () => {
         try{
-          setStatus("creating…");
+          setStatus("creatingâ€¦");
           const id = await createSession();
           if(id){
             setSelectedSessionId(id);
@@ -408,11 +408,11 @@
     }
 
     if(refBtn && !refBtn.__novaBound){
-      refBtn.addEventListener("click", async () => refreshSessions("refreshing…"));
+      refBtn.addEventListener("click", async () => refreshSessions("refreshingâ€¦"));
       refBtn.__novaBound = true;
     }
 
-    refreshSessions("loading…");
+    refreshSessions("loadingâ€¦");
     setInterval(() => refreshSessions(""), 2000);
   }
 

@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\stream-service.js
+﻿// C:\Users\Owner\nova\static\js\stream-service.js
 
 (() => {
 "use strict"
@@ -419,7 +419,7 @@ function createStreamService(options = {}){
       const isAbort = error?.name === "AbortError"
       const messageText = isAbort
         ? "Response stopped."
-        : `⚠️ Network/stream error: ${error.message || error}`
+        : `âš ï¸ Network/stream error: ${error.message || error}`
 
       updateMessageContent(assistantMessage.id, messageText)
       finalizeMessage(assistantMessage.id, {

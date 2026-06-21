@@ -1,5 +1,5 @@
-document.addEventListener("DOMContentLoaded", () => {
-    console.log("Nova Ultimate 2026 — Multi-Device Collaboration Loaded 🚀");
+﻿document.addEventListener("DOMContentLoaded", () => {
+    console.log("Nova Ultimate 2026 â€” Multi-Device Collaboration Loaded ðŸš€");
 
     const backendPort = window.NOVA_BACKEND_PORT;
     const model = window.DEFAULT_MODEL;
@@ -108,3 +108,4 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
 });
+

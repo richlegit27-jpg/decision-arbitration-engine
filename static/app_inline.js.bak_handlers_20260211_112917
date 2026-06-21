@@ -1,4 +1,4 @@
-const log=document.getElementById("log");
+﻿const log=document.getElementById("log");
  const msg=document.getElementById("msg");
  const send=document.getElementById("send");
  const stop=document.getElementById("stop");
@@ -208,3 +208,4 @@ statusEl.textContent="Cleared."}
    }
  }
 );
+

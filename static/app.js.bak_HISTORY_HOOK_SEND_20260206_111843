@@ -8773,3 +8773,4 @@ if(err){ console.log(TAG,"failed",err); render("âŒ "+err.message); return; }
   document.addEventListener("DOMContentLoaded", ()=>{ try{ rehook(); }catch(e){} });
 })();
 /* ===== /NOVA_HISTORY_ENDGAME_V1 ===== */
+

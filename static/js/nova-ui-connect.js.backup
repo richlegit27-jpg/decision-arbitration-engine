@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded",()=>{
+﻿document.addEventListener("DOMContentLoaded",()=>{
   "use strict";
   const Nova=window.Nova=window.Nova||{};
   Nova.state=Nova.state||{};
@@ -77,9 +77,9 @@ document.addEventListener("DOMContentLoaded",()=>{
     const recognition=new webkitSpeechRecognition();
     recognition.continuous=false;recognition.interimResults=false;recognition.lang='en-US';
     voiceBtn.addEventListener("click",()=>{voiceBtn.disabled=true;voiceBtn.textContent="Listening...";recognition.start();});
-    recognition.onresult=(e)=>{inputEl.value=e.results[0][0].transcript;sendMessage();voiceBtn.disabled=false;voiceBtn.textContent="🎤 Voice";};
-    recognition.onerror=(e)=>{console.error(e);voiceBtn.disabled=false;voiceBtn.textContent="🎤 Voice";};
-    recognition.onend=()=>{voiceBtn.disabled=false;voiceBtn.textContent="🎤 Voice";};
+    recognition.onresult=(e)=>{inputEl.value=e.results[0][0].transcript;sendMessage();voiceBtn.disabled=false;voiceBtn.textContent="ðŸŽ¤ Voice";};
+    recognition.onerror=(e)=>{console.error(e);voiceBtn.disabled=false;voiceBtn.textContent="ðŸŽ¤ Voice";};
+    recognition.onend=()=>{voiceBtn.disabled=false;voiceBtn.textContent="ðŸŽ¤ Voice";};
   }else if(voiceBtn)voiceBtn.addEventListener("click",()=>alert("Voice input not supported."));
 
   // Artifacts pin/delete

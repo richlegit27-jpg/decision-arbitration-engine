@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat-state.js
+﻿// C:\Users\Owner\nova\static\js\chat-state.js
 
 (() => {
 "use strict"
@@ -135,3 +135,4 @@ window.NovaChatState = {
 }
 
 })()
+

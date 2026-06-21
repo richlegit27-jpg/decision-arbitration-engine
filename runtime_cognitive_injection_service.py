@@ -1,4 +1,4 @@
-class RuntimeCognitiveInjectionService:
+﻿class RuntimeCognitiveInjectionService:
     """
     Compresses runtime state into small cognition signals
     that chat/intelligence routing can safely consume.
@@ -292,3 +292,4 @@ class RuntimeCognitiveInjectionService:
             return "runtime is safe to observe"
 
         return ""
+

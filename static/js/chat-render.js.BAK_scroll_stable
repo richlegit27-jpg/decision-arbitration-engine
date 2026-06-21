@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat-render.js
+﻿// C:\Users\Owner\nova\static\js\chat-render.js
 
 (() => {
 "use strict"
@@ -166,7 +166,7 @@ function createRenderService(options = {}){
     el.pendingAttachments.innerHTML = files.map((file, index) => `
       <div class="pending-attachment">
         <span>${escapeHtml(file?.name || `File ${index + 1}`)}</span>
-        <button type="button" data-remove-pending-index="${index}" title="Remove file">×</button>
+        <button type="button" data-remove-pending-index="${index}" title="Remove file">Ã—</button>
       </div>
     `).join("")
   }

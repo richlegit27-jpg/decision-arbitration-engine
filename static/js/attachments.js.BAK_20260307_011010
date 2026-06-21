@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\attachments.js
+﻿// C:\Users\Owner\nova\static\js\attachments.js
 
 (() => {
 "use strict"
@@ -143,7 +143,7 @@ function createManager(options = {}){
     meta.className = "composer-attachment-meta"
     meta.textContent = [file?.type || "file", formatBytes(file?.size || 0)]
       .filter(Boolean)
-      .join(" · ")
+      .join(" Â· ")
 
     info.appendChild(name)
     if(meta.textContent){
@@ -154,7 +154,7 @@ function createManager(options = {}){
     removeBtn.type = "button"
     removeBtn.className = "composer-attachment-remove"
     removeBtn.setAttribute("aria-label", `Remove ${file?.name || "attachment"}`)
-    removeBtn.textContent = "×"
+    removeBtn.textContent = "Ã—"
     removeBtn.addEventListener("click", () => {
       removeAt(index)
     })

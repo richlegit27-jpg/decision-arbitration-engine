@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 const statusText = document.getElementById("backendStatusText");
@@ -12,7 +12,7 @@ function setStatus(connected, authenticated = false){
   if(connected){
     statusDot.style.background = "#10a37f";
     statusText.textContent = authenticated
-      ? "Backend connected • logged in"
+      ? "Backend connected â€¢ logged in"
       : "Backend connected";
     return;
   }
@@ -44,3 +44,4 @@ async function checkBackend(){
 checkBackend();
 setInterval(checkBackend, 15000);
 })();
+

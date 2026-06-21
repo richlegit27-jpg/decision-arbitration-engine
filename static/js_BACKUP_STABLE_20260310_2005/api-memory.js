@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\api-memory.js
+﻿// C:\Users\Owner\nova\static\js\api-memory.js
 
 (() => {
 "use strict"
@@ -78,3 +78,4 @@ window.NovaAPIMemory = {
 }
 
 })()
+

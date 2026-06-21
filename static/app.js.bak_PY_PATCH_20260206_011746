@@ -6847,3 +6847,4 @@ console.log('NOVA_BOOT_NO_STT_V1: STT/voice loop removed from boot');
   console.log("✅ NOVA_COPY_HOTKEYS_V1 installed (Ctrl+Shift+Q/A/K, toggle Ctrl+Shift+M)");
 })();
 /* ===== /NOVA_COPY_HOTKEYS_V1 ===== */
+

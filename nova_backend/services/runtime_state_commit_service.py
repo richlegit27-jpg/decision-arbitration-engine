@@ -1,4 +1,4 @@
-class RuntimeStateCommitService:
+﻿class RuntimeStateCommitService:
 
     def commit(
         self,
@@ -40,3 +40,4 @@ class RuntimeStateCommitService:
             "changed_keys": changed_keys,
             "execution_state": execution_state,
         }
+

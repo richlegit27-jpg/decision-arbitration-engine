@@ -1,4 +1,4 @@
-Set-Location C:\Users\Owner\nova
+﻿Set-Location C:\Users\Owner\nova
 
 Write-Host ""
 Write-Host "=== NOVA LAUNCH ===" -ForegroundColor Cyan

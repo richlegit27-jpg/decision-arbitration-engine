@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat\api.js
+﻿// C:\Users\Owner\nova\static\js\chat\api.js
 
 (() => {
   const api = {
@@ -65,3 +65,4 @@
   window.NovaApp = window.NovaApp || {};
   window.NovaApp.api = api;
 })();
+

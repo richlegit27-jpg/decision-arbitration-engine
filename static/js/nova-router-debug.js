@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaRouterDebugLite) return;
@@ -39,7 +39,7 @@
       <div style="opacity:.7;">
         ${
           (route.memory_used || []).map(m =>
-            `<div>• ${m.kind} (${m.score}) → ${m.value}</div>`
+            `<div>â€¢ ${m.kind} (${m.score}) â†’ ${m.value}</div>`
           ).join("") || "-"
         }
       </div>
@@ -72,3 +72,4 @@
     }
   });
 })();
+

@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+﻿document.addEventListener("DOMContentLoaded", () => {
     const sidebar = document.getElementById("sidebar");
     const toggleBtn = document.getElementById("toggleSidebar");
 
@@ -30,3 +30,4 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 });
+

@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     "use strict";
 
     function notifyMessageCopied() {
@@ -198,3 +198,4 @@
     };
 
 })();
+

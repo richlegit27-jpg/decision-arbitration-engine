@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   function q(id) {
@@ -243,11 +243,11 @@
     const title = escapeHtml(att.title || att.filename || "File");
     const url = escapeHtml(att.url || "#");
     const mime = escapeHtml(att.mime_type || "");
-    const size = att.size != null ? ` • ${escapeHtml(String(att.size))} bytes` : "";
+    const size = att.size != null ? ` â€¢ ${escapeHtml(String(att.size))} bytes` : "";
 
     return `
       <a class="nova-file-chip" href="${url}" target="_blank" rel="noopener">
-        <span class="nova-file-chip-icon">📎</span>
+        <span class="nova-file-chip-icon">ðŸ“Ž</span>
         <span class="nova-file-chip-body">
           <span class="nova-file-chip-title">${title}</span>
           <span class="nova-file-chip-meta">${mime || "file"}${size}</span>
@@ -406,3 +406,4 @@
     NovaRender.init();
   }
 })();
+

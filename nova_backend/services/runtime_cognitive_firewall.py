@@ -1,4 +1,4 @@
-class RuntimeCognitiveFirewall:
+﻿class RuntimeCognitiveFirewall:
     """
     Filters memory before it enters operational/runtime cognition.
 
@@ -147,3 +147,4 @@ class RuntimeCognitiveFirewall:
                 )
 
         return filtered
+

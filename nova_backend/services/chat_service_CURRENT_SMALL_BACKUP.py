@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64
 import os
@@ -1727,7 +1727,7 @@ Available actions:
 
         user_text_lc = str(user_text or "").lower().strip()
 
-        # ðŸ”¥ 1. HARD USER OVERRIDE (strongest)
+        # Ã°Å¸â€Â¥ 1. HARD USER OVERRIDE (strongest)
         if any(p in user_text_lc for p in [
             "don't give short",
             "dont give short",
@@ -1748,7 +1748,7 @@ Available actions:
         ]):
             return "short"
 
-        # ðŸ”¥ 2. MEMORY (most recent wins)
+        # Ã°Å¸â€Â¥ 2. MEMORY (most recent wins)
         for m in reversed(memory_items or []):
             if not isinstance(m, dict):
                 continue
@@ -1761,7 +1761,7 @@ Available actions:
             if "short answers" in text:
                 return "short"
 
-        # ðŸ”¥ 3. DEFAULT
+        # Ã°Å¸â€Â¥ 3. DEFAULT
         return "normal"
 
     def _apply_pending_fix(self, session_id: str) -> dict:
@@ -2057,7 +2057,7 @@ Available actions:
             "send the code",
             "send one of these",
             "send the code and",
-            "whatâ€™s the symptom",
+            "whatÃ¢â‚¬â„¢s the symptom",
             "what's the symptom",
             "tell me what you need",
             "i can help",
@@ -2450,7 +2450,7 @@ Available actions:
                 "SMFF mode:\n"
                 "- Send full file path.\n"
                 "- Send the full broken function or file.\n"
-                "- I’ll return the full replacement, cleanly indented."
+                "- Iâ€™ll return the full replacement, cleanly indented."
             ).strip()
 
         stuck_exact = {
@@ -2492,7 +2492,7 @@ Available actions:
             return {
                 "assistant_text": (
                     "Send the full function and file path.\n"
-                    "I’ll return the full replacement block, cleanly indented."
+                    "Iâ€™ll return the full replacement block, cleanly indented."
                 ),
                 "intelligence": {
                     "strategy": "smff_bug_intake",
@@ -2508,7 +2508,7 @@ Available actions:
             return {
                 "assistant_text": (
                     "Paste the error, file path, or failing behavior.\n"
-                    "I’ll help patch it."
+                    "Iâ€™ll help patch it."
                 ),
                 "intelligence": {
                     "strategy": "bug_intake",
@@ -2525,7 +2525,7 @@ Available actions:
             return {
                 "assistant_text": (
                     "Paste the text, code, error, screenshot, or link.\n"
-                    "I’ll break it down clearly."
+                    "Iâ€™ll break it down clearly."
                 ),
                 "intelligence": {
                     "strategy": "clarify_missing_subject",
@@ -2544,7 +2544,7 @@ Available actions:
         hard_override_applied = False
 
         if not assistant_text:
-            assistant_text = "I couldn’t generate a useful answer from that. Send the exact thing you want handled."
+            assistant_text = "I couldnâ€™t generate a useful answer from that. Send the exact thing you want handled."
 
         try:
             intelligence = self._fuse_response_intelligence(
@@ -2717,18 +2717,18 @@ Available actions:
         if smff_active and code_intent and not asks_alternatives:
             return (
                 "Send full file path + full broken code.\n"
-                "I’ll return the full replacement, cleanly indented.\n\n"
+                "Iâ€™ll return the full replacement, cleanly indented.\n\n"
                 "PowerShell test:\n"
                 "python -m py_compile <file_path>"
             )
 
         if smff_active and code_intent and asks_alternatives:
             return (
-                "Option A — safest:\n"
-                "Send the full file path + full broken file. I’ll return the full-file replacement.\n\n"
-                "Option B — faster:\n"
-                "Send the full function only. I’ll return the full function replacement.\n\n"
-                "Option C — debug-only:\n"
+                "Option A â€” safest:\n"
+                "Send the full file path + full broken file. Iâ€™ll return the full-file replacement.\n\n"
+                "Option B â€” faster:\n"
+                "Send the full function only. Iâ€™ll return the full function replacement.\n\n"
+                "Option C â€” debug-only:\n"
                 "Run this and send the exact error:\n"
                 "python -m py_compile <file_path>"
             )
@@ -2743,7 +2743,7 @@ Available actions:
         ):
             return (
                 "Send the full function and file path.\n"
-                "I’ll return the full replacement block, cleanly indented."
+                "Iâ€™ll return the full replacement block, cleanly indented."
             )
 
         kill_phrases = [
@@ -2774,7 +2774,7 @@ Available actions:
 
         bad_endings = [
             "Example:",
-            "Here’s how:",
+            "Hereâ€™s how:",
             "Here's how:",
             "This prints:",
             "That prints:",
@@ -2795,7 +2795,7 @@ Available actions:
             if (
                 last.endswith(":")
                 or last.endswith("-")
-                or last_lc in {"example", "output", "result", "here’s how", "here's how"}
+                or last_lc in {"example", "output", "result", "hereâ€™s how", "here's how"}
             ):
                 lines.pop()
                 continue
@@ -3229,7 +3229,7 @@ Available actions:
 
         clean_query = re.sub(r"\s+", " ", clean_query).strip()
 
-        # 🔥 empty → global news
+        # ðŸ”¥ empty â†’ global news
         if not clean_query:
             return [
                 "world news",
@@ -3567,14 +3567,14 @@ Available actions:
 
         if sources:
             assistant_text = assistant_text.strip()
-            assistant_text += "\n\n— Top sources —\n"
+            assistant_text += "\n\nâ€” Top sources â€”\n"
 
             for index, item in enumerate(sources[:5], start=1):
                 title = self._safe_str(item.get("title")).strip()
                 source = self._safe_str(item.get("source")).strip()
                 url = self._safe_str(item.get("url")).strip()
 
-                line = f"{index}. {source} — {title}" if source and title else f"{index}. {title or source or url}"
+                line = f"{index}. {source} â€” {title}" if source and title else f"{index}. {title or source or url}"
                 assistant_text += line + "\n"
 
                 if url and "news.google.com" not in url.lower():
@@ -4871,7 +4871,7 @@ Available actions:
         # Step 1: try relevant memory
         relevant_items = self._select_relevant_memory(user_text, limit=memory_limit)
 
-        # Step 2: fallback Ã¢â€ â€™ recent memory
+        # Step 2: fallback ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ recent memory
         if not relevant_items:
             try:
                 if hasattr(self, "memory") and self.memory:
@@ -4970,7 +4970,7 @@ Available actions:
         if not lines:
             return "I do not have any saved memory yet."
 
-        return "HereÃ¢â‚¬â„¢s what I remember:\n" + "\n".join(lines)
+        return "HereÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s what I remember:\n" + "\n".join(lines)
 
 
     def answer_from_web_results(self, query: str, results: list[dict] | None = None) -> str:
@@ -5005,7 +5005,7 @@ Available actions:
             )
 
         if not cleaned:
-            return f'I couldnâ€™t find strong live results for "{query}".'
+            return f'I couldnÃ¢â‚¬â„¢t find strong live results for "{query}".'
 
         context_blocks: list[str] = []
         for idx, item in enumerate(cleaned, start=1):
@@ -5057,7 +5057,7 @@ Available actions:
             if text:
                 import re
 
-                text = re.split(r"[-–—]\s*Top sources\s*[-–—]", text, flags=re.IGNORECASE)[0].strip()
+                text = re.split(r"[-â€“â€”]\s*Top sources\s*[-â€“â€”]", text, flags=re.IGNORECASE)[0].strip()
                 text = re.split(r"\bTop sources\b", text, flags=re.IGNORECASE)[0].strip()
 
                 sources_block = ""
@@ -5101,7 +5101,7 @@ Available actions:
                         ).strip()
 
                         lines.append(f"{idx}source")
-                        lines.append(f"{domain} — {title}")
+                        lines.append(f"{domain} â€” {title}")
 
                         if url and "news.google.com" not in url.lower():
                             lines.append(url)
@@ -5112,9 +5112,9 @@ Available actions:
 
             import re
 
-            # ?? HARD CLEAN — remove ANY sources text
+            # ?? HARD CLEAN â€” remove ANY sources text
             clean_text = re.split(
-                r"[-–—]\s*Top sources\s*[-–—]",
+                r"[-â€“â€”]\s*Top sources\s*[-â€“â€”]",
                 text,
                 flags=re.IGNORECASE
             )[0]
@@ -5142,7 +5142,7 @@ Available actions:
         if top.get("url"):
             fallback_parts.append(str(top["url"]))
 
-        return "\n".join(fallback_parts).strip() or f'Here’s what I found for "{query}".'
+        return "\n".join(fallback_parts).strip() or f'Hereâ€™s what I found for "{query}".'
 
     # =========================
     # EXECUTION GUARD HELPERS (STEP TRUTH ENFORCEMENT)
@@ -5722,7 +5722,7 @@ Available actions:
             if text_parts:
                 return "\n".join(text_parts).strip()
 
-        return "IÃ¢â‚¬â„¢m here, but the model returned an empty response."
+        return "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢m here, but the model returned an empty response."
 
     # ==============================
     # DECISION CONTRACT
@@ -5930,11 +5930,11 @@ Available actions:
             return False
 
 
-        # ðŸ”¥ PLAN CREATION
+        # Ã°Å¸â€Â¥ PLAN CREATION
         if any(x in text for x in ["plan", "steps", "how to", "next steps"]):
             return True
 
-        # ðŸ”¥ FALLBACK: coding / structured intent
+        # Ã°Å¸â€Â¥ FALLBACK: coding / structured intent
         if decision and decision.get("mode") in {"coding", "analysis"}:
             return True
 
@@ -6930,7 +6930,7 @@ Next action:
         current_index = -1
 
         for i, line in enumerate(lines):
-            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "âœ”", "Ã¢Å“â€"]):
+            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "Ã¢Å“â€", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â"]):
                 step_indexes.append(i)
 
             if "[>]" in line:
@@ -6941,8 +6941,8 @@ Next action:
     def _refresh_execution_header(self, body: str):
         lines = self._safe_str(body).splitlines()
 
-        total = sum(1 for line in lines if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "âœ”", "Ã¢Å“â€"]))
-        done = sum(1 for line in lines if any(x in line for x in ["[x]", "[X]", "âœ”", "Ã¢Å“â€"]))
+        total = sum(1 for line in lines if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "Ã¢Å“â€", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â"]))
+        done = sum(1 for line in lines if any(x in line for x in ["[x]", "[X]", "Ã¢Å“â€", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â"]))
 
         updated = "\n".join(lines)
         updated = re.sub(
@@ -6959,8 +6959,8 @@ Next action:
                     .replace("[ ]", "")
                     .replace("[x]", "")
                     .replace("[X]", "")
-                    .replace("âœ”", "")
                     .replace("Ã¢Å“â€", "")
+                    .replace("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â", "")
                     .strip(" -")
                     .strip()
                 )
@@ -7278,7 +7278,7 @@ Next action:
                 ]
             ):
                 if current_file:
-                    return f"WeÃ¢â‚¬â„¢re in `{current_file}`."
+                    return f"WeÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢re in `{current_file}`."
                 return "I do not have the current file locked in yet."
 
             if any(
@@ -7357,7 +7357,7 @@ Next action:
 
             if active_task and next_move:
                 return (
-                    f"WeÃ¢â‚¬â„¢re {active_task}. "
+                    f"WeÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢re {active_task}. "
                     f"Next: {next_move}"
                     + (f" Current file: `{current_file}`." if current_file else "")
                     + (f" Current bug: {current_bug}." if current_bug else "")
@@ -7482,7 +7482,7 @@ Next action:
 
         def _clean_value(value: str) -> str:
             value = self._safe_str(value).strip()
-            value = value.strip("+    â† (FOUR SPACES â€” press space 4 times)\r\n-:;,.")
+            value = value.strip("+    Ã¢â€ Â (FOUR SPACES Ã¢â‚¬â€ press space 4 times)\r\n-:;,.")
             return value
 
         def _set_if_present(field_name: str, value: str):
@@ -8326,7 +8326,7 @@ Next action:
             return 9.0
 
         if k in {"style"}:
-            return 8.0   # ðŸ”¥ NEW â€” how you want responses
+            return 8.0   # Ã°Å¸â€Â¥ NEW Ã¢â‚¬â€ how you want responses
 
         if k in {"preference"}:
             return 7.0
@@ -8382,7 +8382,7 @@ Next action:
         item_session = self._safe_str(item.get("session_id"))
 
         if current_session and item_session and current_session == item_session:
-            return 0.75   # â†“ reduced from 1.5
+            return 0.75   # Ã¢â€ â€œ reduced from 1.5
 
         return 0.0
 
@@ -8489,7 +8489,7 @@ Next action:
             "image", "picture", "photo", "art", "scene", "visual"
         ]
 
-        # ðŸ”¥ detect intent: action + image concept
+        # Ã°Å¸â€Â¥ detect intent: action + image concept
         if any(k in text for k in keywords) and any(i in text for i in image_words):
             return True
 
@@ -8817,10 +8817,10 @@ Next action:
                 assistant_text = self._extract_response_text(response)
 
             except Exception:
-                assistant_text = "I couldnâ€™t analyze that image."
+                assistant_text = "I couldnÃ¢â‚¬â„¢t analyze that image."
 
         else:
-            assistant_text = "I couldnâ€™t find an image attachment to analyze."
+            assistant_text = "I couldnÃ¢â‚¬â„¢t find an image attachment to analyze."
 
         return {
             "ok": True,
@@ -8852,7 +8852,7 @@ Next action:
             return ""
 
         return (
-            "\n\nRESPONSE POLICY — HIGH PRIORITY:\n"
+            "\n\nRESPONSE POLICY â€” HIGH PRIORITY:\n"
             f"- Mode: {mode or 'normal'}\n"
             f"- Answer length: {answer_length or 'normal'}\n"
             f"- Tone: {tone or 'direct'}\n"
@@ -9655,5 +9655,7 @@ def _build_chat_input(
 
         except Exception as e:
             exec_debug("MEMORY CLEANUP FAILED:", e)
+
+
 
 

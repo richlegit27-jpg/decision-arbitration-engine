@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat-render.js
+﻿// C:\Users\Owner\nova\static\js\chat-render.js
 
 (() => {
 "use strict"
@@ -150,7 +150,7 @@ function createRenderService(options = {}){
               data-delete-chat-id="${escapeHtml(chatId)}"
               aria-label="Delete chat"
               title="Delete chat"
-            >×</button>
+            >Ã—</button>
           </div>
         `
       }
@@ -175,7 +175,7 @@ function createRenderService(options = {}){
             data-delete-chat-id="${escapeHtml(chatId)}"
             aria-label="Delete chat"
             title="Delete chat"
-          >×</button>
+          >Ã—</button>
         </div>
       `
     }).join("")

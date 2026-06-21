@@ -1,4 +1,4 @@
-class RuntimeMultiAgentMesh:
+﻿class RuntimeMultiAgentMesh:
 
     name = "runtime_multi_agent_mesh"
 
@@ -76,3 +76,4 @@ class RuntimeMultiAgentMesh:
             "agent_count": len(agents),
             "agents": agents,
         }
+

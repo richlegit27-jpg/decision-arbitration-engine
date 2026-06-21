@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\attachments.js
+﻿// C:\Users\Owner\nova\static\js\attachments.js
 
 (() => {
 "use strict"
@@ -133,7 +133,7 @@ function createAttachmentsService(options = {}){
             aria-label="Remove ${name}"
             title="Remove file"
           >
-            ×
+            Ã—
           </button>
         </div>
       `

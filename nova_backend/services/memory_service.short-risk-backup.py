@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -136,7 +136,7 @@ class MemoryService:
                 existing["count"] = count
                 existing["updated_at"] = now
 
-                # 🔥 reinforcement
+                # ðŸ”¥ reinforcement
                 existing["weight"] = min(10.0, existing_weight + 1.25)
 
                 if count >= 3:
@@ -246,3 +246,4 @@ class MemoryService:
 
     def clear(self) -> None:
         self._write_store({"memory": []})
+

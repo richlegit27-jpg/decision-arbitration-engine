@@ -1,4 +1,4 @@
-<!-- C:\Users\Owner\nova\templates\index.html -->
+﻿<!-- C:\Users\Owner\nova\templates\index.html -->
 
 <!DOCTYPE html>
 <html lang="en">
@@ -72,7 +72,7 @@
       <textarea
         id="promptInput"
         class="composer-input"
-        placeholder="Type a message�"
+        placeholder="Type a message…"
         rows="1"
         autocomplete="off"
       ></textarea>
@@ -129,3 +129,4 @@
 
 </body>
 </html>
+

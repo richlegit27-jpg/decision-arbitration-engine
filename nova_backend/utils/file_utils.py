@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import os
@@ -121,7 +121,7 @@ def atomic_write_json(path, data, raise_on_fail=True):
             # small delay before retry
             time.sleep(0.05)
 
-    # 🔥 FALLBACK: direct overwrite (non-atomic but safe enough)
+    # ðŸ”¥ FALLBACK: direct overwrite (non-atomic but safe enough)
     try:
         with open(p, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
@@ -210,3 +210,4 @@ def safe_str(value: Any, default: str = "") -> str:
     if value is None:
         return default
     return str(value)
+

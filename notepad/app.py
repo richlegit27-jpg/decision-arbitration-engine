@@ -1,4 +1,4 @@
-from flask import Flask, render_template, send_from_directory
+﻿from flask import Flask, render_template, send_from_directory
 import os
 
 app = Flask(
@@ -19,3 +19,4 @@ def serve_static(path):
 
 if __name__ == "__main__":
     app.run(debug=True, host='127.0.0.1', port=5000)
+

@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\attachments.js
+﻿// C:\Users\Owner\nova\static\js\attachments.js
 
 (() => {
 "use strict"
@@ -154,7 +154,7 @@ function createAttachmentsService(options = {}){
           <div class="pending-attachment-chip" data-file-index="${index}">
             <div class="pending-attachment-copy">
               <div class="pending-attachment-name">${name}</div>
-              <div class="pending-attachment-meta">${type} • ${size}</div>
+              <div class="pending-attachment-meta">${type} â€¢ ${size}</div>
             </div>
 
             <button
@@ -164,7 +164,7 @@ function createAttachmentsService(options = {}){
               aria-label="Remove ${name}"
               title="Remove"
             >
-              ✕
+              âœ•
             </button>
           </div>
         `
@@ -261,3 +261,4 @@ window.NovaAttachmentsService = {
   create: createAttachmentsService,
   createAttachmentsService
 }})()
+

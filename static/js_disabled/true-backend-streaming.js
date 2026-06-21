@@ -1,4 +1,4 @@
-/* notepad C:\Users\Owner\nova\static\js\true-backend-streaming.js */
+﻿/* notepad C:\Users\Owner\nova\static\js\true-backend-streaming.js */
 
 (() => {
 "use strict";
@@ -22,3 +22,4 @@ window.__novaTrueBackendStreamingLoaded = true;
 
 console.info("Nova legacy true-backend-streaming stub loaded. Real streaming is handled by composer.js.");
 })();
+

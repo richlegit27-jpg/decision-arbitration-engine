@@ -1,4 +1,4 @@
-class RuntimeRecursivePlanner:
+﻿class RuntimeRecursivePlanner:
 
     def expand(
         self,
@@ -90,3 +90,4 @@ class RuntimeRecursivePlanner:
             "step_count": len(steps),
             "steps": steps,
         }
+

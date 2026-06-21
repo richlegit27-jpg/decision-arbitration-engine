@@ -1,4 +1,4 @@
-# -----------------------------
+﻿# -----------------------------
 # Nova Endgame Launch Script
 # -----------------------------
 
@@ -35,4 +35,4 @@ Start-Sleep -Seconds 2
 Write-Host "Opening Nova app in default browser..."
 Start-Process "http://127.0.0.1:$port/app?fresh=1"
 
-Write-Host "✅ Nova Endgame Launched!"
+Write-Host "âœ… Nova Endgame Launched!"

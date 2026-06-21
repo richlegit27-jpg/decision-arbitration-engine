@@ -1,4 +1,4 @@
-<!-- C:\Users\Owner\nova\templates\index.html -->
+﻿<!-- C:\Users\Owner\nova\templates\index.html -->
 
 <!DOCTYPE html>
 <html lang="en">
@@ -20,7 +20,7 @@
       <div class="sidebar-logo">Nova</div>
 
       <button id="btnSidebarClose" class="sidebar-toggle" type="button" aria-label="Close sidebar">
-        ✕
+        âœ•
       </button>
     </div>
 
@@ -36,7 +36,7 @@
   <main class="main">
     <header class="topbar">
       <button id="btnSidebarToggle" class="mobile-sidebar-btn" type="button" aria-label="Open sidebar">
-        ☰
+        â˜°
       </button>
 
       <div id="chatTitle" class="chat-title">Nova</div>
@@ -59,13 +59,13 @@
         title="Attach file"
         aria-label="Attach file"
       >
-        📎
+        ðŸ“Ž
       </button>
 
       <textarea
         id="promptInput"
         class="composer-input"
-        placeholder="Type a message…"
+        placeholder="Type a messageâ€¦"
         rows="1"
         autocomplete="off"
       ></textarea>

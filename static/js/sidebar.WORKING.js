@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 if (window.__novaSidebarLoaded) {
@@ -357,3 +357,4 @@ if (document.readyState === "loading") {
   initSidebar();
 }
 })();
+

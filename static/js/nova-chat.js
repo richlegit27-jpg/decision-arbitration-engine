@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+﻿document.addEventListener("DOMContentLoaded", () => {
   const sendBtn = document.getElementById("sendBtn");
   const composerInput = document.getElementById("composerInput");
   const messages = document.getElementById("messages");
@@ -58,3 +58,4 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+

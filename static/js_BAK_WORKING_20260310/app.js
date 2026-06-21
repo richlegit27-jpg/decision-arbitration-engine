@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+﻿from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from flask_socketio import SocketIO, emit
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -46,7 +46,7 @@ with app.app_context():
 
 
 # -----------------------
-# Pages (GET routes)  ✅ FIXES YOUR 405
+# Pages (GET routes)  âœ… FIXES YOUR 405
 # -----------------------
 @app.route("/")
 def index():
@@ -224,3 +224,4 @@ def upload_avatar():
 
 if __name__ == "__main__":
     socketio.run(app, debug=True)
+

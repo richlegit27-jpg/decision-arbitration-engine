@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
@@ -134,12 +134,12 @@
         <div class="logo"></div>
         <div>
           <div class="title">NOVA</div>
-          <div class="subtitle">Local UI • API proxy</div>
+          <div class="subtitle">Local UI â€¢ API proxy</div>
         </div>
       </div>
 
       <div class="row">
-        <div class="pill" id="pill-status">status: …</div>
+        <div class="pill" id="pill-status">status: â€¦</div>
         <button class="btn" id="btn-health">Health</button>
         <button class="btn primary" id="btn-selftest">Selftest</button>
       </div>
@@ -149,7 +149,7 @@
       <div class="card">
         <h3>
           <span>Chat</span>
-          <span class="status" id="api-base">api: …</span>
+          <span class="status" id="api-base">api: â€¦</span>
         </h3>
 
         <div class="tabs">
@@ -160,7 +160,7 @@
 
         <div class="pane">
           <div class="composer">
-            <textarea id="in" placeholder="Type here… (Enter = send, Shift+Enter = newline)"></textarea>
+            <textarea id="in" placeholder="Type hereâ€¦ (Enter = send, Shift+Enter = newline)"></textarea>
             <div style="display:flex;flex-direction:column;gap:8px">
               <button class="btn primary" id="btn-send">Send</button>
               <button class="btn danger" id="btn-clear">Clear</button>
@@ -192,7 +192,7 @@
           </div>
 
           <div style="height:10px"></div>
-          <div class="small" id="debug">debug: …</div>
+          <div class="small" id="debug">debug: â€¦</div>
         </div>
       </div>
     </div>
@@ -252,7 +252,7 @@
 
       const payload = { text: text, mode: state.mode };
 
-      setStatus(true, "sending…");
+      setStatus(true, "sendingâ€¦");
       const res = await postJSON("/api/chat", payload);
 
       if(res.ok){
@@ -291,7 +291,7 @@
     async function saveKey(){
       const k = key.value.trim();
       if(!k){ setStatus(false, "missing key"); return; }
-      setStatus(true, "saving key cookie…");
+      setStatus(true, "saving key cookieâ€¦");
       const res = await postJSON("/__set_key_cookie", { key: k });
       if(res.ok){
         setStatus(true, "key cookie saved");

@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat\sidebar.js
+﻿// C:\Users\Owner\nova\static\js\chat\sidebar.js
 
 (() => {
   const app = window.NovaApp;
@@ -101,7 +101,7 @@
 
         const btnRename = document.createElement("button");
         btnRename.className = "icon-btn";
-        btnRename.textContent = "✎";
+        btnRename.textContent = "âœŽ";
         btnRename.title = "Rename chat";
         btnRename.onclick = (e) => {
           e.stopPropagation();
@@ -112,7 +112,7 @@
 
         const btnDelete = document.createElement("button");
         btnDelete.className = "icon-btn";
-        btnDelete.textContent = "✕";
+        btnDelete.textContent = "âœ•";
         btnDelete.title = "Delete chat";
         btnDelete.onclick = (e) => {
           e.stopPropagation();
@@ -165,3 +165,4 @@
   window.NovaApp = window.NovaApp || {};
   window.NovaApp.sidebar = sidebar;
 })();
+

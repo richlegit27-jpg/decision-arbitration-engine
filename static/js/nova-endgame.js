@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 /* ---------------------------------------------------
@@ -56,7 +56,7 @@ const NovaComposer=(function(){
   function ensurePendingAttachments(){ if(!Array.isArray(state.pendingAttachments)) state.pendingAttachments=[]; return state.pendingAttachments; }
   function pushMessage(m){ ensureMessages().push(m); window.dispatchEvent(new CustomEvent("nova:messages-changed",{detail:state.messages})) }
   function appendUserMessage(text,attachments=[]){ const msg={id:makeId("user"),role:"user",content:String(text||""),created_at:nowIso(),attachments:attachments||[]}; pushMessage(msg); return msg; }
-  function appendThinkingMessage(model){ const msg={id:makeId("assistant"),role:"assistant",content:`Thinking…${model?` (${model})`:""}`,created_at:nowIso(),isThinking:true}; pushMessage(msg); return msg; }
+  function appendThinkingMessage(model){ const msg={id:makeId("assistant"),role:"assistant",content:`Thinkingâ€¦${model?` (${model})`:""}`,created_at:nowIso(),isThinking:true}; pushMessage(msg); return msg; }
   async function sendMessage(){ const raw=el.composerInput?.value||""; const text=raw.trim(); const attachments=ensurePendingAttachments(); if(!text&&!attachments.length) return; appendUserMessage(text||"[Attachment]",attachments); if(el.composerInput) el.composerInput.value=""; state.pendingAttachments=[]; const thinking=appendThinkingMessage(""); try{ const resp=await fetch(chatUrl,{method:"POST",credentials:"include",headers:{"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify({chat_id:state.activeChatId,message:text,model:"",attachments})}); const data=await resp.json().catch(()=>({})); if(!resp.ok) throw new Error(data?.error||data?.detail||`HTTP ${resp.status}`); }catch(e){ console.error(e); } }
   return {sendMessage};
 })();
@@ -76,3 +76,4 @@ const NovaComposer=(function(){
   document.addEventListener("keydown",(e)=>{ if(e.key==="Escape"){ closePanel(memoryPanel); closePanel(filesPanel); } });
   addClass(document.body,"endgame-ready");
 })();
+

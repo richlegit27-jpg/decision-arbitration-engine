@@ -1,4 +1,4 @@
-# -----------------------------
+﻿# -----------------------------
 # Nova Endgame One-Click Launcher
 # -----------------------------
 
@@ -22,4 +22,4 @@ Start-Sleep -Seconds 3
 # Open the default browser to Nova workspace
 Start-Process $novaUrl
 
-Write-Host "✅ Nova Endgame Launched!"
+Write-Host "âœ… Nova Endgame Launched!"

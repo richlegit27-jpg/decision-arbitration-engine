@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   const Nova = (window.Nova = window.Nova || {});
@@ -143,7 +143,7 @@
       const mainBtn=document.createElement("button"); 
       mainBtn.type="button"; mainBtn.className="session-main-btn"; 
       mainBtn.dataset.sessionId=id; 
-      mainBtn.innerHTML=`<span class="session-title">${escapeHtml(title)}</span><span class="session-meta">${escapeHtml(`${count} msg${count===1?"":"s"}${updatedAt?` · ${formatTime(updatedAt)}`:""}`)}</span>`; 
+      mainBtn.innerHTML=`<span class="session-title">${escapeHtml(title)}</span><span class="session-meta">${escapeHtml(`${count} msg${count===1?"":"s"}${updatedAt?` Â· ${formatTime(updatedAt)}`:""}`)}</span>`; 
       row.appendChild(mainBtn); 
       root.appendChild(row); 
     }); 

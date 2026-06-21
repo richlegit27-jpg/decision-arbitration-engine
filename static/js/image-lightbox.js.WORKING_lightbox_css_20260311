@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\image-lightbox.js
+﻿// C:\Users\Owner\nova\static\js\image-lightbox.js
 
 (() => {
 "use strict"
@@ -26,7 +26,7 @@ function ensureLightbox(){
         data-lightbox-close="true"
         aria-label="Close image preview"
       >
-        ✕
+        âœ•
       </button>
       <img
         id="novaImageLightboxImg"

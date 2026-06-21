@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\api.js
+﻿// C:\Users\Owner\nova\static\js\api.js
 
 (() => {
 "use strict"
@@ -617,3 +617,4 @@ window.NovaAPI = {
 }
 
 })()
+

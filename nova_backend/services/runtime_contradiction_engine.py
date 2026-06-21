@@ -1,4 +1,4 @@
-class RuntimeContradictionEngine:
+﻿class RuntimeContradictionEngine:
 
     def analyze(
         self,
@@ -141,3 +141,4 @@ class RuntimeContradictionEngine:
             "governor_mode": governor_mode,
             "recovery_mode": recovery_mode,
         }
+

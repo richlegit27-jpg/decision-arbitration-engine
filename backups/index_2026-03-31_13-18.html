@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -276,7 +276,7 @@
           </div>
         </div>
 
-        <button id="sidebarToggle" class="nova-shell-btn" type="button" title="Collapse or expand sidebar">☰</button>
+        <button id="sidebarToggle" class="nova-shell-btn" type="button" title="Collapse or expand sidebar">â˜°</button>
       </div>
 
       <div class="nova-session-actions">
@@ -286,7 +286,7 @@
       <div class="nova-session-list-wrap">
         <div class="nova-session-list-head">
           <div class="nova-session-list-title">Sessions</div>
-          <button id="refreshSessionsBtn" class="nova-shell-btn" type="button" title="Refresh sessions">↻</button>
+          <button id="refreshSessionsBtn" class="nova-shell-btn" type="button" title="Refresh sessions">â†»</button>
         </div>
 
         <div id="sessionList" class="nova-session-list" aria-live="polite"></div>
@@ -298,7 +298,7 @@
     <main class="nova-main">
       <header class="nova-main-topbar">
         <div class="nova-main-topbar-left">
-          <button id="mobileSidebarToggle" class="nova-shell-btn" type="button" title="Open sidebar">☰</button>
+          <button id="mobileSidebarToggle" class="nova-shell-btn" type="button" title="Open sidebar">â˜°</button>
 
           <div class="nova-main-title-wrap">
             <div id="activeSessionTitle" class="nova-main-title">New Chat</div>
@@ -360,13 +360,13 @@
                   <textarea
                     id="chatInput"
                     class="nova-composer-textarea"
-                    placeholder="Message Nova…"
+                    placeholder="Message Novaâ€¦"
                     spellcheck="true"
                   ></textarea>
 
                   <div class="nova-composer-footer">
                     <div class="nova-composer-hint">
-                      Enter sends • Shift+Enter newline • Upload stages files before send
+                      Enter sends â€¢ Shift+Enter newline â€¢ Upload stages files before send
                     </div>
 
                     <div class="nova-composer-actions">
@@ -397,14 +397,14 @@
               <button id="memoryTabBtn" class="nova-panel-tab" type="button">Memory</button>
               <button id="artifactsTabBtn" class="nova-panel-tab" type="button">Artifacts</button>
               <button id="webTabBtn" class="nova-panel-tab" type="button">Web</button>
-              <button id="closeRailBtn" class="nova-shell-btn" type="button" title="Close rail">×</button>
+              <button id="closeRailBtn" class="nova-shell-btn" type="button" title="Close rail">Ã—</button>
             </div>
           </div>
 
           <div class="nova-right-rail-body">
             <section id="memoryPanel" class="nova-right-panel" aria-label="Memory panel">
               <div class="nova-panel-toolbar">
-                <button id="memoryRefreshBtn" class="nova-shell-btn" type="button" title="Refresh memory">↻</button>
+                <button id="memoryRefreshBtn" class="nova-shell-btn" type="button" title="Refresh memory">â†»</button>
               </div>
               <div id="memoryPanelScroll" class="nova-panel-scroll"></div>
             </section>
@@ -418,7 +418,7 @@
                   <option value="media">Media</option>
                   <option value="chat_reply">Chat Reply</option>
                 </select>
-                <button id="artifactRefresh" class="nova-shell-btn" type="button" title="Refresh artifacts">↻</button>
+                <button id="artifactRefresh" class="nova-shell-btn" type="button" title="Refresh artifacts">â†»</button>
               </div>
 
               <div class="nova-panel-scroll">
@@ -430,7 +430,7 @@
 
             <section id="webPanel" class="nova-right-panel" aria-label="Web panel">
               <div class="nova-panel-toolbar">
-                <button id="webRefreshBtn" class="nova-shell-btn" type="button" title="Refresh web panel">↻</button>
+                <button id="webRefreshBtn" class="nova-shell-btn" type="button" title="Refresh web panel">â†»</button>
               </div>
               <div id="webPanelScroll" class="nova-panel-scroll"></div>
             </section>
@@ -445,7 +445,7 @@
             <div class="nova-debug-actions">
               <button id="debugRefreshBtn" class="nova-shell-btn" type="button">Refresh</button>
               <button id="debugCopyBtn" class="nova-shell-btn" type="button">Copy</button>
-              <button id="debugCloseBtn" class="nova-shell-btn" type="button">×</button>
+              <button id="debugCloseBtn" class="nova-shell-btn" type="button">Ã—</button>
             </div>
           </div>
 
@@ -730,7 +730,7 @@
               '</div>' +
               thumb +
               '<div class="nova-staged-chip-title">' + escapeHtml(name) + '</div>' +
-              '<div class="nova-staged-chip-meta">' + escapeHtml([item.mime_type || item.mime || "", formatSize(item.size)].filter(Boolean).join(" • ")) + '</div>' +
+              '<div class="nova-staged-chip-meta">' + escapeHtml([item.mime_type || item.mime || "", formatSize(item.size)].filter(Boolean).join(" â€¢ ")) + '</div>' +
             '</div>'
           );
         }).join("");
@@ -784,3 +784,4 @@
   </script>
 </body>
 </html>
+

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 import re
@@ -146,3 +146,4 @@ def protect_routes(users: dict[str, dict[str, Any]]):
         return None
 
     return None
+

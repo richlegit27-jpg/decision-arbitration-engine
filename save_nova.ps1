@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Continue"
+﻿$ErrorActionPreference = "Continue"
 
 $ProjectRoot = "C:\Users\Owner\nova"
 $BackendRoot = "C:\Users\Owner\nova\backend"

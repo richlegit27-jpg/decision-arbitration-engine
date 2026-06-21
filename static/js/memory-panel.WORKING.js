@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 if (window.__novaMemoryPanelLoaded) {
@@ -513,3 +513,4 @@ if (document.readyState === "loading") {
   initMemoryPanel();
 }
 })();
+

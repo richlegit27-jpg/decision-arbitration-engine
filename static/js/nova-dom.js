@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\nova-dom.js
+﻿// C:\Users\Owner\nova\static\js\nova-dom.js
 
 (() => {
   "use strict";
@@ -155,3 +155,4 @@
 
   refreshRefs();
 })();
+

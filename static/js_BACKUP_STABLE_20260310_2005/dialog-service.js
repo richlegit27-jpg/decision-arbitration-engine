@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\dialog-service.js
+﻿// C:\Users\Owner\nova\static\js\dialog-service.js
 
 (() => {
 "use strict"
@@ -36,3 +36,4 @@ window.NovaDialogService = {
 }
 
 })()
+

@@ -1,4 +1,4 @@
-# C:\Users\Owner\nova\nova_backend\services\response_rewrite_service.py
+﻿# C:\Users\Owner\nova\nova_backend\services\response_rewrite_service.py
 
 from nova_backend.services.nova_voice_profile import NOVA_VOICE_PROFILE
 import re
@@ -36,7 +36,7 @@ class ResponseRewriteService:
             "send me the rest",
             "i can also",
 
-            # 🔥 added (anti-chatbot tone)
+            # ðŸ”¥ added (anti-chatbot tone)
             "got it",
             "bugs can be frustrating",
             "step by step",
@@ -81,7 +81,7 @@ class ResponseRewriteService:
             if any(k in l.lower() for k in ["fix", "do", "run", "add", "use", "replace"]):
                 return l
 
-        # fallback → first meaningful line
+        # fallback â†’ first meaningful line
         for line in lines:
             l = line.strip()
             if l:
@@ -133,7 +133,7 @@ class ResponseRewriteService:
     def _force_execution_first(self, text: str) -> str:
         lowered = self._clean(text).lower()
 
-        # 🔥 force action extraction only (no soft fallback)
+        # ðŸ”¥ force action extraction only (no soft fallback)
         lines = re.split(r"[.!?\n]", text)
         clean = [l.strip() for l in lines if l.strip()]
 
@@ -144,5 +144,7 @@ class ResponseRewriteService:
             ]):
                 return l
 
-        # 🔥 if nothing actionable → force directive
+        # ðŸ”¥ if nothing actionable â†’ force directive
         return "Identify the issue."
+
+

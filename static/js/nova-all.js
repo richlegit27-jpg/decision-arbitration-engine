@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 /* -------------------------- Composer -------------------------- */
@@ -71,7 +71,7 @@ if (!window.__novaComposerLoaded) {
 
   /* Stream handling, image commands, text commands, sendMessage, stopMessage, binding buttons/input, initComposer... */
   /* Full previous code continues here exactly as you had it for composer.js */
-  /* This single JS covers composer, render, sidebar, markdown, app-fixed—all merged for simplicity */
+  /* This single JS covers composer, render, sidebar, markdown, app-fixedâ€”all merged for simplicity */
 
   app.sendMessage=async()=>{ const input=getMessageInput(); const text=getMessageText(); if(state.isSending||!input||!text){ notifyError(!input?"No input":"Message empty"); return; } const chatId=ensureActiveChat(); const existing=cloneMessages(getMessagesForChat(chatId)); const userMsg=buildUserMessage(text); if(text.trim().toLowerCase().startsWith("/image ")) await sendImageMessage(chatId,userMsg,existing); else await sendTextMessage(chatId,userMsg,existing); };
   app.stopMessage=()=>{ state.activeController?.abort?.(); finishSending(); };
@@ -93,3 +93,4 @@ console.log("Nova sidebar loaded");
 window.NovaMarkdown={ render:text=>String(text||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\r?\n/g,"<br>") };
 
 })();
+

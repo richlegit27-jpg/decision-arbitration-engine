@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat-orchestrator.js
+﻿// C:\Users\Owner\nova\static\js\chat-orchestrator.js
 
 (() => {
 "use strict"
@@ -986,3 +986,4 @@ window.NovaChatOrchestrator = {
 }
 
 })()
+

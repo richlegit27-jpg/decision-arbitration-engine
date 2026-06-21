@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   const API = {
@@ -421,7 +421,7 @@
             >
               <span class="nova-session-title-row">
                 <span class="nova-session-title">${title}</span>
-                ${session.pinned ? '<span class="nova-session-pin-badge">📌</span>' : ""}
+                ${session.pinned ? '<span class="nova-session-pin-badge">ðŸ“Œ</span>' : ""}
               </span>
 
               <span class="nova-session-meta-row">
@@ -438,7 +438,7 @@
                 data-action="rename"
                 data-session-id="${sessionId}"
                 title="Rename"
-              >✎</button>
+              >âœŽ</button>
 
               <button
                 type="button"
@@ -447,7 +447,7 @@
                 data-session-id="${sessionId}"
                 data-pinned="${session.pinned ? "1" : "0"}"
                 title="${session.pinned ? "Unpin" : "Pin"}"
-              >${session.pinned ? "★" : "☆"}</button>
+              >${session.pinned ? "â˜…" : "â˜†"}</button>
 
               <button
                 type="button"
@@ -455,7 +455,7 @@
                 data-action="delete"
                 data-session-id="${sessionId}"
                 title="Delete"
-              >🗑</button>
+              >ðŸ—‘</button>
             </div>
           </div>
         `;
@@ -651,3 +651,4 @@ apiPublic.reloadArtifacts = async function () {
     boot();
   }
 })();
+

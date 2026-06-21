@@ -1,4 +1,4 @@
-class RuntimeIntegrityService:
+﻿class RuntimeIntegrityService:
 
     def validate(
         self,
@@ -104,3 +104,4 @@ class RuntimeIntegrityService:
             "checked_signal": runtime_signal,
             "checked_action": final_action,
         }
+

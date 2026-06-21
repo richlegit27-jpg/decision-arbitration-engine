@@ -1,4 +1,4 @@
-class RuntimeEscalationService:
+﻿class RuntimeEscalationService:
     def evaluate(
         self,
         execution_state=None,
@@ -85,3 +85,4 @@ class RuntimeEscalationService:
             "failed_cycles": failed_cycles,
             "execution_state": execution_state,
         }
+

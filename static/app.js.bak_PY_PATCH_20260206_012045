@@ -6988,3 +6988,4 @@ console.log('NOVA_BOOT_NO_STT_V1: STT/voice loop removed from boot');
   console.log("✅ NOVA_COPY_TOOLBAR_V1 installed");
 })();
 /* ===== /NOVA_COPY_TOOLBAR_V1 ===== */
+

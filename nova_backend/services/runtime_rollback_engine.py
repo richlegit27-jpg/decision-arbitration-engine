@@ -1,4 +1,4 @@
-class RuntimeRollbackEngine:
+﻿class RuntimeRollbackEngine:
 
     def decide(
         self,
@@ -69,3 +69,4 @@ class RuntimeRollbackEngine:
                 else {}
             ),
         }
+

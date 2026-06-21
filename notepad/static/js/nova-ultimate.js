@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 window.NovaApp = window.NovaApp || {};
@@ -32,7 +32,7 @@ input.addEventListener("keydown",(e)=>{ if(e.key==="Enter"&&!e.shiftKey){ e.prev
 const sidebarBtn=byId("sidebarToggleBtn"); if(sidebarBtn){ sidebarBtn.addEventListener("click",()=>{ const s=byId("sidebar"); if(!s) return; s.classList.toggle("closed"); s.style.transition="transform 0.25s ease"; getRootState().ui.sidebarOpen=!s.classList.contains("closed"); }); }
 
 // Theme button
-const themeBtn=document.createElement("button"); themeBtn.textContent="🌗"; themeBtn.style.marginTop="8px";
+const themeBtn=document.createElement("button"); themeBtn.textContent="ðŸŒ—"; themeBtn.style.marginTop="8px";
 themeBtn.addEventListener("click",()=>{ const root=document.documentElement; const next=root.getAttribute("data-theme")==="dark"?"light":"dark"; root.setAttribute("data-theme",next); try{ localStorage.setItem("nova_theme",next);}catch{} });
 if(byId("themeContainer")) byId("themeContainer").appendChild(themeBtn);
 
@@ -44,3 +44,4 @@ setMessagesForChat(starterId,[
 ]);
 
 })();
+

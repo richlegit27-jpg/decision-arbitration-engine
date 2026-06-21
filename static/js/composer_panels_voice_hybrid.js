@@ -1,5 +1,5 @@
-document.addEventListener("DOMContentLoaded", () => {
-    console.log("Nova Ultimate 2026 — Offline/Hybrid Mode Loaded 🌐");
+﻿document.addEventListener("DOMContentLoaded", () => {
+    console.log("Nova Ultimate 2026 â€” Offline/Hybrid Mode Loaded ðŸŒ");
 
     const backendPort = window.NOVA_BACKEND_PORT;
     const model = window.DEFAULT_MODEL;
@@ -94,3 +94,4 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 });
+

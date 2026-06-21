@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 from flask import Flask, request, jsonify, send_from_directory, Response
 from openai import OpenAI
 from werkzeug.utils import secure_filename
@@ -942,3 +942,4 @@ if __name__ == "__main__":
     port = int((os.getenv("PORT") or os.getenv("APP_PORT") or "8743").strip())
     debug = (os.getenv("DEBUG") or "true").strip().lower() == "true"
     app.run(host=host, port=port, debug=debug)
+

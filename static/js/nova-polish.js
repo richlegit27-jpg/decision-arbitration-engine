@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaPolishLoaded) {
@@ -289,3 +289,4 @@
     init();
   }
 })();
+

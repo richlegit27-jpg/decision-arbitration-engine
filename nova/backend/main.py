@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import hashlib
 import hmac
@@ -436,7 +436,7 @@ def save_memory_item(username: str, text: str, kind: str = "general", pinned: bo
 
 
 def describe_learned_memory(item: Dict[str, Any]) -> str:
-    prefix = "📌" if bool(item.get("pinned")) else "🧠"
+    prefix = "ðŸ“Œ" if bool(item.get("pinned")) else "ðŸ§ "
     kind = str(item.get("kind") or "general").strip() or "general"
     text = str(item.get("text") or "").strip()
     return f"{prefix} Learned {kind}: {text}"
@@ -1726,3 +1726,4 @@ async def chat_stream(request: Request):
             "X-Accel-Buffering": "no",
         },
     )
+

@@ -1,4 +1,4 @@
-import os
+﻿import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -331,3 +331,4 @@ def get_tavily_api_key() -> str:
         or os.getenv("TAVILY_KEY")
         or os.getenv("NOVA_TAVILY_API_KEY")
     )
+

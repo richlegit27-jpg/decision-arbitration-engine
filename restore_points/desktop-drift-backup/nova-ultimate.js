@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaUltimateLoaded) return;
@@ -143,10 +143,10 @@
     const modelEl = byId("routerModelValue");
     const modelSelect = byId("modelSelect");
 
-    if (routeEl) routeEl.textContent = meta.route || meta.intent || "—";
-    if (reasonEl) reasonEl.textContent = meta.reason || "—";
-    if (memoryEl) memoryEl.textContent = meta.memory_scope || meta.memory || "—";
-    if (modelEl) modelEl.textContent = meta.model || state.currentModel || "—";
+    if (routeEl) routeEl.textContent = meta.route || meta.intent || "â€”";
+    if (reasonEl) reasonEl.textContent = meta.reason || "â€”";
+    if (memoryEl) memoryEl.textContent = meta.memory_scope || meta.memory || "â€”";
+    if (modelEl) modelEl.textContent = meta.model || state.currentModel || "â€”";
     if (modelSelect) modelSelect.value = state.currentModel || "gpt-4.1-mini";
   }
 
@@ -482,3 +482,4 @@
     boot();
   }
 })();
+

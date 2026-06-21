@@ -25,3 +25,4 @@ print("EXTRACT:", hasattr(cs, "_extract_response_text"))
 print("RECON:", hasattr(cs, "_reconcile_execution_state"))
 
 print("DIR SAMPLE:", [x for x in dir(cs) if "_" in x][:50])
+

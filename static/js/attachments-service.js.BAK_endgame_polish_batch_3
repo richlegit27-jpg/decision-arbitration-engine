@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\attachments-service.js
+﻿// C:\Users\Owner\nova\static\js\attachments-service.js
 
 (() => {
 "use strict"
@@ -120,11 +120,11 @@ function createAttachmentsService(options = {}){
     const name = getFileName(file).toLowerCase()
     const type = getFileType(file).toLowerCase()
 
-    if(type.startsWith("image/")) return "🖼"
-    if(type.startsWith("audio/")) return "🎵"
-    if(type.startsWith("video/")) return "🎬"
-    if(type.includes("pdf") || name.endsWith(".pdf")) return "📕"
-    if(name.endsWith(".zip") || name.endsWith(".rar") || name.endsWith(".7z")) return "🗜"
+    if(type.startsWith("image/")) return "ðŸ–¼"
+    if(type.startsWith("audio/")) return "ðŸŽµ"
+    if(type.startsWith("video/")) return "ðŸŽ¬"
+    if(type.includes("pdf") || name.endsWith(".pdf")) return "ðŸ“•"
+    if(name.endsWith(".zip") || name.endsWith(".rar") || name.endsWith(".7z")) return "ðŸ—œ"
     if(
       name.endsWith(".js") ||
       name.endsWith(".ts") ||
@@ -135,10 +135,10 @@ function createAttachmentsService(options = {}){
       name.endsWith(".md") ||
       name.endsWith(".sql")
     ){
-      return "💻"
+      return "ðŸ’»"
     }
 
-    return "📄"
+    return "ðŸ“„"
   }
 
   function createObjectPreview(file){
@@ -606,7 +606,7 @@ function createAttachmentsService(options = {}){
                 aria-label="Remove attachment"
                 title="Remove"
               >
-                ×
+                Ã—
               </button>
             </div>
           `

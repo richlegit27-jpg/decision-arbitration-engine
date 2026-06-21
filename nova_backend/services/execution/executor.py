@@ -1,4 +1,4 @@
-class Executor:
+﻿class Executor:
     """
     Executes actions decided by BrainCore.
     """
@@ -26,3 +26,4 @@ class Executor:
             return {"status": "cancelled"}
 
         return {"status": "chat"}
+

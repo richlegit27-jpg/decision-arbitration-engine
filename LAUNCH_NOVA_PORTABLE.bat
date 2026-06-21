@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 REM =========================================================
 REM Nova Ultimate 2026 Phase 6
 REM Single-click portable launcher

@@ -772,7 +772,7 @@ def _nova_replace_weak_backend_reply(user_text, result):
         else:
             replacement = (
         
-                "Iâ€™m here. The active Nova phase is frontend/mobile polish. "
+                "I'm here. The active Nova phase is frontend/mobile polish. "
                 "Give me the next task and Iâ€™ll move directly on it."
             )
 
@@ -2444,7 +2444,7 @@ def _nova_prevent_bad_exact_pong_response(assistant_text, user_text):
     if clean_user in allowed_pong_requests:
         return clean_answer
 
-    return "Iâ€™m here. The active Nova phase is frontend/mobile polish. Give me the next task and Iâ€™ll move directly on it."
+    return "I'm here. The active Nova phase is frontend/mobile polish. Give me the next task and Iâ€™ll move directly on it."
 
 
 def _nova_try_project_state_direct_recall(user_text, session_id):
@@ -2630,12 +2630,12 @@ def _nova_casual_chat_guard():
             "hey": "Hey.",
             "hello": "Hey.",
             "yo": "Yo.",
-            "sup": "Iâ€™m here.",
-            "how are you": "Iâ€™m good. Ready when you are.",
-            "how are u": "Iâ€™m good. Ready when you are.",
-            "how you doing": "Iâ€™m good. Ready when you are.",
-            "whats up": "Iâ€™m here. Ready for the next move.",
-            "what's up": "Iâ€™m here. Ready for the next move.",
+            "sup": "I'm here.",
+            "how are you": "I'm good. Ready when you are.",
+            "how are u": "I'm good. Ready when you are.",
+            "how you doing": "I'm good. Ready when you are.",
+            "whats up": "I'm here. Ready for the next move.",
+            "what's up": "I'm here. Ready for the next move.",
         }
 
         if clean not in casual_replies:
@@ -10330,7 +10330,7 @@ def _nova_stop_fake_attachment_chat_gate():
             "ok": True,
             "assistant_message": {
                 "role": "assistant",
-                "text": "Iâ€™m good. Ready when you are.",
+                "text": "I'm good. Ready when you are.",
                 "attachments": [],
                 "meta": {
                     "route": "normal_chat_casual_gate"
@@ -13355,6 +13355,9 @@ if __name__ == "__main__":
 
 
 # NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611
+
+
+
 
 
 

@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat-render.js
+﻿// C:\Users\Owner\nova\static\js\chat-render.js
 
 (() => {
 "use strict"
@@ -125,3 +125,4 @@ window.NovaChatRender = {
 }
 
 })()
+

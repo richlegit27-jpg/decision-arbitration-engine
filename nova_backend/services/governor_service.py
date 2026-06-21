@@ -1,4 +1,4 @@
-class GovernorService:
+﻿class GovernorService:
     def __init__(self):
         self.governor_policy = {
             "allow_retry": True,
@@ -106,3 +106,4 @@ class GovernorService:
 
     def get_policy(self):
         return self.governor_policy
+

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
@@ -109,3 +109,4 @@ class ArtifactMediaService:
         artifact["audio_missing"] = viewer["audio_missing"]
 
         return artifact
+

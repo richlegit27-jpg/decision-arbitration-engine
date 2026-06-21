@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 import os
 import time
 import uuid
@@ -284,3 +284,4 @@ async def upload_attachment(file: UploadFile = File(...)):
 # --- Run server ---
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8743, reload=False)
+

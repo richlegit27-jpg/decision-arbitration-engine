@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\utils.js
+﻿// C:\Users\Owner\nova\static\js\utils.js
 
 (() => {
 "use strict"
@@ -72,3 +72,4 @@ window.NovaUtils = {
 }
 
 })()
+

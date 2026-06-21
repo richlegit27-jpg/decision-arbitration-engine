@@ -1,4 +1,4 @@
-class RuntimeAutonomyLoop:
+﻿class RuntimeAutonomyLoop:
 
     name = "runtime_autonomy_loop"
 
@@ -80,3 +80,4 @@ class RuntimeAutonomyLoop:
             "executed": executed,
             "execution_count": len(executed),
         }
+

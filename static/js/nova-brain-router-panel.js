@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaRouterPanelLoaded) return;
@@ -62,7 +62,7 @@
 
   function formatConfidence(value) {
     const raw = safeText(value);
-    if (!raw) return "—";
+    if (!raw) return "â€”";
 
     const num = Number(raw);
     if (!Number.isFinite(num)) return raw;
@@ -95,8 +95,8 @@
           </div>
 
           <div class="nova-router-panel-actions">
-            <button type="button" class="nova-router-panel-action" id="novaRouterPanelRefresh" title="Refresh">↻</button>
-            <button type="button" class="nova-router-panel-action" id="novaRouterPanelClose" title="Close">✕</button>
+            <button type="button" class="nova-router-panel-action" id="novaRouterPanelRefresh" title="Refresh">â†»</button>
+            <button type="button" class="nova-router-panel-action" id="novaRouterPanelClose" title="Close">âœ•</button>
           </div>
         </div>
 
@@ -104,37 +104,37 @@
           <div class="nova-router-grid">
             <div class="nova-router-card">
               <div class="nova-router-label">Mode</div>
-              <div class="nova-router-value" id="novaRouterMode">—</div>
+              <div class="nova-router-value" id="novaRouterMode">â€”</div>
             </div>
 
             <div class="nova-router-card">
               <div class="nova-router-label">Intent</div>
-              <div class="nova-router-value" id="novaRouterIntent">—</div>
+              <div class="nova-router-value" id="novaRouterIntent">â€”</div>
             </div>
 
             <div class="nova-router-card">
               <div class="nova-router-label">Model</div>
-              <div class="nova-router-value" id="novaRouterModel">—</div>
+              <div class="nova-router-value" id="novaRouterModel">â€”</div>
             </div>
 
             <div class="nova-router-card">
               <div class="nova-router-label">Confidence</div>
-              <div class="nova-router-value" id="novaRouterConfidence">—</div>
+              <div class="nova-router-value" id="novaRouterConfidence">â€”</div>
             </div>
 
             <div class="nova-router-card">
               <div class="nova-router-label">Memory Used</div>
-              <div class="nova-router-value" id="novaRouterMemoryUsed">—</div>
+              <div class="nova-router-value" id="novaRouterMemoryUsed">â€”</div>
             </div>
 
             <div class="nova-router-card">
               <div class="nova-router-label">Memory Count</div>
-              <div class="nova-router-value" id="novaRouterMemoryCount">—</div>
+              <div class="nova-router-value" id="novaRouterMemoryCount">â€”</div>
             </div>
 
             <div class="nova-router-card nova-router-card-wide">
               <div class="nova-router-label">Source</div>
-              <div class="nova-router-value" id="novaRouterSource">—</div>
+              <div class="nova-router-value" id="novaRouterSource">â€”</div>
             </div>
           </div>
 
@@ -273,18 +273,18 @@
     const normalized = normalizeMeta(meta);
     state.meta = normalized;
 
-    byId("novaRouterMode").textContent = normalized?.mode || "—";
-    byId("novaRouterIntent").textContent = normalized?.intent || "—";
-    byId("novaRouterModel").textContent = normalized?.model || "—";
-    byId("novaRouterConfidence").textContent = normalized ? formatConfidence(normalized.confidence) : "—";
-    byId("novaRouterMemoryUsed").textContent = normalized ? (normalized.memory_used ? "yes" : "no") : "—";
-    byId("novaRouterMemoryCount").textContent = normalized ? String(normalized.memory_count) : "—";
-    byId("novaRouterSource").textContent = normalized?.source || "—";
+    byId("novaRouterMode").textContent = normalized?.mode || "â€”";
+    byId("novaRouterIntent").textContent = normalized?.intent || "â€”";
+    byId("novaRouterModel").textContent = normalized?.model || "â€”";
+    byId("novaRouterConfidence").textContent = normalized ? formatConfidence(normalized.confidence) : "â€”";
+    byId("novaRouterMemoryUsed").textContent = normalized ? (normalized.memory_used ? "yes" : "no") : "â€”";
+    byId("novaRouterMemoryCount").textContent = normalized ? String(normalized.memory_count) : "â€”";
+    byId("novaRouterSource").textContent = normalized?.source || "â€”";
 
     const subtitle = byId("novaRouterPanelSubtitle");
     if (subtitle) {
       subtitle.textContent = normalized
-        ? `${normalized.mode || "unknown"} · ${normalized.intent || "unknown"}`
+        ? `${normalized.mode || "unknown"} Â· ${normalized.intent || "unknown"}`
         : "Waiting for data";
     }
 
@@ -687,3 +687,4 @@
     state,
   };
 })();
+

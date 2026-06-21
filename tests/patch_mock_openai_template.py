@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 from datetime import datetime
 
 # Path to the test file to patch
@@ -58,3 +58,4 @@ def test_api_chat_endpoint_smoke(monkeypatch):
 # Write replacement to test file
 TEST_FILE_PATH.write_text(replacement, encoding="utf-8")
 print("OK: test_api_chat_smoke.py now mocks chat_service.handle()")
+

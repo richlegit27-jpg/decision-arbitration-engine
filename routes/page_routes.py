@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
@@ -16,3 +16,4 @@ async def index(request: Request):
         "index.html",
         {"request": request},
     )
+

@@ -281,3 +281,5 @@ async function readChatStream(response, thinking) {
     window.NovaAttachBubbleActions = attachBubbleActions;
 })();
 
+
+

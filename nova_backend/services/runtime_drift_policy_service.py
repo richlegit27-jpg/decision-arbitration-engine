@@ -1,4 +1,4 @@
-class RuntimeDriftPolicyService:
+﻿class RuntimeDriftPolicyService:
 
     def __init__(self):
 
@@ -66,3 +66,4 @@ class RuntimeDriftPolicyService:
             )
 
         return policy
+

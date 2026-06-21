@@ -1,4 +1,4 @@
-import time
+﻿import time
 from urllib.parse import urlparse
 
 from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
@@ -284,3 +284,4 @@ def init_password_gate(app):
     app.config["SESSION_COOKIE_SECURE"] = False
 
     app.register_blueprint(password_gate_bp)
+

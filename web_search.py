@@ -1,4 +1,4 @@
-import requests
+﻿import requests
 
 def search_web(query):
     url = "https://duckduckgo.com/html/"
@@ -31,3 +31,4 @@ def search_web(query):
     except Exception as e:
         print("search error:", e)
         return []
+

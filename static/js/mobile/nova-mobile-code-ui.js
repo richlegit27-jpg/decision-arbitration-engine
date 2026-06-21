@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     "use strict";
 
     function hasCodeText(text) {
@@ -116,3 +116,4 @@
     };
 
 })();
+

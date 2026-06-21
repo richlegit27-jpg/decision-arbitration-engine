@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaArtifactsLoaded) return;
@@ -297,7 +297,7 @@
   function truncate(value, max = 280) {
     const text = String(value ?? "");
     if (text.length <= max) return text;
-    return `${text.slice(0, max).trim()}…`;
+    return `${text.slice(0, max).trim()}â€¦`;
   }
 
   function getRoot() {

@@ -1,4 +1,4 @@
-# C:\Users\Owner\nova\nova_backend\services\runtime_self_preservation_service.py
+﻿# C:\Users\Owner\nova\nova_backend\services\runtime_self_preservation_service.py
 
 class RuntimeSelfPreservationService:
     def __init__(
@@ -91,3 +91,4 @@ class RuntimeSelfPreservationService:
             "health_state": health_state,
             "execution_state": execution_state,
         }
+

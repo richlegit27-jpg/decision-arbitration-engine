@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     "use strict";
 
     function syncExecutionStatusFromResponse(data) {
@@ -53,7 +53,7 @@
 
         if (currentStep && currentIndex && totalSteps) {
             statusEl.textContent =
-                `Status: ${status} · Step ${currentIndex}/${totalSteps}: ${currentStep}`;
+                `Status: ${status} Â· Step ${currentIndex}/${totalSteps}: ${currentStep}`;
             return;
         }
 
@@ -101,3 +101,4 @@
 
     console.log("[Nova Mobile] state module ready");
 })();
+

@@ -1,4 +1,4 @@
-#sidebar {
+﻿#sidebar {
   position:fixed; top:0; left:0; bottom:0;
   width:320px; background: linear-gradient(180deg, #121925, #0b0f14);
   padding:10px; overflow-y:auto; color:#fff;

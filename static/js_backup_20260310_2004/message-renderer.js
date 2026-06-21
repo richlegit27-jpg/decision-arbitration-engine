@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\message-renderer.js
+﻿// C:\Users\Owner\nova\static\js\message-renderer.js
 
 (() => {
 "use strict"
@@ -123,3 +123,4 @@ window.NovaMessageRenderer = {
 }
 
 })()
+

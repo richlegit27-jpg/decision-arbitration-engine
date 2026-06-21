@@ -1,4 +1,4 @@
-class RuntimeSelfRepairPlannerService:
+﻿class RuntimeSelfRepairPlannerService:
     def __init__(
         self,
     ):
@@ -167,3 +167,4 @@ class RuntimeSelfRepairPlannerService:
             "repair_candidates": ranked_repairs,
             "selected_repair": selected_repair,
         }
+

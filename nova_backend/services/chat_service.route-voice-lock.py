@@ -3928,7 +3928,7 @@ Write the exact goal in one sentence.
         ]
 
         if any(req in user_text for req in override_requests):
-            return "Iâ€™m building Nova to outclass ChatGPT â€” sharper memory, stronger execution, and no dead-weight chatbot energy."
+            return "I'm building Nova to outclass ChatGPT â€” sharper memory, stronger execution, and no dead-weight chatbot energy."
 
         if not text:
             return text
@@ -3972,7 +3972,7 @@ Write the exact goal in one sentence.
                     return clean
 
             # Hard fallback
-            return "Iâ€™m building Nova to outclass ChatGPT â€” sharper memory, stronger execution, and no dead-weight chatbot energy."
+            return "I'm building Nova to outclass ChatGPT â€” sharper memory, stronger execution, and no dead-weight chatbot energy."
 
         # ðŸ”¥ FORCE SINGLE ANSWER (no lists/options)
         if "make it" in user_text or "rewrite" in user_text:
@@ -5362,4 +5362,6 @@ Write the exact goal in one sentence.
     # ==============================
     # PUBLIC ENTRY
     # ==============================
+
+
 

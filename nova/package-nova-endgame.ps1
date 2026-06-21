@@ -1,4 +1,4 @@
-# ---------------------------------------------------
+﻿# ---------------------------------------------------
 # Nova Endgame: Fully Bundled ZIP Creator
 # ---------------------------------------------------
 
@@ -16,7 +16,7 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 # Create ZIP of entire Nova folder
 [System.IO.Compression.ZipFile]::CreateFromDirectory($novaRoot, $packagePath)
 
-Write-Host "✅ Nova packaged successfully: $packagePath"
+Write-Host "âœ… Nova packaged successfully: $packagePath"
 
 # Optional: launch Nova automatically after packaging
 Write-Host "Launching Nova..."

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import re
 
@@ -75,3 +75,4 @@ def should_store_memory(text: str) -> bool:
     ]
 
     return any(x in t for x in triggers)
+

@@ -1,5 +1,5 @@
-document.addEventListener("DOMContentLoaded",()=>{
-    console.log("Nova AI Tools Suite Loaded 🤖");
+﻿document.addEventListener("DOMContentLoaded",()=>{
+    console.log("Nova AI Tools Suite Loaded ðŸ¤–");
 
     const panels={
         memory:document.getElementById("memoryPanel"),
@@ -58,3 +58,4 @@ document.addEventListener("DOMContentLoaded",()=>{
     const observer=new MutationObserver(updateTokenUsage);
     observer.observe(panels.chat,{childList:true});
 });
+

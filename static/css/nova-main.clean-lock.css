@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg: #0a0d12;
   --bg-2: #0f141b;
   --bg-3: #131a23;
@@ -898,7 +898,7 @@ footer.nova-composer-shell {
 
 /* ===== FINAL POLISH PASS ===== */
 
-/* message bubbles — depth + premium */
+/* message bubbles â€” depth + premium */
 
 .nova-message-inner {
   background:

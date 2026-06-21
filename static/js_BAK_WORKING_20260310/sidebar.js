@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\sidebar.js
+﻿// C:\Users\Owner\nova\static\js\sidebar.js
 
 (() => {
 "use strict"
@@ -110,3 +110,4 @@ window.NovaSidebar = {
 }
 
 })()
+

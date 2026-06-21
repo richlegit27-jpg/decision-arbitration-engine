@@ -1,4 +1,4 @@
-import sys
+﻿import sys
 import re
 
 
@@ -30,3 +30,5 @@ if __name__ == "__main__":
 
     normalize_indentation(sys.argv[1])
     print("Indentation normalized.")
+
+

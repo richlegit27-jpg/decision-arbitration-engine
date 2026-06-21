@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   const LOG = "[NovaComposerBundle]";
@@ -85,7 +85,7 @@
   function shortText(value, max) {
     const s = String(value || "").trim();
     if (!s) return "";
-    return s.length > max ? s.slice(0, max - 1) + "…" : s;
+    return s.length > max ? s.slice(0, max - 1) + "â€¦" : s;
   }
 
   function setComposerStatus(text, isError) {
@@ -165,7 +165,7 @@ function renderStreamingAssistant(text) {
 }
 
 function clearStreamingAssistant() {
-  // do nothing — grouping handles final render
+  // do nothing â€” grouping handles final render
 }
 async function streamChat(payload) {
   const res = await fetch(API.streamChat, {
@@ -210,7 +210,7 @@ async function streamChat(payload) {
       if (event === "delta") {
         full += data.text || "";
 
-        // 🔥 update state live
+        // ðŸ”¥ update state live
         let last = state.messages[state.messages.length - 1];
 
         if (!last || last.role !== "assistant") {
@@ -524,7 +524,7 @@ async function streamChat(payload) {
       const preview = escapeHtml(shortText(session.last_message_preview || session.preview || "", 110));
       const updated = escapeHtml(fmtDate(session.updated_at || session.created_at || ""));
       const count = session.message_count != null ? String(session.message_count) : "";
-      const pinGlyph = session.pinned ? "★" : "☆";
+      const pinGlyph = session.pinned ? "â˜…" : "â˜†";
 
       return [
         '<div class="nova-session-card' + (isActive ? ' is-active' : '') + '" data-session-id="' + escapeHtml(session.id || "") + '">',
@@ -532,12 +532,12 @@ async function streamChat(payload) {
         '    <div class="nova-session-card-main">',
         '      <div class="nova-session-title">' + title + "</div>",
         (preview ? '      <div class="nova-session-preview">' + preview + "</div>" : ""),
-        '      <div class="nova-session-meta">' + escapeHtml(count ? count + " msgs" : "") + (updated ? (count ? " · " : "") + updated : "") + "</div>",
+        '      <div class="nova-session-meta">' + escapeHtml(count ? count + " msgs" : "") + (updated ? (count ? " Â· " : "") + updated : "") + "</div>",
         "    </div>",
         '    <div class="nova-session-actions">',
         '      <button class="nova-icon-btn" type="button" data-action="pin" data-session-id="' + escapeHtml(session.id || "") + '" aria-label="Pin session">' + pinGlyph + "</button>",
-        '      <button class="nova-icon-btn" type="button" data-action="rename" data-session-id="' + escapeHtml(session.id || "") + '" aria-label="Rename session">✎</button>',
-        '      <button class="nova-icon-btn" type="button" data-action="delete" data-session-id="' + escapeHtml(session.id || "") + '" aria-label="Delete session">×</button>',
+        '      <button class="nova-icon-btn" type="button" data-action="rename" data-session-id="' + escapeHtml(session.id || "") + '" aria-label="Rename session">âœŽ</button>',
+        '      <button class="nova-icon-btn" type="button" data-action="delete" data-session-id="' + escapeHtml(session.id || "") + '" aria-label="Delete session">Ã—</button>',
         "    </div>",
         "  </div>",
         "</div>"
@@ -701,7 +701,7 @@ els.chatMessages.innerHTML = groups.map(function (group) {
       const meta = escapeHtml([
         item.kind || viewer.kind || "",
         fmtDate(item.updated_at || item.created_at || "")
-      ].filter(Boolean).join(" · "));
+      ].filter(Boolean).join(" Â· "));
       const body = escapeHtml(
         shortText(
           item.preview ||
@@ -743,7 +743,7 @@ els.chatMessages.innerHTML = groups.map(function (group) {
       const meta = escapeHtml([
         item.domain || "",
         fmtDate(item.updated_at || item.created_at || item.fetched_at || "")
-      ].filter(Boolean).join(" · "));
+      ].filter(Boolean).join(" Â· "));
       const body = escapeHtml(
         shortText(
           item.preview ||
@@ -1092,7 +1092,7 @@ els.chatMessages.innerHTML = groups.map(function (group) {
     try {
       data = await streamChat(payload);
     } catch (e) {
-      warn("Streaming failed, fallback → JSON", e);
+      warn("Streaming failed, fallback â†’ JSON", e);
       clearStreamingAssistant();
 
       data = await requestJson(API.chat, {
@@ -1453,4 +1453,6 @@ els.chatMessages.innerHTML = groups.map(function (group) {
   document.addEventListener("DOMContentLoaded", boot);
 
 })();
+
+
 

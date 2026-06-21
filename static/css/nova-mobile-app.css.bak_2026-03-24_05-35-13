@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaMobileAppLoaded) return;
@@ -268,12 +268,12 @@
 
     if (app.state.isListening) {
       voiceBtn.classList.add("is-listening");
-      voiceBtn.textContent = "◼";
+      voiceBtn.textContent = "â—¼";
       voiceBtn.title = "Stop voice input";
       voiceBtn.setAttribute("aria-label", "Stop voice input");
     } else {
       voiceBtn.classList.remove("is-listening");
-      voiceBtn.textContent = "🎤";
+      voiceBtn.textContent = "ðŸŽ¤";
       voiceBtn.title = app.state.isSending ? "Voice disabled while sending" : "Voice input";
       voiceBtn.setAttribute("aria-label", "Voice input");
     }
@@ -391,7 +391,7 @@
       const deleteBtn = node.querySelector(".session-delete");
 
       if (title) title.textContent = safeText(session.title) || "New Chat";
-      if (meta) meta.textContent = `${session.pinned ? "Pinned · " : ""}${session.message_count || 0} msgs`;
+      if (meta) meta.textContent = `${session.pinned ? "Pinned Â· " : ""}${session.message_count || 0} msgs`;
 
       main?.addEventListener("click", async () => {
         if (!session.id || app.state.isSending) return;

@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+﻿document.addEventListener("DOMContentLoaded", () => {
   const body = document.body;
   const memoryPanel = document.getElementById("memoryPanel");
   if (!memoryPanel) return;
@@ -136,7 +136,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 title="Delete memory"
                 aria-label="Delete memory"
               >
-                ✕
+                âœ•
               </button>
             </div>
           </div>
@@ -299,3 +299,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
   renderMemory();
 });
+

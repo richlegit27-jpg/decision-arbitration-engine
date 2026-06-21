@@ -973,3 +973,4 @@ footer.nova-composer-shell {
   min-height: 0;
   overflow: auto;
 }
+

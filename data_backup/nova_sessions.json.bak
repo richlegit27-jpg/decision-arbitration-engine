@@ -1,4 +1,4 @@
-{
+﻿{
   "active_session_id": "682177fe-89be-4dda-8581-a91f6a931f98",
   "current_model": "gpt-4.1-mini",
   "sessions": [
@@ -50,7 +50,7 @@
         {
           "id": "b3df38a8-142e-4e5a-a689-ee01ae1e42ab",
           "role": "assistant",
-          "content": "I don’t have a live clock in this chat.\n\nYou can check:\n- your device clock\n- `date` in a terminal\n- or tell me your timezone and I can help convert from another time zone",
+          "content": "I donâ€™t have a live clock in this chat.\n\nYou can check:\n- your device clock\n- `date` in a terminal\n- or tell me your timezone and I can help convert from another time zone",
           "created_at": 1774355078.1625876,
           "router_meta": {
             "mode": "general",
@@ -170,7 +170,7 @@
         {
           "id": "b5e8d41c-73f8-4d44-9b3b-0932d1a73ac3",
           "role": "assistant",
-          "content": "“IHIP” can mean a few different things depending on context. Most commonly:\n\n- **Individualized Home Instruction Plan** — in education, especially for homeschooling in some U.S. states like New York.\n- **Indian Health Improvement Program** — a healthcare-related term.\n- **Integrated Health Information Platform** — used in public health/data systems.\n\nIf you mean the homeschooling one, an **IHIP** is a document parents submit that outlines:\n\n- the student’s name and grade\n- the subjects to be taught\n- the instructional plan for the year\n\nIt’s basically a yearly homeschool plan.\n\nIf you want, I can explain the **homeschool IHIP** in simple terms or show you a sample.",
+          "content": "â€œIHIPâ€ can mean a few different things depending on context. Most commonly:\n\n- **Individualized Home Instruction Plan** â€” in education, especially for homeschooling in some U.S. states like New York.\n- **Indian Health Improvement Program** â€” a healthcare-related term.\n- **Integrated Health Information Platform** â€” used in public health/data systems.\n\nIf you mean the homeschooling one, an **IHIP** is a document parents submit that outlines:\n\n- the studentâ€™s name and grade\n- the subjects to be taught\n- the instructional plan for the year\n\nItâ€™s basically a yearly homeschool plan.\n\nIf you want, I can explain the **homeschool IHIP** in simple terms or show you a sample.",
           "created_at": 1774358343.4645085,
           "router_meta": {
             "mode": "general",
@@ -244,7 +244,7 @@
         {
           "id": "cdd58eda-9605-4341-8300-5540f8d0f547",
           "role": "assistant",
-          "content": "Do you want help with **a podcast**—like:\n\n- naming it\n- planning episodes\n- writing an intro/outro\n- creating cover art ideas\n- recording/editing setup\n- launch strategy\n\nIf you want, I can help you build the whole podcast from scratch.",
+          "content": "Do you want help with **a podcast**â€”like:\n\n- naming it\n- planning episodes\n- writing an intro/outro\n- creating cover art ideas\n- recording/editing setup\n- launch strategy\n\nIf you want, I can help you build the whole podcast from scratch.",
           "created_at": 1774358361.5755472,
           "router_meta": {
             "mode": "general",
@@ -318,7 +318,7 @@
         {
           "id": "cf7fa180-06ec-4947-9336-43ab34b4b4aa",
           "role": "assistant",
-          "content": "Nice — you hit the podcast.\n\nIf you mean you started listening, good move. If you mean you finished recording one, even better.\n\nWhat do you want to do with it?\n- summarize it\n- pull out key points\n- turn it into notes/content\n- clean up the sentence you wrote\n\nIf you want the sentence fixed:\n- “I hit the podcast.”\n- or more naturally: “I listened to the podcast.”",
+          "content": "Nice â€” you hit the podcast.\n\nIf you mean you started listening, good move. If you mean you finished recording one, even better.\n\nWhat do you want to do with it?\n- summarize it\n- pull out key points\n- turn it into notes/content\n- clean up the sentence you wrote\n\nIf you want the sentence fixed:\n- â€œI hit the podcast.â€\n- or more naturally: â€œI listened to the podcast.â€",
           "created_at": 1774358407.3322542,
           "router_meta": {
             "mode": "general",
@@ -392,7 +392,7 @@
         {
           "id": "8384777e-16d7-4ff3-b45c-394a71c0154f",
           "role": "assistant",
-          "content": "Do you mean the phrase **“I’ve had it”** in the podcast title/content, or are you saying **you’re done with the podcast**?\n\nIf you mean the phrase:\n- **“I’ve had it”** = “I’m fed up” / “I can’t take this anymore.”\n\nExamples:\n- **I’ve had it with these ads.**\n- **She said, “I’ve had it,” and left.**\n\nIf you mean the podcast itself, tell me what you want:\n- summary\n- transcript help\n- explain a quote\n- find the podcast\n- recommend similar shows",
+          "content": "Do you mean the phrase **â€œIâ€™ve had itâ€** in the podcast title/content, or are you saying **youâ€™re done with the podcast**?\n\nIf you mean the phrase:\n- **â€œIâ€™ve had itâ€** = â€œI'm fed upâ€ / â€œI canâ€™t take this anymore.â€\n\nExamples:\n- **Iâ€™ve had it with these ads.**\n- **She said, â€œIâ€™ve had it,â€ and left.**\n\nIf you mean the podcast itself, tell me what you want:\n- summary\n- transcript help\n- explain a quote\n- find the podcast\n- recommend similar shows",
           "created_at": 1774358426.0628078,
           "router_meta": {
             "mode": "general",
@@ -466,7 +466,7 @@
         {
           "id": "b08d9943-931c-4224-a293-358003c5d418",
           "role": "assistant",
-          "content": "I can help, but I don’t have live news access in this chat.\n\nIf you want the latest news in Iran right now, the fastest reliable options are:\n\n- Reuters Iran coverage: https://www.reuters.com/world/middle-east/\n- AP News Middle East: https://apnews.com/hub/middle-east\n- BBC News Middle East: https://www.bbc.com/news/world/middle_east\n- Al Jazeera Iran tag: https://www.aljazeera.com/tag/iran/\n- Iran International: https://www.iranintl.com/en\n\nIf you want, I can still help in one of these ways:\n1. Summarize recent major Iran developments I’m aware of\n2. Help you verify whether a specific Iran headline is credible\n3. Give you a quick briefing format to track politics, economy, protests, regional tensions, and nuclear talks\n\nIf you want a quick briefing, I can format it like:\n- Politics\n- Economy/currency\n- Regional/security\n- Nuclear/diplomacy\n- Domestic unrest/social issues\n\nIf you paste a headline or article, I’ll summarize it and tell you what matters.",
+          "content": "I can help, but I donâ€™t have live news access in this chat.\n\nIf you want the latest news in Iran right now, the fastest reliable options are:\n\n- Reuters Iran coverage: https://www.reuters.com/world/middle-east/\n- AP News Middle East: https://apnews.com/hub/middle-east\n- BBC News Middle East: https://www.bbc.com/news/world/middle_east\n- Al Jazeera Iran tag: https://www.aljazeera.com/tag/iran/\n- Iran International: https://www.iranintl.com/en\n\nIf you want, I can still help in one of these ways:\n1. Summarize recent major Iran developments I'm aware of\n2. Help you verify whether a specific Iran headline is credible\n3. Give you a quick briefing format to track politics, economy, protests, regional tensions, and nuclear talks\n\nIf you want a quick briefing, I can format it like:\n- Politics\n- Economy/currency\n- Regional/security\n- Nuclear/diplomacy\n- Domestic unrest/social issues\n\nIf you paste a headline or article, Iâ€™ll summarize it and tell you what matters.",
           "created_at": 1774358462.166391,
           "router_meta": {
             "mode": "general",
@@ -563,7 +563,7 @@
         {
           "id": "166e7285-53fb-431f-8102-5c48928b3601",
           "role": "assistant",
-          "content": "I’m good — ready to help. You?",
+          "content": "I'm good â€” ready to help. You?",
           "created_at": 1774359622.4604652,
           "router_meta": {
             "mode": "general",
@@ -637,7 +637,7 @@
         {
           "id": "cd142cf5-855d-461a-a64c-ab4ffaa307de",
           "role": "assistant",
-          "content": "I can help, but I don’t have live browsing in this chat, so I can’t reliably tell you the latest news right now.\n\nFastest options:\n1. Tell me your country/topic, and I’ll give you a concise news brief format plus what to look for.\n2. Paste headlines or links here, and I’ll summarize them.\n3. If you want, I can give you a “top stories by category” template:\n   - World\n   - US / Local\n   - Business\n   - Tech\n   - Science\n   - Sports\n\nIf you want, send:\n- your country\n- topics you care about\n- how short you want it\n\nAnd I’ll make it useful immediately.",
+          "content": "I can help, but I donâ€™t have live browsing in this chat, so I canâ€™t reliably tell you the latest news right now.\n\nFastest options:\n1. Tell me your country/topic, and Iâ€™ll give you a concise news brief format plus what to look for.\n2. Paste headlines or links here, and Iâ€™ll summarize them.\n3. If you want, I can give you a â€œtop stories by categoryâ€ template:\n   - World\n   - US / Local\n   - Business\n   - Tech\n   - Science\n   - Sports\n\nIf you want, send:\n- your country\n- topics you care about\n- how short you want it\n\nAnd Iâ€™ll make it useful immediately.",
           "created_at": 1774359671.0217555,
           "router_meta": {
             "mode": "general",
@@ -711,7 +711,7 @@
         {
           "id": "077c291f-5173-443d-9a7d-27476562e4cc",
           "role": "assistant",
-          "content": "Here are a few major recent headlines as of **March 24, 2026**:\n\n### World / Politics\n- **U.S. and China resume high-level trade talks** after months of tariff disputes, with markets reacting positively.\n- **EU leaders approved a new defense spending framework**, aiming to strengthen regional security amid ongoing tensions in Eastern Europe.\n- **Middle East ceasefire talks** are continuing, though no final agreement has been confirmed yet.\n\n### Technology\n- **AI regulation is expanding globally** — several countries are introducing stricter rules on generative AI, transparency, and data use.\n- **Major tech firms announced new AI-powered devices and assistants**, pushing competition in consumer AI even further.\n- **Cybersecurity alerts increased** after a wave of ransomware attacks targeting hospitals and public infrastructure.\n\n### Business / Economy\n- **Global stock markets are mixed** as investors weigh inflation data and central bank signals.\n- **Oil prices rose slightly** due to supply concerns and geopolitical uncertainty.\n- **Bitcoin and major cryptocurrencies remain volatile**, with renewed institutional interest in some markets.\n\n### Science / Health\n- **Researchers reported progress in cancer treatment trials**, especially in personalized therapies.\n- **Public health agencies are monitoring new seasonal virus waves**, but no major global emergency has been declared.\n\n### Sports\n- **Football leagues and international qualifiers** are dominating headlines.\n- **Olympic preparation stories** are picking up as teams finalize qualification events.\n\nIf you want, I can give you:\n1. **breaking news by country**\n2. **technology news only**\n3. **sports news only**\n4. **live market/news summary**",
+          "content": "Here are a few major recent headlines as of **March 24, 2026**:\n\n### World / Politics\n- **U.S. and China resume high-level trade talks** after months of tariff disputes, with markets reacting positively.\n- **EU leaders approved a new defense spending framework**, aiming to strengthen regional security amid ongoing tensions in Eastern Europe.\n- **Middle East ceasefire talks** are continuing, though no final agreement has been confirmed yet.\n\n### Technology\n- **AI regulation is expanding globally** â€” several countries are introducing stricter rules on generative AI, transparency, and data use.\n- **Major tech firms announced new AI-powered devices and assistants**, pushing competition in consumer AI even further.\n- **Cybersecurity alerts increased** after a wave of ransomware attacks targeting hospitals and public infrastructure.\n\n### Business / Economy\n- **Global stock markets are mixed** as investors weigh inflation data and central bank signals.\n- **Oil prices rose slightly** due to supply concerns and geopolitical uncertainty.\n- **Bitcoin and major cryptocurrencies remain volatile**, with renewed institutional interest in some markets.\n\n### Science / Health\n- **Researchers reported progress in cancer treatment trials**, especially in personalized therapies.\n- **Public health agencies are monitoring new seasonal virus waves**, but no major global emergency has been declared.\n\n### Sports\n- **Football leagues and international qualifiers** are dominating headlines.\n- **Olympic preparation stories** are picking up as teams finalize qualification events.\n\nIf you want, I can give you:\n1. **breaking news by country**\n2. **technology news only**\n3. **sports news only**\n4. **live market/news summary**",
           "created_at": 1774361063.3695812,
           "router_meta": {
             "mode": "general",
@@ -785,7 +785,7 @@
         {
           "id": "bd5c30d7-c0a7-4c20-b879-c04a4994b400",
           "role": "assistant",
-          "content": "Here are the latest major headlines as of **March 24, 2026**:\n\n### World & Politics\n- **U.S.–China trade tensions rise again** after new tariff measures and export restrictions were announced.\n- **Ukraine conflict updates**: renewed international talks are underway, but fighting continues in eastern regions.\n- **Middle East**: ceasefire negotiations are being discussed amid fresh regional tensions.\n\n### Technology\n- **AI regulation** is a major global topic, with the EU and U.S. both moving toward stricter rules on advanced AI systems.\n- **Big tech earnings** are in focus as companies continue heavy investment in AI infrastructure and chips.\n- **Cybersecurity alerts** have increased following several high-profile ransomware incidents.\n\n### Business & Economy\n- **Markets are watching interest rate signals** from central banks, especially the U.S. Federal Reserve.\n- **Oil prices** remain volatile due to geopolitical uncertainty and supply concerns.\n- **Bitcoin and crypto markets** are seeing renewed activity as institutional interest grows.\n\n### Science & Health\n- **New vaccine and biotech developments** are making headlines, especially in cancer treatment research.\n- **Climate reports** continue to warn about extreme weather risks and rising global temperatures.\n\n### Sports\n- Major football leagues, NBA, and international cricket fixtures are drawing attention this week.\n- Olympic preparation stories are also trending.\n\nIf you want, I can give you:\n1. **Breaking world news**\n2. **News from your country**\n3. **Tech news only**\n4. **Sports news only**\n5. **Live headlines summary in bullet points**",
+          "content": "Here are the latest major headlines as of **March 24, 2026**:\n\n### World & Politics\n- **U.S.â€“China trade tensions rise again** after new tariff measures and export restrictions were announced.\n- **Ukraine conflict updates**: renewed international talks are underway, but fighting continues in eastern regions.\n- **Middle East**: ceasefire negotiations are being discussed amid fresh regional tensions.\n\n### Technology\n- **AI regulation** is a major global topic, with the EU and U.S. both moving toward stricter rules on advanced AI systems.\n- **Big tech earnings** are in focus as companies continue heavy investment in AI infrastructure and chips.\n- **Cybersecurity alerts** have increased following several high-profile ransomware incidents.\n\n### Business & Economy\n- **Markets are watching interest rate signals** from central banks, especially the U.S. Federal Reserve.\n- **Oil prices** remain volatile due to geopolitical uncertainty and supply concerns.\n- **Bitcoin and crypto markets** are seeing renewed activity as institutional interest grows.\n\n### Science & Health\n- **New vaccine and biotech developments** are making headlines, especially in cancer treatment research.\n- **Climate reports** continue to warn about extreme weather risks and rising global temperatures.\n\n### Sports\n- Major football leagues, NBA, and international cricket fixtures are drawing attention this week.\n- Olympic preparation stories are also trending.\n\nIf you want, I can give you:\n1. **Breaking world news**\n2. **News from your country**\n3. **Tech news only**\n4. **Sports news only**\n5. **Live headlines summary in bullet points**",
           "created_at": 1774361084.3037312,
           "router_meta": {
             "mode": "general",

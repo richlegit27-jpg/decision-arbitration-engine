@@ -1,4 +1,4 @@
-# ---------------------------------------------------
+﻿# ---------------------------------------------------
 # Nova Endgame Master Upgrade Script
 # ---------------------------------------------------
 # WARNING: This will overwrite your existing Nova files.
@@ -97,7 +97,7 @@ $indexPath = Join-Path $novaRoot "templates\index.html"
   <aside id="sidebar" class="sidebar">
     <div class="sidebar-header">
       <div class="sidebar-title">Nova</div>
-      <button id="btnCloseSidebar" class="sidebar-close" type="button">✕</button>
+      <button id="btnCloseSidebar" class="sidebar-close" type="button">âœ•</button>
     </div>
     <div class="sidebar-actions">
       <button id="btnNewChat" class="sidebar-btn">+ New Chat</button>
@@ -110,16 +110,16 @@ $indexPath = Join-Path $novaRoot "templates\index.html"
     <div class="composer">
       <textarea id="composerInput" placeholder="Type a message..."></textarea>
       <button id="sendBtn">Send</button>
-      <button id="voiceBtn">🎤</button>
+      <button id="voiceBtn">ðŸŽ¤</button>
       <input type="file" id="fileInput" style="display:none;">
-      <button id="attachBtn">📎</button>
+      <button id="attachBtn">ðŸ“Ž</button>
     </div>
   </main>
 
   <aside id="memoryPanel" class="memory-panel">
     <div class="memory-header">
       <h3>Memory</h3>
-      <button id="closeMemoryPanelBtn">✕</button>
+      <button id="closeMemoryPanelBtn">âœ•</button>
       <button id="deleteAllMemoryBtn">Delete All</button>
     </div>
     <div id="memoryList" class="memory-list"></div>

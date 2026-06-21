@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any
 
@@ -15,8 +15,9 @@ def summarize_text(value: str, limit: int = 120) -> str:
     text = normalize_text(value).strip()
     if len(text) <= limit:
         return text
-    return text[: max(0, limit - 1)].rstrip() + "…"
+    return text[: max(0, limit - 1)].rstrip() + "â€¦"
 
 
 def textish(value: Any) -> str:
     return str(value or "").strip()
+

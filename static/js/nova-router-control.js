@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaRouterControlLoaded) return;
@@ -29,7 +29,7 @@
     return Array.from(root.querySelectorAll(selector));
   }
 
-  function safeText(value, fallback = "—") {
+  function safeText(value, fallback = "â€”") {
     const text = String(value ?? "").trim();
     return text || fallback;
   }
@@ -44,10 +44,10 @@
   }
 
   function shortJson(value) {
-    if (value == null) return "—";
+    if (value == null) return "â€”";
     try {
       const text = JSON.stringify(value, null, 2);
-      return text.length > 1600 ? `${text.slice(0, 1600)}\n…` : text;
+      return text.length > 1600 ? `${text.slice(0, 1600)}\nâ€¦` : text;
     } catch {
       return String(value);
     }
@@ -151,7 +151,7 @@
     return list
       .map((item) => {
         if (item == null) {
-          return `<div class="nova-router-item">—</div>`;
+          return `<div class="nova-router-item">â€”</div>`;
         }
 
         if (typeof item === "string") {
@@ -196,10 +196,10 @@
     state.meta = normalized;
 
     if (!normalized) {
-      if (refs.intent) refs.intent.textContent = "—";
-      if (refs.model) refs.model.textContent = "—";
-      if (refs.confidence) refs.confidence.textContent = "—";
-      if (refs.routeTime) refs.routeTime.textContent = "—";
+      if (refs.intent) refs.intent.textContent = "â€”";
+      if (refs.model) refs.model.textContent = "â€”";
+      if (refs.confidence) refs.confidence.textContent = "â€”";
+      if (refs.routeTime) refs.routeTime.textContent = "â€”";
       if (refs.reason) refs.reason.textContent = "No router meta yet.";
       if (refs.memoryCount) refs.memoryCount.textContent = "0";
       if (refs.sourceCount) refs.sourceCount.textContent = "0";
@@ -207,7 +207,7 @@
       if (refs.sourceList) refs.sourceList.innerHTML = `<div class="nova-router-empty">No sources used.</div>`;
       if (refs.raw) refs.raw.textContent = "{}";
       if (refs.pill) refs.pill.textContent = "idle";
-      if (refs.timestamp) refs.timestamp.textContent = "—";
+      if (refs.timestamp) refs.timestamp.textContent = "â€”";
       setStatus("Waiting for router meta");
       return;
     }
@@ -510,3 +510,4 @@
     getMeta: () => state.meta,
   };
 })();
+

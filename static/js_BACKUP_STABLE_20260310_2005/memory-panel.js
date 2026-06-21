@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\memory-panel.js
+﻿// C:\Users\Owner\nova\static\js\memory-panel.js
 
 (() => {
 "use strict"
@@ -334,3 +334,4 @@ window.NovaMemoryPanel = {
 }
 
 })()
+

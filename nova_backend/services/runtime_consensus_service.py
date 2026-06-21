@@ -1,4 +1,4 @@
-class RuntimeConsensusService:
+﻿class RuntimeConsensusService:
     def resolve(
         self,
         execution_state=None,
@@ -73,3 +73,4 @@ class RuntimeConsensusService:
             "reason": reason,
             "execution_state": execution_state,
         }
+

@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat-ui.js
+﻿// C:\Users\Owner\nova\static\js\chat-ui.js
 
 (() => {
 "use strict"
@@ -114,3 +114,4 @@ window.NovaChatUi = {
 }
 
 })()
+

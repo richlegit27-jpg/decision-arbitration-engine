@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\modules\chat-controller.js
+﻿// C:\Users\Owner\nova\static\js\modules\chat-controller.js
 
 import {
   createChat,
@@ -193,7 +193,7 @@ async function handleSubmit() {
     setLastTurn(message, finalText);
     await refreshChats();
   } catch (err) {
-    appendMessage(dom.chatMessages, "assistant", `⚠️ Network/stream error: ${err.message}`);
+    appendMessage(dom.chatMessages, "assistant", `âš ï¸ Network/stream error: ${err.message}`);
   } finally {
     setSending(false);
     setComposerBusy(dom.sendBtn, false);
@@ -221,3 +221,4 @@ function fileToAttachmentLike(file) {
     is_image: (file.type || "").startsWith("image/"),
   };
 }
+

@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaRouterControlLoaded) return;
@@ -42,3 +42,4 @@
     wire();
   }
 })();
+

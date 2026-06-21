@@ -1,4 +1,4 @@
-# C:\Users\Owner\nova\nova_backend\services\rewrite_service.py
+﻿# C:\Users\Owner\nova\nova_backend\services\rewrite_service.py
 
 
 class RewriteService:
@@ -24,3 +24,4 @@ class RewriteService:
             return text
 
         return text
+

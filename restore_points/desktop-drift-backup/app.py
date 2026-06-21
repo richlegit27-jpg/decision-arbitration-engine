@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 import copy
@@ -274,7 +274,7 @@ def local_reply(message: str, route_meta: Dict[str, str]) -> str:
     route = route_meta.get("route", "general")
 
     if not clean:
-        return "I didn’t receive a message."
+        return "I didnâ€™t receive a message."
 
     if route == "coding":
         return (
@@ -295,7 +295,7 @@ def local_reply(message: str, route_meta: Dict[str, str]) -> str:
         return (
             "Writing mode detected.\n\n"
             f"Topic: {clean}\n\n"
-            "Give me the exact draft target and I’ll structure it directly."
+            "Give me the exact draft target and Iâ€™ll structure it directly."
         )
 
     if route == "analysis":
@@ -715,3 +715,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("NOVA_PORT", "5001"))
     debug = os.environ.get("NOVA_DEBUG", "1") == "1"
     app.run(host=host, port=port, debug=debug)
+

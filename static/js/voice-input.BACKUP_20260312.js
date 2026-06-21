@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\voice-input.js
+﻿// C:\Users\Owner\nova\static\js\voice-input.js
 
 (() => {
 "use strict"
@@ -156,3 +156,4 @@ window.NovaVoiceInput = {
 }
 
 })()
+

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import time
 import uuid
@@ -132,3 +132,4 @@ def add_message_impl(
         save_sessions_func()
 
     return message
+

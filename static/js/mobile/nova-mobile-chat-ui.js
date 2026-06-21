@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     "use strict";
 
     function appendMessage(role, text) {
@@ -138,3 +138,4 @@
     };
 
 })();
+

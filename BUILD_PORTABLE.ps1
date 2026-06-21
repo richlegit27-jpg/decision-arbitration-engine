@@ -1,4 +1,4 @@
-# =========================================================
+﻿# =========================================================
 # Nova Ultimate 2026 Phase 6
 # Portable Build Script
 # =========================================================
@@ -47,6 +47,6 @@ if (Test-Path $ZipPath) { Remove-Item $ZipPath -Force }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::CreateFromDirectory($BuildRoot, $ZipPath)
 
-Write-Host "✅ Nova Phase 6 portable build complete!"
+Write-Host "âœ… Nova Phase 6 portable build complete!"
 Write-Host "Build folder: $BuildRoot"
 Write-Host "Zip package: $ZipPath"

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import csv
 import json
@@ -637,3 +637,4 @@ class DocumentService:
             "document_preview": truncate(context_text, 300) if context_text else "",
             "documents": debug_docs,
         }
+

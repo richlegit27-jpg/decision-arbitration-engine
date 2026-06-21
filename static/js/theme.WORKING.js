@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 if (window.__novaThemeLoaded) {
@@ -211,3 +211,4 @@ app.theme = {
   toggleTheme
 };
 })();
+

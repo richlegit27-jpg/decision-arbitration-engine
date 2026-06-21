@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaMobileLoaded) return;
@@ -295,7 +295,7 @@
       chip.className = "mobile-file-chip";
       chip.innerHTML = `
         <span>${escapeHtml(file.name)} (${Math.max(1, Math.round((Number(file.size) || 0) / 1024))} KB)</span>
-        <button type="button" data-file-index="${index}" aria-label="Remove file">✕</button>
+        <button type="button" data-file-index="${index}" aria-label="Remove file">âœ•</button>
       `;
       bar.appendChild(chip);
     });
@@ -665,7 +665,7 @@
     regenBtn.type = "button";
     regenBtn.id = "mobileRegenerateBtn";
     regenBtn.className = "mobile-btn icon mobile-regenerate-btn";
-    regenBtn.textContent = "↻";
+    regenBtn.textContent = "â†»";
 
     if (sendBtn && sendBtn.parentNode === inputBar) {
       inputBar.insertBefore(regenBtn, sendBtn);
@@ -819,3 +819,4 @@
     });
   });
 })();
+

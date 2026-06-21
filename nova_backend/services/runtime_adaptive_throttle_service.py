@@ -1,4 +1,4 @@
-# C:\Users\Owner\nova\nova_backend\services\runtime_adaptive_throttle_service.py
+﻿# C:\Users\Owner\nova\nova_backend\services\runtime_adaptive_throttle_service.py
 
 class RuntimeAdaptiveThrottleService:
     def __init__(
@@ -103,3 +103,4 @@ class RuntimeAdaptiveThrottleService:
             "preservation_mode": preservation_mode,
             "execution_state": execution_state,
         }
+

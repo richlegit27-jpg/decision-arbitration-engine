@@ -1,4 +1,4 @@
-cd C:\Users\Owner\nova
+﻿cd C:\Users\Owner\nova
 
 try { python --version | Out-Null } catch { Write-Host "Python not found!" -ForegroundColor Red; exit }
 

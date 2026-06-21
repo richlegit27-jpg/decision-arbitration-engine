@@ -1,4 +1,4 @@
-# Python
+﻿# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -51,3 +51,4 @@ runtime/
 data/nova_project_state.json
 data/nova_project_state.json
 data/nova_sessions*.json
+

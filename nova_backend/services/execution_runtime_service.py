@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import datetime, timezone
 
@@ -306,3 +306,4 @@ class ExecutionRuntimeService:
 
         except Exception:
             return
+

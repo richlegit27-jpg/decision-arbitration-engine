@@ -1,4 +1,4 @@
-/* notepad C:\Users\Owner\nova\static\js\nova-integration-pass.js */
+﻿/* notepad C:\Users\Owner\nova\static\js\nova-integration-pass.js */
 
 (() => {
 "use strict";
@@ -23,3 +23,4 @@ window.__novaIntegrationPassLoaded = true;
 
 console.info("Nova legacy integration-pass stub loaded. Real integration is handled by the main UI files.");
 })();
+

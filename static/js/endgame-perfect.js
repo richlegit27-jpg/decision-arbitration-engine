@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 // --- Memory panel enhancements ---
@@ -136,3 +136,4 @@ window.renderMessages = async (messages) => {
   }
 };
 })();
+

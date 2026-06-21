@@ -10202,16 +10202,22 @@ if (not attachments) and (__name__ == "__main__"):
         }:
             return True
 
-        if text.startswith("/image") or text.startswith("/iimage") or "/image" in text:
+        if text.startswith("/image"):
             return True
 
-        keywords = ["generate", "create", "make", "draw", "render", "design"]
-        image_words = ["image", "picture", "photo", "art", "scene", "visual"]
+        explicit_image_requests = (
+            "generate an image",
+            "generate image",
+            "create an image",
+            "create image",
+            "make an image",
+            "make image",
+            "draw me",
+            "draw a",
+            "draw an",
+        )
 
-        if any(k in text for k in keywords) and any(i in text for i in image_words):
-            return True
-
-        return False
+        return text.startswith(explicit_image_requests)
 
     def _image_prompt_from_text(self, user_text: str) -> str:
         text = str(user_text or "").strip()
@@ -11648,10 +11654,9 @@ if (not attachments) and (__name__ == "__main__"):
         planner_prefixes = (
             "auto-plan",
             "build ",
-            "create ",
-            "make ",
             "implement ",
             "fix ",
+            "upgrade ",
             "repair ",
             "upgrade ",
         )
@@ -15224,17 +15229,19 @@ Auto-fix result:
         # IMAGE GENERATION (PRIORITY)
         # =========================
 
-        image_triggers = (
-            "generate an image",
-            "make an image",
-            "create an image",
+        explicit_image_request = lower_text.startswith((
+            "/image ",
+            "generate image ",
+            "generate an image ",
+            "create image ",
+            "create an image ",
+            "make image ",
+            "make an image ",
             "draw ",
-            "picture of",
-            "image of",
-            "render ",
-        )
+            "draw me ",
+        ))
 
-        if any(trigger in lower_text for trigger in image_triggers):
+        if explicit_image_request:
             return {
                 "route": self.ROUTE_IMAGE_GENERATION,
                 "mode": "image_generation",
@@ -15453,8 +15460,7 @@ Auto-fix result:
         planner_prefixes = (
             "auto-plan",
             "build ",
-            "create ",
-            "make ",
+            "upgrade ",
             "implement ",
             "fix ",
             "repair ",
@@ -19152,20 +19158,31 @@ Next action:
         if not text:
             return False
 
-        # explicit command
-        if text.startswith("/image") or "/image" in text:
+        if text in {
+            "regen",
+            "regenerate",
+            "redo image",
+            "make another",
+            "another image",
+        }:
             return True
 
-        # strong keyword detection
-        keywords = ["generate", "create", "make", "draw", "render", "design"]
-
-        image_words = ["image", "picture", "photo", "art", "scene", "visual"]
-
-        # Ã°Å¸â€Â¥ detect intent: action + image concept
-        if any(k in text for k in keywords) and any(i in text for i in image_words):
+        if text.startswith("/image"):
             return True
 
-        return False
+        explicit_image_requests = (
+            "generate an image",
+            "generate image",
+            "create an image",
+            "create image",
+            "make an image",
+            "make image",
+            "draw me",
+            "draw a",
+            "draw an",
+        )
+
+        return text.startswith(explicit_image_requests)
 
     def _build_image_generation_meta(
         self,
@@ -22244,4 +22261,6 @@ try:
     print("[NOVA ATTACHMENT SYNC] ChatService.handle attachment text sync installed")
 except Exception as exc:
     print("[NOVA ATTACHMENT SYNC] ChatService.handle attachment text sync install failed:", exc)
+
+
 

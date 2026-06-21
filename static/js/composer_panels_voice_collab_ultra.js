@@ -1,5 +1,5 @@
-document.addEventListener("DOMContentLoaded", () => {
-    console.log("Nova Ultimate 2026 — Ultra Collaboration Loaded 🌟");
+﻿document.addEventListener("DOMContentLoaded", () => {
+    console.log("Nova Ultimate 2026 â€” Ultra Collaboration Loaded ðŸŒŸ");
 
     const backendPort = window.NOVA_BACKEND_PORT;
     const model = window.DEFAULT_MODEL;
@@ -143,3 +143,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
     panels.memory.addEventListener("dblclick",()=>{ /* optional quick record trigger */ });
 });
+

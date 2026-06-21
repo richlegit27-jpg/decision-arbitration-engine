@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 
@@ -96,3 +96,4 @@ def build_video_analysis_result(
         "videos": videos,
         "bullets": bullets,
     }
+

@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\composer-attachments.js
+﻿// C:\Users\Owner\nova\static\js\composer-attachments.js
 
 (() => {
 "use strict"
@@ -102,7 +102,7 @@ function createComposerAttachments(options = {}){
             data-remove-pending-index="${index}"
             aria-label="Remove attachment"
           >
-            ×
+            Ã—
           </button>
         </div>
       `
@@ -239,3 +239,4 @@ window.NovaComposerAttachments = {
 }
 
 })()
+

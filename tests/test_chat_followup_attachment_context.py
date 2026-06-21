@@ -58,3 +58,5 @@ def test_chat_followup_reuses_prior_attachment_context(monkeypatch) -> None:
     )
 
     assert text
+
+

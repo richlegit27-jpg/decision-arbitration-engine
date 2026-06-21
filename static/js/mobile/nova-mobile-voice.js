@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     "use strict";
 
     // NOVA_MOBILE_SAFE_VOICE_TOAST_20260608
@@ -125,3 +125,5 @@ setTimeout(installVoiceButtonListener, 0);
 
     console.log("[Nova Mobile] voice module ready");
 })();
+
+

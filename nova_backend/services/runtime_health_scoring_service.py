@@ -1,4 +1,4 @@
-# C:\Users\Owner\nova\nova_backend\services\runtime_health_scoring_service.py
+﻿# C:\Users\Owner\nova\nova_backend\services\runtime_health_scoring_service.py
 
 class RuntimeHealthScoringService:
     def __init__(
@@ -87,3 +87,4 @@ class RuntimeHealthScoringService:
             "recent_recovery_count": recent_recovery_count,
             "runtime_signal": runtime_signal,
         }
+

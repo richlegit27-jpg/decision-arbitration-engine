@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
@@ -121,3 +121,4 @@ async def change_password(request: Request):
             "username": updated.get("username"),
         },
     }
+

@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+﻿document.addEventListener("DOMContentLoaded", () => {
   const messagesContainer = document.getElementById("messages");
   const inputEl = document.getElementById("composerInput");
   const sendBtn = document.getElementById("sendBtn");

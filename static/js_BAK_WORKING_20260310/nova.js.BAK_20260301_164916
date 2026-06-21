@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\nova.js
+﻿// C:\Users\Owner\nova\static\js\nova.js
 (() => {
   "use strict";
 
@@ -33,7 +33,7 @@
   function banner(){
     const el = document.createElement("div");
     el.id = "nova_js_banner";
-    el.textContent = "✅ NOVA JS LOADED — " + STAMP + " — " + now();
+    el.textContent = "âœ… NOVA JS LOADED â€” " + STAMP + " â€” " + now();
     el.style.position="fixed";
     el.style.left="0"; el.style.top="0"; el.style.right="0";
     el.style.zIndex="2147483647";

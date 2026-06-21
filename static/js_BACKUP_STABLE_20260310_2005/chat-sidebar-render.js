@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat-sidebar-render.js
+﻿// C:\Users\Owner\nova\static\js\chat-sidebar-render.js
 
 (() => {
 "use strict"
@@ -82,8 +82,8 @@ function createChatSidebarRender(options = {}){
           </button>
 
           <div class="chat-list-actions">
-            <button type="button" class="chat-list-action" data-action="rename" data-chat-id="${escapeHtml(chatId)}" aria-label="Rename chat">✎</button>
-            <button type="button" class="chat-list-action" data-action="delete" data-chat-id="${escapeHtml(chatId)}" aria-label="Delete chat">🗑</button>
+            <button type="button" class="chat-list-action" data-action="rename" data-chat-id="${escapeHtml(chatId)}" aria-label="Rename chat">âœŽ</button>
+            <button type="button" class="chat-list-action" data-action="delete" data-chat-id="${escapeHtml(chatId)}" aria-label="Delete chat">ðŸ—‘</button>
           </div>
         </div>
       `
@@ -107,3 +107,4 @@ window.NovaChatSidebarRender = {
 }
 
 })()
+

@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   const Nova = (window.Nova = window.Nova || {});
@@ -94,3 +94,4 @@
     bootstrap();
   }
 })();
+

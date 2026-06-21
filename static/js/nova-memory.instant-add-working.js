@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   const state = {
@@ -42,7 +42,7 @@
     const text = String(value || "").trim();
     if (!text) return "";
     if (text.length <= maxLen) return text;
-    return text.slice(0, maxLen - 1) + "…";
+    return text.slice(0, maxLen - 1) + "â€¦";
   }
 
   function formatDate(value) {
@@ -260,7 +260,7 @@ function renderList() {
   
 async function loadMemory() {
   state.loading = true;
-  setStatus("Loading memory…", "loading");
+  setStatus("Loading memoryâ€¦", "loading");
 
   try {
     const payload = await api(`/api/memory?ts=${Date.now()}`);
@@ -305,7 +305,7 @@ async function addMemory() {
   state.items = [tempItem].concat(state.items || []);
   buildKindOptions();
   applyFilters();
-  setStatus("Saving memory…", "loading");
+  setStatus("Saving memoryâ€¦", "loading");
 
   try {
     const payload = await api("/api/memory/add", {
@@ -348,7 +348,7 @@ async function addMemory() {
 
   async function deleteMemory(id) {
     if (!id) return;
-    setStatus("Deleting memory…", "loading");
+    setStatus("Deleting memoryâ€¦", "loading");
 
     try {
       await api("/api/memory/delete", {
@@ -483,7 +483,7 @@ function wireEvents() {
           });
 
           await loadMemory();
-          setStatus("✓ Memory updated", "ok");
+          setStatus("âœ“ Memory updated", "ok");
         } catch (err) {
           console.error("[NovaMemory] update failed:", err);
           setStatus(`Memory update failed: ${err.message}`, "error");
@@ -589,3 +589,4 @@ function waitForPanelAndBoot() {
     waitForPanelAndBoot();
   }
 })();
+

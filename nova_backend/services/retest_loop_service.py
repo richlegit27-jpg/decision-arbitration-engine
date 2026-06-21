@@ -1,4 +1,4 @@
-class RetestLoopService:
+﻿class RetestLoopService:
 
     def __init__(
         self,
@@ -136,3 +136,4 @@ class RetestLoopService:
                 "Recovery attempts exhausted."
             ),
         }
+

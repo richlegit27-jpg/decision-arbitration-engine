@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\sse.js
+﻿// C:\Users\Owner\nova\static\js\sse.js
 function safeJsonParse(s) { try { return JSON.parse(s); } catch { return null; } }
 
 function parseSseFrame(frame) {
@@ -92,3 +92,4 @@ export function startSseStream(url, bodyObj, handlers = {}, opts = {}) {
     promise: run
   };
 }
+

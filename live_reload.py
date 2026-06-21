@@ -1,4 +1,4 @@
-import time
+﻿import time
 import webbrowser
 from pathlib import Path
 from watchdog.observers import Observer
@@ -43,3 +43,4 @@ try:
 except KeyboardInterrupt:
     observer.stop()
 observer.join()
+

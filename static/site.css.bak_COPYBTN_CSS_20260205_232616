@@ -358,3 +358,4 @@ label.small input[type="checkbox"]{
 .btnStop:active{ transform: translateY(1px); }
 .btnStop[disabled]{ opacity:.5; cursor:not-allowed; }
 /* ===== /NOVA_STOP_BTN_CSS_V1 ===== */
+

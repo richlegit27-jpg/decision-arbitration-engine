@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg: #0b1020;
   --bg-elev-1: #11182d;
   --bg-elev-2: #17213b;
@@ -591,7 +591,7 @@ body.is-shell-locked .nova-composer {
 }
 
 /* =========================================================
-   PHASE 3 — MESSAGE / ACTION PREMIUM POLISH
+   PHASE 3 â€” MESSAGE / ACTION PREMIUM POLISH
    ========================================================= */
 
 .nova-message {
@@ -2959,7 +2959,7 @@ body.is-sidebar-open .nova-sidebar {
 }
 
 /* =========================================================
-   🎥 VIDEO UI POLISH LOCK
+   ðŸŽ¥ VIDEO UI POLISH LOCK
    ========================================================= */
 
 .nova-message-video {
@@ -3015,7 +3015,7 @@ body.is-sidebar-open .nova-sidebar {
 }
 
 /* =========================================================
-   ARTIFACTS PANEL — FINAL POLISH LOCK
+   ARTIFACTS PANEL â€” FINAL POLISH LOCK
    ========================================================= */
 
 .nova-rail-card[data-artifact-open],
@@ -3560,7 +3560,7 @@ body.is-rail-open #rail-reopen-root {
 }
 
 /* =========================================================
-   🔧 RAIL REOPEN BUTTON OFFSET FIX
+   ðŸ”§ RAIL REOPEN BUTTON OFFSET FIX
    (push it down so it doesn't overlap model chip)
    ========================================================= */
 
@@ -3568,7 +3568,7 @@ body.is-rail-open #rail-reopen-root {
   position: fixed;
   right: 16px;
 
-  /* 👇 increase this value to move it DOWN */
+  /* ðŸ‘‡ increase this value to move it DOWN */
   top: 96px;
 
   z-index: 1000;
@@ -6553,7 +6553,7 @@ button.nova-memory-card,
   backdrop-filter: blur(6px);
 }
 
-/* 🔥 hover lift */
+/* ðŸ”¥ hover lift */
 .nova-artifact-card:hover {
   transform: translateY(-2px) scale(1.01);
   border-color: rgba(255, 255, 255, 0.14);
@@ -6563,7 +6563,7 @@ button.nova-memory-card,
     0 0 0 1px rgba(255, 255, 255, 0.04) inset;
 }
 
-/* ⚡ active (selected) */
+/* âš¡ active (selected) */
 .nova-artifact-card.is-active {
   transform: translateY(-1px) scale(1.01);
   border-color: rgba(120, 180, 255, 0.45);
@@ -7295,7 +7295,7 @@ button.nova-memory-card,
 }
 
 /* ==============================
-   ARTIFACT VIEWER — POWER UI
+   ARTIFACT VIEWER â€” POWER UI
 ============================== */
 
 .artifact-view {
@@ -7795,7 +7795,7 @@ button.nova-memory-card,
 }
 
 /* =========================
-   WORKING CONTEXT PANEL — FINAL POLISH
+   WORKING CONTEXT PANEL â€” FINAL POLISH
    ========================= */
 
 .nova-working-context-panel {
@@ -8582,7 +8582,7 @@ button.nova-button {
 .nova-session-preview,
 .nova-session-subtitle,
 .nova-session-meta {
-  display: block !important;        /* 🔥 FORCE NEW LINE */
+  display: block !important;        /* ðŸ”¥ FORCE NEW LINE */
   width: 100% !important;
   font-size: 11px !important;
   line-height: 1.2 !important;
@@ -8593,7 +8593,7 @@ button.nova-button {
   text-overflow: ellipsis !important;
 }
 
-/* 🚨 CRITICAL: if subtitle is inline text inside same node */
+/* ðŸš¨ CRITICAL: if subtitle is inline text inside same node */
 .nova-session-title + *,
 .nova-session-name + * {
   display: block !important;
@@ -9429,7 +9429,7 @@ button.nova-button {
   color: rgba(255, 255, 255, 0.76);
 }
 
-/* 🔥 RIGHT RAIL */
+/* ðŸ”¥ RIGHT RAIL */
 
 #nova-source-rail {
   position: fixed;
@@ -10013,7 +10013,7 @@ button:active,
   color: #ffd166;
 }
 
-/* Headers — subtle hierarchy */
+/* Headers â€” subtle hierarchy */
 .message-text-inline h1 {
   color: #e6edf3;
 }
@@ -10026,7 +10026,7 @@ button:active,
   color: #9da7b3;
 }
 
-/* Links — clean blue (like ChatGPT) */
+/* Links â€” clean blue (like ChatGPT) */
 .message-text-inline a {
   color: #58a6ff;
   text-decoration: none;
@@ -10051,7 +10051,7 @@ button:active,
   color: #ffffff;
 }
 
-/* Code blocks — subtle, not flashy */
+/* Code blocks â€” subtle, not flashy */
 .code-block {
   background: #0d1117;
   border: 1px solid rgba(255,255,255,0.08);
@@ -10128,7 +10128,7 @@ button:active,
   white-space: nowrap;
 }
 
-/* 🔥 FORCE SOURCE CARD VISIBILITY */
+/* ðŸ”¥ FORCE SOURCE CARD VISIBILITY */
 
 .nova-source-grid {
   display: grid !important;
@@ -10214,7 +10214,7 @@ button:active,
 }
 
 /* ================================
-   NOVA SOURCE CARDS — PREMIUM LOCK
+   NOVA SOURCE CARDS â€” PREMIUM LOCK
    ================================ */
 
 .nova-source-grid {

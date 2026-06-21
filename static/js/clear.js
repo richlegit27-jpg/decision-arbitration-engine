@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 if (window.__novaClearLoaded) {
@@ -167,3 +167,4 @@ document.addEventListener("click", updateClearButtonState);
 document.addEventListener("nova:chat-changed", updateClearButtonState);
 document.addEventListener("nova:messages-updated", updateClearButtonState);
 })();
+

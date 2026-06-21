@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -54,7 +54,7 @@ class ArtifactService:
             return []
 
     # =========================
-    # 🔥 NORMALIZATION CORE
+    # ðŸ”¥ NORMALIZATION CORE
     # =========================
     def _normalize_kind(self, kind: str) -> str:
         k = str(kind or "").lower().strip()
@@ -220,7 +220,7 @@ class ArtifactService:
         if not replaced:
             items.append(artifact)
 
-        # 🔥 STORAGE CONTROL
+        # ðŸ”¥ STORAGE CONTROL
         MAX_ARTIFACTS = 100
         items = items[-MAX_ARTIFACTS:]
 
@@ -232,3 +232,4 @@ class ArtifactService:
 
     def create(self, artifact: Dict[str, Any]) -> Dict[str, Any]:
         return self.save_artifact(artifact)
+

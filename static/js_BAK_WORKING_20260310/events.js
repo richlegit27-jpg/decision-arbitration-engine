@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\events.js
+﻿// C:\Users\Owner\nova\static\js\events.js
 import { state, setCurrentChatId, setStreaming } from "./state.js";
 import { apiJson, loadSessions, createSession, loadMessages, clearChat } from "./api.js";
 import { startSseStream } from "./sse.js";
@@ -120,7 +120,7 @@ async function startChatStream(chatId, message) {
   stopActiveStream();
 
   setStreaming(true);
-  setStatus("Streaming…");
+  setStatus("Streamingâ€¦");
 
   // Create the user row immediately; msgid will be filled onStart
   const userRow = appendMessage("user", msg);
@@ -168,7 +168,7 @@ async function startRegenerateStream(chatId) {
   stopActiveStream();
 
   setStreaming(true);
-  setStatus("Regenerating…");
+  setStatus("Regeneratingâ€¦");
 
   let assistantText = "";
   const assistantMsgId = ensureStreamingAssistantPlaceholder();
@@ -212,7 +212,7 @@ async function startEditLastStream(chatId, newText, messageId, userRow) {
   stopActiveStream();
 
   setStreaming(true);
-  setStatus("Editing…");
+  setStatus("Editingâ€¦");
 
   // Update UI user bubble immediately
   if (userRow) setRowText(userRow, msg);
@@ -353,3 +353,4 @@ export async function boot() {
     await openChat(chatId);
   }
 }
+

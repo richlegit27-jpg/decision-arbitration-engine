@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import threading
 import time
@@ -172,3 +172,4 @@ def ensure_agent_thread_impl(
     )
     thread.start()
     agent_state["thread_started"] = True
+

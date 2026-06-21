@@ -1,4 +1,4 @@
-class RuntimeAuthorityService:
+﻿class RuntimeAuthorityService:
 
     def resolve(
         self,
@@ -87,3 +87,4 @@ class RuntimeAuthorityService:
             "supreme_authority": supreme_authority,
             "execution_state": execution_state,
         }
+

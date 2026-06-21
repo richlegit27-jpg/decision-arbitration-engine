@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaRenderChatLoaded) return;
@@ -1099,3 +1099,5 @@ if (!useLastAttachments) {
 
   document.addEventListener("DOMContentLoaded", bootstrap);
 })();
+
+

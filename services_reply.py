@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any, Callable
 
@@ -103,3 +103,4 @@ def generate_reply_impl(
             reply_text = "I couldn't generate a response."
 
     return reply_text, final_results, provider
+

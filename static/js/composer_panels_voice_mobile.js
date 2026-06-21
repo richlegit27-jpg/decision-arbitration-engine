@@ -1,5 +1,5 @@
-document.addEventListener("DOMContentLoaded", () => {
-    console.log("Nova Ultimate 2026 — Mobile & Productivity Loaded 📱");
+﻿document.addEventListener("DOMContentLoaded", () => {
+    console.log("Nova Ultimate 2026 â€” Mobile & Productivity Loaded ðŸ“±");
 
     const input = document.getElementById("messageInput");
     const sendBtn = document.getElementById("sendBtn");
@@ -76,3 +76,4 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 });
+

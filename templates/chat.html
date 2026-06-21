@@ -1,5 +1,5 @@
-{% extends "base.html" %}
-{% block title %}Chat • Nova{% endblock %}
+﻿{% extends "base.html" %}
+{% block title %}Chat â€¢ Nova{% endblock %}
 
 {% block content %}
 <div class="h-[calc(100vh-170px)] grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4">
@@ -14,7 +14,7 @@
 
       <input id="search"
         class="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-700"
-        placeholder="Search chats… (Ctrl+K)" />
+        placeholder="Search chatsâ€¦ (Ctrl+K)" />
 
       <div id="sidebar-msg" class="text-xs text-red-400 hidden"></div>
     </div>
@@ -24,7 +24,7 @@
     <div class="p-3 border-t border-zinc-800 bg-zinc-950/30 flex items-center justify-between gap-2">
       <div class="text-xs text-zinc-400 truncate">
         <span class="font-semibold text-zinc-200">Auth:</span>
-        <span id="auth-state">checking…</span>
+        <span id="auth-state">checkingâ€¦</span>
       </div>
       <button id="logout"
         class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white">
@@ -38,7 +38,7 @@
     <div class="p-3 border-b border-zinc-800 bg-zinc-950/30 flex items-center justify-between gap-3">
       <div class="min-w-0">
         <div class="text-sm text-zinc-400">Conversation</div>
-        <div id="chat-title" class="font-semibold truncate">—</div>
+        <div id="chat-title" class="font-semibold truncate">â€”</div>
       </div>
 
       <div class="flex items-center gap-2">
@@ -56,7 +56,7 @@
     <div id="auth-banner" class="hidden p-4 border-b border-zinc-800 bg-zinc-950/30">
       <div class="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 flex items-start justify-between gap-4">
         <div>
-          <div class="font-semibold">You’re not logged in</div>
+          <div class="font-semibold">Youâ€™re not logged in</div>
           <div class="text-sm text-zinc-400 mt-1">Login to use chats and load history.</div>
         </div>
         <a href="/login"
@@ -73,7 +73,7 @@
       <form id="chat-form" class="flex gap-2 items-end" action="javascript:void(0);">
         <textarea id="chat-input" rows="1"
           class="flex-1 resize-none rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 outline-none focus:ring-2 focus:ring-zinc-700"
-          placeholder="Type a message… (Enter to send, Shift+Enter newline)"></textarea>
+          placeholder="Type a messageâ€¦ (Enter to send, Shift+Enter newline)"></textarea>
 
         <button id="send-btn" type="submit"
           class="rounded-xl bg-white text-zinc-900 font-semibold px-4 py-2 hover:bg-zinc-200 transition disabled:opacity-50 disabled:cursor-not-allowed">
@@ -89,7 +89,7 @@
       <div class="flex items-center justify-between mt-2">
         <div id="chat-msg" class="text-sm text-red-400 hidden"></div>
         <div class="text-xs text-zinc-500">
-          Ctrl+N new • Ctrl+K search • Esc blur • Shift+Enter newline
+          Ctrl+N new â€¢ Ctrl+K search â€¢ Esc blur â€¢ Shift+Enter newline
         </div>
       </div>
     </div>
@@ -99,3 +99,4 @@
 
 <script src="/static/js/chat.js"></script>
 {% endblock %}
+

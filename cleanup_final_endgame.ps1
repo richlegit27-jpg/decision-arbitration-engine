@@ -1,4 +1,4 @@
-# --------------------------------------------
+﻿# --------------------------------------------
 # Nova Endgame Final Copy Cleanup
 # --------------------------------------------
 
@@ -28,4 +28,4 @@ Get-ChildItem -Path $jsPath -Include "*.bak_*","*.BAK_*","*.WORKING_*" -File -Re
 $cssPath = Join-Path $sourcePath "static\css"
 Get-ChildItem -Path $cssPath -Include "*.bak_*","*.BAK_*","*.WORKING_*" -File -Recurse | Remove-Item -Force
 
-Write-Host "✅ Cleanup complete. Only latest working files remain."
+Write-Host "âœ… Cleanup complete. Only latest working files remain."

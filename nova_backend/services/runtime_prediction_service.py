@@ -1,4 +1,4 @@
-class RuntimePredictionService:
+﻿class RuntimePredictionService:
 
     def __init__(
         self,
@@ -85,3 +85,4 @@ class RuntimePredictionService:
             "prediction_reason": prediction_reason,
             "success_rate": success_rate,
         }
+

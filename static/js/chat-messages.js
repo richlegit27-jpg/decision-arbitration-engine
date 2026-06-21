@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat-messages.js
+﻿// C:\Users\Owner\nova\static\js\chat-messages.js
 
 (() => {
 "use strict"
@@ -366,3 +366,4 @@ if(document.readyState === "loading"){
 }
 
 })()
+

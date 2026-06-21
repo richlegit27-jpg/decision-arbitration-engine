@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Dict, List
@@ -115,3 +115,4 @@ class MemoryWeightingService:
             if text.lower().startswith("name:"):
                 return text.split(":", 1)[1].strip()
         return ""
+

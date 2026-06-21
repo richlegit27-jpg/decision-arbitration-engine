@@ -1,4 +1,4 @@
-import base64
+﻿import base64
 import json
 import mimetypes
 import os
@@ -1328,3 +1328,4 @@ if __name__ == "__main__":
     port = int(os.getenv("APP_PORT") or os.getenv("NOVA_PORT") or "5001")
     debug = safe_str(os.getenv("NOVA_DEBUG", "1")).lower() not in {"0", "false", "no"}
     app.run(host=host, port=port, debug=debug)
+

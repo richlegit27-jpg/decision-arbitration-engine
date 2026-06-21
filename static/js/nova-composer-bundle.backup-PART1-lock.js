@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   function findArtifactById(artifactId) {
@@ -194,7 +194,7 @@ function resolveUploadUrl(url) {
     const text = normalizeText(value).trim();
     const max = Number(limit || 100);
     if (text.length <= max) return text;
-    return text.slice(0, Math.max(0, max - 1)).trimEnd() + "…";
+    return text.slice(0, Math.max(0, max - 1)).trimEnd() + "â€¦";
   }
 
   function isImageMime(mime) {
@@ -281,7 +281,7 @@ function normalizeMessage(raw) {
 function attachmentSummary(attachment) {
     const name = attachment.filename || attachment.name || "attachment";
     const size = formatBytes(attachment.size);
-    return size ? name + " · " + size : name;
+    return size ? name + " Â· " + size : name;
   }
 
   const els = {
@@ -754,12 +754,12 @@ function applyStatePayload(payload) {
     const removeButton = removable
       ? '<button type="button" class="nova-upload-chip__remove" data-upload-remove="' +
         escapeHtml(item.id) +
-        '" aria-label="Remove attachment">×</button>'
+        '" aria-label="Remove attachment">Ã—</button>'
       : "";
 
     const statusHtml =
       status === "uploading"
-        ? '<span class="nova-upload-chip__status">Uploading…</span>'
+        ? '<span class="nova-upload-chip__status">Uploadingâ€¦</span>'
         : status === "error"
         ? '<span class="nova-upload-chip__status nova-upload-chip__status--error">' +
           escapeHtml(error || "Upload failed") +
@@ -812,7 +812,7 @@ function renderAttachmentBlock(attachment) {
   if (mime) sub.push(mime);
   if (item.size) sub.push(formatBytes(item.size));
 
-  const subText = sub.join(" · ");
+  const subText = sub.join(" Â· ");
 
   if (item.url && isImageMime(mime)) {
     return (
@@ -901,7 +901,7 @@ function renderAttachmentBlock(attachment) {
     '<a href="' +
     escapeHtml(href || "#") +
     '" target="_blank" rel="noopener noreferrer" class="message-attachment__file-link">' +
-    '<div class="message-attachment__icon">📎</div>' +
+    '<div class="message-attachment__icon">ðŸ“Ž</div>' +
     '<div class="message-attachment__footer">' +
     '<div class="message-attachment__name">' +
     escapeHtml(name) +
@@ -1033,7 +1033,7 @@ function renderMessageCard(message) {
   if (message.source) metaBits.push(message.source);
 
   const metaHtml = metaBits.length
-    ? '<div class="message-card__meta">' + escapeHtml(metaBits.join(" · ")) + "</div>"
+    ? '<div class="message-card__meta">' + escapeHtml(metaBits.join(" Â· ")) + "</div>"
     : "";
 
   return (
@@ -1125,7 +1125,7 @@ function renderSessionList() {
         '<div class="nova-session-card-title">' +
         escapeHtml(session.title || "Untitled chat") +
         "</div>" +
-        (session.pinned ? '<div class="nova-session-card-pin">📌</div>' : "") +
+        (session.pinned ? '<div class="nova-session-card-pin">ðŸ“Œ</div>' : "") +
         "</div>" +
         '<div class="nova-session-card-preview">' +
         escapeHtml(session.last_message_preview || "No messages yet") +
@@ -1776,7 +1776,7 @@ function artifactViewerHtml(artifact) {
     });
 
   const subtitle = String(
-    artifact.session_id ? prettyKind + " • session artifact" : prettyKind
+    artifact.session_id ? prettyKind + " â€¢ session artifact" : prettyKind
   ).trim();
 
   const sourceBadge = sourceUrl
@@ -1940,7 +1940,7 @@ function setRailTab(tab) {
     }
   });
 
-  /* ✅ FIXED: correct selector */
+  /* âœ… FIXED: correct selector */
   const panels = document.querySelectorAll("[data-rail-panel]");
 
   panels.forEach(function (panel) {
@@ -2813,7 +2813,7 @@ function updateTtsToggleUi() {
 
   els.ttsToggleButton.classList.toggle("is-muted", muted);
   els.ttsToggleButton.classList.toggle("is-playing", playing);
-  els.ttsToggleButton.textContent = muted ? "🔇" : "🔊";
+  els.ttsToggleButton.textContent = muted ? "ðŸ”‡" : "ðŸ”Š";
 
   if (muted) {
     els.ttsToggleButton.setAttribute("aria-label", "Voice replies muted");
@@ -3593,7 +3593,7 @@ function summarizeMemoryText(value, limit) {
   const max = typeof limit === "number" ? limit : 140;
   if (!text) return "";
   if (text.length <= max) return text;
-  return text.slice(0, max) + "…";
+  return text.slice(0, max) + "â€¦";
 }
 
 function findMemoryById(memoryId) {
@@ -3680,7 +3680,7 @@ function renderMemory() {
           '<div class="nova-rail-card-title">' + title + '</div>' +
           '<div class="nova-rail-card-meta">' + kind + '</div>' +
         '</button>' +
-        '<button type="button" class="nova-rail-card-delete" data-memory-delete="' + id + '">✕</button>' +
+        '<button type="button" class="nova-rail-card-delete" data-memory-delete="' + id + '">âœ•</button>' +
       '</div>'
     );
   }).join("");
@@ -3748,7 +3748,7 @@ function renderMemoryViewer(item) {
     '<div class="nova-viewer-title">' + escapeHtml(item.kind || "note") + "</div>" +
     '<div class="nova-viewer-meta">' +
     escapeHtml(item.source || "memory") +
-    (item.session_id ? " · " + escapeHtml(item.session_id) : "") +
+    (item.session_id ? " Â· " + escapeHtml(item.session_id) : "") +
     "</div>" +
     '<pre class="nova-artifact-meta-pre">' + escapeHtml(item.text || item.preview || "") + "</pre>" +
     "</div>" +
@@ -4030,3 +4030,5 @@ if (btn) {
 }
 
 })();
+
+

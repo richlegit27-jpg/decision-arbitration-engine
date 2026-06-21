@@ -1,4 +1,4 @@
-// Function to authenticate and retrieve the token
+﻿// Function to authenticate and retrieve the token
 function authenticate(username, password) {
     fetch("/api/authenticate", {
         method: "POST",
@@ -45,3 +45,5 @@ function createSession(token) {
 
 // Call the authenticate function
 authenticate("validUser", "validPassword");
+
+

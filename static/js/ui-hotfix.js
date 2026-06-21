@@ -1,4 +1,4 @@
-/* notepad C:\Users\Owner\nova\static\js\ui-hotfix.js */
+﻿/* notepad C:\Users\Owner\nova\static\js\ui-hotfix.js */
 
 (() => {
 "use strict";
@@ -177,3 +177,4 @@ if (document.readyState === "loading") {
 window.addEventListener("nova:controls-ready", init, { once: true });
 
 })();
+

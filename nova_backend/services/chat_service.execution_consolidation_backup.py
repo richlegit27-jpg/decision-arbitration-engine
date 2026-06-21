@@ -15228,3 +15228,4 @@ for name in CHAT_SERVICE_METHODS:
     obj = globals().get(name)
     if callable(obj):
         setattr(ChatService, name, obj)
+

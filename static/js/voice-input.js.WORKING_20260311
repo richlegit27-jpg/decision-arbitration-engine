@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\voice-input.js
+﻿// C:\Users\Owner\nova\static\js\voice-input.js
 
 (() => {
 "use strict"
@@ -41,7 +41,7 @@ function ensureVoiceButton(){
   button.className = "composer-btn composer-voice-btn"
   button.setAttribute("aria-label", "Voice input")
   button.setAttribute("title", "Voice input")
-  button.textContent = "🎤"
+  button.textContent = "ðŸŽ¤"
 
   const attachBtn = getAttachButton()
   if(attachBtn && attachBtn.parentElement === composer){
@@ -106,7 +106,7 @@ function setListeningUi(flag){
   if(button){
     button.classList.toggle("is-listening", isListening)
     button.setAttribute("aria-pressed", isListening ? "true" : "false")
-    button.textContent = isListening ? "⏺" : "🎤"
+    button.textContent = isListening ? "âº" : "ðŸŽ¤"
   }
 }
 
@@ -167,7 +167,7 @@ function startListening(){
 
   recognition.onstart = () => {
     setListeningUi(true)
-    setStatus("Listening… speak now.", "active")
+    setStatus("Listeningâ€¦ speak now.", "active")
   }
 
   recognition.onresult = (event) => {

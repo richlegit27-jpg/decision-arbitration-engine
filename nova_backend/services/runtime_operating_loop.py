@@ -1,4 +1,4 @@
-class RuntimeOperatingLoop:
+﻿class RuntimeOperatingLoop:
 
     name = "runtime_operating_loop"
 
@@ -84,3 +84,4 @@ class RuntimeOperatingLoop:
             ),
             "loop_state": loop_state,
         }
+

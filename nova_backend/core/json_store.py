@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from copy import deepcopy
@@ -23,3 +23,4 @@ def read_json(path: Path, default: Any) -> Any:
     except Exception:
         write_json(path, default)
         return deepcopy(default)
+

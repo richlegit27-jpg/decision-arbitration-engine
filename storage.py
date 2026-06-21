@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from pathlib import Path
@@ -74,3 +74,4 @@ def load_sessions() -> dict[str, dict[str, Any]]:
 
 def save_sessions(sessions: dict[str, dict[str, Any]]) -> None:
     _write_json(SESSIONS_FILE, sessions)
+

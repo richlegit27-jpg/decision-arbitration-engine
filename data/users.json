@@ -1,4 +1,4 @@
-{
+﻿{
   "testuser": {
     "username": "testuser",
     "password_hash": "scrypt:32768:8:1$lbiO61V4yPsuigEn$54b1e5c5a6f69f8fcb16e43c2b9540ef0375e0051b05557861ab6a8a8b944ee8301b44333d84a9ff157a021052048f3cae168e7f8dcaca5efa9a36e6d1431b46",

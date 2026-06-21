@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import py_compile
 import shutil
@@ -948,3 +948,4 @@ def default_executor(move: NextMove) -> ExecutionResult:
             status="failed",
             error=str(e),
         )
+

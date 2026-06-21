@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat-sidebar-actions.js
+﻿// C:\Users\Owner\nova\static\js\chat-sidebar-actions.js
 
 (() => {
 "use strict"
@@ -203,3 +203,4 @@ window.NovaChatSidebarActions = {
 }
 
 })()
+

@@ -1,4 +1,4 @@
-class RuntimeCollectiveIntelligence:
+﻿class RuntimeCollectiveIntelligence:
 
     name = "runtime_collective_intelligence"
 
@@ -82,3 +82,4 @@ class RuntimeCollectiveIntelligence:
             ),
             "consensus": consensus,
         }
+

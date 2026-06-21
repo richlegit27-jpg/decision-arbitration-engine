@@ -1,4 +1,4 @@
-class RuntimePlanExecutor:
+﻿class RuntimePlanExecutor:
 
     def execute(
         self,
@@ -56,3 +56,4 @@ class RuntimePlanExecutor:
             "executed_steps": executed_steps,
             "step_count": len(executed_steps),
         }
+

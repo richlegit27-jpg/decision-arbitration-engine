@@ -1,4 +1,4 @@
-class RuntimeGraphQueryService:
+﻿class RuntimeGraphQueryService:
 
     def __init__(
         self,
@@ -233,3 +233,4 @@ class RuntimeGraphQueryService:
             "recommendations": recommendations,
             "hot_paths": hot_paths,
         }
+

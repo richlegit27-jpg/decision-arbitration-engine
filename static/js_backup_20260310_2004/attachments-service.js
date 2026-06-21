@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\attachments-service.js
+﻿// C:\Users\Owner\nova\static\js\attachments-service.js
 
 (() => {
 "use strict"
@@ -196,3 +196,4 @@ window.NovaAttachmentsService = {
 window.NovaAttachments = window.NovaAttachmentsService
 
 })()
+

@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   const API = {
@@ -83,12 +83,12 @@
 
     if (els.sendBtn) {
       els.sendBtn.disabled = busy;
-      els.sendBtn.textContent = state.sending ? "Sending…" : "Send";
+      els.sendBtn.textContent = state.sending ? "Sendingâ€¦" : "Send";
     }
 
     if (els.uploadBtn) {
       els.uploadBtn.disabled = busy;
-      els.uploadBtn.textContent = state.uploading ? "Uploading…" : "Upload";
+      els.uploadBtn.textContent = state.uploading ? "Uploadingâ€¦" : "Upload";
     }
   }
 
@@ -407,7 +407,7 @@
     const opts = options || {};
     if (!sessionId) return null;
 
-    setConnectionStatus("Restoring…");
+    setConnectionStatus("Restoringâ€¦");
 
     const data = await requestJson(API.session(sessionId));
     const session = normalizeSessionSummary(data.session);
@@ -486,7 +486,7 @@
 
     state.uploading = true;
     setBusyFlags();
-    setConnectionStatus("Uploading…");
+    setConnectionStatus("Uploadingâ€¦");
 
     const requestMeta = {
       at: nowIso(),
@@ -548,7 +548,7 @@
 
     state.sending = true;
     setBusyFlags();
-    setConnectionStatus("Sending…");
+    setConnectionStatus("Sendingâ€¦");
 
     let localUserMessage = null;
     let createdSessionId = "";
@@ -778,7 +778,7 @@
   }
 
   async function bootstrapState() {
-    setConnectionStatus("Loading…");
+    setConnectionStatus("Loadingâ€¦");
 
     try {
       const data = await requestJson(API.state);
@@ -892,3 +892,4 @@
     NovaComposerBundle.init();
   }
 })();
+

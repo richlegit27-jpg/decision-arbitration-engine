@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import uuid
@@ -407,3 +407,4 @@ class SessionService:
             return datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp()
         except Exception:
             return 0.0
+

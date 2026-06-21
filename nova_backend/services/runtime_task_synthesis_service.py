@@ -1,4 +1,4 @@
-class RuntimeTaskSynthesisService:
+﻿class RuntimeTaskSynthesisService:
     def __init__(
         self,
     ):
@@ -94,3 +94,4 @@ class RuntimeTaskSynthesisService:
                 "source": "RuntimeTaskSynthesisService",
             },
         }
+

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import uuid
 from typing import Any, Dict
@@ -20,7 +20,7 @@ def _trim(text: str, limit: int) -> str:
     value = str(text or "").strip()
     if len(value) <= limit:
         return value
-    return value[:limit].rstrip() + "…"
+    return value[:limit].rstrip() + "â€¦"
 
 
 def new_artifact(
@@ -160,3 +160,4 @@ def artifact_preview(artifact: dict) -> str:
 def artifact_viewer_payload(artifact: dict) -> dict:
     normalized = normalize_artifact(artifact)
     return normalized["viewer"]
+

@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat-controller.js
+﻿// C:\Users\Owner\nova\static\js\chat-controller.js
 
 (() => {
 "use strict"
@@ -607,3 +607,4 @@ window.NovaChatController = {
 }
 
 })()
+

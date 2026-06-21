@@ -1,4 +1,4 @@
-class RuntimePlanningService:
+﻿class RuntimePlanningService:
     def __init__(self):
         self.plan_state = {
             "active_plan": [],
@@ -156,3 +156,4 @@ class RuntimePlanningService:
             return float(value)
         except Exception:
             return default
+

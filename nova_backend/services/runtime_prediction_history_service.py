@@ -1,4 +1,4 @@
-class RuntimePredictionHistoryService:
+﻿class RuntimePredictionHistoryService:
 
     def __init__(self):
 
@@ -56,3 +56,4 @@ class RuntimePredictionHistoryService:
             "history_count": len(self.history),
             "state_counts": states,
         }
+

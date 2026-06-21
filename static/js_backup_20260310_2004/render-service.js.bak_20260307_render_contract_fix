@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\render-service.js
+﻿// C:\Users\Owner\nova\static\js\render-service.js
 
 (() => {
 "use strict"
@@ -146,7 +146,7 @@ function createRenderService(options = {}){
     const removable = Boolean(options.removable)
     const indexAttr = Number.isInteger(options.index) ? ` data-index="${options.index}"` : ""
     const removeButton = removable
-      ? `<button type="button" class="attachment-chip-remove" data-action="remove-pending-attachment"${indexAttr} aria-label="Remove attachment">×</button>`
+      ? `<button type="button" class="attachment-chip-remove" data-action="remove-pending-attachment"${indexAttr} aria-label="Remove attachment">Ã—</button>`
       : ""
 
     const label = escapeHtml(
@@ -166,7 +166,7 @@ function createRenderService(options = {}){
     }
 
     const meta = metaParts.length
-      ? `<span class="attachment-chip-meta">${metaParts.join(" · ")}</span>`
+      ? `<span class="attachment-chip-meta">${metaParts.join(" Â· ")}</span>`
       : ""
 
     return `

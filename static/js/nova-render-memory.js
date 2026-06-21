@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaRenderMemoryLoaded) {
@@ -108,3 +108,4 @@
 
   render.memoryImpl = renderMemory;
 })();
+

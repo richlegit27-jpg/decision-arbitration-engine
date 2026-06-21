@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat-bootstrap.js
+﻿// C:\Users\Owner\nova\static\js\chat-bootstrap.js
 
 (() => {
 "use strict"
@@ -32,3 +32,4 @@ window.NovaChatBootstrap = {
 }
 
 })()
+

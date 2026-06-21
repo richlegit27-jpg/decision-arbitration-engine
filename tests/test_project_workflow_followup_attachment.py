@@ -60,3 +60,5 @@ def test_project_workflow_followup_can_reuse_prior_attachment_context() -> None:
     assert attachment["client_session_id"] == session_id
     assert attachment["size"] == 444
     assert attachment["mime_type"] == "text/plain"
+
+

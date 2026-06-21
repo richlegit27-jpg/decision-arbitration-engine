@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $projectRoot = "C:\Users\Owner\nova"
 $backupScript = "C:\Users\Owner\nova\backup.ps1"

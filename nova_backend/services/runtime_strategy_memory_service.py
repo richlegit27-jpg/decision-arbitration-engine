@@ -1,4 +1,4 @@
-
+﻿
 class RuntimeStrategyMemoryService:
     def __init__(
         self,
@@ -129,3 +129,4 @@ class RuntimeStrategyMemoryService:
             "preferred_strategy": preferred_strategy,
             "suppressed_strategy": suppressed_strategy,
         }
+

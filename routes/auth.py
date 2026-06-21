@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -97,3 +97,4 @@ async def logout():
     response = JSONResponse({"ok": True})
     response.delete_cookie(key="nova_username")
     return response
+

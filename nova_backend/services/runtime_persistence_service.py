@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from pathlib import Path
@@ -217,3 +217,4 @@ class RuntimePersistenceService:
         ] = True
 
         return execution_state
+

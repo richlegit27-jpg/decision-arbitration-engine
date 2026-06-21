@@ -1,4 +1,4 @@
-import time
+﻿import time
 import uuid
 
 from nova_backend.services.runtime_graph_storage_service import RuntimeGraphStorageService
@@ -275,3 +275,4 @@ class RuntimeGraphMemoryService:
         }
 
         return self.record_event(event)
+

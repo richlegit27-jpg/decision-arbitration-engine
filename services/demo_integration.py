@@ -1,4 +1,4 @@
-# =========================================================
+﻿# =========================================================
 # Nova Ultimate 2026 Phase 6
 # Demo Integration: Connect frontend to pre-populated backend
 # =========================================================
@@ -30,3 +30,4 @@ def api_sessions():
 
 if __name__ == "__main__":
     app.run(port=8743, debug=True)
+

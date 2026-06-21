@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\api-core.js
+﻿// C:\Users\Owner\nova\static\js\api-core.js
 
 (() => {
 "use strict"
@@ -226,3 +226,4 @@ window.NovaAPICore = {
 }
 
 })()
+

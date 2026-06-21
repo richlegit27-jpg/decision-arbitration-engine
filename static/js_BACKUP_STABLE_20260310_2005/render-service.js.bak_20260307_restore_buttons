@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\render-service.js
+﻿// C:\Users\Owner\nova\static\js\render-service.js
 
 (() => {
 "use strict"
@@ -179,7 +179,7 @@ function createRenderService(options = {}){
             aria-label="Remove ${name}"
             title="Remove file"
           >
-            ×
+            Ã—
           </button>
         </div>
       `

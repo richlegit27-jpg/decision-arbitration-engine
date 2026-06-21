@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 import json
@@ -367,3 +367,4 @@ if __name__ == "__main__":
     port = int((os.getenv("APP_PORT") or "5001").strip())
     debug = (os.getenv("APP_DEBUG") or "true").strip().lower() == "true"
     app.run(host=host, port=port, debug=debug)
+

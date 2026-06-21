@@ -1,4 +1,4 @@
-class RuntimeEngineSuppressionService:
+﻿class RuntimeEngineSuppressionService:
 
     def __init__(self):
 
@@ -94,3 +94,4 @@ class RuntimeEngineSuppressionService:
             "reason": "",
             "engine": engine_name,
         }
+

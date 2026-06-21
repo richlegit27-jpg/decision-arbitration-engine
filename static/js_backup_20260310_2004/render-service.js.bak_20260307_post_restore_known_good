@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\render-service.js
+﻿// C:\Users\Owner\nova\static\js\render-service.js
 
 (() => {
 "use strict"
@@ -108,7 +108,7 @@ function createRenderService(options = {}){
               aria-label="Rename chat"
               title="Rename"
             >
-              ✎
+              âœŽ
             </button>
 
             <button
@@ -119,7 +119,7 @@ function createRenderService(options = {}){
               aria-label="Delete chat"
               title="Delete"
             >
-              🗑
+              ðŸ—‘
             </button>
           </div>
         </div>
@@ -257,7 +257,7 @@ function createRenderService(options = {}){
             aria-label="Remove ${name}"
             title="Remove file"
           >
-            ×
+            Ã—
           </button>
         </div>
       `

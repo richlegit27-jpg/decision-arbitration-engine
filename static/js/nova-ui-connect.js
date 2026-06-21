@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+﻿document.addEventListener("DOMContentLoaded", () => {
   const sendBtn = document.getElementById("sendBtn");
   const chatInput = document.getElementById("chatInput");
 
@@ -33,3 +33,4 @@ document.addEventListener("DOMContentLoaded", () => {
       return data.session.id;
     });
 });
+

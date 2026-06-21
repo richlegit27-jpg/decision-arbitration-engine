@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 if (window.__novaOpenCloseLoaded) {
@@ -301,3 +301,4 @@ app.closeAllPanels = closeAllPanels;
 
 document.addEventListener("DOMContentLoaded", initOpenClose);
 })();
+

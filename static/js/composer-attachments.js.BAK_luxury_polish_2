@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\composer-attachments.js
+﻿// C:\Users\Owner\nova\static\js\composer-attachments.js
 
 (() => {
 "use strict"
@@ -176,11 +176,11 @@ function createComposerAttachments(options = {}){
     const name = String(file.filename || file.name || "").toLowerCase()
     const type = String(file.mime_type || file.type || "").toLowerCase()
 
-    if(type.startsWith("image/")) return "🖼"
-    if(type.startsWith("audio/")) return "🎵"
-    if(type.startsWith("video/")) return "🎬"
-    if(type.includes("pdf") || name.endsWith(".pdf")) return "📕"
-    if(name.endsWith(".zip") || name.endsWith(".rar") || name.endsWith(".7z")) return "🗜"
+    if(type.startsWith("image/")) return "ðŸ–¼"
+    if(type.startsWith("audio/")) return "ðŸŽµ"
+    if(type.startsWith("video/")) return "ðŸŽ¬"
+    if(type.includes("pdf") || name.endsWith(".pdf")) return "ðŸ“•"
+    if(name.endsWith(".zip") || name.endsWith(".rar") || name.endsWith(".7z")) return "ðŸ—œ"
     if(
       name.endsWith(".js") ||
       name.endsWith(".ts") ||
@@ -191,10 +191,10 @@ function createComposerAttachments(options = {}){
       name.endsWith(".md") ||
       name.endsWith(".sql")
     ){
-      return "💻"
+      return "ðŸ’»"
     }
 
-    return "📄"
+    return "ðŸ“„"
   }
 
   function renderPendingAttachments(){
@@ -237,7 +237,7 @@ function createComposerAttachments(options = {}){
                 aria-label="Remove attachment"
                 title="Remove"
               >
-                ×
+                Ã—
               </button>
             </div>
           `

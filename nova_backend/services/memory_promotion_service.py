@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -383,3 +383,4 @@ class MemoryPromotionService:
         clean = dict(item)
         clean.pop("normalized_text", None)
         return clean
+

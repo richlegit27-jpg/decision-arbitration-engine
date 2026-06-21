@@ -1,4 +1,4 @@
-const API_BASE = window.location.origin;
+﻿const API_BASE = window.location.origin;
 
 const elSessions = document.getElementById("sessions");
 const elThread = document.getElementById("thread");
@@ -66,7 +66,7 @@ async function loadHealth() {
   try {
     const res = await api("/api/health");
     const j = await res.json();
-    elBuild.textContent = `${j.build || ""} · ${j.model || ""}`;
+    elBuild.textContent = `${j.build || ""} Â· ${j.model || ""}`;
   } catch {}
 }
 
@@ -197,7 +197,7 @@ async function send() {
 
     if (!res.ok) {
       const errText = await res.text();
-      setStatus(`❌ HTTP ${res.status} ${errText}`);
+      setStatus(`âŒ HTTP ${res.status} ${errText}`);
       return;
     }
 
@@ -227,13 +227,13 @@ async function send() {
           assistantBubble.innerHTML = `<div class="prose prose-invert max-w-none">${marked.parse(out)}</div>`;
           scrollBottom();
         }
-        if (evt.error) setStatus(`❌ ${JSON.stringify(evt.error)}`);
+        if (evt.error) setStatus(`âŒ ${JSON.stringify(evt.error)}`);
       }
     }
 
     await refreshSessions();
   } catch {
-    setStatus(`❌ Network error: Failed to fetch`);
+    setStatus(`âŒ Network error: Failed to fetch`);
   }
 }
 
@@ -264,7 +264,7 @@ function kbRenderResults(results) {
 
     const top = document.createElement("div");
     top.className = "text-xs text-zinc-400";
-    top.textContent = `${r.filename} · chunk ${r.chunk_index}`;
+    top.textContent = `${r.filename} Â· chunk ${r.chunk_index}`;
 
     const body = document.createElement("div");
     body.className = "text-xs text-zinc-200 mt-1 whitespace-pre-wrap";
@@ -281,14 +281,14 @@ async function kbSearchNow() {
   const q = (elKbQuery.value || "").trim();
   if (!q) { kbRenderResults([]); kbSetStatus(""); return; }
 
-  kbSetStatus("Searching…");
+  kbSetStatus("Searchingâ€¦");
   try {
     const res = await api(`/api/kb/search?q=${encodeURIComponent(q)}`);
     const j = await res.json();
     kbRenderResults(j.results || []);
     kbSetStatus(`${(j.results || []).length} results`);
   } catch {
-    kbSetStatus("❌ KB search failed");
+    kbSetStatus("âŒ KB search failed");
   }
 }
 
@@ -301,7 +301,7 @@ elFileInput.addEventListener("change", async () => {
   const f = elFileInput.files && elFileInput.files[0];
   if (!f) return;
 
-  kbSetStatus("Uploading…");
+  kbSetStatus("Uploadingâ€¦");
   try {
     const fd = new FormData();
     fd.append("file", f);
@@ -310,17 +310,18 @@ elFileInput.addEventListener("change", async () => {
     const j = await res.json();
 
     if (!res.ok) {
-      kbSetStatus(`❌ Upload failed: ${JSON.stringify(j)}`);
+      kbSetStatus(`âŒ Upload failed: ${JSON.stringify(j)}`);
       return;
     }
 
     kbSetStatus(`Indexed ${j.indexed_chunks} chunks from ${j.file.filename}`);
     elFileInput.value = "";
   } catch {
-    kbSetStatus("❌ Upload failed");
+    kbSetStatus("âŒ Upload failed");
   }
 });
 
 // boot
 loadHealth();
 refreshSessions();
+

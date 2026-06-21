@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -145,7 +145,7 @@
 
     <!-- Sidebar Navigation -->
     <div id="mySidenav" class="sidenav">
-      <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">Ã—</a>
+      <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">Ãƒâ€”</a>
       <a href="#">Home</a>
       <a href="#">About</a>
       <a href="#">Services</a>
@@ -270,4 +270,5 @@
 </body>
 </html>
 <!-- NOVA_SERVE_MARKER 20260226_034637 -->
+
 

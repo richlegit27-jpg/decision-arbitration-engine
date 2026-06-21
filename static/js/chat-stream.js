@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat-stream.js
+﻿// C:\Users\Owner\nova\static\js\chat-stream.js
 
 (() => {
 
@@ -114,3 +114,4 @@ window.NovaStream = {
 }
 
 })()
+

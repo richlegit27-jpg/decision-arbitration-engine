@@ -1,4 +1,4 @@
-\# Nova Landing Page Build Order
+﻿\# Nova Landing Page Build Order
 
 
 
@@ -121,4 +121,5 @@ Landing page work should be isolated as much as possible.
 \## Immediate Next Step
 
 Inspect the current route and template flow before editing any UI files.
+
 

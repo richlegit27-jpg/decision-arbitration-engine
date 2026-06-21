@@ -1,4 +1,4 @@
-class ConsciousnessLoop:
+﻿class ConsciousnessLoop:
 
     def __init__(
         self,
@@ -170,3 +170,4 @@ class ConsciousnessLoop:
                 improvements
             ),
         }
+

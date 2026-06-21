@@ -1,4 +1,4 @@
-[33ma968b21[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mbrain-pass-working-2026-03-27[m[33m)[m backup checkpoint before session rail rollback
+﻿[33ma968b21[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mbrain-pass-working-2026-03-27[m[33m)[m backup checkpoint before session rail rollback
 [33m1c75ab3[m save checkpoint live search real publisher resolution
 [33m55e99d0[m[33m ([m[1;33mtag: [m[1;33mweb-card-render-premium-2026-04-01[m[33m)[m web card render premium: polished chat card, artifact reopen, web rail sync
 [33m6377331[m[33m ([m[1;33mtag: [m[1;33mweb-fetch-polish-2026-03-31[m[33m)[m web fetch polish: clean summary, stable web meta, artifact reopen ready, ssl fallback locked, route stable
@@ -18,3 +18,4 @@
 [33m0bd762c[m frontend sends recent chat history to backend
 [33m28dd87d[m history pass-through on real model path
 [33mbb5437d[m checkpoint: unified chat render contract + stable api chat payload + unified right rail
+

@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $stamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
 $projectRoot = "C:\Users\Owner\nova"

@@ -497,3 +497,4 @@ label.small input[type="checkbox"]{
 }
 .copyBtn.mdToggle.ok{ opacity: 1; }
 /* ===== /NOVA_COPY_MD_TOGGLE_CSS_V1 ===== */
+

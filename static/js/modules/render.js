@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\modules\render.js
+﻿// C:\Users\Owner\nova\static\js\modules\render.js
 
 import { renameChat, deleteChat } from "./api.js";
 import { state, setEditing } from "./state.js";
@@ -249,3 +249,4 @@ function formatBytes(bytes) {
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
+

@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+﻿document.addEventListener("DOMContentLoaded", () => {
     // Panels
     const panels = {
         memory: document.getElementById("memoryPanel"),
@@ -26,7 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const sequence = async () => {
         const delay = ms => new Promise(res => setTimeout(res, ms));
 
-        // 1️⃣ Show Memory panel
+        // 1ï¸âƒ£ Show Memory panel
         showPanel(panels.memory);
         panels.memory.innerHTML = "";
         ["You: Hello!", "AI: Welcome to Nova Ultimate 2026 demo!"].forEach(msg => {
@@ -37,7 +37,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         await delay(1200);
 
-        // 2️⃣ Show Attachments panel
+        // 2ï¸âƒ£ Show Attachments panel
         showPanel(panels.attachments);
         panels.attachments.innerHTML = "";
         const fakeFile = new File(["Demo content"], "demo.txt", {type:"text/plain"});
@@ -45,7 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
         addAttachment(fakeFile);
         await delay(1200);
 
-        // 3️⃣ Show Images panel
+        // 3ï¸âƒ£ Show Images panel
         showPanel(panels.images);
         panels.images.innerHTML = "";
         const fakeImg = new Image();
@@ -55,17 +55,18 @@ document.addEventListener("DOMContentLoaded", () => {
         panels.images.appendChild(fakeImg);
         await delay(1200);
 
-        // 4️⃣ Show Exports panel
+        // 4ï¸âƒ£ Show Exports panel
         showPanel(panels.exports);
         await delay(800);
 
-        // 5️⃣ Show Voice panel
+        // 5ï¸âƒ£ Show Voice panel
         showPanel(panels.voice);
         await delay(800);
 
-        // 6️⃣ Show New Chat panel
+        // 6ï¸âƒ£ Show New Chat panel
         showPanel(panels.newChat);
     };
 
     sequence();
 });
+

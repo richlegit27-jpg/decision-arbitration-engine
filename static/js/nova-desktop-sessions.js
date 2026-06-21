@@ -1,11 +1,11 @@
-(function () {
+﻿(function () {
   "use strict";
 
 function $(id) {
   return document.getElementById(id);
 }
 
-// 👇 ADD THIS RIGHT HERE (GLOBAL STATE)
+// ðŸ‘‡ ADD THIS RIGHT HERE (GLOBAL STATE)
 window.__NOVA_SESSION_STATE = {
   activeSid: null,
   currentRequest: null
@@ -225,3 +225,4 @@ function wireButtons() {
 
   console.log("[Nova Desktop Sessions External] ready");
 })();
+

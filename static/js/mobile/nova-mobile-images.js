@@ -1,4 +1,4 @@
-/* NOVA_MOBILE_IMAGES_MODULE_20260606 */
+﻿/* NOVA_MOBILE_IMAGES_MODULE_20260606 */
 
 (function () {
     "use strict";
@@ -306,3 +306,4 @@
 
     console.log("[Nova Mobile Images] module ready");
 })();
+

@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaPhase3RepairLoaded) {
@@ -478,3 +478,4 @@
     init();
   }
 })();
+

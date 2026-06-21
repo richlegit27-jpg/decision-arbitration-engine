@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 if (window.__novaComposerLoaded) {
@@ -379,3 +379,4 @@ if (document.readyState === "loading") {
   initComposer();
 }
 })();
+

@@ -1,4 +1,4 @@
-const btn = document.getElementById("sendBtn");
+﻿const btn = document.getElementById("sendBtn");
 const input = document.getElementById("messageInput");
 
 btn.addEventListener("click", async () => {
@@ -21,3 +21,4 @@ btn.addEventListener("click", async () => {
         console.error("Send failed:", err);
     }
 });
+

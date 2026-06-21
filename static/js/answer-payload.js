@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\answer-payload.js
+﻿// C:\Users\Owner\nova\static\js\answer-payload.js
 
 (() => {
 "use strict"
@@ -288,3 +288,4 @@ window.NovaAnswerPayload = {
 bindCopyHandlers()
 
 })()
+

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
@@ -218,3 +218,5 @@ def summarize_attachments_for_session(
 # ATTACHMENT_FILENAME_FROM_URL_LOCK
 
 # ATTACHMENT_FORCE_FILENAME_FIX_LOCK
+
+

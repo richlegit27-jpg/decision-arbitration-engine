@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\attachments.js
+﻿// C:\Users\Owner\nova\static\js\attachments.js
 
 (() => {
 "use strict"
@@ -142,19 +142,19 @@ function createAttachmentsService(options = {}){
     const type = String(entry?.type || "").toLowerCase()
 
     if(type.startsWith("image/")){
-      return "🖼️"
+      return "ðŸ–¼ï¸"
     }
 
     if(type.startsWith("video/")){
-      return "🎞️"
+      return "ðŸŽžï¸"
     }
 
     if(type.startsWith("audio/")){
-      return "🎵"
+      return "ðŸŽµ"
     }
 
     if(name.endsWith(".pdf")){
-      return "📄"
+      return "ðŸ“„"
     }
 
     if(
@@ -168,7 +168,7 @@ function createAttachmentsService(options = {}){
       name.endsWith(".ps1") ||
       name.endsWith(".sh")
     ){
-      return "💻"
+      return "ðŸ’»"
     }
 
     if(
@@ -178,10 +178,10 @@ function createAttachmentsService(options = {}){
       name.endsWith(".tar") ||
       name.endsWith(".gz")
     ){
-      return "🗜️"
+      return "ðŸ—œï¸"
     }
 
-    return "📎"
+    return "ðŸ“Ž"
   }
 
   function renderPendingAttachments(){
@@ -221,7 +221,7 @@ function createAttachmentsService(options = {}){
             aria-label="Remove ${name}"
             title="Remove attachment"
           >
-            ×
+            Ã—
           </button>
         </div>
       `

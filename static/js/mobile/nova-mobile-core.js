@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     "use strict";
 
     const chatContainer =
@@ -244,7 +244,7 @@
 
         html = html.replace(
             /^\- (.*)$/gm,
-            '<div class="mobile-bullet">• $1</div>'
+            '<div class="mobile-bullet">â€¢ $1</div>'
         );
 
         html = html.replace(
@@ -405,3 +405,4 @@ window.hapticError = hapticError;
     );
 
 })();
+

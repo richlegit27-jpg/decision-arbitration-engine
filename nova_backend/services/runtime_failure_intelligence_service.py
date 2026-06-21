@@ -1,4 +1,4 @@
-class RuntimeFailureIntelligenceService:
+﻿class RuntimeFailureIntelligenceService:
 
     def __init__(self):
 
@@ -101,3 +101,4 @@ class RuntimeFailureIntelligenceService:
                 )
 
         return intelligence
+

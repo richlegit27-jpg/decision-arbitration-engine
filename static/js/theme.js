@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 if(window.__novaThemeLoaded) return;
 window.__novaThemeLoaded=true;
@@ -19,3 +19,4 @@ window.toggleTheme = ()=>{
     saveTheme(theme);
 };
 })();
+

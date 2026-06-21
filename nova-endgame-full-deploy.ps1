@@ -1,4 +1,4 @@
-# ---------------------------------------------------
+﻿# ---------------------------------------------------
 # Nova Endgame: Full Deployment Installer
 # ---------------------------------------------------
 
@@ -6,14 +6,14 @@ $novaRoot = "C:\Users\Owner\nova"
 $timestamp = Get-Date -Format yyyyMMdd_HHmmss
 
 # ------------------------------
-# 1️⃣ Backup existing Nova
+# 1ï¸âƒ£ Backup existing Nova
 # ------------------------------
 $backupPath = "$novaRoot-backup-$timestamp"
 Write-Host "Backing up existing Nova to $backupPath"
 Copy-Item -Path $novaRoot -Destination $backupPath -Recurse
 
 # ------------------------------
-# 2️⃣ Rebuild backend/main.py
+# 2ï¸âƒ£ Rebuild backend/main.py
 # ------------------------------
 $backendPath = Join-Path $novaRoot "backend\main.py"
 @"
@@ -79,7 +79,7 @@ async def upload_file(file: UploadFile = File(...)):
 "@ | Set-Content -Path $backendPath -Force
 
 # ------------------------------
-# 3️⃣ Rebuild templates/index.html
+# 3ï¸âƒ£ Rebuild templates/index.html
 # ------------------------------
 $indexPath = Join-Path $novaRoot "templates\index.html"
 @"
@@ -99,7 +99,7 @@ $indexPath = Join-Path $novaRoot "templates\index.html"
 <aside id='sidebar' class='sidebar'>
 <div class='sidebar-header'>
 <div class='sidebar-title'>Nova</div>
-<button id='btnCloseSidebar' class='sidebar-close' type='button'>✕</button>
+<button id='btnCloseSidebar' class='sidebar-close' type='button'>âœ•</button>
 </div>
 <div class='sidebar-actions'>
 <button id='btnNewChat' class='sidebar-btn'>+ New Chat</button>
@@ -112,16 +112,16 @@ $indexPath = Join-Path $novaRoot "templates\index.html"
 <div class='composer'>
 <textarea id='composerInput' placeholder='Type a message...'></textarea>
 <button id='sendBtn'>Send</button>
-<button id='voiceBtn'>🎤</button>
+<button id='voiceBtn'>ðŸŽ¤</button>
 <input type='file' id='fileInput' style='display:none;'>
-<button id='attachBtn'>📎</button>
+<button id='attachBtn'>ðŸ“Ž</button>
 </div>
 </main>
 
 <aside id='memoryPanel' class='memory-panel'>
 <div class='memory-header'>
 <h3>Memory</h3>
-<button id='closeMemoryPanelBtn'>✕</button>
+<button id='closeMemoryPanelBtn'>âœ•</button>
 <button id='deleteAllMemoryBtn'>Delete All</button>
 </div>
 <div id='memoryList' class='memory-list'></div>
@@ -138,7 +138,7 @@ $indexPath = Join-Path $novaRoot "templates\index.html"
 "@ | Set-Content -Path $indexPath -Force
 
 # ------------------------------
-# 4️⃣ JS/CSS placeholders (final content can be pasted here)
+# 4ï¸âƒ£ JS/CSS placeholders (final content can be pasted here)
 # ------------------------------
 $jsFiles = @("app.js","composer.js","memory-panel.js","glassmorphism-final.js")
 $cssFiles = @("base.css","layout.css","glassmorphism-final.css")
@@ -154,7 +154,7 @@ foreach($file in $cssFiles){
 }
 
 # ------------------------------
-# 5️⃣ Launcher Scripts
+# 5ï¸âƒ£ Launcher Scripts
 # ------------------------------
 $launcher = Join-Path $novaRoot "launch-nova.ps1"
 @"
@@ -177,4 +177,4 @@ cd \$novaRoot
 Start-Process powershell -ArgumentList '-NoExit','-Command',"python -m uvicorn backend.main:app --reload"
 "@ | Set-Content -Path $packageLauncher -Force
 
-Write-Host "✅ Nova Endgame full deployment complete! Run launch-nova.ps1 to start or use the package script."
+Write-Host "âœ… Nova Endgame full deployment complete! Run launch-nova.ps1 to start or use the package script."

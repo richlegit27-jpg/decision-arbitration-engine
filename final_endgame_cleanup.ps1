@@ -1,4 +1,4 @@
-# --------------------------------------------
+﻿# --------------------------------------------
 # Nova Endgame Final Copy Minimal Cleanup
 # --------------------------------------------
 
@@ -30,4 +30,4 @@ Get-ChildItem -Path $jsPath -File | Where-Object {
     $_.Name -notin @("app.js","composer.js","memory-panel.js")
 } | Remove-Item -Force
 
-Write-Host "✅ Minimal cleanup complete. Only essential working files remain."
+Write-Host "âœ… Minimal cleanup complete. Only essential working files remain."

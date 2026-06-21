@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaSourcesPanelLoaded) return;
@@ -101,8 +101,8 @@
             <div id="novaSourcesSubtitle" class="nova-sources-subtitle">No sources yet</div>
           </div>
           <div class="nova-sources-actions">
-            <button id="novaSourcesCopyBtn" class="nova-sources-icon-btn" type="button" aria-label="Copy sources">⧉</button>
-            <button id="novaSourcesCloseBtn" class="nova-sources-icon-btn" type="button" aria-label="Close sources">✕</button>
+            <button id="novaSourcesCopyBtn" class="nova-sources-icon-btn" type="button" aria-label="Copy sources">â§‰</button>
+            <button id="novaSourcesCloseBtn" class="nova-sources-icon-btn" type="button" aria-label="Close sources">âœ•</button>
           </div>
         </div>
         <div id="novaSourcesBody" class="nova-sources-body">
@@ -131,7 +131,7 @@
       ? new Date(STATE.lastUpdatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
       : "just now";
 
-    return `${count} source${count === 1 ? "" : "s"} • updated ${updated}`;
+    return `${count} source${count === 1 ? "" : "s"} â€¢ updated ${updated}`;
   }
 
   function buildSourceCard(item) {
@@ -153,7 +153,7 @@
         <a class="nova-source-card" href="${safeUrl}" target="_blank" rel="noopener noreferrer">
           <div class="nova-source-row">
             <h4 class="nova-source-title">${safeTitle}</h4>
-            <span class="nova-source-external">↗</span>
+            <span class="nova-source-external">â†—</span>
           </div>
           ${urlLine}
           ${snippetLine}
@@ -165,7 +165,7 @@
       <div class="nova-source-card">
         <div class="nova-source-row">
           <h4 class="nova-source-title">${safeTitle}</h4>
-          <span class="nova-source-external">•</span>
+          <span class="nova-source-external">â€¢</span>
         </div>
         ${urlLine}
         ${snippetLine}
@@ -437,3 +437,4 @@
     init();
   }
 })();
+

@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 // ----------------------------
@@ -56,7 +56,7 @@ function renderChatList(){
 
     const del = document.createElement("button");
     del.className = "chat-delete-btn";
-    del.textContent = "✕";
+    del.textContent = "âœ•";
     del.onclick = e => { e.stopPropagation(); deleteChat(chat.id); };
     li.appendChild(del);
 
@@ -195,3 +195,4 @@ window.addEventListener("DOMContentLoaded", init);
 window.addEventListener("nova:chat-changed", () => { renderChatList(); });
 window.addEventListener("nova:messages-changed", () => { renderAttachments(); });
 })();
+

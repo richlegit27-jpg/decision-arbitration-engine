@@ -1,4 +1,4 @@
-class RuntimeRestrictionService:
+﻿class RuntimeRestrictionService:
     def enforce(
         self,
         execution_state=None,
@@ -46,3 +46,4 @@ class RuntimeRestrictionService:
             "blocked_systems": blocked,
             "execution_state": execution_state,
         }
+

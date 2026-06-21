@@ -1,4 +1,4 @@
-class EmergenceEngine:
+﻿class EmergenceEngine:
 
     def detect(
         self,
@@ -109,3 +109,4 @@ class EmergenceEngine:
                 emergent_patterns
             ),
         }
+

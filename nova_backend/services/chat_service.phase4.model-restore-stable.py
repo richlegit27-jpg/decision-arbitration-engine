@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64   
 import os
@@ -669,7 +669,7 @@ class ChatService:
             if text_parts:
                 return "\n".join(text_parts).strip()
 
-        return "I’m here, but the model returned an empty response."
+        return "I'm here, but the model returned an empty response."
 
     # ==============================
     # DECISION CONTRACT
@@ -1322,7 +1322,7 @@ class ChatService:
         next_move = self._safe_str(state.get("next_move"))
         checkpoint = self._safe_str(state.get("checkpoint"))
 
-        lines = ["Current status I�m tracking:"]
+        lines = ["Current status I’m tracking:"]
 
         if active_task:
             lines.append(f"- Active task: {active_task}")
@@ -2455,7 +2455,7 @@ class ChatService:
                 else:
                     lines.append(f"- {text}")
 
-            assistant_text = "Here’s what I remember that seems relevant right now:\n" + "\n".join(lines)
+            assistant_text = "Hereâ€™s what I remember that seems relevant right now:\n" + "\n".join(lines)
         else:
             assistant_text = "I do not have any relevant saved memory for that yet."
 
@@ -3046,3 +3046,5 @@ class ChatService:
             working_state=working_state,
             working_context_block=working_context_block,
         )
+
+

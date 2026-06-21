@@ -1,4 +1,4 @@
-class RuntimeMemoryCompressionService:
+﻿class RuntimeMemoryCompressionService:
     def __init__(
         self,
         history_limit=25,
@@ -423,3 +423,4 @@ class RuntimeMemoryCompressionService:
             "summary_count": len(summary_memory),
             "risk_memory_state": risk_memory_state,
         }
+

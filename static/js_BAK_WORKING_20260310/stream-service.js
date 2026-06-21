@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\stream-service.js
+﻿// C:\Users\Owner\nova\static\js\stream-service.js
 
 (() => {
 "use strict"
@@ -174,3 +174,4 @@ window.NovaStreamService = {
 }
 
 })()
+

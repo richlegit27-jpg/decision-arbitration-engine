@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\render-service.js
+﻿// C:\Users\Owner\nova\static\js\render-service.js
 
 (() => {
 "use strict"
@@ -309,7 +309,7 @@ function createRenderService(options = {}){
           return `
             <div class="message-attachment">
               <div class="message-attachment-name">${name}</div>
-              <div class="message-attachment-meta">${type} • ${size}</div>
+              <div class="message-attachment-meta">${type} â€¢ ${size}</div>
             </div>
           `
         }).join("")}

@@ -1,4 +1,4 @@
-import os
+﻿import os
 from typing import Dict, Any
 
 
@@ -88,3 +88,4 @@ class ToolService:
             return {"ok": True, "matches": matches[:50]}
         except Exception as e:
             return {"ok": False, "error": str(e)}
+

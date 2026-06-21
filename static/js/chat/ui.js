@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat\ui.js
+﻿// C:\Users\Owner\nova\static\js\chat\ui.js
 
 (() => {
   const $ = (q) => document.querySelector(q);
@@ -155,3 +155,4 @@
   window.NovaApp = window.NovaApp || {};
   window.NovaApp.ui = ui;
 })();
+

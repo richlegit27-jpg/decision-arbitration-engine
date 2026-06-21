@@ -1,4 +1,4 @@
-class CivilizationLayer:
+﻿class CivilizationLayer:
 
     def __init__(self):
 
@@ -118,3 +118,4 @@ class CivilizationLayer:
                 == "active"
             ]),
         }
+

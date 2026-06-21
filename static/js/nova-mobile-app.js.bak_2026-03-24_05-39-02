@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaMobileAppLoaded) return;
@@ -109,7 +109,7 @@
       app.state.isListening ? "Stop voice input" : "Voice input"
     );
     voiceBtn.title = app.state.isListening ? "Listening..." : "Voice input";
-    voiceBtn.textContent = app.state.isListening ? "◼" : "🎤";
+    voiceBtn.textContent = app.state.isListening ? "â—¼" : "ðŸŽ¤";
   }
 
   function autoResizeTextarea(el) {
@@ -347,7 +347,7 @@
       const deleteBtn = node.querySelector(".session-delete");
 
       if (title) title.textContent = safeText(session.title) || "New Chat";
-      if (meta) meta.textContent = `${session.pinned ? "Pinned · " : ""}${session.message_count || 0} msgs`;
+      if (meta) meta.textContent = `${session.pinned ? "Pinned Â· " : ""}${session.message_count || 0} msgs`;
 
       main?.addEventListener("click", async () => {
         if (!session.id) return;

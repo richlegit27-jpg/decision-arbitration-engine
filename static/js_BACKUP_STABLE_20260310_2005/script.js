@@ -1,4 +1,4 @@
-// JavaScript for dynamic input box resizing
+﻿// JavaScript for dynamic input box resizing
 document.getElementById('input-area').addEventListener('input', function() {
     this.style.height = 'auto';  // Reset height
     this.style.height = (this.scrollHeight) + 'px';  // Set new height
@@ -69,3 +69,4 @@ document.getElementById('input-area').addEventListener('keydown', function(event
         event.preventDefault();  // Prevent new line when Enter is pressed
     }
 });
+

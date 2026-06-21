@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import re
 from typing import Any, Dict, List, Tuple
@@ -156,7 +156,7 @@ class MemoryCleanupService:
         text = str(value or "")
         text = text.replace("\r\n", "\n").replace("\r", "\n")
         text = re.sub(r"\s+", " ", text).strip().lower()
-        text = re.sub(r"^[\-\*\•\s]+", "", text)
+        text = re.sub(r"^[\-\*\â€¢\s]+", "", text)
         text = re.sub(r"\s+([,.;:!?])", r"\1", text)
         return text.strip()
 
@@ -281,3 +281,4 @@ class MemoryCleanupService:
         clean = dict(item)
         clean.pop("normalized_text", None)
         return clean
+

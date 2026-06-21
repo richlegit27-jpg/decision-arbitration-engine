@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\render.js
+﻿// C:\Users\Owner\nova\static\js\render.js
 
 (() => {
 "use strict"
@@ -121,7 +121,7 @@ function createAttachmentList(items = []){
     const type = String(item.type || item.mime_type || "")
     const size = item.size ? formatBytes(item.size) : ""
 
-    meta.textContent = [type, size].filter(Boolean).join(" · ")
+    meta.textContent = [type, size].filter(Boolean).join(" Â· ")
 
     card.appendChild(name)
 
@@ -202,3 +202,4 @@ window.NovaRender = {
 }
 
 })()
+

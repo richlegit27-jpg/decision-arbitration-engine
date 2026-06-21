@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat-messages.js
+﻿// C:\Users\Owner\nova\static\js\chat-messages.js
 
 (() => {
 "use strict"
@@ -115,7 +115,7 @@ function renderMessageActions(message){
   const safeContent = escapeHtml(message?.content || "")
   const isCopied = isCopiedMessage(getMessageId(message))
 
-  const copyLabel = isCopied ? "Copied ✓" : "Copy"
+  const copyLabel = isCopied ? "Copied âœ“" : "Copy"
   const copyDisabled = isCopied ? "disabled" : ""
 
   if(role === "assistant"){
@@ -284,7 +284,7 @@ function renderCodeBlock(code, language, messageId, codeIndex){
   const safeLanguage = escapeHtml(language || "")
   const safeCode = escapeHtml(code || "")
   const codeKey = makeCodeCopyKey(messageId, codeIndex)
-  const copyLabel = isCopiedCodeBlock(messageId, codeIndex) ? "Copied ✓" : "Copy code"
+  const copyLabel = isCopiedCodeBlock(messageId, codeIndex) ? "Copied âœ“" : "Copy code"
 
   return `
     <div class="message-code-wrap">
@@ -353,7 +353,7 @@ function renderThinkingIndicatorMarkup(){
             <span class="thinking-dot"></span>
             <span class="thinking-dot"></span>
             <span class="thinking-dot"></span>
-            <span class="thinking-text">Nova is thinking…</span>
+            <span class="thinking-text">Nova is thinkingâ€¦</span>
           </div>
         </div>
       </article>

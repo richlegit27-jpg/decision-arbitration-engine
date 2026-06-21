@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any, Dict, List
 
@@ -40,3 +40,4 @@ class MemoryController:
             "override": False,
             "ranked_memory": ranked,
         }
+

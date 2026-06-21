@@ -1,4 +1,4 @@
-# RUNTIME_GRAPH_TIMEZONE_UTC_LOCK
+﻿# RUNTIME_GRAPH_TIMEZONE_UTC_LOCK
 import json
 import os
 from datetime import datetime, timezone
@@ -150,3 +150,4 @@ class RuntimeGraphStoreService:
             "path": self.path,
             "event_count": len(events),
         }
+

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 from pathlib import Path
@@ -30,3 +30,4 @@ FLASK_DEBUG = str(os.getenv("NOVA_DEBUG", "true")).strip().lower() in {
     "yes",
     "on",
 }
+

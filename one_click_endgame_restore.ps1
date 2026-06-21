@@ -1,4 +1,4 @@
-# --------------------------------------------
+﻿# --------------------------------------------
 # Nova One-Click Endgame Restore
 # --------------------------------------------
 
@@ -32,5 +32,5 @@ foreach ($item in $itemsToCopy){
     Copy-Item -Path $src -Destination $dest -Recurse -Force
 }
 
-Write-Host "✅ Nova UI fully restored and cleaned!"
-Write-Host "Restart your Nova server now — everything should work perfectly."
+Write-Host "âœ… Nova UI fully restored and cleaned!"
+Write-Host "Restart your Nova server now â€” everything should work perfectly."

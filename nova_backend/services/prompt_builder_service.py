@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any, Dict, List
 
@@ -9,7 +9,7 @@ class PromptBuilderService:
 
     - filtered recent conversation
     - ranked memory injection
-    - 🔥 memory lock enforcement (NEW)
+    - ðŸ”¥ memory lock enforcement (NEW)
     - explicit anti-echo instruction
     """
 
@@ -32,7 +32,7 @@ class PromptBuilderService:
         memory_items = memory_items or []
 
         # -----------------------
-        # 🔥 LOCKED MEMORY (NEW)
+        # ðŸ”¥ LOCKED MEMORY (NEW)
         # -----------------------
 
         locked_items = [
@@ -119,7 +119,7 @@ class PromptBuilderService:
         }
 
     # -----------------------
-    # 🔥 LOCKED MEMORY BUILDER
+    # ðŸ”¥ LOCKED MEMORY BUILDER
     # -----------------------
 
     def _build_locked_lines(self, items: List[Dict[str, Any]]) -> List[str]:
@@ -233,3 +233,4 @@ class PromptBuilderService:
 
     def _safe_text(self, value: Any) -> str:
         return str(value or "").strip()
+

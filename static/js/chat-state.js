@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict"
 
 const STORAGE_KEYS = {
@@ -76,3 +76,4 @@ function getActiveChat(){ return ensureActiveChat() }
 
 window.NovaChatState = { state, STORAGE_KEYS, generateId, nowIso, createChat, getChatById, setActiveChat, updateActiveChatTitle, deleteChat, getActiveChat }
 })();
+

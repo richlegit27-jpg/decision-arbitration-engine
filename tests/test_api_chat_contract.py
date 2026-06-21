@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from app import app
 
@@ -35,3 +35,5 @@ def test_api_chat_response_contract_smoke() -> None:
 
     assert isinstance(text, str)
     assert text.strip()
+
+

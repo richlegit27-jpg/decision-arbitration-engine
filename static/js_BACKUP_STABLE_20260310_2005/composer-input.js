@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\composer-input.js
+﻿// C:\Users\Owner\nova\static\js\composer-input.js
 
 (() => {
 "use strict"
@@ -112,3 +112,4 @@ window.NovaComposerInput = {
 }
 
 })()
+

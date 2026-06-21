@@ -1,4 +1,4 @@
-class RuntimeResponseSanitizerService:
+﻿class RuntimeResponseSanitizerService:
     """
     Keeps internal runtime/session/artifact state from flooding chat responses.
 
@@ -96,3 +96,4 @@ class RuntimeResponseSanitizerService:
                 payload.get("debug")
             ),
         }
+

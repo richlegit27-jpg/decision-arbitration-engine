@@ -26,3 +26,4 @@
 
   console.log("[nova-ui] patch: injected fetch X-API-Key for /api/* when key is available");
 })();
+

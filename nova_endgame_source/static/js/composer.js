@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 // --- ELEMENT REFS ---
@@ -124,3 +124,4 @@ function resetNovaTips(){
 // --- INIT ---
 updateCards();
 })();
+

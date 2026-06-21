@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
@@ -74,3 +74,4 @@ def disable_agent():
         save_sessions()
 
     return jsonify({"ok": True, "session": session_obj, "agent": AGENT_STATE})
+

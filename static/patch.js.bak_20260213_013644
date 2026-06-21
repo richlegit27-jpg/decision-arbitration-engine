@@ -39,3 +39,4 @@
 
   console.log("[nova-ui] patch: fetch auth injector active");
 })();
+

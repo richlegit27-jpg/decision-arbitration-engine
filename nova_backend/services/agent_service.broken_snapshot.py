@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import re
 from typing import Any, Dict, List, Tuple
@@ -433,11 +433,11 @@ def _should_save_artifact(
     user_text = self._clean_text(user_text)
     memory_context = memory_context or {}
 
-    # 🔹 explicit user intent always wins
+    # ðŸ”¹ explicit user intent always wins
     if any(marker in user_text for marker in self.SAVE_ARTIFACT_MARKERS):
         return True
 
-    # 🔹 memory-driven project detection
+    # ðŸ”¹ memory-driven project detection
     memory_items = memory_context.get("items", [])
     project_context = any(
         "nova" in self._clean_text(item.get("text"))
@@ -445,15 +445,15 @@ def _should_save_artifact(
         for item in memory_items
     )
 
-    # 🔹 high-value modes auto-save when in project context
+    # ðŸ”¹ high-value modes auto-save when in project context
     if project_context and final_mode in {"coding", "planning", "analysis"}:
         return True
 
-    # 🔹 always save structured outputs
+    # ðŸ”¹ always save structured outputs
     if final_mode in {"web", "recon", "image"}:
         return True
 
-    # 🔹 planning outputs often useful
+    # ðŸ”¹ planning outputs often useful
     if final_mode == "planning":
         return True
 
@@ -531,3 +531,4 @@ def _should_save_artifact(
         text = str(value or "").strip().lower()
         text = re.sub(r"\s+", " ", text)
         return text
+

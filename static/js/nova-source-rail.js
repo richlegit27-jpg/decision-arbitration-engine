@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\nova-source-rail.js
+﻿// C:\Users\Owner\nova\static\js\nova-source-rail.js
 
 (function () {
   function ensureRail() {
@@ -10,7 +10,7 @@
     rail.innerHTML =
       '<div class="nova-rail__header">' +
         '<div class="nova-rail__title">Source preview</div>' +
-        '<button class="nova-rail__close" data-rail-close>×</button>' +
+        '<button class="nova-rail__close" data-rail-close>Ã—</button>' +
       "</div>" +
       '<div class="nova-rail__body">' +
         '<iframe id="nova-source-frame" class="nova-rail__frame" src=""></iframe>' +
@@ -40,3 +40,4 @@
     rail.classList.add("open");
   };
 })();
+
