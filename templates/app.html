@@ -8563,5 +8563,193 @@ code,
   }
 </style>
 
+
+<!-- NOVA_DESKTOP_EMPTY_LOADING_POLISH_20260620 -->
+<style>
+  .empty-state,
+  .panel-empty,
+  .chat-empty,
+  .sessions-empty,
+  .memory-empty,
+  .artifacts-empty,
+  .execution-empty,
+  .execution-note,
+  .memory-note,
+  .artifact-note,
+  .status-note,
+  .notice,
+  .hint {
+    background: rgba(15, 23, 42, 0.58) !important;
+    border: 1px dashed rgba(168, 85, 247, 0.30) !important;
+    border-radius: 15px !important;
+    color: rgba(248, 244, 255, 0.86) !important;
+    padding: 0.85rem 0.9rem !important;
+    line-height: 1.48 !important;
+  }
+
+  .loading,
+  .thinking,
+  .typing,
+  .status-loading,
+  .assistant-loading,
+  .nova-loading {
+    color: #d8b4fe !important;
+    background: rgba(168, 85, 247, 0.10) !important;
+    border: 1px solid rgba(168, 85, 247, 0.22) !important;
+    border-radius: 999px !important;
+    padding: 0.35rem 0.65rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.35rem !important;
+  }
+
+  .loading::after,
+  .thinking::after,
+  .typing::after,
+  .status-loading::after,
+  .assistant-loading::after,
+  .nova-loading::after {
+    content: "";
+    width: 0.42rem;
+    height: 0.42rem;
+    border-radius: 999px;
+    background: rgba(216, 180, 254, 0.85);
+    box-shadow:
+      0 0 0 rgba(216, 180, 254, 0.0),
+      0 0 14px rgba(216, 180, 254, 0.35);
+    animation: novaLoadingPulse 1.05s ease-in-out infinite;
+  }
+
+  @keyframes novaLoadingPulse {
+    0% {
+      opacity: 0.45;
+      transform: scale(0.82);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    100% {
+      opacity: 0.45;
+      transform: scale(0.82);
+    }
+  }
+
+  .error,
+  .status-error,
+  .send-error,
+  .danger,
+  .warning {
+    background: rgba(127, 29, 29, 0.22) !important;
+    border: 1px solid rgba(248, 113, 113, 0.32) !important;
+    color: #fecaca !important;
+    border-radius: 14px !important;
+    padding: 0.65rem 0.78rem !important;
+  }
+
+  .success,
+  .status-success,
+  .ready,
+  .status-ready {
+    color: #bbf7d0 !important;
+  }
+</style>
+
+
+<!-- NOVA_DESKTOP_MICRO_INTERACTION_POLISH_20260620 -->
+<style>
+  button,
+  .button,
+  .icon-button,
+  .quick-button,
+  .session-item,
+  .desktop-session-item,
+  .memory-item,
+  .artifact-item,
+  .execution-item,
+  .source-card,
+  .assistant-bubble,
+  .user-bubble,
+  .message.assistant,
+  .message.user,
+  .msg.assistant,
+  .msg.user,
+  .desktop-message.assistant,
+  .desktop-message.user {
+    transition:
+      background 0.16s ease,
+      border-color 0.16s ease,
+      box-shadow 0.16s ease,
+      transform 0.16s ease,
+      opacity 0.16s ease !important;
+  }
+
+  button:hover,
+  .button:hover,
+  .icon-button:hover,
+  .quick-button:hover {
+    transform: translateY(-1px) !important;
+  }
+
+  button:active,
+  .button:active,
+  .icon-button:active,
+  .quick-button:active {
+    transform: translateY(0) scale(0.985) !important;
+  }
+
+  .session-item:hover,
+  .desktop-session-item:hover,
+  .memory-item:hover,
+  .artifact-item:hover,
+  .execution-item:hover,
+  .source-card:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.24) !important;
+  }
+
+  .assistant-bubble:hover,
+  .message.assistant:hover,
+  .msg.assistant:hover,
+  .desktop-message.assistant:hover {
+    border-color: rgba(216, 180, 254, 0.30) !important;
+  }
+
+  .user-bubble:hover,
+  .message.user:hover,
+  .msg.user:hover,
+  .desktop-message.user:hover {
+    border-color: rgba(216, 180, 254, 0.42) !important;
+  }
+
+  button:disabled,
+  .button:disabled,
+  .icon-button:disabled,
+  .quick-button:disabled {
+    opacity: 0.52 !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  .nova-code-copy:hover,
+  .message-actions button:hover,
+  .assistant-bubble button:hover,
+  .assistant-message button:hover {
+    box-shadow: 0 8px 18px rgba(168, 85, 247, 0.18) !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+</style>
+
 </body>
 </html>
