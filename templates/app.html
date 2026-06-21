@@ -7859,5 +7859,109 @@ code,
   }
 </style>
 
+
+<!-- NOVA_BUBBLE_VISUAL_POLISH_20260620 -->
+<style>
+  .message,
+  .msg,
+  .desktop-message,
+  .chat-message {
+    margin: 0.85rem 0 !important;
+  }
+
+  .assistant-bubble,
+  .assistant-message,
+  .message.assistant,
+  .msg.assistant,
+  .desktop-message.assistant,
+  [data-role="assistant"] {
+    background: linear-gradient(
+      180deg,
+      rgba(17, 24, 39, 0.96),
+      rgba(12, 18, 32, 0.96)
+    ) !important;
+    border: 1px solid rgba(168, 85, 247, 0.22) !important;
+    border-radius: 18px !important;
+    padding: 0.95rem 1rem !important;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.20) !important;
+  }
+
+  .user-bubble,
+  .user-message,
+  .message.user,
+  .msg.user,
+  .desktop-message.user,
+  [data-role="user"] {
+    background: linear-gradient(
+      180deg,
+      rgba(168, 85, 247, 0.34),
+      rgba(126, 34, 206, 0.26)
+    ) !important;
+    border: 1px solid rgba(216, 180, 254, 0.30) !important;
+    border-radius: 18px !important;
+    padding: 0.82rem 0.95rem !important;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18) !important;
+  }
+
+  .assistant-bubble > :first-child,
+  .assistant-message > :first-child,
+  .message.assistant > :first-child,
+  .msg.assistant > :first-child,
+  .desktop-message.assistant > :first-child {
+    margin-top: 0 !important;
+  }
+
+  .assistant-bubble > :last-child,
+  .assistant-message > :last-child,
+  .message.assistant > :last-child,
+  .msg.assistant > :last-child,
+  .desktop-message.assistant > :last-child {
+    margin-bottom: 0 !important;
+  }
+
+  .user-bubble > :first-child,
+  .user-message > :first-child,
+  .message.user > :first-child,
+  .msg.user > :first-child,
+  .desktop-message.user > :first-child {
+    margin-top: 0 !important;
+  }
+
+  .user-bubble > :last-child,
+  .user-message > :last-child,
+  .message.user > :last-child,
+  .msg.user > :last-child,
+  .desktop-message.user > :last-child {
+    margin-bottom: 0 !important;
+  }
+
+  .assistant-bubble .message-actions,
+  .assistant-message .message-actions,
+  .message.assistant .message-actions,
+  .msg.assistant .message-actions,
+  .desktop-message.assistant .message-actions {
+    padding-top: 0.45rem !important;
+    border-top: 1px solid rgba(168, 85, 247, 0.14) !important;
+  }
+
+  @media (max-width: 900px) {
+    .assistant-bubble,
+    .assistant-message,
+    .message.assistant,
+    .msg.assistant,
+    .desktop-message.assistant,
+    [data-role="assistant"],
+    .user-bubble,
+    .user-message,
+    .message.user,
+    .msg.user,
+    .desktop-message.user,
+    [data-role="user"] {
+      border-radius: 16px !important;
+      padding: 0.82rem 0.85rem !important;
+    }
+  }
+</style>
+
 </body>
 </html>
