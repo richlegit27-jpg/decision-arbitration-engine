@@ -9907,5 +9907,600 @@ body {
 })();
 </script>
 
+
+<!-- NOVA_CODE_BLOCK_POLISH_FINAL_20260622 -->
+<style>
+/* ChatGPT-style code blocks */
+#chat pre {
+    position: relative !important;
+    margin: 14px 0 !important;
+    padding: 42px 14px 14px !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    background: rgba(5, 7, 18, 0.92) !important;
+    overflow: auto !important;
+    max-width: 100% !important;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.22) !important;
+}
+
+#chat pre code {
+    display: block !important;
+    white-space: pre !important;
+    overflow-x: auto !important;
+    color: #e8eaf6 !important;
+    font-size: 13px !important;
+    line-height: 1.55 !important;
+    font-family: Consolas, "Cascadia Code", "Courier New", monospace !important;
+}
+
+#chat code:not(pre code) {
+    padding: 2px 6px !important;
+    border-radius: 7px !important;
+    background: rgba(255,255,255,0.08) !important;
+    color: #f0eaff !important;
+    font-family: Consolas, "Cascadia Code", "Courier New", monospace !important;
+    font-size: 0.92em !important;
+}
+
+.nova-code-toolbar {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 34px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    padding: 0 10px !important;
+    border-bottom: 1px solid rgba(255,255,255,0.10) !important;
+    background: rgba(255,255,255,0.055) !important;
+    border-radius: 14px 14px 0 0 !important;
+    pointer-events: auto !important;
+}
+
+.nova-code-language {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    opacity: 0.72 !important;
+    letter-spacing: 0.02em !important;
+    text-transform: uppercase !important;
+    user-select: none !important;
+}
+
+.nova-code-copy-btn {
+    height: 24px !important;
+    padding: 0 9px !important;
+    border: 1px solid rgba(255,255,255,0.14) !important;
+    border-radius: 8px !important;
+    background: rgba(255,255,255,0.08) !important;
+    color: inherit !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+}
+
+.nova-code-copy-btn:hover {
+    background: rgba(255,255,255,0.14) !important;
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_CODE_BLOCK_POLISH_FINAL_20260622__) return;
+    window.__NOVA_CODE_BLOCK_POLISH_FINAL_20260622__ = true;
+
+    function detectLanguage(pre) {
+        const code = pre.querySelector("code");
+        const className = code ? String(code.className || "") : "";
+        const match = className.match(/language-([a-z0-9_-]+)/i);
+
+        if (match && match[1]) {
+            return match[1].replace(/_/g, "-");
+        }
+
+        const text = code ? String(code.textContent || "") : String(pre.textContent || "");
+
+        if (/^\s*(cd |git |python |powershell|Remove-Item|Set-Content|Select-String)/mi.test(text)) return "powershell";
+        if (/^\s*(function|const|let|var|document\.|window\.)/mi.test(text)) return "javascript";
+        if (/^\s*(from |import |def |class |path = Path)/mi.test(text)) return "python";
+        if (/^\s*(<script|<style|<div|<!doctype|<html)/mi.test(text)) return "html";
+        if (/^\s*[\.\#a-z0-9_-]+\s*\{/mi.test(text)) return "css";
+
+        return "code";
+    }
+
+    async function copyText(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        ta.style.top = "-9999px";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+
+        try {
+            document.execCommand("copy");
+            return true;
+        } finally {
+            ta.remove();
+        }
+    }
+
+    function enhanceCodeBlocks(root) {
+        const scope = root || document;
+        const blocks = scope.querySelectorAll ? scope.querySelectorAll("#chat pre") : [];
+
+        blocks.forEach(function (pre) {
+            if (!pre || pre.dataset.novaCodeEnhanced === "1") return;
+
+            pre.dataset.novaCodeEnhanced = "1";
+
+            const toolbar = document.createElement("div");
+            toolbar.className = "nova-code-toolbar";
+
+            const label = document.createElement("div");
+            label.className = "nova-code-language";
+            label.textContent = detectLanguage(pre);
+
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "nova-code-copy-btn";
+            btn.textContent = "Copy";
+
+            btn.addEventListener("click", async function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                const code = pre.querySelector("code");
+                const text = code ? code.textContent : pre.textContent.replace(btn.textContent, "").trim();
+
+                try {
+                    await copyText(text || "");
+                    btn.textContent = "Copied";
+                    setTimeout(function () {
+                        btn.textContent = "Copy";
+                    }, 900);
+                } catch (_) {
+                    btn.textContent = "Failed";
+                    setTimeout(function () {
+                        btn.textContent = "Copy";
+                    }, 1200);
+                }
+            });
+
+            toolbar.appendChild(label);
+            toolbar.appendChild(btn);
+            pre.insertBefore(toolbar, pre.firstChild);
+        });
+    }
+
+    window.NovaEnhanceCodeBlocks = enhanceCodeBlocks;
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", function () {
+            enhanceCodeBlocks(document);
+        });
+    } else {
+        enhanceCodeBlocks(document);
+    }
+
+    setTimeout(function () { enhanceCodeBlocks(document); }, 300);
+    setTimeout(function () { enhanceCodeBlocks(document); }, 1000);
+
+    try {
+        const chat = document.getElementById("chat");
+
+        if (chat) {
+            const observer = new MutationObserver(function () {
+                enhanceCodeBlocks(chat);
+            });
+
+            observer.observe(chat, {
+                childList: true,
+                subtree: true
+            });
+        }
+    } catch (_) {}
+
+    console.log("[Nova Code Block Polish] ready");
+})();
+</script>
+
+
+<!-- NOVA_FRONTEND_SOURCE_CARD_SCOPE_GUARD_20260622 -->
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_FRONTEND_SOURCE_CARD_SCOPE_GUARD_20260622__) return;
+    window.__NOVA_FRONTEND_SOURCE_CARD_SCOPE_GUARD_20260622__ = true;
+
+    const USER_SELECTORS = [
+        ".user",
+        ".user-message",
+        ".message.user",
+        ".chat-message.user",
+        ".desktop-user-message",
+        "[data-role='user']"
+    ].join(",");
+
+    const SOURCE_SELECTORS = [
+        ".source-card",
+        ".source-cards",
+        ".sourceCards",
+        ".desktop-source-card",
+        ".desktop-source-cards",
+        ".nova-source-card",
+        ".nova-source-cards",
+        ".web-source-card",
+        ".web-source-cards",
+        ".live-source-card",
+        ".live-source-cards",
+        "[data-source-card]",
+        "[data-source-url]"
+    ].join(",");
+
+    function wantsLiveWeb(text) {
+        const t = String(text || "").toLowerCase();
+
+        return [
+            "latest",
+            "today's",
+            "todays",
+            "current",
+            "right now",
+            "breaking",
+            "news",
+            "headline",
+            "headlines",
+            "look up",
+            "lookup",
+            "search",
+            "web fetch",
+            "browse",
+            "google",
+            "online",
+            "recent",
+            "source",
+            "sources",
+            "article",
+            "who won",
+            "score",
+            "weather",
+            "stock price"
+        ].some(term => t.includes(term));
+    }
+
+    function lastUserText() {
+        const users = Array.from(document.querySelectorAll(USER_SELECTORS));
+        const last = users[users.length - 1];
+        return last ? String(last.innerText || last.textContent || "").trim() : "";
+    }
+
+    function cleanLeakedSourceCards() {
+        const text = lastUserText();
+
+        if (!text || wantsLiveWeb(text)) return;
+
+        document.querySelectorAll(SOURCE_SELECTORS).forEach(el => {
+            el.remove();
+        });
+    }
+
+    cleanLeakedSourceCards();
+
+    const observer = new MutationObserver(() => {
+        cleanLeakedSourceCards();
+    });
+
+    observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true
+    });
+
+    console.log("[Nova] frontend source-card scope guard ready");
+})();
+</script>
+
+
+<!-- NOVA_CODE_BLOCK_STACK_FIX_20260622 -->
+<style>
+/* =========================================================
+   NOVA_CODE_BLOCK_STACK_FIX_20260622
+   Kill stacked/hovering code toolbars and rebuild clean block
+   ========================================================= */
+
+pre {
+    position: relative !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 12px 0 14px 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border-radius: 12px !important;
+    background: #111318 !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    box-sizing: border-box !important;
+}
+
+/* Hide ALL old code toolbar/header systems */
+pre > *:not(code):not(.nova-codebar-stackfix),
+pre .nova-codebar-final,
+pre .code-header,
+pre .code-toolbar,
+pre .code-block-header,
+pre .codeblock-header,
+pre .copy-code,
+pre .copy-btn,
+pre button:not(.nova-codebar-stackfix-copy) {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+pre code {
+    display: block !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: none !important;
+    box-sizing: border-box !important;
+    padding: 48px 14px 14px 14px !important;
+    margin: 0 !important;
+    overflow-x: auto !important;
+    background: transparent !important;
+    color: #f3f4f6 !important;
+    font-family: Consolas, "SFMono-Regular", Menlo, Monaco, monospace !important;
+    font-size: 13.5px !important;
+    line-height: 1.55 !important;
+    white-space: pre !important;
+}
+
+.nova-codebar-stackfix {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 36px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+    padding: 0 10px 0 12px !important;
+    border-bottom: 1px solid rgba(255,255,255,0.10) !important;
+    background: #181b22 !important;
+    border-radius: 12px 12px 0 0 !important;
+    box-sizing: border-box !important;
+    z-index: 3 !important;
+    pointer-events: auto !important;
+    visibility: visible !important;
+}
+
+.nova-codebar-stackfix-lang {
+    color: #cbd5e1 !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.05em !important;
+    text-transform: uppercase !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+}
+
+.nova-codebar-stackfix-copy {
+    appearance: none !important;
+    border: 0 !important;
+    outline: 0 !important;
+    background: transparent !important;
+    color: #cbd5e1 !important;
+    font-size: 12px !important;
+    line-height: 1 !important;
+    padding: 6px 8px !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+}
+
+.nova-codebar-stackfix-copy:hover {
+    background: rgba(255,255,255,0.10) !important;
+    color: #ffffff !important;
+}
+
+/* Keep message-level Copy/Regen below the message, not hovering over code */
+.message-actions,
+.assistant-actions,
+.bubble-actions,
+.nova-message-actions,
+.desktop-message-actions,
+.message-buttons,
+.assistant-message-actions {
+    position: static !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    margin-top: 8px !important;
+    transform: none !important;
+    inset: auto !important;
+    z-index: 1 !important;
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_CODE_BLOCK_STACK_FIX_20260622__) return;
+    window.__NOVA_CODE_BLOCK_STACK_FIX_20260622__ = true;
+
+    function detectLang(codeText, className) {
+        const cls = String(className || "");
+        const match = cls.match(/language-([a-z0-9_-]+)/i);
+
+        if (match && match[1]) {
+            return match[1];
+        }
+
+        const t = String(codeText || "").trim();
+
+        if (/^(Get-|Set-|New-|Remove-|Start-|Stop-|Test-|Invoke-|\$)/m.test(t)) {
+            return "powershell";
+        }
+
+        if (/^(def |import |from |print\()/m.test(t)) {
+            return "python";
+        }
+
+        if (/^(const |let |var |function |\(\)\s*=>)/m.test(t)) {
+            return "javascript";
+        }
+
+        if (/^(cd |dir |ls |git |python |npm |pip )/m.test(t)) {
+            return "shell";
+        }
+
+        return "code";
+    }
+
+    function stripToolbarText(raw) {
+        let text = String(raw || "");
+
+        text = text.replace(/^\s*Copy\s+/i, "");
+        text = text.replace(/^\s*(PowerShell|Python|JavaScript|Bash|Shell|Code)\s*Copy\s*/i, "");
+        text = text.replace(/^\s*(POWERSHELL|PYTHON|JAVASCRIPT|BASH|SHELL|CODE)\s*\n/i, "");
+
+        return text.trimEnd();
+    }
+
+    function rebuildPre(pre) {
+        if (!pre || pre.nodeType !== 1) return;
+
+        const oldCode = pre.querySelector("code");
+        if (!oldCode) return;
+
+        const rawText = stripToolbarText(oldCode.textContent || "");
+        const oldClass = oldCode.className || "";
+        const lang = detectLang(rawText, oldClass);
+
+        pre.innerHTML = "";
+        pre.dataset.novaCodeStackFixed = "1";
+
+        const bar = document.createElement("div");
+        bar.className = "nova-codebar-stackfix";
+
+        const label = document.createElement("div");
+        label.className = "nova-codebar-stackfix-lang";
+        label.textContent = lang;
+
+        const copy = document.createElement("button");
+        copy.type = "button";
+        copy.className = "nova-codebar-stackfix-copy";
+        copy.textContent = "Copy";
+
+        const code = document.createElement("code");
+        code.className = oldClass || ("language-" + lang);
+        code.textContent = rawText;
+
+        copy.addEventListener("click", async function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            try {
+                await navigator.clipboard.writeText(code.textContent || "");
+                copy.textContent = "Copied";
+                setTimeout(() => copy.textContent = "Copy", 900);
+            } catch (_) {
+                copy.textContent = "Copy failed";
+                setTimeout(() => copy.textContent = "Copy", 1200);
+            }
+        });
+
+        bar.appendChild(label);
+        bar.appendChild(copy);
+        pre.appendChild(bar);
+        pre.appendChild(code);
+    }
+
+    function cleanNearbyToolbarJunk(pre) {
+        let prev = pre.previousSibling;
+
+        while (prev) {
+            const text = String(prev.textContent || prev.nodeValue || "").trim();
+
+            if (!text) {
+                const remove = prev;
+                prev = prev.previousSibling;
+                remove.remove();
+                continue;
+            }
+
+            if (/^(Copy|PowerShellCopy|PythonCopy|JavaScriptCopy|BashCopy|ShellCopy|CodeCopy)$/i.test(text)) {
+                const remove = prev;
+                prev = prev.previousSibling;
+                remove.remove();
+                continue;
+            }
+
+            break;
+        }
+    }
+
+    function fixAllCodeBlocks(root) {
+        const scope = root && root.nodeType === 1 ? root : document;
+
+        const blocks = [];
+
+        if (scope.matches && scope.matches("pre")) {
+            blocks.push(scope);
+        }
+
+        scope.querySelectorAll?.("pre").forEach(pre => blocks.push(pre));
+
+        blocks.forEach(pre => {
+            cleanNearbyToolbarJunk(pre);
+            rebuildPre(pre);
+        });
+    }
+
+    fixAllCodeBlocks(document);
+
+    const observer = new MutationObserver(mutations => {
+        let shouldFix = false;
+
+        for (const mutation of mutations) {
+            mutation.addedNodes.forEach(node => {
+                if (node && node.nodeType === 1) {
+                    if (
+                        node.matches?.("pre") ||
+                        node.querySelector?.("pre")
+                    ) {
+                        shouldFix = true;
+                    }
+                }
+            });
+        }
+
+        if (shouldFix) {
+            requestAnimationFrame(() => fixAllCodeBlocks(document));
+        }
+    });
+
+    observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true
+    });
+
+    console.log("[Nova] code block stack fix ready");
+})();
+</script>
+
 </body>
 </html>
