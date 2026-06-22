@@ -1670,7 +1670,7 @@ function renderSessions(list, sessions, activeId) {
 }
 
 async function loadDesktopSessions() {
-console.log("[SESSION LOAD]", new Date().toISOString(), new Error().stack);
+
   const list = document.getElementById("desktopSessionList");
   if (!list) return;
 
