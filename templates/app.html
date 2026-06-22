@@ -4338,34 +4338,6 @@ renderAuthWidget(data || {});
     } catch (err) { console.warn("[Nova Desktop Final Source Cards] render failed", err); return null; }
   }
 
-/*
-window.renderDesktopChatMessagesRescue = function(messages) {
-    var box = getDesktopMessageBox();
-    if (!box) return false;
-    box.innerHTML = "";
-
-    (Array.isArray(messages) ? messages : []).forEach(function(msg) {
-        var role = String((msg.role || msg.sender || "assistant")).toLowerCase();
-        var text = msg.text || msg.content || msg.message || "";
-        if (!text && typeof msg === "string") text = msg;
-
-        var row = document.createElement("div");
-        row.className = "message " + (role.indexOf("user") !== -1 ? "user" : "assistant");
-        row.textContent = String(text).trim() || JSON.stringify(msg);
-
-        if (role.indexOf("user") === -1) {
-            var sourceCards = makeSourceCards(msg);
-            if (sourceCards) row.appendChild(sourceCards);
-        }
-
-        box.appendChild(row);
-    });
-
-    box.scrollTop = box.scrollHeight;
-    return true;
-};
-*/
-
 window.novaDesktopFinalSourceCardsReady = true;
 console.log("[Nova Desktop Final Source Cards] ready");
 })();
