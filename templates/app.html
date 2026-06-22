@@ -7214,5 +7214,265 @@ main {
 })();
 </script>
 
+
+<!-- NOVA_REAL_DESKTOP_RIGHT_PANEL_SCROLL_FIX_20260622 -->
+<style>
+/* Fix the real desktop shell/right panel, not fake wrapper names */
+html,
+body {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+}
+
+.shell {
+    height: auto !important;
+    min-height: 100vh !important;
+    max-height: none !important;
+    overflow: visible !important;
+    align-items: stretch !important;
+}
+
+.panel {
+    min-height: 0 !important;
+}
+
+.panel.tools,
+.tools {
+    height: auto !important;
+    max-height: calc(100vh - 28px) !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding-bottom: 42px !important;
+    scrollbar-gutter: stable !important;
+}
+
+.tools-section {
+    flex: 0 0 auto !important;
+}
+
+.memory-section {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    flex: 0 0 auto !important;
+    scroll-margin-top: 12px !important;
+    scroll-margin-bottom: 90px !important;
+}
+
+#desktopMemoryList,
+.desktop-memory-list {
+    min-height: 90px !important;
+    max-height: none !important;
+    overflow-y: visible !important;
+}
+
+@media (max-height: 820px) {
+    .panel.tools,
+    .tools {
+        max-height: calc(100vh - 18px) !important;
+        overflow-y: auto !important;
+    }
+
+    .tools-section {
+        padding-top: 10px !important;
+        padding-bottom: 10px !important;
+    }
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_REAL_DESKTOP_RIGHT_PANEL_SCROLL_FIX_20260622__) return;
+    window.__NOVA_REAL_DESKTOP_RIGHT_PANEL_SCROLL_FIX_20260622__ = true;
+
+    function openMemoryFixed() {
+        const tools = document.querySelector(".panel.tools") || document.querySelector(".tools");
+        const memory = document.querySelector(".memory-section");
+
+        if (tools) {
+            tools.style.display = "flex";
+            tools.style.overflowY = "auto";
+            tools.style.overflowX = "hidden";
+            tools.style.maxHeight = "calc(100vh - 28px)";
+        }
+
+        if (memory) {
+            memory.hidden = false;
+            memory.removeAttribute("hidden");
+            memory.style.display = "block";
+            memory.style.visibility = "visible";
+            memory.style.opacity = "1";
+
+            if (tools && typeof tools.scrollTo === "function") {
+                tools.scrollTo({
+                    top: Math.max(0, memory.offsetTop - 16),
+                    behavior: "smooth"
+                });
+            }
+        }
+
+        if (typeof window.loadDesktopMemory === "function") {
+            window.loadDesktopMemory();
+        } else if (typeof window.NovaLoadDesktopMemory === "function") {
+            window.NovaLoadDesktopMemory();
+        } else if (typeof window.loadMemories === "function") {
+            window.loadMemories();
+        }
+    }
+
+    function wire() {
+        const button = document.getElementById("openMemoryBtn");
+        if (!button || button.dataset.novaRealPanelScrollFixed === "true") return;
+
+        button.dataset.novaRealPanelScrollFixed = "true";
+
+        button.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (typeof event.stopImmediatePropagation === "function") {
+                event.stopImmediatePropagation();
+            }
+
+            openMemoryFixed();
+        }, true);
+    }
+
+    window.NovaOpenMemoryFixed = openMemoryFixed;
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", wire);
+    } else {
+        wire();
+    }
+
+    setTimeout(wire, 300);
+    setTimeout(wire, 1000);
+})();
+</script>
+
+
+<!-- NOVA_MEMORY_TOP_PRIORITY_FINAL_20260622 -->
+<style>
+/* Keep Memory as a first-class right panel section */
+.memory-section {
+    order: -999 !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    flex: 0 0 auto !important;
+    position: relative !important;
+    z-index: 5 !important;
+}
+
+.memory-card-shell {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+#desktopMemoryList,
+.desktop-memory-list {
+    display: grid !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    min-height: 90px !important;
+    max-height: 260px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_MEMORY_TOP_PRIORITY_FINAL_20260622__) return;
+    window.__NOVA_MEMORY_TOP_PRIORITY_FINAL_20260622__ = true;
+
+    function keepMemoryAtTop() {
+        const tools = document.querySelector(".panel.tools") || document.querySelector(".tools");
+        const memory = document.querySelector(".memory-section");
+
+        if (!tools || !memory) return;
+
+        memory.hidden = false;
+        memory.removeAttribute("hidden");
+        memory.style.display = "block";
+        memory.style.visibility = "visible";
+        memory.style.opacity = "1";
+        memory.style.order = "-999";
+
+        if (tools.firstElementChild && tools.firstElementChild !== memory) {
+            tools.insertBefore(memory, tools.firstElementChild);
+        }
+
+        tools.style.overflowY = "auto";
+        tools.style.overflowX = "hidden";
+        tools.style.minHeight = "0";
+    }
+
+    function openMemoryTop() {
+        keepMemoryAtTop();
+
+        const tools = document.querySelector(".panel.tools") || document.querySelector(".tools");
+        const memory = document.querySelector(".memory-section");
+
+        if (tools && memory && typeof tools.scrollTo === "function") {
+            tools.scrollTo({ top: 0, behavior: "smooth" });
+        }
+
+        if (typeof window.loadDesktopMemory === "function") {
+            window.loadDesktopMemory();
+        } else if (typeof window.NovaLoadDesktopMemory === "function") {
+            window.NovaLoadDesktopMemory();
+        } else if (typeof window.loadMemories === "function") {
+            window.loadMemories();
+        }
+    }
+
+    function wire() {
+        keepMemoryAtTop();
+
+        const button = document.getElementById("openMemoryBtn");
+        if (!button || button.dataset.novaMemoryTopPriorityWired === "true") return;
+
+        button.dataset.novaMemoryTopPriorityWired = "true";
+
+        button.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (typeof event.stopImmediatePropagation === "function") {
+                event.stopImmediatePropagation();
+            }
+
+            openMemoryTop();
+        }, true);
+    }
+
+    window.NovaKeepMemoryAtTop = keepMemoryAtTop;
+    window.NovaOpenMemoryTop = openMemoryTop;
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", wire);
+    } else {
+        wire();
+    }
+
+    setTimeout(wire, 200);
+    setTimeout(wire, 700);
+    setTimeout(wire, 1400);
+    window.addEventListener("resize", keepMemoryAtTop);
+})();
+</script>
+
 </body>
 </html>
