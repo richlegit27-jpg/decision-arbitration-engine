@@ -1220,9 +1220,9 @@ observer.observe(document.documentElement, {
     <main class="panel chat-panel">
       <header class="chat-top">
         <div>
-          <h2 class="chat-title">Desktop Chat</h2>
-          <div id="status">status: idle</div>
-          <div id="meta">summary: 0 chars</div>
+          <h2 class="chat-title">Nova</h2>
+          <div id="status">Ready</div>
+          <div id="meta">No summary yet.</div>
         </div>
         <span class="pill"><span class="dot"></span> ready</span>
       </header>
@@ -6078,41 +6078,11 @@ async function loadDesktopArtifacts() {
   }
 }
 
-  function wireDesktopArtifacts() {
-    const btn = $("openArtifactsBtn");
-    if (!btn || btn.dataset.novaArtifactsWired === "true") return;
-
-    btn.dataset.novaArtifactsWired = "true";
-    btn.addEventListener("click", function (event) {
-      event.preventDefault();
-      event.stopPropagation();
-
-      const tools = document.querySelector(".tools");
-      const section = document.querySelector(".artifacts-section");
-
-      if (tools) tools.style.display = "flex";
-      if (section) {
-        section.style.display = "block";
-        // section.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-
-      loadDesktopArtifacts();
-    }, true);
-  }
-
-  window.NovaLoadDesktopArtifacts = loadDesktopArtifacts;
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", wireDesktopArtifacts);
-  } else {
-    wireDesktopArtifacts();
-  }
-
-  setTimeout(wireDesktopArtifacts, 500);
-  setTimeout(wireDesktopArtifacts, 1500);
-
-  console.log("[Nova Desktop Artifacts] ready");
-})();
+function wireDesktopArtifacts() {
+  // NOVA_ARTIFACTS_CLICK_ONLY_20260621
+  // Old Artifacts click wiring disabled.
+  // The click-only controller near marked.min.js owns #openArtifactsBtn now.
+}})();
 </script>
 
 <style>
@@ -7013,8 +6983,194 @@ code,
 
 </style>
 
+<!-- NOVA_LEFT_PANEL_ARTIFACTS_FINAL_20260621 -->
+<script>
+(function () {
+    "use strict";
 
+    if (window.__NOVA_LEFT_PANEL_ARTIFACTS_FINAL_20260621__) return;
+    window.__NOVA_LEFT_PANEL_ARTIFACTS_FINAL_20260621__ = true;
 
+    function esc(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function getButton() {
+        return document.getElementById("openArtifactsBtn");
+    }
+
+    function ensureLeftArtifactsPanel() {
+        let panel = document.getElementById("novaLeftArtifactsPanel");
+        if (panel) return panel;
+
+        const btn = getButton();
+        const sidebar =
+            (btn && btn.closest("aside")) ||
+            document.querySelector("aside.sidebar") ||
+            document.querySelector("aside") ||
+            document.body;
+
+        panel = document.createElement("section");
+        panel.id = "novaLeftArtifactsPanel";
+        panel.className = "nova-left-artifacts-panel";
+        panel.innerHTML = `
+            <div class="nova-left-artifacts-head">
+                <strong>Artifacts</strong>
+                <span id="novaLeftArtifactsCount">0</span>
+            </div>
+            <div id="novaLeftArtifactsList" class="nova-left-artifacts-list">
+                <div class="session-placeholder">Click Artifacts to load.</div>
+            </div>
+        `;
+
+        const footer = btn && btn.closest(".side-footer-links");
+
+        if (footer && footer.parentNode) {
+            footer.parentNode.insertBefore(panel, footer.nextSibling);
+        } else {
+            sidebar.appendChild(panel);
+        }
+
+        return panel;
+    }
+
+    function hideOldRightArtifacts() {
+        const oldSection =
+            document.querySelector(".panel.tools .artifacts-section") ||
+            document.querySelector(".artifacts-section");
+
+        if (!oldSection) return;
+
+        oldSection.classList.remove("nova-artifacts-open");
+        oldSection.style.setProperty("display", "none", "important");
+    }
+
+    function hideLeftArtifacts() {
+        const panel = ensureLeftArtifactsPanel();
+        panel.classList.remove("nova-left-artifacts-open");
+        panel.style.setProperty("display", "none", "important");
+        hideOldRightArtifacts();
+    }
+
+    function showLeftArtifacts() {
+        const panel = ensureLeftArtifactsPanel();
+        panel.classList.add("nova-left-artifacts-open");
+        panel.style.setProperty("display", "block", "important");
+        hideOldRightArtifacts();
+        loadLeftArtifacts();
+    }
+
+    function toggleLeftArtifacts() {
+        const panel = ensureLeftArtifactsPanel();
+        const isOpen =
+            panel.classList.contains("nova-left-artifacts-open") &&
+            window.getComputedStyle(panel).display !== "none";
+
+        if (isOpen) {
+            hideLeftArtifacts();
+        } else {
+            showLeftArtifacts();
+        }
+    }
+
+    async function loadLeftArtifacts() {
+        const list = document.getElementById("novaLeftArtifactsList");
+        const count = document.getElementById("novaLeftArtifactsCount");
+
+        if (!list) return;
+
+        list.innerHTML = "<div class='session-placeholder'>Loading artifacts...</div>";
+
+        try {
+            const res = await fetch("/api/artifacts", { cache: "no-store" });
+            const data = await res.json();
+
+            const artifacts =
+                data.artifacts ||
+                data.items ||
+                data.data ||
+                (data.payload && data.payload.artifacts) ||
+                (data.payload && data.payload.items) ||
+                [];
+
+            if (count) count.textContent = String(artifacts.length);
+
+            if (!artifacts.length) {
+                list.innerHTML = "<div class='session-placeholder'>No artifacts yet.</div>";
+                return;
+            }
+
+            list.innerHTML = "";
+
+            artifacts.slice(0, 30).forEach(function (a) {
+                const title = a.title || a.name || "Artifact";
+                const kind = a.kind || a.type || "";
+                const summary = String(a.summary || a.body || a.prompt || "").slice(0, 160);
+                const imageUrl = a.image_url || a.preview || (a.viewer && a.viewer.image_url) || "";
+                const url = a.url || a.file_url || a.path || "";
+
+                const card = document.createElement(url ? "a" : "div");
+                card.className = "nova-left-artifact-card";
+
+                if (url) {
+                    card.href = url;
+                    card.target = "_blank";
+                    card.rel = "noopener noreferrer";
+                }
+
+                card.innerHTML = `
+                    ${imageUrl ? `<img src="${esc(imageUrl)}" alt="">` : ""}
+                    <strong>${esc(title)}</strong>
+                    ${kind ? `<span>${esc(kind)}</span>` : ""}
+                    ${summary ? `<p>${esc(summary)}</p>` : ""}
+                `;
+
+                list.appendChild(card);
+            });
+        } catch (error) {
+            list.innerHTML =
+                "<pre style='white-space:pre-wrap;color:#ff8080;'>" +
+                esc(error && error.stack ? error.stack : error) +
+                "</pre>";
+        }
+    }
+
+    function bootClosed() {
+        ensureLeftArtifactsPanel();
+        hideLeftArtifacts();
+        hideOldRightArtifacts();
+    }
+
+    document.addEventListener("DOMContentLoaded", bootClosed);
+    setTimeout(bootClosed, 100);
+    setTimeout(bootClosed, 700);
+
+    document.addEventListener("click", function (event) {
+        const btn = event.target.closest("#openArtifactsBtn");
+        if (!btn) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (typeof event.stopImmediatePropagation === "function") {
+            event.stopImmediatePropagation();
+        }
+
+        toggleLeftArtifacts();
+    }, true);
+
+    window.NovaShowDesktopArtifacts = showLeftArtifacts;
+    window.NovaHideDesktopArtifacts = hideLeftArtifacts;
+    window.NovaToggleDesktopArtifacts = toggleLeftArtifacts;
+
+    console.log("[Nova Left Artifacts] final controller ready");
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="/static/js/nova-desktop-sessions.js?v=external-new-session-1"></script>
 
@@ -7422,6 +7578,495 @@ code,
 
 <!-- NOVA_DESKTOP_POLISH_CSS_LINK_20260620 -->
 <link rel="stylesheet"
-href="/static/css/nova-desktop-polish.css?v=composer-visual-lower-20260621-1">
+href="/static/css/nova-desktop-polish.css?v=header-summary-polish-20260621-1">
+
+<!-- NOVA_DESKTOP_SUMMARY_FINAL_WINNER_20260621 -->
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_DESKTOP_SUMMARY_FINAL_WINNER_20260621__) return;
+    window.__NOVA_DESKTOP_SUMMARY_FINAL_WINNER_20260621__ = true;
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function clean(value) {
+        return String(value || "").replace(/\s+/g, " ").trim();
+    }
+
+    function esc(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function injectStyle() {
+        if ($("novaSummaryFinalStyle")) return;
+
+        const style = document.createElement("style");
+        style.id = "novaSummaryFinalStyle";
+        style.textContent = `
+            .chat-title {
+                font-size: 19px !important;
+                letter-spacing: -0.035em !important;
+            }
+
+            #status {
+                margin-top: 3px !important;
+                font-size: 13px !important;
+                color: rgba(245, 243, 255, 0.88) !important;
+            }
+
+            #meta {
+                margin-top: 2px !important;
+                font-size: 12px !important;
+                color: rgba(245, 243, 255, 0.66) !important;
+                max-width: 560px !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                white-space: nowrap !important;
+            }
+
+            .nova-summary-final-card .bubble {
+                border: 1px solid rgba(168, 85, 247, 0.32) !important;
+                background: rgba(168, 85, 247, 0.12) !important;
+            }
+
+            .nova-summary-final-card .bubble strong {
+                display: inline-block !important;
+                margin-bottom: 6px !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    function friendlyStatus(value) {
+        const raw = clean(value).replace(/^status:\s*/i, "").toLowerCase();
+
+        if (!raw || raw === "idle" || raw === "done" || raw === "ready") return "Ready";
+        if (raw.includes("loading") || raw.includes("sending") || raw.includes("thinking")) return "Working...";
+        if (raw.includes("summarizing")) return "Building summary...";
+        if (raw.includes("new session ready")) return "New chat ready";
+        if (raw.includes("session selected")) return "Session selected";
+        if (raw.includes("failed") || raw.includes("error")) return "Needs attention";
+
+        return raw.charAt(0).toUpperCase() + raw.slice(1);
+    }
+
+    function polishHeader() {
+        injectStyle();
+
+        const title = document.querySelector(".chat-title");
+        const status = $("status");
+        const meta = $("meta");
+
+        if (title && clean(title.textContent).toLowerCase() === "desktop chat") {
+            title.textContent = "Nova";
+        }
+
+        if (status) {
+            const value = clean(status.textContent);
+            if (!value || /^status:/i.test(value) || value.toLowerCase() === "idle" || value.toLowerCase() === "done") {
+                status.textContent = friendlyStatus(value);
+            }
+        }
+
+        if (meta) {
+            const value = clean(meta.textContent);
+            if (!value || /^summary:\s*0\s*chars/i.test(value)) {
+                meta.textContent = "No summary yet.";
+            } else if (/^summary:\s*\d+\s*chars/i.test(value)) {
+                meta.textContent = "Summary ready.";
+            }
+        }
+
+        const pill = document.querySelector(".pill");
+        if (pill && clean(pill.textContent).toLowerCase() === "ready") {
+            pill.innerHTML = '<span class="dot"></span>Ready';
+        }
+    }
+
+    function chatBox() {
+        return $("chat") ||
+            document.querySelector(".chat-messages") ||
+            document.querySelector("[data-messages]");
+    }
+
+    function collectMessages() {
+        const chat = chatBox();
+        if (!chat) return [];
+
+        const rows = Array.from(chat.querySelectorAll(".msg, .message"));
+        const messages = [];
+
+        rows.forEach(function (row) {
+            if (row.classList.contains("nova-summary-final-card")) return;
+
+            const roleEl = row.querySelector(".role");
+            const bubbleEl = row.querySelector(".bubble") || row;
+
+            let role = clean(roleEl ? roleEl.textContent : "");
+            let body = clean(bubbleEl ? bubbleEl.textContent : "");
+
+            body = body.replace(/^assistant\s*/i, "").replace(/^user\s*/i, "").trim();
+
+            if (!body) return;
+            if (/^Nova Desktop is ready/i.test(body)) return;
+            if (/^Nova is ready/i.test(body)) return;
+            if (/^Send a message to begin/i.test(body)) return;
+
+            if (!role) {
+                role = row.classList.contains("user") ? "user" : "assistant";
+            }
+
+            messages.push({ role, body });
+        });
+
+        return messages;
+    }
+
+    function short(value, limit) {
+        const text = clean(value);
+        if (text.length <= limit) return text;
+        return text.slice(0, limit - 1).trim() + "…";
+    }
+
+    function buildSummary() {
+        const messages = collectMessages();
+
+        if (!messages.length) {
+            return "No conversation to summarize yet.";
+        }
+
+        const userMessages = messages.filter(function (m) {
+            return String(m.role || "").toLowerCase().includes("user");
+        });
+
+        const assistantMessages = messages.filter(function (m) {
+            return String(m.role || "").toLowerCase().includes("assistant");
+        });
+
+        const recentUser = userMessages.slice(-3).map(function (m) {
+            return short(m.body, 75);
+        });
+
+        const latestUser = userMessages.length
+            ? userMessages[userMessages.length - 1].body
+            : messages[messages.length - 1].body;
+
+        let out = "";
+        out += "This session has " + messages.length + " messages";
+        out += " — " + userMessages.length + " from you and " + assistantMessages.length + " from Nova.";
+
+        if (recentUser.length) {
+            out += " Recent focus: " + recentUser.join(" / ") + ".";
+        }
+
+        if (latestUser) {
+            out += " Latest ask: “" + short(latestUser, 130) + "”.";
+        }
+
+        return out;
+    }
+
+    function renderSummary(summary) {
+        const chat = chatBox();
+        if (!chat) return;
+
+        const old = chat.querySelector(".nova-summary-final-card");
+        if (old) old.remove();
+
+        const row = document.createElement("div");
+        row.className = "msg assistant nova-summary-final-card";
+
+        const role = document.createElement("div");
+        role.className = "role";
+        role.textContent = "assistant";
+
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+        bubble.innerHTML = "<strong>Session summary</strong><br>" + esc(summary);
+
+        row.appendChild(role);
+        row.appendChild(bubble);
+        chat.appendChild(row);
+
+        try {
+            chat.scrollTop = chat.scrollHeight;
+        } catch (_) {}
+    }
+
+    function runSummary() {
+        const status = $("status");
+        const meta = $("meta");
+
+        if (status) status.textContent = "Building summary...";
+
+        const summary = buildSummary();
+
+        if (meta) {
+            meta.textContent = summary === "No conversation to summarize yet."
+                ? "No summary yet."
+                : "Summary: " + short(summary, 145);
+        }
+
+        renderSummary(summary);
+
+        if (status) status.textContent = "Summary ready";
+    }
+
+    function replaceSummaryButton() {
+        const oldBtn = $("summarizeBtn");
+        if (!oldBtn || oldBtn.dataset.novaSummaryFinalWinner === "true") return;
+
+        const btn = oldBtn.cloneNode(true);
+        btn.disabled = false;
+        btn.dataset.novaSummaryFinalWinner = "true";
+
+        oldBtn.parentNode.replaceChild(btn, oldBtn);
+
+        btn.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (typeof event.stopImmediatePropagation === "function") {
+                event.stopImmediatePropagation();
+            }
+
+            runSummary();
+        }, true);
+    }
+
+    function boot() {
+        polishHeader();
+        replaceSummaryButton();
+    }
+
+    boot();
+    setTimeout(boot, 100);
+    setTimeout(boot, 500);
+    setTimeout(boot, 1500);
+    setInterval(polishHeader, 1200);
+
+    const observer = new MutationObserver(function () {
+        polishHeader();
+        replaceSummaryButton();
+    });
+
+    if (document.body) {
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            characterData: true
+        });
+    }
+
+    window.NovaDesktopLocalSummary = runSummary;
+
+    console.log("[Nova Summary Final Winner] ready");
+})();
+</script>
+
+
+<!-- NOVA_VISIBLE_SUMMARY_BOX_FINAL_20260621 -->
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_VISIBLE_SUMMARY_BOX_FINAL_20260621__) return;
+    window.__NOVA_VISIBLE_SUMMARY_BOX_FINAL_20260621__ = true;
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function clean(value) {
+        return String(value || "").replace(/\s+/g, " ").trim();
+    }
+
+    function esc(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function ensureSummaryBox() {
+        let box = $("novaVisibleSummaryBox");
+        if (box) return box;
+
+        const header = document.querySelector(".chat-top");
+        const meta = $("meta");
+
+        box = document.createElement("div");
+        box.id = "novaVisibleSummaryBox";
+        box.className = "nova-visible-summary-box";
+        box.innerHTML = "<strong>Session summary</strong><p>No summary yet.</p>";
+
+        if (header && header.parentNode) {
+            header.parentNode.insertBefore(box, header.nextSibling);
+        } else if (meta && meta.parentNode) {
+            meta.parentNode.appendChild(box);
+        } else {
+            document.body.prepend(box);
+        }
+
+        return box;
+    }
+
+    function getChatTextRows() {
+        const chat =
+            $("chat") ||
+            document.querySelector(".chat-messages") ||
+            document.querySelector("[data-messages]");
+
+        if (!chat) return [];
+
+        return Array.from(chat.querySelectorAll(".msg, .message"))
+            .map(function (row) {
+                if (row.classList.contains("nova-summary-final-card")) return "";
+                if (row.classList.contains("nova-summary-card")) return "";
+
+                const role = clean(row.querySelector(".role")?.textContent || "");
+                const bubble = clean(row.querySelector(".bubble")?.textContent || row.textContent || "");
+
+                if (!bubble) return "";
+                if (/^Nova Desktop is ready/i.test(bubble)) return "";
+                if (/^Nova is ready/i.test(bubble)) return "";
+
+                return clean((role ? role + ": " : "") + bubble);
+            })
+            .filter(Boolean);
+    }
+
+    function short(value, limit) {
+        const text = clean(value);
+        if (text.length <= limit) return text;
+        return text.slice(0, limit - 1).trim() + "…";
+    }
+
+    function buildSummary() {
+        const rows = getChatTextRows();
+
+        if (!rows.length) {
+            return "No conversation to summarize yet.";
+        }
+
+        const latest = rows.slice(-4);
+        const latestUser = rows.filter(function (row) {
+            return /^user:/i.test(row);
+        }).slice(-1)[0] || rows[rows.length - 1];
+
+        return [
+            "This session has " + rows.length + " visible messages.",
+            "Recent focus: " + latest.map(function (row) {
+                return short(row.replace(/^(user|assistant):\s*/i, ""), 70);
+            }).join(" / ") + ".",
+            "Latest ask: “" + short(latestUser.replace(/^user:\s*/i, ""), 120) + "”."
+        ].join(" ");
+    }
+
+    function showSummary() {
+        const box = ensureSummaryBox();
+        const meta = $("meta");
+        const status = $("status");
+
+        if (status) status.textContent = "Building summary...";
+
+        const summary = buildSummary();
+
+        box.innerHTML = "<strong>Session summary</strong><p>" + esc(summary) + "</p>";
+        box.style.setProperty("display", "block", "important");
+
+        if (meta) {
+            meta.textContent = summary === "No conversation to summarize yet."
+                ? "No summary yet."
+                : "Summary: " + short(summary, 140);
+        }
+
+        if (status) status.textContent = "Summary ready";
+
+        return summary;
+    }
+
+    function bindSummaryButton() {
+        const oldBtn = $("summarizeBtn");
+        if (!oldBtn || oldBtn.dataset.novaVisibleSummaryBound === "true") return;
+
+        const btn = oldBtn.cloneNode(true);
+        btn.disabled = false;
+        btn.dataset.novaVisibleSummaryBound = "true";
+
+        oldBtn.parentNode.replaceChild(btn, oldBtn);
+
+        btn.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (typeof event.stopImmediatePropagation === "function") {
+                event.stopImmediatePropagation();
+            }
+
+            showSummary();
+        }, true);
+    }
+
+    function injectStyle() {
+        if ($("novaVisibleSummaryBoxStyle")) return;
+
+        const style = document.createElement("style");
+        style.id = "novaVisibleSummaryBoxStyle";
+        style.textContent = `
+            #novaVisibleSummaryBox {
+                display: none !important;
+                margin: 10px 0 12px !important;
+                padding: 12px 14px !important;
+                border-radius: 16px !important;
+                border: 1px solid rgba(168, 85, 247, 0.30) !important;
+                background: rgba(168, 85, 247, 0.10) !important;
+                color: #f5f3ff !important;
+                box-sizing: border-box !important;
+            }
+
+            #novaVisibleSummaryBox strong {
+                display: block !important;
+                margin-bottom: 6px !important;
+                font-size: 13px !important;
+            }
+
+            #novaVisibleSummaryBox p {
+                margin: 0 !important;
+                font-size: 13px !important;
+                line-height: 1.45 !important;
+                opacity: 0.9 !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    function boot() {
+        injectStyle();
+        ensureSummaryBox();
+        bindSummaryButton();
+    }
+
+    boot();
+    setTimeout(boot, 200);
+    setTimeout(boot, 800);
+    setTimeout(boot, 1600);
+
+    window.NovaDesktopLocalSummary = showSummary;
+
+    console.log("[Nova Visible Summary Box] ready");
+})();
+</script>
+
 </body>
 </html>
