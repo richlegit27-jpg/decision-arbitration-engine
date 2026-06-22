@@ -3160,6 +3160,36 @@ if (not attachments) and (__name__ == "__main__"):
             if not url or not title:
                 continue
 
+            # NOVA_NEWS_JUNK_RESULT_FILTER_20260622
+            # These are recurring false positives for generic top-news searches.
+            # They are not useful broad news cards.
+            _nova_news_junk_probe = " ".join([
+                str(title or ""),
+                str(snippet or ""),
+                str(url or ""),
+            ]).lower()
+
+            _nova_news_junk_terms = (
+                "school assembly news headlines",
+                "assembly news headlines today",
+                "curated for you",
+                "you're my favorite song",
+                "you’re my favorite song",
+                "introduces today's new top stars",
+                "introduces today’s new top stars",
+                "gma network",
+                "kanak news odisha",
+                "odia news",
+                "kanak shorts",
+                "top 50 english-language news sites",
+                "traffic drops in may",
+                "indian brands hit hardest by traffic drops",
+                "press gazette",
+            )
+
+            if any(term in _nova_news_junk_probe for term in _nova_news_junk_terms):
+                continue
+
             low_url = url.lower()
 
             # decode duckduckgo redirect instead of skipping
@@ -3222,6 +3252,156 @@ if (not attachments) and (__name__ == "__main__"):
         headers = {"User-Agent": "Mozilla/5.0"}
 
         all_results = []
+
+        # NOVA_GENERIC_NEWS_QUERY_FIX_20260622
+        # Generic "latest news" must not use a vague open-ended news search.
+        # It must use broad trusted news sources only.
+        clean_news_query = " ".join(str(query or "").lower().strip().split())
+        generic_news_queries = {
+            "latest news",
+            "tell me the latest news",
+            "what is the latest news",
+            "whats the latest news",
+            "what's the latest news",
+            "top news",
+            "top headlines",
+            "breaking news",
+            "current news",
+            "world news",
+            "top world news",
+            "latest world news",
+            "what happened today",
+            "current events",
+        }
+
+        is_generic_news_query = (
+            clean_news_query in generic_news_queries
+            or (
+                clean_news_query.startswith(("tell me ", "show me ", "give me "))
+                and any(
+                    phrase in clean_news_query
+                    for phrase in (
+                        "latest news",
+                        "top news",
+                        "top headlines",
+                        "breaking news",
+                        "world news",
+                        "current events",
+                    )
+                )
+            )
+        )
+
+        if is_generic_news_query:
+            trusted_source_queries = [
+                "top world news today site:bbc.com/news",
+                "top world news today site:reuters.com/world",
+                "top world news today site:apnews.com",
+                "top world news today site:cbc.ca/news/world",
+                "top world news today site:aljazeera.com/news",
+                "top world news today site:theguardian.com/world",
+            ]
+
+            trusted_domains = (
+                "bbc.com",
+                "reuters.com",
+                "apnews.com",
+                "cbc.ca",
+                "aljazeera.com",
+                "theguardian.com",
+            )
+
+            trusted_results = []
+            trusted_seen = set()
+
+            try:
+                from urllib.parse import urlparse
+
+                for trusted_query in trusted_source_queries:
+                    try:
+                        trusted_url = "https://duckduckgo.com/html/?q=" + quote_plus(trusted_query)
+                        trusted_response = requests.get(trusted_url, headers=headers, timeout=10)
+                        trusted_html = trusted_response.text or ""
+
+                        for match in re.finditer(
+                            r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
+                            trusted_html,
+                            re.S,
+                        ):
+                            link = match.group(1).replace("&amp;", "&")
+                            title = re.sub(r"<.*?>", "", match.group(2)).strip()
+                            title = re.sub(r"\s+", " ", title).strip()
+
+                            snippet_match = re.search(
+                                r'class="result__snippet"[^>]*>(.*?)</',
+                                trusted_html[match.end() : match.end() + 500],
+                                re.S,
+                            )
+
+                            snippet = ""
+                            if snippet_match:
+                                snippet = re.sub(r"<.*?>", "", snippet_match.group(1)).strip()
+                                snippet = re.sub(r"\s+", " ", snippet).strip()
+
+                            if "duckduckgo.com" in link:
+                                try:
+                                    from urllib.parse import parse_qs, unquote
+
+                                    parsed = urlparse(link)
+                                    qs = parse_qs(parsed.query)
+                                    if "uddg" in qs:
+                                        link = unquote(qs["uddg"][0])
+                                except Exception:
+                                    continue
+
+                            try:
+                                domain = urlparse(link).netloc.lower().replace("www.", "")
+                            except Exception:
+                                domain = ""
+
+                            if not any(domain.endswith(item) or item in domain for item in trusted_domains):
+                                continue
+
+                            key = (title.lower(), domain)
+                            if not title or key in trusted_seen:
+                                continue
+
+                            trusted_seen.add(key)
+
+                            trusted_results.append({
+                                "title": title,
+                                "snippet": snippet,
+                                "content": snippet,
+                                "url": link,
+                            })
+
+                            if len(trusted_results) >= 6:
+                                break
+
+                        if len(trusted_results) >= 6:
+                            break
+
+                    except Exception:
+                        continue
+
+            except Exception:
+                trusted_results = []
+
+            cleaned_trusted_results = self._clean_web_results(trusted_results)
+
+            if cleaned_trusted_results:
+                return {
+                    "results": cleaned_trusted_results,
+                    "sources": cleaned_trusted_results,
+                    "source_urls": [
+                        item.get("url")
+                        for item in cleaned_trusted_results
+                        if isinstance(item, dict) and item.get("url")
+                    ],
+                }
+
+            # Last fallback: do not allow vague "latest news" to hit dirty Google News.
+            query = "top world news today BBC Reuters AP CBC Al Jazeera Guardian"
 
         # -------------------------
         # 1. DuckDuckGo HTML
