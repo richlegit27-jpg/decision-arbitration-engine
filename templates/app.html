@@ -9233,5 +9233,345 @@ body {
 })();
 </script>
 
+
+
+
+
+<!-- NOVA_TOOLS_PANEL_MEMORY_ONLY_STABLE_20260622 -->
+<style>
+/* Stable rule: right tools panel is Memory-only without re-render shaking */
+.panel.tools > :not(.memory-section),
+.tools > :not(.memory-section) {
+    display: none !important;
+}
+
+.panel.tools > .memory-section,
+.tools > .memory-section {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    order: -9999 !important;
+    flex: 0 0 auto !important;
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_TOOLS_PANEL_MEMORY_ONLY_STABLE_20260622__) return;
+    window.__NOVA_TOOLS_PANEL_MEMORY_ONLY_STABLE_20260622__ = true;
+
+    let cleanupTimer = null;
+    let didInitialMemoryBoot = false;
+
+    function enforceMemoryOnlyStable() {
+        const tools = document.querySelector(".panel.tools") || document.querySelector(".tools");
+        const memory = document.querySelector(".memory-section");
+
+        if (!tools || !memory) return;
+
+        Array.from(tools.children).forEach(function (child) {
+            if (child === memory) {
+                child.hidden = false;
+                child.removeAttribute("hidden");
+
+                if (child.style.display !== "block") child.style.display = "block";
+                if (child.style.visibility !== "visible") child.style.visibility = "visible";
+                if (child.style.opacity !== "1") child.style.opacity = "1";
+                if (child.style.order !== "-9999") child.style.order = "-9999";
+
+                return;
+            }
+
+            if (!child.hidden) child.hidden = true;
+            if (child.style.display !== "none") child.style.display = "none";
+        });
+
+        if (tools.firstElementChild !== memory) {
+            tools.insertBefore(memory, tools.firstElementChild);
+        }
+
+        tools.style.display = "flex";
+        tools.style.flexDirection = "column";
+        tools.style.overflowY = "auto";
+        tools.style.overflowX = "hidden";
+
+        if (!didInitialMemoryBoot && typeof window.NovaMemoryV2Boot === "function") {
+            didInitialMemoryBoot = true;
+            window.NovaMemoryV2Boot();
+        }
+    }
+
+    function scheduleCleanup() {
+        clearTimeout(cleanupTimer);
+        cleanupTimer = setTimeout(enforceMemoryOnlyStable, 80);
+    }
+
+    window.NovaEnforceMemoryOnlyRightPanel = enforceMemoryOnlyStable;
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", enforceMemoryOnlyStable);
+    } else {
+        enforceMemoryOnlyStable();
+    }
+
+    document.addEventListener("click", function (event) {
+        const tools = document.querySelector(".panel.tools") || document.querySelector(".tools");
+
+        if (tools && tools.contains(event.target)) {
+            scheduleCleanup();
+        }
+    }, true);
+
+    window.addEventListener("resize", scheduleCleanup);
+
+    setTimeout(enforceMemoryOnlyStable, 300);
+    setTimeout(enforceMemoryOnlyStable, 1000);
+})();
+</script>
+
+
+<!-- NOVA_CHAT_COMPOSER_LOCK_FINAL_20260622 -->
+<style>
+/* Lock the chat composer so messages scroll instead of pushing the bar down */
+.chat-panel {
+    height: calc(100vh - 28px) !important;
+    max-height: calc(100vh - 28px) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) auto auto !important;
+}
+
+.chat-top {
+    flex: 0 0 auto !important;
+}
+
+#chat {
+    min-height: 0 !important;
+    height: auto !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: contain !important;
+}
+
+#novaChatSummaryStrip {
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+}
+
+.composer {
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    position: relative !important;
+    z-index: 20 !important;
+}
+
+#input {
+    max-height: 130px !important;
+    overflow-y: auto !important;
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_CHAT_COMPOSER_LOCK_FINAL_20260622__) return;
+    window.__NOVA_CHAT_COMPOSER_LOCK_FINAL_20260622__ = true;
+
+    function lockComposer() {
+        const chatPanel = document.querySelector(".chat-panel");
+        const chat = document.getElementById("chat");
+        const composer = document.querySelector(".composer");
+        const summary = document.getElementById("novaChatSummaryStrip");
+
+        if (chatPanel) {
+            chatPanel.style.height = "calc(100vh - 28px)";
+            chatPanel.style.maxHeight = "calc(100vh - 28px)";
+            chatPanel.style.minHeight = "0";
+            chatPanel.style.overflow = "hidden";
+            chatPanel.style.display = "grid";
+            chatPanel.style.gridTemplateRows = "auto minmax(0, 1fr) auto auto";
+        }
+
+        if (chat) {
+            chat.style.minHeight = "0";
+            chat.style.overflowY = "auto";
+            chat.style.overflowX = "hidden";
+        }
+
+        if (summary) {
+            summary.style.margin = "0";
+        }
+
+        if (composer) {
+            composer.style.margin = "0";
+            composer.style.position = "relative";
+            composer.style.zIndex = "20";
+        }
+    }
+
+    window.NovaLockChatComposer = lockComposer;
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", lockComposer);
+    } else {
+        lockComposer();
+    }
+
+    setTimeout(lockComposer, 300);
+    setTimeout(lockComposer, 1000);
+    window.addEventListener("resize", lockComposer);
+})();
+</script>
+
+
+<!-- NOVA_CHAT_SCROLL_VIEWPORT_FORCE_20260622 -->
+<style>
+/* Force chat messages to scroll instead of pushing composer down */
+.shell {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+}
+
+.panel.chat-panel,
+.chat-panel {
+    height: calc(100vh - 28px) !important;
+    max-height: calc(100vh - 28px) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) auto auto !important;
+}
+
+#chat {
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: contain !important;
+}
+
+#novaChatSummaryStrip,
+.composer {
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+}
+
+#input {
+    max-height: 120px !important;
+    overflow-y: auto !important;
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_CHAT_SCROLL_VIEWPORT_FORCE_20260622__) return;
+    window.__NOVA_CHAT_SCROLL_VIEWPORT_FORCE_20260622__ = true;
+
+    let resizeTimer = null;
+
+    function px(value) {
+        return Math.max(0, Math.floor(value || 0));
+    }
+
+    function forceChatScrollViewport() {
+        const shell = document.querySelector(".shell");
+        const panel = document.querySelector(".panel.chat-panel") || document.querySelector(".chat-panel");
+        const top = document.querySelector(".chat-top");
+        const chat = document.getElementById("chat");
+        const summary = document.getElementById("novaChatSummaryStrip");
+        const composer = document.querySelector(".composer");
+
+        if (!panel || !chat || !composer) return;
+
+        if (shell) {
+            shell.style.height = "100vh";
+            shell.style.maxHeight = "100vh";
+            shell.style.overflow = "hidden";
+        }
+
+        panel.style.height = "calc(100vh - 28px)";
+        panel.style.maxHeight = "calc(100vh - 28px)";
+        panel.style.minHeight = "0";
+        panel.style.overflow = "hidden";
+        panel.style.display = "grid";
+        panel.style.gridTemplateRows = "auto minmax(0, 1fr) auto auto";
+
+        const panelRect = panel.getBoundingClientRect();
+        const topH = top ? top.getBoundingClientRect().height : 0;
+        const summaryH = summary ? summary.getBoundingClientRect().height : 0;
+        const composerH = composer ? composer.getBoundingClientRect().height : 0;
+
+        const available = px(panelRect.height - topH - summaryH - composerH);
+
+        chat.style.minHeight = "0";
+        chat.style.height = available + "px";
+        chat.style.maxHeight = available + "px";
+        chat.style.overflowY = "auto";
+        chat.style.overflowX = "hidden";
+
+        composer.style.flex = "0 0 auto";
+        composer.style.margin = "0";
+        composer.style.position = "relative";
+        composer.style.zIndex = "30";
+
+        if (summary) {
+            summary.style.flex = "0 0 auto";
+            summary.style.margin = "0";
+        }
+    }
+
+    function scheduleForce() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(forceChatScrollViewport, 40);
+    }
+
+    window.NovaForceChatScrollViewport = forceChatScrollViewport;
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", forceChatScrollViewport);
+    } else {
+        forceChatScrollViewport();
+    }
+
+    window.addEventListener("resize", scheduleForce);
+
+    setTimeout(forceChatScrollViewport, 200);
+    setTimeout(forceChatScrollViewport, 700);
+    setTimeout(forceChatScrollViewport, 1400);
+
+    try {
+        const chat = document.getElementById("chat");
+        if (chat) {
+            const observer = new MutationObserver(function () {
+                forceChatScrollViewport();
+                chat.scrollTop = chat.scrollHeight;
+            });
+
+            observer.observe(chat, {
+                childList: true,
+                subtree: true,
+                characterData: true
+            });
+        }
+    } catch (_) {}
+
+    try {
+        const input = document.getElementById("input");
+        if (input) {
+            input.addEventListener("input", scheduleForce);
+        }
+    } catch (_) {}
+})();
+</script>
+
 </body>
 </html>
