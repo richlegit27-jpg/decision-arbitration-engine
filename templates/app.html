@@ -5807,6 +5807,133 @@ console.log("[Nova Force New Chat] cleared chat");
         }
     }
 
+    function openLeftArtifactViewer(artifact) {
+        const artifactId = artifact.id || artifact.artifact_id || artifact.uuid || "";
+
+        let overlay = document.getElementById("novaArtifactReadableOverlay");
+        if (!overlay) {
+            overlay = document.createElement("div");
+            overlay.id = "novaArtifactReadableOverlay";
+            overlay.style.cssText =
+                "position:fixed;inset:0;z-index:99999;background:rgba(5,6,18,.72);" +
+                "display:flex;align-items:center;justify-content:center;padding:24px;";
+
+            overlay.innerHTML = `
+                <div id="novaArtifactReadableBox" style="
+                    width:min(980px,96vw);
+                    max-height:88vh;
+                    overflow:auto;
+                    background:#111226;
+                    color:#f4f1ff;
+                    border:1px solid rgba(255,255,255,.16);
+                    border-radius:18px;
+                    box-shadow:0 22px 80px rgba(0,0,0,.45);
+                    padding:22px;
+                    font-family:Inter,system-ui,Segoe UI,Arial,sans-serif;
+                ">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;">
+                        <strong id="novaArtifactReadableTitle" style="font-size:20px;">Artifact</strong>
+                        <button id="novaArtifactReadableClose" type="button" style="
+                            border:1px solid rgba(255,255,255,.18);
+                            background:rgba(255,255,255,.10);
+                            color:#fff;
+                            border-radius:999px;
+                            width:34px;
+                            height:34px;
+                            cursor:pointer;
+                            font-size:20px;
+                            line-height:1;
+                        ">&times;</button>
+                    </div>
+                    <div id="novaArtifactReadableMeta" style="opacity:.68;font-size:13px;margin-bottom:14px;"></div>
+                    <div id="novaArtifactReadableContent" style="line-height:1.55;">Loading artifact...</div>
+                </div>
+            `;
+
+            document.body.appendChild(overlay);
+
+            overlay.addEventListener("click", function (event) {
+                if (event.target === overlay) {
+                    overlay.remove();
+                }
+            });
+
+            const close = overlay.querySelector("#novaArtifactReadableClose");
+            if (close) {
+                close.addEventListener("click", function () {
+                    overlay.remove();
+                });
+            }
+        }
+
+        function render(record) {
+            const item = record.artifact || record.item || record.data || record || artifact;
+
+            const title = item.title || item.name || item.filename || artifact.title || artifact.name || "Nova Artifact";
+            const kind = item.kind || item.type || item.mime_type || artifact.kind || artifact.type || "artifact";
+
+            const imageUrl =
+                item.image_url ||
+                item.preview ||
+                item.url ||
+                item.file_url ||
+                (item.viewer && item.viewer.image_url) ||
+                artifact.image_url ||
+                artifact.preview ||
+                "";
+
+            const body =
+                item.content ||
+                item.body ||
+                item.text ||
+                item.markdown ||
+                item.output ||
+                item.summary ||
+                item.prompt ||
+                artifact.content ||
+                artifact.body ||
+                artifact.text ||
+                artifact.summary ||
+                artifact.prompt ||
+                "";
+
+            const titleNode = document.getElementById("novaArtifactReadableTitle");
+            const metaNode = document.getElementById("novaArtifactReadableMeta");
+            const contentNode = document.getElementById("novaArtifactReadableContent");
+
+            if (titleNode) titleNode.textContent = title;
+            if (metaNode) metaNode.textContent = kind;
+
+            if (!contentNode) return;
+
+            let html = "";
+
+            if (imageUrl && /\.(png|jpg|jpeg|gif|webp|svg)(\?|#|$)/i.test(String(imageUrl))) {
+                html += `<img src="${esc(imageUrl)}" alt="" style="max-width:100%;border-radius:14px;margin-bottom:14px;display:block;">`;
+            }
+
+            if (body) {
+                html += `<pre style="white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.25);border-radius:14px;padding:14px;margin:0;">${esc(body)}</pre>`;
+            } else {
+                html += `<pre style="white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.25);border-radius:14px;padding:14px;margin:0;">${esc(JSON.stringify(item, null, 2))}</pre>`;
+            }
+
+            contentNode.innerHTML = html;
+        }
+
+        if (!artifactId) {
+            render(artifact);
+            return;
+        }
+
+        fetch("/api/artifacts/" + encodeURIComponent(artifactId), { cache: "no-store" })
+            .then(function (res) { return res.json(); })
+            .then(render)
+            .catch(function () {
+                render(artifact);
+            });
+    }
+
     async function loadLeftArtifacts() {
         const list = document.getElementById("novaLeftArtifactsList");
         const count = document.getElementById("novaLeftArtifactsCount");
@@ -5841,15 +5968,42 @@ console.log("[Nova Force New Chat] cleared chat");
                 const kind = a.kind || a.type || "";
                 const summary = String(a.summary || a.body || a.prompt || "").slice(0, 160);
                 const imageUrl = a.image_url || a.preview || (a.viewer && a.viewer.image_url) || "";
-                const url = a.url || a.file_url || a.path || "";
+                const artifactId = a.id || a.artifact_id || a.uuid || "";
+                const directUrl = a.url || a.file_url || a.path || "";
+                const openUrl = directUrl || (artifactId ? "/api/artifacts/" + encodeURIComponent(artifactId) : "");
 
-                const card = document.createElement(url ? "a" : "div");
+                const shouldUseViewer = !!artifactId;
+
+                const card = document.createElement(shouldUseViewer ? "button" : (directUrl ? "a" : "button"));
                 card.className = "nova-left-artifact-card";
 
-                if (url) {
-                    card.href = url;
+                if (artifactId) {
+                    card.dataset.artifactId = artifactId;
+                }
+
+                if (shouldUseViewer) {
+                    card.type = "button";
+                    card.style.textAlign = "left";
+                    card.title = "Open artifact";
+                    card.addEventListener("click", function (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        openLeftArtifactViewer(a);
+                    });
+                } else if (directUrl) {
+                    card.href = directUrl;
                     card.target = "_blank";
                     card.rel = "noopener noreferrer";
+                    card.title = "Open artifact";
+                } else {
+                    card.type = "button";
+                    card.style.textAlign = "left";
+                    card.title = "Open artifact";
+                    card.addEventListener("click", function (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        openLeftArtifactViewer(a);
+                    });
                 }
 
                 card.innerHTML = `
