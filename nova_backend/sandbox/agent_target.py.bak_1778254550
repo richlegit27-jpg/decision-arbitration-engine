@@ -1,6 +1,0 @@
-﻿def placeholder_function(self, *args, **kwargs):
-    return {
-        "ok": True,
-        "generated": True,
-    }
-
