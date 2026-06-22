@@ -8,13 +8,13 @@ nova-stable-desktop-20260621
 Current branch:
 post-frontend-polish-phase
 
-Latest commit:
+Latest commit before this note:
 c2b3d2b Add Nova dev check script
 
 Confirmed working:
-- Core routes pass smoke test
+- Core smoke test passes
+- Attachment smoke test passes
 - Chat endpoint works
-- Attachment upload + attachment chat analysis works
 - Sessions restore flow works
 - Left-panel Artifacts works
 - Recent session card polish committed
@@ -25,7 +25,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\nova_dev_check.ps1
 
 Current caution:
 - Do not patch the message bar unless browser is maximized and DevTools is undocked.
-- The last bad layout reading was from a tiny 778x350 viewport, so it was not a fair desktop test.
+- Last bad layout reading was from a tiny 778x350 viewport, so it was not a fair desktop test.
 
 Next possible work:
 1. Re-test message bar at full desktop size.
