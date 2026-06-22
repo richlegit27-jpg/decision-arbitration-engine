@@ -7351,6 +7351,76 @@ code,
 href="/static/css/nova-desktop-polish.css?v=recent-session-cards-final-20260621-1">
 
 
+
+<!-- NOVA_DESKTOP_CHAT_LAYOUT_STABLE_FINAL_20260622 -->
+<style>
+/* Keep desktop chat from growing downward forever. */
+html,
+body {
+    height: 100% !important;
+    min-height: 100% !important;
+    overflow: hidden !important;
+    padding-bottom: 0 !important;
+}
+
+/* Main app frame owns the viewport. */
+.app-shell,
+.desktop-shell,
+main {
+    min-height: 0 !important;
+}
+
+/* Chat panel becomes a real column: header, messages, composer. */
+.chat-panel,
+.chat-column,
+.desktop-chat,
+.chat-container {
+    min-height: 0 !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+/* Messages scroll inside the chat area instead of pushing the composer down. */
+#chat,
+.chat-messages,
+.messages,
+.message-list,
+.conversation,
+.nova-chat {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding-bottom: 24px !important;
+    scroll-padding-bottom: 24px !important;
+    box-sizing: border-box !important;
+}
+
+/* Composer stays in normal flow at the bottom, not hovering over messages. */
+.composer,
+.desktop-composer,
+.chat-composer,
+.input-row,
+.chat-input-row {
+    flex: 0 0 auto !important;
+    position: relative !important;
+    bottom: auto !important;
+    z-index: 20 !important;
+    margin-top: 0 !important;
+    box-sizing: border-box !important;
+}
+
+/* Keep the text box usable without expanding the page. */
+#input {
+    max-height: 160px !important;
+    overflow-y: auto !important;
+}
+</style>
+<!-- /NOVA_DESKTOP_CHAT_LAYOUT_STABLE_FINAL_20260622 -->
+
 <!-- NOVA_DESKTOP_SESSION_OPEN_FINAL_20260621 -->
 <script>
 (function () {
