@@ -7016,10 +7016,175 @@ code,
 
 </style>
 
-</style>
+<script>
+(function () {
+    document.addEventListener("click", function (event) {
+        const btn = event.target.closest("#openArtifactsBtn");
+        if (!btn) return;
 
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>>
-<script src="/static/js/nova-desktop-sessions.js?v=external-sessions-clean-20260621-3"></script>
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        console.log("[Nova Artifacts Force Click] clicked");
+
+        const tools = document.querySelector(".tools");
+        if (tools) {
+        }
+
+        if (typeof window.NovaLoadDesktopArtifacts === "function") {
+            window.NovaLoadDesktopArtifacts();
+        }
+
+        const section = document.querySelector(".artifacts-section");
+        if (section) {
+            section.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+
+        return false;
+    }, true);
+})();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="/static/js/nova-desktop-sessions.js?v=external-new-session-2"></script>
+
+<script>
+(function () {
+  "use strict";
+
+  if (window.__NOVA_TEXT_COLOR_POLISH_20260620__) return;
+  window.__NOVA_TEXT_COLOR_POLISH_20260620__ = true;
+
+  function escapeHtml(text) {
+    return String(text || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function token(type, text) {
+    return '<span class="nova-token-' + type + '">' + escapeHtml(text) + '</span>';
+  }
+
+  function colorize(code) {
+    const keywords = new Set([
+      "function", "const", "let", "var", "return", "if", "else", "for", "while",
+      "async", "await", "try", "catch", "class", "new", "this", "true", "false",
+      "null", "undefined", "import", "from", "export", "def", "print", "pass",
+      "in", "and", "or", "not"
+    ]);
+
+    const pattern =
+      /(\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->|\/\/[^\n]*|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`|<\/?[a-zA-Z][^>\n]*>|\b\d+(?:\.\d+)?\b|\b[a-zA-Z_$][\w$]*\b)/g;
+
+    let output = "";
+    let lastIndex = 0;
+    let match;
+
+    while ((match = pattern.exec(code)) !== null) {
+      const raw = match[0];
+      const index = match.index;
+
+      output += escapeHtml(code.slice(lastIndex, index));
+
+      if (
+        raw.startsWith("//") ||
+        raw.startsWith("/*") ||
+        raw.startsWith("<!--")
+      ) {
+        output += token("comment", raw);
+      } else if (
+        raw.startsWith('"') ||
+        raw.startsWith("'") ||
+        raw.startsWith("`")
+      ) {
+        output += token("string", raw);
+      } else if (raw.startsWith("<")) {
+        output += token("tag", raw);
+      } else if (/^\d/.test(raw)) {
+        output += token("number", raw);
+      } else if (keywords.has(raw)) {
+        output += token("keyword", raw);
+      } else {
+        const after = code.slice(index + raw.length);
+        if (/^\s*\(/.test(after)) {
+          output += token("function", raw);
+        } else {
+          output += escapeHtml(raw);
+        }
+      }
+
+      lastIndex = index + raw.length;
+    }
+
+    output += escapeHtml(code.slice(lastIndex));
+    return output;
+  }
+
+  function addCopyButton(pre, code) {
+    if (pre.querySelector(".nova-code-copy")) return;
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "nova-code-copy";
+    btn.textContent = "Copy";
+
+    btn.addEventListener("click", async function () {
+      try {
+        await navigator.clipboard.writeText(code.textContent || "");
+        btn.textContent = "Copied";
+
+        setTimeout(function () {
+          btn.textContent = "Copy";
+        }, 900);
+      } catch (e) {
+        btn.textContent = "Failed";
+
+        setTimeout(function () {
+          btn.textContent = "Copy";
+        }, 900);
+      }
+    });
+
+    pre.appendChild(btn);
+  }
+
+  function polishCodeBlocks(root) {
+    const scope = root || document;
+
+    scope.querySelectorAll("pre code").forEach(function (code) {
+      const pre = code.closest("pre");
+      if (!pre) return;
+
+      addCopyButton(pre, code);
+
+      if (code.dataset.novaColorized === "1") return;
+
+      const raw = code.textContent || "";
+      code.innerHTML = colorize(raw);
+      code.dataset.novaColorized = "1";
+    });
+  }
+
+  function polishAll() {
+    polishCodeBlocks(document);
+  }
+
+  polishAll();
+
+  const observer = new MutationObserver(function () {
+    polishAll();
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  console.log("[Nova Text Color Polish] ready");
+})();
+</script>
 
 <!-- NOVA_RESCUE_CONTAINER_SHIM_20260620 -->
 <script>
@@ -7287,696 +7452,92 @@ code,
 </script>
 
 <!-- NOVA_DESKTOP_POLISH_CSS_LINK_20260620 -->
-<link rel="stylesheet" href="/static/css/nova-desktop-polish.css?v=desktop-polish-20260621-restore-sessions-1">
+<link rel="stylesheet" href="/static/css/nova-desktop-polish.css?v=desktop-polish-20260621-fixed-composer-scroll-1">
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<!-- NOVA_SESSIONS_REPLACE_CARDS_AREA_20260621 -->
-<style>
-  #novaSessionsReplaceCardsArea {
-    display: block !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-    padding: 14px !important;
-    margin: 0 !important;
-    border: 3px solid rgba(168, 85, 247, 0.9) !important;
-    border-radius: 16px !important;
-    background: #111827 !important;
-    color: #f8fafc !important;
-    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45) !important;
-  }
-
-  .nova-sessions-cards-title {
-    font-size: 16px !important;
-    font-weight: 900 !important;
-    margin-bottom: 12px !important;
-  }
-
-  .nova-sessions-cards-subtitle {
-    font-size: 12px !important;
-    opacity: 0.72 !important;
-    margin-bottom: 12px !important;
-  }
-
-  .nova-sessions-cards-list {
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 8px !important;
-  }
-
-  .nova-sessions-cards-item {
-    display: block !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-    text-align: left !important;
-    padding: 12px !important;
-    border-radius: 12px !important;
-    border: 1px solid rgba(255,255,255,0.16) !important;
-    background: rgba(255,255,255,0.08) !important;
-    color: #f8fafc !important;
-    cursor: pointer !important;
-  }
-
-  .nova-sessions-cards-item:hover {
-    background: rgba(168,85,247,0.24) !important;
-    border-color: rgba(168,85,247,0.7) !important;
-  }
-
-  .nova-sessions-cards-name {
-    font-size: 13px !important;
-    font-weight: 800 !important;
-  }
-
-  .nova-sessions-cards-meta {
-    margin-top: 6px !important;
-    font-size: 11px !important;
-    opacity: 0.72 !important;
-  }
-</style>
-
+<!-- NOVA_HIDE_DESKTOP_CHAT_FLOATING_CARD_BY_TEXT_20260621 -->
 <script>
 (function () {
   "use strict";
 
-  if (window.__NOVA_SESSIONS_REPLACE_CARDS_AREA_20260621__) return;
-  window.__NOVA_SESSIONS_REPLACE_CARDS_AREA_20260621__ = true;
+  if (window.__NOVA_HIDE_DESKTOP_CHAT_FLOATING_CARD_BY_TEXT__) return;
+  window.__NOVA_HIDE_DESKTOP_CHAT_FLOATING_CARD_BY_TEXT__ = true;
 
-  function esc(value) {
-    return String(value || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
+  function looksLikeOldDesktopChatCard(el) {
+    if (!el || !el.innerText) return false;
 
-  function pick(session, keys, fallback) {
-    for (var i = 0; i < keys.length; i++) {
-      var value = session && session[keys[i]];
-      if (value !== undefined && value !== null && String(value).trim()) {
-        return String(value).trim();
-      }
-    }
-    return fallback || "";
-  }
-
-  function normalize(payload) {
-    var sessions =
-      payload && Array.isArray(payload.sessions) ? payload.sessions :
-      payload && Array.isArray(payload.items) ? payload.items :
-      payload && Array.isArray(payload.data) ? payload.data :
-      Array.isArray(payload) ? payload :
-      [];
-
-    return sessions.filter(function (session) {
-      return pick(session, ["id", "session_id", "sid", "uuid"], "");
-    });
-  }
-
-  function visible(el) {
-    if (!el || el === document.body || el === document.documentElement) return false;
-    var r = el.getBoundingClientRect();
-    var s = getComputedStyle(el);
-    return r.width > 70 && r.height > 30 && s.display !== "none" && s.visibility !== "hidden" && Number(s.opacity || 1) > 0;
-  }
-
-  function cardSignal(el) {
-    var raw = String(
-      (el.id || "") + " " +
-      (el.className || "") + " " +
-      (el.getAttribute("aria-label") || "") + " " +
-      (el.getAttribute("title") || "")
-    ).toLowerCase();
-
-    var text = String(el.innerText || "").toLowerCase();
-
-    var score = 0;
-    if (raw.includes("source")) score += 10;
-    if (raw.includes("card")) score += 8;
-    if (raw.includes("artifact")) score += 4;
-    if (text.includes("source")) score += 4;
-    if (text.includes("web fetch")) score += 6;
-    if (text.includes("open") && text.includes("source")) score += 4;
-
-    return score;
-  }
-
-  function findVisibleCardsHost() {
-    var all = Array.from(document.querySelectorAll("body *")).filter(visible);
-
-    var scored = all
-      .map(function (el) {
-        var r = el.getBoundingClientRect();
-        return {
-          el: el,
-          score: cardSignal(el),
-          area: r.width * r.height,
-          rect: r
-        };
-      })
-      .filter(function (x) {
-        return x.score > 0;
-      })
-      .sort(function (a, b) {
-        return (b.score - a.score) || (b.area - a.area);
-      });
-
-    if (scored.length) {
-      var node = scored[0].el;
-
-      // If we found an individual card, use its parent so the session list replaces the card stack.
-      if (node.parentElement && node.parentElement !== document.body) {
-        return node.parentElement;
-      }
-
-      return node;
-    }
+    const text = el.innerText
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
 
     return (
-      document.querySelector("main") ||
-      document.querySelector(".chat-container") ||
-      document.querySelector("#chat") ||
-      document.body
+      text.includes("desktop chat") &&
+      text.includes("summary") &&
+      text.includes("chars")
     );
   }
 
-  function clearHostForSessions(host) {
-    if (!host) return;
+  function hideCard(card) {
+    if (!card) return;
 
-    Array.from(host.children).forEach(function (child) {
-      if (child.id === "novaSessionsReplaceCardsArea") return;
-      child.setAttribute("data-nova-hidden-by-sessions", "1");
-      child.style.setProperty("display", "none", "important");
-    });
-
-    host.style.setProperty("display", "block", "important");
-    host.style.setProperty("visibility", "visible", "important");
-    host.style.setProperty("opacity", "1", "important");
-    host.style.setProperty("overflow", "auto", "important");
-    host.style.setProperty("min-width", "280px", "important");
-    host.style.setProperty("min-height", "180px", "important");
+    card.style.setProperty("display", "none", "important");
+    card.style.setProperty("visibility", "hidden", "important");
+    card.style.setProperty("opacity", "0", "important");
+    card.style.setProperty("pointer-events", "none", "important");
+    card.setAttribute("data-nova-hidden-old-desktop-chat-card", "true");
   }
 
-  function makePanel(host) {
-    var panel = document.getElementById("novaSessionsReplaceCardsArea");
+  function findBestCard(node) {
+    let current = node;
 
-    if (panel && panel.parentElement !== host) {
-      panel.remove();
-      panel = null;
-    }
+    for (let i = 0; i < 8 && current && current !== document.body; i++) {
+      const text = (current.innerText || "").replace(/\s+/g, " ").trim();
 
-    if (!panel) {
-      panel = document.createElement("section");
-      panel.id = "novaSessionsReplaceCardsArea";
-      host.insertBefore(panel, host.firstChild || null);
-    }
-
-    return panel;
-  }
-
-  async function openSessionsInCardsArea() {
-    var host = findVisibleCardsHost();
-    clearHostForSessions(host);
-
-    var panel = makePanel(host);
-
-    panel.innerHTML =
-      '<div class="nova-sessions-cards-title">Session history</div>' +
-      '<div class="nova-sessions-cards-subtitle">This replaced the cards area so history is visible here.</div>' +
-      '<div class="nova-sessions-cards-list">Loading sessions...</div>';
-
-    var list = panel.querySelector(".nova-sessions-cards-list");
-
-    try {
-      var response = await fetch("/api/sessions", { cache: "no-store" });
-      var payload = await response.json();
-      var sessions = normalize(payload);
-
-      if (!sessions.length) {
-        list.innerHTML = "No saved sessions yet.";
-        return;
+      if (
+        looksLikeOldDesktopChatCard(current) &&
+        text.length < 220
+      ) {
+        return current;
       }
 
-      list.innerHTML = "";
+      current = current.parentElement;
+    }
 
-      sessions.slice(0, 60).forEach(function (session) {
-        var sid = pick(session, ["id", "session_id", "sid", "uuid"], "");
-        var title = pick(session, ["title", "name", "label", "preview", "summary"], "Untitled session");
-        var time = pick(session, ["updated_at", "updated", "created_at", "created"], "");
-        var count = pick(session, ["message_count", "messages_count", "count"], "");
+    return node;
+  }
 
-        var btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "nova-sessions-cards-item";
-        btn.innerHTML =
-          '<div class="nova-sessions-cards-name">' + esc(title) + '</div>' +
-          '<div class="nova-sessions-cards-meta">' +
-            esc(count ? count + " messages" : "Session") +
-            (time ? " ? " + esc(time) : "") +
-          '</div>';
+  function sweep() {
+    const nodes = Array.from(document.querySelectorAll("body *"));
 
-        btn.addEventListener("click", function () {
-          if (typeof window.NovaDesktopOpenSession === "function") {
-            window.NovaDesktopOpenSession(sid);
-          } else if (typeof window.openSession === "function") {
-            window.openSession(sid);
-          }
-        });
+    for (const node of nodes) {
+      if (!looksLikeOldDesktopChatCard(node)) continue;
 
-        list.appendChild(btn);
-      });
-
-      panel.scrollIntoView({ behavior: "smooth", block: "start" });
-
-      console.log("[Nova Sessions Replace Cards Area] open", {
-        host: host.tagName + "#" + (host.id || "") + "." + String(host.className || ""),
-        hostRect: host.getBoundingClientRect(),
-        panelRect: panel.getBoundingClientRect(),
-        text: panel.innerText
-      });
-    } catch (error) {
-      console.warn("[Nova Sessions Replace Cards Area] failed", error);
-      list.innerHTML = "Could not load sessions.";
+      const card = findBestCard(node);
+      hideCard(card);
     }
   }
 
-  function isSessionButton(target) {
-    var btn = target && target.closest && target.closest("button, a, [role='button']");
-    if (!btn) return false;
-    if (btn.closest("#novaSessionsReplaceCardsArea")) return false;
-
-    var text = String(
-      (btn.id || "") + " " +
-      (btn.className || "") + " " +
-      (btn.textContent || "") + " " +
-      (btn.getAttribute("aria-label") || "") + " " +
-      (btn.getAttribute("title") || "")
-    ).toLowerCase();
-
-    return text.includes("session") || text.includes("history");
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", sweep);
+  } else {
+    sweep();
   }
 
-  document.addEventListener("click", function (event) {
-    if (!isSessionButton(event.target)) return;
+  setTimeout(sweep, 100);
+  setTimeout(sweep, 500);
+  setTimeout(sweep, 1500);
 
-    event.preventDefault();
-    event.stopPropagation();
+  const observer = new MutationObserver(function () {
+    sweep();
+  });
 
-    if (typeof event.stopImmediatePropagation === "function") {
-      event.stopImmediatePropagation();
-    }
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    characterData: true
+  });
 
-    openSessionsInCardsArea();
-  }, true);
-
-  window.NovaOpenSessionsReplaceCardsArea = openSessionsInCardsArea;
-
-  console.log("[Nova Sessions Replace Cards Area] ready");
-})();
-</script>
-<!-- END_NOVA_SESSIONS_REPLACE_CARDS_AREA_20260621 -->
-
-<!-- NOVA_CHAT_POLISH_SAFE_20260621 -->
-<style>
-/* =========================================================
-   NOVA CHAT POLISH SAFE OVERLAY
-   Does not touch sessions/history/backend.
-   ========================================================= */
-
-#chat,
-.chat,
-.chat-container,
-#messages,
-.messages,
-.desktop-chat-messages {
-    scroll-behavior: smooth;
-}
-
-/* Main message row spacing */
-.message,
-.msg,
-.chat-message,
-.desktop-message {
-    margin: 14px 0;
-    max-width: 100%;
-}
-
-/* Bubble base */
-.message-bubble,
-.msg-bubble,
-.chat-bubble,
-.user-bubble,
-.assistant-bubble,
-.desktop-message-bubble {
-    max-width: min(780px, 92%);
-    padding: 14px 16px;
-    border-radius: 18px;
-    line-height: 1.55;
-    font-size: 15px;
-    word-wrap: break-word;
-    overflow-wrap: anywhere;
-    box-sizing: border-box;
-}
-
-/* User message */
-.user .message-bubble,
-.user.msg-bubble,
-.message.user .message-bubble,
-.chat-message.user .chat-bubble,
-.desktop-message.user .desktop-message-bubble,
-.user-bubble {
-    margin-left: auto;
-    background: linear-gradient(135deg, rgba(147, 51, 234, 0.95), rgba(126, 34, 206, 0.95));
-    color: white;
-    border-bottom-right-radius: 6px;
-}
-
-/* Assistant message */
-.assistant .message-bubble,
-.assistant.msg-bubble,
-.message.assistant .message-bubble,
-.chat-message.assistant .chat-bubble,
-.desktop-message.assistant .desktop-message-bubble,
-.assistant-bubble {
-    margin-right: auto;
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.94);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    border-bottom-left-radius: 6px;
-}
-
-/* Fallback: assistant text directly inside row */
-.message.assistant,
-.chat-message.assistant,
-.desktop-message.assistant {
-    color: rgba(255, 255, 255, 0.94);
-}
-
-/* Paragraph cleanup */
-.message-bubble p,
-.msg-bubble p,
-.chat-bubble p,
-.desktop-message-bubble p,
-.assistant-bubble p,
-.user-bubble p {
-    margin: 0 0 10px;
-}
-
-.message-bubble p:last-child,
-.msg-bubble p:last-child,
-.chat-bubble p:last-child,
-.desktop-message-bubble p:last-child,
-.assistant-bubble p:last-child,
-.user-bubble p:last-child {
-    margin-bottom: 0;
-}
-
-/* Inline code */
-.message-bubble code,
-.msg-bubble code,
-.chat-bubble code,
-.desktop-message-bubble code,
-.assistant-bubble code,
-.user-bubble code {
-    padding: 2px 6px;
-    border-radius: 7px;
-    background: rgba(0, 0, 0, 0.28);
-    color: #f3e8ff;
-    font-family: Consolas, Monaco, "Courier New", monospace;
-    font-size: 0.92em;
-}
-
-/* Code blocks */
-.message-bubble pre,
-.msg-bubble pre,
-.chat-bubble pre,
-.desktop-message-bubble pre,
-.assistant-bubble pre,
-.user-bubble pre {
-    position: relative;
-    margin: 14px 0;
-    padding: 42px 14px 14px;
-    border-radius: 14px;
-    background: rgba(10, 10, 18, 0.92);
-    border: 1px solid rgba(168, 85, 247, 0.28);
-    overflow-x: auto;
-    max-width: 100%;
-    box-sizing: border-box;
-}
-
-.message-bubble pre code,
-.msg-bubble pre code,
-.chat-bubble pre code,
-.desktop-message-bubble pre code,
-.assistant-bubble pre code,
-.user-bubble pre code {
-    display: block;
-    padding: 0;
-    background: transparent;
-    color: #f8fafc;
-    white-space: pre;
-    font-family: Consolas, Monaco, "Courier New", monospace;
-    font-size: 13.5px;
-    line-height: 1.5;
-}
-
-/* Copy button inside code block */
-.nova-code-copy-btn {
-    position: absolute;
-    top: 9px;
-    right: 9px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.88);
-    border-radius: 9px;
-    padding: 5px 9px;
-    font-size: 12px;
-    cursor: pointer;
-}
-
-.nova-code-copy-btn:hover {
-    background: rgba(168, 85, 247, 0.25);
-    color: white;
-}
-
-/* Lists */
-.message-bubble ul,
-.message-bubble ol,
-.msg-bubble ul,
-.msg-bubble ol,
-.chat-bubble ul,
-.chat-bubble ol,
-.desktop-message-bubble ul,
-.desktop-message-bubble ol {
-    margin-top: 8px;
-    margin-bottom: 8px;
-    padding-left: 22px;
-}
-
-/* Links */
-.message-bubble a,
-.msg-bubble a,
-.chat-bubble a,
-.desktop-message-bubble a,
-.assistant-bubble a,
-.user-bubble a {
-    color: #d8b4fe;
-    text-decoration: none;
-}
-
-.message-bubble a:hover,
-.msg-bubble a:hover,
-.chat-bubble a:hover,
-.desktop-message-bubble a:hover,
-.assistant-bubble a:hover,
-.user-bubble a:hover {
-    text-decoration: underline;
-}
-
-/* Small screens */
-@media (max-width: 700px) {
-    .message-bubble,
-    .msg-bubble,
-    .chat-bubble,
-    .user-bubble,
-    .assistant-bubble,
-    .desktop-message-bubble {
-        max-width: 96%;
-        font-size: 14.5px;
-    }
-
-    .message-bubble pre,
-    .msg-bubble pre,
-    .chat-bubble pre,
-    .desktop-message-bubble pre,
-    .assistant-bubble pre,
-    .user-bubble pre {
-        font-size: 13px;
-    }
-}
-</style>
-
-<script>
-(function () {
-    "use strict";
-
-    if (window.__NOVA_CHAT_POLISH_SAFE_20260621__) return;
-    window.__NOVA_CHAT_POLISH_SAFE_20260621__ = true;
-
-    function findChatRoot() {
-        return (
-            document.getElementById("chat") ||
-            document.getElementById("messages") ||
-            document.querySelector(".desktop-chat-messages") ||
-            document.querySelector(".chat-container") ||
-            document.querySelector(".messages") ||
-            document.body
-        );
-    }
-
-    function normalizeMessageBubbles() {
-        const candidates = document.querySelectorAll(
-            ".message, .msg, .chat-message, .desktop-message"
-        );
-
-        candidates.forEach(function (row) {
-            if (row.dataset.novaPolished === "1") return;
-
-            const alreadyHasBubble = row.querySelector(
-                ".message-bubble, .msg-bubble, .chat-bubble, .desktop-message-bubble, .assistant-bubble, .user-bubble"
-            );
-
-            if (!alreadyHasBubble) {
-                const children = Array.from(row.childNodes).filter(function (node) {
-                    if (node.nodeType === Node.TEXT_NODE) {
-                        return node.textContent.trim();
-                    }
-
-                    if (node.nodeType === Node.ELEMENT_NODE) {
-                        return !node.classList.contains("nova-code-copy-btn");
-                    }
-
-                    return false;
-                });
-
-                if (children.length > 0) {
-                    const bubble = document.createElement("div");
-
-                    if (row.classList.contains("user")) {
-                        bubble.className = "message-bubble user-bubble";
-                    } else if (row.classList.contains("assistant")) {
-                        bubble.className = "message-bubble assistant-bubble";
-                    } else {
-                        bubble.className = "message-bubble";
-                    }
-
-                    children.forEach(function (child) {
-                        bubble.appendChild(child);
-                    });
-
-                    row.appendChild(bubble);
-                }
-            }
-
-            row.dataset.novaPolished = "1";
-        });
-    }
-
-    function addCodeCopyButtons() {
-        const blocks = document.querySelectorAll("pre");
-
-        blocks.forEach(function (pre) {
-            if (pre.dataset.novaCopyReady === "1") return;
-
-            const code = pre.querySelector("code");
-            if (!code) return;
-
-            const btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "nova-code-copy-btn";
-            btn.textContent = "Copy";
-
-            btn.addEventListener("click", async function () {
-                const text = code.innerText || code.textContent || "";
-
-                try {
-                    await navigator.clipboard.writeText(text);
-                    btn.textContent = "Copied";
-                    setTimeout(function () {
-                        btn.textContent = "Copy";
-                    }, 900);
-                } catch (err) {
-                    btn.textContent = "Failed";
-                    setTimeout(function () {
-                        btn.textContent = "Copy";
-                    }, 900);
-                }
-            });
-
-            pre.appendChild(btn);
-            pre.dataset.novaCopyReady = "1";
-        });
-    }
-
-    function polishChat() {
-        normalizeMessageBubbles();
-        addCodeCopyButtons();
-    }
-
-    function boot() {
-        polishChat();
-
-        const root = findChatRoot();
-
-        const observer = new MutationObserver(function () {
-            polishChat();
-        });
-
-        observer.observe(root, {
-            childList: true,
-            subtree: true
-        });
-
-        window.__NOVA_CHAT_POLISH_OBSERVER__ = observer;
-
-        console.log("[NOVA CHAT POLISH SAFE] ready");
-    }
-
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", boot);
-    } else {
-        boot();
-    }
+  console.log("[Nova] hidden old Desktop Chat floating card by text");
 })();
 </script>
 

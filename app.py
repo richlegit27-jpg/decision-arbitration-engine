@@ -13332,6 +13332,799 @@ except Exception:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# NOVA_HISTORY_LIST_AND_DETAIL_20260621
+def nova_history_load_sessions_20260621():
+    import json
+    from pathlib import Path
+
+    base = Path(__file__).resolve().parent
+    data_path = base / "data" / "nova_sessions.json"
+
+    try:
+        payload = json.loads(data_path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+    if isinstance(payload, list):
+        return payload
+
+    if isinstance(payload, dict):
+        for key in ("sessions", "items", "data"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return value
+
+        values = list(payload.values())
+        if values and all(isinstance(v, dict) for v in values):
+            return values
+
+    return []
+
+
+def nova_history_sid_20260621(session):
+    if not isinstance(session, dict):
+        return ""
+    return str(
+        session.get("id") or
+        session.get("session_id") or
+        session.get("sid") or
+        session.get("uuid") or
+        ""
+    )
+
+
+def nova_history_title_20260621(session):
+    if not isinstance(session, dict):
+        return "Untitled session"
+    return str(
+        session.get("title") or
+        session.get("name") or
+        session.get("label") or
+        "Untitled session"
+    )
+
+
+def nova_history_messages_20260621(session):
+    if not isinstance(session, dict):
+        return []
+
+    for key in ("messages", "chat", "conversation", "items"):
+        value = session.get(key)
+        if isinstance(value, list):
+            return value
+
+    return []
+
+
+def nova_history_msg_text_20260621(message):
+    import json
+
+    if isinstance(message, str):
+        return message
+
+    if not isinstance(message, dict):
+        return str(message)
+
+    for key in ("content", "text", "message", "body", "output", "answer"):
+        value = message.get(key)
+        if value is not None and str(value).strip():
+            return str(value)
+
+    return json.dumps(message, ensure_ascii=False, indent=2)
+
+
+def nova_history_msg_role_20260621(message):
+    if not isinstance(message, dict):
+        return "message"
+
+    return str(
+        message.get("role") or
+        message.get("sender") or
+        message.get("type") or
+        "message"
+    )
+
+
+@app.route("/history")
+def nova_history_list_page_20260621():
+    import html
+
+    sessions = [
+        s for s in nova_history_load_sessions_20260621()
+        if nova_history_sid_20260621(s)
+    ]
+
+    def updated(s):
+        if not isinstance(s, dict):
+            return ""
+        return str(s.get("updated_at") or s.get("updated") or s.get("created_at") or s.get("created") or "")
+
+    sessions.sort(key=updated, reverse=True)
+
+    cards = []
+
+    for s in sessions:
+        sid = nova_history_sid_20260621(s)
+        title = nova_history_title_20260621(s)
+        count = s.get("message_count") or len(nova_history_messages_20260621(s)) or 0
+
+        cards.append(f"""
+          <a class="session" href="/history/{html.escape(sid)}">
+            <div class="title">{html.escape(title)}</div>
+            <div class="meta">{html.escape(str(count))} messages ? {html.escape(updated(s))}</div>
+            <div class="sid">{html.escape(sid)}</div>
+          </a>
+        """)
+
+    if not cards:
+        cards.append('<div class="empty">No sessions found.</div>')
+
+    return f"""
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Nova History</title>
+  <style>
+    body {{
+      margin: 0;
+      padding: 22px;
+      background: #0f172a;
+      color: #f8fafc;
+      font-family: Arial, sans-serif;
+    }}
+
+    .wrap {{
+      max-width: 850px;
+      margin: 0 auto;
+    }}
+
+    h1 {{
+      margin: 0 0 8px;
+      font-size: 30px;
+    }}
+
+    .sub {{
+      opacity: 0.72;
+      margin-bottom: 16px;
+    }}
+
+    .top {{
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: #0f172a;
+      padding-bottom: 12px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }}
+
+    .btn {{
+      border: 1px solid rgba(168, 85, 247, 0.75);
+      background: rgba(168, 85, 247, 0.18);
+      color: white;
+      padding: 10px 12px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-size: 14px;
+    }}
+
+    .btn.disabled {{
+      opacity: 0.55;
+      cursor: not-allowed;
+      display: inline-block;
+    }}
+
+    .list {{
+      max-height: calc(100vh - 150px);
+      overflow-y: auto;
+      padding-right: 8px;
+    }}
+
+    .session {{
+      display: block;
+      margin: 10px 0;
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(168, 85, 247, 0.65);
+      background: #1f2937;
+      color: white;
+      text-decoration: none;
+      box-sizing: border-box;
+    }}
+
+    .session:hover {{
+      background: rgba(168, 85, 247, 0.25);
+    }}
+
+    .title {{
+      font-size: 17px;
+      font-weight: 800;
+    }}
+
+    .meta {{
+      opacity: 0.75;
+      font-size: 13px;
+      margin-top: 6px;
+    }}
+
+    .sid {{
+      opacity: 0.48;
+      font-size: 12px;
+      margin-top: 6px;
+      word-break: break-all;
+    }}
+
+    .empty {{
+      padding: 18px;
+      border-radius: 14px;
+      background: #1f2937;
+      border: 1px solid rgba(168, 85, 247, 0.65);
+    }}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Nova History</h1>
+    <div class="sub">Found {len(sessions)} sessions. Click a card to view its messages.</div>
+
+    <div class="top">
+      <a class="btn" href="/app">Back to Nova</a>
+      <a class="btn" href="/new-session">New Chat</a>
+      <a class="btn" href="/history">Refresh</a>
+      <a class="btn" href="/api/sessions">Raw API</a>
+    </div>
+
+    <div class="list">
+      {''.join(cards)}
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+
+@app.route("/history/<session_id>")
+def nova_history_detail_page_20260621(session_id):
+    import html
+
+    sessions = nova_history_load_sessions_20260621()
+    session = None
+
+    for s in sessions:
+        if nova_history_sid_20260621(s) == session_id:
+            session = s
+            break
+
+    if not session:
+        return f"""
+<!doctype html>
+<html>
+<body style="font-family:Arial;background:#0f172a;color:white;padding:24px;">
+  <h1>Session not found</h1>
+  <p>{html.escape(session_id)}</p>
+  <p><a style="color:#c084fc;" href="/history">Back to history</a></p>
+</body>
+</html>
+"""
+
+    title = nova_history_title_20260621(session)
+    sid = nova_history_sid_20260621(session)
+    messages = nova_history_messages_20260621(session)
+
+    rows = []
+
+    for m in messages:
+        role = nova_history_msg_role_20260621(m)
+        text = nova_history_msg_text_20260621(m)
+
+        rows.append(f"""
+          <div class="msg {html.escape(role.lower())}">
+            <div class="role">{html.escape(role)}</div>
+            <pre>{html.escape(text)}</pre>
+          </div>
+        """)
+
+    if not rows:
+        rows.append("""
+          <div class="empty">
+            This is a new empty session. No messages yet. Click "Open in Nova" to start chatting.
+          </div>
+        """)
+
+    return f"""
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{html.escape(title)}</title>
+  <style>
+    body {{
+      margin: 0;
+      padding: 22px;
+      background: #0f172a;
+      color: #f8fafc;
+      font-family: Arial, sans-serif;
+    }}
+
+    .wrap {{
+      max-width: 900px;
+      margin: 0 auto;
+    }}
+
+    h1 {{
+      margin: 0 0 8px;
+      font-size: 28px;
+    }}
+
+    .sid {{
+      opacity: 0.55;
+      font-size: 12px;
+      margin-bottom: 16px;
+      word-break: break-all;
+    }}
+
+    .top {{
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: #0f172a;
+      padding-bottom: 12px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }}
+
+    .btn {{
+      border: 1px solid rgba(168, 85, 247, 0.75);
+      background: rgba(168, 85, 247, 0.18);
+      color: white;
+      padding: 10px 12px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-size: 14px;
+    }}
+
+    .btn.disabled {{
+      opacity: 0.55;
+      cursor: not-allowed;
+      display: inline-block;
+    }}
+
+    .composer {{
+      display: flex;
+      gap: 10px;
+      margin: 12px 0 16px;
+      align-items: stretch;
+    }}
+
+    .composer textarea {{
+      flex: 1;
+      min-height: 54px;
+      resize: vertical;
+      border-radius: 12px;
+      border: 1px solid rgba(168, 85, 247, 0.55);
+      background: #111827;
+      color: white;
+      padding: 12px;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      box-sizing: border-box;
+    }}
+
+    .composer button {{
+      border: 1px solid rgba(168, 85, 247, 0.75);
+      background: rgba(168, 85, 247, 0.25);
+      color: white;
+      padding: 10px 14px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 700;
+    }}
+
+    .messages {{
+      max-height: calc(100vh - 245px);
+      overflow-y: auto;
+      padding-right: 8px;
+    }}
+
+    .msg {{
+      margin: 12px 0;
+      padding: 14px;
+      border-radius: 14px;
+      background: #1f2937;
+      border: 1px solid rgba(148, 163, 184, 0.24);
+    }}
+
+    .msg.user {{
+      border-color: rgba(168, 85, 247, 0.65);
+    }}
+
+    .msg.assistant {{
+      border-color: rgba(59, 130, 246, 0.55);
+    }}
+
+    .role {{
+      font-size: 12px;
+      opacity: 0.7;
+      font-weight: 800;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }}
+
+    pre {{
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: inherit;
+      line-height: 1.45;
+    }}
+
+    .empty {{
+      padding: 18px;
+      border-radius: 14px;
+      background: #1f2937;
+      border: 1px solid rgba(168, 85, 247, 0.65);
+    }}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>{html.escape(title)}</h1>
+    <div class="sid">{html.escape(sid)}</div>
+
+    <div class="top">
+      <a class="btn" href="/history">Back to History</a>
+      <span class="btn disabled">Open in Nova disabled for now</span>
+    </div>
+
+    <form class="composer" method="POST" action="/history/{html.escape(sid)}/send">
+      <textarea name="text" placeholder="Type here to add to this exact session..." required></textarea>
+      <button type="submit">Add to This Session</button>
+    </form>
+
+    <div class="messages">
+      {''.join(rows)}
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+
+@app.route("/new-session")
+def nova_history_new_session_20260621():
+    import json
+    import uuid
+    from pathlib import Path
+    from datetime import datetime, timezone
+
+    base = Path(__file__).resolve().parent
+    data_path = base / "data" / "nova_sessions.json"
+
+    try:
+        payload = json.loads(data_path.read_text(encoding="utf-8"))
+    except Exception:
+        payload = {"sessions": []}
+
+    if isinstance(payload, list):
+        root = {"sessions": payload}
+        sessions = payload
+    elif isinstance(payload, dict):
+        root = payload
+        sessions = None
+
+        for key in ("sessions", "items", "data"):
+            if isinstance(root.get(key), list):
+                sessions = root[key]
+                break
+
+        if sessions is None:
+            sessions = []
+            root["sessions"] = sessions
+    else:
+        root = {"sessions": []}
+        sessions = root["sessions"]
+
+    now = datetime.now(timezone.utc).isoformat()
+    sid = "session_" + uuid.uuid4().hex
+
+    session = {
+        "id": sid,
+        "title": "New Chat",
+        "created_at": now,
+        "updated_at": now,
+        "message_count": 0,
+        "messages": [],
+        "meta": {},
+        "pinned": False,
+        "working_state": {
+            "active_task": "",
+            "checkpoint": "",
+            "current_bug": "",
+            "current_file": "",
+            "last_success": "",
+            "next_move": "",
+            "updated_at": ""
+        }
+    }
+
+    sessions.insert(0, session)
+    root["active_session_id"] = sid
+    root["sessions"] = sessions
+
+    data_path.write_text(json.dumps(root, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    return f"""
+<!doctype html>
+<html>
+<body>
+<script>
+  localStorage.setItem("nova_active_session_id", "{sid}");
+  localStorage.setItem("nova_session_id", "{sid}");
+  localStorage.setItem("nova_desktop_active_session_id", "{sid}");
+  localStorage.setItem("nova_current_session_id", "{sid}");
+  location.href = "/app?session_id={sid}&bust=" + Date.now();
+</script>
+New session created.
+</body>
+</html>
+"""
+# END_NOVA_HISTORY_LIST_AND_DETAIL_20260621
+
+
+# NOVA_OPEN_SESSION_BRIDGE_20260622
+@app.route("/open-session/<session_id>")
+def nova_open_session_bridge_20260622(session_id):
+    import json
+    import html
+    from pathlib import Path
+
+    sid = str(session_id or "").strip()
+    base = Path(__file__).resolve().parent
+    data_path = base / "data" / "nova_sessions.json"
+
+    try:
+        payload = json.loads(data_path.read_text(encoding="utf-8"))
+    except Exception:
+        payload = {"sessions": []}
+
+    def get_sessions(root):
+        if isinstance(root, list):
+            return root
+
+        if isinstance(root, dict):
+            for key in ("sessions", "items", "data"):
+                value = root.get(key)
+                if isinstance(value, list):
+                    return value
+
+        return []
+
+    sessions = get_sessions(payload)
+    found = False
+
+    for session in sessions:
+        if not isinstance(session, dict):
+            continue
+
+        current_id = str(
+            session.get("id") or
+            session.get("session_id") or
+            session.get("sid") or
+            session.get("uuid") or
+            ""
+        ).strip()
+
+        if current_id == sid:
+            found = True
+            session["id"] = sid
+            session["session_id"] = sid
+
+            if not isinstance(session.get("messages"), list):
+                session["messages"] = []
+
+            break
+
+    if isinstance(payload, dict):
+        payload["active_session_id"] = sid
+
+    try:
+        data_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+    safe_sid = html.escape(sid)
+
+    if not found:
+        return f"""
+<!doctype html>
+<html>
+<body style="background:#0f172a;color:white;font-family:Arial;padding:24px;">
+  <h1>Session not found</h1>
+  <p>{safe_sid}</p>
+  <p><a style="color:#c084fc;" href="/history">Back to history</a></p>
+</body>
+</html>
+"""
+
+    return f"""
+<!doctype html>
+<html>
+<body style="background:#0f172a;color:white;font-family:Arial;padding:24px;">
+  <p>Opening session...</p>
+
+  <script>
+    const sid = "{safe_sid}";
+
+    try {{
+      localStorage.setItem("nova_active_session_id", sid);
+      localStorage.setItem("nova_session_id", sid);
+      localStorage.setItem("nova_desktop_active_session_id", sid);
+      localStorage.setItem("nova_current_session_id", sid);
+      localStorage.setItem("active_session_id", sid);
+      localStorage.setItem("session_id", sid);
+
+      sessionStorage.setItem("nova_active_session_id", sid);
+      sessionStorage.setItem("nova_session_id", sid);
+      sessionStorage.setItem("active_session_id", sid);
+      sessionStorage.setItem("session_id", sid);
+    }} catch (_) {{}}
+
+    location.replace("/app?session_id=" + encodeURIComponent(sid) + "&force_session=1&bust=" + Date.now());
+  </script>
+</body>
+</html>
+"""
+# END_NOVA_OPEN_SESSION_BRIDGE_20260622
+
+
+
+# NOVA_HISTORY_DIRECT_SEND_20260622
+@app.route("/history/<session_id>/send", methods=["POST"])
+def nova_history_direct_send_20260622(session_id):
+    import json
+    from pathlib import Path
+    from datetime import datetime, timezone
+    from flask import request, redirect
+
+    sid = str(session_id or "").strip()
+    text = str(request.form.get("text") or "").strip()
+
+    if not sid or not text:
+        return redirect("/history/" + sid)
+
+    base = Path(__file__).resolve().parent
+    data_path = base / "data" / "nova_sessions.json"
+
+    try:
+        payload = json.loads(data_path.read_text(encoding="utf-8"))
+    except Exception:
+        payload = {"sessions": []}
+
+    def get_sessions(root):
+        if isinstance(root, list):
+            return root
+
+        if isinstance(root, dict):
+            for key in ("sessions", "items", "data"):
+                value = root.get(key)
+                if isinstance(value, list):
+                    return value
+
+        return []
+
+    def get_sid(session):
+        if not isinstance(session, dict):
+            return ""
+        return str(
+            session.get("id") or
+            session.get("session_id") or
+            session.get("sid") or
+            session.get("uuid") or
+            ""
+        ).strip()
+
+    sessions = get_sessions(payload)
+    target = None
+
+    for session in sessions:
+        if get_sid(session) == sid:
+            target = session
+            break
+
+    if target is None:
+        now = datetime.now(timezone.utc).isoformat()
+        target = {
+            "id": sid,
+            "session_id": sid,
+            "title": "New Chat",
+            "created_at": now,
+            "updated_at": now,
+            "message_count": 0,
+            "messages": [],
+            "meta": {},
+            "pinned": False,
+            "working_state": {
+                "active_task": "",
+                "checkpoint": "",
+                "current_bug": "",
+                "current_file": "",
+                "last_success": "",
+                "next_move": "",
+                "updated_at": ""
+            }
+        }
+
+        if isinstance(payload, dict):
+            if not isinstance(payload.get("sessions"), list):
+                payload["sessions"] = []
+            payload["sessions"].insert(0, target)
+            sessions = payload["sessions"]
+        else:
+            payload = {"sessions": [target]}
+            sessions = payload["sessions"]
+
+    messages = target.get("messages")
+    if not isinstance(messages, list):
+        messages = []
+        target["messages"] = messages
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    messages.append({
+        "role": "user",
+        "content": text,
+        "created_at": now
+    })
+
+    target["id"] = sid
+    target["session_id"] = sid
+    target["message_count"] = len(messages)
+    target["updated_at"] = now
+
+    if str(target.get("title") or "").strip().lower() in ("", "new chat", "untitled session"):
+        words = text.replace("\n", " ").split()
+        title = " ".join(words[:6]).strip()
+        target["title"] = title[:60] if title else "New Chat"
+
+    if isinstance(payload, dict):
+        payload["active_session_id"] = sid
+
+    data_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    return redirect("/history/" + sid)
+# END_NOVA_HISTORY_DIRECT_SEND_20260622
+
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(

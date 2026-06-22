@@ -281,3 +281,146 @@ html {
   min-height: 0 !important;
   overflow-y: auto !important;
 }
+
+/* NOVA_EXACT_CHAT_PANEL_HEADER_AND_SCROLL_FIX_20260621 */
+
+/* Stop the whole page from growing downward. */
+html,
+body {
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  padding-bottom: 0 !important;
+}
+
+/* The real desktop chat panel. */
+main.chat-panel,
+.panel.chat-panel,
+.chat-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  height: calc(100vh - 32px) !important;
+  max-height: calc(100vh - 32px) !important;
+  overflow: hidden !important;
+}
+
+/* Hide old "Desktop Chat / status / summary / ready" header, but keep it in DOM for old JS. */
+main.chat-panel > header.chat-top,
+.panel.chat-panel > header.chat-top,
+.chat-panel > header.chat-top {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  max-width: 1px !important;
+  max-height: 1px !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+
+/* Only the message history scrolls. */
+main.chat-panel > #chat,
+.panel.chat-panel > #chat,
+.chat-panel > #chat {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain !important;
+}
+
+/* Composer/message bar stays in place. */
+main.chat-panel > .composer,
+.panel.chat-panel > .composer,
+.chat-panel > .composer {
+  flex: 0 0 auto !important;
+  position: relative !important;
+  bottom: auto !important;
+  transform: none !important;
+  z-index: 50 !important;
+  margin-top: 12px !important;
+}
+
+/* Messages should not stretch the entire page. */
+#chat .msg,
+#chat .message,
+#chat .desktop-message,
+#chat .assistant-bubble,
+#chat .user-bubble {
+  flex-shrink: 0 !important;
+}
+
+/* NOVA_RESTORE_DESKTOP_SESSIONS_AFTER_CHAT_PANEL_FIX_20260621 */
+
+/* Keep side panels visible after locking the chat panel. */
+.sidebar,
+.side-panel,
+.desktop-sidebar,
+.sessions-shell,
+.sessions-panel,
+.panel.sessions,
+aside.panel,
+aside.sidebar,
+aside {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+
+/* The actual recent sessions list should scroll inside itself, not disappear. */
+#desktopSessionList,
+.desktop-session-list,
+.session-list-shell {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+  align-items: stretch !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  min-height: 120px !important;
+  max-height: 320px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  gap: 10px !important;
+}
+
+/* Session rows stay visible and stacked. */
+#desktopSessionList .desktop-session-item,
+.desktop-session-list .desktop-session-item {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  flex: 0 0 auto !important;
+  width: 100% !important;
+}
+
+/* Session buttons must remain clickable. */
+#openSessionsBtn,
+#newSessionBtn,
+#desktopSessionsButton {
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* Loosen only the global body clipping from the previous chat fix. */
+html,
+body {
+  overflow-x: hidden !important;
+}
+
+/* Keep the main chat panel fixed without hiding the sidebar. */
+main.chat-panel,
+.panel.chat-panel,
+.chat-panel {
+  overflow: hidden !important;
+}
