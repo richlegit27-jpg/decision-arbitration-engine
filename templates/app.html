@@ -2896,61 +2896,6 @@ function renderDesktopChatMessagesRescue(messages) {
 })();
 </script>
 
-<style>
-/* NOVA_DESKTOP_COMPACT_RECENT_SCROLL_CHAT_20260610 */
-
-/* Keep the Recent/session list scrollable without breaking resize. */
-#desktopSessionList,
-.desktop-session-list {
-  height: 320px !important;
-  min-height: 160px !important;
-  max-height: 320px !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  padding-right: 6px !important;
-  box-sizing: border-box !important;
-  pointer-events: auto !important;
-}
-
-@media (max-height: 760px) {
-  #desktopSessionList,
-  .desktop-session-list {
-    height: 220px !important;
-    max-height: 220px !important;
-  }
-}
-
-/* Make repeated session rows smaller so Desktop Chat is not pushed way down. */
-.desktop-session-item {
-  min-height: 34px !important;
-  padding: 8px 10px !important;
-  margin: 4px 0 !important;
-  font-size: 13px !important;
-  line-height: 1.2 !important;
-  cursor: pointer !important;
-  pointer-events: auto !important;
-}
-
-/* Keep the lower chat area reachable. */
-html,
-body {
-  overflow-y: auto !important;
-}
-
-body {
-  padding-bottom: 160px !important;
-}
-
-/* Give Desktop Chat some breathing room when scrolled into view. */
-main,
-.desktop-chat,
-.chat-panel,
-.chat-column,
-.chat-container {
-  scroll-margin-top: 24px !important;
-}
-</style>
-
 <script>
 (function () {
   "use strict";
