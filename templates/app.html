@@ -7214,5 +7214,621 @@ main {
 })();
 </script>
 
+
+<!-- NOVA_MEMORY_PANEL_RESPONSIVE_ACCESS_FINAL_20260622 -->
+<style>
+/* Keep Memory reachable when browser height/width is collapsed */
+.sidebar,
+.side-panel,
+aside,
+.tools {
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scrollbar-gutter: stable !important;
+}
+
+.memory-section {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    flex: 0 0 auto !important;
+    scroll-margin-top: 16px !important;
+    scroll-margin-bottom: 96px !important;
+}
+
+.memory-card-shell {
+    min-height: 0 !important;
+}
+
+#desktopMemoryList,
+.desktop-memory-list {
+    min-height: 80px !important;
+    max-height: min(360px, 34vh) !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+
+@media (max-height: 760px) {
+    .sidebar,
+    .side-panel,
+    aside,
+    .tools {
+        max-height: 100vh !important;
+        overflow-y: auto !important;
+    }
+
+    #desktopMemoryList,
+    .desktop-memory-list {
+        max-height: 42vh !important;
+    }
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_MEMORY_PANEL_RESPONSIVE_ACCESS_FINAL_20260622__) return;
+    window.__NOVA_MEMORY_PANEL_RESPONSIVE_ACCESS_FINAL_20260622__ = true;
+
+    function showMemoryPanel() {
+        const tools = document.querySelector(".tools");
+        const memory = document.querySelector(".memory-section");
+        const list = document.getElementById("desktopMemoryList");
+
+        if (tools) {
+            tools.style.display = "flex";
+            tools.style.visibility = "visible";
+            tools.style.opacity = "1";
+            tools.style.overflowY = "auto";
+            tools.style.minHeight = "0";
+        }
+
+        if (memory) {
+            memory.hidden = false;
+            memory.removeAttribute("hidden");
+            memory.style.display = "block";
+            memory.style.visibility = "visible";
+            memory.style.opacity = "1";
+
+            try {
+                memory.scrollIntoView({
+                    behavior: "smooth",
+                    block: "nearest"
+                });
+            } catch (_) {
+                memory.scrollIntoView();
+            }
+        }
+
+        if (list && !list.dataset.novaMemoryResponsiveLoaded) {
+            list.dataset.novaMemoryResponsiveLoaded = "true";
+            if (typeof window.loadDesktopMemory === "function") {
+                window.loadDesktopMemory();
+            } else if (typeof window.NovaLoadDesktopMemory === "function") {
+                window.NovaLoadDesktopMemory();
+            } else if (typeof window.loadMemories === "function") {
+                window.loadMemories();
+            }
+        }
+
+        window.__NOVA_MEMORY_PANEL_OPEN__ = true;
+    }
+
+    function wireMemoryButton() {
+        const button = document.getElementById("openMemoryBtn");
+        if (!button || button.dataset.novaMemoryResponsiveWired === "true") return;
+
+        button.dataset.novaMemoryResponsiveWired = "true";
+
+        button.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (typeof event.stopImmediatePropagation === "function") {
+                event.stopImmediatePropagation();
+            }
+
+            showMemoryPanel();
+        }, true);
+    }
+
+    window.NovaShowMemoryPanelResponsive = showMemoryPanel;
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", wireMemoryButton);
+    } else {
+        wireMemoryButton();
+    }
+
+    setTimeout(wireMemoryButton, 300);
+    setTimeout(wireMemoryButton, 900);
+
+    window.addEventListener("resize", function () {
+        if (window.__NOVA_MEMORY_PANEL_OPEN__) {
+            setTimeout(showMemoryPanel, 80);
+        }
+    });
+})();
+</script>
+
+
+<!-- NOVA_MEMORY_CONTROL_OVERLAY_FINAL_20260622 -->
+<style>
+#novaMemoryControlOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    background: rgba(5, 6, 18, .72);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 22px;
+}
+
+#novaMemoryControlOverlay.nova-memory-open {
+    display: flex;
+}
+
+#novaMemoryControlBox {
+    width: min(1080px, 96vw);
+    max-height: 88vh;
+    overflow: hidden;
+    background: #111226;
+    color: #f4f1ff;
+    border: 1px solid rgba(255,255,255,.16);
+    border-radius: 20px;
+    box-shadow: 0 24px 90px rgba(0,0,0,.48);
+    font-family: Inter, system-ui, Segoe UI, Arial, sans-serif;
+    display: grid;
+    grid-template-rows: auto auto 1fr;
+}
+
+.nova-memory-control-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 18px 20px;
+    border-bottom: 1px solid rgba(255,255,255,.10);
+}
+
+.nova-memory-control-head h2 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.nova-memory-control-close {
+    border: 1px solid rgba(255,255,255,.18);
+    background: rgba(255,255,255,.10);
+    color: #fff;
+    border-radius: 999px;
+    width: 34px;
+    height: 34px;
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+}
+
+.nova-memory-control-toolbar {
+    display: grid;
+    gap: 10px;
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(255,255,255,.10);
+}
+
+.nova-memory-control-search {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid rgba(255,255,255,.16);
+    background: rgba(255,255,255,.08);
+    color: #fff;
+    border-radius: 12px;
+    padding: 10px 12px;
+    outline: none;
+}
+
+.nova-memory-control-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.nova-memory-tab,
+.nova-memory-action {
+    border: 1px solid rgba(255,255,255,.16);
+    background: rgba(255,255,255,.08);
+    color: #f4f1ff;
+    border-radius: 999px;
+    padding: 7px 10px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.nova-memory-tab.active {
+    background: rgba(170,130,255,.26);
+    border-color: rgba(190,160,255,.45);
+}
+
+#novaMemoryControlList {
+    overflow: auto;
+    padding: 16px 20px 20px;
+    display: grid;
+    gap: 10px;
+}
+
+.nova-memory-control-card {
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.06);
+    border-radius: 14px;
+    padding: 12px;
+    display: grid;
+    gap: 8px;
+}
+
+.nova-memory-control-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    opacity: .72;
+    font-size: 12px;
+}
+
+.nova-memory-control-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.45;
+}
+
+@media (max-height: 720px) {
+    #novaMemoryControlOverlay {
+        align-items: stretch;
+        padding: 10px;
+    }
+
+    #novaMemoryControlBox {
+        max-height: calc(100vh - 20px);
+    }
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_MEMORY_CONTROL_OVERLAY_FINAL_20260622__) return;
+    window.__NOVA_MEMORY_CONTROL_OVERLAY_FINAL_20260622__ = true;
+
+    let memoryItems = [];
+    let currentTab = "all";
+    let searchText = "";
+
+    function escMemory(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function getMemoryText(item) {
+        return String(
+            item.text ||
+            item.value ||
+            item.fact ||
+            item.content ||
+            item.memory ||
+            item.summary ||
+            item.title ||
+            ""
+        );
+    }
+
+    function getMemoryKind(item) {
+        const raw = String(item.kind || item.type || item.category || "").toLowerCase();
+        const text = getMemoryText(item).toLowerCase();
+
+        if (item.pinned || item.pin || item.is_pinned) return "pinned";
+        if (raw.includes("preference") || text.includes("prefer") || text.includes("favorite") || text.includes("style")) return "preferences";
+        if (raw.includes("project") || text.includes("nova") || text.includes("current project") || text.includes("phase")) return "project";
+        if (raw.includes("name") || raw.includes("person") || text.includes("my name") || text.includes("user name")) return "people";
+
+        return raw || "general";
+    }
+
+    function normalizeMemoryPayload(data) {
+        const candidates =
+            data.items ||
+            data.memories ||
+            data.memory ||
+            data.data ||
+            data.records ||
+            [];
+
+        if (Array.isArray(candidates)) return candidates;
+
+        if (candidates && Array.isArray(candidates.items)) return candidates.items;
+        if (candidates && Array.isArray(candidates.memories)) return candidates.memories;
+
+        return [];
+    }
+
+    function ensureMemoryOverlay() {
+        let overlay = document.getElementById("novaMemoryControlOverlay");
+        if (overlay) return overlay;
+
+        overlay = document.createElement("div");
+        overlay.id = "novaMemoryControlOverlay";
+        overlay.innerHTML = `
+            <section id="novaMemoryControlBox" role="dialog" aria-modal="true" aria-label="Memory Control Center">
+                <div class="nova-memory-control-head">
+                    <div>
+                        <h2>Memory Control Center</h2>
+                        <div id="novaMemoryControlCount" style="opacity:.68;font-size:13px;margin-top:4px;">Loading...</div>
+                    </div>
+                    <button class="nova-memory-control-close" type="button" aria-label="Close">&times;</button>
+                </div>
+
+                <div class="nova-memory-control-toolbar">
+                    <input id="novaMemoryControlSearch" class="nova-memory-control-search" placeholder="Search memory..." />
+                    <div class="nova-memory-control-tabs">
+                        <button class="nova-memory-tab active" type="button" data-memory-tab="all">All</button>
+                        <button class="nova-memory-tab" type="button" data-memory-tab="preferences">Preferences</button>
+                        <button class="nova-memory-tab" type="button" data-memory-tab="project">Project</button>
+                        <button class="nova-memory-tab" type="button" data-memory-tab="people">People</button>
+                        <button class="nova-memory-tab" type="button" data-memory-tab="pinned">Pinned</button>
+                        <button class="nova-memory-action" type="button" id="novaMemoryRefreshBtn">Refresh</button>
+                    </div>
+                </div>
+
+                <div id="novaMemoryControlList">
+                    <div class="session-placeholder">Loading memory...</div>
+                </div>
+            </section>
+        `;
+
+        document.body.appendChild(overlay);
+
+        overlay.addEventListener("click", function (event) {
+            if (event.target === overlay) closeMemoryOverlay();
+        });
+
+        const close = overlay.querySelector(".nova-memory-control-close");
+        if (close) close.addEventListener("click", closeMemoryOverlay);
+
+        const search = overlay.querySelector("#novaMemoryControlSearch");
+        if (search) {
+            search.addEventListener("input", function () {
+                searchText = search.value || "";
+                renderMemoryOverlayList();
+            });
+        }
+
+        overlay.querySelectorAll("[data-memory-tab]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                currentTab = button.dataset.memoryTab || "all";
+                overlay.querySelectorAll("[data-memory-tab]").forEach(function (b) {
+                    b.classList.toggle("active", b === button);
+                });
+                renderMemoryOverlayList();
+            });
+        });
+
+        const refresh = overlay.querySelector("#novaMemoryRefreshBtn");
+        if (refresh) refresh.addEventListener("click", loadMemoryOverlayData);
+
+        return overlay;
+    }
+
+    function closeMemoryOverlay() {
+        const overlay = document.getElementById("novaMemoryControlOverlay");
+        if (overlay) overlay.classList.remove("nova-memory-open");
+    }
+
+    async function openMemoryOverlay() {
+        const overlay = ensureMemoryOverlay();
+        overlay.classList.add("nova-memory-open");
+        await loadMemoryOverlayData();
+    }
+
+    async function loadMemoryOverlayData() {
+        const list = document.getElementById("novaMemoryControlList");
+        const count = document.getElementById("novaMemoryControlCount");
+
+        if (list) list.innerHTML = "<div class='session-placeholder'>Loading memory...</div>";
+        if (count) count.textContent = "Loading...";
+
+        try {
+            const res = await fetch("/api/memory", { cache: "no-store" });
+            const data = await res.json();
+
+            memoryItems = normalizeMemoryPayload(data);
+            renderMemoryOverlayList();
+
+            if (typeof window.loadDesktopMemory === "function") {
+                window.loadDesktopMemory();
+            }
+        } catch (error) {
+            if (count) count.textContent = "Memory failed to load";
+            if (list) list.innerHTML = "<div class='session-placeholder'>Could not load memory.</div>";
+        }
+    }
+
+    function renderMemoryOverlayList() {
+        const list = document.getElementById("novaMemoryControlList");
+        const count = document.getElementById("novaMemoryControlCount");
+        if (!list) return;
+
+        const q = String(searchText || "").trim().toLowerCase();
+
+        let visible = memoryItems.filter(function (item) {
+            const text = getMemoryText(item);
+            const kind = getMemoryKind(item);
+
+            if (currentTab !== "all" && kind !== currentTab) return false;
+            if (q && !text.toLowerCase().includes(q) && !kind.includes(q)) return false;
+
+            return true;
+        });
+
+        if (count) {
+            count.textContent = visible.length + " shown / " + memoryItems.length + " total";
+        }
+
+        if (!visible.length) {
+            list.innerHTML = "<div class='session-placeholder'>No memories found for this view.</div>";
+            return;
+        }
+
+        list.innerHTML = visible.map(function (item) {
+            const text = getMemoryText(item);
+            const kind = getMemoryKind(item);
+            const id = item.id || item.memory_id || item.uuid || "";
+            const pinned = item.pinned || item.pin || item.is_pinned;
+
+            return `
+                <article class="nova-memory-control-card" data-memory-id="${escMemory(id)}">
+                    <div class="nova-memory-control-meta">
+                        <span>${escMemory(kind)}</span>
+                        ${pinned ? "<span>pinned</span>" : ""}
+                    </div>
+                    <div class="nova-memory-control-text">${escMemory(text || JSON.stringify(item, null, 2))}</div>
+                </article>
+            `;
+        }).join("");
+    }
+
+    function wireMemoryOverlayButton() {
+        const button = document.getElementById("openMemoryBtn");
+        if (!button || button.dataset.novaMemoryOverlayWired === "true") return;
+
+        button.dataset.novaMemoryOverlayWired = "true";
+
+        button.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (typeof event.stopImmediatePropagation === "function") {
+                event.stopImmediatePropagation();
+            }
+
+            openMemoryOverlay();
+        }, true);
+    }
+
+    window.NovaOpenMemoryControlCenter = openMemoryOverlay;
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", wireMemoryOverlayButton);
+    } else {
+        wireMemoryOverlayButton();
+    }
+
+    setTimeout(wireMemoryOverlayButton, 300);
+    setTimeout(wireMemoryOverlayButton, 1000);
+})();
+</script>
+
+
+<!-- NOVA_MEMORY_FLOATING_FALLBACK_BUTTON_20260622 -->
+<style>
+#novaMemoryFloatingFallbackBtn {
+    position: fixed;
+    left: 16px;
+    bottom: 16px;
+    z-index: 100001;
+    display: none;
+    border: 1px solid rgba(255,255,255,.20);
+    background: rgba(36, 28, 68, .94);
+    color: #f4f1ff;
+    border-radius: 999px;
+    padding: 10px 14px;
+    cursor: pointer;
+    font: 700 13px Inter, system-ui, Segoe UI, Arial, sans-serif;
+    box-shadow: 0 12px 34px rgba(0,0,0,.34);
+}
+
+@media (max-height: 820px), (max-width: 760px) {
+    #novaMemoryFloatingFallbackBtn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_MEMORY_FLOATING_FALLBACK_BUTTON_20260622__) return;
+    window.__NOVA_MEMORY_FLOATING_FALLBACK_BUTTON_20260622__ = true;
+
+    function ensureButton() {
+        let button = document.getElementById("novaMemoryFloatingFallbackBtn");
+        if (button) return button;
+
+        button = document.createElement("button");
+        button.id = "novaMemoryFloatingFallbackBtn";
+        button.type = "button";
+        button.textContent = "Memory";
+        button.title = "Open Memory";
+
+        document.body.appendChild(button);
+
+        button.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (typeof window.NovaOpenMemoryControlCenter === "function") {
+                window.NovaOpenMemoryControlCenter();
+                return;
+            }
+
+            const normalButton = document.getElementById("openMemoryBtn");
+            if (normalButton) normalButton.click();
+        }, true);
+
+        return button;
+    }
+
+    function updateButton() {
+        const fallback = ensureButton();
+        const normal = document.getElementById("openMemoryBtn");
+
+        if (!normal) {
+            fallback.style.display = "inline-flex";
+            return;
+        }
+
+        const rect = normal.getBoundingClientRect();
+        const normalVisible =
+            rect.width > 0 &&
+            rect.height > 0 &&
+            rect.bottom > 0 &&
+            rect.top < window.innerHeight &&
+            rect.right > 0 &&
+            rect.left < window.innerWidth;
+
+        const cramped = window.innerHeight <= 820 || window.innerWidth <= 760;
+
+        fallback.style.display = (!normalVisible || cramped) ? "inline-flex" : "";
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", updateButton);
+    } else {
+        updateButton();
+    }
+
+    window.addEventListener("resize", updateButton);
+    setTimeout(updateButton, 300);
+    setTimeout(updateButton, 1000);
+})();
+</script>
+
 </body>
 </html>
