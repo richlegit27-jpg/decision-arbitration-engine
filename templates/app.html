@@ -7310,6 +7310,122 @@ href="/static/css/nova-desktop-polish.css?v=recent-session-cards-final-20260621-
 
 
 
+
+<!-- NOVA_CODE_BLOCK_VISUAL_POLISH_FINAL_20260622 -->
+<style>
+/* Final visible code-block polish. Uses the existing Nova renderer/copy buttons. */
+#chat .nova-code-block,
+#chat pre.nova-code-block,
+#chat .bubble pre,
+#chat .bubble .nova-code-block {
+    position: relative !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 14px 0 !important;
+    padding: 46px 16px 16px !important;
+    border-radius: 16px !important;
+    border: 1px solid rgba(168, 85, 247, 0.42) !important;
+    background:
+        linear-gradient(180deg, rgba(168, 85, 247, 0.16), rgba(18, 10, 31, 0.96)),
+        #120a1f !important;
+    color: #f3e8ff !important;
+    font-family: Consolas, Monaco, "Courier New", monospace !important;
+    font-size: 13px !important;
+    line-height: 1.58 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    white-space: pre !important;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28) !important;
+}
+
+#chat .nova-code-block code,
+#chat pre.nova-code-block code,
+#chat .bubble pre code {
+    display: block !important;
+    min-width: max-content !important;
+    background: transparent !important;
+    border: 0 !important;
+    padding: 0 !important;
+    color: inherit !important;
+    white-space: pre !important;
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+}
+
+#chat .nova-code-lang {
+    position: absolute !important;
+    top: 10px !important;
+    left: 12px !important;
+    z-index: 4 !important;
+    border: 1px solid rgba(216, 180, 254, 0.22) !important;
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: rgba(250, 245, 255, 0.88) !important;
+    padding: 4px 9px !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    letter-spacing: .06em !important;
+    text-transform: uppercase !important;
+}
+
+#chat .nova-code-copy {
+    position: absolute !important;
+    top: 9px !important;
+    right: 10px !important;
+    z-index: 5 !important;
+    min-height: 28px !important;
+    border: 1px solid rgba(216, 180, 254, 0.32) !important;
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, 0.10) !important;
+    color: #faf5ff !important;
+    padding: 4px 11px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+}
+
+#chat .nova-code-copy:hover {
+    background: rgba(168, 85, 247, 0.28) !important;
+    border-color: rgba(216, 180, 254, 0.55) !important;
+}
+
+/* Support both old fallback token names and newer Nova token names. */
+#chat .tok-keyword,
+#chat .token.keyword,
+#chat .token.function,
+#chat .nova-token-keyword,
+#chat .nova-token-function {
+    color: #d8b4fe !important;
+    font-weight: 800 !important;
+}
+
+#chat .tok-string,
+#chat .token.string,
+#chat .nova-token-string {
+    color: #86efac !important;
+}
+
+#chat .tok-number,
+#chat .token.number,
+#chat .nova-token-number {
+    color: #fde68a !important;
+}
+
+#chat .tok-comment,
+#chat .token.comment,
+#chat .nova-token-comment {
+    color: #a1a1aa !important;
+    font-style: italic !important;
+}
+
+#chat .nova-token-tag {
+    color: #93c5fd !important;
+}
+</style>
+<!-- /NOVA_CODE_BLOCK_VISUAL_POLISH_FINAL_20260622 -->
+
 <!-- NOVA_DESKTOP_CHAT_LAYOUT_STABLE_FINAL_20260622 -->
 <style>
 /* Keep desktop chat from growing downward forever. */
