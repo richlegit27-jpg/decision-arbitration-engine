@@ -226,7 +226,3 @@ function wireButtons() {
   console.log("[Nova Desktop Sessions External] ready");
 })();
 
-
-;(function () {
-})();
-
