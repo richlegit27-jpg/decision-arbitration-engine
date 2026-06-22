@@ -55,47 +55,57 @@ return (
     return data;
   }
 
-async function openSession(sid) {
-  sid = String(sid || "").trim();
+async function openSession(sessionId) {
+  const sid = setSessionId(sessionId);
+
   if (!sid) return;
 
-  const state = window.__NOVA_SESSION_STATE;
-
-  // cancel previous request if still running
-  if (state.currentRequest && state.currentRequest.abort) {
-    try { state.currentRequest.abort(); } catch (e) {}
-  }
-
-  const controller = new AbortController();
-  state.currentRequest = controller;
-  state.activeSid = sid;
-
-  setSessionId(sid);
+  console.log("[Nova Desktop Sessions External] open session", sid);
 
   try {
-    const detail = await fetchJson(
-      "/api/sessions/" + encodeURIComponent(sid),
-      {
-        cache: "no-store",
-        signal: controller.signal
+    window.NOVA_FORCE_NEW_SESSION_ON_NEXT_SEND = false;
+    window.NOVA_PENDING_NEW_SESSION_ID = "";
+
+    localStorage.setItem("nova.session_id", sid);
+    localStorage.setItem("nova_session_id", sid);
+    localStorage.setItem("nova_active_session_id", sid);
+    sessionStorage.setItem("nova_session_id", sid);
+    sessionStorage.setItem("nova_active_session_id", sid);
+
+    window.__NOVA_ACTIVE_SESSION_ID = sid;
+    window.currentSessionId = sid;
+    window.activeSessionId = sid;
+    window.novaCurrentSessionId = sid;
+  } catch (e) {}
+
+  window.setStatus?.("loading session...");
+
+  try {
+    if (typeof window.NovaDesktopFetchSession === "function") {
+      await window.NovaDesktopFetchSession(sid);
+    } else {
+      const data = await fetchJson("/api/sessions/" + encodeURIComponent(sid), {
+        cache: "no-store"
+      });
+
+      const session = data.session || data;
+
+      if (session && Array.isArray(session.messages)) {
+        if (typeof window.renderDesktopChatMessages === "function") {
+          window.renderDesktopChatMessages(session.messages);
+        } else if (typeof window.renderDesktopChatMessagesRescue === "function") {
+          window.renderDesktopChatMessagesRescue(session.messages);
+        }
       }
-    );
-
-    const session = detail.session || detail;
-
-    window.renderDesktopChatMessagesRescue?.(session.messages || []);
-
-    window.setStatus?.("session selected");
-
-    console.log("[Session] opened:", sid);
-
-  } catch (e) {
-    if (e.name === "AbortError") {
-      console.log("[Session] aborted:", sid);
-      return;
     }
 
-    console.warn("[Session] open failed", e);
+    document.querySelectorAll(".desktop-session-item").forEach(function (item) {
+      item.classList.toggle("is-active", item.dataset.sessionId === sid);
+    });
+
+    window.setStatus?.("session selected");
+  } catch (error) {
+    console.warn("[Nova Desktop Sessions External] open session failed", error);
     window.setStatus?.("session load failed");
   }
 }
@@ -123,8 +133,8 @@ async function loadDesktopSessionsExternal() {
 
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className =
-      "desktop-session-item" + (sid === active ? " is-active" : "");
+    btn.className = "desktop-session-item" + (sid === active ? " is-active" : "");
+    btn.dataset.sessionId = sid;
 
     btn.innerHTML = `
       <div class="desktop-session-title">${session.title || "Untitled"}</div>
