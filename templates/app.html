@@ -1526,56 +1526,6 @@ async function fetchJsonOrNull(url, options) {
       }
     }
 
-function renderSessions(list, sessions, activeId) {
-  if (!list) return;
-
-  list.innerHTML = "";
-
-  if (!sessions || !sessions.length) {
-    const empty = document.createElement("div");
-    empty.className = "session-placeholder";
-    empty.textContent = "No saved sessions yet.";
-    list.appendChild(empty);
-    return;
-  }
-
-  sessions.slice(0, 20).forEach((session) => {
-    const sid = getSessionIdFromObject(session);
-    if (!sid) return;
-
-    const button = document.createElement("button");
-    button.type = "button";
-   button.className =
-  "desktop-session-item" + (sid === activeId ? " is-active" : "");
-    button.setAttribute("data-sid", sid);
-
-    const title = document.createElement("div");
-    title.className = "desktop-session-title";
-    title.textContent = getSessionTitle(session);
-
-    const meta = document.createElement("div");
-    meta.className = "desktop-session-meta";
-    meta.textContent = sid;
-
-    button.appendChild(title);
-    button.appendChild(meta);
-
-    button.addEventListener("click", async () => {
-      setSessionId(sid);
-      setStatus("loading session...");
-
-      if (typeof window.NovaDesktopFetchSession === "function") {
-        await window.NovaDesktopFetchSession(sid);
-      }
-
-      setStatus("session selected");
-      refreshSummaryMeta();
-    });
-
-    list.appendChild(button);
-  });
-}
-
 async function loadDesktopSessions() {
 
   const list = document.getElementById("desktopSessionList");
