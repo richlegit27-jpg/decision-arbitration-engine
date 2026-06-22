@@ -7474,5 +7474,214 @@ body {
 })();
 </script>
 
+
+
+
+
+<!-- NOVA_RIGHT_PANEL_MISSION_SUMMARY_FINAL_20260622 -->
+<style>
+.nova-mission-summary-section {
+    order: -998 !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    flex: 0 0 auto !important;
+    position: relative !important;
+    z-index: 4 !important;
+}
+
+.nova-mission-summary-shell {
+    display: grid;
+    gap: 10px;
+}
+
+.nova-mission-summary-box {
+    border: 1px solid var(--line);
+    background: rgba(0,0,0,.16);
+    border-radius: 14px;
+    padding: 10px;
+    display: grid;
+    gap: 8px;
+}
+
+.nova-mission-summary-label {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.nova-mission-summary-text {
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.nova-mission-summary-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.nova-mission-summary-actions button {
+    border: 1px solid rgba(255,255,255,.16);
+    background: rgba(255,255,255,.075);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 9px 10px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.nova-mission-summary-actions button:hover {
+    border-color: rgba(167,139,250,.7);
+    background: rgba(255,255,255,.12);
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_RIGHT_PANEL_MISSION_SUMMARY_FINAL_20260622__) return;
+    window.__NOVA_RIGHT_PANEL_MISSION_SUMMARY_FINAL_20260622__ = true;
+
+    function sendMissionPrompt(prompt) {
+        const input = document.getElementById("input") || document.querySelector("textarea");
+
+        if (input) {
+            input.value = prompt;
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+
+        if (typeof window.handleSendClick === "function") {
+            window.handleSendClick(prompt);
+            return;
+        }
+
+        if (typeof handleSendClick === "function") {
+            handleSendClick(prompt);
+            return;
+        }
+
+        const sendBtn = document.getElementById("sendBtn");
+        if (sendBtn) {
+            sendBtn.click();
+        }
+    }
+
+    function ensureMissionSummary() {
+        let section = document.getElementById("novaMissionSummarySection");
+        if (section) return section;
+
+        const tools = document.querySelector(".panel.tools") || document.querySelector(".tools");
+        const memory = document.querySelector(".memory-section");
+
+        if (!tools) return null;
+
+        section = document.createElement("section");
+        section.id = "novaMissionSummarySection";
+        section.className = "tools-section nova-mission-summary-section";
+
+        section.innerHTML = `
+            <h3>Summary</h3>
+
+            <div class="nova-mission-summary-shell">
+                <div class="nova-mission-summary-box">
+                    <div>
+                        <div class="nova-mission-summary-label">Current state</div>
+                        <div id="novaMissionCurrentState" class="nova-mission-summary-text">
+                            Nova is stable. Use this panel to continue, improve, or inspect the next move.
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="nova-mission-summary-label">Next move</div>
+                        <div id="novaMissionNextMove" class="nova-mission-summary-text">
+                            Keep Memory visible, then upgrade Memory into Preferences / Project / People / Pinned.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="nova-mission-summary-actions">
+                    <button id="novaMissionNextBtn" type="button">Next</button>
+                    <button id="novaMissionImproveBtn" type="button">Improve</button>
+                    <button id="novaMissionFixBtn" type="button">Fix</button>
+                    <button id="novaMissionStatusBtn" type="button">Status</button>
+                </div>
+            </div>
+        `;
+
+        if (memory && memory.parentNode === tools) {
+            tools.insertBefore(section, memory.nextSibling);
+        } else if (tools.firstElementChild) {
+            tools.insertBefore(section, tools.firstElementChild);
+        } else {
+            tools.appendChild(section);
+        }
+
+        const nextBtn = section.querySelector("#novaMissionNextBtn");
+        const improveBtn = section.querySelector("#novaMissionImproveBtn");
+        const fixBtn = section.querySelector("#novaMissionFixBtn");
+        const statusBtn = section.querySelector("#novaMissionStatusBtn");
+
+        if (nextBtn) {
+            nextBtn.addEventListener("click", function () {
+                sendMissionPrompt("Continue from where we left off. Tell me the next concrete step for Nova and keep it direct.");
+            });
+        }
+
+        if (improveBtn) {
+            improveBtn.addEventListener("click", function () {
+                sendMissionPrompt("Look at the current Nova UI/project state and suggest the highest-value improvement next. Keep it practical.");
+            });
+        }
+
+        if (fixBtn) {
+            fixBtn.addEventListener("click", function () {
+                sendMissionPrompt("Help me fix the current Nova issue. Start by identifying the likely broken area, then give the safest patch.");
+            });
+        }
+
+        if (statusBtn) {
+            statusBtn.addEventListener("click", function () {
+                sendMissionPrompt("Give me a short Nova status report: what works, what is still broken, and what we should do next.");
+            });
+        }
+
+        return section;
+    }
+
+    function keepMissionSummaryNearTop() {
+        const tools = document.querySelector(".panel.tools") || document.querySelector(".tools");
+        const memory = document.querySelector(".memory-section");
+        const section = ensureMissionSummary();
+
+        if (!tools || !section) return;
+
+        section.style.order = "-998";
+
+        if (memory && memory.parentNode === tools && memory.nextSibling !== section) {
+            tools.insertBefore(section, memory.nextSibling);
+        }
+    }
+
+    window.NovaEnsureMissionSummary = ensureMissionSummary;
+    window.NovaKeepMissionSummaryNearTop = keepMissionSummaryNearTop;
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", keepMissionSummaryNearTop);
+    } else {
+        keepMissionSummaryNearTop();
+    }
+
+    setTimeout(keepMissionSummaryNearTop, 300);
+    setTimeout(keepMissionSummaryNearTop, 1000);
+    window.addEventListener("resize", keepMissionSummaryNearTop);
+})();
+</script>
+
 </body>
 </html>
