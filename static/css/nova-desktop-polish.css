@@ -471,3 +471,103 @@ aside.panel.tools,
     display: inline-block !important;
     margin-bottom: 5px !important;
 }
+
+/* NOVA_DESKTOP_RECENT_SESSION_CARDS_FINAL_20260621 */
+
+/* Recent list should stack from the top, never spread out. */
+#desktopSessionList,
+.desktop-session-list {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    gap: 7px !important;
+
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: 320px !important;
+
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+
+    padding: 2px 6px 2px 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+}
+
+/* Every session card keeps a clean fixed rhythm. */
+#desktopSessionList .desktop-session-item,
+.desktop-session-list .desktop-session-item {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+
+    min-height: 44px !important;
+    max-height: 52px !important;
+
+    flex: 0 0 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: center !important;
+    gap: 2px !important;
+
+    padding: 8px 10px !important;
+    margin: 0 !important;
+
+    text-align: left !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+}
+
+/* Title stays one clean line instead of printing downward. */
+#desktopSessionList .desktop-session-title,
+.desktop-session-list .desktop-session-title {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+
+    font-size: 13px !important;
+    line-height: 17px !important;
+    font-weight: 800 !important;
+}
+
+/* Keep the id/meta tiny, not layout-breaking. */
+#desktopSessionList .desktop-session-meta,
+.desktop-session-list .desktop-session-meta {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+
+    font-size: 10px !important;
+    line-height: 12px !important;
+    opacity: 0.55 !important;
+}
+
+/* Active session is clear but not huge. */
+#desktopSessionList .desktop-session-item.is-active,
+.desktop-session-list .desktop-session-item.is-active {
+    border-color: rgba(216, 180, 254, 0.58) !important;
+    background: rgba(168, 85, 247, 0.18) !important;
+}
+
+/* Smaller screens: keep list usable. */
+@media (max-height: 760px) {
+    #desktopSessionList,
+    .desktop-session-list {
+        max-height: 240px !important;
+    }
+}
