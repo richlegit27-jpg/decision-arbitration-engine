@@ -7478,24 +7478,512 @@ body {
 
 
 
-<!-- NOVA_RIGHT_PANEL_MISSION_SUMMARY_FINAL_20260622 -->
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- NOVA_MEMORY_CONTROL_CENTER_V1_20260622 -->
 <style>
-.nova-mission-summary-section {
-    order: -998 !important;
+.memory-section {
+    order: -999 !important;
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
     flex: 0 0 auto !important;
-    position: relative !important;
-    z-index: 4 !important;
 }
 
-.nova-mission-summary-shell {
+.nova-memory-control {
     display: grid;
     gap: 10px;
 }
 
-.nova-mission-summary-box {
+.nova-memory-toolbar {
+    display: grid;
+    gap: 8px;
+}
+
+#novaMemorySearch {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--line);
+    background: rgba(0,0,0,.20);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 9px 10px;
+    outline: none;
+    font-size: 13px;
+}
+
+.nova-memory-filters,
+.nova-memory-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.nova-memory-filter,
+.nova-memory-btn,
+.nova-memory-item-btn {
+    border: 1px solid rgba(255,255,255,.16);
+    background: rgba(255,255,255,.075);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 7px 9px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 900;
+}
+
+.nova-memory-filter.active {
+    background: rgba(167,139,250,.28);
+    border-color: rgba(167,139,250,.7);
+}
+
+.nova-memory-filter:hover,
+.nova-memory-btn:hover,
+.nova-memory-item-btn:hover {
+    border-color: rgba(167,139,250,.7);
+    background: rgba(255,255,255,.12);
+}
+
+#desktopMemoryList,
+.desktop-memory-list {
+    display: grid !important;
+    gap: 8px !important;
+    max-height: 360px !important;
+    min-height: 120px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+
+.nova-memory-card {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: rgba(0,0,0,.16);
+    padding: 10px;
+    display: grid;
+    gap: 7px;
+}
+
+.nova-memory-card-text {
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.42;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.nova-memory-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.nova-memory-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+@media (max-height: 720px) {
+    #desktopMemoryList,
+    .desktop-memory-list {
+        max-height: 240px !important;
+    }
+
+    .nova-memory-card-text {
+        font-size: 12px;
+        line-height: 1.35;
+    }
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_MEMORY_CONTROL_CENTER_V1_20260622__) return;
+    window.__NOVA_MEMORY_CONTROL_CENTER_V1_20260622__ = true;
+
+    let novaMemoryItems = [];
+    let novaMemoryFilter = "all";
+    let novaMemorySearch = "";
+
+    function escapeMemory(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function getMemoryText(item) {
+        return String(
+            item.text ||
+            item.value ||
+            item.fact ||
+            item.content ||
+            item.memory ||
+            item.summary ||
+            item.title ||
+            item.note ||
+            ""
+        ).trim();
+    }
+
+    function getMemoryId(item) {
+        return String(item.id || item.memory_id || item.uuid || item.key || "");
+    }
+
+    function getMemoryKind(item) {
+        const raw = String(item.kind || item.type || item.category || item.source || "").toLowerCase();
+        const text = getMemoryText(item).toLowerCase();
+
+        if (item.pinned || item.pin || item.is_pinned) return "pinned";
+        if (raw.includes("preference") || text.includes("prefer") || text.includes("favorite") || text.includes("from now on")) return "preferences";
+        if (raw.includes("project") || text.includes("nova") || text.includes("project") || text.includes("phase")) return "project";
+        if (raw.includes("person") || raw.includes("people") || text.includes("my name") || text.includes("richard")) return "people";
+
+        return raw || "general";
+    }
+
+    function isPinned(item) {
+        return Boolean(item.pinned || item.pin || item.is_pinned);
+    }
+
+    function normalizeMemoryPayload(data) {
+        const candidates = [
+            data && data.items,
+            data && data.memories,
+            data && data.memory,
+            data && data.records,
+            data && data.data && data.data.items,
+            data && data.data && data.data.memories,
+            data && data.data && data.data.memory,
+            data && data.data && data.data.records,
+            data && data.data
+        ];
+
+        for (const value of candidates) {
+            if (Array.isArray(value)) return value;
+        }
+
+        return [];
+    }
+
+    function ensureMemoryControlUI() {
+        const memory = document.querySelector(".memory-section");
+        const list = document.getElementById("desktopMemoryList");
+
+        if (!memory || !list) return;
+
+        if (memory.querySelector(".nova-memory-control")) return;
+
+        const shell = document.createElement("div");
+        shell.className = "nova-memory-control";
+
+        shell.innerHTML = `
+            <div class="nova-memory-toolbar">
+                <input id="novaMemorySearch" type="search" placeholder="Search memory..." />
+
+                <div class="nova-memory-filters">
+                    <button class="nova-memory-filter active" type="button" data-memory-filter="all">All</button>
+                    <button class="nova-memory-filter" type="button" data-memory-filter="preferences">Preferences</button>
+                    <button class="nova-memory-filter" type="button" data-memory-filter="project">Project</button>
+                    <button class="nova-memory-filter" type="button" data-memory-filter="people">People</button>
+                    <button class="nova-memory-filter" type="button" data-memory-filter="pinned">Pinned</button>
+                </div>
+
+                <div class="nova-memory-actions">
+                    <button id="novaMemoryAddPreferenceBtn" class="nova-memory-btn" type="button">+ Preference</button>
+                    <button id="novaMemoryAddProjectBtn" class="nova-memory-btn" type="button">+ Project Note</button>
+                    <button id="novaMemoryRefreshBtn" class="nova-memory-btn" type="button">Refresh</button>
+                </div>
+            </div>
+        `;
+
+        list.parentNode.insertBefore(shell, list);
+        shell.appendChild(list);
+
+        const search = document.getElementById("novaMemorySearch");
+        if (search) {
+            search.addEventListener("input", function () {
+                novaMemorySearch = search.value || "";
+                renderMemoryControlList();
+            });
+        }
+
+        shell.querySelectorAll("[data-memory-filter]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                novaMemoryFilter = button.dataset.memoryFilter || "all";
+
+                shell.querySelectorAll("[data-memory-filter]").forEach(function (b) {
+                    b.classList.toggle("active", b === button);
+                });
+
+                renderMemoryControlList();
+            });
+        });
+
+        const addPref = document.getElementById("novaMemoryAddPreferenceBtn");
+        const addProject = document.getElementById("novaMemoryAddProjectBtn");
+        const refresh = document.getElementById("novaMemoryRefreshBtn");
+
+        if (addPref) {
+            addPref.addEventListener("click", function () {
+                addMemoryPrompt("preference");
+            });
+        }
+
+        if (addProject) {
+            addProject.addEventListener("click", function () {
+                addMemoryPrompt("project");
+            });
+        }
+
+        if (refresh) {
+            refresh.addEventListener("click", loadMemoryControlData);
+        }
+    }
+
+    async function postMemory(url, payload) {
+        const res = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload || {})
+        });
+
+        let data = null;
+
+        try {
+            data = await res.json();
+        } catch (_) {}
+
+        if (!res.ok) {
+            throw new Error("Request failed: " + url);
+        }
+
+        return data;
+    }
+
+    async function addMemoryPrompt(kind) {
+        const label = kind === "project" ? "Project note" : "Preference";
+        const value = prompt("Add " + label + ":");
+
+        if (!value || !value.trim()) return;
+
+        const clean = value.trim();
+
+        try {
+            await postMemory("/api/memory/add", {
+                text: clean,
+                value: clean,
+                memory: clean,
+                note: clean,
+                kind: kind,
+                type: kind,
+                category: kind
+            });
+
+            await loadMemoryControlData();
+        } catch (error) {
+            alert("Could not add memory yet. Backend may use a different payload.");
+        }
+    }
+
+    async function pinMemory(item) {
+        const id = getMemoryId(item);
+
+        if (!id) {
+            alert("This memory has no ID, so it cannot be pinned from the UI yet.");
+            return;
+        }
+
+        try {
+            await postMemory("/api/memory/pin", {
+                id: id,
+                memory_id: id,
+                pinned: !isPinned(item),
+                pin: !isPinned(item)
+            });
+
+            await loadMemoryControlData();
+        } catch (error) {
+            alert("Could not pin this memory yet.");
+        }
+    }
+
+    async function deleteMemory(item) {
+        const id = getMemoryId(item);
+
+        if (!id) {
+            alert("This memory has no ID, so it cannot be deleted from the UI yet.");
+            return;
+        }
+
+        if (!confirm("Delete this memory?")) return;
+
+        try {
+            await postMemory("/api/memory/delete", {
+                id: id,
+                memory_id: id
+            });
+
+            await loadMemoryControlData();
+        } catch (error) {
+            alert("Could not delete this memory yet.");
+        }
+    }
+
+    async function loadMemoryControlData() {
+        ensureMemoryControlUI();
+
+        const list = document.getElementById("desktopMemoryList");
+        const count = document.getElementById("desktopMemoryCount");
+
+        if (list) {
+            list.innerHTML = "<div class='execution-note'>Loading memory...</div>";
+        }
+
+        try {
+            const res = await fetch("/api/memory", { cache: "no-store" });
+            const data = await res.json();
+
+            novaMemoryItems = normalizeMemoryPayload(data);
+
+            if (count) {
+                count.textContent = String(novaMemoryItems.length);
+            }
+
+            renderMemoryControlList();
+        } catch (error) {
+            if (list) {
+                list.innerHTML = "<div class='execution-note'>Memory failed to load.</div>";
+            }
+
+            if (count) {
+                count.textContent = "error";
+            }
+        }
+    }
+
+    function renderMemoryControlList() {
+        const list = document.getElementById("desktopMemoryList");
+        const count = document.getElementById("desktopMemoryCount");
+
+        if (!list) return;
+
+        const q = String(novaMemorySearch || "").trim().toLowerCase();
+
+        let visible = novaMemoryItems.filter(function (item) {
+            const text = getMemoryText(item);
+            const kind = getMemoryKind(item);
+
+            if (novaMemoryFilter !== "all") {
+                if (novaMemoryFilter === "pinned" && !isPinned(item)) return false;
+                if (novaMemoryFilter !== "pinned" && kind !== novaMemoryFilter) return false;
+            }
+
+            if (q) {
+                const haystack = (text + " " + kind + " " + JSON.stringify(item)).toLowerCase();
+                if (!haystack.includes(q)) return false;
+            }
+
+            return true;
+        });
+
+        if (count) {
+            count.textContent = String(visible.length) + "/" + String(novaMemoryItems.length);
+        }
+
+        if (!visible.length) {
+            list.innerHTML = "<div class='execution-note'>No matching memories.</div>";
+            return;
+        }
+
+        list.innerHTML = visible.map(function (item, index) {
+            const text = getMemoryText(item) || JSON.stringify(item, null, 2);
+            const kind = getMemoryKind(item);
+            const pinned = isPinned(item);
+            const id = getMemoryId(item);
+
+            return `
+                <article class="nova-memory-card" data-memory-index="${index}" data-memory-id="${escapeMemory(id)}">
+                    <div class="nova-memory-card-meta">
+                        <span>${escapeMemory(kind)}</span>
+                        ${pinned ? "<span>pinned</span>" : ""}
+                        ${id ? "<span>ID</span>" : ""}
+                    </div>
+
+                    <div class="nova-memory-card-text">${escapeMemory(text)}</div>
+
+                    <div class="nova-memory-card-actions">
+                        <button class="nova-memory-item-btn" type="button" data-memory-action="pin" data-memory-index="${index}">
+                            ${pinned ? "Unpin" : "Pin"}
+                        </button>
+                        <button class="nova-memory-item-btn" type="button" data-memory-action="delete" data-memory-index="${index}">
+                            Delete
+                        </button>
+                    </div>
+                </article>
+            `;
+        }).join("");
+
+        list.querySelectorAll("[data-memory-action]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                const index = Number(button.dataset.memoryIndex || "-1");
+                const item = visible[index];
+
+                if (!item) return;
+
+                if (button.dataset.memoryAction === "pin") {
+                    pinMemory(item);
+                }
+
+                if (button.dataset.memoryAction === "delete") {
+                    deleteMemory(item);
+                }
+            });
+        });
+    }
+
+    function bootMemoryControlCenter() {
+        ensureMemoryControlUI();
+        loadMemoryControlData();
+    }
+
+    window.NovaBootMemoryControlCenter = bootMemoryControlCenter;
+    window.NovaLoadDesktopMemory = loadMemoryControlData;
+    window.loadDesktopMemory = loadMemoryControlData;
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", bootMemoryControlCenter);
+    } else {
+        bootMemoryControlCenter();
+    }
+
+    setTimeout(bootMemoryControlCenter, 400);
+    setTimeout(bootMemoryControlCenter, 1200);
+})();
+</script>
+
+
+<!-- NOVA_MEMORY_TYPED_INPUT_FINAL_20260622 -->
+<style>
+.nova-memory-compose {
     border: 1px solid var(--line);
     background: rgba(0,0,0,.16);
     border-radius: 14px;
@@ -7504,40 +7992,59 @@ body {
     gap: 8px;
 }
 
-.nova-mission-summary-label {
-    color: var(--muted);
-    font-size: 11px;
-    font-weight: 900;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-}
-
-.nova-mission-summary-text {
+#novaMemoryComposeInput {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 74px;
+    max-height: 150px;
+    resize: vertical;
+    border: 1px solid var(--line);
+    background: rgba(0,0,0,.22);
     color: var(--text);
+    border-radius: 12px;
+    padding: 10px;
+    outline: none;
     font-size: 13px;
-    line-height: 1.45;
+    line-height: 1.4;
 }
 
-.nova-mission-summary-actions {
+.nova-memory-compose-row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 8px;
 }
 
-.nova-mission-summary-actions button {
-    border: 1px solid rgba(255,255,255,.16);
-    background: rgba(255,255,255,.075);
+#novaMemoryComposeKind {
+    width: 100%;
+    border: 1px solid var(--line);
+    background: rgba(0,0,0,.22);
     color: var(--text);
     border-radius: 12px;
-    padding: 9px 10px;
+    padding: 8px 9px;
+    outline: none;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+#novaMemorySaveTypedBtn {
+    border: 1px solid rgba(167,139,250,.55);
+    background: rgba(167,139,250,.22);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 8px 11px;
     cursor: pointer;
     font-size: 12px;
     font-weight: 900;
+    white-space: nowrap;
 }
 
-.nova-mission-summary-actions button:hover {
-    border-color: rgba(167,139,250,.7);
-    background: rgba(255,255,255,.12);
+#novaMemorySaveTypedBtn:hover {
+    background: rgba(167,139,250,.32);
+}
+
+#novaMemoryComposeStatus {
+    color: var(--muted);
+    font-size: 11px;
 }
 </style>
 
@@ -7545,141 +8052,168 @@ body {
 (function () {
     "use strict";
 
-    if (window.__NOVA_RIGHT_PANEL_MISSION_SUMMARY_FINAL_20260622__) return;
-    window.__NOVA_RIGHT_PANEL_MISSION_SUMMARY_FINAL_20260622__ = true;
+    if (window.__NOVA_MEMORY_TYPED_INPUT_FINAL_20260622__) return;
+    window.__NOVA_MEMORY_TYPED_INPUT_FINAL_20260622__ = true;
 
-    function sendMissionPrompt(prompt) {
-        const input = document.getElementById("input") || document.querySelector("textarea");
+    function setMemoryStatus(text) {
+        const status = document.getElementById("novaMemoryComposeStatus");
+        if (status) status.textContent = text || "";
+    }
+
+    async function postTypedMemory(text, kind) {
+        const clean = String(text || "").trim();
+        const safeKind = String(kind || "general").trim() || "general";
+
+        if (!clean) {
+            setMemoryStatus("Type something first.");
+            return;
+        }
+
+        setMemoryStatus("Saving...");
+
+        const payload = {
+            text: clean,
+            value: clean,
+            memory: clean,
+            note: clean,
+            content: clean,
+            kind: safeKind,
+            type: safeKind,
+            category: safeKind
+        };
+
+        const res = await fetch("/api/memory/add", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        });
+
+        let data = null;
+
+        try {
+            data = await res.json();
+        } catch (_) {}
+
+        if (!res.ok || (data && data.ok === false)) {
+            setMemoryStatus("Save failed.");
+            return;
+        }
+
+        const input = document.getElementById("novaMemoryComposeInput");
+        if (input) input.value = "";
+
+        setMemoryStatus("Saved.");
+
+        if (typeof window.loadDesktopMemory === "function") {
+            window.loadDesktopMemory();
+        } else if (typeof window.NovaLoadDesktopMemory === "function") {
+            window.NovaLoadDesktopMemory();
+        } else if (typeof window.NovaBootMemoryControlCenter === "function") {
+            window.NovaBootMemoryControlCenter();
+        }
+
+        setTimeout(function () {
+            setMemoryStatus("Ctrl+Enter saves too.");
+        }, 900);
+    }
+
+    function focusMemoryInput(kind) {
+        const input = document.getElementById("novaMemoryComposeInput");
+        const select = document.getElementById("novaMemoryComposeKind");
+
+        if (select && kind) {
+            select.value = kind;
+        }
 
         if (input) {
-            input.value = prompt;
-            input.dispatchEvent(new Event("input", { bubbles: true }));
-        }
-
-        if (typeof window.handleSendClick === "function") {
-            window.handleSendClick(prompt);
-            return;
-        }
-
-        if (typeof handleSendClick === "function") {
-            handleSendClick(prompt);
-            return;
-        }
-
-        const sendBtn = document.getElementById("sendBtn");
-        if (sendBtn) {
-            sendBtn.click();
+            input.focus();
         }
     }
 
-    function ensureMissionSummary() {
-        let section = document.getElementById("novaMissionSummarySection");
-        if (section) return section;
+    function replacePromptButton(id, kind) {
+        const oldButton = document.getElementById(id);
+        if (!oldButton || oldButton.dataset.novaTypedMemoryReplaced === "true") return;
 
-        const tools = document.querySelector(".panel.tools") || document.querySelector(".tools");
+        const newButton = oldButton.cloneNode(true);
+        newButton.dataset.novaTypedMemoryReplaced = "true";
+
+        newButton.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            focusMemoryInput(kind);
+        });
+
+        oldButton.replaceWith(newButton);
+    }
+
+    function ensureMemoryTypedInput() {
         const memory = document.querySelector(".memory-section");
+        const list = document.getElementById("desktopMemoryList");
 
-        if (!tools) return null;
+        if (!memory || !list) return;
 
-        section = document.createElement("section");
-        section.id = "novaMissionSummarySection";
-        section.className = "tools-section nova-mission-summary-section";
+        if (!document.getElementById("novaMemoryComposeBox")) {
+            const box = document.createElement("div");
+            box.id = "novaMemoryComposeBox";
+            box.className = "nova-memory-compose";
 
-        section.innerHTML = `
-            <h3>Summary</h3>
+            box.innerHTML = `
+                <textarea id="novaMemoryComposeInput" placeholder="Type what you want Nova to remember..."></textarea>
 
-            <div class="nova-mission-summary-shell">
-                <div class="nova-mission-summary-box">
-                    <div>
-                        <div class="nova-mission-summary-label">Current state</div>
-                        <div id="novaMissionCurrentState" class="nova-mission-summary-text">
-                            Nova is stable. Use this panel to continue, improve, or inspect the next move.
-                        </div>
-                    </div>
+                <div class="nova-memory-compose-row">
+                    <select id="novaMemoryComposeKind">
+                        <option value="preference">Preference</option>
+                        <option value="project">Project Note</option>
+                        <option value="people">People</option>
+                        <option value="general">General</option>
+                    </select>
 
-                    <div>
-                        <div class="nova-mission-summary-label">Next move</div>
-                        <div id="novaMissionNextMove" class="nova-mission-summary-text">
-                            Keep Memory visible, then upgrade Memory into Preferences / Project / People / Pinned.
-                        </div>
-                    </div>
+                    <button id="novaMemorySaveTypedBtn" type="button">Save Memory</button>
                 </div>
 
-                <div class="nova-mission-summary-actions">
-                    <button id="novaMissionNextBtn" type="button">Next</button>
-                    <button id="novaMissionImproveBtn" type="button">Improve</button>
-                    <button id="novaMissionFixBtn" type="button">Fix</button>
-                    <button id="novaMissionStatusBtn" type="button">Status</button>
-                </div>
-            </div>
-        `;
+                <div id="novaMemoryComposeStatus">Ctrl+Enter saves too.</div>
+            `;
 
-        if (memory && memory.parentNode === tools) {
-            tools.insertBefore(section, memory.nextSibling);
-        } else if (tools.firstElementChild) {
-            tools.insertBefore(section, tools.firstElementChild);
-        } else {
-            tools.appendChild(section);
+            list.parentNode.insertBefore(box, list);
+
+            const save = box.querySelector("#novaMemorySaveTypedBtn");
+            const input = box.querySelector("#novaMemoryComposeInput");
+            const kind = box.querySelector("#novaMemoryComposeKind");
+
+            if (save) {
+                save.addEventListener("click", function () {
+                    postTypedMemory(input ? input.value : "", kind ? kind.value : "general");
+                });
+            }
+
+            if (input) {
+                input.addEventListener("keydown", function (event) {
+                    if (event.ctrlKey && event.key === "Enter") {
+                        event.preventDefault();
+                        postTypedMemory(input.value, kind ? kind.value : "general");
+                    }
+                });
+            }
         }
 
-        const nextBtn = section.querySelector("#novaMissionNextBtn");
-        const improveBtn = section.querySelector("#novaMissionImproveBtn");
-        const fixBtn = section.querySelector("#novaMissionFixBtn");
-        const statusBtn = section.querySelector("#novaMissionStatusBtn");
-
-        if (nextBtn) {
-            nextBtn.addEventListener("click", function () {
-                sendMissionPrompt("Continue from where we left off. Tell me the next concrete step for Nova and keep it direct.");
-            });
-        }
-
-        if (improveBtn) {
-            improveBtn.addEventListener("click", function () {
-                sendMissionPrompt("Look at the current Nova UI/project state and suggest the highest-value improvement next. Keep it practical.");
-            });
-        }
-
-        if (fixBtn) {
-            fixBtn.addEventListener("click", function () {
-                sendMissionPrompt("Help me fix the current Nova issue. Start by identifying the likely broken area, then give the safest patch.");
-            });
-        }
-
-        if (statusBtn) {
-            statusBtn.addEventListener("click", function () {
-                sendMissionPrompt("Give me a short Nova status report: what works, what is still broken, and what we should do next.");
-            });
-        }
-
-        return section;
+        replacePromptButton("novaMemoryAddPreferenceBtn", "preference");
+        replacePromptButton("novaMemoryAddProjectBtn", "project");
     }
 
-    function keepMissionSummaryNearTop() {
-        const tools = document.querySelector(".panel.tools") || document.querySelector(".tools");
-        const memory = document.querySelector(".memory-section");
-        const section = ensureMissionSummary();
-
-        if (!tools || !section) return;
-
-        section.style.order = "-998";
-
-        if (memory && memory.parentNode === tools && memory.nextSibling !== section) {
-            tools.insertBefore(section, memory.nextSibling);
-        }
-    }
-
-    window.NovaEnsureMissionSummary = ensureMissionSummary;
-    window.NovaKeepMissionSummaryNearTop = keepMissionSummaryNearTop;
+    window.NovaEnsureMemoryTypedInput = ensureMemoryTypedInput;
+    window.NovaSaveTypedMemory = postTypedMemory;
 
     if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", keepMissionSummaryNearTop);
+        document.addEventListener("DOMContentLoaded", ensureMemoryTypedInput);
     } else {
-        keepMissionSummaryNearTop();
+        ensureMemoryTypedInput();
     }
 
-    setTimeout(keepMissionSummaryNearTop, 300);
-    setTimeout(keepMissionSummaryNearTop, 1000);
-    window.addEventListener("resize", keepMissionSummaryNearTop);
+    setTimeout(ensureMemoryTypedInput, 300);
+    setTimeout(ensureMemoryTypedInput, 900);
+    setTimeout(ensureMemoryTypedInput, 1600);
 })();
 </script>
 
