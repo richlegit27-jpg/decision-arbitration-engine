@@ -1614,10 +1614,6 @@ function startDesktopSessionSync() {
       __desktopSessionCache = sessions;
       __desktopSessionCacheReady = true;
 
-      const list = $("desktopSessionList");
-// Disabled duplicate session renderer; loadDesktopSessions owns the list.
-// if (list) renderSessions(list, sessions);
-
     } catch (e) {
       console.warn("[SessionSync event] failed", e);
     }
