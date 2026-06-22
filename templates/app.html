@@ -734,7 +734,7 @@ aside,
 .chat-column,
 .desktop-chat,
 .chat-container,
-#nova-desktop-rescue-messages {
+#chat {
   min-height: 280px !important;
   max-height: none !important;
   overflow-y: auto !important;
@@ -1227,7 +1227,7 @@ observer.observe(document.documentElement, {
         <span class="pill"><span class="dot"></span> ready</span>
       </header>
 
-      <section id="chat">
+      <section id="chat" class="messages chat-messages desktop-rescue-messages" data-messages="true">
         <div class="msg assistant">
           <div class="role">assistant</div>
           <div class="bubble">Nova Desktop is ready. Type a message, press Enter to send, or use a quick action.</div>
@@ -2682,7 +2682,7 @@ async function loadMemory() {
       document.getElementById("messages") ||
       document.getElementById("chatMessages") ||
       document.getElementById("desktopMessages") ||
-      document.getElementById("nova-desktop-rescue-messages") ||
+      document.getElementById("chat") ||
       document.querySelector(".messages") ||
       document.querySelector(".chat-messages") ||
       document.querySelector("[data-messages]");
@@ -2697,7 +2697,7 @@ async function loadMemory() {
       document.body;
 
     var box = document.createElement("div");
-    box.id = "nova-desktop-rescue-messages";
+    box.id = "chat";
     box.className = "messages chat-messages desktop-rescue-messages";
     box.setAttribute("data-messages", "true");
 
@@ -4356,7 +4356,7 @@ renderAuthWidget(data || {});
 
   function getDesktopMessageBox() {
     var existing =
-      document.getElementById("nova-desktop-rescue-messages") ||
+      document.getElementById("chat") ||
       document.getElementById("messages") ||
       document.getElementById("chatMessages") ||
       document.getElementById("desktopMessages") ||
@@ -4374,7 +4374,7 @@ renderAuthWidget(data || {});
       document.body;
 
     var box = document.createElement("div");
-    box.id = "nova-desktop-rescue-messages";
+    box.id = "chat";
     box.className = "messages chat-messages desktop-rescue-messages";
     box.setAttribute("data-messages", "true");
 
@@ -4471,11 +4471,11 @@ renderAuthWidget(data || {});
   'use strict';
 
   function getDesktopMessageBox() {
-    var box = document.getElementById("nova-desktop-rescue-messages");
+    var box = document.getElementById("chat");
     if (box) return box;
     var host = document.querySelector(".desktop-chat-container") || document.querySelector("main") || document.body;
     box = document.createElement("div");
-    box.id = "nova-desktop-rescue-messages";
+    box.id = "chat";
     box.className = "messages chat-messages desktop-rescue-messages";
     box.style.minHeight = "320px";
     box.style.maxHeight = "60vh";
@@ -4617,7 +4617,7 @@ function getActiveSessionId() {
 }
 
   function getRescueBox() {
-    let box = document.getElementById("nova-desktop-rescue-messages");
+    let box = document.getElementById("chat");
     if (box) return box;
 
     const host =
@@ -4627,7 +4627,7 @@ function getActiveSessionId() {
       document.body;
 
     box = document.createElement("div");
-    box.id = "nova-desktop-rescue-messages";
+    box.id = "chat";
     box.className = "messages chat-messages desktop-rescue-messages";
     box.style.minHeight = "320px";
     box.style.maxHeight = "60vh";
@@ -5165,7 +5165,7 @@ window.NovaDesktopFetchSession = fetchSession;
 
   function fallbackContainer() {
     var box =
-      document.querySelector("#nova-desktop-rescue-messages") ||
+      document.querySelector("#chat") ||
       document.querySelector("#desktopChatMessages") ||
       document.querySelector(".desktop-chat-messages") ||
       document.querySelector(".desktop-chat-container") ||
@@ -5944,7 +5944,7 @@ const emptyHtml = `
   document.getElementById("messages"),
   document.getElementById("chatMessages"),
   document.getElementById("desktopMessages"),
-  document.getElementById("nova-desktop-rescue-messages")
+  document.getElementById("chat")
 ].filter(Boolean).forEach(function (node) {
   node.innerHTML = emptyHtml;
 });
