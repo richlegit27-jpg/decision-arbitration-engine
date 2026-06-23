@@ -10647,9 +10647,9 @@ pre code {
         var name = String(attachment && (attachment.name || attachment.filename || attachment.original_filename || "") || "").toLowerCase();
 
         if (mime.indexOf("image/") === 0 || /\.(png|jpe?g|gif|webp|bmp|svg)$/.test(name)) return "image";
-        if (mime.indexOf("pdf") >= 0 || /\.pdf$/.test(name)) return "??";
-        if (mime.indexOf("text") >= 0 || /\.(txt|md|csv|json|py|js|html|css)$/.test(name)) return "??";
-        return "??";
+        if (mime.indexOf("pdf") >= 0 || /\.pdf$/.test(name)) return "PDF";
+        if (mime.indexOf("text") >= 0 || /\.(txt|md|csv|json|py|js|html|css)$/.test(name)) return "PDF";
+        return "PDF";
     }
 
     function getAttachmentUrl(attachment) {
@@ -10675,10 +10675,10 @@ pre code {
 
         var thumb = icon === "image" && url
             ? '<img src="' + esc(url) + '" alt="">'
-            : esc(icon === "image" ? "???" : icon);
+            : esc(icon === "image" ? "IMG" : icon);
 
         var extra = count > 1 ? " +" + String(count - 1) + " more" : "";
-        var meta = [mime, size].filter(Boolean).join(" ? ") + extra;
+        var meta = [mime, size].filter(Boolean).join(" - ") + extra;
 
         return [
             '<div class="nova-attachment-preview-card">',
