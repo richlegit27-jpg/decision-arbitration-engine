@@ -14278,6 +14278,59 @@ def nova_blog_single_post_api(slug):
 # NOVA_BLOG_WRITABLE_ROUTES_END_20260623
 
 
+
+# NOVA_AUTH_WORKSPACE_DIAGNOSTIC_20260623
+@app.get("/api/auth/workspace")
+def nova_auth_workspace_diagnostic():
+    from flask import jsonify, session as flask_session
+    import os
+
+    session_payload = {}
+
+    try:
+        session_payload = dict(flask_session)
+    except Exception:
+        session_payload = {}
+
+    user = (
+        session_payload.get("username")
+        or session_payload.get("user")
+        or session_payload.get("email")
+        or session_payload.get("user_email")
+        or session_payload.get("user_id")
+        or ""
+    )
+
+    if isinstance(user, dict):
+        user = (
+            user.get("username")
+            or user.get("email")
+            or user.get("id")
+            or ""
+        )
+
+    user = str(user or "").strip()
+
+    redacted_session_keys = sorted([str(key) for key in session_payload.keys()])
+
+    return jsonify({
+        "ok": True,
+        "authenticated_user_guess": user,
+        "session_keys": redacted_session_keys,
+        "data_files": {
+            "sessions_file": str(SESSIONS_FILE),
+            "artifacts_file": str(ARTIFACTS_FILE),
+            "memory_file": str(MEMORY_FILE),
+        },
+        "service_counts": {
+            "sessions": len(session_service.get_all() or []),
+            "artifacts": len(artifact_service.build_list_payload() or []),
+            "memory": len(memory_service.build_list_payload() or []),
+        }
+    })
+# NOVA_AUTH_WORKSPACE_DIAGNOSTIC_END_20260623
+
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
