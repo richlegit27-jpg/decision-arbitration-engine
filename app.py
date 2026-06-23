@@ -11201,23 +11201,25 @@ def nova_before_request_slim_api_sessions_20260611():
 
         returned_sessions = slim_sessions[:50]
 
-        slim_response = jsonify({
-            "ok": True,
-        # NOVA_SLIM_RETURN_ACTIVE_SESSION_VISIBLE_GATE_20260623
-        # Final fail-safe: never return an active_session_id unless that ID is
-        # actually present in the scoped visible list being returned.
+        # NOVA_FORCE_BLANK_ACTIVE_WHEN_NO_RETURNED_SESSIONS_20260623
+        # If the scoped visible list is empty, never return a stale active id.
+        # This blocks debug_encoding_news_003 from being re-remembered by mobile.
         try:
-            _nova_visible_ids_20260623 = {
+            returned_session_ids = {
                 str(item.get("id") or item.get("session_id") or "").strip()
                 for item in returned_sessions
                 if isinstance(item, dict) and str(item.get("id") or item.get("session_id") or "").strip()
             }
 
-            if str(active_session_id or "").strip() not in _nova_visible_ids_20260623:
+            if not returned_session_ids:
+                active_session_id = ""
+            elif str(active_session_id or "").strip() not in returned_session_ids:
                 active_session_id = ""
         except Exception:
             active_session_id = ""
 
+        slim_response = jsonify({
+            "ok": True,
             "active_session_id": active_session_id,
             "sessions": returned_sessions,
             "items": returned_sessions,
