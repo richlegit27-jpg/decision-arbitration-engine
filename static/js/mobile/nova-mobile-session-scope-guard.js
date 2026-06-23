@@ -1,14 +1,14 @@
 /*
-NOVA_MOBILE_SESSION_SCOPE_GUARD_20260623
-Clears stale mobile active session ids when /api/sessions says they are not visible.
+NOVA_MOBILE_SESSION_SCOPE_GUARD_STORAGE_LOCK_20260623
+Prevents stale hidden session ids from being re-saved by old mobile bridge code.
 */
 
 (function () {
     "use strict";
 
-    const FIX_ID = "NOVA_MOBILE_SESSION_SCOPE_GUARD_20260623";
+    const FIX_ID = "NOVA_MOBILE_SESSION_SCOPE_GUARD_STORAGE_LOCK_20260623";
 
-    const SESSION_KEYS = [
+    const ACTIVE_KEYS = [
         "nova_mobile_active_session_id",
         "nova_active_session_id",
         "active_session_id",
@@ -19,29 +19,47 @@ Clears stale mobile active session ids when /api/sessions says they are not visi
         "NOVA_ACTIVE_SESSION_ID"
     ];
 
-    function getLocalActiveId() {
-        for (const key of SESSION_KEYS) {
-            try {
-                const value = String(localStorage.getItem(key) || sessionStorage.getItem(key) || "").trim();
+    const GLOBAL_KEYS = [
+        "NOVA_ACTIVE_SESSION_ID",
+        "NovaActiveSessionId",
+        "NovaMobileActiveSessionId",
+        "novaMobileActiveSessionId",
+        "NovaCurrentSessionId",
+        "currentSessionId",
+        "activeSessionId"
+    ];
 
-                if (value) return value;
-            } catch (_) {}
-        }
+    let visibleSessionIds = new Set();
+    let hasSeenSessionsPayload = false;
 
-        return String(
-            window.NOVA_ACTIVE_SESSION_ID ||
-            window.NovaActiveSessionId ||
-            window.NovaMobileActiveSessionId ||
-            window.novaMobileActiveSessionId ||
-            window.NovaCurrentSessionId ||
-            window.currentSessionId ||
-            window.activeSessionId ||
-            ""
-        ).trim();
+    function clean(value) {
+        return String(value || "").trim();
     }
 
-    function clearLocalActiveId(reason) {
-        SESSION_KEYS.forEach(function (key) {
+    function isActiveKey(key) {
+        return ACTIVE_KEYS.includes(String(key || ""));
+    }
+
+    function isBlockedSessionId(value) {
+        const id = clean(value);
+
+        if (!id) return false;
+
+        if (id === "debug_encoding_news_003") return true;
+
+        if (id.startsWith("debug_") && hasSeenSessionsPayload && !visibleSessionIds.has(id)) {
+            return true;
+        }
+
+        if (visibleSessionIds.size && !visibleSessionIds.has(id)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    function removeActiveStorage(reason) {
+        ACTIVE_KEYS.forEach(function (key) {
             try {
                 localStorage.removeItem(key);
             } catch (_) {}
@@ -51,17 +69,72 @@ Clears stale mobile active session ids when /api/sessions says they are not visi
             } catch (_) {}
         });
 
-        window.NOVA_ACTIVE_SESSION_ID = "";
-        window.NovaActiveSessionId = "";
-        window.NovaMobileActiveSessionId = "";
-        window.novaMobileActiveSessionId = "";
-        window.NovaCurrentSessionId = "";
-        window.currentSessionId = "";
-        window.activeSessionId = "";
+        GLOBAL_KEYS.forEach(function (key) {
+            try {
+                window[key] = "";
+            } catch (_) {}
+        });
+
         window.NOVA_FORCE_NEW_SESSION_ON_NEXT_SEND = true;
         window.NOVA_PENDING_NEW_SESSION_ID = "";
 
-        console.log("[" + FIX_ID + "] cleared stale active session", reason || "");
+        console.log("[" + FIX_ID + "] cleared active session", reason || "");
+    }
+
+    function installStorageSetItemLock() {
+        if (window.__novaMobileScopeStorageSetItemLock20260623) return;
+
+        window.__novaMobileScopeStorageSetItemLock20260623 = true;
+
+        const originalLocalSetItem = Storage.prototype.setItem;
+
+        Storage.prototype.setItem = function (key, value) {
+            if (isActiveKey(key) && isBlockedSessionId(value)) {
+                try {
+                    originalLocalSetItem.call(this, key, "");
+                    this.removeItem(key);
+                } catch (_) {}
+
+                console.log("[" + FIX_ID + "] blocked stale storage save", key, value);
+                return;
+            }
+
+            return originalLocalSetItem.call(this, key, value);
+        };
+    }
+
+    function installGlobalLocks() {
+        if (window.__novaMobileScopeGlobalLocks20260623) return;
+
+        window.__novaMobileScopeGlobalLocks20260623 = true;
+
+        GLOBAL_KEYS.forEach(function (key) {
+            let internalValue = "";
+
+            try {
+                internalValue = clean(window[key]);
+            } catch (_) {}
+
+            try {
+                Object.defineProperty(window, key, {
+                    configurable: true,
+                    get: function () {
+                        return internalValue;
+                    },
+                    set: function (value) {
+                        const next = clean(value);
+
+                        if (isBlockedSessionId(next)) {
+                            internalValue = "";
+                            console.log("[" + FIX_ID + "] blocked stale global save", key, next);
+                            return;
+                        }
+
+                        internalValue = next;
+                    }
+                });
+            } catch (_) {}
+        });
     }
 
     function collectVisibleIds(payload) {
@@ -73,7 +146,7 @@ Clears stale mobile active session ids when /api/sessions says they are not visi
             list.forEach(function (item) {
                 if (!item || typeof item !== "object") return;
 
-                const id = String(item.id || item.session_id || "").trim();
+                const id = clean(item.id || item.session_id);
 
                 if (id) ids.add(id);
             });
@@ -82,24 +155,49 @@ Clears stale mobile active session ids when /api/sessions says they are not visi
         return ids;
     }
 
-    function scrubFromPayload(payload) {
+    function scrubPayload(payload) {
         if (!payload || typeof payload !== "object") return;
 
-        const ids = collectVisibleIds(payload);
-        const localId = getLocalActiveId();
-        const responseActive = String(payload.active_session_id || "").trim();
+        if ("items" in payload || "sessions" in payload) {
+            visibleSessionIds = collectVisibleIds(payload);
+            hasSeenSessionsPayload = true;
+        }
 
-        if (responseActive && !ids.has(responseActive)) {
+        const activeId = clean(payload.active_session_id);
+
+        if (activeId && isBlockedSessionId(activeId)) {
             payload.active_session_id = "";
+            removeActiveStorage("response active id not visible: " + activeId);
         }
 
-        if (localId && !ids.has(localId)) {
-            clearLocalActiveId("not visible in /api/sessions: " + localId);
+        if (!visibleSessionIds.size && hasSeenSessionsPayload) {
+            removeActiveStorage("empty scoped session list");
         }
+    }
 
-        if (!ids.size && localId) {
-            clearLocalActiveId("empty scoped session list");
-        }
+    function installFetchHook() {
+        if (window.__novaMobileScopeFetchLock20260623) return;
+
+        window.__novaMobileScopeFetchLock20260623 = true;
+
+        const originalFetch = window.fetch;
+
+        if (typeof originalFetch !== "function") return;
+
+        window.fetch = function () {
+            const args = arguments;
+            const url = clean(args[0] && args[0].url || args[0] || "");
+
+            return originalFetch.apply(this, args).then(function (response) {
+                try {
+                    if (url.includes("/api/sessions")) {
+                        response.clone().json().then(scrubPayload).catch(function () {});
+                    }
+                } catch (_) {}
+
+                return response;
+            });
+        };
     }
 
     async function checkNow() {
@@ -113,7 +211,7 @@ Clears stale mobile active session ids when /api/sessions says they are not visi
 
             const payload = await response.json();
 
-            scrubFromPayload(payload);
+            scrubPayload(payload);
 
             return payload;
         } catch (error) {
@@ -122,35 +220,14 @@ Clears stale mobile active session ids when /api/sessions says they are not visi
         }
     }
 
-    function installFetchHook() {
-        if (window.__novaMobileSessionScopeGuardFetchHook) return;
-
-        window.__novaMobileSessionScopeGuardFetchHook = true;
-
-        const originalFetch = window.fetch;
-
-        if (typeof originalFetch !== "function") return;
-
-        window.fetch = function () {
-            const args = arguments;
-            const url = String(args[0] && args[0].url || args[0] || "");
-
-            return originalFetch.apply(this, args).then(function (response) {
-                try {
-                    if (url.includes("/api/sessions")) {
-                        response.clone().json().then(scrubFromPayload).catch(function () {});
-                    }
-                } catch (_) {}
-
-                return response;
-            });
-        };
-    }
-
     function boot() {
+        installStorageSetItemLock();
+        installGlobalLocks();
         installFetchHook();
 
-        [80, 500, 1200, 2400].forEach(function (delay) {
+        removeActiveStorage("boot cleanup");
+
+        [80, 400, 1000, 1800, 3000].forEach(function (delay) {
             window.setTimeout(checkNow, delay);
         });
 
@@ -165,6 +242,9 @@ Clears stale mobile active session ids when /api/sessions says they are not visi
 
     window.NovaMobileSessionScopeGuard = {
         check: checkNow,
-        clear: clearLocalActiveId
+        clear: removeActiveStorage,
+        visibleIds: function () {
+            return Array.from(visibleSessionIds);
+        }
     };
 })();
