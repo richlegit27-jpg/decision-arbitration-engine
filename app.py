@@ -11203,6 +11203,21 @@ def nova_before_request_slim_api_sessions_20260611():
 
         slim_response = jsonify({
             "ok": True,
+        # NOVA_SLIM_RETURN_ACTIVE_SESSION_VISIBLE_GATE_20260623
+        # Final fail-safe: never return an active_session_id unless that ID is
+        # actually present in the scoped visible list being returned.
+        try:
+            _nova_visible_ids_20260623 = {
+                str(item.get("id") or item.get("session_id") or "").strip()
+                for item in returned_sessions
+                if isinstance(item, dict) and str(item.get("id") or item.get("session_id") or "").strip()
+            }
+
+            if str(active_session_id or "").strip() not in _nova_visible_ids_20260623:
+                active_session_id = ""
+        except Exception:
+            active_session_id = ""
+
             "active_session_id": active_session_id,
             "sessions": returned_sessions,
             "items": returned_sessions,
