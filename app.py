@@ -14339,28 +14339,36 @@ def _nova_scope_normalize_user_20260623(value):
 
 def _nova_scope_current_user_20260623():
     try:
-        from flask import session as flask_session
+        from flask import session as flask_session, g
 
         payload = dict(flask_session)
+        g_user = getattr(g, "nova_auth_user", None)
     except Exception:
         payload = {}
+        g_user = None
 
+    # Local auth stores this exact key on register/login:
+    # session["nova_user_id"] = user["id"]
     user = (
-        payload.get("username")
+        payload.get("nova_user_id")
+        or payload.get("user_id")
+        or payload.get("username")
         or payload.get("email")
         or payload.get("user_email")
-        or payload.get("user_id")
         or payload.get("account")
         or payload.get("user")
         or ""
     )
 
+    if not user and g_user:
+        user = g_user
+
     if isinstance(user, dict):
         user = (
-            user.get("username")
-            or user.get("email")
-            or user.get("id")
+            user.get("id")
             or user.get("user_id")
+            or user.get("username")
+            or user.get("email")
             or ""
         )
 
@@ -14384,21 +14392,24 @@ def _nova_scope_session_owner_20260623(session):
         return ""
 
     owner = (
-        session.get("owner")
+        session.get("user_id")
+        or session.get("id_user")
+        or session.get("owner_id")
+        or session.get("owner")
         or session.get("owner_username")
         or session.get("username")
+        or session.get("email")
         or session.get("user")
-        or session.get("user_id")
         or session.get("account")
         or ""
     )
 
     if isinstance(owner, dict):
         owner = (
-            owner.get("username")
-            or owner.get("email")
-            or owner.get("id")
+            owner.get("id")
             or owner.get("user_id")
+            or owner.get("username")
+            or owner.get("email")
             or ""
         )
 
