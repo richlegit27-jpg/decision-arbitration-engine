@@ -13211,6 +13211,34 @@ def nova_final_session_detail_response_cache_20260612(response):
             if assistant_text and assistant_text in existing_messages_blob:
                 assistant_already_saved = True
 
+            # NOVA_FINAL_SESSION_CACHE_SAME_TEXT_DEDUPE_20260622
+            # If another bridge already placed the same assistant text in session.messages,
+            # do not append the top-level assistant_message again.
+            if assistant_text and not assistant_already_saved:
+                try:
+                    _assistant_text_norm = str(assistant_text or "").strip()
+                    for _existing_msg in messages:
+                        if not isinstance(_existing_msg, dict):
+                            continue
+
+                        _existing_role = str(_existing_msg.get("role") or _existing_msg.get("sender") or "").strip().lower()
+                        _existing_text = str(
+                            _existing_msg.get("text")
+                            or _existing_msg.get("content")
+                            or _existing_msg.get("message")
+                            or ""
+                        ).strip()
+
+                        if (
+                            _existing_role == "assistant"
+                            and _assistant_text_norm
+                            and _existing_text == _assistant_text_norm
+                        ):
+                            assistant_already_saved = True
+                            break
+                except Exception:
+                    pass
+
             if assistant_text and not assistant_already_saved:
                 saved_assistant = assistant_message if isinstance(assistant_message, dict) else {}
                 saved_assistant = dict(saved_assistant)

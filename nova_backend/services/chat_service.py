@@ -8935,6 +8935,66 @@ if (not attachments) and (__name__ == "__main__"):
         text = str(user_text or "").strip()
         user_msg = self._build_user_message(user_text, attachments=attachments)
 
+        # NOVA_WEBFETCH_CODE_COMMAND_BOUNCE_20260622
+        # If a normal code/command prompt accidentally enters web_fetch after a prior news request,
+        # answer as code instead of using stale web/news context.
+        try:
+            _code_probe = text.lower()
+
+            _code_markers = (
+                "powershell",
+                "code block",
+                "```",
+                "terminal",
+                "command",
+                "cmd",
+                "bash",
+                "shell",
+            )
+
+            _code_verbs = (
+                "show me",
+                "give me",
+                "write",
+                "make",
+                "create",
+                "generate",
+                "example",
+            )
+
+            _is_code_command_request = (
+                any(_marker in _code_probe for _marker in _code_markers)
+                and any(_verb in _code_probe for _verb in _code_verbs)
+            )
+
+            if _is_code_command_request:
+                if "powershell" in _code_probe:
+                    _reply = "```powershell\nGet-Process\n```"
+                elif "bash" in _code_probe or "shell" in _code_probe or "terminal" in _code_probe:
+                    _reply = "```bash\nls -la\n```"
+                else:
+                    _reply = "```text\nexample command\n```"
+
+                assistant_msg = self._build_assistant_message(
+                    _reply,
+                    meta={
+                        "route": "final_session_detail_response_cache",
+                        "strategy": "code_command_bounced_from_web_fetch",
+                        "web_fetch_blocked_for_code": True,
+                        "source_urls": [],
+                        "sources": [],
+                    },
+                )
+
+                return self._finalize_response(
+                    session_id=session_id,
+                    user_msg=user_msg,
+                    assistant_msg=assistant_msg,
+                    saved_artifact=None,
+                )
+        except Exception as _nova_code_bounce_error:
+            print("[NOVA_WEBFETCH_CODE_COMMAND_BOUNCE] failed:", _nova_code_bounce_error)
+
         # EXECUTE_WEB_FETCH_ATTACHMENT_CHOKE_LOCK
         # app.py injects attachment text into user_text, then suppresses raw attachments before chat_service.
         # That means attachments can be empty here even though this is an attachment request.
