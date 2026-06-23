@@ -317,11 +317,23 @@ Renders only newest 8 artifacts.
         button.textContent = "Artifacts";
 
         /*
-        Keep Artifacts as the very last menu item.
-        This means the normal Close button stays directly above it.
+        Correct order:
+        Artifacts second-last.
+        Close dead last.
         */
-        toolsPanel.appendChild(button);
+        const closeButton = Array.from(toolsPanel.querySelectorAll("button"))
+            .find(function (btn) {
+                return clean(btn.innerText || btn.textContent || "").toLowerCase() === "close";
+            });
+
+        if (closeButton && closeButton.parentNode) {
+            toolsPanel.insertBefore(button, closeButton);
+            toolsPanel.appendChild(closeButton);
+        } else {
+            toolsPanel.appendChild(button);
+        }
     }
+
 
     function bindButton(button, handler) {
         if (!button || button.dataset.novaArtifactsSafeBound === "1") {
