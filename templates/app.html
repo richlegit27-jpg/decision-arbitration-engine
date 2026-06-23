@@ -10001,5 +10001,169 @@ pre code {
 
 
 
+
+<!-- NOVA_COLLAPSED_SOURCE_DRAWER_20260622 -->
+<style>
+.nova-source-drawer {
+    margin-top: 10px;
+    max-width: 100%;
+}
+
+.nova-source-drawer > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    width: fit-content;
+    max-width: 100%;
+    padding: 6px 10px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.42);
+    color: rgba(226, 232, 240, 0.86);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+}
+
+.nova-source-drawer > summary::-webkit-details-marker {
+    display: none;
+}
+
+.nova-source-drawer > summary::after {
+    content: "?";
+    opacity: 0.75;
+    font-size: 11px;
+}
+
+.nova-source-drawer[open] > summary::after {
+    content: "?";
+}
+
+.nova-source-drawer .nova-source-cards {
+    margin-top: 8px !important;
+    display: grid !important;
+    gap: 6px !important;
+}
+
+.nova-source-drawer .nova-source-card {
+    padding: 8px 10px !important;
+    border-radius: 10px !important;
+    background: rgba(15, 23, 42, 0.30) !important;
+    border: 1px solid rgba(148, 163, 184, 0.16) !important;
+    box-shadow: none !important;
+    font-size: 12px !important;
+    line-height: 1.25 !important;
+}
+
+.nova-source-drawer .nova-source-title,
+.nova-source-drawer .nova-source-card-title,
+.nova-source-drawer .nova-source-card .title {
+    font-size: 12px !important;
+    font-weight: 650 !important;
+}
+
+.nova-source-drawer .nova-source-card-top,
+.nova-source-drawer .nova-source-domain,
+.nova-source-drawer .nova-source-url {
+    font-size: 11px !important;
+    opacity: 0.72 !important;
+}
+
+.nova-source-drawer .nova-source-card div[style*="font-size:13px"],
+.nova-source-drawer .nova-source-card div[style*="font-size: 13px"] {
+    display: none !important;
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_COLLAPSED_SOURCE_DRAWER_20260622__) return;
+    window.__NOVA_COLLAPSED_SOURCE_DRAWER_20260622__ = true;
+
+    function sourceGroups() {
+        try {
+            return Array.from(document.querySelectorAll(
+                ".nova-source-cards, [data-nova-forced-source-cards='true']"
+            )).filter(function (node) {
+                return (
+                    node &&
+                    node.parentNode &&
+                    !node.closest(".nova-source-drawer") &&
+                    !node.hasAttribute("data-nova-source-drawer-wrapped")
+                );
+            });
+        } catch (_) {
+            return [];
+        }
+    }
+
+    function countCards(group) {
+        try {
+            var cards = group.querySelectorAll(".nova-source-card, [data-source-card='true']");
+            if (cards && cards.length) return cards.length;
+        } catch (_) {}
+
+        try {
+            return Math.max(1, group.children.length || 1);
+        } catch (_) {
+            return 1;
+        }
+    }
+
+    function wrapGroup(group) {
+        if (!group || !group.parentNode) return;
+
+        if (group.closest(".nova-source-drawer")) return;
+
+        var count = countCards(group);
+
+        group.setAttribute("data-nova-source-drawer-wrapped", "true");
+
+        var drawer = document.createElement("details");
+        drawer.className = "nova-source-drawer";
+        drawer.setAttribute("data-nova-source-drawer", "true");
+
+        var summary = document.createElement("summary");
+        summary.textContent = count === 1 ? "Source" : ("Sources " + count);
+
+        drawer.appendChild(summary);
+
+        group.parentNode.insertBefore(drawer, group);
+        drawer.appendChild(group);
+    }
+
+    function collapseSourceCards() {
+        sourceGroups().forEach(wrapGroup);
+    }
+
+    collapseSourceCards();
+
+    setTimeout(collapseSourceCards, 250);
+    setTimeout(collapseSourceCards, 900);
+    setTimeout(collapseSourceCards, 1800);
+
+    document.addEventListener("nova:message:rendered", collapseSourceCards);
+
+    var observer = new MutationObserver(function () {
+        clearTimeout(window.__novaCollapsedSourceDrawerTimer);
+        window.__novaCollapsedSourceDrawerTimer = setTimeout(collapseSourceCards, 80);
+    });
+
+    observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true
+    });
+
+    window.NovaCollapseSourceCards = collapseSourceCards;
+
+    console.log("[Nova] collapsed source drawer ready");
+})();
+</script>
+<!-- /NOVA_COLLAPSED_SOURCE_DRAWER_20260622 -->
+
 </body>
 </html>
