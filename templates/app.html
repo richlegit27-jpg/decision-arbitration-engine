@@ -10410,5 +10410,37 @@ pre code {
 })();
 </script>
 <!-- NOVA_DESKTOP_OPEN_SESSION_FORCE_RENDER_END_20260622 -->
+<!-- NOVA_DESKTOP_SESSION_LIST_TIGHT_SPACING_20260622 -->
+<style>
+/* Keep Recent session rows packed at the top instead of stretching apart. */
+#desktopSessionList,
+.desktop-session-list {
+    display: grid !important;
+    grid-auto-rows: max-content !important;
+    align-content: start !important;
+    align-items: start !important;
+    justify-items: stretch !important;
+    gap: 8px !important;
+}
+
+.desktop-session-item,
+.session-item {
+    min-height: 0 !important;
+    height: auto !important;
+    align-self: start !important;
+    display: grid !important;
+    grid-template-rows: auto auto !important;
+    gap: 4px !important;
+}
+
+.desktop-session-title,
+.desktop-session-meta {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+</style>
+<!-- NOVA_DESKTOP_SESSION_LIST_TIGHT_SPACING_END_20260622 -->
 </body>
 </html>
