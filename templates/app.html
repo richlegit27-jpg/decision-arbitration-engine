@@ -10510,5 +10510,241 @@ pre code {
 }
 </style>
 <!-- NOVA_DESKTOP_COMPOSER_FIXED_SCROLL_LOCK_END_20260622 -->
+<!-- NOVA_DESKTOP_ATTACHMENT_PREVIEW_POLISH_20260622 -->
+<style>
+#desktopAttachmentChip {
+    margin: 0 16px 12px !important;
+    padding: 10px !important;
+    border: 1px solid rgba(167, 139, 250, 0.42) !important;
+    border-radius: 18px !important;
+    background:
+        radial-gradient(circle at top left, rgba(168, 85, 247, 0.20), transparent 34%),
+        rgba(17, 24, 39, 0.78) !important;
+    color: var(--text) !important;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24) !important;
+    backdrop-filter: blur(14px) !important;
+    box-sizing: border-box !important;
+}
+
+.nova-attachment-preview-card {
+    display: grid !important;
+    grid-template-columns: 52px minmax(0, 1fr) auto !important;
+    align-items: center !important;
+    gap: 10px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+.nova-attachment-preview-thumb {
+    width: 52px !important;
+    height: 52px !important;
+    border-radius: 14px !important;
+    overflow: hidden !important;
+    display: grid !important;
+    place-items: center !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #ddd6fe !important;
+    font-size: 22px !important;
+    flex: 0 0 auto !important;
+}
+
+.nova-attachment-preview-thumb img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    display: block !important;
+}
+
+.nova-attachment-preview-main {
+    min-width: 0 !important;
+    overflow: hidden !important;
+}
+
+.nova-attachment-preview-label {
+    font-size: 11px !important;
+    color: #c4b5fd !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+    margin-bottom: 3px !important;
+}
+
+.nova-attachment-preview-name {
+    font-size: 13px !important;
+    font-weight: 850 !important;
+    color: #f8fafc !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+.nova-attachment-preview-meta {
+    margin-top: 3px !important;
+    font-size: 12px !important;
+    color: rgba(226, 232, 240, 0.70) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+.nova-attachment-preview-remove {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    background: rgba(255, 255, 255, 0.10) !important;
+    color: #f8fafc !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 20px !important;
+    line-height: 1 !important;
+    font-weight: 800 !important;
+}
+
+.nova-attachment-preview-remove:hover {
+    background: rgba(239, 68, 68, 0.22) !important;
+    border-color: rgba(248, 113, 113, 0.55) !important;
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_DESKTOP_ATTACHMENT_PREVIEW_POLISH_20260622__) return;
+    window.__NOVA_DESKTOP_ATTACHMENT_PREVIEW_POLISH_20260622__ = true;
+
+    function esc(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
+
+    function formatBytes(value) {
+        var bytes = Number(value || 0);
+        if (!bytes || bytes < 0) return "";
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + " KB";
+        return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+    }
+
+    function getAttachmentList() {
+        try {
+            if (Array.isArray(pendingDesktopAttachments)) {
+                return pendingDesktopAttachments;
+            }
+        } catch (_) {}
+        return [];
+    }
+
+    function getFileIcon(attachment) {
+        var mime = String(attachment && (attachment.mime_type || attachment.type || "") || "").toLowerCase();
+        var name = String(attachment && (attachment.name || attachment.filename || attachment.original_filename || "") || "").toLowerCase();
+
+        if (mime.indexOf("image/") === 0 || /\.(png|jpe?g|gif|webp|bmp|svg)$/.test(name)) return "image";
+        if (mime.indexOf("pdf") >= 0 || /\.pdf$/.test(name)) return "??";
+        if (mime.indexOf("text") >= 0 || /\.(txt|md|csv|json|py|js|html|css)$/.test(name)) return "??";
+        return "??";
+    }
+
+    function getAttachmentUrl(attachment) {
+        return String(
+            attachment && (
+                attachment.url ||
+                attachment.file_url ||
+                attachment.preview_url ||
+                attachment.image_url ||
+                ""
+            ) || ""
+        );
+    }
+
+    function buildPreviewHtml(attachment, count) {
+        attachment = attachment || {};
+
+        var name = attachment.original_filename || attachment.name || attachment.filename || "Attached file";
+        var mime = attachment.mime_type || attachment.content_type || attachment.type || "file";
+        var size = formatBytes(attachment.size || attachment.size_bytes);
+        var url = getAttachmentUrl(attachment);
+        var icon = getFileIcon(attachment);
+
+        var thumb = icon === "image" && url
+            ? '<img src="' + esc(url) + '" alt="">'
+            : esc(icon === "image" ? "???" : icon);
+
+        var extra = count > 1 ? " +" + String(count - 1) + " more" : "";
+        var meta = [mime, size].filter(Boolean).join(" ? ") + extra;
+
+        return [
+            '<div class="nova-attachment-preview-card">',
+                '<div class="nova-attachment-preview-thumb">' + thumb + '</div>',
+                '<div class="nova-attachment-preview-main">',
+                    '<div class="nova-attachment-preview-label">Attachment ready</div>',
+                    '<div class="nova-attachment-preview-name" title="' + esc(name) + '">' + esc(name) + '</div>',
+                    '<div class="nova-attachment-preview-meta" title="' + esc(meta) + '">' + esc(meta) + '</div>',
+                '</div>',
+                '<button type="button" class="nova-attachment-preview-remove" id="desktopAttachmentDeleteBtn" title="Remove attachment" aria-label="Remove attachment">&times;</button>',
+            '</div>'
+        ].join("");
+    }
+
+    window.showDesktopAttachmentChip = function () {
+        var chip = document.getElementById("desktopAttachmentChip");
+
+        if (!chip) {
+            chip = document.createElement("div");
+            chip.id = "desktopAttachmentChip";
+
+            var composer = document.querySelector(".composer") || document.getElementById("input")?.parentElement || document.body;
+            if (composer && composer.parentElement) {
+                composer.parentElement.insertBefore(chip, composer);
+            } else {
+                document.body.appendChild(chip);
+            }
+        }
+
+        var attachments = getAttachmentList();
+
+        if (!attachments.length) {
+            chip.hidden = true;
+            chip.style.display = "none";
+            chip.innerHTML = "";
+            return;
+        }
+
+        chip.hidden = false;
+        chip.style.display = "block";
+        chip.innerHTML = buildPreviewHtml(attachments[attachments.length - 1], attachments.length);
+
+        var remove = document.getElementById("desktopAttachmentDeleteBtn");
+        if (remove) {
+            remove.onclick = function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (typeof window.clearDesktopAttachments === "function") {
+                    window.clearDesktopAttachments();
+                } else {
+                    try { pendingDesktopAttachments = []; } catch (_) {}
+                    chip.hidden = true;
+                    chip.style.display = "none";
+                    chip.innerHTML = "";
+                }
+            };
+        }
+    };
+
+    window.renderDesktopAttachmentChip = window.showDesktopAttachmentChip;
+    window.renderDesktopAttachments = window.showDesktopAttachmentChip;
+
+    console.log("[Nova Desktop Attachment Preview Polish] ready");
+})();
+</script>
+<!-- NOVA_DESKTOP_ATTACHMENT_PREVIEW_POLISH_END_20260622 -->
 </body>
 </html>
