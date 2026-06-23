@@ -11098,10 +11098,11 @@ def nova_before_request_slim_api_sessions_20260611():
             if not isinstance(item, dict):
                 return False
 
-            session_owner = _nova_slim_session_owner_20260623(item)
-
             if not scoped_user_id:
                 return False
+
+            session_id = str(item.get("id") or "").strip()
+            session_owner = _nova_slim_session_owner_20260623(item)
 
             if session_owner != scoped_user_id:
                 return False
@@ -11119,12 +11120,39 @@ def nova_before_request_slim_api_sessions_20260611():
                 or ""
             ).strip().lower()
 
-            # If old sessions have visible identity labels, do not let joe-labeled
-            # sessions show inside a different email/username workspace.
-            if session_username and scoped_username and session_username != scoped_username:
-                return False
+            allowed_visible = {
+                value
+                for value in [
+                    scoped_username,
+                    scoped_email,
+                    scoped_user_id
+                ]
+                if value
+            }
 
-            if session_email and scoped_email and session_email != scoped_email:
+            visible_identity = {
+                value
+                for value in [
+                    session_username,
+                    session_email
+                ]
+                if value
+            }
+
+            # NOVA_SLIM_SESSION_VISIBLE_IDENTITY_FAIL_CLOSED_20260623
+            # If a session advertises a visible username/email, it must match the
+            # current authenticated account. This blocks joe-labeled legacy sessions
+            # even if their internal user_id was accidentally reused.
+            if visible_identity:
+                if not allowed_visible:
+                    return False
+
+                if not any(value in allowed_visible for value in visible_identity):
+                    return False
+
+            # Extra safety: debug_* sessions are legacy/dev sessions.
+            # Only show them if they also passed the visible identity check above.
+            if session_id.startswith("debug_") and not visible_identity:
                 return False
 
             return True
@@ -14830,6 +14858,82 @@ def _nova_user_scoped_sessions_after_request_20260623(response):
 
         return response
 # NOVA_USER_SCOPED_SESSIONS_PHASE1_END_20260623
+
+
+
+# NOVA_API_SESSIONS_STALE_ACTIVE_ID_SCRUB_20260623
+@app.after_request
+def _nova_api_sessions_stale_active_id_scrub_20260623(response):
+    try:
+        from flask import request, jsonify
+
+        if str(request.path or "") != "/api/sessions":
+            return response
+
+        if not response.is_json:
+            return response
+
+        payload = response.get_json(silent=True)
+
+        if not isinstance(payload, dict):
+            return response
+
+        visible_ids = set()
+
+        for key in ("items", "sessions"):
+            value = payload.get(key)
+
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict):
+                        sid = str(item.get("id") or item.get("session_id") or "").strip()
+                        if sid:
+                            visible_ids.add(sid)
+
+        active_id = str(payload.get("active_session_id") or "").strip()
+
+        if active_id and active_id not in visible_ids:
+            payload["active_session_id"] = ""
+
+            session = payload.get("session")
+            if isinstance(session, dict):
+                sid = str(session.get("id") or session.get("session_id") or "").strip()
+                if sid == active_id:
+                    payload["session"] = None
+
+            debug = payload.get("debug")
+            if not isinstance(debug, dict):
+                debug = {}
+
+            debug["stale_active_session_scrubbed"] = active_id
+            debug["route"] = str(debug.get("route") or "api_sessions_stale_active_scrub")
+            payload["debug"] = debug
+
+            scrubbed = jsonify(payload)
+            scrubbed.status_code = response.status_code
+
+            try:
+                scrubbed.headers["X-Nova-Stale-Active-Session-Scrubbed"] = active_id
+            except Exception:
+                pass
+
+            for cookie_name in ("nova_active_session_id", "active_session_id", "session_id"):
+                try:
+                    scrubbed.delete_cookie(cookie_name)
+                except Exception:
+                    pass
+
+            return scrubbed
+
+        return response
+    except Exception:
+        try:
+            app.logger.exception("[sessions-stale-active-scrub] failed")
+        except Exception:
+            pass
+
+        return response
+# NOVA_API_SESSIONS_STALE_ACTIVE_ID_SCRUB_END_20260623
 
 
 if __name__ == "__main__":
