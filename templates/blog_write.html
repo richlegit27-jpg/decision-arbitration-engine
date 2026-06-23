@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Write ? Nova Blog</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+        :root {
+            --bg: #070712;
+            --card: rgba(15, 23, 42, 0.86);
+            --text: #f8fafc;
+            --muted: rgba(226, 232, 240, 0.68);
+            --line: rgba(216, 180, 254, 0.22);
+            --purple: #a855f7;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at top left, rgba(168, 85, 247, 0.22), transparent 34%),
+                radial-gradient(circle at bottom right, rgba(124, 58, 237, 0.14), transparent 34%),
+                var(--bg);
+            color: var(--text);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        .page {
+            width: min(1180px, calc(100% - 28px));
+            margin: 0 auto;
+            padding: 22px 0 46px;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 18px;
+        }
+
+        .brand strong {
+            display: block;
+            font-size: 18px;
+            letter-spacing: -0.04em;
+        }
+
+        .brand span {
+            display: block;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 750;
+            margin-top: 2px;
+        }
+
+        .nav {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .nav a,
+        button {
+            text-decoration: none;
+            color: var(--text);
+            font-size: 12px;
+            font-weight: 950;
+            padding: 9px 13px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(168, 85, 247, 0.14);
+            cursor: pointer;
+        }
+
+        button.primary {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.42), rgba(124, 58, 237, 0.24));
+        }
+
+        .editor-grid {
+            display: grid;
+            grid-template-columns: 1fr 0.82fr;
+            gap: 16px;
+            align-items: start;
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            background: var(--card);
+            padding: 18px;
+            box-shadow: 0 24px 65px rgba(0, 0, 0, 0.30);
+        }
+
+        h1 {
+            margin: 0 0 14px;
+            font-size: clamp(30px, 5vw, 54px);
+            line-height: 0.96;
+            letter-spacing: -0.065em;
+        }
+
+        label {
+            display: block;
+            margin: 14px 0 7px;
+            color: rgba(226, 232, 240, 0.78);
+            font-size: 12px;
+            font-weight: 900;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            border: 1px solid rgba(216, 180, 254, 0.20);
+            border-radius: 16px;
+            background: rgba(2, 6, 23, 0.56);
+            color: var(--text);
+            outline: none;
+            padding: 12px 13px;
+            font: inherit;
+            font-size: 14px;
+            line-height: 1.45;
+        }
+
+        textarea {
+            min-height: 390px;
+            resize: vertical;
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+
+        .status {
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 750;
+        }
+
+        .preview {
+            overflow-wrap: anywhere;
+        }
+
+        .preview h2 {
+            margin: 0 0 10px;
+            font-size: 30px;
+            line-height: 1;
+            letter-spacing: -0.05em;
+        }
+
+        .preview .excerpt {
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.55;
+            margin-bottom: 16px;
+            font-weight: 650;
+        }
+
+        .preview .body {
+            color: rgba(248, 250, 252, 0.90);
+            font-size: 15px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+        }
+
+        @media (max-width: 900px) {
+            .topbar {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .editor-grid {
+                grid-template-columns: 1fr;
+            }
+
+            textarea {
+                min-height: 300px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="page">
+        <header class="topbar">
+            <div class="brand">
+                <strong>Write Blog Post</strong>
+                <span>save posts into Nova</span>
+            </div>
+
+            <nav class="nav">
+                <a href="/">Home</a>
+                <a href="/blog">Blog</a>
+                <a href="/mobile">Mobile</a>
+            </nav>
+        </header>
+
+        <section class="editor-grid">
+            <div class="panel">
+                <h1>Write a post.</h1>
+
+                <label for="title">Title</label>
+                <input id="title" placeholder="Example: What I fixed in Nova today">
+
+                <label for="excerpt">Excerpt</label>
+                <input id="excerpt" placeholder="Short summary for the blog list">
+
+                <label for="tags">Tags</label>
+                <input id="tags" placeholder="Nova, Mobile, Build Notes">
+
+                <label for="body">Body</label>
+                <textarea id="body" placeholder="Write your blog post here..."></textarea>
+
+                <div class="actions">
+                    <button class="primary" id="saveBtn" type="button">Publish</button>
+                    <button id="draftBtn" type="button">Save draft locally</button>
+                    <button id="clearBtn" type="button">Clear</button>
+                </div>
+
+                <div class="status" id="status">Ready.</div>
+            </div>
+
+            <aside class="panel preview">
+                <h2 id="previewTitle">Untitled post</h2>
+                <div class="excerpt" id="previewExcerpt">Your excerpt will show here.</div>
+                <div class="body" id="previewBody">Your post preview will show here.</div>
+            </aside>
+        </section>
+    </main>
+
+    <script>
+        const fields = {
+            title: document.getElementById("title"),
+            excerpt: document.getElementById("excerpt"),
+            tags: document.getElementById("tags"),
+            body: document.getElementById("body")
+        };
+
+        const statusEl = document.getElementById("status");
+
+        function escapeHtml(value) {
+            return String(value || "").replace(/[&<>"']/g, function (char) {
+                return {
+                    "&": "&amp;",
+                    "<": "&lt;",
+                    ">": "&gt;",
+                    '"': "&quot;",
+                    "'": "&#039;"
+                }[char];
+            });
+        }
+
+        function getValue() {
+            return {
+                title: fields.title.value.trim(),
+                excerpt: fields.excerpt.value.trim(),
+                tags: fields.tags.value.trim(),
+                body: fields.body.value.trim()
+            };
+        }
+
+        function setStatus(value) {
+            statusEl.textContent = value;
+        }
+
+        function updatePreview() {
+            const value = getValue();
+
+            document.getElementById("previewTitle").textContent = value.title || "Untitled post";
+            document.getElementById("previewExcerpt").textContent = value.excerpt || "Your excerpt will show here.";
+            document.getElementById("previewBody").textContent = value.body || "Your post preview will show here.";
+
+            localStorage.setItem("nova_blog_writer_autosave", JSON.stringify(value));
+        }
+
+        function restoreDraft() {
+            try {
+                const saved = JSON.parse(localStorage.getItem("nova_blog_writer_autosave") || "{}");
+
+                fields.title.value = saved.title || "";
+                fields.excerpt.value = saved.excerpt || "";
+                fields.tags.value = saved.tags || "";
+                fields.body.value = saved.body || "";
+            } catch (_) {}
+
+            updatePreview();
+        }
+
+        async function publishPost() {
+            const value = getValue();
+
+            if (!value.title) {
+                setStatus("Title is required.");
+                return;
+            }
+
+            if (!value.body) {
+                setStatus("Body is required.");
+                return;
+            }
+
+            setStatus("Publishing...");
+
+            try {
+                const res = await fetch("/api/blog/posts", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(value)
+                });
+
+                const data = await res.json();
+
+                if (!data.ok) {
+                    setStatus(data.error || "Publish failed.");
+                    return;
+                }
+
+                localStorage.removeItem("nova_blog_writer_autosave");
+                setStatus("Published.");
+
+                setTimeout(function () {
+                    window.location.href = "/blog/" + encodeURIComponent(data.post.slug);
+                }, 450);
+            } catch (error) {
+                setStatus("Publish failed.");
+            }
+        }
+
+        Object.values(fields).forEach(function (field) {
+            field.addEventListener("input", updatePreview);
+        });
+
+        document.getElementById("saveBtn").addEventListener("click", publishPost);
+
+        document.getElementById("draftBtn").addEventListener("click", function () {
+            localStorage.setItem("nova_blog_writer_autosave", JSON.stringify(getValue()));
+            setStatus("Draft saved locally.");
+        });
+
+        document.getElementById("clearBtn").addEventListener("click", function () {
+            fields.title.value = "";
+            fields.excerpt.value = "";
+            fields.tags.value = "";
+            fields.body.value = "";
+            localStorage.removeItem("nova_blog_writer_autosave");
+            updatePreview();
+            setStatus("Cleared.");
+        });
+
+        restoreDraft();
+    </script>
+</body>
+</html>

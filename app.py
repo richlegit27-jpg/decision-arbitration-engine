@@ -14155,6 +14155,129 @@ def nova_history_direct_send_20260622(session_id):
 # END_NOVA_HISTORY_DIRECT_SEND_20260622
 
 
+
+# NOVA_BLOG_WRITABLE_ROUTES_20260623
+@app.route("/blog")
+def nova_blog_page():
+    from flask import render_template
+    return render_template("blog.html")
+
+
+@app.route("/blog/write")
+def nova_blog_write_page():
+    from flask import render_template
+    return render_template("blog_write.html")
+
+
+@app.route("/blog/<slug>")
+def nova_blog_post_page(slug):
+    from flask import render_template
+    return render_template("blog_post.html", slug=slug)
+
+
+@app.route("/api/blog/posts", methods=["GET", "POST"])
+def nova_blog_posts_api():
+    from flask import request, jsonify
+    from pathlib import Path
+    from datetime import datetime, timezone
+    import json
+    import re
+
+    path = Path("data/blog_posts.json")
+    path.parent.mkdir(exist_ok=True)
+
+    if not path.exists():
+        path.write_text("[]\n", encoding="utf-8")
+
+    def read_posts():
+        try:
+            value = json.loads(path.read_text(encoding="utf-8", errors="replace") or "[]")
+            return value if isinstance(value, list) else []
+        except Exception:
+            return []
+
+    def write_posts(posts):
+        path.write_text(json.dumps(posts, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    def slugify(value):
+        value = str(value or "untitled").strip().lower()
+        value = re.sub(r"[^a-z0-9]+", "-", value)
+        value = re.sub(r"-+", "-", value).strip("-")
+        return value or "untitled"
+
+    posts = read_posts()
+
+    if request.method == "GET":
+        posts = sorted(posts, key=lambda item: item.get("updated_at") or item.get("created_at") or "", reverse=True)
+        return jsonify({"ok": True, "posts": posts})
+
+    payload = request.get_json(silent=True) or {}
+
+    title = str(payload.get("title") or "").strip()
+    body = str(payload.get("body") or "").strip()
+    excerpt = str(payload.get("excerpt") or "").strip()
+    tags = payload.get("tags") or []
+
+    if isinstance(tags, str):
+        tags = [part.strip() for part in tags.split(",") if part.strip()]
+
+    if not title:
+        return jsonify({"ok": False, "error": "Title is required."}), 400
+
+    if not body:
+        return jsonify({"ok": False, "error": "Body is required."}), 400
+
+    base_slug = slugify(payload.get("slug") or title)
+    slug = base_slug
+    existing_slugs = {post.get("slug") for post in posts}
+
+    if slug in existing_slugs:
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+        slug = f"{base_slug}-{stamp}"
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    if not excerpt:
+        excerpt = body.replace("\n", " ").strip()[:180]
+
+    post = {
+        "slug": slug,
+        "title": title,
+        "excerpt": excerpt,
+        "body": body,
+        "tags": tags,
+        "created_at": now,
+        "updated_at": now,
+        "status": "published"
+    }
+
+    posts.append(post)
+    write_posts(posts)
+
+    return jsonify({"ok": True, "post": post})
+
+
+@app.route("/api/blog/posts/<slug>", methods=["GET"])
+def nova_blog_single_post_api(slug):
+    from flask import jsonify
+    from pathlib import Path
+    import json
+
+    path = Path("data/blog_posts.json")
+
+    try:
+        posts = json.loads(path.read_text(encoding="utf-8", errors="replace") or "[]")
+    except Exception:
+        posts = []
+
+    for post in posts:
+        if post.get("slug") == slug:
+            return jsonify({"ok": True, "post": post})
+
+    return jsonify({"ok": False, "error": "Post not found."}), 404
+# NOVA_BLOG_WRITABLE_ROUTES_END_20260623
+
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
