@@ -3594,7 +3594,173 @@ header {
 }
 </style>
 <!-- NOVA_MOBILE_SUMMARY_HORSEMEN_STYLE_END_20260623 -->
-<script src="/static/js/mobile/nova-mobile-summary-horsemen.js?v=summary-horsemen-20260623"></script>
+<script src="/static/js/mobile/nova-mobile-summary-horsemen.js?v=summary-horsemen-polish-20260623"></script>
+<!-- NOVA_MOBILE_FINAL_POLISH_20260623 -->
+<style>
+/* Summary + 4 Horsemen should be a normal docked card, not a menu panel */
+#nova-mobile-summary-horsemen,
+#nova-mobile-summary-horsemen.nova-mobile-tools-menu-fixed,
+#nova-mobile-summary-horsemen.nova-mobile-menu-panel-fixed,
+#nova-mobile-summary-horsemen.nova-mobile-panel-fixed,
+#nova-mobile-summary-horsemen.mobile-menu-panel-fixed {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    position: relative !important;
+    inset: auto !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    width: calc(100% - 22px) !important;
+    max-width: 760px !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 8px auto 8px auto !important;
+    padding: 10px !important;
+    border-radius: 18px !important;
+    border: 1px solid rgba(216, 180, 254, 0.24) !important;
+    background:
+        radial-gradient(circle at top left, rgba(168, 85, 247, 0.20), transparent 45%),
+        rgba(15, 23, 42, 0.86) !important;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.26) !important;
+    color: #f8fafc !important;
+    z-index: 20 !important;
+}
+
+#nova-mobile-summary-horsemen .nova-mobile-summary-head {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+
+#nova-mobile-summary-horsemen .nova-mobile-summary-title {
+    color: #f8fafc !important;
+    font-size: 12px !important;
+    font-weight: 950 !important;
+    letter-spacing: -0.02em !important;
+}
+
+#nova-mobile-summary-horsemen .nova-mobile-summary-sub {
+    margin-top: 2px !important;
+    color: rgba(226, 232, 240, 0.68) !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+}
+
+#nova-mobile-summary-horsemen .nova-mobile-summary-body {
+    margin-top: 9px !important;
+    display: grid !important;
+    gap: 7px !important;
+}
+
+#nova-mobile-summary-horsemen .nova-mobile-summary-body.is-hidden {
+    display: none !important;
+}
+
+#nova-mobile-summary-horsemen .nova-mobile-summary-line {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 12px !important;
+    min-height: 31px !important;
+    padding: 7px 9px !important;
+    border-radius: 12px !important;
+    background: rgba(255, 255, 255, 0.045) !important;
+    color: rgba(226, 232, 240, 0.78) !important;
+    font-size: 10.5px !important;
+    font-weight: 850 !important;
+}
+
+#nova-mobile-summary-horsemen .nova-mobile-summary-line strong {
+    max-width: 58% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    color: #f8fafc !important;
+    font-size: 10.5px !important;
+    font-weight: 950 !important;
+}
+
+#nova-mobile-summary-horsemen .nova-mobile-horsemen-row {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+    margin-top: 2px !important;
+}
+
+/* Shared small purple pill button polish */
+#nova-mobile-summary-horsemen button,
+.nova-mobile-assistant-action,
+.nova-mobile-assistant-actions button {
+    min-height: 28px !important;
+    padding: 5px 10px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(216, 180, 254, 0.28) !important;
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.28), rgba(124, 58, 237, 0.16)) !important;
+    color: #f8fafc !important;
+    font-size: 10px !important;
+    line-height: 1 !important;
+    font-weight: 950 !important;
+    letter-spacing: -0.02em !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08) !important;
+}
+
+#nova-mobile-summary-horsemen button:active,
+.nova-mobile-assistant-action:active,
+.nova-mobile-assistant-actions button:active {
+    transform: translateY(1px) !important;
+}
+
+.nova-mobile-assistant-actions {
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 6px !important;
+    margin: 0 0 7px 0 !important;
+    padding: 0 !important;
+}
+
+/* Attachment chip polish */
+.nova-mobile-attachment-chip,
+.mobile-attachment-chip,
+.attachment-chip,
+.nova-attachment-chip,
+[data-mobile-attachment-chip],
+[class*="attachment"][class*="chip"] {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 7px !important;
+    max-width: 100% !important;
+    min-height: 32px !important;
+    padding: 6px 10px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(216, 180, 254, 0.24) !important;
+    background: rgba(15, 23, 42, 0.72) !important;
+    color: #f8fafc !important;
+    font-size: 11px !important;
+    font-weight: 850 !important;
+}
+
+.nova-mobile-attachment-chip *,
+.mobile-attachment-chip *,
+.attachment-chip *,
+.nova-attachment-chip *,
+[data-mobile-attachment-chip] * {
+    max-width: 100% !important;
+}
+
+@media (max-width: 420px) {
+    #nova-mobile-summary-horsemen .nova-mobile-horsemen-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+}
+</style>
+<!-- NOVA_MOBILE_FINAL_POLISH_END_20260623 -->
+<script src="/static/js/mobile/nova-mobile-final-polish-guard.js?v=final-polish-guard-20260623"></script>
 </body>
 </html>
 

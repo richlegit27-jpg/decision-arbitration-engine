@@ -457,3 +457,130 @@ Does not restore old floating debug UI.
         boot();
     }
 })();
+
+
+/*
+NOVA_MOBILE_SUMMARY_HORSEMEN_FINAL_POLISH_20260623
+Final polish layer:
+- keeps Summary + 4 Horsemen visible
+- strips menu-panel classes
+- keeps it docked above composer
+- hides stray standalone ? in attachment chips
+*/
+(function () {
+    "use strict";
+
+    const FIX_ID = "NOVA_MOBILE_SUMMARY_HORSEMEN_FINAL_POLISH_20260623";
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function composer() {
+        return (
+            $("nova-mobile-composer") ||
+            document.querySelector(".nova-mobile-composer") ||
+            document.querySelector(".mobile-composer") ||
+            document.querySelector("footer")
+        );
+    }
+
+    function getPanel() {
+        return $("nova-mobile-summary-horsemen");
+    }
+
+    function cleanPanelClasses(panel) {
+        if (!panel) return;
+
+        panel.classList.remove(
+            "hidden",
+            "is-hidden",
+            "nova-hidden",
+            "d-none",
+            "nova-mobile-tools-menu-fixed",
+            "nova-mobile-menu-panel-fixed",
+            "nova-mobile-panel-fixed",
+            "mobile-menu-panel-fixed"
+        );
+
+        panel.hidden = false;
+        panel.removeAttribute("aria-hidden");
+
+        panel.style.display = "block";
+        panel.style.visibility = "visible";
+        panel.style.opacity = "1";
+        panel.style.pointerEvents = "auto";
+        panel.style.position = "relative";
+        panel.style.inset = "auto";
+        panel.style.transform = "none";
+        panel.style.zIndex = "20";
+    }
+
+    function dockPanel(panel) {
+        if (!panel) return;
+
+        const c = composer();
+
+        if (c && c.parentNode && panel.nextElementSibling !== c) {
+            c.parentNode.insertBefore(panel, c);
+        }
+    }
+
+    function hideStrayQuestionMarks() {
+        const chips = Array.from(document.querySelectorAll([
+            ".nova-mobile-attachment-chip",
+            ".mobile-attachment-chip",
+            ".attachment-chip",
+            ".nova-attachment-chip",
+            "[data-mobile-attachment-chip]",
+            "[class*='attachment'][class*='chip']"
+        ].join(",")));
+
+        chips.forEach(function (chip) {
+            Array.from(chip.querySelectorAll("span, small, em, i, b, div")).forEach(function (node) {
+                const value = String(node.textContent || "").trim();
+
+                if (value === "?") {
+                    node.style.display = "none";
+                    node.setAttribute("aria-hidden", "true");
+                }
+            });
+        });
+    }
+
+    function polish() {
+        const panel = getPanel();
+
+        if (panel) {
+            cleanPanelClasses(panel);
+            dockPanel(panel);
+        }
+
+        hideStrayQuestionMarks();
+
+        if (window.NovaMobileSummaryHorsemen && typeof window.NovaMobileSummaryHorsemen.update === "function") {
+            try {
+                window.NovaMobileSummaryHorsemen.update();
+            } catch (_) {}
+        }
+    }
+
+    function boot() {
+        polish();
+
+        window.clearInterval(window.__novaMobileSummaryFinalPolishInterval);
+        window.__novaMobileSummaryFinalPolishInterval = window.setInterval(polish, 1800);
+
+        console.log("[" + FIX_ID + "] ready");
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", boot);
+    } else {
+        boot();
+    }
+
+    window.NovaMobileSummaryHorsemenPolish = {
+        polish: polish
+    };
+})();
