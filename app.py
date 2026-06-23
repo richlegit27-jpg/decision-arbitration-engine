@@ -11033,6 +11033,111 @@ def nova_before_request_slim_api_sessions_20260611():
 
         slim_sessions.sort(key=_updated_key_20260611, reverse=True)
 
+        # NOVA_SLIM_SESSIONS_SOURCE_USER_SCOPE_20260623
+        # /api/sessions is served early by this slim before_request route.
+        # Filter here before the payload escapes, because later hooks skip
+        # X-Nova-Slim-Sessions responses.
+        try:
+            from flask import session as flask_session
+
+            scoped_user_id = str(flask_session.get("nova_user_id") or "").strip().lower()
+        except Exception:
+            scoped_user_id = ""
+
+        def _nova_slim_session_owner_20260623(item):
+            if not isinstance(item, dict):
+                return ""
+
+            owner = (
+                item.get("user_id")
+                or item.get("owner_id")
+                or item.get("owner")
+                or item.get("owner_username")
+                or item.get("username")
+                or item.get("email")
+                or ""
+            )
+
+            if isinstance(owner, dict):
+                owner = (
+                    owner.get("id")
+                    or owner.get("user_id")
+                    or owner.get("username")
+                    or owner.get("email")
+                    or ""
+                )
+
+            return str(owner or "").strip().lower()
+
+        # NOVA_STRICT_SESSION_IDENTITY_SCOPE_20260623
+        try:
+            auth_user = None
+            users_payload = load_json(users_path, {"users": []})
+            users_list = users_payload.get("users", []) if isinstance(users_payload, dict) else []
+
+            for candidate in users_list:
+                if isinstance(candidate, dict) and str(candidate.get("id") or "").strip().lower() == scoped_user_id:
+                    auth_user = candidate
+                    break
+
+            scoped_username = str(
+                (auth_user or {}).get("username")
+                or (auth_user or {}).get("name")
+                or ""
+            ).strip().lower()
+
+            scoped_email = str(
+                (auth_user or {}).get("email")
+                or ""
+            ).strip().lower()
+        except Exception:
+            scoped_username = ""
+            scoped_email = ""
+
+        def _nova_slim_session_identity_ok_20260623(item):
+            if not isinstance(item, dict):
+                return False
+
+            session_owner = _nova_slim_session_owner_20260623(item)
+
+            if not scoped_user_id:
+                return False
+
+            if session_owner != scoped_user_id:
+                return False
+
+            session_username = str(
+                item.get("username")
+                or item.get("owner_username")
+                or item.get("name")
+                or ""
+            ).strip().lower()
+
+            session_email = str(
+                item.get("email")
+                or item.get("owner_email")
+                or ""
+            ).strip().lower()
+
+            # If old sessions have visible identity labels, do not let joe-labeled
+            # sessions show inside a different email/username workspace.
+            if session_username and scoped_username and session_username != scoped_username:
+                return False
+
+            if session_email and scoped_email and session_email != scoped_email:
+                return False
+
+            return True
+
+        if scoped_user_id:
+            slim_sessions = [
+                item
+                for item in slim_sessions
+                if _nova_slim_session_identity_ok_20260623(item)
+            ]
+        else:
+            slim_sessions = []
+
         active_session_id = ""
         try:
             active_session_id = str(
@@ -11042,6 +11147,15 @@ def nova_before_request_slim_api_sessions_20260611():
                 or ""
             ).strip()
         except Exception:
+            active_session_id = ""
+
+        visible_session_ids = {
+            str(item.get("id") or "").strip()
+            for item in slim_sessions
+            if isinstance(item, dict) and str(item.get("id") or "").strip()
+        }
+
+        if active_session_id not in visible_session_ids:
             active_session_id = ""
 
         if not active_session_id and slim_sessions:
@@ -14480,9 +14594,37 @@ def _nova_scope_tag_session_owner_20260623(session_id, user=None):
 
         if _nova_scope_session_owner_20260623(session) != user:
             session["owner"] = user
-            session["owner_username"] = user
             session["user_id"] = user
             changed = True
+
+        try:
+            from flask import session as flask_session
+
+            uid = str(flask_session.get("nova_user_id") or "").strip()
+            users_payload = load_json(users_path, {"users": []})
+            users_list = users_payload.get("users", []) if isinstance(users_payload, dict) else []
+            auth_user = None
+
+            for candidate in users_list:
+                if isinstance(candidate, dict) and str(candidate.get("id") or "").strip() == uid:
+                    auth_user = candidate
+                    break
+
+            if auth_user:
+                username_value = str(auth_user.get("username") or auth_user.get("name") or auth_user.get("email") or "").strip()
+                email_value = str(auth_user.get("email") or "").strip()
+
+                if username_value and session.get("username") != username_value:
+                    session["username"] = username_value
+                    session["owner_username"] = username_value
+                    changed = True
+
+                if email_value and session.get("email") != email_value:
+                    session["email"] = email_value
+                    session["owner_email"] = email_value
+                    changed = True
+        except Exception:
+            pass
 
         session.setdefault("owner_source", "auth_session")
         break
