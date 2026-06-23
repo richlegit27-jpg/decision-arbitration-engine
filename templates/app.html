@@ -10746,5 +10746,79 @@ pre code {
 })();
 </script>
 <!-- NOVA_DESKTOP_ATTACHMENT_PREVIEW_POLISH_END_20260622 -->
+<!-- NOVA_DESKTOP_FOOTER_BUTTONS_POLISH_20260622 -->
+<style>
+/* Make Home / Mobile / Artifacts look like one matched button group. */
+.side-footer-links {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    margin-top: 14px !important;
+}
+
+.side-footer-links a,
+.side-footer-links button,
+.side-footer-links .footer-mini-button,
+#openArtifactsBtn {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 38px !important;
+    height: 38px !important;
+    box-sizing: border-box !important;
+    padding: 0 10px !important;
+    margin: 0 !important;
+    border: 1px solid rgba(167, 139, 250, 0.38) !important;
+    border-radius: 999px !important;
+    background:
+        linear-gradient(135deg, rgba(168, 85, 247, 0.18), rgba(91, 33, 182, 0.10)),
+        rgba(255, 255, 255, 0.055) !important;
+    color: #ddd6fe !important;
+    font-size: 12px !important;
+    font-weight: 850 !important;
+    line-height: 1 !important;
+    text-align: center !important;
+    text-decoration: none !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    cursor: pointer !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+.side-footer-links a:hover,
+.side-footer-links button:hover,
+.side-footer-links .footer-mini-button:hover,
+#openArtifactsBtn:hover {
+    color: #ffffff !important;
+    border-color: rgba(216, 180, 254, 0.70) !important;
+    background:
+        linear-gradient(135deg, rgba(168, 85, 247, 0.30), rgba(91, 33, 182, 0.18)),
+        rgba(255, 255, 255, 0.09) !important;
+    box-shadow: 0 8px 22px rgba(168, 85, 247, 0.18) !important;
+}
+
+.side-footer-links a:active,
+.side-footer-links button:active,
+.side-footer-links .footer-mini-button:active,
+#openArtifactsBtn:active {
+    transform: translateY(0) scale(0.98) !important;
+}
+
+.side-footer-links a:focus-visible,
+.side-footer-links button:focus-visible,
+.side-footer-links .footer-mini-button:focus-visible,
+#openArtifactsBtn:focus-visible {
+    outline: 2px solid rgba(216, 180, 254, 0.85) !important;
+    outline-offset: 2px !important;
+}
+</style>
+<!-- NOVA_DESKTOP_FOOTER_BUTTONS_POLISH_END_20260622 -->
 </body>
 </html>
