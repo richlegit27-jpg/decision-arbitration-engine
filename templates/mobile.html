@@ -608,7 +608,7 @@
 <script src="/static/js/mobile/nova-mobile-message-actions.js?v=mobile-actions-fix-007"></script>
 <script src="/static/js/mobile/nova-mobile-webcards.js?v=webcards-payload-hook-20260609"></script>
 <script src="/static/js/mobile/nova-mobile-upload.js?v=hard-attach-final-20260607210437"></script>
-<script src="/static/js/mobile/nova-mobile-ui-utils.js?v=guard-old-composer-resizers-20260609-002"></script>
+<script src="/static/js/mobile/nova-mobile-ui-utils.js?v=single-code-copy-light-20260623"></script>
 <script src="/static/js/mobile/nova-mobile-voice.js?v=mobile-voice-endgame-002"></script>
 <script src="/static/js/mobile/nova-mobile-listeners.js?v=mobile-modular-001"></script>
 <script src="/static/js/mobile/nova-mobile-stream.js?v=mobile-stream-full-clean-20260604-001"></script>
@@ -1971,96 +1971,7 @@ header {
 })();
 </script>
 <!-- NOVA_MOBILE_TOP_ACTION_USER_LANES_SAFE_END_20260623 -->
-<!-- NOVA_MOBILE_HIDE_BROKEN_COPY_EXPORT_20260623 -->
-<style>
-/* Mobile: hide broken top-level Copy/Export utility buttons.
-   Bubble-level copy can stay handled by nova-mobile-ui-utils.js.
-*/
-.nova-mobile-top-copy-export-hidden {
-    display: none !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
-}
-</style>
 
-<script>
-(function () {
-    "use strict";
-
-    const FIX_ID = "NOVA_MOBILE_HIDE_BROKEN_COPY_EXPORT_20260623";
-
-    function textOf(el) {
-        return String((el && el.textContent) || "")
-            .replace(/\s+/g, " ")
-            .trim()
-            .toLowerCase();
-    }
-
-    function attrBag(el) {
-        if (!el) return "";
-
-        return [
-            textOf(el),
-            el.id || "",
-            el.className || "",
-            el.getAttribute && el.getAttribute("aria-label") || "",
-            el.getAttribute && el.getAttribute("title") || "",
-            el.getAttribute && el.getAttribute("href") || ""
-        ].join(" ").toLowerCase();
-    }
-
-    function isTopCopyExport(el) {
-        if (!el || !el.matches || !el.matches("a, button")) return false;
-
-        const rect = el.getBoundingClientRect();
-        const bag = attrBag(el);
-        const text = textOf(el);
-
-        const isCopyExport =
-            text === "copy" ||
-            text === "export" ||
-            bag.includes("copy") ||
-            bag.includes("export");
-
-        if (!isCopyExport) return false;
-
-        /* Do not hide message/code bubble copy buttons lower in the chat */
-        return rect.top < 170;
-    }
-
-    function hideBrokenTopCopyExport() {
-        Array.from(document.querySelectorAll("a, button"))
-            .filter(isTopCopyExport)
-            .forEach(function (btn) {
-                btn.classList.add("nova-mobile-top-copy-export-hidden");
-                btn.setAttribute("aria-hidden", "true");
-                btn.tabIndex = -1;
-            });
-    }
-
-    function scheduleHide() {
-        [50, 200, 600, 1200].forEach(function (ms) {
-            setTimeout(hideBrokenTopCopyExport, ms);
-        });
-    }
-
-    document.addEventListener("DOMContentLoaded", scheduleHide);
-    document.addEventListener("click", scheduleHide, true);
-
-    const observer = new MutationObserver(scheduleHide);
-    observer.observe(document.documentElement, {
-        childList: true,
-        subtree: true
-    });
-
-    window.NovaMobileHideBrokenTopCopyExport = hideBrokenTopCopyExport;
-
-    scheduleHide();
-
-    console.log("[" + FIX_ID + "] ready");
-})();
-</script>
-<!-- NOVA_MOBILE_HIDE_BROKEN_COPY_EXPORT_END_20260623 -->
 
 <!-- NOVA_MOBILE_MENU_PANEL_SCROLL_FIX_20260623 -->
 <style>
@@ -3175,7 +3086,7 @@ header {
 }
 </style>
 <!-- NOVA_MOBILE_ARTIFACTS_PANEL_SAFE_STYLE_END_20260623 -->
-<script src="/static/js/mobile/nova-mobile-assistant-actions.js?v=assistant-actions-20260623"></script>
+<script src="/static/js/mobile/nova-mobile-assistant-actions.js?v=assistant-actions-retry-20260623"></script>
 <!-- NOVA_MOBILE_ASSISTANT_ACTIONS_STYLE_20260623 -->
 <style>
 .nova-mobile-assistant-actions {
@@ -3206,6 +3117,484 @@ header {
 }
 </style>
 <!-- NOVA_MOBILE_ASSISTANT_ACTIONS_STYLE_END_20260623 -->
+
+
+<!-- NOVA_MOBILE_TOP_COPY_EXPORT_SESSION_20260623 -->
+<style>
+#nova-mobile-copy-chat,
+#nova-mobile-export-chat {
+    display: inline-flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 30px !important;
+    padding: 6px 10px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(216, 180, 254, 0.26) !important;
+    background: rgba(168, 85, 247, 0.14) !important;
+    color: #f8fafc !important;
+    font-size: 11px !important;
+    font-weight: 900 !important;
+    line-height: 1 !important;
+    position: relative !important;
+    z-index: 50 !important;
+}
+
+#nova-mobile-copy-chat.nova-mobile-top-copy-export-hidden,
+#nova-mobile-export-chat.nova-mobile-top-copy-export-hidden {
+    display: inline-flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    const FIX_ID = "NOVA_MOBILE_TOP_COPY_EXPORT_SESSION_20260623";
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function clean(value) {
+        return String(value || "")
+            .replace(/\r/g, "")
+            .replace(/[ \t]+\n/g, "\n")
+            .replace(/\n[ \t]+/g, "\n")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim();
+    }
+
+    function toast(message) {
+        if (typeof window.showToast === "function") {
+            window.showToast(message);
+            return;
+        }
+
+        if (window.NovaMobileUI && typeof window.NovaMobileUI.showToast === "function") {
+            window.NovaMobileUI.showToast(message);
+            return;
+        }
+
+        console.log("[" + FIX_ID + "] " + message);
+    }
+
+    function getApiKey() {
+        return (
+            window.API_KEY ||
+            window.NOVA_API_KEY ||
+            window.apiKey ||
+            localStorage.getItem("nova_api_key") ||
+            localStorage.getItem("NOVA_API_KEY") ||
+            "dev"
+        );
+    }
+
+    function getSessionId() {
+        try {
+            if (window.NovaMobileBridge && typeof window.NovaMobileBridge.getSessionId === "function") {
+                const sid = window.NovaMobileBridge.getSessionId();
+
+                if (sid) return sid;
+            }
+        } catch (_) {}
+
+        const keys = [
+            "nova_mobile_active_session_id",
+            "novaMobileSessionId",
+            "active_session_id",
+            "session_id",
+            "nova_session_id"
+        ];
+
+        for (const key of keys) {
+            try {
+                const value = localStorage.getItem(key);
+
+                if (value) return value;
+            } catch (_) {}
+        }
+
+        return "";
+    }
+
+    function extractMessages(payload) {
+        if (!payload) return [];
+
+        if (Array.isArray(payload.messages)) return payload.messages;
+        if (payload.session && Array.isArray(payload.session.messages)) return payload.session.messages;
+        if (payload.data && Array.isArray(payload.data.messages)) return payload.data.messages;
+        if (payload.chat && Array.isArray(payload.chat.messages)) return payload.chat.messages;
+
+        return [];
+    }
+
+    function roleOf(message) {
+        const raw = String(
+            message.role ||
+            message.sender ||
+            message.type ||
+            message.author ||
+            ""
+        ).toLowerCase();
+
+        if (raw.includes("user") || raw.includes("human")) return "user";
+        if (raw.includes("assistant") || raw.includes("bot") || raw.includes("ai")) return "assistant";
+
+        return "";
+    }
+
+    function textOfMessage(message) {
+        return clean(
+            message.text ||
+            message.content ||
+            message.body ||
+            message.message ||
+            message.value ||
+            message.output ||
+            ""
+        );
+    }
+
+    function formatSessionMessages(messages) {
+        const parts = [];
+
+        messages.forEach(function (message) {
+            const role = roleOf(message);
+            const value = textOfMessage(message);
+
+            if (!role || !value) return;
+            if (value === "New chat started and saved to Sessions.") return;
+
+            parts.push(role + "\n" + value);
+        });
+
+        return clean(parts.join("\n\n"));
+    }
+
+    async function fetchSessionTranscript() {
+        const sessionId = getSessionId();
+
+        if (!sessionId) return "";
+
+        const urls = [
+            "/api/sessions/" + encodeURIComponent(sessionId),
+            "/api/chat/" + encodeURIComponent(sessionId)
+        ];
+
+        for (const url of urls) {
+            try {
+                const response = await fetch(url, {
+                    method: "GET",
+                    headers: {
+                        "Accept": "application/json",
+                        "x-api-key": getApiKey()
+                    }
+                });
+
+                if (!response.ok) continue;
+
+                const payload = await response.json();
+                const messages = extractMessages(payload);
+                const transcript = formatSessionMessages(messages);
+
+                if (transcript) return transcript;
+            } catch (_) {}
+        }
+
+        return "";
+    }
+
+    function getDomTranscriptFallback() {
+        const root =
+            $("mobileChatMessages") ||
+            $("nova-mobile-messages") ||
+            $("messagesContainer") ||
+            $("messages-container") ||
+            document.querySelector("[data-mobile-chat-messages]") ||
+            document.querySelector(".mobile-chat-messages") ||
+            document.querySelector(".mobile-chat-container") ||
+            document.querySelector(".chat-messages");
+
+        if (!root) return "";
+
+        const clone = root.cloneNode(true);
+
+        clone.querySelectorAll([
+            "button",
+            ".nova-mobile-assistant-actions",
+            ".nova-mobile-message-actions",
+            ".nova-code-copy-btn",
+            ".mobile-panel",
+            "#nova-mobile-tools-panel",
+            "#nova-mobile-artifacts-panel",
+            "#nova-mobile-execution-panel",
+            "#nova-mobile-memory-panel",
+            "[data-mobile-assistant-action]"
+        ].join(",")).forEach(function (el) {
+            el.remove();
+        });
+
+        return clean(
+            String(clone.innerText || clone.textContent || "")
+                .replace(/New chat started and saved to Sessions\./g, "")
+        );
+    }
+
+    async function getTranscript() {
+        const sessionTranscript = await fetchSessionTranscript();
+
+        if (sessionTranscript) return sessionTranscript;
+
+        return getDomTranscriptFallback() || "No chat messages.";
+    }
+
+    async function copyText(value) {
+        value = clean(value);
+
+        if (!value) {
+            toast("Nothing to copy.");
+            return false;
+        }
+
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(value);
+                toast("Copied chat.");
+                return true;
+            }
+        } catch (_) {}
+
+        const area = document.createElement("textarea");
+        area.value = value;
+        area.style.position = "fixed";
+        area.style.left = "-9999px";
+        area.style.top = "0";
+
+        document.body.appendChild(area);
+        area.focus();
+        area.select();
+
+        try {
+            document.execCommand("copy");
+            toast("Copied chat.");
+            return true;
+        } catch (error) {
+            toast("Copy failed.");
+            return false;
+        } finally {
+            area.remove();
+        }
+    }
+
+    async function copyWholeChat() {
+        const transcript = await getTranscript();
+        await copyText(transcript);
+    }
+
+    async function exportWholeChat() {
+        const transcript = await getTranscript();
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+        const filename = "nova-chat-" + stamp + ".txt";
+
+        try {
+            const blob = new Blob([transcript], {
+                type: "text/plain;charset=utf-8"
+            });
+
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+
+            link.href = url;
+            link.download = filename;
+            link.style.display = "none";
+
+            document.body.appendChild(link);
+            link.click();
+
+            setTimeout(function () {
+                URL.revokeObjectURL(url);
+                link.remove();
+            }, 800);
+
+            toast("Exported chat.");
+        } catch (error) {
+            await copyText(transcript);
+            toast("Export failed, copied instead.");
+        }
+    }
+
+    function restoreButton(button) {
+        if (!button) return;
+
+        button.classList.remove("nova-mobile-top-copy-export-hidden");
+        button.classList.remove("nova-mobile-hidden-duplicate");
+        button.removeAttribute("aria-hidden");
+        button.tabIndex = 0;
+
+        button.style.setProperty("display", "inline-flex", "important");
+        button.style.setProperty("visibility", "visible", "important");
+        button.style.setProperty("opacity", "1", "important");
+        button.style.setProperty("pointer-events", "auto", "important");
+    }
+
+    function bind(id, handler) {
+        const oldButton = $(id);
+
+        if (!oldButton || !oldButton.parentNode) return;
+
+        const button = oldButton.cloneNode(true);
+
+        restoreButton(button);
+        button.removeAttribute("onclick");
+        button.dataset.novaTopCopyExportSession = "1";
+
+        button.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            handler();
+            return false;
+        }, true);
+
+        oldButton.parentNode.replaceChild(button, oldButton);
+    }
+
+    function wire() {
+        bind("nova-mobile-copy-chat", copyWholeChat);
+        bind("nova-mobile-export-chat", exportWholeChat);
+    }
+
+    window.NovaMobileCopyWholeChat = copyWholeChat;
+    window.NovaMobileExportWholeChat = exportWholeChat;
+    window.NovaMobileGetTopTranscript = getTranscript;
+
+    document.addEventListener("DOMContentLoaded", wire);
+    wire();
+
+    setTimeout(wire, 250);
+    setTimeout(wire, 900);
+
+    console.log("[" + FIX_ID + "] ready");
+})();
+</script>
+<!-- NOVA_MOBILE_TOP_COPY_EXPORT_SESSION_END_20260623 -->
+<!-- NOVA_MOBILE_SUMMARY_HORSEMEN_STYLE_20260623 -->
+<style>
+.nova-mobile-summary-horsemen {
+    width: calc(100% - 22px) !important;
+    max-width: 760px !important;
+    margin: 8px auto 8px auto !important;
+    padding: 10px !important;
+    border-radius: 18px !important;
+    border: 1px solid rgba(216, 180, 254, 0.22) !important;
+    background:
+        radial-gradient(circle at top left, rgba(168, 85, 247, 0.20), transparent 44%),
+        rgba(15, 23, 42, 0.82) !important;
+    box-shadow: 0 14px 35px rgba(0, 0, 0, 0.28) !important;
+    color: #f8fafc !important;
+    position: relative !important;
+    z-index: 12 !important;
+}
+
+.nova-mobile-summary-head {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+
+.nova-mobile-summary-title {
+    font-size: 12px !important;
+    font-weight: 950 !important;
+    letter-spacing: -0.02em !important;
+    color: #f8fafc !important;
+}
+
+.nova-mobile-summary-sub {
+    margin-top: 2px !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    color: rgba(226, 232, 240, 0.68) !important;
+}
+
+.nova-mobile-summary-toggle {
+    min-height: 28px !important;
+    padding: 5px 10px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(216, 180, 254, 0.24) !important;
+    background: rgba(168, 85, 247, 0.14) !important;
+    color: #f8fafc !important;
+    font-size: 10px !important;
+    font-weight: 900 !important;
+}
+
+.nova-mobile-summary-body {
+    margin-top: 9px !important;
+    display: grid !important;
+    gap: 7px !important;
+}
+
+.nova-mobile-summary-body.is-hidden {
+    display: none !important;
+}
+
+.nova-mobile-summary-line {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 7px 8px !important;
+    border-radius: 12px !important;
+    background: rgba(255, 255, 255, 0.045) !important;
+    color: rgba(226, 232, 240, 0.78) !important;
+    font-size: 10.5px !important;
+    font-weight: 800 !important;
+}
+
+.nova-mobile-summary-line strong {
+    max-width: 55% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    color: #f8fafc !important;
+    font-size: 10.5px !important;
+    font-weight: 950 !important;
+}
+
+.nova-mobile-horsemen-row {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+    margin-top: 2px !important;
+}
+
+.nova-mobile-horsemen-row button {
+    min-height: 31px !important;
+    padding: 6px 6px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(216, 180, 254, 0.28) !important;
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.30), rgba(124, 58, 237, 0.18)) !important;
+    color: #f8fafc !important;
+    font-size: 10px !important;
+    font-weight: 950 !important;
+    letter-spacing: -0.02em !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08) !important;
+}
+
+@media (max-width: 420px) {
+    .nova-mobile-horsemen-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+}
+</style>
+<!-- NOVA_MOBILE_SUMMARY_HORSEMEN_STYLE_END_20260623 -->
+<script src="/static/js/mobile/nova-mobile-summary-horsemen.js?v=summary-horsemen-20260623"></script>
 </body>
 </html>
 

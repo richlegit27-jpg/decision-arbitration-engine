@@ -1,15 +1,14 @@
 /*
-NOVA_MOBILE_ASSISTANT_ACTIONS_20260623
+NOVA_MOBILE_ASSISTANT_ACTIONS_RETRY_20260623
 Assistant-only Copy + Regen buttons.
-Does not attach to user messages.
-Does not restore broken top Copy/Export.
-Uses only the chat container, not the whole page.
+Bounded retry scanner so buttons appear after chat render.
+No old laggy observer pile.
 */
 
 (function () {
     "use strict";
 
-    const FIX_ID = "NOVA_MOBILE_ASSISTANT_ACTIONS_20260623";
+    const FIX_ID = "NOVA_MOBILE_ASSISTANT_ACTIONS_RETRY_20260623";
 
     function textOf(value) {
         return String(value || "").replace(/\s+/g, " ").trim();
@@ -17,6 +16,20 @@ Uses only the chat container, not the whole page.
 
     function lower(value) {
         return textOf(value).toLowerCase();
+    }
+
+    function toast(message) {
+        if (typeof window.showToast === "function") {
+            window.showToast(message);
+            return;
+        }
+
+        if (window.NovaMobileUI && typeof window.NovaMobileUI.showToast === "function") {
+            window.NovaMobileUI.showToast(message);
+            return;
+        }
+
+        console.log("[" + FIX_ID + "] " + message);
     }
 
     function getChatRoot() {
@@ -28,22 +41,27 @@ Uses only the chat container, not the whole page.
             document.querySelector("[data-mobile-chat-messages]") ||
             document.querySelector(".mobile-chat-messages") ||
             document.querySelector(".mobile-chat-container") ||
-            document.querySelector(".chat-messages")
+            document.querySelector(".chat-messages") ||
+            document.querySelector("main")
         );
+    }
+
+    function attrBag(node) {
+        if (!node) return "";
+
+        return lower([
+            node.className || "",
+            node.getAttribute && node.getAttribute("data-role") || "",
+            node.getAttribute && node.getAttribute("data-message-role") || "",
+            node.getAttribute && node.getAttribute("role") || "",
+            node.getAttribute && node.getAttribute("aria-label") || ""
+        ].join(" "));
     }
 
     function looksUser(node) {
         if (!node || !node.matches) return false;
 
-        const bag = lower(
-            [
-                node.className,
-                node.getAttribute("data-role"),
-                node.getAttribute("data-message-role"),
-                node.getAttribute("role"),
-                node.getAttribute("aria-label")
-            ].join(" ")
-        );
+        const bag = attrBag(node);
 
         return (
             bag.includes("user") ||
@@ -55,26 +73,14 @@ Uses only the chat container, not the whole page.
     function looksAssistant(node) {
         if (!node || !node.matches || looksUser(node)) return false;
 
-        const bag = lower(
-            [
-                node.className,
-                node.getAttribute("data-role"),
-                node.getAttribute("data-message-role"),
-                node.getAttribute("role"),
-                node.getAttribute("aria-label")
-            ].join(" ")
-        );
+        const bag = attrBag(node);
 
-        if (
+        return (
             bag.includes("assistant") ||
             bag.includes("bot") ||
             bag.includes("ai") ||
             node.matches(".assistant, .assistant-message, .mobile-assistant-message, .nova-mobile-assistant-message, [data-role='assistant'], [data-message-role='assistant']")
-        ) {
-            return true;
-        }
-
-        return false;
+        );
     }
 
     function findAssistantMessages() {
@@ -91,24 +97,23 @@ Uses only the chat container, not the whole page.
             "[data-message-role='assistant']",
             ".message.assistant",
             ".mobile-message.assistant",
-            ".nova-mobile-message.assistant"
+            ".nova-mobile-message.assistant",
+            "[class*='assistant']"
         ].join(",");
 
         let nodes = Array.from(root.querySelectorAll(selectors));
 
-        if (!nodes.length) {
-            nodes = Array.from(
-                root.querySelectorAll(
-                    ".message, .mobile-message, .nova-mobile-message, .chat-message, .message-bubble, [class*='message'], [class*='bubble']"
-                )
-            ).filter(looksAssistant);
-        }
+        nodes = nodes.filter(function (node) {
+            if (!node || !node.isConnected) return false;
+            if (looksUser(node)) return false;
+            if (node.closest("#nova-mobile-tools-panel, #nova-mobile-artifacts-panel, #nova-mobile-execution-panel, #nova-mobile-memory-panel")) return false;
 
-        return nodes
-            .filter(function (node) {
-                return node && node.isConnected && !looksUser(node);
-            })
-            .slice(-40);
+            const value = cleanAssistantText(node);
+
+            return value && value.length > 1;
+        });
+
+        return Array.from(new Set(nodes)).slice(-40);
     }
 
     async function copyText(value) {
@@ -137,7 +142,9 @@ Uses only the chat container, not the whole page.
             area.value = value;
             area.style.position = "fixed";
             area.style.left = "-9999px";
+
             document.body.appendChild(area);
+            area.focus();
             area.select();
 
             try {
@@ -151,21 +158,9 @@ Uses only the chat container, not the whole page.
         }
     }
 
-    function toast(message) {
-        if (typeof window.showToast === "function") {
-            window.showToast(message);
-            return;
-        }
-
-        if (window.NovaMobileUI && typeof window.NovaMobileUI.showToast === "function") {
-            window.NovaMobileUI.showToast(message);
-            return;
-        }
-
-        console.log("[" + FIX_ID + "] " + message);
-    }
-
     function cleanAssistantText(node) {
+        if (!node) return "";
+
         const clone = node.cloneNode(true);
 
         clone.querySelectorAll([
@@ -182,6 +177,7 @@ Uses only the chat container, not the whole page.
 
         return String(clone.innerText || clone.textContent || "")
             .replace(/\n{3,}/g, "\n\n")
+            .replace(/\bCopy\s+Regen\b/gi, "")
             .trim();
     }
 
@@ -190,9 +186,11 @@ Uses only the chat container, not the whole page.
 
         const userNodes = Array.from(
             root.querySelectorAll(
-                ".user, .user-message, .mobile-user-message, .nova-mobile-user-message, [data-role='user'], [data-message-role='user']"
+                ".user, .user-message, .mobile-user-message, .nova-mobile-user-message, [data-role='user'], [data-message-role='user'], [class*='user']"
             )
-        );
+        ).filter(function (node) {
+            return !node.closest("#nova-mobile-tools-panel, #nova-mobile-artifacts-panel, #nova-mobile-execution-panel, #nova-mobile-memory-panel");
+        });
 
         const last = userNodes[userNodes.length - 1];
 
@@ -258,9 +256,30 @@ Uses only the chat container, not the whole page.
         toast("Could not regenerate.");
     }
 
+    function hasActionRow(node) {
+        return !!(node && node.querySelector && node.querySelector(".nova-mobile-assistant-actions"));
+    }
+
+    function removeOldRows(node) {
+        if (!node || !node.querySelectorAll) return;
+
+        node.querySelectorAll(".nova-mobile-message-actions").forEach(function (row) {
+            const text = lower(row.innerText || row.textContent || "");
+
+            if (text.includes("copy") || text.includes("regen")) {
+                row.remove();
+            }
+        });
+    }
+
     function addActions(node) {
-        if (!node || node.dataset.novaAssistantActions === "1") return;
-        if (looksUser(node)) return;
+        if (!node || looksUser(node)) return;
+
+        removeOldRows(node);
+
+        if (hasActionRow(node)) {
+            return;
+        }
 
         node.dataset.novaAssistantActions = "1";
 
@@ -301,50 +320,56 @@ Uses only the chat container, not the whole page.
 
         row.appendChild(copy);
         row.appendChild(regen);
-
         node.insertBefore(row, node.firstChild);
     }
 
-    function removeDuplicateOldRows(node) {
-        const rows = Array.from(node.querySelectorAll(".nova-mobile-message-actions"));
-
-        rows.forEach(function (row) {
-            const text = lower(row.innerText || row.textContent || "");
-
-            if (text.includes("copy") || text.includes("regen")) {
-                row.remove();
-            }
-        });
-    }
-
     function scan() {
-        findAssistantMessages().forEach(function (node) {
-            removeDuplicateOldRows(node);
-            addActions(node);
-        });
+        const messages = findAssistantMessages();
+
+        messages.forEach(addActions);
+
+        return messages.length;
     }
 
     function scheduleScan() {
         window.clearTimeout(window.__novaAssistantActionsTimer);
-        window.__novaAssistantActionsTimer = window.setTimeout(scan, 80);
+        window.__novaAssistantActionsTimer = window.setTimeout(scan, 90);
+    }
+
+    function installObserver() {
+        const root = getChatRoot();
+
+        if (!root) return false;
+
+        if (window.__novaAssistantActionsObserver) {
+            window.__novaAssistantActionsObserver.disconnect();
+        }
+
+        window.__novaAssistantActionsObserver = new MutationObserver(scheduleScan);
+        window.__novaAssistantActionsObserver.observe(root, {
+            childList: true,
+            subtree: true
+        });
+
+        return true;
     }
 
     function boot() {
         scan();
+        installObserver();
 
-        const root = getChatRoot();
+        let tries = 0;
 
-        if (root && !window.__novaAssistantActionsObserver) {
-            window.__novaAssistantActionsObserver = new MutationObserver(scheduleScan);
-            window.__novaAssistantActionsObserver.observe(root, {
-                childList: true,
-                subtree: true
-            });
-        }
+        const interval = window.setInterval(function () {
+            tries += 1;
 
-        [150, 500, 1200].forEach(function (ms) {
-            window.setTimeout(scan, ms);
-        });
+            scan();
+            installObserver();
+
+            if (tries >= 30) {
+                window.clearInterval(interval);
+            }
+        }, 350);
 
         console.log("[" + FIX_ID + "] ready");
     }
