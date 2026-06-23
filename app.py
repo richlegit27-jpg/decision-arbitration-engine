@@ -14331,6 +14331,313 @@ def nova_auth_workspace_diagnostic():
 # NOVA_AUTH_WORKSPACE_DIAGNOSTIC_END_20260623
 
 
+
+# NOVA_USER_SCOPED_SESSIONS_PHASE1_20260623
+def _nova_scope_normalize_user_20260623(value):
+    return str(value or "").strip().lower()
+
+
+def _nova_scope_current_user_20260623():
+    try:
+        from flask import session as flask_session
+
+        payload = dict(flask_session)
+    except Exception:
+        payload = {}
+
+    user = (
+        payload.get("username")
+        or payload.get("email")
+        or payload.get("user_email")
+        or payload.get("user_id")
+        or payload.get("account")
+        or payload.get("user")
+        or ""
+    )
+
+    if isinstance(user, dict):
+        user = (
+            user.get("username")
+            or user.get("email")
+            or user.get("id")
+            or user.get("user_id")
+            or ""
+        )
+
+    return _nova_scope_normalize_user_20260623(user)
+
+
+def _nova_scope_session_id_20260623(session):
+    if not isinstance(session, dict):
+        return ""
+
+    return str(
+        session.get("id")
+        or session.get("session_id")
+        or session.get("conversation_id")
+        or ""
+    ).strip()
+
+
+def _nova_scope_session_owner_20260623(session):
+    if not isinstance(session, dict):
+        return ""
+
+    owner = (
+        session.get("owner")
+        or session.get("owner_username")
+        or session.get("username")
+        or session.get("user")
+        or session.get("user_id")
+        or session.get("account")
+        or ""
+    )
+
+    if isinstance(owner, dict):
+        owner = (
+            owner.get("username")
+            or owner.get("email")
+            or owner.get("id")
+            or owner.get("user_id")
+            or ""
+        )
+
+    return _nova_scope_normalize_user_20260623(owner)
+
+
+def _nova_scope_session_is_owned_20260623(session, user):
+    user = _nova_scope_normalize_user_20260623(user)
+
+    if not user:
+        return True
+
+    owner = _nova_scope_session_owner_20260623(session)
+
+    # Important: ownerless legacy sessions are hidden from authenticated accounts.
+    # They remain in data/nova_sessions.json, but stop leaking into new users.
+    return bool(owner and owner == user)
+
+
+def _nova_scope_get_all_sessions_20260623():
+    try:
+        sessions = session_service.get_all() or []
+        return sessions if isinstance(sessions, list) else []
+    except Exception:
+        return []
+
+
+def _nova_scope_save_sessions_20260623(sessions, active_session_id=""):
+    try:
+        if hasattr(session_service, "save"):
+            try:
+                session_service.save(sessions, active=active_session_id or None)
+            except TypeError:
+                session_service.save(sessions, active_session_id or None)
+            return True
+
+        if hasattr(session_service, "_save_sessions"):
+            session_service._save_sessions(sessions, active_session_id or "")
+            return True
+    except Exception:
+        try:
+            app.logger.exception("[user-scope] failed saving sessions")
+        except Exception:
+            pass
+
+    return False
+
+
+def _nova_scope_tag_session_owner_20260623(session_id, user=None):
+    user = _nova_scope_normalize_user_20260623(user or _nova_scope_current_user_20260623())
+    session_id = str(session_id or "").strip()
+
+    if not user or not session_id:
+        return None
+
+    sessions = _nova_scope_get_all_sessions_20260623()
+    changed = False
+    found = None
+
+    for session in sessions:
+        if not isinstance(session, dict):
+            continue
+
+        if _nova_scope_session_id_20260623(session) != session_id:
+            continue
+
+        found = session
+
+        if _nova_scope_session_owner_20260623(session) != user:
+            session["owner"] = user
+            session["owner_username"] = user
+            session["user_id"] = user
+            changed = True
+
+        session.setdefault("owner_source", "auth_session")
+        break
+
+    if changed:
+        active = ""
+        try:
+            active = str(session_service.active_session_id or "").strip()
+        except Exception:
+            active = session_id
+
+        _nova_scope_save_sessions_20260623(sessions, active or session_id)
+
+        try:
+            app.logger.info("[user-scope] tagged session owner session_id=%s owner=%s", session_id, user)
+        except Exception:
+            pass
+
+    return found
+
+
+def _nova_scope_extract_response_session_id_20260623(payload):
+    if not isinstance(payload, dict):
+        return ""
+
+    session = payload.get("session")
+
+    if isinstance(session, dict):
+        sid = _nova_scope_session_id_20260623(session)
+        if sid:
+            return sid
+
+    return str(
+        payload.get("session_id")
+        or payload.get("active_session_id")
+        or payload.get("client_session_id")
+        or payload.get("conversation_id")
+        or ""
+    ).strip()
+
+
+def _nova_scope_filter_payload_20260623(payload, user):
+    if not isinstance(payload, dict):
+        return payload
+
+    user = _nova_scope_normalize_user_20260623(user)
+
+    if not user:
+        return payload
+
+    sessions = payload.get("sessions")
+
+    if isinstance(sessions, list):
+        owned_sessions = [
+            session
+            for session in sessions
+            if _nova_scope_session_is_owned_20260623(session, user)
+        ]
+
+        payload["sessions"] = owned_sessions
+
+        owned_ids = {
+            _nova_scope_session_id_20260623(session)
+            for session in owned_sessions
+            if _nova_scope_session_id_20260623(session)
+        }
+
+        active_id = str(payload.get("active_session_id") or "").strip()
+
+        if active_id not in owned_ids:
+            payload["active_session_id"] = next(iter(owned_ids), "")
+
+    session = payload.get("session")
+
+    if isinstance(session, dict):
+        sid = _nova_scope_session_id_20260623(session)
+        owner_ok = _nova_scope_session_is_owned_20260623(session, user)
+
+        if sid and not owner_ok:
+            payload["session"] = None
+            payload["messages"] = []
+            payload["active_session_id"] = ""
+            payload["missing_session"] = True
+            payload["blocked_by_user_scope"] = True
+
+    return payload
+
+
+@app.after_request
+def _nova_user_scoped_sessions_after_request_20260623(response):
+    try:
+        from flask import request, jsonify
+
+        path_value = str(request.path or "")
+
+        session_api = (
+            path_value == "/api/sessions"
+            or path_value.startswith("/api/sessions/")
+            or path_value in {"/api/chat", "/api/chat/stream"}
+        )
+
+        if not session_api:
+            return response
+
+        user = _nova_scope_current_user_20260623()
+
+        if not user:
+            return response
+
+        if not response.is_json:
+            return response
+
+        payload = response.get_json(silent=True)
+
+        if not isinstance(payload, dict):
+            return response
+
+        sid = _nova_scope_extract_response_session_id_20260623(payload)
+
+        if sid and response.status_code < 400:
+            _nova_scope_tag_session_owner_20260623(sid, user)
+
+            # Refresh session payload after tagging, so returned JSON carries owner.
+            try:
+                fresh = session_service.get_session(sid)
+                if isinstance(fresh, dict):
+                    payload["session"] = fresh
+            except Exception:
+                pass
+
+        payload = _nova_scope_filter_payload_20260623(payload, user)
+
+        # For detail endpoints, do not return another user's or legacy ownerless session.
+        if (
+            path_value.startswith("/api/sessions/")
+            and path_value not in {
+                "/api/sessions/new",
+                "/api/sessions/switch",
+                "/api/sessions/rename",
+                "/api/sessions/pin",
+                "/api/sessions/delete",
+            }
+            and payload.get("blocked_by_user_scope")
+        ):
+            return jsonify({
+                "ok": False,
+                "error": "Session not found.",
+                "blocked_by_user_scope": True,
+                "session": None,
+                "messages": [],
+            }), 404
+
+        scoped_response = jsonify(payload)
+        scoped_response.status_code = response.status_code
+
+        return scoped_response
+    except Exception:
+        try:
+            app.logger.exception("[user-scope] after_request failed")
+        except Exception:
+            pass
+
+        return response
+# NOVA_USER_SCOPED_SESSIONS_PHASE1_END_20260623
+
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
