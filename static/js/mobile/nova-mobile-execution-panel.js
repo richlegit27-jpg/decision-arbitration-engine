@@ -1,43 +1,324 @@
-﻿/*
-NOVA_MOBILE_EXECUTION_PANEL_20260607
-Adds a lightweight frontend execution control panel.
-Does not modify attachment flow.
+/*
+NOVA_MOBILE_EXECUTION_PANEL_EXISTING_IDS_20260623
+Uses the existing template panel:
+- nova-mobile-execution-panel
+- nova-mobile-execution-status
+- nova-mobile-execution-progress-bar
+- nova-mobile-execution-badge
+- nova-mobile-execution-last-update
+
+No heavy backend/session scans.
+No global page-wide search.
 */
+
 (function () {
     "use strict";
-
-    if (window.__novaMobileExecutionPanelInstalled) {
-        return;
-    }
-
-    window.__novaMobileExecutionPanelInstalled = true;
 
     function $(id) {
         return document.getElementById(id);
     }
 
-    function getSessionId() {
-        try {
-            if (window.NovaMobileBridge && typeof window.NovaMobileBridge.getSessionId === "function") {
-                return window.NovaMobileBridge.getSessionId();
-            }
-        } catch (_) {}
+    function clean(value) {
+        return String(value || "")
+            .replace(/\r/g, "")
+            .replace(/[ \t]+/g, " ")
+            .trim();
+    }
 
-        try {
-            return localStorage.getItem("nova_mobile_active_session_id") || "";
-        } catch (_) {
-            return "";
+    function short(value, maxLength) {
+        value = clean(value);
+
+        if (value.length <= maxLength) {
+            return value;
+        }
+
+        return value.slice(0, maxLength) + "?";
+    }
+
+    function getPanel() {
+        return $("nova-mobile-execution-panel");
+    }
+
+    function getStatusEl() {
+        return $("nova-mobile-execution-status");
+    }
+
+    function getProgressBar() {
+        return $("nova-mobile-execution-progress-bar");
+    }
+
+    function getBadge() {
+        return $("nova-mobile-execution-badge");
+    }
+
+    function getLastUpdate() {
+        return $("nova-mobile-execution-last-update");
+    }
+
+    function setPanelVisible(visible) {
+        const panel = getPanel();
+
+        if (!panel) {
+            return;
+        }
+
+        if (visible) {
+            panel.classList.remove("hidden");
+            panel.setAttribute("aria-hidden", "false");
+            panel.style.cssText = [
+                "display:flex !important",
+                "position:fixed !important",
+                "left:10px !important",
+                "right:10px !important",
+                "top:90px !important",
+                "z-index:999999 !important",
+                "flex-direction:column !important",
+                "gap:10px !important",
+                "padding:14px !important",
+                "background:#111827 !important",
+                "border:1px solid rgba(255,255,255,.18) !important",
+                "border-radius:18px !important",
+                "max-height:calc(100vh - 120px) !important",
+                "overflow:auto !important",
+                "box-shadow:0 18px 50px rgba(0,0,0,.42) !important"
+            ].join(";");
+        } else {
+            panel.classList.add("hidden");
+            panel.setAttribute("aria-hidden", "true");
+            panel.style.cssText = "display:none !important;";
         }
     }
 
+    function closeToolsPanel() {
+        const toolsPanel = $("nova-mobile-tools-panel");
+
+        if (!toolsPanel) {
+            return;
+        }
+
+        toolsPanel.classList.add("hidden");
+        toolsPanel.style.cssText = "display:none !important;";
+    }
+
+    function renderIdle(message) {
+        const statusEl = getStatusEl();
+        const progressBar = getProgressBar();
+        const badge = getBadge();
+        const lastUpdate = getLastUpdate();
+
+        if (statusEl) {
+            statusEl.textContent = message || "No active execution loaded.";
+        }
+
+        if (progressBar) {
+            progressBar.style.width = "0%";
+        }
+
+        if (badge) {
+            badge.textContent = "idle";
+            badge.dataset.status = "idle";
+        }
+
+        if (lastUpdate) {
+            lastUpdate.textContent = "Last update: " + new Date().toLocaleTimeString();
+        }
+    }
+
+    function renderExecution(execution) {
+        const statusEl = getStatusEl();
+        const progressBar = getProgressBar();
+        const badge = getBadge();
+        const lastUpdate = getLastUpdate();
+
+        if (!statusEl) {
+            return;
+        }
+
+        if (!execution) {
+            renderIdle("No active execution loaded. Start one with: auto-plan make a simple todo app");
+            return;
+        }
+
+        const status = execution.status || "active";
+        const goal = execution.goal || execution.original_user_text || execution.title || "Execution mission";
+        const currentStep = execution.current_step || execution.step || execution.current || "Waiting for next step";
+
+        const currentIndex =
+            typeof execution.current_index === "number"
+                ? execution.current_index + 1
+                : typeof execution.currentIndex === "number"
+                    ? execution.currentIndex
+                    : execution.current_index
+                        ? Number(execution.current_index) + 1
+                        : execution.currentIndex
+                            ? Number(execution.currentIndex)
+                            : 1;
+
+        const totalSteps =
+            Array.isArray(execution.steps)
+                ? execution.steps.length
+                : execution.total_steps || execution.totalSteps || 3;
+
+        const safeCurrent = Number.isFinite(Number(currentIndex)) ? Number(currentIndex) : 1;
+        const safeTotal = Number.isFinite(Number(totalSteps)) && Number(totalSteps) > 0 ? Number(totalSteps) : 3;
+
+        const progress = Math.max(
+            0,
+            Math.min(100, Math.round((safeCurrent / safeTotal) * 100))
+        );
+
+        statusEl.textContent = [
+            "Status: " + status,
+            "Goal: " + short(goal, 160),
+            "Step " + safeCurrent + "/" + safeTotal + ": " + short(currentStep, 220)
+        ].join("\n");
+
+        if (progressBar) {
+            progressBar.style.width = progress + "%";
+        }
+
+        if (badge) {
+            badge.textContent = status;
+            badge.dataset.status = status;
+        }
+
+        if (lastUpdate) {
+            lastUpdate.textContent = "Last update: " + new Date().toLocaleTimeString();
+        }
+    }
+
+    function latestMatch(text, regex) {
+        const matches = Array.from(String(text || "").matchAll(regex));
+
+        if (!matches.length) {
+            return null;
+        }
+
+        return matches[matches.length - 1];
+    }
+
+    function parseExecutionText(text) {
+        text = String(text || "").replace(/\r/g, "");
+
+        const mission = latestMatch(text, /Execution mission started:\s*([^\n]+)/gi);
+        const step = latestMatch(text, /Step\s+(\d+)\s*\/\s*(\d+)\s*:\s*([^\n]+)/gi);
+        const plan = latestMatch(text, /Execution plan created\.?\s*([^\n]*)/gi);
+
+        if (!mission && !step && !plan) {
+            return null;
+        }
+
+        return {
+            status: "active",
+            goal: mission ? clean(mission[1]) : "Execution plan",
+            current_index: step ? Math.max(0, parseInt(step[1], 10) - 1) : 0,
+            total_steps: step ? parseInt(step[2], 10) : 3,
+            current_step: step ? clean(step[3]) : "Waiting for next step"
+        };
+    }
+
+    function executionFromResponse(data) {
+        if (!data || typeof data !== "object") {
+            return null;
+        }
+
+        const direct =
+            data.execution_state ||
+            data.execution ||
+            data.assistant_message?.meta?.execution_state ||
+            data.assistant_message?.execution_state ||
+            data.meta?.execution_state ||
+            null;
+
+        if (direct && typeof direct === "object") {
+            return direct;
+        }
+
+        const text =
+            data.assistant_message?.text ||
+            data.assistant_message?.content ||
+            data.text ||
+            data.message ||
+            data.response ||
+            "";
+
+        return parseExecutionText(text);
+    }
+
+    function getVisibleChatText() {
+        const containers = [
+            $("mobileChatMessages"),
+            $("messagesContainer"),
+            $("messages-container"),
+            document.querySelector("[data-mobile-chat-messages]"),
+            document.querySelector(".mobile-chat-messages"),
+            document.querySelector(".chat-messages")
+        ].filter(Boolean);
+
+        let messages = [];
+
+        containers.forEach(function (container) {
+            const found = Array.from(
+                container.querySelectorAll(
+                    ".mobile-chat-message, .mobile-message, .message, .bubble, [data-message-role], [data-role]"
+                )
+            );
+
+            if (found.length) {
+                messages = messages.concat(found);
+            } else {
+                messages.push(container);
+            }
+        });
+
+        if (!messages.length) {
+            messages = Array.from(
+                document.querySelectorAll(
+                    ".mobile-chat-message, .mobile-message, .message, .bubble, [data-message-role], [data-role]"
+                )
+            );
+        }
+
+        return messages
+            .slice(-30)
+            .map(function (el) {
+                return el.innerText || el.textContent || "";
+            })
+            .join("\n");
+    }
+
+    function refreshFromVisibleChat() {
+        const execution = parseExecutionText(getVisibleChatText());
+
+        if (execution) {
+            renderExecution(execution);
+            return true;
+        }
+
+        renderIdle("No active execution found in visible chat yet. Start one with: auto-plan make a simple todo app");
+        return false;
+    }
+
+    function openPanel() {
+        closeToolsPanel();
+        setPanelVisible(true);
+        refreshFromVisibleChat();
+    }
+
+    function closePanel() {
+        setPanelVisible(false);
+    }
+
     function getInput() {
-        return $("nova-mobile-input") || document.querySelector("textarea, input[type='text']");
+        return $("nova-mobile-input") || $("input") || document.querySelector("textarea, input[type='text']");
     }
 
     function clickSend() {
         const send =
             $("nova-mobile-send") ||
+            $("sendBtn") ||
             document.querySelector("[data-action='send']") ||
+            document.querySelector("[data-send]") ||
             document.querySelector(".nova-mobile-send") ||
             document.querySelector(".mobile-send");
 
@@ -52,147 +333,117 @@ Does not modify attachment flow.
     function sendExecutionCommand(command) {
         const input = getInput();
 
-        if (input) {
-            input.value = command;
-            input.dispatchEvent(new Event("input", { bubbles: true }));
-            clickSend();
-            updateExecutionPanel({
-                status: "sent",
-                step: command
-            });
+        if (!input) {
+            renderIdle("Input not found. Could not send: " + command);
             return;
         }
 
-        sendCommandDirect(command);
-    }
+        input.value = command;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
 
-    async function sendCommandDirect(command) {
-        updateExecutionPanel({
-            status: "sending",
-            step: command
+        clickSend();
+
+        renderExecution({
+            status: "sent",
+            goal: "Execution command",
+            current_index: 0,
+            total_steps: 3,
+            current_step: command
         });
 
-        try {
-            const response = await fetch("/api/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    user_text: command,
-                    session_id: getSessionId(),
-                    attachments: []
-                })
-            });
-
-            const data = await response.json();
-
-            updateExecutionPanel({
-                status: data && data.ok ? "complete" : "error",
-                step: command,
-                detail: data && data.assistant_message ? (data.assistant_message.text || "") : ""
-            });
-        } catch (error) {
-            updateExecutionPanel({
-                status: "error",
-                step: command,
-                detail: String(error && error.message ? error.message : error)
-            });
-        }
+        closePanel();
     }
 
-    function ensurePanel() {
-        let panel = $("nova-mobile-execution-panel");
-
-        if (panel) {
-            return panel;
+    function replaceAndBind(button, handler) {
+        if (!button || button.dataset.novaExecutionPanelV2 === "1") {
+            return;
         }
 
-        panel = document.createElement("section");
-        panel.id = "nova-mobile-execution-panel";
-        panel.className = "nova-mobile-execution-panel";
-        panel.innerHTML = [
-            '<div class="nova-exec-head">',
-            '  <div>',
-            '    <div class="nova-exec-label">Execution</div>',
-            '    <div id="nova-exec-status" class="nova-exec-status">idle</div>',
-            '  </div>',
-            '  <button id="nova-exec-collapse" type="button" class="nova-exec-mini-btn">−</button>',
-            '</div>',
-            '<div id="nova-exec-body" class="nova-exec-body">',
-            '  <div class="nova-exec-row">',
-            '    <span class="nova-exec-key">Step</span>',
-            '    <span id="nova-exec-step" class="nova-exec-value">No active step</span>',
-            '  </div>',
-            '  <div id="nova-exec-detail" class="nova-exec-detail"></div>',
-            '  <div class="nova-exec-actions">',
-            '    <button type="button" data-exec-command="run step">Run Step</button>',
-            '    <button type="button" data-exec-command="continue">Continue</button>',
-            '    <button type="button" data-exec-command="run all">Run All</button>',
-            '    <button type="button" data-exec-command="stop">Stop</button>',
-            '  </div>',
-            '</div>'
-        ].join("");
+        const clone = button.cloneNode(true);
 
-        const composer =
-            $("nova-mobile-composer") ||
-            document.querySelector(".nova-mobile-composer") ||
-            document.querySelector(".mobile-composer");
+        clone.dataset.novaExecutionPanelV2 = "1";
+        clone.removeAttribute("onclick");
 
-        if (composer && composer.parentNode) {
-            composer.parentNode.insertBefore(panel, composer);
-        } else {
-            document.body.appendChild(panel);
-        }
+        clone.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            handler(event);
+            return false;
+        }, true);
 
-        panel.querySelectorAll("[data-exec-command]").forEach(function (button) {
-            button.addEventListener("click", function () {
-                const command = button.getAttribute("data-exec-command") || "";
-                if (command) {
-                    sendExecutionCommand(command);
-                }
-            });
-        });
-
-        const collapse = $("nova-exec-collapse");
-        const body = $("nova-exec-body");
-
-        if (collapse && body) {
-            collapse.addEventListener("click", function () {
-                const collapsed = panel.classList.toggle("is-collapsed");
-                collapse.textContent = collapsed ? "+" : "−";
-            });
-        }
-
-        return panel;
+        button.parentNode.replaceChild(clone, button);
     }
 
-    function updateExecutionPanel(state) {
-        ensurePanel();
+    function wireButtons() {
+        Array.from(document.querySelectorAll("[data-mobile-tool='execution']"))
+            .forEach(function (button) {
+                replaceAndBind(button, openPanel);
+            });
 
-        const status = $("nova-exec-status");
-        const step = $("nova-exec-step");
-        const detail = $("nova-exec-detail");
+        Array.from(document.querySelectorAll("button"))
+            .filter(function (button) {
+                return clean(button.innerText || button.textContent || "").toLowerCase() === "open execution panel";
+            })
+            .forEach(function (button) {
+                replaceAndBind(button, openPanel);
+            });
 
-        if (status) {
-            status.textContent = state && state.status ? state.status : "idle";
+        replaceAndBind($("nova-mobile-execution-close"), closePanel);
+
+        Array.from(document.querySelectorAll("[data-mobile-tool='refresh_execution']"))
+            .forEach(function (button) {
+                replaceAndBind(button, refreshFromVisibleChat);
+            });
+
+        Array.from(document.querySelectorAll("[data-mobile-tool='run_step']"))
+            .forEach(function (button) {
+                replaceAndBind(button, function () {
+                    sendExecutionCommand("next");
+                });
+            });
+
+        Array.from(document.querySelectorAll("[data-mobile-tool='run_all']"))
+            .forEach(function (button) {
+                replaceAndBind(button, function () {
+                    sendExecutionCommand("run all");
+                });
+            });
+    }
+
+    function patchNovaMobileState() {
+        if (!window.NovaMobileState || window.NovaMobileState.__executionPanelV2Patched) {
+            return;
         }
 
-        if (step) {
-            step.textContent = state && state.step ? state.step : "No active step";
-        }
+        const original = window.NovaMobileState.syncExecutionStatusFromResponse;
 
-        if (detail) {
-            detail.textContent = state && state.detail ? String(state.detail).slice(0, 240) : "";
-        }
+        window.NovaMobileState.syncExecutionStatusFromResponse = function (data) {
+            if (typeof original === "function") {
+                try {
+                    original(data);
+                } catch (_) {}
+            }
+
+            const execution = executionFromResponse(data);
+
+            if (execution) {
+                renderExecution(execution);
+            }
+        };
+
+        window.NovaMobileState.__executionPanelV2Patched = true;
     }
 
     function boot() {
-        ensurePanel();
-        updateExecutionPanel({
-            status: "idle",
-            step: "Ready"
-        });
+        wireButtons();
+        patchNovaMobileState();
 
-        console.log("[Nova Mobile Execution Panel] ready");
+        if (getStatusEl()) {
+            renderIdle("No active execution loaded.");
+        }
+
+        console.log("[Nova Mobile Execution Panel Existing IDs] ready");
     }
 
     if (document.readyState === "loading") {
@@ -202,10 +453,24 @@ Does not modify attachment flow.
     }
 
     window.NovaMobileExecutionPanel = {
-        ensurePanel: ensurePanel,
-        update: updateExecutionPanel,
+        open: openPanel,
+        close: closePanel,
+        refresh: refreshFromVisibleChat,
+        update: renderExecution,
+        syncFromResponse: function (data) {
+            const execution = executionFromResponse(data);
+
+            if (execution) {
+                renderExecution(execution);
+                return true;
+            }
+
+            return false;
+        },
         send: sendExecutionCommand
     };
+
+    window.NovaOpenMobileExecution = openPanel;
+    window.NovaCloseMobileExecution = closePanel;
+    window.NovaRefreshMobileExecution = refreshFromVisibleChat;
 })();
-
-
