@@ -10442,5 +10442,73 @@ pre code {
 }
 </style>
 <!-- NOVA_DESKTOP_SESSION_LIST_TIGHT_SPACING_END_20260622 -->
+<!-- NOVA_DESKTOP_COMPOSER_FIXED_SCROLL_LOCK_20260622 -->
+<style>
+/* Desktop: keep composer fixed in the bottom grid row.
+   Only #chat should scroll; the message bar should not get pushed down. */
+@media (min-width: 900px) {
+    html,
+    body {
+        height: 100% !important;
+        max-height: 100% !important;
+        overflow: hidden !important;
+    }
+
+    .shell,
+    .app-shell,
+    .desktop-shell {
+        height: 100vh !important;
+        max-height: 100vh !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+    }
+
+    .chat-panel {
+        display: grid !important;
+        grid-template-rows: auto minmax(0, 1fr) auto !important;
+        height: 100vh !important;
+        max-height: 100vh !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+    }
+
+    #chat,
+    .chat-messages,
+    .messages,
+    .desktop-rescue-messages {
+        min-height: 0 !important;
+        max-height: none !important;
+        height: auto !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        overscroll-behavior: contain !important;
+        box-sizing: border-box !important;
+    }
+
+    .composer,
+    .desktop-composer,
+    .chat-composer,
+    .input-row,
+    .chat-input-row {
+        flex: 0 0 auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+        position: relative !important;
+        z-index: 9000 !important;
+    }
+
+    aside,
+    .sidebar,
+    .tools,
+    .side-panel,
+    .desktop-sidebar {
+        max-height: 100vh !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+    }
+}
+</style>
+<!-- NOVA_DESKTOP_COMPOSER_FIXED_SCROLL_LOCK_END_20260622 -->
 </body>
 </html>
