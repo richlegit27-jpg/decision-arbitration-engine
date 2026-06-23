@@ -25,6 +25,35 @@ No global page-wide search.
             .trim();
     }
 
+
+    const EXECUTION_CACHE_KEY = "nova_mobile_latest_execution_state";
+
+    function saveCachedExecution(execution) {
+        if (!execution) return;
+
+        try {
+            localStorage.setItem(
+                EXECUTION_CACHE_KEY,
+                JSON.stringify({
+                    saved_at: new Date().toISOString(),
+                    execution: execution
+                })
+            );
+        } catch (_) {}
+    }
+
+    function loadCachedExecution() {
+        try {
+            const raw = localStorage.getItem(EXECUTION_CACHE_KEY);
+            if (!raw) return null;
+
+            const parsed = JSON.parse(raw);
+            return parsed && parsed.execution ? parsed.execution : null;
+        } catch (_) {
+            return null;
+        }
+    }
+
     function short(value, maxLength) {
         value = clean(value);
 
@@ -162,16 +191,41 @@ No global page-wide search.
         const safeCurrent = Number.isFinite(Number(currentIndex)) ? Number(currentIndex) : 1;
         const safeTotal = Number.isFinite(Number(totalSteps)) && Number(totalSteps) > 0 ? Number(totalSteps) : 3;
 
+        saveCachedExecution({
+            status: status,
+            goal: goal,
+            current_index: safeCurrent - 1,
+            total_steps: safeTotal,
+            current_step: currentStep
+        });
+
         const progress = Math.max(
             0,
             Math.min(100, Math.round((safeCurrent / safeTotal) * 100))
         );
 
-        statusEl.textContent = [
-            "Status: " + status,
-            "Goal: " + short(goal, 160),
-            "Step " + safeCurrent + "/" + safeTotal + ": " + short(currentStep, 220)
-        ].join("\n");
+        statusEl.innerHTML = "";
+
+        [
+            ["Status", status],
+            ["Goal", short(goal, 160)],
+            ["Step " + safeCurrent + "/" + safeTotal, short(currentStep, 220)]
+        ].forEach(function (row) {
+            const line = document.createElement("div");
+            line.className = "nova-mobile-execution-status-line";
+
+            const label = document.createElement("span");
+            label.className = "nova-mobile-execution-status-label";
+            label.textContent = row[0] + ": ";
+
+            const value = document.createElement("span");
+            value.className = "nova-mobile-execution-status-value";
+            value.textContent = row[1];
+
+            line.appendChild(label);
+            line.appendChild(value);
+            statusEl.appendChild(line);
+        });
 
         if (progressBar) {
             progressBar.style.width = progress + "%";
@@ -295,7 +349,14 @@ No global page-wide search.
             return true;
         }
 
-        renderIdle("No active execution found in visible chat yet. Start one with: auto-plan make a simple todo app");
+        const cached = loadCachedExecution();
+
+        if (cached) {
+            renderExecution(cached);
+            return true;
+        }
+
+        renderIdle("No active execution found yet. Start one with: auto-plan make a simple todo app");
         return false;
     }
 
@@ -428,6 +489,7 @@ No global page-wide search.
             const execution = executionFromResponse(data);
 
             if (execution) {
+                saveCachedExecution(execution);
                 renderExecution(execution);
             }
         };
@@ -461,6 +523,7 @@ No global page-wide search.
             const execution = executionFromResponse(data);
 
             if (execution) {
+                saveCachedExecution(execution);
                 renderExecution(execution);
                 return true;
             }
