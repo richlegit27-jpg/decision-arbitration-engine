@@ -11149,6 +11149,16 @@ def nova_before_request_slim_api_sessions_20260611():
         except Exception:
             active_session_id = ""
 
+        # NOVA_ACTIVE_SESSION_MUST_BE_VISIBLE_AFTER_SCOPE_20260623
+        visible_session_ids = {
+            str(item.get("id") or "").strip()
+            for item in slim_sessions
+            if isinstance(item, dict) and str(item.get("id") or "").strip()
+        }
+
+        if active_session_id not in visible_session_ids:
+            active_session_id = ""
+
         visible_session_ids = {
             str(item.get("id") or "").strip()
             for item in slim_sessions
