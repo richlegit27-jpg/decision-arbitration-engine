@@ -1566,379 +1566,138 @@
 })();
 
 
-// NOVA_MOBILE_REGEN_WRAP_CODE_COPY_20260609
-(function(){
+// NOVA_MOBILE_SINGLE_CODE_COPY_LIGHT_20260623
+(function () {
     "use strict";
 
-    function applyWrapAndCopy(node){
-        if(!node) return;
-
-        // Force wrapping
-        node.style.wordBreak = "break-word";
-        node.style.overflowWrap = "break-word";
-        node.style.whiteSpace = "pre-wrap";
-        node.style.maxWidth = "100%";
-
-        // Add copy button for code blocks
-        var codes = node.querySelectorAll("pre code");
-        codes.forEach(function(code){
-            if(code.parentNode.querySelector(".nova-code-copy-btn")) return;
-
-            var btn = document.createElement("button");
-            btn.textContent = "Copy";
-            btn.className = "nova-code-copy-btn";
-            btn.style.position = "absolute";
-            btn.style.top = "4px";
-            btn.style.right = "4px";
-            btn.style.padding = "2px 6px";
-            btn.style.fontSize = "11px";
-            btn.style.background = "rgba(139,92,246,0.18)";
-            btn.style.border = "1px solid rgba(139,92,246,0.38)";
-            btn.style.borderRadius = "6px";
-            btn.style.cursor = "pointer";
-            btn.style.zIndex = "30";
-
-            btn.onclick = function(e){
-                e.stopPropagation();
-                if(window.copyText){
-                    window.copyText(code.innerText || code.textContent || "");
-                }
-            };
-
-            // Ensure parent <pre> is positioned relative
-            if(getComputedStyle(code.parentNode).position === "static"){
-                code.parentNode.style.position = "relative";
-            }
-
-            code.parentNode.appendChild(btn);
-        });
+    if (window.__novaMobileSingleCodeCopyLightInstalled) {
+        return;
     }
 
-    function scanNewBubbles(){
-        var root = document.getElementById("mobileChatMessages") ||
-                   document.querySelector(".mobile-chat-container") ||
-                   document.querySelector("#nova-mobile-messages");
+    window.__novaMobileSingleCodeCopyLightInstalled = true;
 
-        if(!root) return;
-
-        Array.from(root.children).forEach(applyWrapAndCopy);
-        Array.from(root.querySelectorAll(".mobile-message, .nova-mobile-message, .message, .chat-message, .assistant-message, .user-message, [class*=\"message-bubble\"]"))
-             .forEach(applyWrapAndCopy);
+    function root() {
+        return (
+            document.getElementById("mobileChatMessages") ||
+            document.getElementById("nova-mobile-messages") ||
+            document.getElementById("messagesContainer") ||
+            document.getElementById("messages-container") ||
+            document.querySelector("[data-mobile-chat-messages]") ||
+            document.querySelector(".mobile-chat-messages") ||
+            document.querySelector(".mobile-chat-container") ||
+            document.querySelector(".chat-messages")
+        );
     }
 
-    // Mutation observer for regen/new bubbles
-    var root = document.getElementById("mobileChatMessages") ||
-               document.querySelector(".mobile-chat-container") ||
-               document.querySelector("#nova-mobile-messages");
+    function copyTextSafe(text) {
+        text = String(text || "");
 
-    if(root){
-        scanNewBubbles();
-        if(window.__novaRegenObserver){
-            window.__novaRegenObserver.disconnect();
+        if (typeof window.copyText === "function") {
+            window.copyText(text);
+            return;
         }
 
-        window.__novaRegenObserver = new MutationObserver(function(){
-            window.clearTimeout(window.__novaRegenTimer);
-            window.__novaRegenTimer = window.setTimeout(scanNewBubbles, 80);
-        });
-
-        window.__novaRegenObserver.observe(root,{childList:true,subtree:true});
-    }
-
-    console.log("[Nova Mobile] regen wrapping + code copy observer ready");
-})();
-
-
-// NOVA_MOBILE_REGEN_CODE_COPY_FULL_20260609
-(function(){
-    "use strict";
-
-    function applyWrapAndCodeCopy(node){
-        if(!node) return;
-
-        // Fix text wrapping
-        node.style.wordBreak = "break-word";
-        node.style.overflowWrap = "break-word";
-        node.style.whiteSpace = "pre-wrap";
-        node.style.maxWidth = "100%";
-
-        // Add copy button to code blocks
-        node.querySelectorAll("pre code").forEach(function(code){
-            if(code.parentNode.querySelector(".nova-code-copy-btn")) return;
-
-            var btn = document.createElement("button");
-            btn.textContent = "Copy";
-            btn.className = "nova-code-copy-btn";
-            btn.style.position = "absolute";
-            btn.style.top = "6px";
-            btn.style.right = "6px";
-            btn.style.zIndex = "40";
-            btn.style.padding = "3px 7px";
-            btn.style.fontSize = "11px";
-            btn.style.background = "rgba(139,92,246,0.18)";
-            btn.style.border = "1px solid rgba(139,92,246,0.38)";
-            btn.style.borderRadius = "6px";
-            btn.style.cursor = "pointer";
-
-            btn.onclick = function(e){
-                e.stopPropagation();
-                if(window.copyText) window.copyText(code.innerText || code.textContent || "");
-            };
-
-            if(getComputedStyle(code.parentNode).position === "static"){
-                code.parentNode.style.position = "relative";
-            }
-
-            code.parentNode.appendChild(btn);
-        });
-    }
-
-    function scanAllBubbles(){
-        var root = document.getElementById("mobileChatMessages") ||
-                   document.querySelector(".mobile-chat-container") ||
-                   document.querySelector("#nova-mobile-messages");
-        if(!root) return;
-
-        Array.from(root.children).forEach(applyWrapAndCodeCopy);
-        Array.from(root.querySelectorAll(".mobile-message, .nova-mobile-message, .message, .assistant-message, .user-message, [class*=\"message-bubble\"]")).forEach(applyWrapAndCodeCopy);
-    }
-
-    // Observer for all new bubbles (normal + regenerated)
-    var root = document.getElementById("mobileChatMessages") ||
-               document.querySelector(".mobile-chat-container") ||
-               document.querySelector("#nova-mobile-messages");
-    if(root){
-        scanAllBubbles();
-
-        if(window.__novaRegenObserver){
-            window.__novaRegenObserver.disconnect();
+        if (window.NovaMobileUI && typeof window.NovaMobileUI.copyText === "function") {
+            window.NovaMobileUI.copyText(text);
+            return;
         }
 
-        window.__novaRegenObserver = new MutationObserver(function(){
-            window.clearTimeout(window.__novaRegenTimer);
-            window.__novaRegenTimer = window.setTimeout(scanAllBubbles, 50);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).catch(function () {});
+        }
+    }
+
+    function scanCodeBlocks() {
+        var chat = root();
+
+        if (!chat) return;
+
+        chat.querySelectorAll("pre").forEach(function (pre) {
+            pre.style.maxWidth = "100%";
+            pre.style.overflowX = "auto";
+
+            if (getComputedStyle(pre).position === "static") {
+                pre.style.position = "relative";
+            }
         });
 
-        window.__novaRegenObserver.observe(root,{childList:true,subtree:true});
-    }
+        chat.querySelectorAll("pre code").forEach(function (code) {
+            var pre = code.parentNode;
 
-    // Patch Regen function to trigger observer
-    if(window.NovaMobileRegenerateLast){
-        var originalRegen = window.NovaMobileRegenerateLast;
-        window.NovaMobileRegenerateLast = function(){
-            var result = originalRegen();
-            setTimeout(scanAllBubbles, 50);
-            return result;
-        };
-    }
-
-    console.log("[Nova Mobile] full regen + code copy observer ready");
-})();
-
-
-/* NOVA_MOBILE_ALL_PATCHES_20260609 */
-/* Combined patch:
-   - Regen observer / bubble wrapping
-   - Code block copy button
-   - Long message scroll
-   - Dynamic bubble height
-   - Text/block polish
-*/
-
-(function(){
-    "use strict";
-
-    function applyWrapAndCodeCopy(node){
-        if(!node) return;
-
-        // Text wrapping
-        node.style.wordBreak = "break-word";
-        node.style.overflowWrap = "break-word";
-        node.style.whiteSpace = "pre-wrap";
-        node.style.maxWidth = "100%";
-
-        // Code block Copy button
-        node.querySelectorAll("pre code").forEach(function(code){
-            if(code.parentNode.querySelector(".nova-code-copy-btn")) return;
+            if (!pre || pre.querySelector(".nova-code-copy-btn")) return;
 
             var btn = document.createElement("button");
-            btn.textContent = "Copy";
+
+            btn.type = "button";
             btn.className = "nova-code-copy-btn";
+            btn.textContent = "Copy";
+            btn.setAttribute("aria-label", "Copy code");
+
             btn.style.position = "absolute";
             btn.style.top = "6px";
             btn.style.right = "6px";
             btn.style.zIndex = "50";
-            btn.style.padding = "3px 7px";
+            btn.style.padding = "4px 8px";
+            btn.style.borderRadius = "999px";
+            btn.style.border = "1px solid rgba(216,180,254,.30)";
+            btn.style.background = "rgba(17,24,39,.86)";
+            btn.style.color = "#f8fafc";
             btn.style.fontSize = "11px";
-            btn.style.background = "rgba(139,92,246,0.18)";
-            btn.style.border = "1px solid rgba(139,92,246,0.38)";
-            btn.style.borderRadius = "6px";
-            btn.style.cursor = "pointer";
+            btn.style.fontWeight = "900";
 
-            btn.onclick = function(e){
-                e.stopPropagation();
-                if(window.copyText) window.copyText(code.innerText || code.textContent || "");
-            };
+            btn.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
 
-            if(getComputedStyle(code.parentNode).position === "static"){
-                code.parentNode.style.position = "relative";
+                copyTextSafe(code.innerText || code.textContent || "");
+                btn.textContent = "Copied";
+
+                setTimeout(function () {
+                    btn.textContent = "Copy";
+                }, 900);
+
+                return false;
+            }, true);
+
+            pre.appendChild(btn);
+        });
+    }
+
+    function scheduleScan() {
+        window.clearTimeout(window.__novaMobileSingleCodeCopyTimer);
+        window.__novaMobileSingleCodeCopyTimer = window.setTimeout(scanCodeBlocks, 160);
+    }
+
+    function boot() {
+        var chat = root();
+
+        scanCodeBlocks();
+
+        if (chat) {
+            if (window.__novaMobileSingleCodeCopyObserver) {
+                window.__novaMobileSingleCodeCopyObserver.disconnect();
             }
 
-            code.parentNode.appendChild(btn);
-        });
-
-        // Limit bubble height and allow scroll
-        if(node.className.indexOf("message") !== -1 || node.className.indexOf("bubble") !== -1){
-            node.style.maxHeight = "45vh";
-            node.style.overflowY = "auto";
+            window.__novaMobileSingleCodeCopyObserver = new MutationObserver(scheduleScan);
+            window.__novaMobileSingleCodeCopyObserver.observe(chat, {
+                childList: true,
+                subtree: true
+            });
         }
 
-        // Ensure code blocks scroll separately
-        node.querySelectorAll("pre").forEach(function(pre){
-            pre.style.maxHeight = "30vh";
-            pre.style.overflowY = "auto";
-            pre.style.paddingRight = "4px";
-        });
+        console.log("[Nova Mobile] single light code copy ready");
     }
 
-    function scanAllBubbles(){
-        var root = document.getElementById("mobileChatMessages") ||
-                   document.querySelector(".mobile-chat-container") ||
-                   document.querySelector("#nova-mobile-messages");
-        if(!root) return;
-
-        Array.from(root.children).forEach(applyWrapAndCodeCopy);
-        Array.from(root.querySelectorAll(".mobile-message, .nova-mobile-message, .message, .assistant-message, .user-message, [class*=\"message-bubble\"]")).forEach(applyWrapAndCodeCopy);
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", boot);
+    } else {
+        boot();
     }
 
-    // Mutation observer for all new bubbles (normal + regenerated)
-    var root = document.getElementById("mobileChatMessages") ||
-               document.querySelector(".mobile-chat-container") ||
-               document.querySelector("#nova-mobile-messages");
-    if(root){
-        scanAllBubbles();
-
-        if(window.__novaRegenObserver){
-            window.__novaRegenObserver.disconnect();
-        }
-
-        window.__novaRegenObserver = new MutationObserver(function(){
-            window.clearTimeout(window.__novaRegenTimer);
-            window.__novaRegenTimer = window.setTimeout(scanAllBubbles, 50);
-        });
-
-        window.__novaRegenObserver.observe(root,{childList:true,subtree:true});
-    }
-
-    // Patch Regen function to trigger observer
-    if(window.NovaMobileRegenerateLast){
-        var originalRegen = window.NovaMobileRegenerateLast;
-        window.NovaMobileRegenerateLast = function(){
-            var result = originalRegen();
-            setTimeout(scanAllBubbles, 50);
-            return result;
-        };
-    }
-
-    console.log("[Nova Mobile] full regen + code copy + text polish observer ready");
+    window.NovaMobileScanCodeCopy = scanCodeBlocks;
 })();
 
-
-/* NOVA_MOBILE_CONSOLIDATED_PATCH_20260609 */
-/* Combined stable patch:
-   - Bubble text wrapping
-   - Regen observer
-   - Code block Copy buttons
-   - Long message scroll
-   - Full-width stable rows
-*/
-
-(function(){
-    "use strict";
-
-    function applyWrapAndCodeCopy(node){
-        if(!node) return;
-
-        node.style.wordBreak = "break-word";
-        node.style.overflowWrap = "break-word";
-        node.style.whiteSpace = "pre-wrap";
-        node.style.maxWidth = "100%";
-
-        // Limit bubble height
-        if(node.className.indexOf("message") !== -1 || node.className.indexOf("bubble") !== -1){
-            node.style.maxHeight = "45vh";
-            node.style.overflowY = "auto";
-        }
-
-        // Code block copy
-        node.querySelectorAll("pre code").forEach(function(code){
-            if(code.parentNode.querySelector(".nova-code-copy-btn")) return;
-
-            var btn = document.createElement("button");
-            btn.textContent = "Copy";
-            btn.className = "nova-code-copy-btn";
-            btn.style.position = "absolute";
-            btn.style.top = "6px";
-            btn.style.right = "6px";
-            btn.style.zIndex = "50";
-            btn.style.padding = "3px 7px";
-            btn.style.fontSize = "11px";
-            btn.style.background = "rgba(139,92,246,0.18)";
-            btn.style.border = "1px solid rgba(139,92,246,0.38)";
-            btn.style.borderRadius = "6px";
-            btn.style.cursor = "pointer";
-
-            btn.onclick = function(e){
-                e.stopPropagation();
-                if(window.copyText) window.copyText(code.innerText || code.textContent || "");
-            };
-
-            if(getComputedStyle(code.parentNode).position === "static"){
-                code.parentNode.style.position = "relative";
-            }
-
-            code.parentNode.appendChild(btn);
-        });
-    }
-
-    function scanAllBubbles(){
-        var root = document.getElementById("mobileChatMessages") ||
-                   document.querySelector(".mobile-chat-container") ||
-                   document.querySelector("#nova-mobile-messages");
-        if(!root) return;
-
-        Array.from(root.children).forEach(applyWrapAndCodeCopy);
-        Array.from(root.querySelectorAll(".mobile-message, .nova-mobile-message, .message, .assistant-message, .user-message, [class*=\"message-bubble\"]")).forEach(applyWrapAndCodeCopy);
-    }
-
-    // Observer for new bubbles
-    var root = document.getElementById("mobileChatMessages") ||
-               document.querySelector(".mobile-chat-container") ||
-               document.querySelector("#nova-mobile-messages");
-    if(root){
-        scanAllBubbles();
-        if(window.__novaRegenObserver) window.__novaRegenObserver.disconnect();
-
-        window.__novaRegenObserver = new MutationObserver(function(){
-            window.clearTimeout(window.__novaRegenTimer);
-            window.__novaRegenTimer = window.setTimeout(scanAllBubbles, 50);
-        });
-
-        window.__novaRegenObserver.observe(root,{childList:true,subtree:true});
-    }
-
-    // Patch Regen function to trigger observer
-    if(window.NovaMobileRegenerateLast){
-        var originalRegen = window.NovaMobileRegenerateLast;
-        window.NovaMobileRegenerateLast = function(){
-            var result = originalRegen();
-            setTimeout(scanAllBubbles, 50);
-            return result;
-        };
-    }
-
-    console.log("[Nova Mobile] consolidated patch ready");
-})();
 
 // NOVA_MOBILE_RUNTIME_MESSAGE_BAR_FIX_20260609
 (function () {
