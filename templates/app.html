@@ -10820,5 +10820,130 @@ pre code {
 }
 </style>
 <!-- NOVA_DESKTOP_FOOTER_BUTTONS_POLISH_END_20260622 -->
+<!-- NOVA_LEFT_ARTIFACTS_PANEL_POLISH_20260622 -->
+<style>
+#novaLeftArtifactsPanel,
+.nova-left-artifacts-panel {
+    margin-top: 12px !important;
+    padding: 12px !important;
+    border: 1px solid rgba(167, 139, 250, 0.34) !important;
+    border-radius: 20px !important;
+    background:
+        radial-gradient(circle at top left, rgba(168, 85, 247, 0.18), transparent 34%),
+        rgba(15, 23, 42, 0.72) !important;
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.22) !important;
+    backdrop-filter: blur(14px) !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+}
+
+#novaLeftArtifactsPanel.nova-left-artifacts-open,
+.nova-left-artifacts-panel.nova-left-artifacts-open {
+    display: block !important;
+}
+
+.nova-left-artifacts-head {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+    padding: 2px 2px 10px !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    margin-bottom: 10px !important;
+}
+
+.nova-left-artifacts-head strong {
+    color: #f8fafc !important;
+    font-size: 13px !important;
+    font-weight: 900 !important;
+    letter-spacing: -0.02em !important;
+}
+
+#novaLeftArtifactsCount {
+    min-width: 26px !important;
+    height: 24px !important;
+    padding: 0 8px !important;
+    border-radius: 999px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: rgba(168, 85, 247, 0.22) !important;
+    border: 1px solid rgba(216, 180, 254, 0.30) !important;
+    color: #ddd6fe !important;
+    font-size: 12px !important;
+    font-weight: 900 !important;
+}
+
+.nova-left-artifacts-list {
+    display: grid !important;
+    gap: 8px !important;
+    max-height: 260px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding-right: 4px !important;
+}
+
+.nova-left-artifact-card {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 4px !important;
+    padding: 10px 11px !important;
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    border-radius: 15px !important;
+    background: rgba(255, 255, 255, 0.055) !important;
+    color: #e5e7eb !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    box-sizing: border-box !important;
+    text-align: left !important;
+}
+
+.nova-left-artifact-card:hover {
+    transform: translateY(-1px) !important;
+    border-color: rgba(216, 180, 254, 0.50) !important;
+    background: rgba(168, 85, 247, 0.16) !important;
+    box-shadow: 0 10px 26px rgba(168, 85, 247, 0.15) !important;
+}
+
+.nova-left-artifact-card * {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+.nova-left-artifact-card strong,
+.nova-left-artifact-card .title {
+    color: #f8fafc !important;
+    font-size: 13px !important;
+    font-weight: 850 !important;
+    white-space: nowrap !important;
+}
+
+.nova-left-artifact-card small,
+.nova-left-artifact-card span,
+.nova-left-artifact-card p {
+    color: rgba(226, 232, 240, 0.68) !important;
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+}
+
+#novaArtifactReadableOverlay {
+    backdrop-filter: blur(12px) !important;
+}
+
+#novaArtifactReadableBox {
+    border-radius: 22px !important;
+    border: 1px solid rgba(216, 180, 254, 0.28) !important;
+    background:
+        radial-gradient(circle at top left, rgba(168, 85, 247, 0.16), transparent 34%),
+        #111226 !important;
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42) !important;
+}
+</style>
+<!-- NOVA_LEFT_ARTIFACTS_PANEL_POLISH_END_20260622 -->
 </body>
 </html>
