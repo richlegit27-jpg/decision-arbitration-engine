@@ -14578,10 +14578,41 @@ def _nova_user_scoped_sessions_after_request_20260623(response):
 
         user = _nova_scope_current_user_20260623()
 
-        if not user:
+        if not response.is_json:
             return response
 
-        if not response.is_json:
+        if not user:
+            # NOVA_USER_SCOPED_SESSIONS_UNAUTH_LEAK_GUARD_20260623
+            # Never expose global legacy sessions to unauthenticated requests.
+            if path_value == "/api/sessions":
+                return jsonify({
+                    "ok": True,
+                    "authenticated": False,
+                    "active_session_id": "",
+                    "session": None,
+                    "sessions": [],
+                    "items": [],
+                    "artifacts": {},
+                    "memory": {},
+                    "blocked_by_user_scope": True,
+                    "debug": {
+                        "route": "user_scope_unauth_empty_sessions",
+                        "reason": "no authenticated workspace user"
+                    }
+                })
+
+            if path_value.startswith("/api/sessions/"):
+                return jsonify({
+                    "ok": False,
+                    "authenticated": False,
+                    "error": "Authentication required.",
+                    "active_session_id": "",
+                    "session": None,
+                    "sessions": [],
+                    "items": [],
+                    "blocked_by_user_scope": True
+                }), 401
+
             return response
 
         payload = response.get_json(silent=True)
