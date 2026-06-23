@@ -12786,10 +12786,12 @@ def nova_web_fetch_requested_session_bridge_safe_20260612(response):
 
         try:
             if user_text not in existing_blob:
-                session_service.append_message(target_session_id, user_message)
+                # Disabled 20260622: target-session bridge/chat service handles user persistence.
+                pass
 
             if assistant_text not in existing_blob:
-                session_service.append_message(target_session_id, assistant_saved)
+                # Disabled 20260622: prevent duplicate assistant persistence from web_fetch_requested_session_bridge_safe.
+                pass
         except Exception as persist_error:
             try:
                 app.logger.warning(
