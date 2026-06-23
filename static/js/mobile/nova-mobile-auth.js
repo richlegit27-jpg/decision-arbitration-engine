@@ -15,6 +15,76 @@
         };
     }
 
+
+    // NOVA_MOBILE_AUTH_BLANK_SLATE_20260623
+    function clearWorkspaceSessionState(reason) {
+        const keys = [
+            "nova_mobile_active_session_id",
+            "nova_active_session_id",
+            "active_session_id",
+            "session_id",
+            "nova_session_id",
+            "novaMobileSessionId",
+            "NovaMobileActiveSessionId",
+            "NOVA_ACTIVE_SESSION_ID",
+            "nova_pending_session_id",
+            "nova_pending_new_session_id",
+            "nova_mobile_pending_attachments",
+            "nova_desktop_pending_attachments",
+            "nova_mobile_session_cache",
+            "nova_session_restore_cache"
+        ];
+
+        keys.forEach(function (key) {
+            try {
+                localStorage.removeItem(key);
+            } catch (_) {}
+
+            try {
+                sessionStorage.removeItem(key);
+            } catch (_) {}
+        });
+
+        window.NOVA_ACTIVE_SESSION_ID = "";
+        window.NovaActiveSessionId = "";
+        window.NovaMobileActiveSessionId = "";
+        window.novaMobileActiveSessionId = "";
+        window.NovaCurrentSessionId = "";
+        window.currentSessionId = "";
+        window.activeSessionId = "";
+        window.NOVA_FORCE_NEW_SESSION_ON_NEXT_SEND = true;
+        window.NOVA_PENDING_NEW_SESSION_ID = "";
+
+        console.log("[Nova Mobile Auth Blank Slate] cleared workspace session state", reason || "");
+    }
+
+    function normalizeUsername(value) {
+        return String(value || "").trim().toLowerCase();
+    }
+
+    function applyAuthWorkspaceBoundary(authenticated, username) {
+        const currentUser = normalizeUsername(username);
+        const previousUser = normalizeUsername(localStorage.getItem("nova_last_auth_username") || "");
+
+        if (!authenticated || !currentUser) {
+            clearWorkspaceSessionState("not authenticated");
+            localStorage.removeItem("nova_last_auth_username");
+            return;
+        }
+
+        if (previousUser && previousUser !== currentUser) {
+            clearWorkspaceSessionState("user changed from " + previousUser + " to " + currentUser);
+        }
+
+        if (!previousUser) {
+            clearWorkspaceSessionState("fresh authenticated workspace for " + currentUser);
+        }
+
+        localStorage.setItem("nova_last_auth_username", currentUser);
+        document.body.dataset.novaWorkspaceUser = currentUser;
+        window.NovaWorkspaceUser = currentUser;
+    }
+
     function ensureStyles() {
         if (document.getElementById("nova-mobile-auth-style")) return;
 
@@ -97,6 +167,8 @@
                     console.warn("[Nova Mobile Auth] logout failed", error);
                 }
 
+                clearWorkspaceSessionState("logout");
+                localStorage.removeItem("nova_last_auth_username");
                 window.location.href = LOGIN_URL;
             });
         }
@@ -124,6 +196,7 @@
             const username = String(user.username || data.username || "");
 
             setBodyAuthState(authenticated, username);
+            applyAuthWorkspaceBoundary(authenticated, username);
 
             if (!authenticated) {
                 window.location.href = LOGIN_URL;
