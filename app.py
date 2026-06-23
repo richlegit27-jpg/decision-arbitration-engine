@@ -14953,6 +14953,112 @@ def _nova_api_sessions_stale_active_id_scrub_20260623(response):
 # NOVA_API_SESSIONS_STALE_ACTIVE_ID_SCRUB_END_20260623
 
 
+
+
+# NOVA_FINAL_API_SESSIONS_PROCESS_RESPONSE_SCRUB_20260623
+# Final response-layer scrub. This runs after Flask's normal response processing,
+# so old before/after hooks cannot re-add stale active_session_id afterward.
+try:
+    _nova_original_process_response_20260623 = app.process_response
+
+    def _nova_final_api_sessions_process_response_scrub_20260623(response):
+        response = _nova_original_process_response_20260623(response)
+
+        try:
+            from flask import request
+            import json
+
+            if str(getattr(request, "path", "") or "") != "/api/sessions":
+                return response
+
+            raw = response.get_data(as_text=True)
+
+            if not raw:
+                return response
+
+            payload = json.loads(raw)
+
+            if not isinstance(payload, dict):
+                return response
+
+            visible_ids = set()
+
+            def _collect_session_id_20260623(item):
+                if not isinstance(item, dict):
+                    return ""
+
+                return str(item.get("id") or item.get("session_id") or "").strip()
+
+            for key in ("items", "sessions"):
+                value = payload.get(key)
+
+                if isinstance(value, list):
+                    for item in value:
+                        sid = _collect_session_id_20260623(item)
+
+                        if sid:
+                            visible_ids.add(sid)
+
+                elif isinstance(value, dict):
+                    for item in value.values():
+                        sid = _collect_session_id_20260623(item)
+
+                        if sid:
+                            visible_ids.add(sid)
+
+            active_id = str(payload.get("active_session_id") or "").strip()
+
+            if active_id and active_id not in visible_ids:
+                payload["active_session_id"] = ""
+
+                session = payload.get("session")
+
+                if isinstance(session, dict):
+                    sid = _collect_session_id_20260623(session)
+
+                    if sid == active_id:
+                        payload["session"] = None
+
+                debug = payload.get("debug")
+
+                if not isinstance(debug, dict):
+                    debug = {}
+
+                debug["final_process_response_scrubbed_active_session_id"] = active_id
+                debug["visible_session_count"] = len(visible_ids)
+                payload["debug"] = debug
+
+                response.set_data(json.dumps(payload))
+                response.headers["Content-Type"] = "application/json"
+
+                try:
+                    response.headers["Content-Length"] = str(len(response.get_data()))
+                except Exception:
+                    pass
+
+                for cookie_name in ("nova_active_session_id", "active_session_id", "session_id"):
+                    try:
+                        response.delete_cookie(cookie_name)
+                    except Exception:
+                        pass
+
+            return response
+
+        except Exception:
+            try:
+                app.logger.exception("[NOVA_FINAL_API_SESSIONS_PROCESS_RESPONSE_SCRUB_20260623] failed")
+            except Exception:
+                pass
+
+            return response
+
+    app.process_response = _nova_final_api_sessions_process_response_scrub_20260623
+
+except Exception:
+    pass
+# NOVA_FINAL_API_SESSIONS_PROCESS_RESPONSE_SCRUB_END_20260623
+
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
