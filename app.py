@@ -15059,6 +15059,172 @@ except Exception:
 # NOVA_FINAL_API_SESSIONS_PROCESS_RESPONSE_SCRUB_END_20260623
 
 
+
+
+# NOVA_AUTH_SCOPED_NEW_SESSION_ROUTE_FIX_20260623
+@app.before_request
+def _nova_auth_scoped_new_session_route_fix_20260623():
+    try:
+        from flask import request, session as flask_session, jsonify
+        from pathlib import Path
+        from datetime import datetime, timezone
+        import json
+        import time
+        import uuid
+
+        if str(request.path or "") != "/api/sessions/new":
+            return None
+
+        if request.method != "POST":
+            return None
+
+        auth_user_id = str(flask_session.get("nova_user_id") or "").strip()
+
+        if not auth_user_id:
+            return jsonify({
+                "ok": False,
+                "error": "authentication_required",
+                "active_session_id": "",
+                "session": None,
+                "sessions": []
+            }), 401
+
+        base_dir = Path(__file__).resolve().parent
+        data_dir = base_dir / "data"
+        sessions_path = data_dir / "nova_sessions.json"
+        users_path_local = data_dir / "nova_users.json"
+
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        def _read_json_file_20260623(p, fallback):
+            try:
+                if not p.exists():
+                    return fallback
+
+                return json.loads(p.read_text(encoding="utf-8", errors="replace") or "")
+            except Exception:
+                return fallback
+
+        def _write_json_file_20260623(p, value):
+            p.write_text(
+                json.dumps(value, indent=2, ensure_ascii=False),
+                encoding="utf-8"
+            )
+
+        payload = request.get_json(silent=True) or {}
+        title = str(payload.get("title") or "New Chat").strip() or "New Chat"
+
+        users_payload = _read_json_file_20260623(users_path_local, {"users": []})
+        users_list = users_payload.get("users", []) if isinstance(users_payload, dict) else []
+        auth_user = None
+
+        for candidate in users_list:
+            if not isinstance(candidate, dict):
+                continue
+
+            if str(candidate.get("id") or "").strip() == auth_user_id:
+                auth_user = candidate
+                break
+
+        username_value = str(
+            (auth_user or {}).get("username")
+            or (auth_user or {}).get("name")
+            or (auth_user or {}).get("email")
+            or ""
+        ).strip()
+
+        email_value = str((auth_user or {}).get("email") or "").strip()
+
+        now = datetime.now(timezone.utc).isoformat()
+        session_id = "mobile_" + str(int(time.time() * 1000)) + "_" + uuid.uuid4().hex[:8]
+
+        new_session = {
+            "id": session_id,
+            "session_id": session_id,
+            "title": title,
+            "created_at": now,
+            "updated_at": now,
+            "messages": [],
+            "message_count": 0,
+            "user_id": auth_user_id,
+            "owner": auth_user_id,
+            "owner_source": "auth_session",
+            "username": username_value,
+            "owner_username": username_value,
+            "email": email_value,
+            "owner_email": email_value,
+            "meta": {
+                "created_by": "NOVA_AUTH_SCOPED_NEW_SESSION_ROUTE_FIX_20260623",
+                "scope": "authenticated_user",
+                "user_id": auth_user_id
+            }
+        }
+
+        store = _read_json_file_20260623(sessions_path, {"sessions": []})
+
+        if isinstance(store, list):
+            store.append(new_session)
+            _write_json_file_20260623(sessions_path, store)
+
+        elif isinstance(store, dict):
+            sessions = store.get("sessions")
+
+            if not isinstance(sessions, list):
+                sessions = []
+
+            sessions.append(new_session)
+            store["sessions"] = sessions
+            store["active_session_id"] = session_id
+            _write_json_file_20260623(sessions_path, store)
+
+        else:
+            store = {"sessions": [new_session], "active_session_id": session_id}
+            _write_json_file_20260623(sessions_path, store)
+
+        response_payload = {
+            "ok": True,
+            "active_session_id": session_id,
+            "session_id": session_id,
+            "session": new_session,
+            "sessions": [new_session],
+            "items": [new_session],
+            "debug": {
+                "route": "auth_scoped_new_session_fix",
+                "user_id": auth_user_id
+            }
+        }
+
+        response = jsonify(response_payload)
+
+        try:
+            response.set_cookie("nova_active_session_id", session_id, httponly=False, samesite="Lax")
+        except Exception:
+            pass
+
+        return response
+
+    except Exception as exc:
+        try:
+            app.logger.exception("[NOVA_AUTH_SCOPED_NEW_SESSION_ROUTE_FIX_20260623] failed")
+        except Exception:
+            pass
+
+        try:
+            from flask import jsonify
+
+            return jsonify({
+                "ok": False,
+                "error": "new_session_route_fix_failed",
+                "detail": str(exc),
+                "active_session_id": "",
+                "session": None,
+                "sessions": []
+            }), 500
+        except Exception:
+            return None
+# NOVA_AUTH_SCOPED_NEW_SESSION_ROUTE_FIX_END_20260623
+
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
