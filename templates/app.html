@@ -8338,244 +8338,14 @@ body {
 
 
 
-<!-- NOVA_CHAT_ABOVE_COMPOSER_SUMMARY_STRIP_FINAL_20260622 -->
-<style>
-/* Summary strip lives above the message bar, not at the top */
-.chat-panel {
-    grid-template-rows: auto minmax(0, 1fr) auto auto !important;
-}
 
-#novaChatSummaryStrip {
-    border-top: 1px solid var(--line);
-    border-bottom: 1px solid var(--line);
-    background: rgba(0,0,0,.14);
-    padding: 10px 14px;
-    display: grid;
-    gap: 8px;
-}
-
-.nova-chat-summary-main {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 10px;
-    align-items: center;
-}
-
-.nova-chat-summary-text {
-    min-width: 0;
-}
-
-.nova-chat-summary-title {
-    font-size: 12px;
-    font-weight: 900;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: .08em;
-    margin-bottom: 3px;
-}
-
-#novaChatSummaryLine {
-    font-size: 13px;
-    color: var(--text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.nova-chat-summary-actions {
-    display: flex;
-    gap: 7px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-}
-
-.nova-chat-summary-actions button {
-    border: 1px solid rgba(255,255,255,.16);
-    background: rgba(255,255,255,.075);
-    color: var(--text);
-    border-radius: 999px;
-    padding: 7px 10px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 900;
-}
-
-.nova-chat-summary-actions button:hover {
-    border-color: rgba(167,139,250,.7);
-    background: rgba(255,255,255,.12);
-}
-
-@media (max-width: 760px) {
-    .nova-chat-summary-main {
-        grid-template-columns: 1fr;
-    }
-
-    .nova-chat-summary-actions {
-        justify-content: flex-start;
-    }
-}
-</style>
-
-<script>
-(function () {
-    "use strict";
-
-    if (window.__NOVA_CHAT_ABOVE_COMPOSER_SUMMARY_STRIP_FINAL_20260622__) return;
-    window.__NOVA_CHAT_ABOVE_COMPOSER_SUMMARY_STRIP_FINAL_20260622__ = true;
-
-    function sendSummaryPrompt(prompt) {
-        const input = document.getElementById("input") || document.querySelector("textarea");
-        const sendBtn = document.getElementById("sendBtn");
-
-        if (input) {
-            input.value = prompt;
-            input.dispatchEvent(new Event("input", { bubbles: true }));
-        }
-
-        if (typeof window.sendText === "function") {
-            window.sendText(prompt);
-            return;
-        }
-
-        if (sendBtn) {
-            sendBtn.click();
-        }
-    }
-
-    function getChatMessageCount() {
-        const chat = document.getElementById("chat");
-        if (!chat) return 0;
-        return chat.querySelectorAll(".msg").length;
-    }
-
-    function updateSummaryLine() {
-        const line = document.getElementById("novaChatSummaryLine");
-        if (!line) return;
-
-        const count = getChatMessageCount();
-
-        if (count <= 0) {
-            line.textContent = "Ready. Use Next, Improve, Fix, or Status to continue Nova.";
-            return;
-        }
-
-        line.textContent = "Current chat has " + count + " messages. Next move: keep Memory useful, then clean remaining UI later.";
-    }
-
-    function ensureChatSummaryStrip() {
-        let strip = document.getElementById("novaChatSummaryStrip");
-
-        const chatPanel = document.querySelector(".chat-panel");
-        const composer = document.querySelector(".composer");
-        const chat = document.getElementById("chat");
-
-        if (!chatPanel || !composer || !chat) return null;
-
-        if (!strip) {
-            strip = document.createElement("section");
-            strip.id = "novaChatSummaryStrip";
-
-            strip.innerHTML = `
-                <div class="nova-chat-summary-main">
-                    <div class="nova-chat-summary-text">
-                        <div class="nova-chat-summary-title">Summary</div>
-                        <div id="novaChatSummaryLine">Ready. Use Next, Improve, Fix, or Status to continue Nova.</div>
-                    </div>
-
-                    <div class="nova-chat-summary-actions">
-                        <button id="novaChatSummaryNextBtn" type="button">Next</button>
-                        <button id="novaChatSummaryImproveBtn" type="button">Improve</button>
-                        <button id="novaChatSummaryFixBtn" type="button">Fix</button>
-                        <button id="novaChatSummaryStatusBtn" type="button">Status</button>
-                    </div>
-                </div>
-            `;
-        }
-
-        if (strip.parentNode !== chatPanel || strip.nextSibling !== composer) {
-            chatPanel.insertBefore(strip, composer);
-        }
-
-        const next = document.getElementById("novaChatSummaryNextBtn");
-        const improve = document.getElementById("novaChatSummaryImproveBtn");
-        const fix = document.getElementById("novaChatSummaryFixBtn");
-        const status = document.getElementById("novaChatSummaryStatusBtn");
-
-        if (next && next.dataset.novaSummaryWired !== "true") {
-            next.dataset.novaSummaryWired = "true";
-            next.addEventListener("click", function () {
-                sendSummaryPrompt("Continue from where we left off. Tell me the next concrete step for Nova and keep it direct.");
-            });
-        }
-
-        if (improve && improve.dataset.novaSummaryWired !== "true") {
-            improve.dataset.novaSummaryWired = "true";
-            improve.addEventListener("click", function () {
-                sendSummaryPrompt("Look at the current Nova UI/project state and suggest the highest-value improvement next. Keep it practical.");
-            });
-        }
-
-        if (fix && fix.dataset.novaSummaryWired !== "true") {
-            fix.dataset.novaSummaryWired = "true";
-            fix.addEventListener("click", function () {
-                sendSummaryPrompt("Help me fix the current Nova issue. Start by identifying the likely broken area, then give the safest patch.");
-            });
-        }
-
-        if (status && status.dataset.novaSummaryWired !== "true") {
-            status.dataset.novaSummaryWired = "true";
-            status.addEventListener("click", function () {
-                sendSummaryPrompt("Give me a short Nova status report: what works, what is still broken, and what we should do next.");
-            });
-        }
-
-        updateSummaryLine();
-        return strip;
-    }
-
-    window.NovaEnsureChatSummaryStrip = ensureChatSummaryStrip;
-    window.NovaUpdateChatSummaryStrip = updateSummaryLine;
-
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", ensureChatSummaryStrip);
-    } else {
-        ensureChatSummaryStrip();
-    }
-
-    setTimeout(ensureChatSummaryStrip, 300);
-    setTimeout(ensureChatSummaryStrip, 900);
-    setTimeout(ensureChatSummaryStrip, 1600);
-
-    try {
-        const chat = document.getElementById("chat");
-        if (chat) {
-            const observer = new MutationObserver(updateSummaryLine);
-            observer.observe(chat, { childList: true, subtree: true });
-        }
-    } catch (_) {}
-})();
-</script>
+<!-- NOVA_CHAT_SUMMARY_STRIP_REMOVED_20260622 -->
 
 
-<!-- NOVA_SUMMARY_STRIP_TIGHT_TO_COMPOSER_20260622 -->
-<style>
-/* Pull Summary closer to the message bar */
-#novaChatSummaryStrip {
-    margin-bottom: 0 !important;
-    padding-top: 7px !important;
-    padding-bottom: 6px !important;
-    border-bottom: 0 !important;
-}
 
-#novaChatSummaryStrip + .composer,
-.composer {
-    margin-top: 0 !important;
-}
 
-.chat-panel .composer {
-    padding-top: 8px !important;
-}
-</style>
+<!-- NOVA_SUMMARY_STRIP_TIGHT_STYLE_REMOVED_20260622 -->
+
 
 
 <!-- NOVA_MEMORY_CONTROL_CENTER_V2_20260622 -->
@@ -10175,6 +9945,58 @@ pre code {
 
 
 
+
+
+<!-- NOVA_HARD_KILL_CHAT_SUMMARY_STRIP_20260622 -->
+<style>
+#novaChatSummaryStrip,
+.nova-chat-summary-main,
+.nova-chat-summary-text,
+.nova-chat-summary-actions {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    overflow: hidden !important;
+}
+</style>
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_HARD_KILL_CHAT_SUMMARY_STRIP_20260622__) return;
+    window.__NOVA_HARD_KILL_CHAT_SUMMARY_STRIP_20260622__ = true;
+
+    function kill() {
+        [
+            "#novaChatSummaryStrip",
+            ".nova-chat-summary-main",
+            ".nova-chat-summary-text",
+            ".nova-chat-summary-actions"
+        ].forEach(function (selector) {
+            document.querySelectorAll(selector).forEach(function (node) {
+                node.remove();
+            });
+        });
+    }
+
+    kill();
+    setTimeout(kill, 100);
+    setTimeout(kill, 400);
+    setTimeout(kill, 1000);
+    setTimeout(kill, 2000);
+
+    const observer = new MutationObserver(kill);
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+
+    console.log("[Nova hard kill chat summary strip] ready");
+})();
+</script>
+<!-- /NOVA_HARD_KILL_CHAT_SUMMARY_STRIP_20260622 -->
 
 </body>
 </html>
