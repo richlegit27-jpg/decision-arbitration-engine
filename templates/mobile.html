@@ -6894,7 +6894,8 @@ header {
 
 
 
-<!-- NOVA_MOBILE_FINAL_TOP_BUTTON_VISIBILITY_20260624 -->
+
+<!-- NOVA_MOBILE_FINAL_TOP_BUTTON_VISIBILITY_V2_20260624 -->
 <style>
 #nova-mobile-sessions-toggle,
 #nova-mobile-memory-toggle {
@@ -6902,6 +6903,9 @@ header {
     visibility: visible !important;
     opacity: 1 !important;
     pointer-events: auto !important;
+    animation: none !important;
+    transition: none !important;
+    filter: none !important;
 }
 
 #mobileMemoryButton {
@@ -6914,72 +6918,323 @@ header {
 
 <script>
 (() => {
-    const TAG = "[NOVA_MOBILE_FINAL_TOP_BUTTON_VISIBILITY_20260624]";
+    const TAG = "[NOVA_MOBILE_FINAL_TOP_BUTTON_VISIBILITY_V2_20260624]";
+
+    function hardShow(el, label) {
+        if (!el) return false;
+
+        el.textContent = label;
+        el.hidden = false;
+        el.removeAttribute("hidden");
+        el.removeAttribute("aria-hidden");
+        el.removeAttribute("tabindex");
+
+        el.style.cssText += `
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+            animation: none !important;
+            transition: none !important;
+            filter: none !important;
+        `;
+
+        return true;
+    }
+
+    function hardHide(el) {
+        if (!el) return false;
+
+        el.setAttribute("aria-hidden", "true");
+        el.setAttribute("tabindex", "-1");
+
+        el.style.cssText += `
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        `;
+
+        return true;
+    }
 
     function forceButtons() {
         const sessions = document.getElementById("nova-mobile-sessions-toggle");
         const memory = document.getElementById("nova-mobile-memory-toggle");
         const oldMemory = document.getElementById("mobileMemoryButton");
 
-        if (sessions) {
-            sessions.textContent = "Sessions";
-            sessions.style.setProperty("display", "flex", "important");
-            sessions.style.setProperty("visibility", "visible", "important");
-            sessions.style.setProperty("opacity", "1", "important");
-            sessions.style.setProperty("pointer-events", "auto", "important");
-            sessions.removeAttribute("aria-hidden");
-            sessions.removeAttribute("tabindex");
-        }
+        hardShow(sessions, "Sessions");
+        hardShow(memory, "Memory");
 
         if (memory) {
-            memory.textContent = "Memory";
-            memory.style.setProperty("display", "flex", "important");
-            memory.style.setProperty("visibility", "visible", "important");
-            memory.style.setProperty("opacity", "1", "important");
-            memory.style.setProperty("pointer-events", "auto", "important");
             memory.setAttribute("aria-label", "Memory");
             memory.setAttribute("title", "Memory");
-            memory.removeAttribute("aria-hidden");
-            memory.removeAttribute("tabindex");
         }
 
-        if (oldMemory) {
-            oldMemory.style.setProperty("display", "none", "important");
-            oldMemory.style.setProperty("visibility", "hidden", "important");
-            oldMemory.style.setProperty("opacity", "0", "important");
-            oldMemory.style.setProperty("pointer-events", "none", "important");
-            oldMemory.setAttribute("aria-hidden", "true");
-            oldMemory.setAttribute("tabindex", "-1");
-        }
+        hardHide(oldMemory);
 
         return {
-            sessions: !!sessions,
-            memory: !!memory,
-            oldMemory: !!oldMemory
+            sessionsOpacity: sessions ? getComputedStyle(sessions).opacity : "missing",
+            sessionsDisplay: sessions ? getComputedStyle(sessions).display : "missing",
+            sessionsVisibility: sessions ? getComputedStyle(sessions).visibility : "missing",
+            memoryOpacity: memory ? getComputedStyle(memory).opacity : "missing",
+            oldMemoryDisplay: oldMemory ? getComputedStyle(oldMemory).display : "missing"
         };
     }
 
     window.NovaMobileFinalTopButtonVisibility = forceButtons;
 
-    let count = 0;
-    const timer = setInterval(() => {
-        count += 1;
-        const result = forceButtons();
+    const checkpoints = [0, 50, 150, 400, 900, 1500, 2500, 4000];
 
-        if (count === 1 || count === 5 || count === 15) {
-            console.log(TAG, "forced", result);
-        }
-
-        if (count >= 25) {
-            clearInterval(timer);
-        }
-    }, 120);
+    checkpoints.forEach((ms) => {
+        setTimeout(() => {
+            const result = forceButtons();
+            if (ms === 0 || ms === 900 || ms === 4000) {
+                console.log(TAG, "forced", result);
+            }
+        }, ms);
+    });
 
     document.addEventListener("click", () => {
-        setTimeout(forceButtons, 40);
+        requestAnimationFrame(() => forceButtons());
     }, true);
 
-    forceButtons();
+    console.log(TAG, "ready");
+})();
+</script>
+
+
+<!-- NOVA_MOBILE_FINAL_BOTTOM_BUBBLE_SAFE_AREA_20260624 -->
+<style>
+@media (max-width: 900px) {
+    :root {
+        --nova-mobile-composer-real-height: 112px;
+        --nova-mobile-bottom-safe-gap: 132px;
+    }
+
+    html,
+    body {
+        min-height: 100dvh !important;
+        height: 100dvh !important;
+        overflow: hidden !important;
+    }
+
+    #mobileChatMessages,
+    .mobile-chat-container {
+        position: fixed !important;
+        left: 0 !important;
+        right: 0 !important;
+        top: 124px !important;
+        bottom: var(--nova-mobile-bottom-safe-gap) !important;
+        height: auto !important;
+        max-height: none !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        padding-bottom: calc(var(--nova-mobile-composer-real-height) + 34px) !important;
+        scroll-padding-bottom: calc(var(--nova-mobile-composer-real-height) + 44px) !important;
+        box-sizing: border-box !important;
+    }
+
+    #nova-mobile-composer,
+    .nova-mobile-composer,
+    .mobile-composer {
+        position: fixed !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: env(safe-area-inset-bottom, 0px) !important;
+        z-index: 2147483000 !important;
+        box-sizing: border-box !important;
+    }
+
+    #mobileChatMessages > *:last-child,
+    .mobile-chat-container > *:last-child {
+        margin-bottom: 28px !important;
+    }
+}
+</style>
+
+<script>
+(() => {
+    const TAG = "[NOVA_MOBILE_FINAL_BOTTOM_BUBBLE_SAFE_AREA_20260624]";
+
+    let lastLog = 0;
+
+    function px(value, fallback = 0) {
+        const n = Number.parseFloat(value);
+        return Number.isFinite(n) ? n : fallback;
+    }
+
+    function composerEl() {
+        return document.getElementById("nova-mobile-composer") ||
+            document.querySelector(".nova-mobile-composer") ||
+            document.querySelector(".mobile-composer");
+    }
+
+    function chatEl() {
+        return document.getElementById("mobileChatMessages") ||
+            document.querySelector(".mobile-chat-container");
+    }
+
+    function headerBottom() {
+        const candidates = [
+            document.querySelector(".mobile-header"),
+            document.querySelector(".nova-mobile-header"),
+            document.querySelector("header")
+        ].filter(Boolean);
+
+        let bottom = 0;
+
+        for (const el of candidates) {
+            const r = el.getBoundingClientRect();
+            if (r.height > 20 && r.bottom > bottom && r.bottom < window.innerHeight * 0.5) {
+                bottom = r.bottom;
+            }
+        }
+
+        return Math.max(116, Math.round(bottom || 116));
+    }
+
+    function applyGeometry(reason = "apply") {
+        const composer = composerEl();
+        const chat = chatEl();
+
+        if (!composer || !chat) return false;
+
+        const cr = composer.getBoundingClientRect();
+        const composerHeight = Math.max(86, Math.round(cr.height || 108));
+        const bottomGap = composerHeight + 22;
+        const top = headerBottom();
+
+        document.documentElement.style.setProperty("--nova-mobile-composer-real-height", `${composerHeight}px`);
+        document.documentElement.style.setProperty("--nova-mobile-bottom-safe-gap", `${bottomGap}px`);
+
+        chat.style.setProperty("position", "fixed", "important");
+        chat.style.setProperty("left", "0", "important");
+        chat.style.setProperty("right", "0", "important");
+        chat.style.setProperty("top", `${top}px`, "important");
+        chat.style.setProperty("bottom", `${bottomGap}px`, "important");
+        chat.style.setProperty("height", "auto", "important");
+        chat.style.setProperty("max-height", "none", "important");
+        chat.style.setProperty("min-height", "0", "important");
+        chat.style.setProperty("overflow-y", "auto", "important");
+        chat.style.setProperty("overflow-x", "hidden", "important");
+        chat.style.setProperty("-webkit-overflow-scrolling", "touch", "important");
+        chat.style.setProperty("padding-bottom", `${composerHeight + 34}px`, "important");
+        chat.style.setProperty("scroll-padding-bottom", `${composerHeight + 44}px`, "important");
+        chat.style.setProperty("box-sizing", "border-box", "important");
+
+        composer.style.setProperty("position", "fixed", "important");
+        composer.style.setProperty("left", "0", "important");
+        composer.style.setProperty("right", "0", "important");
+        composer.style.setProperty("bottom", "env(safe-area-inset-bottom, 0px)", "important");
+        composer.style.setProperty("z-index", "2147483000", "important");
+
+        const now = Date.now();
+        if (now - lastLog > 1500) {
+            lastLog = now;
+            const rr = chat.getBoundingClientRect();
+            console.log(TAG, reason, {
+                chatTop: Math.round(rr.top),
+                chatBottom: Math.round(rr.bottom),
+                chatHeight: Math.round(rr.height),
+                composerHeight,
+                bottomGap,
+                viewport: window.innerHeight
+            });
+        }
+
+        return true;
+    }
+
+    function scrollLastIntoView(reason = "scroll") {
+        const chat = chatEl();
+        if (!chat) return;
+
+        applyGeometry(reason);
+
+        requestAnimationFrame(() => {
+            const children = Array.from(chat.children).filter(el => {
+                const r = el.getBoundingClientRect();
+                return r.height > 0;
+            });
+
+            const last = children[children.length - 1];
+
+            if (last) {
+                last.scrollIntoView({
+                    block: "end",
+                    inline: "nearest",
+                    behavior: "auto"
+                });
+            }
+
+            chat.scrollTop = chat.scrollHeight;
+        });
+    }
+
+    window.NovaMobileFixBottomBubbleSafeArea = () => {
+        applyGeometry("manual");
+        scrollLastIntoView("manual-scroll");
+    };
+
+    const input = document.getElementById("nova-mobile-input") ||
+        document.querySelector("textarea") ||
+        document.querySelector("input[type='text']");
+
+    if (input) {
+        input.addEventListener("input", () => {
+            requestAnimationFrame(() => {
+                applyGeometry("input");
+                scrollLastIntoView("input-scroll");
+            });
+        }, {passive: true});
+
+        input.addEventListener("focus", () => {
+            setTimeout(() => scrollLastIntoView("focus"), 120);
+            setTimeout(() => scrollLastIntoView("focus-late"), 450);
+        }, {passive: true});
+    }
+
+    document.addEventListener("click", (event) => {
+        const raw = String(event.target?.textContent || "").toLowerCase();
+
+        if (
+            raw.includes("open") ||
+            raw.includes("sessions") ||
+            raw.includes("send") ||
+            event.target?.closest?.("[data-action='open']") ||
+            event.target?.closest?.("#sendBtn")
+        ) {
+            setTimeout(() => scrollLastIntoView("click"), 160);
+            setTimeout(() => scrollLastIntoView("click-late"), 600);
+        }
+    }, true);
+
+    window.addEventListener("resize", () => {
+        setTimeout(() => scrollLastIntoView("resize"), 120);
+    }, {passive: true});
+
+    window.addEventListener("orientationchange", () => {
+        setTimeout(() => scrollLastIntoView("orientation"), 250);
+    }, {passive: true});
+
+    const composer = composerEl();
+    if (composer && "ResizeObserver" in window) {
+        const ro = new ResizeObserver(() => {
+            requestAnimationFrame(() => {
+                applyGeometry("composer-resize");
+            });
+        });
+        ro.observe(composer);
+    }
+
+    applyGeometry("boot");
+    setTimeout(() => scrollLastIntoView("boot-1"), 250);
+    setTimeout(() => scrollLastIntoView("boot-2"), 900);
+    setTimeout(() => scrollLastIntoView("boot-3"), 1800);
+
     console.log(TAG, "ready");
 })();
 </script>
