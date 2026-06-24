@@ -608,7 +608,7 @@
 <script src="/static/js/mobile/nova-mobile-message-actions.js?v=mobile-actions-fix-007"></script>
 <script src="/static/js/mobile/nova-mobile-webcards.js?v=webcards-payload-hook-20260609"></script>
 <script src="/static/js/mobile/nova-mobile-upload.js?v=hard-attach-final-20260607210437"></script>
-<script src="/static/js/mobile/nova-mobile-ui-utils.js?v=single-code-copy-light-20260623"></script>
+<script src="/static/js/mobile/nova-mobile-ui-utils.js?v=git-restored-valid-20260623"></script>
 <script src="/static/js/mobile/nova-mobile-voice.js?v=mobile-voice-endgame-002"></script>
 <script src="/static/js/mobile/nova-mobile-listeners.js?v=mobile-modular-001"></script>
 <script src="/static/js/mobile/nova-mobile-stream.js?v=mobile-stream-full-clean-20260604-001"></script>
@@ -3880,156 +3880,7 @@ header {
 
 
 
-<!-- NOVA_MOBILE_CHAT_ABOVE_COMPOSER_LOCK_V3B_20260623 -->
-<style>
-    html,
-    body {
-        overflow: hidden !important;
-    }
 
-    #nova-mobile-composer,
-    .nova-mobile-composer,
-    .mobile-composer {
-        position: fixed !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        top: auto !important;
-        height: 88px !important;
-        min-height: 88px !important;
-        max-height: 88px !important;
-        overflow: hidden !important;
-        z-index: 2147483000 !important;
-        box-sizing: border-box !important;
-    }
-
-    #mobileChatMessages {
-        position: fixed !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: auto !important;
-        min-height: 0 !important;
-        max-height: none !important;
-        overflow-y: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-        padding-bottom: 14px !important;
-        scroll-padding-bottom: 14px !important;
-        box-sizing: border-box !important;
-        transform: none !important;
-    }
-</style>
-
-<script>
-(function () {
-    const MARK = "NOVA_MOBILE_CHAT_ABOVE_COMPOSER_LOCK_V3B_20260623";
-
-    function pickComposer() {
-        return document.getElementById("nova-mobile-composer")
-            || document.querySelector(".nova-mobile-composer")
-            || document.querySelector(".mobile-composer");
-    }
-
-    function pickChat() {
-        return document.getElementById("mobileChatMessages")
-            || document.querySelector(".mobile-chat-container");
-    }
-
-    function imp(el, key, value) {
-        if (!el) return;
-        el.style.setProperty(key, value, "important");
-    }
-
-    function lock() {
-        const composer = pickComposer();
-        const chat = pickChat();
-
-        if (!composer || !chat) return;
-
-        imp(composer, "position", "fixed");
-        imp(composer, "left", "0");
-        imp(composer, "right", "0");
-        imp(composer, "bottom", "0");
-        imp(composer, "top", "auto");
-        imp(composer, "height", "88px");
-        imp(composer, "min-height", "88px");
-        imp(composer, "max-height", "88px");
-        imp(composer, "overflow", "hidden");
-        imp(composer, "z-index", "2147483000");
-        imp(composer, "box-sizing", "border-box");
-
-        composer.querySelectorAll("textarea,input").forEach(el => {
-            imp(el, "height", "38px");
-            imp(el, "min-height", "38px");
-            imp(el, "max-height", "42px");
-            imp(el, "overflow-y", "auto");
-        });
-
-        composer.querySelectorAll("button").forEach(btn => {
-            imp(btn, "width", "34px");
-            imp(btn, "min-width", "34px");
-            imp(btn, "height", "34px");
-            imp(btn, "min-height", "34px");
-            imp(btn, "max-height", "34px");
-        });
-
-        const desiredTop = 132;
-        const composerTop = Math.round(composer.getBoundingClientRect().top || 281);
-        const desiredBottom = composerTop - 8;
-        const desiredHeight = Math.max(90, desiredBottom - desiredTop);
-
-        imp(chat, "position", "fixed");
-        imp(chat, "left", "0");
-        imp(chat, "right", "0");
-        imp(chat, "bottom", "auto");
-        imp(chat, "top", desiredTop + "px");
-        imp(chat, "height", desiredHeight + "px");
-        imp(chat, "max-height", desiredHeight + "px");
-        imp(chat, "min-height", "0");
-        imp(chat, "overflow-y", "auto");
-        imp(chat, "-webkit-overflow-scrolling", "touch");
-        imp(chat, "padding-bottom", "14px");
-        imp(chat, "scroll-padding-bottom", "14px");
-        imp(chat, "box-sizing", "border-box");
-        imp(chat, "transform", "none");
-
-        requestAnimationFrame(() => {
-            const actualTop = Math.round(chat.getBoundingClientRect().top || 0);
-            const offset = actualTop - desiredTop;
-
-            if (Math.abs(offset) > 2) {
-                const correctedTop = desiredTop - offset;
-                imp(chat, "top", correctedTop + "px");
-                imp(chat, "height", desiredHeight + "px");
-                imp(chat, "max-height", desiredHeight + "px");
-            }
-        });
-    }
-
-    function boot() {
-        lock();
-        requestAnimationFrame(lock);
-        setTimeout(lock, 80);
-        setTimeout(lock, 250);
-        setTimeout(lock, 750);
-        setTimeout(lock, 1500);
-    }
-
-    window.NovaMobileLockChatAboveComposer = lock;
-
-    document.addEventListener("DOMContentLoaded", boot);
-    window.addEventListener("load", boot);
-    window.addEventListener("resize", boot);
-    window.addEventListener("orientationchange", boot);
-
-    clearInterval(window.__novaMobileChatAboveComposerV3BInterval);
-    window.__novaMobileChatAboveComposerV3BInterval = setInterval(lock, 1200);
-
-    boot();
-
-    console.log("[" + MARK + "] ready");
-})();
-</script>
-<!-- /NOVA_MOBILE_CHAT_ABOVE_COMPOSER_LOCK_V3B_20260623 -->
 
 
 <!-- NOVA_MOBILE_INLINE_SESSION_SHAPE_ADAPTER_20260623 -->
@@ -4117,819 +3968,206 @@ header {
 
 
 
-<!-- NOVA_MOBILE_CLEAN_VISUAL_BASELINE_20260623 -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- NOVA_MOBILE_BLANK_PAGE_RECOVERY_CLEANUP_20260623 -->
 <style>
-    html,
-    body {
-        margin: 0 !important;
-        background: #08050f !important;
-        color: #f7f2ff !important;
-        opacity: 1 !important;
-        filter: none !important;
-        mix-blend-mode: normal !important;
-        backdrop-filter: none !important;
-        overflow: hidden !important;
-    }
-
-    body::before {
-        content: "" !important;
-        position: fixed !important;
-        inset: 0 !important;
-        background:
-            radial-gradient(circle at 20% 0%, rgba(124, 58, 237, 0.18), transparent 36%),
-            #08050f !important;
-        z-index: 0 !important;
-        pointer-events: none !important;
-    }
-
-    #app,
-    #root,
-    #mobileApp,
-    #novaMobileApp,
-    .mobile-app,
-    .mobile-shell,
-    .nova-mobile-shell,
-    main {
-        background: transparent !important;
-        color: #f7f2ff !important;
-        opacity: 1 !important;
-        filter: none !important;
-        mix-blend-mode: normal !important;
-        backdrop-filter: none !important;
-    }
-
     #nova-mobile-active-session,
-    .nova-mobile-active-session {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-        width: 0 !important;
-        height: 0 !important;
-        max-width: 0 !important;
-        max-height: 0 !important;
-        overflow: hidden !important;
-        z-index: -9999 !important;
-    }
-
-    #mobileChatMessages {
-        position: fixed !important;
-        left: 0 !important;
-        right: 0 !important;
-        top: 74px !important;
-        bottom: 104px !important;
-        height: auto !important;
-        min-height: 0 !important;
-        max-height: none !important;
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-        -webkit-overflow-scrolling: touch !important;
-        padding: 10px 12px 18px 12px !important;
-        box-sizing: border-box !important;
-        background: transparent !important;
-        color: #f7f2ff !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        filter: none !important;
-        mix-blend-mode: normal !important;
-        backdrop-filter: none !important;
-        z-index: 30 !important;
-        pointer-events: auto !important;
-    }
-
-    #mobileChatMessages button,
-    #mobileChatMessages [role="button"],
-    #mobileChatMessages .nova-mobile-message-actions,
-    #mobileChatMessages .nova-mobile-copy-message,
-    #mobileChatMessages .nova-mobile-regen-message,
-    #mobileChatMessages .nova-clean-message-actions,
-    #mobileChatMessages .nova-clean-copy,
-    #mobileChatMessages .nova-clean-regen {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-        width: 0 !important;
-        height: 0 !important;
-        max-width: 0 !important;
-        max-height: 0 !important;
-        overflow: hidden !important;
-        position: static !important;
-        z-index: -9999 !important;
-    }
-
-    #mobileChatMessages .nova-clean-message {
-        display: flex !important;
-        flex-direction: column !important;
-        margin: 10px 0 !important;
-        background: transparent !important;
-        border: 0 !important;
-        box-shadow: none !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        filter: none !important;
-        mix-blend-mode: normal !important;
-    }
-
-    #mobileChatMessages .nova-clean-message.user {
-        align-items: flex-end !important;
-    }
-
-    #mobileChatMessages .nova-clean-message.assistant {
-        align-items: flex-start !important;
-    }
-
-    #mobileChatMessages .nova-clean-bubble {
-        max-width: 88% !important;
-        padding: 12px 14px !important;
-        border-radius: 17px !important;
-        line-height: 1.45 !important;
-        white-space: pre-wrap !important;
-        word-break: break-word !important;
-        font-size: 15px !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        filter: none !important;
-        mix-blend-mode: normal !important;
-        box-shadow: none !important;
-    }
-
-    #mobileChatMessages .nova-clean-message.user .nova-clean-bubble {
-        background: rgba(124, 58, 237, 0.96) !important;
-        color: #ffffff !important;
-        border: 1px solid rgba(255, 255, 255, 0.16) !important;
-    }
-
-    #mobileChatMessages .nova-clean-message.assistant .nova-clean-bubble {
-        background: rgba(255, 255, 255, 0.09) !important;
-        color: #f7f2ff !important;
-        border: 1px solid rgba(255, 255, 255, 0.13) !important;
-    }
-
-    #nova-mobile-composer,
-    .nova-mobile-composer,
-    .mobile-composer {
-        position: fixed !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        background: rgba(18, 9, 31, 0.98) !important;
-        color: #f7f2ff !important;
-        border-top: 1px solid rgba(255, 255, 255, 0.10) !important;
-        opacity: 1 !important;
-        filter: none !important;
-        mix-blend-mode: normal !important;
-        backdrop-filter: none !important;
-        z-index: 50 !important;
-    }
-
-    .nova-mobile-backend-dock,
-    .nova-mobile-summary-horsemen,
-    .nova-mobile-summary-body,
-    .nova-mobile-overlay,
-    .nova-mobile-modal-backdrop,
-    .mobile-overlay,
-    .mobile-backdrop {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-    }
-</style>
-
-<script>
-(function () {
-    const MARK = "NOVA_MOBILE_CLEAN_VISUAL_BASELINE_20260623";
-
-    if (window.__NOVA_MOBILE_CLEAN_VISUAL_BASELINE_20260623__) {
-        return;
-    }
-
-    window.__NOVA_MOBILE_CLEAN_VISUAL_BASELINE_20260623__ = true;
-
-    let lastKey = "";
-    let inflight = null;
-
-    function escapeHtml(value) {
-        return String(value ?? "")
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    }
-
-    function roleOf(message) {
-        const raw = String(message.role || message.type || message.sender || "").toLowerCase();
-        return raw.includes("assistant") || raw.includes("bot") || raw.includes("nova")
-            ? "assistant"
-            : "user";
-    }
-
-    function textOf(message) {
-        return String(
-            message.content ??
-            message.text ??
-            message.message ??
-            message.body ??
-            message.response ??
-            ""
-        ).replaceAll("??", "?");
-    }
-
-    function normalize(data) {
-        if (window.NovaMobileNormalizeSessionResponse) {
-            data = window.NovaMobileNormalizeSessionResponse(data);
-        }
-
-        if (
-            data &&
-            typeof data === "object" &&
-            data.session &&
-            typeof data.session === "object" &&
-            !Array.isArray(data.messages) &&
-            Array.isArray(data.session.messages)
-        ) {
-            data.messages = data.session.messages;
-        }
-
-        return data;
-    }
-
-    function cleanBadLayers() {
-        document
-            .querySelectorAll("#nova-mobile-active-session, .nova-mobile-active-session")
-            .forEach(el => el.remove());
-
-        const chat = document.getElementById("mobileChatMessages");
-        if (!chat) return;
-
-        chat
-            .querySelectorAll(
-                "button, [role='button'], " +
-                ".nova-mobile-message-actions, " +
-                ".nova-mobile-copy-message, " +
-                ".nova-mobile-regen-message, " +
-                ".nova-clean-message-actions, " +
-                ".nova-clean-copy, " +
-                ".nova-clean-regen"
-            )
-            .forEach(el => el.remove());
-
-        const walker = document.createTreeWalker(
-            chat,
-            NodeFilter.SHOW_TEXT,
-            {
-                acceptNode(node) {
-                    const text = String(node.nodeValue || "").trim().toLowerCase();
-                    if (text === "copy" || text === "regen" || text === "regenerate") {
-                        return NodeFilter.FILTER_ACCEPT;
-                    }
-                    return NodeFilter.FILTER_REJECT;
-                }
-            }
-        );
-
-        const doomed = [];
-        while (walker.nextNode()) doomed.push(walker.currentNode);
-        doomed.forEach(node => node.remove());
-    }
-
-    function renderMessages(messages, reason) {
-        const chat = document.getElementById("mobileChatMessages");
-        if (!chat || !Array.isArray(messages)) return false;
-
-        const key = messages.map(m => roleOf(m) + ":" + textOf(m)).join("\n---\n");
-        if (key && key === lastKey && chat.querySelector(".nova-clean-message")) {
-            cleanBadLayers();
-            return true;
-        }
-
-        lastKey = key;
-
-        chat.innerHTML = messages.map(message => {
-            const role = roleOf(message);
-            const text = textOf(message);
-
-            return `
-                <div class="nova-clean-message ${role}" data-role="${role}" data-nova-bubble-actions="1" data-nova-assistant-actions="1" data-nova-ui-actions-wired="1">
-                    <div class="nova-clean-bubble" data-nova-bubble-actions="1" data-nova-ui-actions-wired="1">${escapeHtml(text).replace(/\n/g, "<br>")}</div>
-                </div>
-            `;
-        }).join("");
-
-        cleanBadLayers();
-
-        requestAnimationFrame(() => {
-            try {
-                chat.scrollTop = chat.scrollHeight;
-            } catch (e) {}
-        });
-
-        console.log("[Nova Mobile Clean Visual Baseline] rendered", {
-            count: messages.length,
-            reason
-        });
-
-        return true;
-    }
-
-    async function fetchAndRenderSession(sessionId, reason) {
-        const sid = String(sessionId || "").trim();
-        if (!sid) return false;
-
-        if (inflight) return inflight;
-
-        inflight = (async () => {
-            try {
-                const response = await fetch("/api/sessions/" + encodeURIComponent(sid));
-                const data = normalize(await response.json());
-                const messages = Array.isArray(data.messages)
-                    ? data.messages
-                    : Array.isArray(data.session && data.session.messages)
-                        ? data.session.messages
-                        : [];
-
-                return renderMessages(messages, reason || "fetch-session");
-            } catch (e) {
-                console.warn("[Nova Mobile Clean Visual Baseline] fetch failed", e);
-                return false;
-            } finally {
-                setTimeout(() => {
-                    inflight = null;
-                }, 250);
-            }
-        })();
-
-        return inflight;
-    }
-
-    function currentSessionId() {
-        try {
-            if (window.NovaMobileCanonicalSessionOwner?.get) {
-                const sid = window.NovaMobileCanonicalSessionOwner.get();
-                if (sid) return sid;
-            }
-        } catch (e) {}
-
-        for (const key of [
-            "nova_mobile_active_session_id",
-            "novaMobileSessionId",
-            "mobile_session_id",
-            "nova_active_session_id",
-            "active_session_id",
-            "nova_session_id"
-        ]) {
-            try {
-                const value = localStorage.getItem(key);
-                if (value) return value;
-            } catch (e) {}
-        }
-
-        return "";
-    }
-
-    window.NovaMobileCleanVisualBaseline = cleanBadLayers;
-    window.NovaMobileHardStopChatActionSpam = cleanBadLayers;
-    window.NovaMobileFetchAndRenderSession = fetchAndRenderSession;
-    window.NovaMobileRenderSessionMessages = function (dataOrMessages, reason) {
-        const data = normalize(dataOrMessages);
-        const messages = Array.isArray(data)
-            ? data
-            : Array.isArray(data && data.messages)
-                ? data.messages
-                : Array.isArray(data && data.session && data.session.messages)
-                    ? data.session.messages
-                    : [];
-
-        return renderMessages(messages, reason || "manual");
-    };
-
-    document.addEventListener("click", event => {
-        const row = event.target?.closest?.("[data-session-id], [data-sid], [data-id], .session-card, .session-item, .mobile-session-card");
-        if (!row) return;
-
-        const sid =
-            row.getAttribute("data-session-id") ||
-            row.getAttribute("data-sid") ||
-            row.getAttribute("data-id") ||
-            "";
-
-        if (/^(mobile|session)_/.test(sid)) {
-            setTimeout(() => fetchAndRenderSession(sid, "session-click"), 120);
-        }
-    }, true);
-
-    const mo = new MutationObserver(() => {
-        clearTimeout(window.__novaMobileCleanVisualBaselineTimer);
-        window.__novaMobileCleanVisualBaselineTimer = setTimeout(cleanBadLayers, 50);
-    });
-
-    mo.observe(document.documentElement, {
-        childList: true,
-        subtree: true,
-        characterData: true
-    });
-
-    setInterval(cleanBadLayers, 700);
-
-    setTimeout(cleanBadLayers, 50);
-    setTimeout(() => {
-        const sid = currentSessionId();
-        if (sid) fetchAndRenderSession(sid, "boot");
-    }, 700);
-
-    console.log("[" + MARK + "] ready");
-})();
-</script>
-<!-- /NOVA_MOBILE_CLEAN_VISUAL_BASELINE_20260623 -->
-
-
-<!-- NOVA_MOBILE_EXPAND_CHAT_VIEWPORT_CLEAN_20260623 -->
-<style>
-    html,
-    body {
-        background: #08050f !important;
-        color: #f7f2ff !important;
-        overflow: hidden !important;
-    }
-
-    body::before {
-        content: "" !important;
-        position: fixed !important;
-        inset: 0 !important;
-        background:
-            radial-gradient(circle at 20% 0%, rgba(124, 58, 237, 0.18), transparent 34%),
-            #08050f !important;
-        z-index: 0 !important;
-        pointer-events: none !important;
-    }
-
-    #mobileChatMessages {
-        position: fixed !important;
-        left: 0 !important;
-        right: 0 !important;
-        top: 74px !important;
-        bottom: 96px !important;
-        height: auto !important;
-        min-height: 0 !important;
-        max-height: none !important;
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-        -webkit-overflow-scrolling: touch !important;
-        padding: 12px 12px 20px 12px !important;
-        box-sizing: border-box !important;
-        background: transparent !important;
-        color: #f7f2ff !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        filter: none !important;
-        mix-blend-mode: normal !important;
-        backdrop-filter: none !important;
-        z-index: 30 !important;
-        pointer-events: auto !important;
-    }
-
-    #mobileChatMessages .nova-stable-message,
-    #mobileChatMessages .mobile-message,
-    #mobileChatMessages .chat-message,
-    #mobileChatMessages .message {
-        margin: 10px 0 !important;
-        background: transparent !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        filter: none !important;
-        mix-blend-mode: normal !important;
-    }
-
-    #mobileChatMessages .nova-stable-bubble,
-    #mobileChatMessages .message-bubble {
-        border-radius: 17px !important;
-        line-height: 1.45 !important;
-        font-size: 15px !important;
-    }
-
-    #nova-mobile-active-session,
-    .nova-mobile-active-session {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-        width: 0 !important;
-        height: 0 !important;
-        overflow: hidden !important;
-        z-index: -9999 !important;
-    }
-
-    #nova-mobile-composer,
-    .nova-mobile-composer,
-    .mobile-composer {
-        position: fixed !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        background: rgba(18, 9, 31, 0.98) !important;
-        color: #f7f2ff !important;
-        border-top: 1px solid rgba(255, 255, 255, 0.10) !important;
-        opacity: 1 !important;
-        z-index: 50 !important;
-    }
-</style>
-
-<script>
-(function () {
-    const MARK = "NOVA_MOBILE_EXPAND_CHAT_VIEWPORT_CLEAN_20260623";
-
-    function fix() {
-        const chat = document.getElementById("mobileChatMessages");
-        const composer =
-            document.getElementById("nova-mobile-composer") ||
-            document.querySelector(".nova-mobile-composer, .mobile-composer");
-
-        document
-            .querySelectorAll("#nova-mobile-active-session, .nova-mobile-active-session")
-            .forEach(el => el.remove());
-
-        if (chat) {
-            chat.style.setProperty("top", "74px", "important");
-            chat.style.setProperty("bottom", "96px", "important");
-            chat.style.setProperty("height", "auto", "important");
-            chat.style.setProperty("max-height", "none", "important");
-            chat.style.setProperty("overflow-y", "auto", "important");
-            chat.style.setProperty("background", "transparent", "important");
-            chat.style.setProperty("z-index", "30", "important");
-        }
-
-        if (composer) {
-            composer.style.setProperty("bottom", "0", "important");
-            composer.style.setProperty("z-index", "50", "important");
-            composer.style.setProperty("background", "rgba(18, 9, 31, 0.98)", "important");
-        }
-    }
-
-    window.NovaMobileExpandChatViewportClean = fix;
-
-    setInterval(fix, 900);
-    setTimeout(fix, 50);
-    setTimeout(fix, 300);
-    setTimeout(fix, 900);
-
-    console.log("[" + MARK + "] ready");
-})();
-</script>
-<!-- /NOVA_MOBILE_EXPAND_CHAT_VIEWPORT_CLEAN_20260623 -->
-
-
-<!-- NOVA_MOBILE_FORCE_TALL_CHAT_VIEW_20260623 -->
-<style>
-    html,
-    body {
-        background: #08050f !important;
-        color: #f7f2ff !important;
-        overflow: hidden !important;
-    }
-
-    #mobileChatMessages {
-        position: fixed !important;
-        left: 0 !important;
-        right: 0 !important;
-        top: 74px !important;
-        bottom: 104px !important;
-        height: auto !important;
-        min-height: 0 !important;
-        max-height: none !important;
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-        -webkit-overflow-scrolling: touch !important;
-        padding: 12px 12px 20px 12px !important;
-        box-sizing: border-box !important;
-        background: transparent !important;
-        color: #f7f2ff !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        z-index: 30 !important;
-        pointer-events: auto !important;
-    }
-
-    #nova-mobile-active-session,
-    .nova-mobile-active-session {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-    }
-</style>
-
-<script>
-(function () {
-    const MARK = "NOVA_MOBILE_FORCE_TALL_CHAT_VIEW_20260623";
-
-    function fix() {
-        const chat = document.getElementById("mobileChatMessages");
-        const composer =
-            document.getElementById("nova-mobile-composer") ||
-            document.querySelector(".nova-mobile-composer, .mobile-composer");
-
-        if (!chat) return;
-
-        const composerHeight = composer
-            ? Math.ceil(composer.getBoundingClientRect().height)
-            : 96;
-
-        document.documentElement.style.setProperty("background", "#08050f", "important");
-        document.body.style.setProperty("background", "#08050f", "important");
-        document.body.style.setProperty("overflow", "hidden", "important");
-
-        chat.style.setProperty("position", "fixed", "important");
-        chat.style.setProperty("left", "0", "important");
-        chat.style.setProperty("right", "0", "important");
-        chat.style.setProperty("top", "74px", "important");
-        chat.style.setProperty("bottom", (composerHeight + 8) + "px", "important");
-        chat.style.setProperty("height", "auto", "important");
-        chat.style.setProperty("max-height", "none", "important");
-        chat.style.setProperty("overflow-y", "auto", "important");
-        chat.style.setProperty("overflow-x", "hidden", "important");
-        chat.style.setProperty("background", "transparent", "important");
-        chat.style.setProperty("z-index", "30", "important");
-
-        document
-            .querySelectorAll("#nova-mobile-active-session, .nova-mobile-active-session")
-            .forEach(el => el.remove());
-    }
-
-    window.NovaMobileForceTallChatView = fix;
-
-    setInterval(fix, 500);
-    setTimeout(fix, 50);
-    setTimeout(fix, 250);
-    setTimeout(fix, 800);
-
-    console.log("[" + MARK + "] ready");
-})();
-</script>
-<!-- /NOVA_MOBILE_FORCE_TALL_CHAT_VIEW_20260623 -->
-
-
-<!-- NOVA_MOBILE_HIDE_MIDDLE_CONTINUE_OVERLAY_20260623 -->
-<style>
-    .nova-mobile-continue-overlay,
-    .nova-mobile-resume-overlay,
-    .continue-overlay,
-    .resume-overlay,
-    [data-nova-continue-overlay],
-    [data-continue-overlay] {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-        width: 0 !important;
-        height: 0 !important;
-        max-width: 0 !important;
-        max-height: 0 !important;
-        overflow: hidden !important;
-        z-index: -9999 !important;
-    }
-</style>
-
-<script>
-(function () {
-    const MARK = "NOVA_MOBILE_HIDE_MIDDLE_CONTINUE_OVERLAY_20260623";
-
-    if (window.__NOVA_MOBILE_HIDE_MIDDLE_CONTINUE_OVERLAY_20260623__) {
-        return;
-    }
-
-    window.__NOVA_MOBILE_HIDE_MIDDLE_CONTINUE_OVERLAY_20260623__ = true;
-
-    function isMiddleContinue(el) {
-        if (!el) return false;
-
-        const text = String(el.innerText || el.textContent || "").trim().toLowerCase();
-
-        if (
-            text !== "continue" &&
-            text !== "continue generating" &&
-            text !== "resume"
-        ) {
-            return false;
-        }
-
-        const rect = el.getBoundingClientRect();
-
-        return (
-            rect.width > 20 &&
-            rect.height > 10 &&
-            rect.top > 70 &&
-            rect.bottom < window.innerHeight - 70
-        );
-    }
-
-    function hide() {
-        document
-            .querySelectorAll(
-                ".nova-mobile-continue-overlay, " +
-                ".nova-mobile-resume-overlay, " +
-                ".continue-overlay, " +
-                ".resume-overlay, " +
-                "[data-nova-continue-overlay], " +
-                "[data-continue-overlay]"
-            )
-            .forEach(el => el.remove());
-
-        document.querySelectorAll("button, div, span, a").forEach(el => {
-            if (isMiddleContinue(el)) {
-                el.remove();
-            }
-        });
-    }
-
-    window.NovaMobileHideMiddleContinueOverlay = hide;
-
-    const mo = new MutationObserver(() => {
-        clearTimeout(window.__novaMobileHideMiddleContinueOverlayTimer);
-        window.__novaMobileHideMiddleContinueOverlayTimer = setTimeout(hide, 40);
-    });
-
-    mo.observe(document.documentElement, {
-        childList: true,
-        subtree: true,
-        characterData: true
-    });
-
-    setInterval(hide, 700);
-
-    setTimeout(hide, 50);
-    setTimeout(hide, 250);
-    setTimeout(hide, 900);
-
-    console.log("[" + MARK + "] ready");
-})();
-</script>
-<!-- /NOVA_MOBILE_HIDE_MIDDLE_CONTINUE_OVERLAY_20260623 -->
-
-
-
-
-
-<!-- NOVA_MOBILE_HIDE_FLOATING_QUICK_ACTIONS_20260623 -->
-<style>
+    .nova-mobile-active-session,
     .mobile-quick-actions,
     .mobile-quick-actions-final,
     .nova-mobile-quick-actions,
     .quick-actions,
     .quick-prompts,
-    .nova-quick-prompts {
+    .nova-quick-prompts,
+    #mobileChatMessages .nova-mobile-message-actions,
+    #mobileChatMessages .nova-mobile-copy-message,
+    #mobileChatMessages .nova-mobile-regen-message {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    html,
+    body {
+        background: #08050f !important;
+        color: #f7f2ff !important;
+    }
+</style>
+
+<script>
+(function () {
+    const MARK = "NOVA_MOBILE_BLANK_PAGE_RECOVERY_CLEANUP_20260623";
+
+    function clean() {
+        document
+            .querySelectorAll(
+                "#nova-mobile-active-session, .nova-mobile-active-session, " +
+                ".mobile-quick-actions, .mobile-quick-actions-final, .nova-mobile-quick-actions, " +
+                ".quick-actions, .quick-prompts, .nova-quick-prompts"
+            )
+            .forEach(el => el.remove());
+
+        const chat = document.getElementById("mobileChatMessages");
+        if (chat) {
+            chat
+                .querySelectorAll(".nova-mobile-message-actions, .nova-mobile-copy-message, .nova-mobile-regen-message")
+                .forEach(el => el.remove());
+        }
+    }
+
+    window.NovaMobileBlankPageRecoveryCleanup = clean;
+
+    setInterval(clean, 1000);
+    setTimeout(clean, 50);
+    setTimeout(clean, 300);
+    setTimeout(clean, 1000);
+
+    console.log("[" + MARK + "] ready");
+})();
+</script>
+<!-- /NOVA_MOBILE_BLANK_PAGE_RECOVERY_CLEANUP_20260623 -->
+
+
+<!-- NOVA_MOBILE_CHAT_AVOID_COMPOSER_GEOMETRY_20260623 -->
+<style>
+    #mobileChatMessages {
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        box-sizing: border-box !important;
+    }
+</style>
+
+<script>
+(function () {
+    const MARK = "NOVA_MOBILE_CHAT_AVOID_COMPOSER_GEOMETRY_20260623";
+
+    function fix() {
+        const chat = document.getElementById("mobileChatMessages");
+        const composer =
+            document.getElementById("nova-mobile-composer") ||
+            document.querySelector(".nova-mobile-composer, .mobile-composer");
+
+        if (!chat || !composer) return;
+
+        const composerRect = composer.getBoundingClientRect();
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+
+        if (!viewportHeight || composerRect.height <= 0 || composerRect.top <= 0) return;
+
+        const top = 74;
+        const gap = 10;
+        const available = Math.max(80, Math.floor(composerRect.top - top - gap));
+
+        chat.style.setProperty("position", "fixed", "important");
+        chat.style.setProperty("left", "0", "important");
+        chat.style.setProperty("right", "0", "important");
+        chat.style.setProperty("top", top + "px", "important");
+        chat.style.setProperty("bottom", "auto", "important");
+        chat.style.setProperty("height", available + "px", "important");
+        chat.style.setProperty("min-height", "0", "important");
+        chat.style.setProperty("max-height", available + "px", "important");
+        chat.style.setProperty("overflow-y", "auto", "important");
+        chat.style.setProperty("overflow-x", "hidden", "important");
+        chat.style.setProperty("z-index", "30", "important");
+        chat.style.setProperty("opacity", "1", "important");
+        chat.style.setProperty("visibility", "visible", "important");
+
+        chat
+            .querySelectorAll("button, [role='button'], .nova-mobile-message-actions, .nova-mobile-copy-message, .nova-mobile-regen-message")
+            .forEach(el => el.remove());
+    }
+
+    window.NovaMobileChatAvoidComposerGeometry = fix;
+
+    setInterval(fix, 500);
+    setTimeout(fix, 50);
+    setTimeout(fix, 250);
+    setTimeout(fix, 900);
+    setTimeout(fix, 1800);
+
+    console.log("[" + MARK + "] ready");
+})();
+</script>
+<!-- /NOVA_MOBILE_CHAT_AVOID_COMPOSER_GEOMETRY_20260623 -->
+
+
+
+
+
+<!-- NOVA_MOBILE_NO_FLASH_ACTION_HIDE_20260623 -->
+<style>
+    /* CSS-only: do not remove/rebuild message nodes, avoids flashing */
+    #mobileChatMessages .nova-mobile-message-actions,
+    #mobileChatMessages .nova-clean-message-actions,
+    #mobileChatMessages .message-actions,
+    #mobileChatMessages .bubble-actions,
+    #mobileChatMessages .nova-mobile-copy-message,
+    #mobileChatMessages .nova-mobile-regen-message,
+    #mobileChatMessages .nova-clean-copy,
+    #mobileChatMessages .nova-clean-regen,
+    #mobileChatMessages button,
+    #mobileChatMessages [role="button"] {
         display: none !important;
         visibility: hidden !important;
         opacity: 0 !important;
         pointer-events: none !important;
         width: 0 !important;
         height: 0 !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
         max-width: 0 !important;
         max-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
         overflow: hidden !important;
-        z-index: -9999 !important;
+        transform: none !important;
     }
 </style>
 
 <script>
 (function () {
-    const MARK = "NOVA_MOBILE_HIDE_FLOATING_QUICK_ACTIONS_20260623";
+    const MARK = "NOVA_MOBILE_NO_FLASH_ACTION_HIDE_20260623";
 
-    function hide() {
-        document
-            .querySelectorAll(
-                ".mobile-quick-actions, " +
-                ".mobile-quick-actions-final, " +
-                ".nova-mobile-quick-actions, " +
-                ".quick-actions, " +
-                ".quick-prompts, " +
-                ".nova-quick-prompts"
-            )
-            .forEach(el => el.remove());
-    }
-
-    window.NovaMobileHideFloatingQuickActions = hide;
-
-    const mo = new MutationObserver(() => {
-        clearTimeout(window.__novaMobileHideFloatingQuickActionsTimer);
-        window.__novaMobileHideFloatingQuickActionsTimer = setTimeout(hide, 40);
-    });
-
-    mo.observe(document.documentElement, {
-        childList: true,
-        subtree: true
-    });
-
-    setInterval(hide, 800);
-    setTimeout(hide, 50);
-    setTimeout(hide, 250);
-    setTimeout(hide, 900);
+    window.NovaMobileNoFlashActionHide = function () {
+        return true;
+    };
 
     console.log("[" + MARK + "] ready");
 })();
 </script>
-<!-- /NOVA_MOBILE_HIDE_FLOATING_QUICK_ACTIONS_20260623 -->
+<!-- /NOVA_MOBILE_NO_FLASH_ACTION_HIDE_20260623 -->
 
 </body>
 </html>
