@@ -7173,7 +7173,8 @@ header {
 
 
 
-<!-- NOVA_MOBILE_ONE_ROW_NEW_SESSIONS_COPY_REGEN_V5_20260624 -->
+
+<!-- NOVA_MOBILE_ONE_ROW_NEW_SESSIONS_COPY_REGEN_V6_20260624 -->
 <style>
 @media (max-width: 900px) {
     #nova-mobile-primary-action-row {
@@ -7219,7 +7220,8 @@ header {
         box-sizing: border-box !important;
     }
 
-    .nova-mobile-v5-parked-old-control {
+    .nova-mobile-v6-parked-old-control,
+    .nova-mobile-v6-parked-old-shell {
         position: fixed !important;
         top: -10000px !important;
         left: -10000px !important;
@@ -7266,6 +7268,22 @@ header {
         z-index: -1 !important;
     }
 
+    #nova-mobile-menu-account-restored {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 100% !important;
+        min-height: 38px !important;
+        padding: 9px 12px !important;
+        border-radius: 12px !important;
+        border: 1px solid rgba(168, 85, 247, 0.35) !important;
+        background: rgba(168, 85, 247, 0.16) !important;
+        color: #f8f5ff !important;
+        font-weight: 800 !important;
+        white-space: normal !important;
+        box-sizing: border-box !important;
+    }
+
     #mobileChatMessages,
     .mobile-chat-container {
         top: 92px !important;
@@ -7296,7 +7314,6 @@ header {
     [data-menu] a,
     [data-panel="menu"] button,
     [data-panel="menu"] a {
-        width: 100% !important;
         max-width: 100% !important;
         min-height: 38px !important;
         height: auto !important;
@@ -7312,7 +7329,7 @@ header {
 
 <script>
 (() => {
-    const TAG = "[NOVA_MOBILE_ONE_ROW_NEW_SESSIONS_COPY_REGEN_V5_20260624]";
+    const TAG = "[NOVA_MOBILE_ONE_ROW_NEW_SESSIONS_COPY_REGEN_V6_20260624]";
 
     const PARK_IDS = [
         "mobileMenuButton",
@@ -7323,6 +7340,12 @@ header {
         "nova-mobile-rail-copy",
         "nova-mobile-rail-regen",
         "nova-mobile-bottom-login"
+    ];
+
+    const SHELL_IDS = [
+        "nova-mobile-bottom-login",
+        "nova-mobile-rail-copy",
+        "nova-mobile-rail-regen"
     ];
 
     let lastLog = "";
@@ -7373,10 +7396,10 @@ header {
         return row;
     }
 
-    function park(el) {
+    function park(el, shell = false) {
         if (!el || el.closest("#nova-mobile-primary-action-row")) return false;
 
-        el.classList.add("nova-mobile-v5-parked-old-control");
+        el.classList.add(shell ? "nova-mobile-v6-parked-old-shell" : "nova-mobile-v6-parked-old-control");
         el.setAttribute("aria-hidden", "true");
         el.setAttribute("tabindex", "-1");
 
@@ -7406,10 +7429,133 @@ header {
 
         PARK_IDS.forEach((id) => {
             const el = document.getElementById(id);
-            if (el && park(el)) parked += 1;
+            if (el && park(el, false)) parked += 1;
         });
 
         return parked;
+    }
+
+    function isUnsafeShellCandidate(el) {
+        if (!el || el === document.body || el === document.documentElement) return false;
+        if (el.closest("#nova-mobile-primary-action-row")) return false;
+
+        const raw = clean([
+            el.id || "",
+            el.className || "",
+            el.getAttribute?.("role") || "",
+            el.getAttribute?.("aria-label") || "",
+            el.textContent || ""
+        ].join(" "));
+
+        if (
+            raw.includes("composer") ||
+            raw.includes("input") ||
+            raw.includes("textarea") ||
+            raw.includes("message") ||
+            raw.includes("chatmessages") ||
+            raw.includes("chat messages") ||
+            raw.includes("mobile-chat") ||
+            raw.includes("menu") ||
+            raw.includes("panel")
+        ) {
+            return false;
+        }
+
+        const r = el.getBoundingClientRect();
+        const vh = window.innerHeight || document.documentElement.clientHeight || 700;
+
+        return r.top > vh * 0.38 || r.bottom > vh - 160;
+    }
+
+    function parkOldShells() {
+        let shells = 0;
+
+        SHELL_IDS.forEach((id) => {
+            const child = document.getElementById(id);
+            if (!child) return;
+
+            let node = child.parentElement;
+
+            for (let depth = 0; node && node !== document.body && depth < 5; depth += 1) {
+                if (!isUnsafeShellCandidate(node)) break;
+
+                const text = clean(node.innerText || node.textContent);
+                const hasOldControls = !!node.querySelector(
+                    "#nova-mobile-bottom-login, #nova-mobile-rail-copy, #nova-mobile-rail-regen"
+                );
+
+                if (hasOldControls || text === "" || text === "copy regen account" || text.includes("account")) {
+                    if (park(node, true)) shells += 1;
+                    node = node.parentElement;
+                    continue;
+                }
+
+                break;
+            }
+        });
+
+        return shells;
+    }
+
+    function menuContainers() {
+        return Array.from(document.querySelectorAll(
+            "#mobileMenuPanel, #nova-mobile-menu, #novaMobileMenu, .mobile-menu, .nova-mobile-menu, [data-menu], [data-panel='menu']"
+        )).filter(el => !el.closest("#nova-mobile-primary-action-row"));
+    }
+
+    function menuHasAccount(menu) {
+        return Array.from(menu.querySelectorAll("button, a, [role='button']"))
+            .some(el => clean(el.textContent) === "account");
+    }
+
+    function clickOriginalAccount() {
+        const login = document.getElementById("nova-mobile-bottom-login");
+
+        if (login) {
+            login.dispatchEvent(new MouseEvent("click", {
+                bubbles: true,
+                cancelable: true,
+                view: window
+            }));
+            console.log(TAG, "clicked original account");
+            return true;
+        }
+
+        for (const name of ["NovaMobileOpenAccount", "openAccount", "showAccount", "NovaMobileLogin"]) {
+            if (typeof window[name] === "function") {
+                try {
+                    window[name]();
+                    console.log(TAG, "called", name);
+                    return true;
+                } catch (_) {}
+            }
+        }
+
+        console.warn(TAG, "account fallback missing");
+        return false;
+    }
+
+    function ensureMenuAccount() {
+        let added = 0;
+
+        menuContainers().forEach((menu) => {
+            if (!menu || menuHasAccount(menu)) return;
+
+            const btn = document.createElement("button");
+            btn.id = "nova-mobile-menu-account-restored";
+            btn.type = "button";
+            btn.textContent = "Account";
+            btn.addEventListener("click", (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                clickOriginalAccount();
+            }, true);
+
+            menu.appendChild(btn);
+            added += 1;
+        });
+
+        return added;
     }
 
     function textOf(el) {
@@ -7545,9 +7691,9 @@ header {
 
         binds.forEach(([id, fn]) => {
             const btn = document.getElementById(id);
-            if (!btn || btn.dataset.novaBoundV5) return;
+            if (!btn || btn.dataset.novaBoundV6) return;
 
-            btn.dataset.novaBoundV5 = "1";
+            btn.dataset.novaBoundV6 = "1";
             btn.addEventListener("click", (event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -7559,12 +7705,15 @@ header {
 
     function apply(reason = "apply") {
         bindRow();
+
         const parked = parkOldControls();
+        const shells = parkOldShells();
+        const menuAccounts = ensureMenuAccount();
 
         const row = ensureRow();
         const widths = Array.from(row.querySelectorAll("button")).map(btn => Math.round(btn.getBoundingClientRect().width));
 
-        const msg = JSON.stringify({ parked, widths });
+        const msg = JSON.stringify({ parked, shells, menuAccounts, widths });
 
         if (msg !== lastLog) {
             lastLog = msg;
@@ -7574,7 +7723,7 @@ header {
         return JSON.parse(msg);
     }
 
-    window.NovaMobileOneRowNewSessionsCopyRegenV5 = () => apply("manual");
+    window.NovaMobileOneRowNewSessionsCopyRegenV6 = () => apply("manual");
 
     apply("boot");
 
