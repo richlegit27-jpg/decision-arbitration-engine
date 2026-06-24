@@ -12340,8 +12340,10 @@ main {
 
 
 
+
+
+
 /* NOVA_MOBILE_SINGLE_GEOMETRY_OWNER_CSS_20260624 */
-/* One owner for mobile chat geometry. No timers. No shake. */
 #mobileChatMessages,
 .mobile-chat-container {
     position: fixed !important;
@@ -12376,15 +12378,4 @@ main {
     height: auto !important;
     box-sizing: border-box !important;
     z-index: 90 !important;
-}
-
-#mobileChatMessages > *,
-.mobile-chat-container > * {
-    position: relative !important;
-    top: auto !important;
-    left: auto !important;
-    right: auto !important;
-    bottom: auto !important;
-    transform: none !important;
-    box-sizing: border-box !important;
 }

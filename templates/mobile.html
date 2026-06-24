@@ -6251,6 +6251,7 @@ header {
 
 
 
+
 <script>
 /* NOVA_MOBILE_SINGLE_GEOMETRY_OWNER_20260624 */
 (function () {
@@ -6258,39 +6259,36 @@ header {
 
     function important(el, prop, value) {
         if (!el) return;
-        if (el.style.getPropertyValue(prop) === value) return;
         el.style.setProperty(prop, value, "important");
     }
 
     function lockOnce() {
-        try {
-            var chat = document.getElementById("mobileChatMessages");
-            var composer = document.getElementById("nova-mobile-composer");
+        var chat = document.getElementById("mobileChatMessages");
+        var composer = document.getElementById("nova-mobile-composer");
 
-            if (!chat || !composer) return;
+        if (!chat || !composer) return;
 
-            important(composer, "position", "fixed");
-            important(composer, "left", "0px");
-            important(composer, "right", "0px");
-            important(composer, "bottom", "0px");
-            important(composer, "top", "auto");
-            important(composer, "width", "100%");
-            important(composer, "max-width", "100%");
-            important(composer, "z-index", "90");
+        important(composer, "position", "fixed");
+        important(composer, "left", "0px");
+        important(composer, "right", "0px");
+        important(composer, "bottom", "0px");
+        important(composer, "top", "auto");
+        important(composer, "width", "100%");
+        important(composer, "max-width", "100%");
+        important(composer, "z-index", "90");
 
-            important(chat, "position", "fixed");
-            important(chat, "top", "72px");
-            important(chat, "left", "0px");
-            important(chat, "right", "0px");
-            important(chat, "bottom", "150px");
-            important(chat, "height", "auto");
-            important(chat, "max-height", "none");
-            important(chat, "overflow-y", "auto");
-            important(chat, "overflow-x", "hidden");
-            important(chat, "box-sizing", "border-box");
-            important(chat, "padding-bottom", "34px");
-            important(chat, "z-index", "10");
-        } catch (_) {}
+        important(chat, "position", "fixed");
+        important(chat, "top", "72px");
+        important(chat, "left", "0px");
+        important(chat, "right", "0px");
+        important(chat, "bottom", "150px");
+        important(chat, "height", "auto");
+        important(chat, "max-height", "none");
+        important(chat, "overflow-y", "auto");
+        important(chat, "overflow-x", "hidden");
+        important(chat, "box-sizing", "border-box");
+        important(chat, "padding-bottom", "34px");
+        important(chat, "z-index", "10");
     }
 
     window.NovaMobileLockComposerGeometry = lockOnce;
