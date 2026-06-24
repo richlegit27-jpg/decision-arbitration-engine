@@ -378,3 +378,80 @@ Final guard:
     console.log("[NOVA_MOBILE_FINAL_SCROLL_GEOMETRY_FORCE_V2_20260624] ready");
 })();
 
+/* NOVA_MOBILE_TOP_BUTTON_POLISH_20260624 */
+(function () {
+    "use strict";
+
+    function imp(el, prop, value) {
+        if (!el) return;
+        el.style.setProperty(prop, value, "important");
+    }
+
+    function polishTopButtons() {
+        var newBtn = document.getElementById("mobileMenuButton");
+        var sessionsBtn = document.getElementById("mobileMemoryButton");
+
+        var visibleTopButtons = [newBtn, sessionsBtn].filter(Boolean);
+
+        visibleTopButtons.forEach(function (btn) {
+            imp(btn, "display", "inline-flex");
+            imp(btn, "align-items", "center");
+            imp(btn, "justify-content", "center");
+            imp(btn, "height", "36px");
+            imp(btn, "min-height", "36px");
+            imp(btn, "max-height", "36px");
+            imp(btn, "padding", "0 14px");
+            imp(btn, "border-radius", "999px");
+            imp(btn, "font-size", "13px");
+            imp(btn, "font-weight", "800");
+            imp(btn, "line-height", "1");
+            imp(btn, "letter-spacing", "0.01em");
+            imp(btn, "color", "#f7f2ff");
+            imp(btn, "background", "linear-gradient(135deg, rgba(168, 85, 247, 0.32), rgba(124, 58, 237, 0.18))");
+            imp(btn, "border", "1px solid rgba(196, 181, 253, 0.38)");
+            imp(btn, "box-shadow", "0 10px 28px rgba(88, 28, 135, 0.22)");
+            imp(btn, "white-space", "nowrap");
+            imp(btn, "box-sizing", "border-box");
+        });
+
+        if (newBtn) {
+            imp(newBtn, "width", "72px");
+        }
+
+        if (sessionsBtn) {
+            imp(sessionsBtn, "width", "92px");
+        }
+
+        // Keep legacy duplicate controls hidden but clickable handlers intact.
+        ["nova-mobile-new-chat", "nova-mobile-sessions-toggle"].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            imp(el, "position", "fixed");
+            imp(el, "left", "-9998px");
+            imp(el, "top", "-9998px");
+            imp(el, "width", "1px");
+            imp(el, "height", "1px");
+            imp(el, "opacity", "0");
+            imp(el, "pointer-events", "none");
+        });
+    }
+
+    window.NovaMobileTopButtonPolish = polishTopButtons;
+
+    window.addEventListener("load", function () {
+        polishTopButtons();
+        setTimeout(polishTopButtons, 500);
+        setTimeout(polishTopButtons, 1500);
+        setTimeout(polishTopButtons, 3000);
+    });
+
+    window.addEventListener("pageshow", function () {
+        setTimeout(polishTopButtons, 400);
+    });
+
+    setTimeout(polishTopButtons, 800);
+    setTimeout(polishTopButtons, 2200);
+
+    console.log("[NOVA_MOBILE_TOP_BUTTON_POLISH_20260624] ready");
+})();
+
