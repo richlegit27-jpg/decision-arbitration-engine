@@ -1262,6 +1262,7 @@ def _nova_phase1_append_text_attachments_to_user_text(user_text, attachments, lo
             logger.warning("[Phase1TextAttachmentReader] append failed error=%s", error)
         return user_text
 
+
 @app.route("/api/chat", methods=["POST"])
 def api_chat_route():
     return api_chat()
@@ -4189,6 +4190,23 @@ def api_chat():
         })
 
     data = request_json()
+    # NOVA_API_CHAT_INPUT_ALIAS_NORMALIZE_20260624
+    try:
+        _nova_input_alias_text = str(
+            data.get("user_text")
+            or data.get("message")
+            or data.get("text")
+            or ""
+        ).strip()
+
+        if _nova_input_alias_text:
+            data["user_text"] = _nova_input_alias_text
+            data["message"] = _nova_input_alias_text
+            data["text"] = _nova_input_alias_text
+    except Exception:
+        pass
+
+
 
     user_text = str(data.get("user_text") or "").strip()
 
@@ -4490,7 +4508,12 @@ def api_chat():
         except Exception:
             pass
 
-        return jsonify(_nova_replace_weak_backend_reply(user_text, result))
+        _nova_chat_service_payload = _nova_replace_weak_backend_reply(user_text, result)
+        _nova_chat_service_cleaner = globals().get("_nova_app_deep_clean_mojibake_20260624")
+        if callable(_nova_chat_service_cleaner):
+            _nova_chat_service_payload = _nova_chat_service_cleaner(_nova_chat_service_payload)
+
+        return jsonify(_nova_chat_service_payload)
 
     force_new_session = bool(data.get("force_new_session") or data.get("new_session"))
 
@@ -5730,7 +5753,7 @@ def api_chat():
             app.logger.warning("[api_chat early explicit memory guard live] failed: %s", _nova_early_memory_error)
 
         app.logger.info(
-            "[api_chat] calling chat_service.handle session_id=%s attachments_count=%s",
+            "[api_chat] preparing chat_service.handle session_id=%s attachments_count=%s",
             session_id,
             len(attachments_for_chat_service or []),
         )
@@ -5773,6 +5796,40 @@ def api_chat():
         ).strip()
 
         _nova_real_web_probe = " ".join(_nova_real_user_text_for_web.lower().split())
+        # NOVA_REAL_WEB_BRIDGE_EXPLICIT_ONLY_20260624
+        # Do not let the real web-fetch bridge hijack normal chat.
+        # Normal prompts like "tell me a joke" or "what is coffee" must fall through to /api/chat.
+        _nova_real_explicit_web_terms_20260624 = (
+            "latest news",
+            "news about",
+            "today in",
+            "what happened today",
+            "current news",
+            "breaking news",
+            "recent news",
+            "latest tech news",
+            "latest sports",
+            "search the web",
+            "web search",
+            "look it up",
+            "lookup",
+            "browse",
+            "google",
+            "sources",
+            "source",
+            "citation",
+            "citations",
+            "links",
+            "show sources",
+            "show links",
+            "with sources",
+            "with citations",
+        )
+
+        if not any(_term in _nova_real_web_probe for _term in _nova_real_explicit_web_terms_20260624):
+            return None
+
+        # /NOVA_REAL_WEB_BRIDGE_EXPLICIT_ONLY_20260624
         _nova_real_web_terms = (
             "latest news",
             "news about",
@@ -15741,6 +15798,284 @@ _nova_install_mobile_login_status_api_20260624()
 # /NOVA_MOBILE_LOGIN_STATUS_API_20260624
 
 
+
+# NOVA_API_CHAT_PAYLOAD_ALIAS_FIX_20260624
+# Accept message/text/content/prompt as aliases for user_text on /api/chat,
+# and make sure assistant_message.text is also exposed as top-level text.
+try:
+    from flask import request
+    import json as _nova_json_20260624
+
+    @app.before_request
+    def _nova_api_chat_payload_alias_fix_20260624():
+        if request.method != "POST":
+            return None
+
+        if request.path not in ("/api/chat", "/api/chat/stream"):
+            return None
+
+        data = request.get_json(silent=True)
+
+        if not isinstance(data, dict):
+            return None
+
+        if not str(data.get("user_text") or "").strip():
+            alias = (
+                data.get("message") or
+                data.get("text") or
+                data.get("content") or
+                data.get("prompt") or
+                data.get("query") or
+                ""
+            )
+
+            if str(alias or "").strip():
+                data["user_text"] = alias
+
+                # Force Flask to reuse the normalized JSON inside the route.
+                try:
+                    request._cached_json = (data, data)
+                except Exception:
+                    pass
+
+                try:
+                    request._cached_data = _nova_json_20260624.dumps(data).encode("utf-8")
+                except Exception:
+                    pass
+
+        return None
+
+
+    @app.after_request
+    def _nova_api_chat_response_text_alias_fix_20260624(response):
+        if request.path != "/api/chat":
+            return response
+
+        if not response.mimetype or "json" not in response.mimetype.lower():
+            return response
+
+        try:
+            data = response.get_json(silent=True)
+        except Exception:
+            return response
+
+        if not isinstance(data, dict):
+            return response
+
+        assistant_text = ""
+
+        assistant_message = data.get("assistant_message")
+        if isinstance(assistant_message, dict):
+            assistant_text = str(assistant_message.get("text") or "")
+
+        if assistant_text.strip() and not str(data.get("text") or "").strip():
+            data["text"] = assistant_text
+            response.set_data(_nova_json_20260624.dumps(data))
+            response.mimetype = "application/json"
+
+        return response
+
+except Exception as _nova_payload_alias_error_20260624:
+    print("[NOVA_API_CHAT_PAYLOAD_ALIAS_FIX_20260624] skipped:", _nova_payload_alias_error_20260624)
+# /NOVA_API_CHAT_PAYLOAD_ALIAS_FIX_20260624
+
+
+
+# NOVA_WEB_SOURCE_OPT_IN_ONLY_20260624
+# Launch-safe rule:
+# Normal chat should not randomly create web/source cards.
+# Web/source mode should only run when the user explicitly asks for web/search/sources/links/citations.
+try:
+    from flask import request
+    import json as _nova_json_20260624
+
+    _NOVA_EXPLICIT_WEB_WORDS_20260624 = (
+        "search the web",
+        "web search",
+        "look it up",
+        "lookup",
+        "browse",
+        "google",
+        "sources",
+        "source",
+        "citation",
+        "citations",
+        "links",
+        "link me",
+        "show sources",
+        "show links",
+        "with sources",
+        "with citations",
+    )
+
+    def _nova_explicit_web_request_20260624(value):
+        text = str(value or "").lower().strip()
+
+        if not text:
+            return False
+
+        return any(word in text for word in _NOVA_EXPLICIT_WEB_WORDS_20260624)
+
+    @app.before_request
+    def _nova_web_source_opt_in_only_request_20260624():
+        if request.method != "POST":
+            return None
+
+        if request.path not in ("/api/chat", "/api/chat/stream"):
+            return None
+
+        data = request.get_json(silent=True)
+
+        if not isinstance(data, dict):
+            return None
+
+        user_text = (
+            data.get("user_text") or
+            data.get("message") or
+            data.get("text") or
+            data.get("content") or
+            data.get("prompt") or
+            data.get("query") or
+            ""
+        )
+
+        # Keep the earlier payload alias fix idea alive.
+        if str(user_text or "").strip():
+            data["user_text"] = user_text
+
+        explicit_web = _nova_explicit_web_request_20260624(user_text)
+
+        if not explicit_web:
+            # These flags are intentionally broad because different parts of Nova
+            # have used different names during development.
+            data["disable_web"] = True
+            data["disable_sources"] = True
+            data["no_sources"] = True
+            data["web"] = False
+            data["web_search"] = False
+            data["search_web"] = False
+            data["show_sources"] = False
+            data["include_sources"] = False
+            data["force_chat"] = True
+            data["route_hint"] = "chat_only_no_sources"
+
+        try:
+            request._cached_json = (data, data)
+        except Exception:
+            pass
+
+        try:
+            request._cached_data = _nova_json_20260624.dumps(data).encode("utf-8")
+        except Exception:
+            pass
+
+        return None
+
+except Exception as _nova_web_source_opt_in_error_20260624:
+    print("[NOVA_WEB_SOURCE_OPT_IN_ONLY_20260624] skipped:", _nova_web_source_opt_in_error_20260624)
+# /NOVA_WEB_SOURCE_OPT_IN_ONLY_20260624
+
+
+
+# NOVA_API_CHAT_LAST_DOOR_MOJIBAKE_FILTER_20260624
+def _nova_last_door_clean_text_20260624(value):
+    import re
+
+    text = str(value or "")
+
+    pairs = {
+        "\u00c3\u0192\u00c2\u00a2\u00c3\u00a2\u00e2\u201a\u00ac\u0161\u00c2\u00ac\u00c3\u00a2\u00e2\u201a\u00ac\u017e\u00c2\u00a2": "\u2019",
+        "\u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u201e\u00a2": "\u2019",
+        "\u00c3\u00a2\u00e2\u201a\u00ac\u00c5\u201c": "\u201c",
+        "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u009d": "\u201d",
+        "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a6": "\u2026",
+        "\u00e2\u20ac\u2122": "\u2019",
+        "\u00e2\u20ac\u02dc": "\u2018",
+        "\u00e2\u20ac\u0153": "\u201c",
+        "\u00e2\u20ac\u009d": "\u201d",
+        "\u00e2\u20ac\u201c": "\u2013",
+        "\u00e2\u20ac\u201d": "\u2014",
+        "\u00e2\u20ac\u00a6": "\u2026",
+        "\u00e2s": "\u2019s",
+        "\u00c2 ": " ",
+        "\u00c2": "",
+    }
+
+    for bad, good in pairs.items():
+        text = text.replace(bad, good)
+
+    bad = "\u00e2"
+    text = re.sub(
+        bad + r"([^" + bad + r"\n]{1,240})" + bad,
+        r'"\1"',
+        text,
+    )
+
+    text = text.replace("\u00e2", "")
+    text = text.replace("\u00c3", "")
+    text = text.replace("\u00c2", "")
+
+    return text
+
+
+def _nova_last_door_deep_clean_20260624(value):
+    if isinstance(value, str):
+        return _nova_last_door_clean_text_20260624(value)
+
+    if isinstance(value, list):
+        return [_nova_last_door_deep_clean_20260624(item) for item in value]
+
+    if isinstance(value, tuple):
+        return tuple(_nova_last_door_deep_clean_20260624(item) for item in value)
+
+    if isinstance(value, dict):
+        return {
+            key: _nova_last_door_deep_clean_20260624(item)
+            for key, item in value.items()
+        }
+
+    return value
+
+
+@app.after_request
+def _nova_api_chat_last_door_mojibake_filter_20260624(response):
+    try:
+        response.headers["X-Nova-Mojibake-Filter"] = "loaded"
+
+        if request.path != "/api/chat":
+            return response
+
+        if not response.is_json:
+            response.headers["X-Nova-Mojibake-Filter"] = "skipped-not-json"
+            return response
+
+        import json as _nova_json
+
+        data = response.get_json(silent=True)
+        if data is None:
+            response.headers["X-Nova-Mojibake-Filter"] = "skipped-no-json-data"
+            return response
+
+        cleaned = _nova_last_door_deep_clean_20260624(data)
+
+        response.set_data(
+            _nova_json.dumps(cleaned, ensure_ascii=False).encode("utf-8")
+        )
+
+        # NOVA_LAST_DOOR_RAW_BODY_MOJIBAKE_CLEAN_20260624
+        raw_body = response.get_data(as_text=True) or ""
+        raw_body = _nova_last_door_clean_text_20260624(raw_body)
+        response.set_data(raw_body.encode("utf-8"))
+
+        response.mimetype = "application/json"
+        response.headers["X-Nova-Mojibake-Filter"] = "raw-cleaned"
+    except Exception as exc:
+        response.headers["X-Nova-Mojibake-Filter"] = "error"
+        response.headers["X-Nova-Mojibake-Error"] = str(exc)[:160]
+
+    return response
+
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
@@ -15764,23 +16099,3 @@ if __name__ == "__main__":
 
 
 # NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

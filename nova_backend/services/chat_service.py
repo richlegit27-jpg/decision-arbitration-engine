@@ -22681,4 +22681,3 @@ try:
 
 except Exception as _nova_nonweb_guard_error_20260622:
     print("[Nova] non-web source leak guard skipped:", _nova_nonweb_guard_error_20260622)
-
