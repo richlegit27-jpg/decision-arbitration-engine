@@ -12343,14 +12343,43 @@ main {
 
 
 
-/* NOVA_MOBILE_SINGLE_GEOMETRY_OWNER_CSS_20260624 */
+
+
+
+/* NOVA_MOBILE_NATURAL_GRID_SCROLL_OWNER_20260624 */
+/* One clean layout: header / scrollable messages / composer. No fixed chat box. */
+html,
+body {
+    height: 100% !important;
+    overflow: hidden !important;
+}
+
+.mobile-shell {
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    max-height: 100dvh !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    overflow: hidden !important;
+}
+
+.mobile-header {
+    position: relative !important;
+    top: auto !important;
+    grid-row: 1 !important;
+    flex: 0 0 auto !important;
+    z-index: 60 !important;
+}
+
 #mobileChatMessages,
 .mobile-chat-container {
-    position: fixed !important;
-    top: 72px !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 150px !important;
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    grid-row: 2 !important;
+    align-self: stretch !important;
     width: 100% !important;
     height: auto !important;
     min-height: 0 !important;
@@ -12366,16 +12395,34 @@ main {
 #nova-mobile-composer,
 .mobile-composer,
 .nova-mobile-composer {
-    position: fixed !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
+    position: relative !important;
     top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    grid-row: 3 !important;
     width: 100% !important;
     max-width: 100% !important;
-    min-height: 118px !important;
-    max-height: 142px !important;
+    min-height: 0 !important;
+    max-height: 116px !important;
     height: auto !important;
     box-sizing: border-box !important;
-    z-index: 90 !important;
+    overflow: hidden !important;
+    z-index: 70 !important;
+}
+
+#nova-mobile-input {
+    min-height: 42px !important;
+    max-height: 54px !important;
+}
+
+#mobileChatMessages > *,
+.mobile-chat-container > * {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    box-sizing: border-box !important;
 }
