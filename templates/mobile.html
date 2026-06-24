@@ -4,67 +4,112 @@
 
 <!-- NOVA_MOBILE_CONSOLE_SPAM_STOP_EARLY_QUIET_20260624 -->
 
-
 <script>
-/* NOVA_MOBILE_COMPACT_FIXED_GEOMETRY_OWNER_20260624 */
+/* NOVA_MOBILE_LATE_OVERLAP_CLAMP_20260624 */
 (function () {
     "use strict";
 
-    function setImp(el, prop, value) {
+    var scheduled = false;
+
+    function important(el, prop, value) {
         if (!el) return;
+        if (el.style.getPropertyValue(prop) === value) return;
         el.style.setProperty(prop, value, "important");
     }
 
-    function applyCompactGeometry() {
-        var chat = document.getElementById("mobileChatMessages");
-        var comp = document.getElementById("nova-mobile-composer");
-        var input = document.getElementById("nova-mobile-input");
+    function clampIfNeeded(reason) {
+        scheduled = false;
 
-        if (!chat || !comp) return;
+        try {
+            var chat = document.getElementById("mobileChatMessages");
+            var composer = document.getElementById("nova-mobile-composer");
 
-        setImp(comp, "position", "fixed");
-        setImp(comp, "left", "0px");
-        setImp(comp, "right", "0px");
-        setImp(comp, "bottom", "0px");
-        setImp(comp, "top", "auto");
-        setImp(comp, "max-height", "106px");
-        setImp(comp, "overflow", "hidden");
+            if (!chat || !composer) return;
 
-        setImp(chat, "position", "fixed");
-        setImp(chat, "top", "118px");
-        setImp(chat, "left", "0px");
-        setImp(chat, "right", "0px");
-        setImp(chat, "bottom", "112px");
-        setImp(chat, "height", "auto");
-        setImp(chat, "overflow-y", "auto");
-        setImp(chat, "overflow-x", "hidden");
-        setImp(chat, "padding-bottom", "28px");
+            var cr = chat.getBoundingClientRect();
+            var pr = composer.getBoundingClientRect();
 
-        if (input) {
-            setImp(input, "min-height", "38px");
-            setImp(input, "max-height", "46px");
-        }
+            var overlaps = cr.bottom > pr.top;
+            var wrongTop = Math.round(cr.top) !== 72;
+            var tooLow = Math.round(cr.bottom) > Math.round(pr.top - 8);
+
+            if (!overlaps && !wrongTop && !tooLow) return;
+
+            var composerHeight = Math.ceil(pr.height || 132);
+            var bottomSpace = Math.max(142, Math.min(158, composerHeight + 10));
+
+            important(composer, "position", "fixed");
+            important(composer, "left", "0px");
+            important(composer, "right", "0px");
+            important(composer, "bottom", "0px");
+            important(composer, "top", "auto");
+            important(composer, "width", "100%");
+            important(composer, "max-width", "100%");
+            important(composer, "z-index", "90");
+
+            important(chat, "position", "fixed");
+            important(chat, "top", "72px");
+            important(chat, "left", "0px");
+            important(chat, "right", "0px");
+            important(chat, "bottom", bottomSpace + "px");
+            important(chat, "height", "auto");
+            important(chat, "max-height", "none");
+            important(chat, "overflow-y", "auto");
+            important(chat, "overflow-x", "hidden");
+            important(chat, "box-sizing", "border-box");
+            important(chat, "padding-bottom", "34px");
+            important(chat, "z-index", "10");
+        } catch (_) {}
     }
 
-    window.NovaMobileLockComposerGeometry = applyCompactGeometry;
+    function schedule(reason) {
+        if (scheduled) return;
+        scheduled = true;
+
+        requestAnimationFrame(function () {
+            clampIfNeeded(reason || "scheduled");
+        });
+    }
+
+    window.NovaMobileLockComposerGeometry = function () {
+        schedule("manual");
+    };
 
     window.addEventListener("load", function () {
-        applyCompactGeometry();
-        setTimeout(applyCompactGeometry, 300);
-        setTimeout(applyCompactGeometry, 1200);
+        schedule("load");
+        setTimeout(schedule, 250);
+        setTimeout(schedule, 800);
+        setTimeout(schedule, 1800);
+        setTimeout(schedule, 3500);
     });
 
     window.addEventListener("pageshow", function () {
-        setTimeout(applyCompactGeometry, 100);
+        schedule("pageshow");
+        setTimeout(schedule, 300);
     });
 
-    window.addEventListener("resize", applyCompactGeometry);
-    window.addEventListener("orientationchange", applyCompactGeometry);
+    window.addEventListener("resize", function () {
+        schedule("resize");
+    });
 
-    setTimeout(applyCompactGeometry, 50);
-    setTimeout(applyCompactGeometry, 700);
+    window.addEventListener("orientationchange", function () {
+        schedule("orientation");
+    });
 
-    console.log("[Nova Mobile] compact fixed geometry owner active");
+    document.addEventListener("click", function () {
+        setTimeout(schedule, 80);
+    }, true);
+
+    document.addEventListener("input", function () {
+        setTimeout(schedule, 80);
+    }, true);
+
+    setTimeout(schedule, 50);
+    setTimeout(schedule, 300);
+    setTimeout(schedule, 1200);
+    setTimeout(schedule, 3000);
+
+    console.log("[Nova Mobile] late overlap clamp active");
 })();
 </script>
 
