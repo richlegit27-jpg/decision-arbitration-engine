@@ -15589,6 +15589,158 @@ def _nova_auth_scoped_chat_persistence_fix_20260623(response):
 # NOVA_AUTH_SCOPED_CHAT_PERSISTENCE_FIX_END_20260623
 
 
+
+# NOVA_MOBILE_LOGIN_ROUTES_20260624
+def _nova_install_mobile_login_routes_20260624():
+    from html import escape
+    from flask import request, redirect, make_response
+
+    def page(title, body):
+        html = f"""<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{escape(title)}</title>
+    <style>
+        body {{
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background: #080812;
+            color: #fff;
+            font-family: Arial, system-ui, sans-serif;
+        }}
+        .card {{
+            width: min(360px, calc(100vw - 32px));
+            padding: 20px;
+            border-radius: 22px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+        }}
+        h1 {{
+            margin: 0 0 14px;
+            font-size: 22px;
+        }}
+        label {{
+            display: block;
+            margin: 12px 0 6px;
+            font-size: 13px;
+            opacity: 0.9;
+        }}
+        input {{
+            width: 100%;
+            box-sizing: border-box;
+            height: 42px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: rgba(0, 0, 0, 0.24);
+            color: #fff;
+            padding: 0 12px;
+            font-size: 15px;
+        }}
+        button, a.btn {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 42px;
+            margin-top: 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            background: rgba(124, 58, 237, 0.55);
+            color: #fff;
+            font-weight: 800;
+            text-decoration: none;
+            cursor: pointer;
+        }}
+        a.small {{
+            display: block;
+            margin-top: 14px;
+            color: #c4b5fd;
+            text-align: center;
+            text-decoration: none;
+            font-size: 13px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        {body}
+    </div>
+</body>
+</html>"""
+        return html
+
+    existing_rules = {rule.rule for rule in app.url_map.iter_rules()}
+
+    if "/login" not in existing_rules:
+        @app.route("/login", methods=["GET", "POST"])
+        def nova_mobile_login_20260624():
+            if request.method == "POST":
+                name = (request.form.get("name") or "Owner").strip()[:80]
+                resp = make_response(redirect("/mobile?fresh=logged-in-20260624"))
+                resp.set_cookie("nova_mobile_user", name, max_age=60 * 60 * 24 * 365, samesite="Lax")
+                return resp
+
+            return page("Nova Login", """
+                <h1>Login</h1>
+                <form method="post" action="/login">
+                    <label>Name</label>
+                    <input name="name" placeholder="Owner" autocomplete="name">
+                    <button type="submit">Login</button>
+                </form>
+                <a class="small" href="/mobile">Back to Nova</a>
+            """)
+
+    if "/account" not in existing_rules:
+        @app.route("/account", methods=["GET"])
+        def nova_mobile_account_20260624():
+            name = (request.cookies.get("nova_mobile_user") or "Not logged in").strip()
+            safe_name = escape(name)
+
+            return page("Nova Account", f"""
+                <h1>Account</h1>
+                <p>Current user: <b>{safe_name}</b></p>
+                <a class="btn" href="/mobile">Back to Nova</a>
+                <a class="small" href="/logout">Logout</a>
+            """)
+
+    if "/logout" not in existing_rules:
+        @app.route("/logout", methods=["GET", "POST"])
+        def nova_mobile_logout_20260624():
+            resp = make_response(redirect("/mobile?fresh=logged-out-20260624"))
+            resp.delete_cookie("nova_mobile_user")
+            return resp
+
+_nova_install_mobile_login_routes_20260624()
+# /NOVA_MOBILE_LOGIN_ROUTES_20260624
+
+
+
+# NOVA_MOBILE_LOGIN_STATUS_API_20260624
+def _nova_install_mobile_login_status_api_20260624():
+    from flask import request, jsonify
+
+    existing_rules = {rule.rule for rule in app.url_map.iter_rules()}
+
+    if "/api/mobile/account" not in existing_rules:
+        @app.route("/api/mobile/account", methods=["GET"])
+        def nova_mobile_account_status_20260624():
+            name = (request.cookies.get("nova_mobile_user") or "").strip()
+
+            return jsonify({
+                "ok": True,
+                "logged_in": bool(name),
+                "name": name
+            })
+
+_nova_install_mobile_login_status_api_20260624()
+# /NOVA_MOBILE_LOGIN_STATUS_API_20260624
+
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
