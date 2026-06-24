@@ -158,13 +158,15 @@ function renderWebCardSources(targetBubble, data) {
 }
 
 // Patch done: now window.renderWebSourcesFromPayload can call renderWebCardSources
-window.renderWebSourcesFromPayload = function(payload){
+// NOVA_MOBILE_DISABLE_LEGACY_INLINE_SOURCE_RENDERER_20260624
+// The old lightweight source renderer made cards look like ugly bubble inserts.
+// Leave rendering to the main mobile web-card system below.
+window.renderWebSourcesFromPayload = function(payload, targetBubble){
     try {
-        renderWebCardSources(document.getElementById("mobileChatMessages"), payload);
-    } catch(e){
-        console.error("[Nova Mobile Sources] render failed", e);
-    }
+        console.log("[Nova Mobile Sources] legacy inline source renderer disabled");
+    } catch (_) {}
 };
+
 
 function collectWebCardSources(data) {
     const out = [];
