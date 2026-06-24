@@ -15592,7 +15592,7 @@ def _nova_auth_scoped_chat_persistence_fix_20260623(response):
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
-        host="127.0.0.1",
+        host="0.0.0.0",
         port=5001,
         debug=True,
     )
