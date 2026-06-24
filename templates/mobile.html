@@ -7005,12 +7005,13 @@ header {
 
 
 
-<!-- NOVA_MOBILE_FINAL_BOTTOM_BUBBLE_SAFE_AREA_V2_20260624 -->
+
+<!-- NOVA_MOBILE_FINAL_BOTTOM_BUBBLE_SAFE_AREA_V3_20260624 -->
 <style>
 @media (max-width: 900px) {
     :root {
-        --nova-mobile-chat-top-final: 132px;
-        --nova-mobile-chat-bottom-final: 118px;
+        --nova-mobile-chat-top-v3: 92px;
+        --nova-mobile-chat-bottom-v3: 116px;
     }
 
     html,
@@ -7025,17 +7026,22 @@ header {
         position: fixed !important;
         left: 0 !important;
         right: 0 !important;
-        top: var(--nova-mobile-chat-top-final) !important;
-        bottom: var(--nova-mobile-chat-bottom-final) !important;
+        top: var(--nova-mobile-chat-top-v3) !important;
+        bottom: var(--nova-mobile-chat-bottom-v3) !important;
         height: auto !important;
         max-height: none !important;
         min-height: 0 !important;
         overflow-y: auto !important;
         overflow-x: hidden !important;
         -webkit-overflow-scrolling: touch !important;
-        padding-bottom: 22px !important;
-        scroll-padding-bottom: 34px !important;
+        padding-bottom: 28px !important;
+        scroll-padding-bottom: 42px !important;
         box-sizing: border-box !important;
+    }
+
+    #mobileChatMessages > *:last-child,
+    .mobile-chat-container > *:last-child {
+        margin-bottom: 24px !important;
     }
 
     #nova-mobile-composer,
@@ -7048,17 +7054,12 @@ header {
         z-index: 2147483000 !important;
         box-sizing: border-box !important;
     }
-
-    #mobileChatMessages > *:last-child,
-    .mobile-chat-container > *:last-child {
-        margin-bottom: 18px !important;
-    }
 }
 </style>
 
 <script>
 (() => {
-    const TAG = "[NOVA_MOBILE_FINAL_BOTTOM_BUBBLE_SAFE_AREA_V2_20260624]";
+    const TAG = "[NOVA_MOBILE_FINAL_BOTTOM_BUBBLE_SAFE_AREA_V3_20260624]";
     let lastLog = 0;
 
     function composerEl() {
@@ -7072,33 +7073,12 @@ header {
             document.querySelector(".mobile-chat-container");
     }
 
-    function visibleTopLimit() {
-        const shell = document.querySelector(".mobile-shell") || document.querySelector("main") || document.body;
-        const shellTop = shell.getBoundingClientRect().top || 0;
+    function calcTop() {
+        const vh = window.innerHeight || document.documentElement.clientHeight || 700;
 
-        const topButtons = Array.from(document.querySelectorAll(
-            "#nova-mobile-sessions-toggle, #nova-mobile-memory-toggle, .mobile-header-btn, header, .mobile-header, .nova-mobile-header"
-        ));
-
-        let bottom = 0;
-
-        for (const el of topButtons) {
-            const cs = getComputedStyle(el);
-            const r = el.getBoundingClientRect();
-
-            if (
-                cs.display !== "none" &&
-                cs.visibility !== "hidden" &&
-                Number(cs.opacity || 1) > 0 &&
-                r.height > 10 &&
-                r.bottom > bottom &&
-                r.bottom < window.innerHeight * 0.45
-            ) {
-                bottom = r.bottom;
-            }
-        }
-
-        return Math.max(118, Math.min(138, Math.round((bottom || 118) + 8 - shellTop)));
+        if (vh <= 430) return 86;
+        if (vh <= 560) return 96;
+        return 112;
     }
 
     function applyGeometry(reason = "apply") {
@@ -7107,13 +7087,25 @@ header {
 
         if (!composer || !chat) return false;
 
+        const vh = window.innerHeight || document.documentElement.clientHeight || 700;
         const cr = composer.getBoundingClientRect();
-        const composerHeight = Math.max(92, Math.min(138, Math.round(cr.height || 108)));
-        const bottomGap = Math.max(104, Math.min(150, composerHeight + 8));
-        const top = visibleTopLimit();
 
-        document.documentElement.style.setProperty("--nova-mobile-chat-top-final", `${top}px`);
-        document.documentElement.style.setProperty("--nova-mobile-chat-bottom-final", `${bottomGap}px`);
+        const top = calcTop();
+
+        /*
+           Use composer TOP, not composer HEIGHT.
+           This makes the chat end just above the bar instead of double-counting the bar.
+        */
+        let bottomGap = Math.round(vh - cr.top + 8);
+
+        if (!Number.isFinite(bottomGap) || bottomGap <= 0) {
+            bottomGap = 116;
+        }
+
+        bottomGap = Math.max(92, Math.min(154, bottomGap));
+
+        document.documentElement.style.setProperty("--nova-mobile-chat-top-v3", `${top}px`);
+        document.documentElement.style.setProperty("--nova-mobile-chat-bottom-v3", `${bottomGap}px`);
 
         chat.style.setProperty("position", "fixed", "important");
         chat.style.setProperty("left", "0", "important");
@@ -7126,8 +7118,8 @@ header {
         chat.style.setProperty("overflow-y", "auto", "important");
         chat.style.setProperty("overflow-x", "hidden", "important");
         chat.style.setProperty("-webkit-overflow-scrolling", "touch", "important");
-        chat.style.setProperty("padding-bottom", "22px", "important");
-        chat.style.setProperty("scroll-padding-bottom", "34px", "important");
+        chat.style.setProperty("padding-bottom", "28px", "important");
+        chat.style.setProperty("scroll-padding-bottom", "42px", "important");
         chat.style.setProperty("box-sizing", "border-box", "important");
 
         composer.style.setProperty("position", "fixed", "important");
@@ -7138,16 +7130,18 @@ header {
 
         const now = Date.now();
 
-        if (now - lastLog > 1800) {
+        if (now - lastLog > 1500) {
             lastLog = now;
             const rr = chat.getBoundingClientRect();
+
             console.log(TAG, reason, {
                 chatTop: Math.round(rr.top),
                 chatBottom: Math.round(rr.bottom),
                 chatHeight: Math.round(rr.height),
-                composerHeight,
+                composerTop: Math.round(cr.top),
+                composerHeight: Math.round(cr.height),
                 bottomGap,
-                viewport: window.innerHeight
+                viewport: vh
             });
         }
 
@@ -7179,13 +7173,13 @@ header {
         }, {passive: true});
 
         input.addEventListener("focus", () => {
-            setTimeout(() => scrollBottom("focus"), 160);
-            setTimeout(() => scrollBottom("focus-late"), 500);
+            setTimeout(() => scrollBottom("focus"), 140);
+            setTimeout(() => scrollBottom("focus-late"), 450);
         }, {passive: true});
     }
 
     document.addEventListener("click", () => {
-        setTimeout(() => scrollBottom("click"), 180);
+        setTimeout(() => scrollBottom("click"), 160);
     }, true);
 
     window.addEventListener("resize", () => {
