@@ -7200,7 +7200,87 @@ header {
 
 
 
-<!-- NOVA_MOBILE_ONE_ROW_NEW_SESSIONS_COPY_REGEN_20260624 -->
+<!-- NOVA_MOBILE_HIDE_TOP_BRAND_SIGN_20260624 -->
+<style>
+@media (max-width: 900px) {
+    .nova-mobile-top-brand-sign-hidden {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+}
+</style>
+
+<script>
+(() => {
+    const TAG = "[NOVA_MOBILE_HIDE_TOP_BRAND_SIGN_20260624]";
+
+    function clean(value) {
+        return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
+    }
+
+    function hideTopBrandSign(reason = "apply") {
+        let hidden = 0;
+
+        const candidates = Array.from(document.querySelectorAll(
+            "h1, h2, h3, header, div, span, .brand, .logo, .mobile-title, .app-title, #mobileTitle, #nova-mobile-title"
+        ));
+
+        candidates.forEach((el) => {
+            if (!el || el.closest("#nova-mobile-primary-action-row")) return;
+
+            const text = clean(el.innerText || el.textContent);
+            if (text !== "nova mobile") return;
+
+            const r = el.getBoundingClientRect();
+            const vh = window.innerHeight || document.documentElement.clientHeight || 700;
+
+            if (r.top > vh * 0.25) return;
+
+            let target = el;
+
+            for (let i = 0; i < 3; i += 1) {
+                const parent = target.parentElement;
+                if (!parent || parent === document.body) break;
+
+                const parentText = clean(parent.innerText || parent.textContent);
+                const pr = parent.getBoundingClientRect();
+
+                if (parentText === "nova mobile" && pr.height <= 90) {
+                    target = parent;
+                    continue;
+                }
+
+                break;
+            }
+
+            target.classList.add("nova-mobile-top-brand-sign-hidden");
+            target.setAttribute("aria-hidden", "true");
+            target.style.setProperty("display", "none", "important");
+            target.style.setProperty("visibility", "hidden", "important");
+            target.style.setProperty("opacity", "0", "important");
+            target.style.setProperty("pointer-events", "none", "important");
+
+            hidden += 1;
+        });
+
+        console.log(TAG, reason, { hidden });
+        return hidden;
+    }
+
+    window.NovaMobileHideTopBrandSign = () => hideTopBrandSign("manual");
+
+    hideTopBrandSign("boot");
+    setTimeout(() => hideTopBrandSign("boot-150"), 150);
+    setTimeout(() => hideTopBrandSign("boot-700"), 700);
+
+    console.log(TAG, "ready");
+})();
+</script>
+
+
+<!-- NOVA_MOBILE_ONE_ROW_NEW_SESSIONS_COPY_REGEN_V2_20260624 -->
 <style>
 @media (max-width: 900px) {
     #nova-mobile-primary-action-row {
@@ -7211,8 +7291,8 @@ header {
         height: 36px !important;
         z-index: 2147483004 !important;
         display: grid !important;
-        grid-template-columns: 0.9fr 1.2fr 0.9fr 0.9fr !important;
-        gap: 6px !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        gap: 5px !important;
         box-sizing: border-box !important;
         pointer-events: auto !important;
     }
@@ -7223,15 +7303,17 @@ header {
         justify-content: center !important;
         width: 100% !important;
         height: 34px !important;
+        min-width: 0 !important;
         min-height: 34px !important;
-        padding: 0 6px !important;
+        padding: 0 4px !important;
         border-radius: 999px !important;
-        border: 1px solid rgba(168, 85, 247, 0.42) !important;
-        background: rgba(168, 85, 247, 0.20) !important;
+        border: 1px solid rgba(168, 85, 247, 0.45) !important;
+        background: rgba(168, 85, 247, 0.22) !important;
         color: #f8f5ff !important;
-        font-size: 12px !important;
+        font-size: 11.5px !important;
         font-weight: 850 !important;
         line-height: 1 !important;
+        text-align: center !important;
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
@@ -7257,6 +7339,37 @@ header {
     .mobile-chat-container {
         top: 92px !important;
     }
+
+    #mobileMenuPanel,
+    #nova-mobile-menu,
+    #novaMobileMenu,
+    .mobile-menu,
+    .nova-mobile-menu {
+        max-width: calc(100vw - 20px) !important;
+        box-sizing: border-box !important;
+    }
+
+    #mobileMenuPanel button,
+    #mobileMenuPanel a,
+    #nova-mobile-menu button,
+    #nova-mobile-menu a,
+    #novaMobileMenu button,
+    #novaMobileMenu a,
+    .mobile-menu button,
+    .mobile-menu a,
+    .nova-mobile-menu button,
+    .nova-mobile-menu a {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-height: 38px !important;
+        height: auto !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        line-height: 1.15 !important;
+        text-align: center !important;
+        box-sizing: border-box !important;
+    }
 }
 
 @media (max-width: 390px) {
@@ -7267,39 +7380,56 @@ header {
     }
 
     #nova-mobile-primary-action-row button {
-        font-size: 11px !important;
-        padding: 0 4px !important;
+        font-size: 10.8px !important;
+        padding: 0 3px !important;
     }
 }
 </style>
 
 <script>
 (() => {
-    const TAG = "[NOVA_MOBILE_ONE_ROW_NEW_SESSIONS_COPY_REGEN_20260624]";
+    const TAG = "[NOVA_MOBILE_ONE_ROW_NEW_SESSIONS_COPY_REGEN_V2_20260624]";
     const ACTIONS = new Set(["copy", "regen", "account"]);
 
     let lastLog = "";
+    let scheduled = false;
 
     function clean(value) {
         return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
     }
 
-    function visible(el) {
-        if (!el) return false;
+    function visibleBox(el) {
+        if (!el) return null;
 
         const cs = getComputedStyle(el);
         const r = el.getBoundingClientRect();
 
-        return cs.display !== "none" &&
-            cs.visibility !== "hidden" &&
-            Number(cs.opacity || 1) > 0 &&
-            r.width > 4 &&
-            r.height > 4;
+        if (
+            cs.display === "none" ||
+            cs.visibility === "hidden" ||
+            Number(cs.opacity || 1) === 0 ||
+            r.width < 4 ||
+            r.height < 4
+        ) {
+            return null;
+        }
+
+        return r;
+    }
+
+    function visible(el) {
+        return !!visibleBox(el);
     }
 
     function insideMessage(el) {
         return !!el.closest(
-            ".message, .assistant, .assistant-message, .user-message, [data-role='assistant'], [data-role='user'], .message-content"
+            ".message, .assistant, .assistant-message, .user-message, [data-role='assistant'], [data-role='user'], .message-content, #mobileChatMessages .bubble, #mobileChatMessages .message"
+        );
+    }
+
+    function insideMenu(el) {
+        return !!el.closest(
+            "#mobileMenuPanel, #nova-mobile-menu, #novaMobileMenu, .mobile-menu, .nova-mobile-menu, [data-panel='menu'], [data-menu]"
         );
     }
 
@@ -7476,8 +7606,8 @@ header {
         const copyBtn = document.getElementById("nova-mobile-row-copy");
         const regenBtn = document.getElementById("nova-mobile-row-regen");
 
-        if (newBtn && !newBtn.dataset.novaBoundOneRow) {
-            newBtn.dataset.novaBoundOneRow = "1";
+        if (newBtn && !newBtn.dataset.novaBoundOneRowV2) {
+            newBtn.dataset.novaBoundOneRowV2 = "1";
             newBtn.addEventListener("click", (event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -7485,8 +7615,8 @@ header {
             }, true);
         }
 
-        if (sessionsBtn && !sessionsBtn.dataset.novaBoundOneRow) {
-            sessionsBtn.dataset.novaBoundOneRow = "1";
+        if (sessionsBtn && !sessionsBtn.dataset.novaBoundOneRowV2) {
+            sessionsBtn.dataset.novaBoundOneRowV2 = "1";
             sessionsBtn.addEventListener("click", (event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -7494,8 +7624,8 @@ header {
             }, true);
         }
 
-        if (copyBtn && !copyBtn.dataset.novaBoundOneRow) {
-            copyBtn.dataset.novaBoundOneRow = "1";
+        if (copyBtn && !copyBtn.dataset.novaBoundOneRowV2) {
+            copyBtn.dataset.novaBoundOneRowV2 = "1";
             copyBtn.addEventListener("click", (event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -7503,8 +7633,8 @@ header {
             }, true);
         }
 
-        if (regenBtn && !regenBtn.dataset.novaBoundOneRow) {
-            regenBtn.dataset.novaBoundOneRow = "1";
+        if (regenBtn && !regenBtn.dataset.novaBoundOneRowV2) {
+            regenBtn.dataset.novaBoundOneRowV2 = "1";
             regenBtn.addEventListener("click", (event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -7513,9 +7643,58 @@ header {
         }
     }
 
+    function isAccount(el) {
+        const raw = clean([
+            el.id || "",
+            el.className || "",
+            el.getAttribute("aria-label") || "",
+            el.getAttribute("title") || "",
+            el.textContent || ""
+        ].join(" "));
+
+        const text = clean(el.textContent);
+
+        return text === "account" ||
+            raw === "account" ||
+            raw.includes(" account ") ||
+            raw.includes("account button") ||
+            raw.includes("mobile account");
+    }
+
+    function showIfMenuAccount(el) {
+        if (!isAccount(el) || !insideMenu(el)) return false;
+
+        el.classList.remove(
+            "nova-mobile-one-row-hidden-control",
+            "nova-mobile-final-hidden-control",
+            "nova-mobile-account-hidden",
+            "nova-mobile-account-outside-menu-hidden"
+        );
+
+        el.removeAttribute("aria-hidden");
+        el.removeAttribute("tabindex");
+        el.style.removeProperty("display");
+        el.style.removeProperty("visibility");
+        el.style.removeProperty("opacity");
+        el.style.removeProperty("pointer-events");
+
+        return true;
+    }
+
+    function hideControl(el) {
+        el.classList.add("nova-mobile-one-row-hidden-control");
+        el.setAttribute("aria-hidden", "true");
+        el.setAttribute("tabindex", "-1");
+        el.style.setProperty("display", "none", "important");
+        el.style.setProperty("visibility", "hidden", "important");
+        el.style.setProperty("opacity", "0", "important");
+        el.style.setProperty("pointer-events", "none", "important");
+    }
+
     function shouldHideOldButton(el) {
         if (el.closest("#nova-mobile-primary-action-row")) return false;
         if (insideMessage(el)) return false;
+        if (insideMenu(el)) return false;
 
         const text = buttonText(el);
         const id = clean(el.id);
@@ -7555,36 +7734,110 @@ header {
         return false;
     }
 
-    function hideOldControls() {
+    function isBottomArea(el) {
+        const r = visibleBox(el);
+        if (!r) return false;
+
+        const vh = window.innerHeight || document.documentElement.clientHeight || 700;
+
+        return r.top > vh * 0.42 || r.bottom > vh - 130;
+    }
+
+    function actionLabelOf(el) {
+        const text = buttonText(el);
+        if (text === "copy" || text === "regen") return text;
+        return "";
+    }
+
+    function actionWordCount(text) {
+        const words = clean(text).split(" ").filter(Boolean);
+        return words.filter(w => w === "copy" || w === "regen" || w === "account").length;
+    }
+
+    function findBottomStripRoot(el) {
+        let node = el;
+
+        for (let depth = 0; node && node !== document.body && depth < 7; depth += 1) {
+            const parent = node.parentElement;
+            if (!parent || parent === document.body) break;
+            if (insideMessage(parent) || insideMenu(parent)) break;
+
+            const pt = clean(parent.innerText || parent.textContent);
+            const pr = visibleBox(parent);
+
+            if (
+                pr &&
+                isBottomArea(parent) &&
+                pt.length <= 100 &&
+                actionWordCount(pt) >= 1
+            ) {
+                node = parent;
+                continue;
+            }
+
+            break;
+        }
+
+        return node || el;
+    }
+
+    function hideBottomCopyRegenStrip() {
+        const candidates = Array.from(document.querySelectorAll("button, a, [role='button'], div, span"))
+            .filter(el => actionLabelOf(el))
+            .filter(el => !insideMessage(el))
+            .filter(el => !insideMenu(el))
+            .filter(isBottomArea);
+
+        const roots = new Set();
+
+        for (const el of candidates) {
+            roots.add(findBottomStripRoot(el));
+        }
+
         let hidden = 0;
 
-        allButtons().forEach((el) => {
-            if (!shouldHideOldButton(el)) return;
-
-            el.classList.add("nova-mobile-one-row-hidden-control");
-            el.setAttribute("aria-hidden", "true");
-            el.setAttribute("tabindex", "-1");
-            el.style.setProperty("display", "none", "important");
-            el.style.setProperty("visibility", "hidden", "important");
-            el.style.setProperty("opacity", "0", "important");
-            el.style.setProperty("pointer-events", "none", "important");
-
+        for (const root of roots) {
+            if (!root || root === document.body || root === document.documentElement) continue;
+            hideControl(root);
             hidden += 1;
-        });
+        }
 
         return hidden;
     }
 
+    function hideOldControls() {
+        let hidden = 0;
+        let menuAccounts = 0;
+
+        allButtons().forEach((el) => {
+            if (showIfMenuAccount(el)) {
+                menuAccounts += 1;
+                return;
+            }
+
+            if (!shouldHideOldButton(el)) return;
+
+            hideControl(el);
+            hidden += 1;
+        });
+
+        hidden += hideBottomCopyRegenStrip();
+
+        return { hidden, menuAccounts };
+    }
+
     function apply(reason = "apply") {
         bindRow();
-        const hidden = hideOldControls();
 
+        const counts = hideOldControls();
         const row = document.getElementById("nova-mobile-primary-action-row");
-        const r = row?.getBoundingClientRect?.();
+        const buttons = row ? Array.from(row.querySelectorAll("button")) : [];
+        const widths = buttons.map(btn => Math.round(btn.getBoundingClientRect().width));
 
         const msg = JSON.stringify({
-            hidden,
-            width: r ? Math.round(r.width) : 0
+            hidden: counts.hidden,
+            menuAccounts: counts.menuAccounts,
+            widths
         });
 
         if (msg !== lastLog) {
@@ -7592,100 +7845,37 @@ header {
             console.log(TAG, reason, JSON.parse(msg));
         }
 
-        return true;
+        return JSON.parse(msg);
     }
 
-    window.NovaMobileOneRowNewSessionsCopyRegen = () => apply("manual");
+    function schedule(reason = "mutation") {
+        if (scheduled) return;
+        scheduled = true;
+
+        requestAnimationFrame(() => {
+            scheduled = false;
+            apply(reason);
+        });
+    }
+
+    window.NovaMobileOneRowNewSessionsCopyRegenV2 = () => apply("manual");
 
     apply("boot");
-    setTimeout(() => apply("boot-150"), 150);
-    setTimeout(() => apply("boot-700"), 700);
-    setTimeout(() => apply("boot-1600"), 1600);
+
+    [80, 180, 400, 800, 1400, 2500, 4000].forEach(ms => {
+        setTimeout(() => apply(`boot-${ms}`), ms);
+    });
+
+    new MutationObserver(() => {
+        schedule("mutation");
+    }).observe(document.body, {
+        childList: true,
+        subtree: true
+    });
 
     document.addEventListener("click", () => {
-        setTimeout(() => apply("click"), 100);
+        setTimeout(() => apply("click"), 80);
     }, true);
-
-    console.log(TAG, "ready");
-})();
-</script>
-
-
-
-<!-- NOVA_MOBILE_HIDE_TOP_BRAND_SIGN_20260624 -->
-<style>
-@media (max-width: 900px) {
-    .nova-mobile-top-brand-sign-hidden {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-    }
-}
-</style>
-
-<script>
-(() => {
-    const TAG = "[NOVA_MOBILE_HIDE_TOP_BRAND_SIGN_20260624]";
-
-    function clean(value) {
-        return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
-    }
-
-    function hideTopBrandSign(reason = "apply") {
-        let hidden = 0;
-
-        const candidates = Array.from(document.querySelectorAll(
-            "h1, h2, h3, header, div, span, .brand, .logo, .mobile-title, .app-title, #mobileTitle, #nova-mobile-title"
-        ));
-
-        candidates.forEach((el) => {
-            if (!el || el.closest("#nova-mobile-primary-action-row")) return;
-
-            const text = clean(el.innerText || el.textContent);
-            if (text !== "nova mobile") return;
-
-            const r = el.getBoundingClientRect();
-            const vh = window.innerHeight || document.documentElement.clientHeight || 700;
-
-            if (r.top > vh * 0.25) return;
-
-            let target = el;
-
-            for (let i = 0; i < 3; i += 1) {
-                const parent = target.parentElement;
-                if (!parent || parent === document.body) break;
-
-                const parentText = clean(parent.innerText || parent.textContent);
-                const pr = parent.getBoundingClientRect();
-
-                if (parentText === "nova mobile" && pr.height <= 90) {
-                    target = parent;
-                    continue;
-                }
-
-                break;
-            }
-
-            target.classList.add("nova-mobile-top-brand-sign-hidden");
-            target.setAttribute("aria-hidden", "true");
-            target.style.setProperty("display", "none", "important");
-            target.style.setProperty("visibility", "hidden", "important");
-            target.style.setProperty("opacity", "0", "important");
-            target.style.setProperty("pointer-events", "none", "important");
-
-            hidden += 1;
-        });
-
-        console.log(TAG, reason, { hidden });
-        return hidden;
-    }
-
-    window.NovaMobileHideTopBrandSign = () => hideTopBrandSign("manual");
-
-    hideTopBrandSign("boot");
-    setTimeout(() => hideTopBrandSign("boot-150"), 150);
-    setTimeout(() => hideTopBrandSign("boot-700"), 700);
 
     console.log(TAG, "ready");
 })();
