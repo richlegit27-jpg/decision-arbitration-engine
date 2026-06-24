@@ -6937,6 +6937,57 @@ header {
 })();
 </script>
 
+
+<!-- NOVA_MOBILE_HIDE_DUPLICATE_MEMORY_BUTTON_20260624 -->
+<style>
+#mobileMemoryButton {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+</style>
+
+<script>
+(() => {
+    const TAG = "[NOVA_MOBILE_HIDE_DUPLICATE_MEMORY_BUTTON_20260624]";
+
+    function hideDuplicate() {
+        const oldBtn = document.getElementById("mobileMemoryButton");
+        const realMemory = document.getElementById("nova-mobile-memory-toggle");
+
+        if (!oldBtn || !realMemory) return false;
+
+        oldBtn.style.setProperty("display", "none", "important");
+        oldBtn.style.setProperty("visibility", "hidden", "important");
+        oldBtn.style.setProperty("pointer-events", "none", "important");
+        oldBtn.setAttribute("aria-hidden", "true");
+        oldBtn.setAttribute("tabindex", "-1");
+
+        console.log(TAG, "hidden duplicate old button");
+        return true;
+    }
+
+    window.NovaMobileHideDuplicateMemoryButton = hideDuplicate;
+
+    let tries = 0;
+    const timer = setInterval(() => {
+        tries += 1;
+        hideDuplicate();
+
+        if (tries >= 20) {
+            clearInterval(timer);
+        }
+    }, 150);
+
+    document.addEventListener("click", () => {
+        setTimeout(hideDuplicate, 50);
+    }, true);
+
+    hideDuplicate();
+    console.log(TAG, "ready");
+})();
+</script>
+
 </body>
 </html>
 
