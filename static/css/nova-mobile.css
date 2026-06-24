@@ -12413,3 +12413,26 @@ main {
     margin-left: auto !important;
     margin-right: 10px !important;
 }
+
+
+/* NOVA_MOBILE_PAGE_SCROLL_BOTTOM_SPACE_20260624 */
+/* Keep newest mobile messages above the fixed composer. */
+html,
+body {
+    overflow-y: auto !important;
+    min-height: 100dvh !important;
+    scroll-behavior: smooth !important;
+}
+
+body::after {
+    content: "";
+    display: block;
+    height: 148px;
+}
+
+#mobileChatMessages,
+.mobile-chat-container,
+.mobile-messages,
+.nova-mobile-messages {
+    padding-bottom: 148px !important;
+}

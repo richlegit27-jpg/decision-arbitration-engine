@@ -70,7 +70,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nova Mobile</title>
 
-<link rel="stylesheet" href="/static/css/nova-mobile.css?v=message-flow-scroll-lock-20260624-001">
+<link rel="stylesheet" href="/static/css/nova-mobile.css?v=page-scroll-lock-20260624-001">
 <style>
     html,
     body,
@@ -6315,6 +6315,108 @@ header {
     setTimeout(scrollChatBottom, 1600);
 
     console.log("[Nova Mobile] message flow scroll lock active");
+})();
+</script>
+
+
+<script>
+/* NOVA_MOBILE_PAGE_SCROLL_BOTTOM_LOCK_20260624 */
+(function () {
+    "use strict";
+
+    function pageScrollBottom() {
+        try {
+            var height = Math.max(
+                document.body ? document.body.scrollHeight : 0,
+                document.documentElement ? document.documentElement.scrollHeight : 0
+            );
+
+            window.scrollTo(0, height);
+
+            if (document.documentElement) {
+                document.documentElement.scrollTop = height;
+            }
+
+            if (document.body) {
+                document.body.scrollTop = height;
+            }
+
+            requestAnimationFrame(function () {
+                var h2 = Math.max(
+                    document.body ? document.body.scrollHeight : 0,
+                    document.documentElement ? document.documentElement.scrollHeight : 0
+                );
+
+                window.scrollTo(0, h2);
+
+                if (document.documentElement) {
+                    document.documentElement.scrollTop = h2;
+                }
+
+                if (document.body) {
+                    document.body.scrollTop = h2;
+                }
+            });
+        } catch (_) {}
+    }
+
+    window.NovaMobileScrollBottomHard = pageScrollBottom;
+
+    function bootPageScrollLock() {
+        pageScrollBottom();
+
+        if (document.body && !document.body.__novaPageScrollBottomObserver) {
+            var observer = new MutationObserver(function () {
+                pageScrollBottom();
+                setTimeout(pageScrollBottom, 80);
+                setTimeout(pageScrollBottom, 250);
+            });
+
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+                characterData: true
+            });
+
+            document.body.__novaPageScrollBottomObserver = observer;
+        }
+
+        document.addEventListener("click", function (event) {
+            if (
+                event.target &&
+                (
+                    event.target.closest("#sendBtn") ||
+                    event.target.closest("[data-send]") ||
+                    event.target.closest(".send-button") ||
+                    event.target.closest(".mobile-send")
+                )
+            ) {
+                setTimeout(pageScrollBottom, 80);
+                setTimeout(pageScrollBottom, 300);
+                setTimeout(pageScrollBottom, 700);
+            }
+        }, true);
+
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Enter") {
+                setTimeout(pageScrollBottom, 80);
+                setTimeout(pageScrollBottom, 300);
+                setTimeout(pageScrollBottom, 700);
+            }
+        }, true);
+    }
+
+    document.addEventListener("DOMContentLoaded", bootPageScrollLock);
+    window.addEventListener("load", bootPageScrollLock);
+    window.addEventListener("resize", pageScrollBottom);
+    window.addEventListener("orientationchange", pageScrollBottom);
+
+    setTimeout(bootPageScrollLock, 50);
+    setTimeout(pageScrollBottom, 300);
+    setTimeout(pageScrollBottom, 900);
+    setTimeout(pageScrollBottom, 1800);
+
+    console.log("[Nova Mobile] page scroll bottom lock active");
 })();
 </script>
 
