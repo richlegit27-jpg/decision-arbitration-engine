@@ -6892,6 +6892,51 @@ header {
 })();
 </script>
 
+
+<!-- NOVA_MOBILE_MEMORY_BUTTON_LABEL_FINAL_20260624 -->
+<script>
+(() => {
+    const TAG = "[NOVA_MOBILE_MEMORY_BUTTON_LABEL_FINAL_20260624]";
+    let logged = false;
+
+    function fixMemoryButton() {
+        const btn = document.getElementById("mobileMemoryButton");
+        if (!btn) return false;
+
+        btn.textContent = "Memory";
+        btn.setAttribute("aria-label", "Memory");
+        btn.setAttribute("title", "Memory");
+        btn.dataset.novaRole = "memory";
+
+        if (!logged) {
+            console.log(TAG, "fixed", {
+                id: btn.id,
+                text: btn.textContent,
+                aria: btn.getAttribute("aria-label"),
+                title: btn.getAttribute("title")
+            });
+            logged = true;
+        }
+
+        return true;
+    }
+
+    window.NovaMobileFixMemoryButtonLabel = fixMemoryButton;
+
+    fixMemoryButton();
+    setTimeout(fixMemoryButton, 100);
+    setTimeout(fixMemoryButton, 500);
+    setTimeout(fixMemoryButton, 1200);
+    setTimeout(fixMemoryButton, 2500);
+
+    document.addEventListener("click", () => {
+        setTimeout(fixMemoryButton, 50);
+    }, true);
+
+    console.log(TAG, "ready");
+})();
+</script>
+
 </body>
 </html>
 
