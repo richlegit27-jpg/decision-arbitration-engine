@@ -301,3 +301,80 @@ Final guard:
     console.log("[NOVA_MOBILE_FINAL_SCROLL_GEOMETRY_FORCE_20260624] ready");
 })();
 
+/* NOVA_MOBILE_FINAL_SCROLL_GEOMETRY_FORCE_V2_20260624 */
+(function () {
+    "use strict";
+
+    function imp(el, prop, value) {
+        if (!el) return;
+        el.style.setProperty(prop, value, "important");
+    }
+
+    function finalScrollGeometryForceV2() {
+        var chat = document.getElementById("mobileChatMessages");
+        var comp = document.getElementById("nova-mobile-composer");
+        var input = document.getElementById("nova-mobile-input");
+
+        if (!chat || !comp) return;
+
+        chat.style.removeProperty("inset");
+        chat.style.removeProperty("transform");
+
+        imp(comp, "position", "fixed");
+        imp(comp, "left", "0px");
+        imp(comp, "right", "0px");
+        imp(comp, "bottom", "0px");
+        imp(comp, "top", "auto");
+        imp(comp, "max-height", "108px");
+        imp(comp, "height", "auto");
+        imp(comp, "overflow", "hidden");
+        imp(comp, "z-index", "90");
+
+        if (input) {
+            imp(input, "min-height", "38px");
+            imp(input, "max-height", "46px");
+        }
+
+        imp(chat, "position", "fixed");
+        imp(chat, "top", "68px");
+        imp(chat, "left", "0px");
+        imp(chat, "right", "0px");
+        imp(chat, "bottom", "118px");
+        imp(chat, "height", "auto");
+        imp(chat, "max-height", "none");
+        imp(chat, "overflow-y", "auto");
+        imp(chat, "overflow-x", "hidden");
+        imp(chat, "padding-bottom", "24px");
+        imp(chat, "z-index", "10");
+    }
+
+    window.NovaMobileFinalScrollGeometryForce = finalScrollGeometryForceV2;
+    window.NovaMobileMicroScrollTune = finalScrollGeometryForceV2;
+
+    window.addEventListener("load", function () {
+        setTimeout(finalScrollGeometryForceV2, 600);
+        setTimeout(finalScrollGeometryForceV2, 1600);
+        setTimeout(finalScrollGeometryForceV2, 3200);
+        setTimeout(finalScrollGeometryForceV2, 5200);
+    });
+
+    window.addEventListener("pageshow", function () {
+        setTimeout(finalScrollGeometryForceV2, 600);
+        setTimeout(finalScrollGeometryForceV2, 1600);
+    });
+
+    document.addEventListener("click", function () {
+        setTimeout(finalScrollGeometryForceV2, 100);
+    }, true);
+
+    document.addEventListener("input", function () {
+        setTimeout(finalScrollGeometryForceV2, 100);
+    }, true);
+
+    setTimeout(finalScrollGeometryForceV2, 900);
+    setTimeout(finalScrollGeometryForceV2, 2500);
+    setTimeout(finalScrollGeometryForceV2, 5000);
+
+    console.log("[NOVA_MOBILE_FINAL_SCROLL_GEOMETRY_FORCE_V2_20260624] ready");
+})();
+
