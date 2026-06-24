@@ -12346,8 +12346,10 @@ main {
 
 
 
-/* NOVA_MOBILE_NATURAL_GRID_SCROLL_OWNER_20260624 */
-/* One clean layout: header / scrollable messages / composer. No fixed chat box. */
+
+
+
+/* NOVA_MOBILE_FINAL_NATURAL_GRID_OWNER_20260624 */
 html,
 body {
     height: 100% !important;
@@ -12367,7 +12369,6 @@ body {
     position: relative !important;
     top: auto !important;
     grid-row: 1 !important;
-    flex: 0 0 auto !important;
     z-index: 60 !important;
 }
 
@@ -12388,7 +12389,7 @@ body {
     overflow-x: hidden !important;
     -webkit-overflow-scrolling: touch !important;
     box-sizing: border-box !important;
-    padding: 10px 10px 34px 10px !important;
+    padding: 10px 10px 40px 10px !important;
     z-index: 10 !important;
 }
 

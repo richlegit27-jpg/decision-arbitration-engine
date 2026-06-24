@@ -4,30 +4,133 @@
 
 <!-- NOVA_MOBILE_CONSOLE_SPAM_STOP_EARLY_QUIET_20260624 -->
 
+
 <script>
-/* NOVA_MOBILE_NATURAL_GRID_SCROLL_OWNER_20260624 */
+/* NOVA_MOBILE_FINAL_NATURAL_GRID_OWNER_20260624 */
 (function () {
     "use strict";
 
-    function scrollBottom() {
-        var chat = document.getElementById("mobileChatMessages");
-        if (!chat) return;
+    var applying = false;
+    var scheduled = false;
+
+    function important(el, prop, value) {
+        if (!el) return;
+        if (el.style.getPropertyValue(prop) === value) return;
+        el.style.setProperty(prop, value, "important");
+    }
+
+    function unlockFixedLayout() {
+        if (applying) return;
+        applying = true;
+
+        try {
+            var shell = document.querySelector(".mobile-shell");
+            var header = document.querySelector(".mobile-header");
+            var chat = document.getElementById("mobileChatMessages");
+            var composer = document.getElementById("nova-mobile-composer");
+            var input = document.getElementById("nova-mobile-input");
+
+            important(document.documentElement, "height", "100%");
+            important(document.documentElement, "overflow", "hidden");
+            important(document.body, "height", "100%");
+            important(document.body, "overflow", "hidden");
+
+            if (shell) {
+                important(shell, "height", "100dvh");
+                important(shell, "min-height", "100dvh");
+                important(shell, "max-height", "100dvh");
+                important(shell, "display", "grid");
+                important(shell, "grid-template-rows", "auto minmax(0, 1fr) auto");
+                important(shell, "overflow", "hidden");
+            }
+
+            if (header) {
+                important(header, "position", "relative");
+                important(header, "top", "auto");
+                important(header, "grid-row", "1");
+            }
+
+            if (chat) {
+                important(chat, "position", "relative");
+                important(chat, "top", "auto");
+                important(chat, "left", "auto");
+                important(chat, "right", "auto");
+                important(chat, "bottom", "auto");
+                important(chat, "grid-row", "2");
+                important(chat, "align-self", "stretch");
+                important(chat, "width", "100%");
+                important(chat, "height", "auto");
+                important(chat, "min-height", "0");
+                important(chat, "max-height", "none");
+                important(chat, "overflow-y", "auto");
+                important(chat, "overflow-x", "hidden");
+                important(chat, "box-sizing", "border-box");
+                important(chat, "padding-bottom", "40px");
+            }
+
+            if (composer) {
+                important(composer, "position", "relative");
+                important(composer, "top", "auto");
+                important(composer, "left", "auto");
+                important(composer, "right", "auto");
+                important(composer, "bottom", "auto");
+                important(composer, "grid-row", "3");
+                important(composer, "width", "100%");
+                important(composer, "max-width", "100%");
+                important(composer, "max-height", "116px");
+                important(composer, "height", "auto");
+                important(composer, "overflow", "hidden");
+            }
+
+            if (input) {
+                important(input, "min-height", "42px");
+                important(input, "max-height", "54px");
+            }
+        } catch (_) {
+        } finally {
+            applying = false;
+        }
+    }
+
+    function scheduleUnlock() {
+        if (scheduled) return;
+        scheduled = true;
 
         requestAnimationFrame(function () {
-            chat.scrollTop = chat.scrollHeight;
+            scheduled = false;
+            unlockFixedLayout();
         });
     }
 
-    window.NovaMobileLockComposerGeometry = scrollBottom;
-    window.NovaMobileScrollBottomHard = scrollBottom;
+    window.NovaMobileLockComposerGeometry = scheduleUnlock;
+    window.NovaMobileScrollBottomHard = function () {
+        scheduleUnlock();
 
-    document.addEventListener("DOMContentLoaded", scrollBottom);
-    window.addEventListener("load", scrollBottom);
+        setTimeout(function () {
+            var chat = document.getElementById("mobileChatMessages");
+            if (chat) chat.scrollTop = chat.scrollHeight;
+        }, 80);
+    };
 
-    setTimeout(scrollBottom, 150);
-    setTimeout(scrollBottom, 700);
+    document.addEventListener("DOMContentLoaded", scheduleUnlock);
+    window.addEventListener("load", scheduleUnlock);
+    window.addEventListener("resize", scheduleUnlock);
+    window.addEventListener("orientationchange", scheduleUnlock);
 
-    console.log("[Nova Mobile] natural grid scroll owner active");
+    document.addEventListener("click", function () {
+        setTimeout(scheduleUnlock, 50);
+    }, true);
+
+    document.addEventListener("input", function () {
+        setTimeout(scheduleUnlock, 50);
+    }, true);
+
+    setTimeout(scheduleUnlock, 50);
+    setTimeout(scheduleUnlock, 300);
+    setTimeout(scheduleUnlock, 1200);
+    setTimeout(scheduleUnlock, 2500);
+
+    console.log("[Nova Mobile] final natural grid owner active");
 })();
 </script>
 
