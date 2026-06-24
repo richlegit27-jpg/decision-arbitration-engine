@@ -70,7 +70,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nova Mobile</title>
 
-<link rel="stylesheet" href="/static/css/nova-mobile.css?v=source-card-kill-20260624-001">
+<link rel="stylesheet" href="/static/css/nova-mobile.css?v=source-card-kill-20260624-999">
 <style>
     html,
     body,
@@ -670,7 +670,7 @@
 <script src="/static/js/mobile/nova-mobile-code-ui.js?v=mobile-modular-001"></script>
 <script src="/static/js/mobile/nova-mobile-chat-ui.js?v=mobile-modular-001"></script>
 <script src="/static/js/mobile/nova-mobile-message-actions.js?v=mobile-actions-fix-007"></script>
-<script src="/static/js/mobile/nova-mobile-webcards.js?v=source-card-kill-20260624-001"></script>
+<script src="/static/js/mobile/nova-mobile-webcards.js?v=source-card-kill-20260624-999"></script>
 <script src="/static/js/mobile/nova-mobile-upload.js?v=hard-attach-final-20260607210437"></script>
 <script src="/static/js/mobile/nova-mobile-ui-utils.js?v=git-restored-valid-20260623"></script>
 <script src="/static/js/mobile/nova-mobile-voice.js?v=mobile-voice-endgame-002"></script>
@@ -680,7 +680,7 @@
 <script src="/static/js/mobile/nova-mobile-events.js?v=compact-quick-prompts-20260610-001"></script>
 <script src="/static/js/mobile/nova-mobile-state.js?v=mobile-state-002"></script>
 <script src="/static/js/mobile/nova-mobile-sessions.js?v=sessions-hide-empty-counts-20260609"></script>
-<script src="/static/js/nova-mobile-app.js?v=json-news-cards-force-20260609"></script>
+<script src="/static/js/nova-mobile-app.js?v=source-card-kill-20260624-999"></script>
 
 <script src="/static/js/mobile/nova-mobile-attachment-payload.js?v=attachment-revert-clean-20260609-001"></script>
 <script src="/static/js/mobile/nova-mobile-attachment-preview.js?v=quiet-preview-cache-20260608"></script>
@@ -6178,6 +6178,73 @@ header {
 })();
 </script>
 <!-- /NOVA_MOBILE_ALIGNED_ACCOUNT_COPY_REGEN_SESSION_20260624 -->
+
+
+<script>
+/* NOVA_MOBILE_INLINE_SOURCE_CARD_KILL_20260624 */
+(function () {
+    "use strict";
+
+    function killSourceCards() {
+        try {
+            var root = document.getElementById("mobileChatMessages") || document.body;
+            if (!root) return;
+
+            root.querySelectorAll([
+                ".mobile-web-section-header",
+                ".mobile-web-card",
+                ".mobile-web-show-more",
+                ".nova-mobile-source-cards",
+                ".source-card",
+                ".source-cards",
+                ".sources",
+                ".web-sources",
+                ".news-sources",
+                "[data-sources]",
+                "[data-source-strip]",
+                "[class*='source-card']",
+                "[class*='web-card']",
+                "[class*='webcard']"
+            ].join(",")).forEach(function (el) {
+                el.remove();
+            });
+        } catch (_) {}
+    }
+
+    window.NovaMobileKillSourceCards = killSourceCards;
+
+    window.renderWebSourcesFromPayload = function () {
+        killSourceCards();
+        return null;
+    };
+
+    function boot() {
+        killSourceCards();
+
+        var root = document.getElementById("mobileChatMessages");
+        if (!root || root.__novaInlineSourceCardKillObserver) return;
+
+        var observer = new MutationObserver(function () {
+            killSourceCards();
+        });
+
+        observer.observe(root, {
+            childList: true,
+            subtree: true
+        });
+
+        root.__novaInlineSourceCardKillObserver = observer;
+    }
+
+    document.addEventListener("DOMContentLoaded", boot);
+    setTimeout(boot, 50);
+    setTimeout(boot, 250);
+    setTimeout(boot, 1000);
+    setTimeout(boot, 2500);
+
+    console.log("[Nova Mobile] inline source card kill active");
+})();
+</script>
 
 </body>
 </html>
