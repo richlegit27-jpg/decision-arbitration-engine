@@ -1265,7 +1265,68 @@ def _nova_phase1_append_text_attachments_to_user_text(user_text, attachments, lo
 
 @app.route("/api/chat", methods=["POST"])
 def api_chat_route():
-    return api_chat()
+    # NOVA_API_CHAT_ROUTE_NEVER_NONE_GUARD_20260624
+    try:
+        result = api_chat()
+
+        if result is not None:
+            return result
+
+        try:
+            data = request.get_json(silent=True) or {}
+            user_text = (
+                data.get("user_text")
+                or data.get("message")
+                or data.get("text")
+                or ""
+            )
+        except Exception:
+            user_text = ""
+
+        fallback_text = "I hit an empty backend response path, but Nova is still running. Try that again."
+
+        return jsonify({
+            "ok": False,
+            "text": fallback_text,
+            "assistant_message": {
+                "role": "assistant",
+                "text": fallback_text,
+                "attachments": [],
+                "meta": {
+                    "route": "api_chat_none_guard",
+                    "user_text": str(user_text or "")[:240],
+                },
+            },
+            "debug": {
+                "route": "api_chat_none_guard",
+                "reason": "api_chat_returned_none",
+            },
+            "attachments": [],
+            "session_attachments": [],
+        }), 200
+
+    except Exception as exc:
+        fallback_text = "Nova hit a backend error, but the API returned JSON instead of breaking the mobile chat."
+
+        return jsonify({
+            "ok": False,
+            "text": fallback_text,
+            "assistant_message": {
+                "role": "assistant",
+                "text": fallback_text,
+                "attachments": [],
+                "meta": {
+                    "route": "api_chat_exception_guard",
+                    "error": str(exc)[:300],
+                },
+            },
+            "debug": {
+                "route": "api_chat_exception_guard",
+                "error": str(exc)[:500],
+            },
+            "attachments": [],
+            "session_attachments": [],
+        }), 200
 
 @app.route("/api/runtime/summary", methods=["GET"])
 def api_runtime_summary():
@@ -5826,8 +5887,24 @@ def api_chat():
             "with citations",
         )
 
-        if not any(_term in _nova_real_web_probe for _term in _nova_real_explicit_web_terms_20260624):
-            return None
+        _nova_real_web_explicit_20260624 = any(
+            _term in _nova_real_web_probe
+            for _term in _nova_real_explicit_web_terms_20260624
+        )
+
+        # Person/topic news phrasing like "latest joe rogan news" should still count as web.
+        _nova_latest_topic_news_20260624 = (
+            _nova_real_web_probe.startswith("latest ")
+            and _nova_real_web_probe.endswith(" news")
+        )
+
+        if _nova_latest_topic_news_20260624:
+            _nova_real_web_explicit_20260624 = True
+            request.environ["NOVA_FORCE_WEB_INTENT_20260609"] = "1"
+
+        if not _nova_real_web_explicit_20260624:
+            # Do NOT return None from api_chat. Normal chat must continue to chat_service.handle().
+            request.environ["NOVA_SKIP_REAL_WEB_BRIDGE_20260624"] = "1"
 
         # /NOVA_REAL_WEB_BRIDGE_EXPLICIT_ONLY_20260624
         _nova_real_web_terms = (
@@ -16074,6 +16151,77 @@ def _nova_api_chat_last_door_mojibake_filter_20260624(response):
         response.headers["X-Nova-Mojibake-Error"] = str(exc)[:160]
 
     return response
+
+
+
+
+# NOVA_FINAL_API_CHAT_JSON_GUARD_REBIND_20260624
+# Final route-level guard: route repair may rebind /api/chat directly to api_chat.
+# This rebinds every /api/chat endpoint back to a JSON-safe wrapper after repairs.
+def _nova_final_api_chat_json_guard_20260624(*args, **kwargs):
+    try:
+        result = api_chat(*args, **kwargs)
+
+        if result is not None:
+            return result
+
+        fallback_text = "Nova hit an empty backend response path, but returned JSON instead of breaking the mobile chat."
+
+        return jsonify({
+            "ok": False,
+            "text": fallback_text,
+            "assistant_message": {
+                "role": "assistant",
+                "text": fallback_text,
+                "attachments": [],
+                "meta": {
+                    "route": "final_api_chat_none_guard",
+                    "reason": "api_chat_returned_none",
+                },
+            },
+            "debug": {
+                "route": "final_api_chat_none_guard",
+                "reason": "api_chat_returned_none",
+            },
+            "attachments": [],
+            "session_attachments": [],
+        }), 200
+
+    except Exception as exc:
+        fallback_text = "Nova hit a backend error, but returned JSON instead of breaking the mobile chat."
+
+        return jsonify({
+            "ok": False,
+            "text": fallback_text,
+            "assistant_message": {
+                "role": "assistant",
+                "text": fallback_text,
+                "attachments": [],
+                "meta": {
+                    "route": "final_api_chat_exception_guard",
+                    "error": str(exc)[:300],
+                },
+            },
+            "debug": {
+                "route": "final_api_chat_exception_guard",
+                "error": str(exc)[:500],
+            },
+            "attachments": [],
+            "session_attachments": [],
+        }), 200
+
+
+try:
+    _nova_rebound_endpoints_20260624 = []
+
+    for _nova_rule_20260624 in list(app.url_map.iter_rules()):
+        if str(_nova_rule_20260624.rule) == "/api/chat":
+            app.view_functions[_nova_rule_20260624.endpoint] = _nova_final_api_chat_json_guard_20260624
+            _nova_rebound_endpoints_20260624.append(_nova_rule_20260624.endpoint)
+
+    print("[NOVA_FINAL_API_CHAT_JSON_GUARD_REBIND_20260624] rebound", _nova_rebound_endpoints_20260624)
+except Exception as _nova_api_chat_guard_rebind_error_20260624:
+    print("[NOVA_FINAL_API_CHAT_JSON_GUARD_REBIND_20260624] skipped:", _nova_api_chat_guard_rebind_error_20260624)
 
 
 if __name__ == "__main__":
