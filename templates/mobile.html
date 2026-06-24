@@ -70,7 +70,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nova Mobile</title>
 
-<link rel="stylesheet" href="/static/css/nova-mobile.css?v=composer-chat-no-overlap-20260624-001">
+<link rel="stylesheet" href="/static/css/nova-mobile.css?v=runtime-composer-geometry-lock-20260624-001">
 <style>
     html,
     body,
@@ -6243,6 +6243,85 @@ header {
     setTimeout(boot, 2500);
 
     console.log("[Nova Mobile] inline source card kill active");
+})();
+</script>
+
+
+<script>
+/* NOVA_MOBILE_RUNTIME_COMPOSER_GEOMETRY_LOCK_20260624 */
+(function () {
+    "use strict";
+
+    function important(el, prop, value) {
+        if (!el) return;
+        el.style.setProperty(prop, value, "important");
+    }
+
+    function lockMobileGeometry() {
+        try {
+            var chat = document.getElementById("mobileChatMessages");
+            var composer = document.getElementById("nova-mobile-composer");
+
+            if (!chat || !composer) return;
+
+            var composerHeight = Math.ceil(composer.getBoundingClientRect().height || 132);
+            var composerSpace = Math.max(136, Math.min(158, composerHeight + 10));
+
+            important(composer, "position", "fixed");
+            important(composer, "left", "0px");
+            important(composer, "right", "0px");
+            important(composer, "bottom", "0px");
+            important(composer, "top", "auto");
+            important(composer, "width", "100%");
+            important(composer, "max-width", "100%");
+            important(composer, "z-index", "90");
+
+            important(chat, "position", "fixed");
+            important(chat, "top", "126px");
+            important(chat, "left", "0px");
+            important(chat, "right", "0px");
+            important(chat, "bottom", composerSpace + "px");
+            important(chat, "height", "auto");
+            important(chat, "max-height", "none");
+            important(chat, "overflow-y", "auto");
+            important(chat, "overflow-x", "hidden");
+            important(chat, "z-index", "10");
+            important(chat, "box-sizing", "border-box");
+            important(chat, "padding-bottom", "14px");
+
+            if (!chat.__novaGeometryObserver) {
+                var observer = new MutationObserver(function () {
+                    lockMobileGeometry();
+                    chat.scrollTop = chat.scrollHeight;
+                });
+
+                observer.observe(chat, {
+                    childList: true,
+                    subtree: true,
+                    characterData: true
+                });
+
+                chat.__novaGeometryObserver = observer;
+            }
+
+            chat.scrollTop = chat.scrollHeight;
+        } catch (_) {}
+    }
+
+    window.NovaMobileLockComposerGeometry = lockMobileGeometry;
+
+    document.addEventListener("DOMContentLoaded", lockMobileGeometry);
+    window.addEventListener("load", lockMobileGeometry);
+    window.addEventListener("resize", lockMobileGeometry);
+    window.addEventListener("orientationchange", lockMobileGeometry);
+
+    setInterval(lockMobileGeometry, 750);
+    setTimeout(lockMobileGeometry, 50);
+    setTimeout(lockMobileGeometry, 250);
+    setTimeout(lockMobileGeometry, 1000);
+    setTimeout(lockMobileGeometry, 2500);
+
+    console.log("[Nova Mobile] runtime composer geometry lock active");
 })();
 </script>
 
