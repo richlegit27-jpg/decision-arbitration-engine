@@ -6360,6 +6360,538 @@ header {
 })();
 </script>
 
+
+<!-- NOVA_MOBILE_FINAL_REAL_SESSIONS_OVERLAY_20260624 -->
+<style>
+@media (max-width: 900px) {
+    #nova-mobile-final-sessions-overlay {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 2147483600 !important;
+        display: none !important;
+        background: rgba(0, 0, 0, 0.42) !important;
+        box-sizing: border-box !important;
+    }
+
+    #nova-mobile-final-sessions-overlay.nova-open {
+        display: block !important;
+    }
+
+    #nova-mobile-final-sessions-panel {
+        position: fixed !important;
+        top: 62px !important;
+        bottom: 88px !important;
+        left: 12px !important;
+        right: 12px !important;
+        width: auto !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+        padding: 12px !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        border-radius: 18px !important;
+        border: 1px solid rgba(168, 85, 247, 0.34) !important;
+        background: rgba(18, 18, 28, 0.98) !important;
+        color: #f8f5ff !important;
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.42) !important;
+        box-sizing: border-box !important;
+    }
+
+    #nova-mobile-final-sessions-panel * {
+        box-sizing: border-box !important;
+    }
+
+    .nova-final-sessions-head {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 10px !important;
+        margin-bottom: 12px !important;
+    }
+
+    .nova-final-sessions-title {
+        font-size: 18px !important;
+        font-weight: 800 !important;
+        letter-spacing: -0.02em !important;
+    }
+
+    .nova-final-sessions-close,
+    .nova-final-sessions-refresh,
+    .nova-final-session-open,
+    .nova-final-session-rename,
+    .nova-final-session-delete {
+        appearance: none !important;
+        border: 1px solid rgba(168, 85, 247, 0.38) !important;
+        background: rgba(168, 85, 247, 0.16) !important;
+        color: #f8f5ff !important;
+        border-radius: 12px !important;
+        padding: 8px 10px !important;
+        font-weight: 800 !important;
+        line-height: 1 !important;
+        cursor: pointer !important;
+    }
+
+    .nova-final-sessions-actions {
+        display: flex !important;
+        gap: 8px !important;
+        align-items: center !important;
+    }
+
+    .nova-final-sessions-list {
+        display: grid !important;
+        gap: 10px !important;
+    }
+
+    .nova-final-session-card {
+        border: 1px solid rgba(255, 255, 255, 0.10) !important;
+        background: rgba(255, 255, 255, 0.055) !important;
+        border-radius: 16px !important;
+        padding: 12px !important;
+        min-width: 0 !important;
+    }
+
+    .nova-final-session-card.is-active {
+        border-color: rgba(168, 85, 247, 0.75) !important;
+        background: rgba(168, 85, 247, 0.18) !important;
+    }
+
+    .nova-final-session-title {
+        font-size: 15px !important;
+        font-weight: 850 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        margin-bottom: 5px !important;
+    }
+
+    .nova-final-session-meta {
+        font-size: 12px !important;
+        opacity: 0.75 !important;
+        margin-bottom: 10px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .nova-final-session-buttons {
+        display: flex !important;
+        gap: 8px !important;
+        flex-wrap: wrap !important;
+    }
+
+    .nova-final-session-open {
+        background: rgba(168, 85, 247, 0.34) !important;
+    }
+
+    .nova-final-session-delete {
+        background: rgba(239, 68, 68, 0.16) !important;
+        border-color: rgba(239, 68, 68, 0.34) !important;
+    }
+
+    .nova-final-session-empty,
+    .nova-final-session-loading,
+    .nova-final-session-error {
+        padding: 18px !important;
+        border-radius: 16px !important;
+        background: rgba(255, 255, 255, 0.06) !important;
+        color: #f8f5ff !important;
+        opacity: 0.9 !important;
+    }
+}
+</style>
+
+<script>
+(() => {
+    const TAG = "[NOVA_MOBILE_FINAL_REAL_SESSIONS_OVERLAY_20260624]";
+    const ACTIVE_KEYS = [
+        "nova_mobile_active_session_id",
+        "nova_active_session_id",
+        "active_session_id",
+        "currentSessionId"
+    ];
+
+    let overlay = null;
+    let panel = null;
+    let list = null;
+
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function activeId() {
+        for (const key of ACTIVE_KEYS) {
+            const value = localStorage.getItem(key);
+            if (value) return value;
+        }
+        return window.NovaMobileActiveSessionId || window.currentSessionId || "";
+    }
+
+    function setActiveId(id) {
+        if (!id) return;
+        for (const key of ACTIVE_KEYS) {
+            localStorage.setItem(key, id);
+        }
+        window.NovaMobileActiveSessionId = id;
+        window.currentSessionId = id;
+    }
+
+    function normalizeSessions(data) {
+        if (Array.isArray(data)) return data;
+        if (Array.isArray(data?.sessions)) return data.sessions;
+        if (Array.isArray(data?.items)) return data.items;
+        if (Array.isArray(data?.data)) return data.data;
+        return [];
+    }
+
+    function sessionId(s) {
+        return s.id || s.session_id || s.sessionId || s.key || "";
+    }
+
+    function sessionTitle(s) {
+        return s.title || s.name || s.label || s.summary || "New Chat";
+    }
+
+    function sessionCount(s) {
+        return s.message_count ?? s.messages_count ?? s.count ?? (Array.isArray(s.messages) ? s.messages.length : 0);
+    }
+
+    function sessionTime(s) {
+        return s.updated_at || s.updatedAt || s.created_at || s.createdAt || s.timestamp || "";
+    }
+
+    function ensureOverlay() {
+        overlay = document.getElementById("nova-mobile-final-sessions-overlay");
+
+        if (!overlay) {
+            overlay = document.createElement("div");
+            overlay.id = "nova-mobile-final-sessions-overlay";
+            overlay.innerHTML = `
+                <div id="nova-mobile-final-sessions-panel" role="dialog" aria-label="Sessions">
+                    <div class="nova-final-sessions-head">
+                        <div class="nova-final-sessions-title">Sessions</div>
+                        <div class="nova-final-sessions-actions">
+                            <button class="nova-final-sessions-refresh" type="button">Refresh</button>
+                            <button class="nova-final-sessions-close" type="button">Close</button>
+                        </div>
+                    </div>
+                    <div class="nova-final-sessions-list">
+                        <div class="nova-final-session-loading">Loading sessions...</div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        panel = document.getElementById("nova-mobile-final-sessions-panel");
+        list = overlay.querySelector(".nova-final-sessions-list");
+
+        overlay.querySelector(".nova-final-sessions-close")?.addEventListener("click", close);
+        overlay.querySelector(".nova-final-sessions-refresh")?.addEventListener("click", loadSessions);
+
+        overlay.addEventListener("click", (event) => {
+            if (event.target === overlay) close();
+        });
+
+        return overlay;
+    }
+
+    function open() {
+        ensureOverlay();
+        overlay.classList.add("nova-open");
+        loadSessions();
+        console.log(TAG, "open");
+    }
+
+    function close() {
+        overlay?.classList.remove("nova-open");
+        console.log(TAG, "close");
+    }
+
+    async function loadSessions() {
+        ensureOverlay();
+
+        list.innerHTML = `<div class="nova-final-session-loading">Loading sessions...</div>`;
+
+        try {
+            const res = await fetch("/api/sessions", {
+                credentials: "same-origin",
+                cache: "no-store"
+            });
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            const data = await res.json();
+            const sessions = normalizeSessions(data);
+            renderSessions(sessions);
+
+            console.log(TAG, "rendered", sessions.length);
+        } catch (error) {
+            list.innerHTML = `<div class="nova-final-session-error">Could not load sessions: ${escapeHtml(error.message)}</div>`;
+            console.warn(TAG, "load failed", error);
+        }
+    }
+
+    function renderSessions(sessions) {
+        const current = activeId();
+
+        if (!sessions.length) {
+            list.innerHTML = `<div class="nova-final-session-empty">No sessions found.</div>`;
+            return;
+        }
+
+        list.innerHTML = sessions.map((s) => {
+            const id = sessionId(s);
+            const title = sessionTitle(s);
+            const count = sessionCount(s);
+            const time = sessionTime(s);
+            const active = id && id === current ? " is-active" : "";
+
+            return `
+                <div class="nova-final-session-card${active}" data-session-id="${escapeHtml(id)}">
+                    <div class="nova-final-session-title">${escapeHtml(title)}</div>
+                    <div class="nova-final-session-meta">${escapeHtml(String(count))} messages${time ? " ? " + escapeHtml(time) : ""}</div>
+                    <div class="nova-final-session-buttons">
+                        <button class="nova-final-session-open" type="button" data-action="open" data-session-id="${escapeHtml(id)}">Open</button>
+                        <button class="nova-final-session-rename" type="button" data-action="rename" data-session-id="${escapeHtml(id)}">Rename</button>
+                        <button class="nova-final-session-delete" type="button" data-action="delete" data-session-id="${escapeHtml(id)}">Delete</button>
+                    </div>
+                </div>
+            `;
+        }).join("");
+    }
+
+    async function readSession(id) {
+        const candidates = [
+            `/api/sessions/${encodeURIComponent(id)}`,
+            `/api/chat/${encodeURIComponent(id)}`
+        ];
+
+        for (const url of candidates) {
+            try {
+                const res = await fetch(url, {
+                    credentials: "same-origin",
+                    cache: "no-store"
+                });
+
+                if (res.ok) return await res.json();
+            } catch (_) {}
+        }
+
+        return null;
+    }
+
+    function normalizeMessages(data) {
+        if (Array.isArray(data)) return data;
+        if (Array.isArray(data?.messages)) return data.messages;
+        if (Array.isArray(data?.session?.messages)) return data.session.messages;
+        if (Array.isArray(data?.data?.messages)) return data.data.messages;
+        return [];
+    }
+
+    function roleOf(m) {
+        return m.role || m.sender || m.type || "assistant";
+    }
+
+    function textOf(m) {
+        return m.content || m.text || m.message || m.body || "";
+    }
+
+    function renderMessages(messages) {
+        const box = document.getElementById("mobileChatMessages");
+        if (!box) return false;
+
+        box.innerHTML = messages.map((m) => {
+            const role = roleOf(m);
+            const text = textOf(m);
+            const cls = String(role).toLowerCase().includes("user") ? "user" : "assistant";
+
+            return `
+                <div class="message ${cls}">
+                    <div class="message-content">${escapeHtml(text)}</div>
+                </div>
+            `;
+        }).join("");
+
+        box.scrollTop = box.scrollHeight;
+        return true;
+    }
+
+    async function openSession(id) {
+        if (!id) return;
+
+        setActiveId(id);
+
+        if (typeof window.NovaMobileRememberSession === "function") {
+            try { window.NovaMobileRememberSession(id); } catch (_) {}
+        }
+
+        if (typeof window.NovaMobileOpenSession === "function") {
+            try {
+                window.NovaMobileOpenSession(id);
+                close();
+                console.log(TAG, "opened via existing function", id);
+                return;
+            } catch (_) {}
+        }
+
+        const data = await readSession(id);
+        const messages = normalizeMessages(data);
+
+        if (messages.length) {
+            renderMessages(messages);
+        }
+
+        close();
+        console.log(TAG, "opened", id, "messages", messages.length);
+    }
+
+    async function renameSession(id) {
+        if (!id) return;
+
+        const title = prompt("Rename session:");
+        if (!title) return;
+
+        const urls = [
+            `/api/sessions/${encodeURIComponent(id)}/rename`,
+            `/api/sessions/rename`
+        ];
+
+        for (const url of urls) {
+            try {
+                const res = await fetch(url, {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({id, session_id: id, title, name: title})
+                });
+
+                if (res.ok) {
+                    await loadSessions();
+                    console.log(TAG, "renamed", id);
+                    return;
+                }
+            } catch (_) {}
+        }
+
+        alert("Rename failed.");
+    }
+
+    async function deleteSession(id) {
+        if (!id) return;
+        if (!confirm("Delete this session?")) return;
+
+        const urls = [
+            `/api/sessions/${encodeURIComponent(id)}/delete`,
+            `/api/sessions/delete`
+        ];
+
+        for (const url of urls) {
+            try {
+                const res = await fetch(url, {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({id, session_id: id})
+                });
+
+                if (res.ok) {
+                    await loadSessions();
+                    console.log(TAG, "deleted", id);
+                    return;
+                }
+            } catch (_) {}
+        }
+
+        alert("Delete failed.");
+    }
+
+    document.addEventListener("click", (event) => {
+        const actionButton = event.target?.closest?.("[data-action][data-session-id]");
+        if (actionButton && overlay?.contains(actionButton)) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const id = actionButton.getAttribute("data-session-id");
+            const action = actionButton.getAttribute("data-action");
+
+            if (action === "open") openSession(id);
+            if (action === "rename") renameSession(id);
+            if (action === "delete") deleteSession(id);
+            return;
+        }
+
+        const button = event.target?.closest?.("button, a, [role='button']");
+        if (!button) return;
+
+        const raw = `${button.id || ""} ${button.className || ""} ${button.getAttribute("aria-label") || ""} ${button.textContent || ""}`.toLowerCase();
+        const plainText = String(button.textContent || "").trim().toLowerCase();
+
+        const isSessionsButton =
+            plainText === "sessions" ||
+            raw.includes("sessions-toggle") ||
+            raw.includes("sessions button") ||
+            raw.includes("mobilememorybutton") === false && raw.includes("session");
+
+        const isNewSessionButton =
+            plainText.includes("new session") ||
+            plainText === "new chat" ||
+            raw.includes("new-chat");
+
+        if (isSessionsButton && !isNewSessionButton) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            open();
+        }
+    }, true);
+
+    window.NovaMobileFinalSessionsOverlay = open;
+    window.NovaMobileFinalSessionsReload = loadSessions;
+
+    ensureOverlay();
+    console.log(TAG, "ready");
+})();
+</script>
+
+
+
+
+<!-- NOVA_MOBILE_DIRECT_SESSIONS_BUTTON_BRIDGE_20260624 -->
+<script>
+(() => {
+    const TAG = "[NOVA_MOBILE_DIRECT_SESSIONS_BUTTON_BRIDGE_20260624]";
+
+    function openSessions(event) {
+        const button = event.target?.closest?.("#nova-mobile-sessions-toggle");
+
+        if (!button) return;
+        if (typeof window.NovaMobileFinalSessionsOverlay !== "function") return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation?.();
+
+        window.NovaMobileFinalSessionsOverlay();
+
+        console.log(TAG, "opened", {
+            id: button.id || "",
+            text: String(button.textContent || "").trim()
+        });
+    }
+
+    document.addEventListener("pointerdown", openSessions, true);
+    document.addEventListener("click", openSessions, true);
+
+    console.log(TAG, "ready");
+})();
+</script>
+
 </body>
 </html>
 
