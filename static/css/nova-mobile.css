@@ -12335,3 +12335,63 @@ main {
     padding: 0 !important;
     overflow: hidden !important;
 }
+
+
+/* NOVA_MOBILE_COMPOSER_CHAT_NO_OVERLAP_LOCK_20260624 */
+/* Real fix from console dump:
+   #mobileChatMessages was fixed top 133 height 178, composer fixed top 237 height 132.
+   That creates overlap. Keep composer at bottom; keep chat above composer. */
+:root {
+    --nova-mobile-header-space: 126px;
+    --nova-mobile-composer-space: 142px;
+}
+
+#mobileChatMessages,
+.mobile-chat-container {
+    position: fixed !important;
+    top: var(--nova-mobile-header-space) !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: var(--nova-mobile-composer-space) !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    box-sizing: border-box !important;
+    padding: 10px 10px 16px 10px !important;
+    z-index: 10 !important;
+}
+
+#nova-mobile-composer,
+.mobile-composer,
+.nova-mobile-composer {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    top: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 118px !important;
+    max-height: 142px !important;
+    height: auto !important;
+    box-sizing: border-box !important;
+    z-index: 80 !important;
+}
+
+/* Anything rendered as a direct message/card in the chat area must flow, not stack. */
+#mobileChatMessages > *,
+.mobile-chat-container > * {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    flex: 0 0 auto !important;
+    clear: both !important;
+    box-sizing: border-box !important;
+}
