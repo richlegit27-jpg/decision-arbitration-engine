@@ -455,3 +455,83 @@ Final guard:
     console.log("[NOVA_MOBILE_TOP_BUTTON_POLISH_20260624] ready");
 })();
 
+/* NOVA_MOBILE_SESSIONS_PANEL_POLISH_V2_20260624 */
+(function () {
+    "use strict";
+
+    function imp(el, prop, value) {
+        if (!el) return;
+        el.style.setProperty(prop, value, "important");
+    }
+
+    function polishSessionsPanelV2() {
+        var panel = document.getElementById("nova-mobile-sessions-panel");
+        if (!panel) return;
+
+        imp(panel, "position", "fixed");
+        imp(panel, "left", "50%");
+        imp(panel, "right", "auto");
+        imp(panel, "top", "62px");
+        imp(panel, "bottom", "118px");
+        imp(panel, "transform", "translateX(-50%)");
+        imp(panel, "width", "min(500px, calc(100vw - 20px))");
+        imp(panel, "max-width", "min(500px, calc(100vw - 20px))");
+        imp(panel, "height", "auto");
+        imp(panel, "max-height", "none");
+        imp(panel, "padding", "14px");
+        imp(panel, "box-sizing", "border-box");
+        imp(panel, "overflow-y", "auto");
+        imp(panel, "overflow-x", "hidden");
+        imp(panel, "border-radius", "22px");
+        imp(panel, "background", "linear-gradient(180deg, rgba(24, 18, 38, 0.98), rgba(13, 10, 22, 0.98))");
+        imp(panel, "border", "1px solid rgba(196, 181, 253, 0.22)");
+        imp(panel, "box-shadow", "0 18px 48px rgba(0, 0, 0, 0.42)");
+        imp(panel, "z-index", "140");
+
+        Array.from(panel.querySelectorAll("button")).forEach(function (btn) {
+            var label = (btn.textContent || "").trim().toLowerCase();
+
+            imp(btn, "height", "32px");
+            imp(btn, "min-height", "32px");
+            imp(btn, "border-radius", "999px");
+            imp(btn, "font-size", "12px");
+            imp(btn, "font-weight", "800");
+            imp(btn, "line-height", "1");
+            imp(btn, "box-sizing", "border-box");
+            imp(btn, "white-space", "nowrap");
+            imp(btn, "color", "#f7f2ff");
+            imp(btn, "border", "1px solid rgba(196, 181, 253, 0.24)");
+
+            if (label === "delete") {
+                imp(btn, "background", "rgba(255, 70, 70, 0.24)");
+                imp(btn, "border-color", "rgba(255, 130, 130, 0.30)");
+            } else if (label.indexOf("close") >= 0) {
+                imp(btn, "background", "rgba(168, 85, 247, 0.24)");
+                imp(btn, "border-color", "rgba(196, 181, 253, 0.34)");
+            } else {
+                imp(btn, "background", "rgba(255, 255, 255, 0.08)");
+            }
+        });
+    }
+
+    window.NovaMobileSessionsPanelPolish = polishSessionsPanelV2;
+    window.NovaMobileSessionsPanelPolishV2 = polishSessionsPanelV2;
+
+    document.addEventListener("click", function () {
+        setTimeout(polishSessionsPanelV2, 80);
+        setTimeout(polishSessionsPanelV2, 350);
+        setTimeout(polishSessionsPanelV2, 900);
+    }, true);
+
+    window.addEventListener("load", function () {
+        setTimeout(polishSessionsPanelV2, 800);
+        setTimeout(polishSessionsPanelV2, 2200);
+    });
+
+    window.addEventListener("pageshow", function () {
+        setTimeout(polishSessionsPanelV2, 700);
+    });
+
+    console.log("[NOVA_MOBILE_SESSIONS_PANEL_POLISH_V2_20260624] ready");
+})();
+
