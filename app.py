@@ -15225,6 +15225,370 @@ def _nova_auth_scoped_new_session_route_fix_20260623():
 # NOVA_AUTH_SCOPED_NEW_SESSION_ROUTE_FIX_END_20260623
 
 
+
+
+# NOVA_AUTH_SCOPED_CHAT_PERSISTENCE_FIX_20260623
+@app.before_request
+def _nova_auth_scoped_chat_persistence_capture_20260623():
+    try:
+        from flask import request, g
+
+        if str(request.path or "") not in ("/api/chat", "/api/chat/stream"):
+            return None
+
+        if request.method != "POST":
+            return None
+
+        g._nova_auth_chat_request_payload_20260623 = request.get_json(silent=True) or {}
+
+    except Exception:
+        pass
+
+    return None
+
+
+@app.after_request
+def _nova_auth_scoped_chat_persistence_fix_20260623(response):
+    try:
+        from flask import request, session as flask_session, g
+        from pathlib import Path
+        from datetime import datetime, timezone
+        import json
+        import time
+        import uuid
+
+        if str(request.path or "") not in ("/api/chat", "/api/chat/stream"):
+            return response
+
+        if request.method != "POST":
+            return response
+
+        auth_user_id = str(flask_session.get("nova_user_id") or "").strip()
+
+        if not auth_user_id:
+            return response
+
+        request_payload = getattr(g, "_nova_auth_chat_request_payload_20260623", {}) or {}
+
+        if not isinstance(request_payload, dict):
+            request_payload = {}
+
+        user_text = str(
+            request_payload.get("message")
+            or request_payload.get("text")
+            or request_payload.get("prompt")
+            or request_payload.get("user_text")
+            or request_payload.get("input")
+            or ""
+        ).strip()
+
+        if not user_text:
+            return response
+
+        response_payload = {}
+
+        try:
+            raw_response = response.get_data(as_text=True)
+
+            if raw_response and raw_response.strip().startswith("{"):
+                response_payload = json.loads(raw_response)
+        except Exception:
+            response_payload = {}
+
+        if not isinstance(response_payload, dict):
+            response_payload = {}
+
+        assistant_text = str(
+            response_payload.get("response")
+            or response_payload.get("answer")
+            or response_payload.get("content")
+            or response_payload.get("text")
+            or ""
+        ).strip()
+
+        message_value = response_payload.get("message")
+
+        if not assistant_text and isinstance(message_value, str):
+            assistant_text = message_value.strip()
+
+        if not assistant_text and isinstance(message_value, dict):
+            assistant_text = str(
+                message_value.get("content")
+                or message_value.get("text")
+                or ""
+            ).strip()
+
+        assistant_value = response_payload.get("assistant")
+
+        if not assistant_text and isinstance(assistant_value, dict):
+            assistant_text = str(
+                assistant_value.get("content")
+                or assistant_value.get("text")
+                or assistant_value.get("message")
+                or ""
+            ).strip()
+
+        assistant_message_value = response_payload.get("assistant_message")
+
+        if not assistant_text and isinstance(assistant_message_value, str):
+            assistant_text = assistant_message_value.strip()
+
+        if not assistant_text and isinstance(assistant_message_value, dict):
+            assistant_text = str(
+                assistant_message_value.get("content")
+                or assistant_message_value.get("text")
+                or assistant_message_value.get("message")
+                or assistant_message_value.get("body")
+                or ""
+            ).strip()
+
+        session_id = str(
+            request_payload.get("session_id")
+            or request_payload.get("active_session_id")
+            or request_payload.get("conversation_id")
+            or request_payload.get("chat_id")
+            or request.cookies.get("nova_active_session_id")
+            or response_payload.get("session_id")
+            or response_payload.get("active_session_id")
+            or ""
+        ).strip()
+
+        session_value = response_payload.get("session")
+
+        if not session_id and isinstance(session_value, dict):
+            session_id = str(session_value.get("id") or session_value.get("session_id") or "").strip()
+
+        base_dir = Path(__file__).resolve().parent
+        data_dir = base_dir / "data"
+        sessions_path = data_dir / "nova_sessions.json"
+        users_path_local = data_dir / "nova_users.json"
+
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        def _read_json_file_20260623(p, fallback):
+            try:
+                if not p.exists():
+                    return fallback
+
+                return json.loads(p.read_text(encoding="utf-8", errors="replace") or "")
+            except Exception:
+                return fallback
+
+        def _write_json_file_20260623(p, value):
+            p.write_text(
+                json.dumps(value, indent=2, ensure_ascii=False),
+                encoding="utf-8"
+            )
+
+        users_payload = _read_json_file_20260623(users_path_local, {"users": []})
+        users_list = users_payload.get("users", []) if isinstance(users_payload, dict) else []
+        auth_user = None
+
+        for candidate in users_list:
+            if not isinstance(candidate, dict):
+                continue
+
+            if str(candidate.get("id") or "").strip() == auth_user_id:
+                auth_user = candidate
+                break
+
+        username_value = str(
+            (auth_user or {}).get("username")
+            or (auth_user or {}).get("name")
+            or (auth_user or {}).get("email")
+            or ""
+        ).strip()
+
+        email_value = str((auth_user or {}).get("email") or "").strip()
+
+        now = datetime.now(timezone.utc).isoformat()
+
+        store = _read_json_file_20260623(sessions_path, {"sessions": []})
+
+        if isinstance(store, list):
+            sessions = store
+            store_is_list = True
+        elif isinstance(store, dict):
+            sessions = store.get("sessions")
+
+            if not isinstance(sessions, list):
+                sessions = []
+
+            store_is_list = False
+        else:
+            sessions = []
+            store = {"sessions": sessions}
+            store_is_list = False
+
+        def _session_id_of_20260623(item):
+            if not isinstance(item, dict):
+                return ""
+
+            return str(item.get("id") or item.get("session_id") or "").strip()
+
+        def _session_owner_of_20260623(item):
+            if not isinstance(item, dict):
+                return ""
+
+            return str(
+                item.get("user_id")
+                or item.get("owner")
+                or item.get("owner_id")
+                or item.get("nova_user_id")
+                or ""
+            ).strip()
+
+        target = None
+
+        if session_id:
+            for candidate in sessions:
+                if not isinstance(candidate, dict):
+                    continue
+
+                if _session_id_of_20260623(candidate) == session_id:
+                    target = candidate
+                    break
+
+        if target is None:
+            for candidate in sessions:
+                if not isinstance(candidate, dict):
+                    continue
+
+                if _session_owner_of_20260623(candidate) == auth_user_id:
+                    target = candidate
+                    session_id = _session_id_of_20260623(candidate)
+                    break
+
+        if target is None:
+            session_id = "mobile_" + str(int(time.time() * 1000)) + "_" + uuid.uuid4().hex[:8]
+
+            target = {
+                "id": session_id,
+                "session_id": session_id,
+                "title": user_text[:60] or "New Chat",
+                "created_at": now,
+                "updated_at": now,
+                "messages": [],
+                "message_count": 0,
+                "user_id": auth_user_id,
+                "owner": auth_user_id,
+                "owner_source": "auth_session_chat_persistence",
+                "username": username_value,
+                "owner_username": username_value,
+                "email": email_value,
+                "owner_email": email_value,
+                "meta": {
+                    "created_by": "NOVA_AUTH_SCOPED_CHAT_PERSISTENCE_FIX_20260623",
+                    "scope": "authenticated_user",
+                    "user_id": auth_user_id
+                }
+            }
+
+            sessions.append(target)
+
+        owner_value = _session_owner_of_20260623(target)
+
+        if owner_value and owner_value != auth_user_id:
+            return response
+
+        target["id"] = session_id
+        target["session_id"] = session_id
+        target["user_id"] = auth_user_id
+        target["owner"] = auth_user_id
+        target["owner_source"] = target.get("owner_source") or "auth_session_chat_persistence"
+        target["username"] = target.get("username") or username_value
+        target["owner_username"] = target.get("owner_username") or username_value
+        target["email"] = target.get("email") or email_value
+        target["owner_email"] = target.get("owner_email") or email_value
+        target["updated_at"] = now
+
+        messages = target.get("messages")
+
+        if not isinstance(messages, list):
+            messages = []
+            target["messages"] = messages
+
+        last_user_text = ""
+
+        for existing in reversed(messages[-6:]):
+            if not isinstance(existing, dict):
+                continue
+
+            if str(existing.get("role") or "").lower() == "user":
+                last_user_text = str(existing.get("content") or existing.get("text") or "").strip()
+                break
+
+        if last_user_text != user_text:
+            messages.append({
+                "role": "user",
+                "content": user_text,
+                "text": user_text,
+                "created_at": now,
+                "timestamp": now
+            })
+
+            if assistant_text:
+                messages.append({
+                    "role": "assistant",
+                    "content": assistant_text,
+                    "text": assistant_text,
+                    "created_at": now,
+                    "timestamp": now
+                })
+
+        target["message_count"] = len(messages)
+
+        if not target.get("title") or str(target.get("title")).strip().lower() in ("new chat", "fresh mobile auth test"):
+            target["title"] = user_text[:60] or "New Chat"
+
+        if store_is_list:
+            _write_json_file_20260623(sessions_path, sessions)
+        else:
+            store["sessions"] = sessions
+            store["active_session_id"] = session_id
+            _write_json_file_20260623(sessions_path, store)
+
+        try:
+            if isinstance(response_payload, dict) and response_payload:
+                response_payload["active_session_id"] = session_id
+                response_payload["session_id"] = session_id
+
+                debug = response_payload.get("debug")
+
+                if not isinstance(debug, dict):
+                    debug = {}
+
+                debug["auth_scoped_chat_persistence_session_id"] = session_id
+                debug["auth_scoped_chat_persistence_message_count"] = len(messages)
+                response_payload["debug"] = debug
+
+                response.set_data(json.dumps(response_payload))
+                response.headers["Content-Type"] = "application/json"
+
+                try:
+                    response.headers["Content-Length"] = str(len(response.get_data()))
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        try:
+            response.set_cookie("nova_active_session_id", session_id, httponly=False, samesite="Lax")
+        except Exception:
+            pass
+
+        return response
+
+    except Exception:
+        try:
+            app.logger.exception("[NOVA_AUTH_SCOPED_CHAT_PERSISTENCE_FIX_20260623] failed")
+        except Exception:
+            pass
+
+        return response
+# NOVA_AUTH_SCOPED_CHAT_PERSISTENCE_FIX_END_20260623
+
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
