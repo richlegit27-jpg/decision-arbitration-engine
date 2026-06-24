@@ -7102,6 +7102,383 @@ header {
 
 
 
+
+<!-- NOVA_MOBILE_SESSION_RESTORE_BRIDGE_V1_20260624 -->
+<script>
+(() => {
+    const TAG = "[NOVA_MOBILE_SESSION_RESTORE_BRIDGE_V1_20260624]";
+    const PANEL_ID = "nova-mobile-session-restore-panel-v1";
+    const LIST_ID = "nova-mobile-session-restore-list-v1";
+
+    if (window.NovaMobileSessionRestoreBridgeV1Installed) {
+        console.log(TAG, "already installed");
+        return;
+    }
+
+    window.NovaMobileSessionRestoreBridgeV1Installed = true;
+
+    function css(el, styles) {
+        if (!el) return;
+        Object.assign(el.style, styles);
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+    }
+
+    function getMessageText(message) {
+        const raw = message?.content ?? message?.text ?? message?.message ?? "";
+
+        if (Array.isArray(raw)) {
+            return raw.map(part => {
+                if (typeof part === "string") return part;
+                return part?.text || part?.content || "";
+            }).join("\n");
+        }
+
+        if (typeof raw === "object" && raw !== null) {
+            return raw.text || raw.content || JSON.stringify(raw);
+        }
+
+        return String(raw || "");
+    }
+
+    function findChatTarget() {
+        const direct = [
+            "nova-mobile-chat",
+            "mobileChat",
+            "chatMessages",
+            "messages",
+            "mobile-messages",
+            "nova-chat-messages"
+        ];
+
+        for (const id of direct) {
+            const el = document.getElementById(id);
+            if (el) return el;
+        }
+
+        const selectors = [
+            ".nova-mobile-chat",
+            ".nova-mobile-chat-messages",
+            ".mobile-chat",
+            ".mobile-chat-messages",
+            ".chat-messages",
+            ".messages",
+            "[data-chat-messages]",
+            "[data-nova-chat]",
+            '[id*="messages" i]',
+            '[class*="messages" i]',
+            '[id*="chat" i]',
+            '[class*="chat" i]'
+        ];
+
+        const seen = new Set();
+        const candidates = [];
+
+        selectors.forEach(sel => {
+            document.querySelectorAll(sel).forEach(el => {
+                if (seen.has(el)) return;
+                seen.add(el);
+
+                const tag = el.tagName;
+                if (["TEXTAREA", "INPUT", "BUTTON", "FORM", "SCRIPT", "STYLE"].includes(tag)) return;
+
+                const r = el.getBoundingClientRect();
+                if (r.width < 180 || r.height < 120) return;
+
+                const name = `${el.id || ""} ${el.className || ""}`.toLowerCase();
+                if (/composer|input|toolbar|tools|session|panel|menu|button/.test(name)) return;
+
+                let score = 0;
+                if (name.includes("messages")) score += 10;
+                if (name.includes("chat")) score += 6;
+                if (el.scrollHeight > el.clientHeight) score += 3;
+                score += Math.min(6, Math.round(r.height / 100));
+
+                candidates.push({ el, score, height: r.height });
+            });
+        });
+
+        candidates.sort((a, b) => b.score - a.score || b.height - a.height);
+        return candidates[0]?.el || null;
+    }
+
+    function messageRole(message) {
+        const role = String(message?.role || message?.author || "assistant").toLowerCase();
+        if (role.includes("user")) return "user";
+        if (role.includes("system")) return "system";
+        return "assistant";
+    }
+
+    function renderMessages(messages) {
+        const chat = findChatTarget();
+
+        if (!chat) {
+            console.warn(TAG, "no chat target found");
+            return false;
+        }
+
+        chat.innerHTML = "";
+
+        messages.forEach(message => {
+            const role = messageRole(message);
+            const bubble = document.createElement("div");
+            bubble.className = `nova-mobile-restored-message nova-mobile-restored-${role}`;
+            bubble.textContent = getMessageText(message);
+
+            css(bubble, {
+                margin: role === "user" ? "10px 12px 10px auto" : "10px auto 10px 12px",
+                maxWidth: "86%",
+                padding: "12px 14px",
+                borderRadius: "16px",
+                background: role === "user" ? "rgba(124,92,255,.26)" : "rgba(255,255,255,.09)",
+                color: "#fff",
+                whiteSpace: "pre-wrap",
+                lineHeight: "1.42",
+                fontSize: "14px",
+                boxSizing: "border-box",
+                border: "1px solid rgba(255,255,255,.08)"
+            });
+
+            chat.appendChild(bubble);
+        });
+
+        requestAnimationFrame(() => {
+            chat.scrollTop = chat.scrollHeight;
+            window.scrollTo?.(0, document.body.scrollHeight);
+        });
+
+        return true;
+    }
+
+    async function fetchSessions() {
+        const data = await fetch("/api/sessions", { cache: "no-store" }).then(r => r.json());
+        return data.items || data.sessions || data.list || [];
+    }
+
+    async function fetchMessages(sessionId) {
+        const data = await fetch(`/api/chat/${encodeURIComponent(sessionId)}`, { cache: "no-store" }).then(r => r.json());
+        return data.messages || data.session?.messages || data.item?.messages || [];
+    }
+
+    async function rememberSession(sessionId) {
+        try {
+            localStorage.setItem("nova_mobile_active_session_id", sessionId);
+            localStorage.setItem("nova_active_session_id", sessionId);
+        } catch {}
+
+        try {
+            await fetch("/api/sessions/switch", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ session_id: sessionId, id: sessionId })
+            });
+        } catch {}
+    }
+
+    function closePanel() {
+        document.getElementById(PANEL_ID)?.remove();
+    }
+
+    function sessionTitle(session) {
+        return String(session.title || session.name || session.id || "Session");
+    }
+
+    function sessionCount(session) {
+        return session.messages?.length ?? session.message_count ?? session.count ?? 0;
+    }
+
+    function sessionUpdated(session) {
+        return session.updated_at || session.created_at || session.timestamp || "";
+    }
+
+    async function restoreSession(sessionId) {
+        if (!sessionId) return;
+
+        console.log(TAG, "restore start", sessionId);
+
+        const messages = await fetchMessages(sessionId);
+        await rememberSession(sessionId);
+
+        const ok = renderMessages(messages);
+
+        closePanel();
+
+        console.log(TAG, "restore done", {
+            sessionId,
+            messages: messages.length,
+            rendered: ok
+        });
+    }
+
+    function makeCard(session) {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.dataset.sessionId = session.id;
+
+        const title = escapeHtml(sessionTitle(session));
+        const count = Number(sessionCount(session) || 0);
+        const updated = escapeHtml(sessionUpdated(session));
+
+        card.innerHTML = `
+            <div style="font-weight:900;font-size:14px;margin-bottom:4px;">${title}</div>
+            <div style="font-size:12px;opacity:.82;">${count} messages</div>
+            <div style="font-size:11px;opacity:.55;margin-top:4px;">${updated}</div>
+        `;
+
+        css(card, {
+            display: "block",
+            width: "100%",
+            textAlign: "left",
+            padding: "12px",
+            margin: "0 0 10px 0",
+            borderRadius: "16px",
+            border: "1px solid rgba(255,255,255,.12)",
+            background: "rgba(255,255,255,.08)",
+            color: "#fff",
+            fontFamily: "inherit",
+            cursor: "pointer"
+        });
+
+        card.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            ev.stopImmediatePropagation();
+            restoreSession(session.id);
+        }, true);
+
+        return card;
+    }
+
+    async function openPanel() {
+        closePanel();
+
+        const panel = document.createElement("div");
+        panel.id = PANEL_ID;
+
+        panel.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;">
+                <div style="font-weight:900;font-size:17px;">Sessions</div>
+                <button type="button" data-close-session-restore-v1="1">Close</button>
+            </div>
+            <div id="${LIST_ID}">
+                <div style="opacity:.7;padding:14px;">Loading sessions...</div>
+            </div>
+        `;
+
+        css(panel, {
+            position: "fixed",
+            zIndex: "2147483646",
+            top: "58px",
+            left: "14px",
+            right: "14px",
+            bottom: "86px",
+            overflow: "auto",
+            WebkitOverflowScrolling: "touch",
+            padding: "14px",
+            borderRadius: "22px",
+            background: "rgba(18,18,26,.98)",
+            color: "#fff",
+            border: "1px solid rgba(255,255,255,.14)",
+            boxShadow: "0 20px 60px rgba(0,0,0,.55)",
+            boxSizing: "border-box",
+            fontFamily: "inherit"
+        });
+
+        const close = panel.querySelector("[data-close-session-restore-v1]");
+        css(close, {
+            minHeight: "36px",
+            padding: "0 14px",
+            borderRadius: "12px",
+            border: "1px solid rgba(255,255,255,.15)",
+            background: "rgba(255,255,255,.10)",
+            color: "#fff",
+            fontWeight: "800"
+        });
+
+        close.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            closePanel();
+        }, true);
+
+        document.body.appendChild(panel);
+
+        const listEl = document.getElementById(LIST_ID);
+
+        try {
+            const sessions = await fetchSessions();
+            listEl.innerHTML = "";
+
+            sessions.forEach(session => {
+                if (!session?.id) return;
+                listEl.appendChild(makeCard(session));
+            });
+
+            if (!listEl.children.length) {
+                listEl.innerHTML = `<div style="opacity:.7;padding:14px;">No sessions found.</div>`;
+            }
+
+            console.log(TAG, "panel loaded", { count: sessions.length });
+        } catch (err) {
+            console.warn(TAG, "panel load failed", err);
+            listEl.innerHTML = `<div style="opacity:.7;padding:14px;">Could not load sessions.</div>`;
+        }
+    }
+
+    function bindSessionsButton() {
+        const btn = document.getElementById("nova-mobile-sessions-toggle");
+        if (!btn || btn.dataset.sessionRestoreBridgeV1 === "1") return;
+
+        btn.dataset.sessionRestoreBridgeV1 = "1";
+
+        const handler = (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            ev.stopImmediatePropagation();
+
+            if (document.getElementById(PANEL_ID)) {
+                closePanel();
+            } else {
+                openPanel();
+            }
+
+            return false;
+        };
+
+        btn.addEventListener("click", handler, true);
+        btn.addEventListener("pointerdown", (ev) => {
+            ev.stopPropagation();
+        }, true);
+
+        console.log(TAG, "sessions button bound");
+    }
+
+    window.NovaMobileSessionRestoreBridgeV1 = () => {
+        bindSessionsButton();
+        return {
+            button: !!document.getElementById("nova-mobile-sessions-toggle"),
+            panel: !!document.getElementById(PANEL_ID),
+            chat: !!findChatTarget()
+        };
+    };
+
+    bindSessionsButton();
+
+    setTimeout(bindSessionsButton, 250);
+    setTimeout(bindSessionsButton, 900);
+    setTimeout(bindSessionsButton, 1800);
+
+    console.log(TAG, "ready");
+})();
+</script>
+
 </body>
 </html>
 
