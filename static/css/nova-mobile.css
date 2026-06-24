@@ -12343,44 +12343,14 @@ main {
 
 
 
-
-
-
-
-
-
-/* NOVA_MOBILE_FINAL_NATURAL_GRID_OWNER_20260624 */
-html,
-body {
-    height: 100% !important;
-    overflow: hidden !important;
-}
-
-.mobile-shell {
-    height: 100dvh !important;
-    min-height: 100dvh !important;
-    max-height: 100dvh !important;
-    display: grid !important;
-    grid-template-rows: auto minmax(0, 1fr) auto !important;
-    overflow: hidden !important;
-}
-
-.mobile-header {
-    position: relative !important;
-    top: auto !important;
-    grid-row: 1 !important;
-    z-index: 60 !important;
-}
-
+/* NOVA_MOBILE_SINGLE_GEOMETRY_OWNER_CSS_20260624 */
 #mobileChatMessages,
 .mobile-chat-container {
-    position: relative !important;
-    top: auto !important;
-    left: auto !important;
-    right: auto !important;
-    bottom: auto !important;
-    grid-row: 2 !important;
-    align-self: stretch !important;
+    position: fixed !important;
+    top: 72px !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 150px !important;
     width: 100% !important;
     height: auto !important;
     min-height: 0 !important;
@@ -12389,41 +12359,23 @@ body {
     overflow-x: hidden !important;
     -webkit-overflow-scrolling: touch !important;
     box-sizing: border-box !important;
-    padding: 10px 10px 40px 10px !important;
+    padding: 10px 10px 34px 10px !important;
     z-index: 10 !important;
 }
 
 #nova-mobile-composer,
 .mobile-composer,
 .nova-mobile-composer {
-    position: relative !important;
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
     top: auto !important;
-    left: auto !important;
-    right: auto !important;
-    bottom: auto !important;
-    grid-row: 3 !important;
     width: 100% !important;
     max-width: 100% !important;
-    min-height: 0 !important;
-    max-height: 116px !important;
+    min-height: 118px !important;
+    max-height: 142px !important;
     height: auto !important;
     box-sizing: border-box !important;
-    overflow: hidden !important;
-    z-index: 70 !important;
-}
-
-#nova-mobile-input {
-    min-height: 42px !important;
-    max-height: 54px !important;
-}
-
-#mobileChatMessages > *,
-.mobile-chat-container > * {
-    position: relative !important;
-    top: auto !important;
-    left: auto !important;
-    right: auto !important;
-    bottom: auto !important;
-    transform: none !important;
-    box-sizing: border-box !important;
+    z-index: 90 !important;
 }
