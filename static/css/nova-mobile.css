@@ -12093,3 +12093,216 @@ main {
     }
 }
 
+
+/* NOVA_MOBILE_DISABLE_SUMMARY_HORSEMEN_20260623 */
+
+.nova-mobile-summary-horsemen,
+#nova-mobile-summary-horsemen,
+.nova-mobile-summary-body,
+#nova-mobile-summary-body,
+.nova-mobile-backend-dock,
+#nova-mobile-backend-dock,
+#nova-backend-readiness-button,
+.nova-backend-readiness-button,
+.nova-mobile-backend-button {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+}
+
+/* END_NOVA_MOBILE_DISABLE_SUMMARY_HORSEMEN_20260623 */
+
+
+/* NOVA_MOBILE_KILL_SUMMARY_HORSEMEN_20260623 */
+
+.nova-mobile-summary-horsemen,
+#nova-mobile-summary-horsemen,
+.nova-mobile-summary-body,
+#nova-mobile-summary-body,
+.nova-mobile-backend-dock,
+#nova-mobile-backend-dock,
+#nova-backend-readiness-button,
+.nova-backend-readiness-button,
+.nova-mobile-backend-button {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+}
+
+/* END_NOVA_MOBILE_KILL_SUMMARY_HORSEMEN_20260623 */
+
+
+
+/* NOVA_MOBILE_SUMMARY_HORSEMEN_FILE_DISABLED_20260623 */
+
+.nova-mobile-summary-horsemen,
+#nova-mobile-summary-horsemen,
+.nova-mobile-summary-body,
+#nova-mobile-summary-body,
+.nova-mobile-backend-dock,
+#nova-mobile-backend-dock,
+#nova-backend-readiness-button,
+.nova-backend-readiness-button,
+.nova-mobile-backend-button {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+}
+
+#mobileChatMessages,
+.mobile-chat-container {
+    padding-bottom: 160px !important;
+}
+
+/* END_NOVA_MOBILE_SUMMARY_HORSEMEN_FILE_DISABLED_20260623 */
+
+
+/* NOVA_MOBILE_SAFE_READABLE_CHAT_AREA_20260623 */
+
+.nova-mobile-summary-horsemen,
+#nova-mobile-summary-horsemen,
+.nova-mobile-summary-body,
+#nova-mobile-summary-body,
+.nova-mobile-backend-dock,
+#nova-mobile-backend-dock,
+#nova-backend-readiness-button,
+.nova-backend-readiness-button,
+.nova-mobile-backend-button {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+}
+
+#mobileChatMessages,
+.mobile-chat-container {
+    min-height: 180px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding-bottom: 170px !important;
+    scroll-padding-bottom: 170px !important;
+    box-sizing: border-box !important;
+    -webkit-overflow-scrolling: touch !important;
+}
+
+/* END_NOVA_MOBILE_SAFE_READABLE_CHAT_AREA_20260623 */
+
+
+/* NOVA_MOBILE_SESSION_NAME_ROOM_SIZE_20260624 */
+
+/* Give the sessions drawer/list full usable width */
+#nova-mobile-sessions-panel,
+.nova-mobile-sessions-panel,
+#nova-mobile-sessions-list,
+.nova-mobile-sessions-list,
+.mobile-sessions-list,
+.sessions-list {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+}
+
+/* Session cards should not squeeze the title column */
+.nova-mobile-session-card,
+.mobile-session-card,
+.session-card,
+.session-item,
+[data-session-id] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    column-gap: 8px !important;
+    align-items: center !important;
+}
+
+/* Anything inside the title/content area gets room to wrap */
+.nova-mobile-session-card > *,
+.mobile-session-card > *,
+.session-card > *,
+.session-item > *,
+[data-session-id] > * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+}
+
+/* Session title text: bigger, wider, wraps cleanly */
+.nova-mobile-session-title,
+.mobile-session-title,
+.session-title,
+.session-name,
+[data-session-title],
+#nova-mobile-session-title,
+#mobile-session-title,
+#nova-mobile-current-session-title,
+[class*="session"][class*="title"],
+[class*="session"][class*="name"] {
+    display: -webkit-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    font-size: 14px !important;
+    font-weight: 750 !important;
+    line-height: 1.28 !important;
+    white-space: normal !important;
+    overflow: hidden !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    text-overflow: clip !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+}
+
+/* Session meta/id/date stays smaller and does not steal title room */
+.nova-mobile-session-meta,
+.mobile-session-meta,
+.session-meta,
+.session-date,
+.session-id,
+[data-session-meta] {
+    font-size: 10px !important;
+    line-height: 1.2 !important;
+    opacity: 0.72 !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+/* Buttons on session cards stay compact */
+.nova-mobile-session-card button,
+.mobile-session-card button,
+.session-card button,
+.session-item button,
+[data-session-id] button {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    min-width: 28px !important;
+    max-width: 72px !important;
+    white-space: nowrap !important;
+}
+
+/* /NOVA_MOBILE_SESSION_NAME_ROOM_SIZE_20260624 */
+
