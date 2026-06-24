@@ -6895,117 +6895,6 @@ header {
 
 
 
-<!-- NOVA_MOBILE_FINAL_TOP_BUTTON_VISIBILITY_V2_20260624 -->
-<style>
-#nova-mobile-sessions-toggle,
-#nova-mobile-memory-toggle {
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    pointer-events: auto !important;
-    animation: none !important;
-    transition: none !important;
-    filter: none !important;
-}
-
-#mobileMemoryButton {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-}
-</style>
-
-<script>
-(() => {
-    const TAG = "[NOVA_MOBILE_FINAL_TOP_BUTTON_VISIBILITY_V2_20260624]";
-
-    function hardShow(el, label) {
-        if (!el) return false;
-
-        el.textContent = label;
-        el.hidden = false;
-        el.removeAttribute("hidden");
-        el.removeAttribute("aria-hidden");
-        el.removeAttribute("tabindex");
-
-        el.style.cssText += `
-            display: flex !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            pointer-events: auto !important;
-            animation: none !important;
-            transition: none !important;
-            filter: none !important;
-        `;
-
-        return true;
-    }
-
-    function hardHide(el) {
-        if (!el) return false;
-
-        el.setAttribute("aria-hidden", "true");
-        el.setAttribute("tabindex", "-1");
-
-        el.style.cssText += `
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            pointer-events: none !important;
-        `;
-
-        return true;
-    }
-
-    function forceButtons() {
-        const sessions = document.getElementById("nova-mobile-sessions-toggle");
-        const memory = document.getElementById("nova-mobile-memory-toggle");
-        const oldMemory = document.getElementById("mobileMemoryButton");
-
-        hardShow(sessions, "Sessions");
-        hardShow(memory, "Memory");
-
-        if (memory) {
-            memory.setAttribute("aria-label", "Memory");
-            memory.setAttribute("title", "Memory");
-        }
-
-        hardHide(oldMemory);
-
-        return {
-            sessionsOpacity: sessions ? getComputedStyle(sessions).opacity : "missing",
-            sessionsDisplay: sessions ? getComputedStyle(sessions).display : "missing",
-            sessionsVisibility: sessions ? getComputedStyle(sessions).visibility : "missing",
-            memoryOpacity: memory ? getComputedStyle(memory).opacity : "missing",
-            oldMemoryDisplay: oldMemory ? getComputedStyle(oldMemory).display : "missing"
-        };
-    }
-
-    window.NovaMobileFinalTopButtonVisibility = forceButtons;
-
-    const checkpoints = [0, 50, 150, 400, 900, 1500, 2500, 4000];
-
-    checkpoints.forEach((ms) => {
-        setTimeout(() => {
-            const result = forceButtons();
-            if (ms === 0 || ms === 900 || ms === 4000) {
-                console.log(TAG, "forced", result);
-            }
-        }, ms);
-    });
-
-    document.addEventListener("click", () => {
-        requestAnimationFrame(() => forceButtons());
-    }, true);
-
-    console.log(TAG, "ready");
-})();
-</script>
-
-
-
-
 <!-- NOVA_MOBILE_FINAL_BOTTOM_BUBBLE_SAFE_AREA_V3_20260624 -->
 <style>
 @media (max-width: 900px) {
@@ -7280,7 +7169,11 @@ header {
 </script>
 
 
-<!-- NOVA_MOBILE_ONE_ROW_NEW_SESSIONS_COPY_REGEN_V2_20260624 -->
+
+
+
+
+<!-- NOVA_MOBILE_ONE_ROW_NEW_SESSIONS_COPY_REGEN_V5_20260624 -->
 <style>
 @media (max-width: 900px) {
     #nova-mobile-primary-action-row {
@@ -7289,25 +7182,28 @@ header {
         left: 8px !important;
         right: 8px !important;
         height: 36px !important;
-        z-index: 2147483004 !important;
-        display: grid !important;
-        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        z-index: 2147483600 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: stretch !important;
         gap: 5px !important;
         box-sizing: border-box !important;
         pointer-events: auto !important;
     }
 
     #nova-mobile-primary-action-row button {
+        flex: 1 1 0 !important;
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
-        width: 100% !important;
-        height: 34px !important;
+        width: auto !important;
         min-width: 0 !important;
+        max-width: none !important;
+        height: 34px !important;
         min-height: 34px !important;
         padding: 0 4px !important;
         border-radius: 999px !important;
-        border: 1px solid rgba(168, 85, 247, 0.45) !important;
+        border: 1px solid rgba(168, 85, 247, 0.46) !important;
         background: rgba(168, 85, 247, 0.22) !important;
         color: #f8f5ff !important;
         font-size: 11.5px !important;
@@ -7323,16 +7219,51 @@ header {
         box-sizing: border-box !important;
     }
 
-    #nova-mobile-primary-action-row button:active {
-        transform: translateY(1px) !important;
+    .nova-mobile-v5-parked-old-control {
+        position: fixed !important;
+        top: -10000px !important;
+        left: -10000px !important;
+        right: auto !important;
+        bottom: auto !important;
+        width: 1px !important;
+        height: 1px !important;
+        min-width: 1px !important;
+        min-height: 1px !important;
+        max-width: 1px !important;
+        max-height: 1px !important;
+        overflow: hidden !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        transform: translate3d(-10000px, -10000px, 0) !important;
+        z-index: -1 !important;
     }
 
-    .nova-mobile-one-row-hidden-control,
-    .nova-mobile-one-row-hidden-control * {
-        display: none !important;
-        visibility: hidden !important;
+    #mobileMenuButton,
+    #mobileMemoryButton,
+    #nova-mobile-new-chat,
+    #nova-mobile-sessions-toggle,
+    #nova-mobile-copy-chat,
+    #nova-mobile-rail-copy,
+    #nova-mobile-rail-regen,
+    #nova-mobile-bottom-login {
+        position: fixed !important;
+        top: -10000px !important;
+        left: -10000px !important;
+        right: auto !important;
+        bottom: auto !important;
+        width: 1px !important;
+        height: 1px !important;
+        min-width: 1px !important;
+        min-height: 1px !important;
+        max-width: 1px !important;
+        max-height: 1px !important;
+        overflow: hidden !important;
         opacity: 0 !important;
+        visibility: hidden !important;
         pointer-events: none !important;
+        transform: translate3d(-10000px, -10000px, 0) !important;
+        z-index: -1 !important;
     }
 
     #mobileChatMessages,
@@ -7344,7 +7275,9 @@ header {
     #nova-mobile-menu,
     #novaMobileMenu,
     .mobile-menu,
-    .nova-mobile-menu {
+    .nova-mobile-menu,
+    [data-menu],
+    [data-panel="menu"] {
         max-width: calc(100vw - 20px) !important;
         box-sizing: border-box !important;
     }
@@ -7358,7 +7291,11 @@ header {
     .mobile-menu button,
     .mobile-menu a,
     .nova-mobile-menu button,
-    .nova-mobile-menu a {
+    .nova-mobile-menu a,
+    [data-menu] button,
+    [data-menu] a,
+    [data-panel="menu"] button,
+    [data-panel="menu"] a {
         width: 100% !important;
         max-width: 100% !important;
         min-height: 38px !important;
@@ -7371,66 +7308,31 @@ header {
         box-sizing: border-box !important;
     }
 }
-
-@media (max-width: 390px) {
-    #nova-mobile-primary-action-row {
-        gap: 4px !important;
-        left: 6px !important;
-        right: 6px !important;
-    }
-
-    #nova-mobile-primary-action-row button {
-        font-size: 10.8px !important;
-        padding: 0 3px !important;
-    }
-}
 </style>
 
 <script>
 (() => {
-    const TAG = "[NOVA_MOBILE_ONE_ROW_NEW_SESSIONS_COPY_REGEN_V2_20260624]";
-    const ACTIONS = new Set(["copy", "regen", "account"]);
+    const TAG = "[NOVA_MOBILE_ONE_ROW_NEW_SESSIONS_COPY_REGEN_V5_20260624]";
+
+    const PARK_IDS = [
+        "mobileMenuButton",
+        "mobileMemoryButton",
+        "nova-mobile-new-chat",
+        "nova-mobile-sessions-toggle",
+        "nova-mobile-copy-chat",
+        "nova-mobile-rail-copy",
+        "nova-mobile-rail-regen",
+        "nova-mobile-bottom-login"
+    ];
 
     let lastLog = "";
-    let scheduled = false;
+
+    function setImportant(el, prop, value) {
+        el.style.setProperty(prop, value, "important");
+    }
 
     function clean(value) {
         return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
-    }
-
-    function visibleBox(el) {
-        if (!el) return null;
-
-        const cs = getComputedStyle(el);
-        const r = el.getBoundingClientRect();
-
-        if (
-            cs.display === "none" ||
-            cs.visibility === "hidden" ||
-            Number(cs.opacity || 1) === 0 ||
-            r.width < 4 ||
-            r.height < 4
-        ) {
-            return null;
-        }
-
-        return r;
-    }
-
-    function visible(el) {
-        return !!visibleBox(el);
-    }
-
-    function insideMessage(el) {
-        return !!el.closest(
-            ".message, .assistant, .assistant-message, .user-message, [data-role='assistant'], [data-role='user'], .message-content, #mobileChatMessages .bubble, #mobileChatMessages .message"
-        );
-    }
-
-    function insideMenu(el) {
-        return !!el.closest(
-            "#mobileMenuPanel, #nova-mobile-menu, #novaMobileMenu, .mobile-menu, .nova-mobile-menu, [data-panel='menu'], [data-menu]"
-        );
     }
 
     function ensureRow() {
@@ -7448,10 +7350,69 @@ header {
             document.body.appendChild(row);
         }
 
+        setImportant(row, "display", "flex");
+        setImportant(row, "position", "fixed");
+        setImportant(row, "top", "6px");
+        setImportant(row, "left", "8px");
+        setImportant(row, "right", "8px");
+        setImportant(row, "height", "36px");
+        setImportant(row, "gap", "5px");
+        setImportant(row, "z-index", "2147483600");
+
+        Array.from(row.querySelectorAll("button")).forEach((btn) => {
+            setImportant(btn, "flex", "1 1 0");
+            setImportant(btn, "width", "auto");
+            setImportant(btn, "min-width", "0");
+            setImportant(btn, "max-width", "none");
+            setImportant(btn, "display", "inline-flex");
+            setImportant(btn, "visibility", "visible");
+            setImportant(btn, "opacity", "1");
+            setImportant(btn, "pointer-events", "auto");
+        });
+
         return row;
     }
 
-    function buttonText(el) {
+    function park(el) {
+        if (!el || el.closest("#nova-mobile-primary-action-row")) return false;
+
+        el.classList.add("nova-mobile-v5-parked-old-control");
+        el.setAttribute("aria-hidden", "true");
+        el.setAttribute("tabindex", "-1");
+
+        setImportant(el, "position", "fixed");
+        setImportant(el, "top", "-10000px");
+        setImportant(el, "left", "-10000px");
+        setImportant(el, "right", "auto");
+        setImportant(el, "bottom", "auto");
+        setImportant(el, "width", "1px");
+        setImportant(el, "height", "1px");
+        setImportant(el, "min-width", "1px");
+        setImportant(el, "min-height", "1px");
+        setImportant(el, "max-width", "1px");
+        setImportant(el, "max-height", "1px");
+        setImportant(el, "overflow", "hidden");
+        setImportant(el, "opacity", "0");
+        setImportant(el, "visibility", "hidden");
+        setImportant(el, "pointer-events", "none");
+        setImportant(el, "transform", "translate3d(-10000px, -10000px, 0)");
+        setImportant(el, "z-index", "-1");
+
+        return true;
+    }
+
+    function parkOldControls() {
+        let parked = 0;
+
+        PARK_IDS.forEach((id) => {
+            const el = document.getElementById(id);
+            if (el && park(el)) parked += 1;
+        });
+
+        return parked;
+    }
+
+    function textOf(el) {
         return clean(el?.textContent);
     }
 
@@ -7460,23 +7421,16 @@ header {
             .filter(el => !el.closest("#nova-mobile-primary-action-row"));
     }
 
-    function originalButtonsByText(labels) {
+    function clickOriginal(labels) {
         const wanted = new Set(labels.map(clean));
 
-        return allButtons()
-            .filter(el => wanted.has(buttonText(el)));
-    }
-
-    function clickOriginal(labels, allowHidden = false) {
-        const candidates = originalButtonsByText(labels)
-            .filter(el => allowHidden || visible(el))
+        const target = allButtons()
+            .filter(el => wanted.has(textOf(el)))
             .sort((a, b) => {
                 const ar = a.getBoundingClientRect();
                 const br = b.getBoundingClientRect();
                 return br.top - ar.top;
-            });
-
-        const target = candidates[0];
+            })[0];
 
         if (!target) return false;
 
@@ -7491,18 +7445,9 @@ header {
     }
 
     function openNew() {
-        if (clickOriginal(["new", "new chat", "new session", "start fresh chat"], true)) {
-            return true;
-        }
+        if (clickOriginal(["new", "new chat", "new session", "start fresh chat"])) return true;
 
-        const names = [
-            "newSession",
-            "NovaMobileNewSession",
-            "NovaMobileCreateNewSession",
-            "startNewSession"
-        ];
-
-        for (const name of names) {
+        for (const name of ["newSession", "NovaMobileNewSession", "NovaMobileCreateNewSession", "startNewSession"]) {
             if (typeof window[name] === "function") {
                 try {
                     window[name]();
@@ -7526,11 +7471,12 @@ header {
         const btn = document.getElementById("nova-mobile-sessions-toggle");
 
         if (btn) {
-            btn.dispatchEvent(new PointerEvent("pointerdown", {
+            btn.dispatchEvent(new MouseEvent("click", {
                 bubbles: true,
-                cancelable: true
+                cancelable: true,
+                view: window
             }));
-            console.log(TAG, "clicked hidden sessions toggle");
+            console.log(TAG, "clicked parked sessions toggle");
             return true;
         }
 
@@ -7552,10 +7498,7 @@ header {
 
         const text = String(last?.innerText || last?.textContent || "").trim();
 
-        if (!text) {
-            console.warn(TAG, "copy fallback found no message text");
-            return false;
-        }
+        if (!text) return false;
 
         try {
             await navigator.clipboard.writeText(text);
@@ -7568,23 +7511,15 @@ header {
     }
 
     function runCopy() {
-        if (clickOriginal(["copy"], true)) return true;
+        if (clickOriginal(["copy"])) return true;
         fallbackCopy();
         return true;
     }
 
     function runRegen() {
-        if (clickOriginal(["regen"], true)) return true;
+        if (clickOriginal(["regen"])) return true;
 
-        const names = [
-            "NovaMobileRegenerate",
-            "NovaMobileRegen",
-            "regenerateLast",
-            "regenLast",
-            "handleRegenerate"
-        ];
-
-        for (const name of names) {
+        for (const name of ["NovaMobileRegenerate", "NovaMobileRegen", "regenerateLast", "regenLast", "handleRegenerate"]) {
             if (typeof window[name] === "function") {
                 try {
                     window[name]();
@@ -7601,244 +7536,35 @@ header {
     function bindRow() {
         ensureRow();
 
-        const newBtn = document.getElementById("nova-mobile-row-new");
-        const sessionsBtn = document.getElementById("nova-mobile-row-sessions");
-        const copyBtn = document.getElementById("nova-mobile-row-copy");
-        const regenBtn = document.getElementById("nova-mobile-row-regen");
+        const binds = [
+            ["nova-mobile-row-new", openNew],
+            ["nova-mobile-row-sessions", openSessions],
+            ["nova-mobile-row-copy", runCopy],
+            ["nova-mobile-row-regen", runRegen],
+        ];
 
-        if (newBtn && !newBtn.dataset.novaBoundOneRowV2) {
-            newBtn.dataset.novaBoundOneRowV2 = "1";
-            newBtn.addEventListener("click", (event) => {
+        binds.forEach(([id, fn]) => {
+            const btn = document.getElementById(id);
+            if (!btn || btn.dataset.novaBoundV5) return;
+
+            btn.dataset.novaBoundV5 = "1";
+            btn.addEventListener("click", (event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                openNew();
+                fn();
+                setTimeout(() => apply("row-click"), 120);
             }, true);
-        }
-
-        if (sessionsBtn && !sessionsBtn.dataset.novaBoundOneRowV2) {
-            sessionsBtn.dataset.novaBoundOneRowV2 = "1";
-            sessionsBtn.addEventListener("click", (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                openSessions();
-            }, true);
-        }
-
-        if (copyBtn && !copyBtn.dataset.novaBoundOneRowV2) {
-            copyBtn.dataset.novaBoundOneRowV2 = "1";
-            copyBtn.addEventListener("click", (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                runCopy();
-            }, true);
-        }
-
-        if (regenBtn && !regenBtn.dataset.novaBoundOneRowV2) {
-            regenBtn.dataset.novaBoundOneRowV2 = "1";
-            regenBtn.addEventListener("click", (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                runRegen();
-            }, true);
-        }
-    }
-
-    function isAccount(el) {
-        const raw = clean([
-            el.id || "",
-            el.className || "",
-            el.getAttribute("aria-label") || "",
-            el.getAttribute("title") || "",
-            el.textContent || ""
-        ].join(" "));
-
-        const text = clean(el.textContent);
-
-        return text === "account" ||
-            raw === "account" ||
-            raw.includes(" account ") ||
-            raw.includes("account button") ||
-            raw.includes("mobile account");
-    }
-
-    function showIfMenuAccount(el) {
-        if (!isAccount(el) || !insideMenu(el)) return false;
-
-        el.classList.remove(
-            "nova-mobile-one-row-hidden-control",
-            "nova-mobile-final-hidden-control",
-            "nova-mobile-account-hidden",
-            "nova-mobile-account-outside-menu-hidden"
-        );
-
-        el.removeAttribute("aria-hidden");
-        el.removeAttribute("tabindex");
-        el.style.removeProperty("display");
-        el.style.removeProperty("visibility");
-        el.style.removeProperty("opacity");
-        el.style.removeProperty("pointer-events");
-
-        return true;
-    }
-
-    function hideControl(el) {
-        el.classList.add("nova-mobile-one-row-hidden-control");
-        el.setAttribute("aria-hidden", "true");
-        el.setAttribute("tabindex", "-1");
-        el.style.setProperty("display", "none", "important");
-        el.style.setProperty("visibility", "hidden", "important");
-        el.style.setProperty("opacity", "0", "important");
-        el.style.setProperty("pointer-events", "none", "important");
-    }
-
-    function shouldHideOldButton(el) {
-        if (el.closest("#nova-mobile-primary-action-row")) return false;
-        if (insideMessage(el)) return false;
-        if (insideMenu(el)) return false;
-
-        const text = buttonText(el);
-        const id = clean(el.id);
-        const raw = clean([
-            el.id || "",
-            el.className || "",
-            el.getAttribute("aria-label") || "",
-            el.getAttribute("title") || "",
-            el.textContent || ""
-        ].join(" "));
-
-        if (ACTIONS.has(text)) return true;
-
-        if (
-            text === "new" ||
-            text === "new chat" ||
-            text === "new session" ||
-            text === "sessions" ||
-            text === "memory" ||
-            id === "nova-mobile-sessions-toggle" ||
-            id === "nova-mobile-memory-toggle" ||
-            id === "mobilememorybutton"
-        ) {
-            return true;
-        }
-
-        if (
-            raw.includes("account") ||
-            raw.includes("new-chat") ||
-            raw.includes("new session") ||
-            raw.includes("sessions-toggle") ||
-            raw.includes("memory")
-        ) {
-            return true;
-        }
-
-        return false;
-    }
-
-    function isBottomArea(el) {
-        const r = visibleBox(el);
-        if (!r) return false;
-
-        const vh = window.innerHeight || document.documentElement.clientHeight || 700;
-
-        return r.top > vh * 0.42 || r.bottom > vh - 130;
-    }
-
-    function actionLabelOf(el) {
-        const text = buttonText(el);
-        if (text === "copy" || text === "regen") return text;
-        return "";
-    }
-
-    function actionWordCount(text) {
-        const words = clean(text).split(" ").filter(Boolean);
-        return words.filter(w => w === "copy" || w === "regen" || w === "account").length;
-    }
-
-    function findBottomStripRoot(el) {
-        let node = el;
-
-        for (let depth = 0; node && node !== document.body && depth < 7; depth += 1) {
-            const parent = node.parentElement;
-            if (!parent || parent === document.body) break;
-            if (insideMessage(parent) || insideMenu(parent)) break;
-
-            const pt = clean(parent.innerText || parent.textContent);
-            const pr = visibleBox(parent);
-
-            if (
-                pr &&
-                isBottomArea(parent) &&
-                pt.length <= 100 &&
-                actionWordCount(pt) >= 1
-            ) {
-                node = parent;
-                continue;
-            }
-
-            break;
-        }
-
-        return node || el;
-    }
-
-    function hideBottomCopyRegenStrip() {
-        const candidates = Array.from(document.querySelectorAll("button, a, [role='button'], div, span"))
-            .filter(el => actionLabelOf(el))
-            .filter(el => !insideMessage(el))
-            .filter(el => !insideMenu(el))
-            .filter(isBottomArea);
-
-        const roots = new Set();
-
-        for (const el of candidates) {
-            roots.add(findBottomStripRoot(el));
-        }
-
-        let hidden = 0;
-
-        for (const root of roots) {
-            if (!root || root === document.body || root === document.documentElement) continue;
-            hideControl(root);
-            hidden += 1;
-        }
-
-        return hidden;
-    }
-
-    function hideOldControls() {
-        let hidden = 0;
-        let menuAccounts = 0;
-
-        allButtons().forEach((el) => {
-            if (showIfMenuAccount(el)) {
-                menuAccounts += 1;
-                return;
-            }
-
-            if (!shouldHideOldButton(el)) return;
-
-            hideControl(el);
-            hidden += 1;
         });
-
-        hidden += hideBottomCopyRegenStrip();
-
-        return { hidden, menuAccounts };
     }
 
     function apply(reason = "apply") {
         bindRow();
+        const parked = parkOldControls();
 
-        const counts = hideOldControls();
-        const row = document.getElementById("nova-mobile-primary-action-row");
-        const buttons = row ? Array.from(row.querySelectorAll("button")) : [];
-        const widths = buttons.map(btn => Math.round(btn.getBoundingClientRect().width));
+        const row = ensureRow();
+        const widths = Array.from(row.querySelectorAll("button")).map(btn => Math.round(btn.getBoundingClientRect().width));
 
-        const msg = JSON.stringify({
-            hidden: counts.hidden,
-            menuAccounts: counts.menuAccounts,
-            widths
-        });
+        const msg = JSON.stringify({ parked, widths });
 
         if (msg !== lastLog) {
             lastLog = msg;
@@ -7848,29 +7574,12 @@ header {
         return JSON.parse(msg);
     }
 
-    function schedule(reason = "mutation") {
-        if (scheduled) return;
-        scheduled = true;
-
-        requestAnimationFrame(() => {
-            scheduled = false;
-            apply(reason);
-        });
-    }
-
-    window.NovaMobileOneRowNewSessionsCopyRegenV2 = () => apply("manual");
+    window.NovaMobileOneRowNewSessionsCopyRegenV5 = () => apply("manual");
 
     apply("boot");
 
-    [80, 180, 400, 800, 1400, 2500, 4000].forEach(ms => {
+    [80, 160, 300, 600, 1000, 1800, 3000, 5000].forEach(ms => {
         setTimeout(() => apply(`boot-${ms}`), ms);
-    });
-
-    new MutationObserver(() => {
-        schedule("mutation");
-    }).observe(document.body, {
-        childList: true,
-        subtree: true
     });
 
     document.addEventListener("click", () => {
