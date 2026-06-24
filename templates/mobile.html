@@ -70,7 +70,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nova Mobile</title>
 
-<link rel="stylesheet" href="/static/css/nova-mobile.css?v=source-card-kill-20260624-999">
+<link rel="stylesheet" href="/static/css/nova-mobile.css?v=message-flow-scroll-lock-20260624-001">
 <style>
     html,
     body,
@@ -6243,6 +6243,78 @@ header {
     setTimeout(boot, 2500);
 
     console.log("[Nova Mobile] inline source card kill active");
+})();
+</script>
+
+
+<script>
+/* NOVA_MOBILE_INLINE_MESSAGE_SCROLL_LOCK_20260624 */
+(function () {
+    "use strict";
+
+    function getChatRoot() {
+        return document.getElementById("mobileChatMessages") ||
+            document.querySelector(".mobile-chat-container") ||
+            document.querySelector(".mobile-messages") ||
+            document.querySelector(".nova-mobile-messages");
+    }
+
+    function scrollChatBottom() {
+        try {
+            var root = getChatRoot();
+            if (!root) return;
+
+            root.scrollTop = root.scrollHeight;
+
+            requestAnimationFrame(function () {
+                root.scrollTop = root.scrollHeight;
+            });
+
+            setTimeout(function () {
+                root.scrollTop = root.scrollHeight;
+            }, 80);
+
+            setTimeout(function () {
+                root.scrollTop = root.scrollHeight;
+            }, 250);
+        } catch (_) {}
+    }
+
+    window.NovaMobileScrollBottomHard = scrollChatBottom;
+
+    function boot() {
+        var root = getChatRoot();
+        if (!root || root.__novaMessageScrollLockObserver) {
+            scrollChatBottom();
+            return;
+        }
+
+        var observer = new MutationObserver(function () {
+            scrollChatBottom();
+        });
+
+        observer.observe(root, {
+            childList: true,
+            subtree: true,
+            characterData: true
+        });
+
+        root.__novaMessageScrollLockObserver = observer;
+
+        scrollChatBottom();
+    }
+
+    document.addEventListener("DOMContentLoaded", boot);
+    window.addEventListener("load", boot);
+    window.addEventListener("resize", scrollChatBottom);
+    window.addEventListener("orientationchange", scrollChatBottom);
+
+    setTimeout(boot, 50);
+    setTimeout(boot, 300);
+    setTimeout(boot, 1000);
+    setTimeout(scrollChatBottom, 1600);
+
+    console.log("[Nova Mobile] message flow scroll lock active");
 })();
 </script>
 

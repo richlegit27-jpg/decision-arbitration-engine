@@ -12335,3 +12335,81 @@ main {
     padding: 0 !important;
     overflow: hidden !important;
 }
+
+
+/* NOVA_MOBILE_MESSAGE_FLOW_SCROLL_LOCK_20260624 */
+/* Final mobile chat flow lock: messages stack; nothing overlaps previous messages. */
+#mobileChatMessages,
+.mobile-chat-container,
+.mobile-messages,
+.nova-mobile-messages {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scroll-behavior: smooth !important;
+    -webkit-overflow-scrolling: touch !important;
+    gap: 8px !important;
+    padding-bottom: 132px !important;
+    box-sizing: border-box !important;
+}
+
+#mobileChatMessages > *,
+.mobile-chat-container > *,
+.mobile-messages > *,
+.nova-mobile-messages > * {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    transform: none !important;
+    flex: 0 0 auto !important;
+    float: none !important;
+    clear: both !important;
+    box-sizing: border-box !important;
+}
+
+#mobileChatMessages .mobile-chat-message,
+#mobileChatMessages .nova-mobile-message,
+#mobileChatMessages .message,
+#mobileChatMessages .chat-message,
+#mobileChatMessages [data-role="assistant"],
+#mobileChatMessages [data-role="user"] {
+    position: relative !important;
+    display: block !important;
+    flex: 0 0 auto !important;
+    max-width: 94% !important;
+    min-height: fit-content !important;
+    height: auto !important;
+    margin-top: 6px !important;
+    margin-bottom: 6px !important;
+    overflow: visible !important;
+    white-space: pre-wrap !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    box-sizing: border-box !important;
+}
+
+#mobileChatMessages .mobile-chat-message.assistant,
+#mobileChatMessages .nova-mobile-message.assistant,
+#mobileChatMessages .message.assistant,
+#mobileChatMessages .chat-message.assistant,
+#mobileChatMessages [data-role="assistant"] {
+    align-self: flex-start !important;
+    margin-right: auto !important;
+    margin-left: 10px !important;
+}
+
+#mobileChatMessages .mobile-chat-message.user,
+#mobileChatMessages .nova-mobile-message.user,
+#mobileChatMessages .message.user,
+#mobileChatMessages .chat-message.user,
+#mobileChatMessages [data-role="user"] {
+    align-self: flex-end !important;
+    margin-left: auto !important;
+    margin-right: 10px !important;
+}
