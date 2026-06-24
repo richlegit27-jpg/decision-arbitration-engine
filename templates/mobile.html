@@ -7195,6 +7195,241 @@ header {
 })();
 </script>
 
+
+
+<!-- NOVA_MOBILE_TOP_COPY_REGEN_BEFORE_NEW_SESSION_20260624 -->
+<style>
+@media (max-width: 900px) {
+    #nova-mobile-top-copy-regen-group {
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        flex: 0 0 auto !important;
+        order: -999 !important;
+        margin-right: 6px !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+
+    #nova-mobile-top-copy-btn,
+    #nova-mobile-top-regen-btn {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        height: 32px !important;
+        min-height: 32px !important;
+        padding: 0 10px !important;
+        border-radius: 999px !important;
+        border: 1px solid rgba(168, 85, 247, 0.42) !important;
+        background: rgba(168, 85, 247, 0.18) !important;
+        color: #f8f5ff !important;
+        font-size: 12px !important;
+        font-weight: 850 !important;
+        line-height: 1 !important;
+        white-space: nowrap !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        position: relative !important;
+        inset: auto !important;
+        transform: none !important;
+        z-index: 2147483001 !important;
+        box-sizing: border-box !important;
+    }
+
+    #nova-mobile-top-copy-btn:active,
+    #nova-mobile-top-regen-btn:active {
+        transform: translateY(1px) !important;
+    }
+}
+</style>
+
+<script>
+(() => {
+    const TAG = "[NOVA_MOBILE_TOP_COPY_REGEN_BEFORE_NEW_SESSION_20260624]";
+
+    function textOf(el) {
+        return String(el?.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+    }
+
+    function visible(el) {
+        if (!el) return false;
+        const cs = getComputedStyle(el);
+        const r = el.getBoundingClientRect();
+
+        return cs.display !== "none" &&
+            cs.visibility !== "hidden" &&
+            Number(cs.opacity || 1) > 0 &&
+            r.width > 4 &&
+            r.height > 4;
+    }
+
+    function findNewOrSessionsButton() {
+        return document.getElementById("nova-mobile-new-chat") ||
+            document.getElementById("nova-mobile-new-toggle") ||
+            document.querySelector("[data-action='new-session']") ||
+            Array.from(document.querySelectorAll("button, a, [role='button']")).find(el => {
+                const t = textOf(el);
+                return t === "new" || t === "new chat" || t === "new session";
+            }) ||
+            document.getElementById("nova-mobile-sessions-toggle");
+    }
+
+    function ensureGroup() {
+        const anchor = findNewOrSessionsButton();
+
+        if (!anchor || !anchor.parentElement) {
+            return null;
+        }
+
+        const parent = anchor.parentElement;
+        let group = document.getElementById("nova-mobile-top-copy-regen-group");
+
+        if (!group) {
+            group = document.createElement("div");
+            group.id = "nova-mobile-top-copy-regen-group";
+            group.innerHTML = `
+                <button id="nova-mobile-top-copy-btn" type="button">Copy</button>
+                <button id="nova-mobile-top-regen-btn" type="button">Regen</button>
+            `;
+        }
+
+        if (group.parentElement !== parent) {
+            parent.insertBefore(group, parent.firstElementChild || anchor);
+        } else if (parent.firstElementChild !== group) {
+            parent.insertBefore(group, parent.firstElementChild);
+        }
+
+        return group;
+    }
+
+    function allButtonsByText(label) {
+        return Array.from(document.querySelectorAll("button, a, [role='button']"))
+            .filter(el => textOf(el) === label)
+            .filter(el => !el.closest("#nova-mobile-top-copy-regen-group"));
+    }
+
+    function clickOriginal(label) {
+        const candidates = allButtonsByText(label).filter(visible);
+        const bottomFirst = candidates.sort((a, b) => {
+            const ar = a.getBoundingClientRect();
+            const br = b.getBoundingClientRect();
+            return br.top - ar.top;
+        });
+
+        const target = bottomFirst[0];
+
+        if (target) {
+            target.dispatchEvent(new MouseEvent("click", {
+                bubbles: true,
+                cancelable: true,
+                view: window
+            }));
+            console.log(TAG, "clicked original", label);
+            return true;
+        }
+
+        return false;
+    }
+
+    async function fallbackCopy() {
+        const messages = Array.from(document.querySelectorAll(
+            ".assistant, .assistant-message, .message.assistant, [data-role='assistant']"
+        ));
+
+        const last = messages[messages.length - 1];
+        const text = String(last?.innerText || last?.textContent || "").trim();
+
+        if (!text) {
+            console.warn(TAG, "copy fallback found no assistant text");
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(text);
+            console.log(TAG, "copied fallback assistant text");
+        } catch (error) {
+            console.warn(TAG, "copy fallback failed", error);
+        }
+    }
+
+    function fallbackRegen() {
+        const names = [
+            "NovaMobileRegenerate",
+            "NovaMobileRegen",
+            "regenerateLast",
+            "regenLast",
+            "handleRegenerate"
+        ];
+
+        for (const name of names) {
+            if (typeof window[name] === "function") {
+                try {
+                    window[name]();
+                    console.log(TAG, "called fallback", name);
+                    return true;
+                } catch (_) {}
+            }
+        }
+
+        console.warn(TAG, "regen fallback not found");
+        return false;
+    }
+
+    function bind() {
+        const group = ensureGroup();
+        if (!group) return false;
+
+        const copy = document.getElementById("nova-mobile-top-copy-btn");
+        const regen = document.getElementById("nova-mobile-top-regen-btn");
+
+        if (copy && !copy.dataset.boundTopCopy) {
+            copy.dataset.boundTopCopy = "1";
+            copy.addEventListener("click", (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (!clickOriginal("copy")) {
+                    fallbackCopy();
+                }
+            }, true);
+        }
+
+        if (regen && !regen.dataset.boundTopRegen) {
+            regen.dataset.boundTopRegen = "1";
+            regen.addEventListener("click", (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (!clickOriginal("regen")) {
+                    fallbackRegen();
+                }
+            }, true);
+        }
+
+        console.log(TAG, "ready", {
+            parent: group.parentElement?.id || group.parentElement?.className || group.parentElement?.tagName || "",
+            copyVisible: copy ? getComputedStyle(copy).display : "missing",
+            regenVisible: regen ? getComputedStyle(regen).display : "missing"
+        });
+
+        return true;
+    }
+
+    window.NovaMobileTopCopyRegenBeforeNewSession = bind;
+
+    bind();
+    setTimeout(bind, 150);
+    setTimeout(bind, 500);
+    setTimeout(bind, 1200);
+
+    document.addEventListener("click", () => {
+        setTimeout(bind, 50);
+    }, true);
+})();
+</script>
+
 </body>
 </html>
 
