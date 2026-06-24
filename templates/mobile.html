@@ -6250,17 +6250,19 @@ header {
 
 
 
+
 <script>
-/* NOVA_MOBILE_RUNTIME_COMPOSER_GEOMETRY_FREEZE_NO_SHAKE_20260624 */
+/* NOVA_MOBILE_SINGLE_GEOMETRY_OWNER_20260624 */
 (function () {
     "use strict";
 
     function important(el, prop, value) {
         if (!el) return;
+        if (el.style.getPropertyValue(prop) === value) return;
         el.style.setProperty(prop, value, "important");
     }
 
-    function freezeGeometry() {
+    function lockOnce() {
         try {
             var chat = document.getElementById("mobileChatMessages");
             var composer = document.getElementById("nova-mobile-composer");
@@ -6280,32 +6282,31 @@ header {
             important(chat, "top", "72px");
             important(chat, "left", "0px");
             important(chat, "right", "0px");
-            important(chat, "bottom", "138px");
+            important(chat, "bottom", "150px");
             important(chat, "height", "auto");
             important(chat, "max-height", "none");
             important(chat, "overflow-y", "auto");
             important(chat, "overflow-x", "hidden");
-            important(chat, "z-index", "10");
             important(chat, "box-sizing", "border-box");
-            important(chat, "padding-bottom", "22px");
+            important(chat, "padding-bottom", "34px");
+            important(chat, "z-index", "10");
         } catch (_) {}
     }
 
-    window.NovaMobileLockComposerGeometry = freezeGeometry;
+    window.NovaMobileLockComposerGeometry = lockOnce;
 
-    document.addEventListener("DOMContentLoaded", freezeGeometry);
-    window.addEventListener("load", freezeGeometry);
-    window.addEventListener("resize", freezeGeometry);
-    window.addEventListener("orientationchange", freezeGeometry);
+    document.addEventListener("DOMContentLoaded", lockOnce);
+    window.addEventListener("load", lockOnce);
+    window.addEventListener("resize", lockOnce);
+    window.addEventListener("orientationchange", lockOnce);
 
-    setTimeout(freezeGeometry, 50);
-    setTimeout(freezeGeometry, 300);
-    setTimeout(freezeGeometry, 1000);
+    setTimeout(lockOnce, 50);
+    setTimeout(lockOnce, 300);
+    setTimeout(lockOnce, 1200);
 
-    console.log("[Nova Mobile] runtime composer geometry freeze no-shake active");
+    console.log("[Nova Mobile] single geometry owner active");
 })();
 </script>
-
 
 </body>
 </html>
