@@ -1196,3 +1196,69 @@ window.NovaMobileWebCards = {
 
 
 
+
+
+// NOVA_MOBILE_SOURCE_CARD_KILL_SWITCH_20260624
+// Hard kill: mobile source/web cards became visual clutter.
+// Assistant text can still mention sources, but card UI is removed from mobile.
+(function () {
+    "use strict";
+
+    function killMobileSourceCards() {
+        try {
+            const root = document.getElementById("mobileChatMessages") || document.body;
+            if (!root) return;
+
+            root.querySelectorAll([
+                ".mobile-web-section-header",
+                ".mobile-web-card",
+                ".mobile-web-show-more",
+                ".nova-mobile-source-cards",
+                ".source-card",
+                ".source-cards",
+                ".sources",
+                ".web-sources",
+                ".news-sources",
+                "[data-sources]",
+                "[data-source-strip]",
+                "[class*='source-card']",
+                "[class*='web-card']",
+                "[class*='webcard']"
+            ].join(",")).forEach(function (el) {
+                el.remove();
+            });
+        } catch (_) {}
+    }
+
+    window.NovaMobileKillSourceCards = killMobileSourceCards;
+
+    window.renderWebSourcesFromPayload = function () {
+        killMobileSourceCards();
+        return null;
+    };
+
+    function bootSourceCardKillSwitch() {
+        killMobileSourceCards();
+
+        const root = document.getElementById("mobileChatMessages");
+        if (!root || root.__novaSourceCardKillObserver) return;
+
+        const observer = new MutationObserver(function () {
+            killMobileSourceCards();
+        });
+
+        observer.observe(root, {
+            childList: true,
+            subtree: true
+        });
+
+        root.__novaSourceCardKillObserver = observer;
+    }
+
+    document.addEventListener("DOMContentLoaded", bootSourceCardKillSwitch);
+    setTimeout(bootSourceCardKillSwitch, 250);
+    setTimeout(bootSourceCardKillSwitch, 1000);
+    setTimeout(bootSourceCardKillSwitch, 2500);
+
+    console.log("[Nova Mobile] source card kill switch active");
+})();

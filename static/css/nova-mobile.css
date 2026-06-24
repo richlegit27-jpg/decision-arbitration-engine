@@ -12306,3 +12306,32 @@ main {
 
 /* /NOVA_MOBILE_SESSION_NAME_ROOM_SIZE_20260624 */
 
+
+
+/* NOVA_MOBILE_SOURCE_CARD_KILL_SWITCH_CSS_20260624 */
+/* Hard kill mobile source/web card clutter. */
+#mobileChatMessages .mobile-web-section-header,
+#mobileChatMessages .mobile-web-card,
+#mobileChatMessages .mobile-web-show-more,
+#mobileChatMessages .nova-mobile-source-cards,
+#mobileChatMessages .source-card,
+#mobileChatMessages .source-cards,
+#mobileChatMessages .sources,
+#mobileChatMessages .web-sources,
+#mobileChatMessages .news-sources,
+#mobileChatMessages [data-sources],
+#mobileChatMessages [data-source-strip],
+#mobileChatMessages [class*="source-card"],
+#mobileChatMessages [class*="web-card"],
+#mobileChatMessages [class*="webcard"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+}
