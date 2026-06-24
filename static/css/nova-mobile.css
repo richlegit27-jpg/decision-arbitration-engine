@@ -12379,3 +12379,26 @@ main {
     box-sizing: border-box !important;
     z-index: 90 !important;
 }
+
+
+/* NOVA_MOBILE_MICRO_SCROLL_TUNE_20260624 */
+/* Small non-destructive tune: shrink composer, keep visible fixed layout. */
+#nova-mobile-composer,
+.mobile-composer,
+.mobile-composer-shell,
+.mobile-input-bar {
+    max-height: 108px !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+#nova-mobile-input {
+    min-height: 38px !important;
+    max-height: 46px !important;
+}
+
+#mobileChatMessages,
+.mobile-chat-messages {
+    bottom: 116px !important;
+    padding-bottom: 24px !important;
+}

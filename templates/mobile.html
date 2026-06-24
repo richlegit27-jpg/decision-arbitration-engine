@@ -70,7 +70,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nova Mobile</title>
 
-<link rel="stylesheet" href="/static/css/nova-mobile.css?v=runtime-composer-geometry-lock-20260624-001">
+<link rel="stylesheet" href="/static/css/nova-mobile.css?v=micro-scroll-tune-20260624-001">
 <style>
     html,
     body,
@@ -6303,6 +6303,60 @@ header {
     setTimeout(lockOnce, 1200);
 
     console.log("[Nova Mobile] single geometry owner active");
+})();
+</script>
+
+
+<script>
+/* NOVA_MOBILE_MICRO_SCROLL_TUNE_20260624 */
+(function () {
+    "use strict";
+
+    function imp(el, prop, value) {
+        if (!el) return;
+        el.style.setProperty(prop, value, "important");
+    }
+
+    function tune() {
+        var chat = document.getElementById("mobileChatMessages");
+        var comp = document.getElementById("nova-mobile-composer");
+        var input = document.getElementById("nova-mobile-input");
+
+        if (comp) {
+            imp(comp, "max-height", "108px");
+            imp(comp, "min-height", "0px");
+            imp(comp, "overflow", "hidden");
+            imp(comp, "bottom", "0px");
+        }
+
+        if (input) {
+            imp(input, "min-height", "38px");
+            imp(input, "max-height", "46px");
+        }
+
+        if (chat) {
+            imp(chat, "bottom", "116px");
+            imp(chat, "padding-bottom", "24px");
+            imp(chat, "overflow-y", "auto");
+        }
+    }
+
+    window.NovaMobileMicroScrollTune = tune;
+
+    window.addEventListener("load", function () {
+        tune();
+        setTimeout(tune, 400);
+        setTimeout(tune, 1400);
+    });
+
+    window.addEventListener("pageshow", function () {
+        setTimeout(tune, 150);
+    });
+
+    setTimeout(tune, 100);
+    setTimeout(tune, 700);
+
+    console.log("[Nova Mobile] micro scroll tune active");
 })();
 </script>
 
