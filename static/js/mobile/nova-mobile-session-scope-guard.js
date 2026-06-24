@@ -96,7 +96,7 @@ Prevents stale hidden session ids from being re-saved by old mobile bridge code.
                 } catch (_) {}
 
                 console.log("[" + FIX_ID + "] blocked stale storage save", key, value);
-                return;
+return;
             }
 
             return originalLocalSetItem.call(this, key, value);
@@ -248,3 +248,153 @@ Prevents stale hidden session ids from being re-saved by old mobile bridge code.
         }
     };
 })();
+
+
+/* NOVA_MOBILE_SESSION_SINGLE_FLIGHT_20260623_START */
+(function () {
+    if (window.__NOVA_MOBILE_SESSION_SINGLE_FLIGHT_20260623) {
+        return;
+    }
+
+    window.__NOVA_MOBILE_SESSION_SINGLE_FLIGHT_20260623 = true;
+
+    const originalFetch = window.fetch ? window.fetch.bind(window) : null;
+
+    if (!originalFetch || !window.Response) {
+        console.warn("[Nova Mobile Session SingleFlight] fetch/Response unavailable");
+        return;
+    }
+
+    let inFlight = null;
+    let inFlightAt = 0;
+    let lastPayload = null;
+    let lastPayloadAt = 0;
+
+    function isSessionListRequest(input, init) {
+        try {
+            const method = String(
+                (init && init.method) ||
+                (input && input.method) ||
+                "GET"
+            ).toUpperCase();
+
+            if (method !== "GET") {
+                return false;
+            }
+
+            const rawUrl = typeof input === "string"
+                ? input
+                : input && input.url
+                    ? input.url
+                    : "";
+
+            const url = new URL(rawUrl, window.location.href);
+
+            return url.pathname === "/api/sessions";
+        } catch (err) {
+            return false;
+        }
+    }
+
+    function makeResponse(payload) {
+        return new Response(payload.body, {
+            status: payload.status,
+            statusText: payload.statusText,
+            headers: payload.headers
+        });
+    }
+
+    window.fetch = function novaSessionSingleFlightFetch(input, init) {
+        if (!isSessionListRequest(input, init)) {
+            return originalFetch(input, init);
+        }
+
+        const now = Date.now();
+
+        if (inFlight && now - inFlightAt < 1600) {
+            console.log("[Nova Mobile Session SingleFlight] joined /api/sessions");
+            return inFlight.then(makeResponse);
+        }
+
+        if (lastPayload && now - lastPayloadAt < 350) {
+            console.log("[Nova Mobile Session SingleFlight] reused fresh /api/sessions");
+            return Promise.resolve(makeResponse(lastPayload));
+        }
+
+        inFlightAt = now;
+
+        inFlight = originalFetch(input, init)
+            .then(async function (response) {
+                const payload = {
+                    body: await response.text(),
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: Array.from(response.headers.entries())
+                };
+
+                lastPayload = payload;
+                lastPayloadAt = Date.now();
+
+                return payload;
+            })
+            .finally(function () {
+                setTimeout(function () {
+                    inFlight = null;
+                }, 500);
+            });
+
+        return inFlight.then(makeResponse);
+    };
+
+    window.NovaMobileVisibleSessionsFallback = window.NovaMobileVisibleSessionsFallback || {};
+
+    window.NovaMobileVisibleSessionsFallback.open = function () {
+        const selectors = [
+            "[data-nova-open-sessions]",
+            "[data-action='sessions']",
+            "#mobileSessionsBtn",
+            "#sessionsBtn",
+            "#novaSessionsBtn",
+            ".nova-mobile-sessions-btn",
+            ".sessions-btn"
+        ];
+
+        for (const selector of selectors) {
+            const button = document.querySelector(selector);
+            if (button) {
+                button.click();
+                return true;
+            }
+        }
+
+        const panels = [
+            "#novaMobileSessionsPanel",
+            "#sessionDrawer",
+            "#sessionsDrawer",
+            ".nova-mobile-sessions-panel",
+            ".sessions-panel"
+        ];
+
+        for (const selector of panels) {
+            const panel = document.querySelector(selector);
+            if (panel) {
+                panel.hidden = false;
+                panel.style.display = "";
+                panel.classList.add("open", "active", "is-open");
+                return true;
+            }
+        }
+
+        window.dispatchEvent(new CustomEvent("nova:mobile:open-sessions"));
+        document.dispatchEvent(new CustomEvent("nova:mobile:open-sessions"));
+
+        console.warn("[Nova Mobile VisibleSessionsFallback] no known sessions button/panel found");
+        return false;
+    };
+
+    console.log("[Nova Mobile Session SingleFlight] ready");
+})();
+/* NOVA_MOBILE_SESSION_SINGLE_FLIGHT_20260623_END */
+
+
+

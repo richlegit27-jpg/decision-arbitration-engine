@@ -352,6 +352,238 @@
     }
 
     function mirrorSessionId(sessionId) {
+
+        /* NOVA_MOBILE_BARE_MIRROR_SPAM_THROTTLE_20260623 */
+        try {
+            const __novaIncomingThrottleMirror = String(sessionId || arguments[0] || "").trim();
+
+            if (/^mobile_\d+$/.test(__novaIncomingThrottleMirror)) {
+                const __novaStorageKeys = [
+                    "nova_mobile_manual_session_lock",
+                    "nova_mobile_clicked_session_id",
+                    "nova_mobile_selected_session_id",
+                    "nova_mobile_last_good_session_id",
+                    "nova_mobile_active_session_id",
+                    "nova_active_session_id",
+                    "nova_session_id",
+                    "novaMobileSessionId",
+                    "active_session_id"
+                ];
+
+                let __novaSessionToKeep = "";
+
+                for (const __novaKey of __novaStorageKeys) {
+                    try {
+                        const __novaValue = String(localStorage.getItem(__novaKey) || "").trim();
+
+                        if (/^mobile_\d+_[a-z0-9]+$/i.test(__novaValue)) {
+                            __novaSessionToKeep = __novaValue;
+                            break;
+                        }
+                    } catch (__novaReadErr) {}
+                }
+
+                const __novaWindowCandidates = [
+                    window.NOVA_MOBILE_LOCKED_SESSION_ID,
+                    window.__NOVA_MOBILE_LOCKED_SESSION_ID,
+                    window.NOVA_MOBILE_ACTIVE_SESSION_ID,
+                    window.__NOVA_MOBILE_ACTIVE_SESSION_ID,
+                    window.currentSessionId,
+                    window.sessionId
+                ];
+
+                for (const __novaCandidate of __novaWindowCandidates) {
+                    const __novaValue = String(__novaCandidate || "").trim();
+
+                    if (!__novaSessionToKeep && /^mobile_\d+_[a-z0-9]+$/i.test(__novaValue)) {
+                        __novaSessionToKeep = __novaValue;
+                        break;
+                    }
+                }
+
+                window.__NOVA_MOBILE_BARE_MIRROR_BLOCKED_SEEN_20260623 =
+                    window.__NOVA_MOBILE_BARE_MIRROR_BLOCKED_SEEN_20260623 || new Set();
+
+                const __novaSig = __novaIncomingThrottleMirror + "::" + (__novaSessionToKeep || "");
+
+                if (!window.__NOVA_MOBILE_BARE_MIRROR_BLOCKED_SEEN_20260623.has(__novaSig)) {
+                    window.__NOVA_MOBILE_BARE_MIRROR_BLOCKED_SEEN_20260623.add(__novaSig);
+
+                    console.warn("[Nova Mobile Bare Mirror Throttle] blocked repeated bare mirror", {
+                        attempted: __novaIncomingThrottleMirror,
+                        keeping: __novaSessionToKeep || ""
+                    });
+                }
+
+                if (__novaSessionToKeep) {
+                    window.NOVA_MOBILE_LOCKED_SESSION_ID = __novaSessionToKeep;
+                    window.__NOVA_MOBILE_LOCKED_SESSION_ID = __novaSessionToKeep;
+                    window.NOVA_MOBILE_ACTIVE_SESSION_ID = __novaSessionToKeep;
+                    window.__NOVA_MOBILE_ACTIVE_SESSION_ID = __novaSessionToKeep;
+                }
+
+                return __novaSessionToKeep || "";
+            }
+        } catch (__novaThrottleErr) {
+            console.warn("[Nova Mobile Bare Mirror Throttle] failed", __novaThrottleErr);
+        }
+
+
+
+        /* NOVA_MOBILE_HARD_BLOCK_BARE_SESSION_MIRROR_20260623 */
+        try {
+            const __novaIncomingHardMirror = String(sessionId || arguments[0] || "").trim();
+
+            const __novaStorageKeys = [
+                "nova_mobile_manual_session_lock",
+                "nova_mobile_clicked_session_id",
+                "nova_mobile_selected_session_id",
+                "nova_mobile_last_good_session_id",
+                "nova_mobile_active_session_id",
+                "nova_active_session_id",
+                "nova_session_id",
+                "novaMobileSessionId",
+                "active_session_id"
+            ];
+
+            let __novaFullSessionToKeep = "";
+
+            for (const __novaKey of __novaStorageKeys) {
+                try {
+                    const __novaValue = String(localStorage.getItem(__novaKey) || "").trim();
+
+                    if (/^mobile_\d+_[a-z0-9]+$/i.test(__novaValue)) {
+                        __novaFullSessionToKeep = __novaValue;
+                        break;
+                    }
+                } catch (__novaReadErr) {}
+            }
+
+            const __novaWindowSessionCandidates = [
+                window.NOVA_MOBILE_LOCKED_SESSION_ID,
+                window.__NOVA_MOBILE_LOCKED_SESSION_ID,
+                window.NOVA_MOBILE_ACTIVE_SESSION_ID,
+                window.__NOVA_MOBILE_ACTIVE_SESSION_ID,
+                window.currentSessionId,
+                window.sessionId
+            ];
+
+            for (const __novaCandidate of __novaWindowSessionCandidates) {
+                const __novaValue = String(__novaCandidate || "").trim();
+
+                if (!__novaFullSessionToKeep && /^mobile_\d+_[a-z0-9]+$/i.test(__novaValue)) {
+                    __novaFullSessionToKeep = __novaValue;
+                    break;
+                }
+            }
+
+            if (/^mobile_\d+$/.test(__novaIncomingHardMirror)) {
+                console.warn("[Nova Mobile Hard Bare Mirror Guard] blocked bare session mirror", {
+                    attempted: __novaIncomingHardMirror,
+                    keeping: __novaFullSessionToKeep || ""
+                });
+
+                return __novaFullSessionToKeep || "";
+            }
+        } catch (__novaHardBareMirrorErr) {
+            console.warn("[Nova Mobile Hard Bare Mirror Guard] failed", __novaHardBareMirrorErr);
+        }
+
+
+
+        /* NOVA_MOBILE_BLOCK_BARE_GENERATED_MIRROR_20260623 */
+        try {
+            const __novaIncomingBareMirror = String(sessionId || arguments[0] || "").trim();
+
+            const __novaKnownSessionKeys = [
+                "nova_mobile_manual_session_lock",
+                "nova_mobile_clicked_session_id",
+                "nova_mobile_selected_session_id",
+                "nova_mobile_last_good_session_id",
+                "nova_mobile_active_session_id",
+                "nova_active_session_id",
+                "nova_session_id",
+                "novaMobileSessionId",
+                "active_session_id"
+            ];
+
+            let __novaBestKnownSession = "";
+
+            for (const __novaKey of __novaKnownSessionKeys) {
+                try {
+                    const __novaValue = String(localStorage.getItem(__novaKey) || "").trim();
+
+                    if (/^mobile_\d+_[a-z0-9]+$/i.test(__novaValue)) {
+                        __novaBestKnownSession = __novaValue;
+                        break;
+                    }
+                } catch (__novaReadErr) {}
+            }
+
+            const __novaWindowCandidates = [
+                window.NOVA_MOBILE_LOCKED_SESSION_ID,
+                window.__NOVA_MOBILE_LOCKED_SESSION_ID,
+                window.NOVA_MOBILE_ACTIVE_SESSION_ID,
+                window.__NOVA_MOBILE_ACTIVE_SESSION_ID,
+                window.currentSessionId,
+                window.sessionId
+            ];
+
+            for (const __novaCandidate of __novaWindowCandidates) {
+                const __novaValue = String(__novaCandidate || "").trim();
+
+                if (!__novaBestKnownSession && /^mobile_\d+_[a-z0-9]+$/i.test(__novaValue)) {
+                    __novaBestKnownSession = __novaValue;
+                    break;
+                }
+            }
+
+            if (
+                /^mobile_\d+$/.test(__novaIncomingBareMirror) &&
+                !window.NOVA_FORCE_NEW_SESSION_ON_NEXT_SEND &&
+                !window.__NOVA_ALLOW_BARE_MOBILE_SESSION_MIRROR
+            ) {
+                console.warn("[Nova Mobile MirrorSessionId Guard] blocked bare generated mirror", {
+                    attempted: __novaIncomingBareMirror,
+                    keeping: __novaBestKnownSession || ""
+                });
+
+                return __novaBestKnownSession || "";
+            }
+        } catch (__novaBareMirrorErr) {
+            console.warn("[Nova Mobile MirrorSessionId Guard] bare generated guard failed", __novaBareMirrorErr);
+        }
+
+
+
+        /* NOVA_MOBILE_MIRROR_SESSION_LOCK_GUARD_20260623 */
+        try {
+            const __novaIncomingMirrorSession = String(arguments && arguments.length ? arguments[0] : "").trim();
+
+            const __novaLockedMirrorSession = String(
+                window.NOVA_MOBILE_LOCKED_SESSION_ID ||
+                window.__NOVA_MOBILE_LOCKED_SESSION_ID ||
+                localStorage.getItem("nova_mobile_manual_session_lock") ||
+                ""
+            ).trim();
+
+            if (
+                __novaLockedMirrorSession &&
+                /^mobile_\d+/.test(__novaIncomingMirrorSession) &&
+                __novaIncomingMirrorSession !== __novaLockedMirrorSession
+            ) {
+                console.warn("[Nova Mobile MirrorSessionId Guard] blocked stale mirror", {
+                    attempted: __novaIncomingMirrorSession,
+                    locked: __novaLockedMirrorSession
+                });
+
+                return __novaLockedMirrorSession;
+            }
+        } catch (__novaMirrorGuardErr) {
+            console.warn("[Nova Mobile MirrorSessionId Guard] failed", __novaMirrorGuardErr);
+        }
+
+
         sessionId = String(sessionId || "").trim();
         if (!sessionId) return;
 

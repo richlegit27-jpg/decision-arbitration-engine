@@ -600,7 +600,7 @@
 
 <!-- DISABLED_FALLBACK_SEND_BRIDGE_FOR_IMAGE_RENDERING_20260606 -->
 
-<script src="/static/js/mobile/nova-mobile-bridge.js?v=final-session-actions-20260609-001"></script>
+<script src="/static/js/mobile/nova-mobile-bridge.js?v=bare-mirror-spam-throttle-20260623-001"></script>
 <script src="/static/js/mobile/nova-mobile-core.js?v=mobile-modular-001"></script>
 <script src="/static/js/mobile/nova-mobile-images.js?v=mobile-modular-001"></script>
 <script src="/static/js/mobile/nova-mobile-code-ui.js?v=mobile-modular-001"></script>
@@ -1944,24 +1944,57 @@ header {
         restoreCopyExportButtons();
     }
 
+    let novaMobileDockFixQueued = false;
+    let novaMobileDockFixTimer = null;
+    let novaMobileDockFixLastRun = 0;
+
+    function runDockFixOnce() {
+        novaMobileDockFixQueued = false;
+        novaMobileDockFixTimer = null;
+        novaMobileDockFixLastRun = Date.now();
+        applyFix();
+    }
+
     function scheduleFix() {
-        [40, 160, 400, 900, 1500].forEach(function (ms) {
-            setTimeout(applyFix, ms);
-        });
+        const now = Date.now();
+
+        if (novaMobileDockFixQueued) {
+            return;
+        }
+
+        novaMobileDockFixQueued = true;
+
+        if (now - novaMobileDockFixLastRun < 180) {
+            novaMobileDockFixTimer = setTimeout(runDockFixOnce, 180);
+            return;
+        }
+
+        requestAnimationFrame(runDockFixOnce);
+    }
+
+    function scheduleFixSlow() {
+        if (novaMobileDockFixTimer) {
+            clearTimeout(novaMobileDockFixTimer);
+        }
+
+        novaMobileDockFixQueued = true;
+        novaMobileDockFixTimer = setTimeout(runDockFixOnce, 220);
     }
 
     document.addEventListener("DOMContentLoaded", scheduleFix);
     document.addEventListener("click", scheduleFix, true);
     document.addEventListener("pointerup", scheduleFix, true);
 
-    const observer = new MutationObserver(scheduleFix);
+    const observer = new MutationObserver(scheduleFixSlow);
 
     observer.observe(document.documentElement, {
         childList: true,
         subtree: true,
         attributes: true,
-        attributeFilter: ["class", "style", "href", "aria-label", "title"]
+        attributeFilter: ["class", "style"]
     });
+
+    console.log("[Nova Mobile Dock Fix Debounced] ready");
 
     window.NovaMobileFixTopActionUserLanesSafe = applyFix;
 
@@ -2138,10 +2171,33 @@ header {
             });
     }
 
+    /* NOVA_MOBILE_MENU_PANEL_FIX_DEBOUNCED_20260623 */
+    let novaMobileMenuPanelFixQueued = false;
+    let novaMobileMenuPanelFixTimer = null;
+    let novaMobileMenuPanelFixLastRun = 0;
+
+    function runMenuPanelFixOnce() {
+        novaMobileMenuPanelFixQueued = false;
+        novaMobileMenuPanelFixTimer = null;
+        novaMobileMenuPanelFixLastRun = Date.now();
+        fixMobileMenuPanels();
+    }
+
     function scheduleFix() {
-        [40, 160, 400, 900, 1500].forEach(function (ms) {
-            setTimeout(fixMobileMenuPanels, ms);
-        });
+        const now = Date.now();
+
+        if (novaMobileMenuPanelFixQueued) {
+            return;
+        }
+
+        novaMobileMenuPanelFixQueued = true;
+
+        if (now - novaMobileMenuPanelFixLastRun < 220) {
+            novaMobileMenuPanelFixTimer = setTimeout(runMenuPanelFixOnce, 220);
+            return;
+        }
+
+        requestAnimationFrame(runMenuPanelFixOnce);
     }
 
     document.addEventListener("DOMContentLoaded", scheduleFix);
@@ -3761,7 +3817,8 @@ header {
 </style>
 <!-- NOVA_MOBILE_FINAL_POLISH_END_20260623 -->
 <script src="/static/js/mobile/nova-mobile-final-polish-guard.js?v=final-polish-guard-20260623"></script>
-<script src="/static/js/mobile/nova-mobile-session-scope-guard.js?v=session-scope-guard-storage-lock-20260623"></script>
+<script src="/static/js/mobile/nova-mobile-session-scope-guard.js?v=session-scope-clean-20260623-001"></script>
+<script src="/static/js/mobile/nova-mobile-visible-sessions-fallback.js?v=visible-sessions-fallback-20260623"></script>
 </body>
 </html>
 
