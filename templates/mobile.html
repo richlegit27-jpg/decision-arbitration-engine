@@ -6893,97 +6893,93 @@ header {
 </script>
 
 
-<!-- NOVA_MOBILE_MEMORY_BUTTON_LABEL_FINAL_20260624 -->
-<script>
-(() => {
-    const TAG = "[NOVA_MOBILE_MEMORY_BUTTON_LABEL_FINAL_20260624]";
-    let logged = false;
 
-    function fixMemoryButton() {
-        const btn = document.getElementById("mobileMemoryButton");
-        if (!btn) return false;
-
-        btn.textContent = "Memory";
-        btn.setAttribute("aria-label", "Memory");
-        btn.setAttribute("title", "Memory");
-        btn.dataset.novaRole = "memory";
-
-        if (!logged) {
-            console.log(TAG, "fixed", {
-                id: btn.id,
-                text: btn.textContent,
-                aria: btn.getAttribute("aria-label"),
-                title: btn.getAttribute("title")
-            });
-            logged = true;
-        }
-
-        return true;
-    }
-
-    window.NovaMobileFixMemoryButtonLabel = fixMemoryButton;
-
-    fixMemoryButton();
-    setTimeout(fixMemoryButton, 100);
-    setTimeout(fixMemoryButton, 500);
-    setTimeout(fixMemoryButton, 1200);
-    setTimeout(fixMemoryButton, 2500);
-
-    document.addEventListener("click", () => {
-        setTimeout(fixMemoryButton, 50);
-    }, true);
-
-    console.log(TAG, "ready");
-})();
-</script>
-
-
-<!-- NOVA_MOBILE_HIDE_DUPLICATE_MEMORY_BUTTON_20260624 -->
+<!-- NOVA_MOBILE_FINAL_TOP_BUTTON_VISIBILITY_20260624 -->
 <style>
+#nova-mobile-sessions-toggle,
+#nova-mobile-memory-toggle {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
 #mobileMemoryButton {
     display: none !important;
     visibility: hidden !important;
+    opacity: 0 !important;
     pointer-events: none !important;
 }
 </style>
 
 <script>
 (() => {
-    const TAG = "[NOVA_MOBILE_HIDE_DUPLICATE_MEMORY_BUTTON_20260624]";
+    const TAG = "[NOVA_MOBILE_FINAL_TOP_BUTTON_VISIBILITY_20260624]";
 
-    function hideDuplicate() {
-        const oldBtn = document.getElementById("mobileMemoryButton");
-        const realMemory = document.getElementById("nova-mobile-memory-toggle");
+    function forceButtons() {
+        const sessions = document.getElementById("nova-mobile-sessions-toggle");
+        const memory = document.getElementById("nova-mobile-memory-toggle");
+        const oldMemory = document.getElementById("mobileMemoryButton");
 
-        if (!oldBtn || !realMemory) return false;
+        if (sessions) {
+            sessions.textContent = "Sessions";
+            sessions.style.setProperty("display", "flex", "important");
+            sessions.style.setProperty("visibility", "visible", "important");
+            sessions.style.setProperty("opacity", "1", "important");
+            sessions.style.setProperty("pointer-events", "auto", "important");
+            sessions.removeAttribute("aria-hidden");
+            sessions.removeAttribute("tabindex");
+        }
 
-        oldBtn.style.setProperty("display", "none", "important");
-        oldBtn.style.setProperty("visibility", "hidden", "important");
-        oldBtn.style.setProperty("pointer-events", "none", "important");
-        oldBtn.setAttribute("aria-hidden", "true");
-        oldBtn.setAttribute("tabindex", "-1");
+        if (memory) {
+            memory.textContent = "Memory";
+            memory.style.setProperty("display", "flex", "important");
+            memory.style.setProperty("visibility", "visible", "important");
+            memory.style.setProperty("opacity", "1", "important");
+            memory.style.setProperty("pointer-events", "auto", "important");
+            memory.setAttribute("aria-label", "Memory");
+            memory.setAttribute("title", "Memory");
+            memory.removeAttribute("aria-hidden");
+            memory.removeAttribute("tabindex");
+        }
 
-        console.log(TAG, "hidden duplicate old button");
-        return true;
+        if (oldMemory) {
+            oldMemory.style.setProperty("display", "none", "important");
+            oldMemory.style.setProperty("visibility", "hidden", "important");
+            oldMemory.style.setProperty("opacity", "0", "important");
+            oldMemory.style.setProperty("pointer-events", "none", "important");
+            oldMemory.setAttribute("aria-hidden", "true");
+            oldMemory.setAttribute("tabindex", "-1");
+        }
+
+        return {
+            sessions: !!sessions,
+            memory: !!memory,
+            oldMemory: !!oldMemory
+        };
     }
 
-    window.NovaMobileHideDuplicateMemoryButton = hideDuplicate;
+    window.NovaMobileFinalTopButtonVisibility = forceButtons;
 
-    let tries = 0;
+    let count = 0;
     const timer = setInterval(() => {
-        tries += 1;
-        hideDuplicate();
+        count += 1;
+        const result = forceButtons();
 
-        if (tries >= 20) {
+        if (count === 1 || count === 5 || count === 15) {
+            console.log(TAG, "forced", result);
+        }
+
+        if (count >= 25) {
             clearInterval(timer);
         }
-    }, 150);
+    }, 120);
 
     document.addEventListener("click", () => {
-        setTimeout(hideDuplicate, 50);
+        setTimeout(forceButtons, 40);
     }, true);
 
-    hideDuplicate();
+    forceButtons();
     console.log(TAG, "ready");
 })();
 </script>
