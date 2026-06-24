@@ -535,3 +535,54 @@ Final guard:
     console.log("[NOVA_MOBILE_SESSIONS_PANEL_POLISH_V2_20260624] ready");
 })();
 
+/* NOVA_MOBILE_SESSIONS_PANEL_SHELL_CENTER_V3_20260624 */
+(function () {
+    "use strict";
+
+    var previousPolish = window.NovaMobileSessionsPanelPolish;
+
+    function imp(el, prop, value) {
+        if (!el) return;
+        el.style.setProperty(prop, value, "important");
+    }
+
+    function shellCenterSessionsPanelV3() {
+        if (typeof previousPolish === "function") {
+            previousPolish();
+        }
+
+        var panel = document.getElementById("nova-mobile-sessions-panel");
+        if (!panel) return;
+
+        var shell = panel.closest(".mobile-shell") || document.querySelector(".mobile-shell") || document.body;
+        var sr = shell.getBoundingClientRect();
+
+        var width = Math.min(500, Math.max(280, sr.width - 20));
+        var left = sr.left + ((sr.width - width) / 2);
+
+        imp(panel, "position", "fixed");
+        imp(panel, "left", left + "px");
+        imp(panel, "right", "auto");
+        imp(panel, "transform", "none");
+        imp(panel, "width", width + "px");
+        imp(panel, "max-width", width + "px");
+    }
+
+    window.NovaMobileSessionsPanelPolish = shellCenterSessionsPanelV3;
+    window.NovaMobileSessionsPanelPolishV3 = shellCenterSessionsPanelV3;
+
+    document.addEventListener("click", function () {
+        setTimeout(shellCenterSessionsPanelV3, 100);
+        setTimeout(shellCenterSessionsPanelV3, 400);
+        setTimeout(shellCenterSessionsPanelV3, 900);
+    }, true);
+
+    window.addEventListener("resize", shellCenterSessionsPanelV3);
+    window.addEventListener("orientationchange", shellCenterSessionsPanelV3);
+
+    setTimeout(shellCenterSessionsPanelV3, 1000);
+    setTimeout(shellCenterSessionsPanelV3, 2500);
+
+    console.log("[NOVA_MOBILE_SESSIONS_PANEL_SHELL_CENTER_V3_20260624] ready");
+})();
+
