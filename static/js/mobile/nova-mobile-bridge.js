@@ -1,3 +1,383 @@
+
+/* NOVA_MOBILE_SESSION_RESPONSE_SHAPE_ADAPTER_20260623 */
+(function () {
+    const MARK = "NOVA_MOBILE_SESSION_RESPONSE_SHAPE_ADAPTER_20260623";
+
+    if (window.__NOVA_MOBILE_SESSION_RESPONSE_SHAPE_ADAPTER_20260623__) {
+        return;
+    }
+
+    window.__NOVA_MOBILE_SESSION_RESPONSE_SHAPE_ADAPTER_20260623__ = true;
+
+    const rawJson = Response.prototype.json;
+
+    Response.prototype.json = function () {
+        return rawJson.call(this).then(data => {
+            try {
+                if (
+                    data &&
+                    typeof data === "object" &&
+                    data.session &&
+                    typeof data.session === "object"
+                ) {
+                    if (!Array.isArray(data.messages) && Array.isArray(data.session.messages)) {
+                        data.messages = data.session.messages;
+                    }
+
+                    if (!data.id && data.session.id) {
+                        data.id = data.session.id;
+                    }
+
+                    if (!data.title && data.session.title) {
+                        data.title = data.session.title;
+                    }
+
+                    if (!data.created_at && data.session.created_at) {
+                        data.created_at = data.session.created_at;
+                    }
+
+                    if (!data.updated_at && data.session.updated_at) {
+                        data.updated_at = data.session.updated_at;
+                    }
+
+                    if (!data.active_session_id && data.session.id) {
+                        data.active_session_id = data.session.id;
+                    }
+                }
+            } catch (e) {}
+
+            return data;
+        });
+    };
+
+    window.NovaMobileNormalizeSessionResponse = function (data) {
+        try {
+            if (
+                data &&
+                typeof data === "object" &&
+                data.session &&
+                typeof data.session === "object"
+            ) {
+                data.messages = Array.isArray(data.messages)
+                    ? data.messages
+                    : Array.isArray(data.session.messages)
+                        ? data.session.messages
+                        : [];
+
+                data.id = data.id || data.session.id || data.active_session_id || "";
+                data.title = data.title || data.session.title || "";
+            }
+        } catch (e) {}
+
+        return data;
+    };
+
+    console.log("[" + MARK + "] ready");
+})();
+/* /NOVA_MOBILE_SESSION_RESPONSE_SHAPE_ADAPTER_20260623 */
+
+
+
+
+
+/* NOVA_MOBILE_CANONICAL_SESSION_OWNER_20260623 */
+(function () {
+    const MARK = "NOVA_MOBILE_CANONICAL_SESSION_OWNER_20260623";
+
+    if (window.__NOVA_MOBILE_CANONICAL_SESSION_OWNER_20260623__) {
+        return;
+    }
+
+    window.__NOVA_MOBILE_CANONICAL_SESSION_OWNER_20260623__ = true;
+
+    const SESSION_KEYS = [
+        "nova_mobile_active_session_id",
+        "nova_active_session_id",
+        "nova_session_id",
+        "active_session_id",
+        "session_id",
+        "mobile_session_id",
+        "novaMobileActiveSessionId",
+        "NOVA_ACTIVE_SESSION_ID",
+        "NOVA_MOBILE_ACTIVE_SESSION_ID"
+    ];
+
+    let allowNewUntil = 0;
+    let canonicalSessionId = "";
+
+    function now() {
+        return Date.now();
+    }
+
+    function isSessionId(value) {
+        const v = String(value || "").trim();
+        return /^mobile_[A-Za-z0-9_-]+$/.test(v) || /^session_[A-Za-z0-9_-]+$/.test(v);
+    }
+
+    function isSessionKey(key) {
+        return /session|sid/i.test(String(key || ""));
+    }
+
+    function readStoredSession() {
+        for (const key of SESSION_KEYS) {
+            try {
+                const value = localStorage.getItem(key) || sessionStorage.getItem(key);
+                if (isSessionId(value)) {
+                    return value;
+                }
+            } catch (e) {}
+        }
+
+        try {
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (!isSessionKey(key)) continue;
+
+                const value = localStorage.getItem(key);
+                if (isSessionId(value)) {
+                    return value;
+                }
+            }
+        } catch (e) {}
+
+        return "";
+    }
+
+    function writeStoredSession(sessionId) {
+        if (!isSessionId(sessionId)) return;
+
+        for (const key of SESSION_KEYS) {
+            try {
+                localStorage.setItem.__novaRaw
+                    ? localStorage.setItem.__novaRaw.call(localStorage, key, sessionId)
+                    : Storage.prototype.setItem.call(localStorage, key, sessionId);
+            } catch (e) {}
+
+            try {
+                sessionStorage.setItem(key, sessionId);
+            } catch (e) {}
+        }
+
+        try {
+            window.NOVA_ACTIVE_SESSION_ID = sessionId;
+            window.NOVA_MOBILE_ACTIVE_SESSION_ID = sessionId;
+            window.activeSessionId = sessionId;
+            window.sessionId = sessionId;
+        } catch (e) {}
+    }
+
+    function setCanonical(sessionId, reason) {
+        if (!isSessionId(sessionId)) return "";
+
+        canonicalSessionId = sessionId;
+        writeStoredSession(sessionId);
+
+        try {
+            window.dispatchEvent(new CustomEvent("nova-mobile-canonical-session", {
+                detail: {
+                    session_id: sessionId,
+                    reason: reason || "set"
+                }
+            }));
+        } catch (e) {}
+
+        console.log("[Nova Mobile Canonical Session Owner] canonical", {
+            session_id: sessionId,
+            reason: reason || "set"
+        });
+
+        return sessionId;
+    }
+
+    function getCanonical() {
+        if (isSessionId(canonicalSessionId)) {
+            return canonicalSessionId;
+        }
+
+        const stored = readStoredSession();
+        if (isSessionId(stored)) {
+            canonicalSessionId = stored;
+            return stored;
+        }
+
+        return "";
+    }
+
+    function allowNewSession(reason) {
+        allowNewUntil = now() + 12000;
+        console.log("[Nova Mobile Canonical Session Owner] allowing new session", reason || "");
+    }
+
+    function shouldAllowNew() {
+        return now() < allowNewUntil;
+    }
+
+    function extractSessionIdFromElement(el) {
+        let node = el;
+
+        for (let i = 0; node && i < 7; i++, node = node.parentElement) {
+            if (!node) break;
+
+            const attrs = [
+                "data-session-id",
+                "data-session",
+                "data-sid",
+                "data-id",
+                "session-id"
+            ];
+
+            for (const attr of attrs) {
+                const value = node.getAttribute && node.getAttribute(attr);
+                if (isSessionId(value)) {
+                    return value;
+                }
+            }
+
+            const text = String(node.textContent || "");
+            const match = text.match(/\b(?:mobile|session)_[A-Za-z0-9_-]+\b/);
+            if (match && isSessionId(match[0])) {
+                return match[0];
+            }
+        }
+
+        return "";
+    }
+
+    canonicalSessionId = readStoredSession();
+
+    if (isSessionId(canonicalSessionId)) {
+        writeStoredSession(canonicalSessionId);
+        console.log("[Nova Mobile Canonical Session Owner] boot locked", canonicalSessionId);
+    } else {
+        console.log("[Nova Mobile Canonical Session Owner] boot no stored session yet");
+    }
+
+    try {
+        const rawSetItem = localStorage.setItem.bind(localStorage);
+        localStorage.setItem.__novaRaw = rawSetItem;
+
+        localStorage.setItem = function (key, value) {
+            const k = String(key || "");
+            const v = String(value || "");
+
+            if (isSessionKey(k) && isSessionId(v)) {
+                const current = getCanonical();
+
+                if (!current || shouldAllowNew()) {
+                    setCanonical(v, shouldAllowNew() ? "allowed-new-localStorage" : "first-localStorage");
+                    return rawSetItem(k, v);
+                }
+
+                if (v !== current) {
+                    console.log("[Nova Mobile Canonical Session Owner] blocked session overwrite", {
+                        key: k,
+                        attempted: v,
+                        keeping: current
+                    });
+                    return rawSetItem(k, current);
+                }
+            }
+
+            return rawSetItem(k, v);
+        };
+    } catch (e) {
+        console.warn("[Nova Mobile Canonical Session Owner] localStorage patch failed", e);
+    }
+
+    try {
+        const rawFetch = window.fetch.bind(window);
+
+        window.fetch = function (input, init) {
+            const url = typeof input === "string" ? input : String((input && input.url) || "");
+
+            if (/\/api\/sessions\/new\b/.test(url)) {
+                allowNewSession("/api/sessions/new");
+            }
+
+            if (init && init.body && /\/api\/chat(?:\/stream)?\b/.test(url)) {
+                const current = getCanonical();
+
+                if (isSessionId(current)) {
+                    try {
+                        const body = JSON.parse(init.body);
+                        body.session_id = current;
+                        body.active_session_id = current;
+                        init = Object.assign({}, init, {
+                            body: JSON.stringify(body)
+                        });
+
+                        console.log("[Nova Mobile Canonical Session Owner] patched chat payload", {
+                            url,
+                            session_id: current
+                        });
+                    } catch (e) {}
+                }
+            }
+
+            return rawFetch(input, init).then(async response => {
+                try {
+                    const clone = response.clone();
+                    const contentType = clone.headers.get("content-type") || "";
+
+                    if (contentType.includes("application/json")) {
+                        const data = await clone.json();
+                        const sid =
+                            data.active_session_id ||
+                            data.session_id ||
+                            (data.session && data.session.id) ||
+                            "";
+
+                        if (isSessionId(sid)) {
+                            if (shouldAllowNew() || !getCanonical()) {
+                                setCanonical(sid, "fetch-response");
+                            } else if (sid !== getCanonical()) {
+                                console.log("[Nova Mobile Canonical Session Owner] ignored response sid", {
+                                    attempted: sid,
+                                    keeping: getCanonical()
+                                });
+                            }
+                        }
+                    }
+                } catch (e) {}
+
+                return response;
+            });
+        };
+    } catch (e) {
+        console.warn("[Nova Mobile Canonical Session Owner] fetch patch failed", e);
+    }
+
+    document.addEventListener("click", function (event) {
+        const target = event.target;
+
+        const newChatHit = target && target.closest && target.closest(
+            "#newChatBtn, #mobileNewChatBtn, .new-chat, .nova-new-chat, [data-action='new-chat']"
+        );
+
+        if (newChatHit || /new chat/i.test(String(target && target.textContent || ""))) {
+            allowNewSession("new-chat-click");
+            return;
+        }
+
+        const sid = extractSessionIdFromElement(target);
+
+        if (isSessionId(sid)) {
+            setCanonical(sid, "session-click");
+        }
+    }, true);
+
+    window.NovaMobileCanonicalSessionOwner = {
+        get: getCanonical,
+        set: function (sessionId) {
+            return setCanonical(sessionId, "manual-api");
+        },
+        allowNew: allowNewSession
+    };
+
+    console.log("[" + MARK + "] ready");
+})();
+/* /NOVA_MOBILE_CANONICAL_SESSION_OWNER_20260623 */
+
 ﻿(function () {
     "use strict";
 
