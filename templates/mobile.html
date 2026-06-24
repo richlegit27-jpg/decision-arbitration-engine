@@ -5161,504 +5161,6 @@ header {
 
 
 
-<!-- NOVA_MOBILE_LOGIN_FLOATING_SINGLE_OWNER_FINAL_20260624 -->
-<style>
-    /* Keep login/account out of the top forever. */
-    #nova-mobile-account-top,
-    .nova-mobile-user-dock,
-    .nova-mobile-user-pill,
-    .nova-mobile-login-top,
-    .nova-mobile-auth-top {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-        width: 0 !important;
-        height: 0 !important;
-        max-width: 0 !important;
-        max-height: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        overflow: hidden !important;
-    }
-
-    /*
-       Final Account/Login owner.
-       Floating on body so session/tools click handlers cannot steal it.
-    */
-    #nova-mobile-bottom-login {
-        position: fixed !important;
-        right: 12px !important;
-        bottom: 78px !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        height: 36px !important;
-        min-width: 82px !important;
-        padding: 0 12px !important;
-        margin: 0 !important;
-        border-radius: 999px !important;
-        border: 1px solid rgba(255, 255, 255, 0.18) !important;
-        background: rgba(124, 58, 237, 0.34) !important;
-        color: #fff !important;
-        font: 800 12px Arial, system-ui, sans-serif !important;
-        line-height: 1 !important;
-        white-space: nowrap !important;
-        text-decoration: none !important;
-        z-index: 2147483000 !important;
-        opacity: 0 !important;
-        visibility: hidden !important;
-        pointer-events: none !important;
-        transform: none !important;
-        transition: none !important;
-        animation: none !important;
-    }
-
-    #nova-mobile-bottom-login[data-ready="1"] {
-        opacity: 1 !important;
-        visibility: visible !important;
-        pointer-events: auto !important;
-    }
-
-    #nova-mobile-login-panel {
-        position: fixed !important;
-        right: 12px !important;
-        bottom: 122px !important;
-        display: none !important;
-        width: min(280px, calc(100vw - 24px)) !important;
-        padding: 12px !important;
-        border-radius: 18px !important;
-        border: 1px solid rgba(255, 255, 255, 0.16) !important;
-        background: rgba(18, 18, 28, 0.97) !important;
-        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45) !important;
-        z-index: 2147483001 !important;
-        box-sizing: border-box !important;
-    }
-
-    #nova-mobile-login-panel[data-open="1"] {
-        display: block !important;
-    }
-
-    #nova-mobile-login-panel-title {
-        color: #fff !important;
-        font: 800 13px Arial, system-ui, sans-serif !important;
-        margin: 0 0 10px !important;
-    }
-
-    .nova-mobile-login-panel-action,
-    #nova-mobile-account-panel-logout {
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        width: 100% !important;
-        height: 38px !important;
-        margin: 8px 0 0 !important;
-        border-radius: 12px !important;
-        border: 1px solid rgba(255, 255, 255, 0.16) !important;
-        background: rgba(255, 255, 255, 0.08) !important;
-        color: #fff !important;
-        font: 800 12px Arial, system-ui, sans-serif !important;
-        text-decoration: none !important;
-        cursor: pointer !important;
-        box-sizing: border-box !important;
-    }
-
-    #nova-mobile-account-panel-logout {
-        background: rgba(255, 80, 80, 0.20) !important;
-    }
-</style>
-
-<script>
-(function () {
-    const MARK = "NOVA_MOBILE_LOGIN_FLOATING_SINGLE_OWNER_FINAL_20260624";
-    const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
-
-    let knownEmail = window.__novaMobileKnownAuthEmail || "";
-    let building = false;
-
-    function safeText(value) {
-        return String(value || "")
-            .replaceAll("&", "&amp;")
-            .replaceAll("<", "&lt;")
-            .replaceAll(">", "&gt;")
-            .replaceAll('"', "&quot;")
-            .replaceAll("'", "&#039;");
-    }
-
-    function emailFromValue(value, depth = 0) {
-        if (!value || depth > 3) return "";
-
-        if (typeof value === "string") {
-            const match = value.match(EMAIL_RE);
-            return match ? match[0] : "";
-        }
-
-        if (typeof value === "object") {
-            const keys = [
-                "email",
-                "userEmail",
-                "accountEmail",
-                "username",
-                "user",
-                "account",
-                "profile",
-                "auth",
-                "state"
-            ];
-
-            for (const key of keys) {
-                try {
-                    const found = emailFromValue(value[key], depth + 1);
-                    if (found) return found;
-                } catch (err) {}
-            }
-
-            try {
-                const found = emailFromValue(JSON.stringify(value), depth + 1);
-                if (found) return found;
-            } catch (err) {}
-        }
-
-        return "";
-    }
-
-    function readStorageEmail(store) {
-        if (!store) return "";
-
-        try {
-            for (let i = 0; i < store.length; i += 1) {
-                const key = store.key(i) || "";
-                const value = store.getItem(key) || "";
-                const joined = key + " " + value;
-
-                if (!/nova|auth|user|account|email|login/i.test(joined)) {
-                    continue;
-                }
-
-                const found = emailFromValue(joined);
-                if (found) return found;
-            }
-        } catch (err) {}
-
-        return "";
-    }
-
-    function readWindowEmail() {
-        const names = [
-            "NovaMobileAuth",
-            "NovaMobileUser",
-            "NovaUser",
-            "NovaAuth",
-            "novaMobileAuth",
-            "novaMobileUser",
-            "novaUser",
-            "novaAuth",
-            "currentUser",
-            "user",
-            "__NOVA_AUTH__",
-            "__novaAuth"
-        ];
-
-        for (const name of names) {
-            try {
-                const found = emailFromValue(window[name]);
-                if (found) return found;
-            } catch (err) {}
-        }
-
-        return "";
-    }
-
-    function readEmail() {
-        return (
-            knownEmail ||
-            window.__novaMobileKnownAuthEmail ||
-            readWindowEmail() ||
-            readStorageEmail(window.localStorage) ||
-            readStorageEmail(window.sessionStorage) ||
-            ""
-        );
-    }
-
-    function removeOldTopLogin() {
-        document.querySelectorAll(
-            "#nova-mobile-account-top, .nova-mobile-user-dock, .nova-mobile-user-pill, .nova-mobile-login-top, .nova-mobile-auth-top"
-        ).forEach(el => el.remove());
-    }
-
-    function getButton() {
-        let btn = document.getElementById("nova-mobile-bottom-login");
-
-        if (!btn) {
-            btn = document.createElement("button");
-            btn.id = "nova-mobile-bottom-login";
-            btn.type = "button";
-            btn.dataset.ready = "0";
-        }
-
-        if (btn.parentElement !== document.body) {
-            document.body.appendChild(btn);
-        }
-
-        return btn;
-    }
-
-    function getPanel() {
-        let panel = document.getElementById("nova-mobile-login-panel");
-
-        if (!panel) {
-            panel = document.createElement("div");
-            panel.id = "nova-mobile-login-panel";
-            panel.dataset.open = "0";
-        }
-
-        if (panel.parentElement !== document.body) {
-            document.body.appendChild(panel);
-        }
-
-        return panel;
-    }
-
-    function buildLoggedIn(email) {
-        const btn = getButton();
-        const panel = getPanel();
-        const safeEmail = safeText(email);
-
-        knownEmail = email;
-        window.__novaMobileKnownAuthEmail = email;
-
-        btn.textContent = "Account";
-        btn.setAttribute("aria-label", "Account");
-        btn.title = "Account";
-        btn.dataset.loggedIn = "1";
-        btn.dataset.email = email;
-        btn.dataset.ready = "1";
-
-        panel.innerHTML = `
-            <div id="nova-mobile-login-panel-title">Account</div>
-            <div style="color:#fff;font:700 12px Arial,system-ui,sans-serif;margin:0 0 8px;word-break:break-word;">
-                Signed in as ${safeEmail}
-            </div>
-            <a class="nova-mobile-login-panel-action" href="/mobile">Back to Nova</a>
-            <button id="nova-mobile-account-panel-logout" type="button">Logout</button>
-        `;
-
-        const logout = document.getElementById("nova-mobile-account-panel-logout");
-
-        if (logout && !logout.__novaFloatingLogoutBound) {
-            logout.__novaFloatingLogoutBound = true;
-
-            logout.addEventListener("click", async function (event) {
-                event.preventDefault();
-                event.stopPropagation();
-                event.stopImmediatePropagation?.();
-
-                knownEmail = "";
-                window.__novaMobileKnownAuthEmail = "";
-
-                try {
-                    if (typeof window.NovaMobileAuthLogout === "function") {
-                        await window.NovaMobileAuthLogout();
-                    }
-                } catch (err) {}
-
-                try {
-                    if (typeof window.novaMobileLogout === "function") {
-                        await window.novaMobileLogout();
-                    }
-                } catch (err) {}
-
-                try {
-                    await fetch("/logout", {
-                        method: "GET",
-                        cache: "no-store",
-                        credentials: "same-origin",
-                        redirect: "manual"
-                    });
-                } catch (err) {}
-
-                [window.localStorage, window.sessionStorage].forEach(store => {
-                    if (!store) return;
-
-                    try {
-                        const keys = [];
-
-                        for (let i = 0; i < store.length; i += 1) {
-                            const key = store.key(i) || "";
-
-                            if (/auth|login|token|email|user/i.test(key) && !/session|message|history|chat/i.test(key)) {
-                                keys.push(key);
-                            }
-                        }
-
-                        keys.forEach(key => store.removeItem(key));
-                    } catch (err) {}
-                });
-
-                location.href = "/mobile?fresh=logout-floating-single-owner-20260624";
-            }, true);
-        }
-    }
-
-    function buildLoggedOut(showReady) {
-        const btn = getButton();
-        const panel = getPanel();
-
-        btn.textContent = "Login";
-        btn.setAttribute("aria-label", "Login");
-        btn.title = "Login";
-        btn.dataset.loggedIn = "0";
-        btn.dataset.email = "";
-
-        if (showReady) {
-            btn.dataset.ready = "1";
-        }
-
-        panel.innerHTML = `
-            <div id="nova-mobile-login-panel-title">Account</div>
-            <a class="nova-mobile-login-panel-action" href="/login">Login</a>
-        `;
-    }
-
-    function build(showLoggedOutNow = false) {
-        if (building) return;
-        building = true;
-
-        try {
-            removeOldTopLogin();
-
-            const email = readEmail();
-
-            if (email) {
-                buildLoggedIn(email);
-            } else {
-                buildLoggedOut(showLoggedOutNow);
-            }
-        } finally {
-            building = false;
-        }
-    }
-
-    function openPanel() {
-        build(true);
-
-        const panel = getPanel();
-        panel.dataset.open = panel.dataset.open === "1" ? "0" : "1";
-    }
-
-    document.addEventListener("click", function (event) {
-        const btn = event.target.closest("#nova-mobile-bottom-login");
-        if (!btn) return;
-
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation?.();
-
-        openPanel();
-        return false;
-    }, true);
-
-    document.addEventListener("click", function (event) {
-        if (event.target.closest("#nova-mobile-bottom-login")) return;
-        if (event.target.closest("#nova-mobile-login-panel")) return;
-
-        const panel = document.getElementById("nova-mobile-login-panel");
-        if (panel) panel.dataset.open = "0";
-    }, true);
-
-    if (!window.__novaMobileFloatingAuthConsoleBridgeInstalled) {
-        window.__novaMobileFloatingAuthConsoleBridgeInstalled = true;
-
-        const originalLog = console.log.bind(console);
-
-        console.log = function (...args) {
-            try {
-                const joined = args.map(arg => {
-                    if (typeof arg === "string") return arg;
-                    try { return JSON.stringify(arg); } catch (err) { return ""; }
-                }).join(" ");
-
-                if (/Nova Mobile Auth/i.test(joined) && /authenticated/i.test(joined)) {
-                    const found = emailFromValue(joined);
-
-                    if (found) {
-                        knownEmail = found;
-                        window.__novaMobileKnownAuthEmail = found;
-                        setTimeout(() => build(false), 0);
-                    }
-                }
-            } catch (err) {}
-
-            return originalLog(...args);
-        };
-    }
-
-    const observer = new MutationObserver(function () {
-        const email = readEmail();
-        const btn = document.getElementById("nova-mobile-bottom-login");
-        const panel = document.getElementById("nova-mobile-login-panel");
-
-        if (email && btn && btn.textContent.trim() !== "Account") {
-            requestAnimationFrame(() => build(false));
-            return;
-        }
-
-        if (email && panel && panel.dataset.open === "1" && !/Logout/i.test(panel.innerText || "")) {
-            requestAnimationFrame(() => build(false));
-        }
-    });
-
-    observer.observe(document.documentElement, {
-        childList: true,
-        subtree: true,
-        characterData: true
-    });
-
-    window.NovaMobileLoginSingleOwnerRefresh = function () {
-        build(true);
-    };
-
-    window.NovaMobileLoginFloatingOwnerRefresh = window.NovaMobileLoginSingleOwnerRefresh;
-
-    build(false);
-
-    setTimeout(() => build(false), 250);
-    setTimeout(() => build(false), 750);
-    setTimeout(() => build(true), 1500);
-
-    console.log("[" + MARK + "] ready");
-})();
-</script>
-<!-- /NOVA_MOBILE_LOGIN_FLOATING_SINGLE_OWNER_FINAL_20260624 -->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 <!-- NOVA_MOBILE_ALIGNED_ACCOUNT_COPY_REGEN_SESSION_20260624 -->
 <style>
     /*
@@ -6981,7 +6483,8 @@ header {
 
 
 
-<!-- NOVA_MOBILE_ONE_ROW_NEW_SESSIONS_COPY_REGEN_V7_20260624 -->
+
+<!-- NOVA_MOBILE_ONE_ROW_NEW_SESSIONS_COPY_REGEN_V9_20260624 -->
 <style>
 @media (max-width: 900px) {
     #nova-mobile-primary-action-row {
@@ -7027,11 +6530,11 @@ header {
         box-sizing: border-box !important;
     }
 
-    .nova-mobile-v7-parked-old-control,
-    .nova-mobile-v7-parked-old-shell {
+    .nova-mobile-v9-parked,
+    .nova-mobile-v9-parked * {
         position: fixed !important;
-        top: -10000px !important;
-        left: -10000px !important;
+        top: -12000px !important;
+        left: -12000px !important;
         right: auto !important;
         bottom: auto !important;
         width: 1px !important;
@@ -7044,7 +6547,7 @@ header {
         opacity: 0 !important;
         visibility: hidden !important;
         pointer-events: none !important;
-        transform: translate3d(-10000px, -10000px, 0) !important;
+        transform: translate3d(-12000px, -12000px, 0) !important;
         z-index: -1 !important;
     }
 
@@ -7055,10 +6558,12 @@ header {
     #nova-mobile-copy-chat,
     #nova-mobile-rail-copy,
     #nova-mobile-rail-regen,
-    #nova-mobile-bottom-login {
+    #nova-mobile-bottom-login,
+    #nova-mobile-account-fallback-menu,
+    #nova-mobile-real-menu-account {
         position: fixed !important;
-        top: -10000px !important;
-        left: -10000px !important;
+        top: -12000px !important;
+        left: -12000px !important;
         right: auto !important;
         bottom: auto !important;
         width: 1px !important;
@@ -7071,45 +6576,28 @@ header {
         opacity: 0 !important;
         visibility: hidden !important;
         pointer-events: none !important;
-        transform: translate3d(-10000px, -10000px, 0) !important;
+        transform: translate3d(-12000px, -12000px, 0) !important;
         z-index: -1 !important;
     }
 
-    #nova-mobile-account-fallback-menu {
-        position: fixed !important;
-        right: 12px !important;
-        bottom: 148px !important;
-        width: min(260px, calc(100vw - 24px)) !important;
-        z-index: 2147483601 !important;
-        display: none !important;
-        flex-direction: column !important;
-        gap: 8px !important;
-        padding: 10px !important;
-        border-radius: 16px !important;
-        border: 1px solid rgba(168, 85, 247, 0.40) !important;
-        background: rgba(20, 12, 32, 0.96) !important;
-        box-shadow: 0 14px 32px rgba(0, 0, 0, 0.35) !important;
-        box-sizing: border-box !important;
-    }
-
-    #nova-mobile-account-fallback-menu.nova-mobile-account-fallback-open {
-        display: flex !important;
-    }
-
-    #nova-mobile-menu-account-restored,
-    #nova-mobile-account-fallback-button {
+    #nova-mobile-menu-account-final {
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         width: 100% !important;
         min-height: 38px !important;
+        height: auto !important;
+        margin-top: 6px !important;
         padding: 9px 12px !important;
         border-radius: 12px !important;
         border: 1px solid rgba(168, 85, 247, 0.35) !important;
         background: rgba(168, 85, 247, 0.18) !important;
         color: #f8f5ff !important;
+        font-size: 13px !important;
         font-weight: 850 !important;
+        line-height: 1.15 !important;
         white-space: normal !important;
+        text-align: center !important;
         box-sizing: border-box !important;
     }
 
@@ -7122,7 +6610,7 @@ header {
 
 <script>
 (() => {
-    const TAG = "[NOVA_MOBILE_ONE_ROW_NEW_SESSIONS_COPY_REGEN_V7_20260624]";
+    const TAG = "[NOVA_MOBILE_ONE_ROW_NEW_SESSIONS_COPY_REGEN_V9_20260624]";
 
     const PARK_IDS = [
         "mobileMenuButton",
@@ -7132,7 +6620,9 @@ header {
         "nova-mobile-copy-chat",
         "nova-mobile-rail-copy",
         "nova-mobile-rail-regen",
-        "nova-mobile-bottom-login"
+        "nova-mobile-bottom-login",
+        "nova-mobile-account-fallback-menu",
+        "nova-mobile-real-menu-account"
     ];
 
     let lastLog = "";
@@ -7143,6 +6633,34 @@ header {
 
     function setImportant(el, prop, value) {
         el.style.setProperty(prop, value, "important");
+    }
+
+    function park(el) {
+        if (!el || el.closest("#nova-mobile-primary-action-row")) return false;
+
+        el.classList.add("nova-mobile-v9-parked");
+        el.setAttribute("aria-hidden", "true");
+        el.setAttribute("tabindex", "-1");
+
+        setImportant(el, "position", "fixed");
+        setImportant(el, "top", "-12000px");
+        setImportant(el, "left", "-12000px");
+        setImportant(el, "right", "auto");
+        setImportant(el, "bottom", "auto");
+        setImportant(el, "width", "1px");
+        setImportant(el, "height", "1px");
+        setImportant(el, "min-width", "1px");
+        setImportant(el, "min-height", "1px");
+        setImportant(el, "max-width", "1px");
+        setImportant(el, "max-height", "1px");
+        setImportant(el, "overflow", "hidden");
+        setImportant(el, "opacity", "0");
+        setImportant(el, "visibility", "hidden");
+        setImportant(el, "pointer-events", "none");
+        setImportant(el, "transform", "translate3d(-12000px, -12000px, 0)");
+        setImportant(el, "z-index", "-1");
+
+        return true;
     }
 
     function ensureRow() {
@@ -7183,180 +6701,64 @@ header {
         return row;
     }
 
-    function park(el, shell = false) {
-        if (!el || el.closest("#nova-mobile-primary-action-row")) return false;
-
-        el.classList.add(shell ? "nova-mobile-v7-parked-old-shell" : "nova-mobile-v7-parked-old-control");
-        el.setAttribute("aria-hidden", "true");
-        el.setAttribute("tabindex", "-1");
-
-        setImportant(el, "position", "fixed");
-        setImportant(el, "top", "-10000px");
-        setImportant(el, "left", "-10000px");
-        setImportant(el, "right", "auto");
-        setImportant(el, "bottom", "auto");
-        setImportant(el, "width", "1px");
-        setImportant(el, "height", "1px");
-        setImportant(el, "min-width", "1px");
-        setImportant(el, "min-height", "1px");
-        setImportant(el, "max-width", "1px");
-        setImportant(el, "max-height", "1px");
-        setImportant(el, "overflow", "hidden");
-        setImportant(el, "opacity", "0");
-        setImportant(el, "visibility", "hidden");
-        setImportant(el, "pointer-events", "none");
-        setImportant(el, "transform", "translate3d(-10000px, -10000px, 0)");
-        setImportant(el, "z-index", "-1");
-
-        return true;
-    }
-
     function parkOldControls() {
         let parked = 0;
 
         PARK_IDS.forEach((id) => {
             const el = document.getElementById(id);
-            if (el && park(el, false)) parked += 1;
+            if (el && park(el)) parked += 1;
         });
 
         return parked;
     }
 
-    function fixChatComposerOverlap() {
-        const chat = document.getElementById("mobileChatMessages") || document.querySelector(".mobile-chat-container");
-        const composer = document.getElementById("nova-mobile-composer") || document.querySelector(".nova-mobile-composer, .mobile-composer");
+    function killTinyBottomBubble() {
+        let killed = 0;
+        const vh = window.innerHeight || document.documentElement.clientHeight || 700;
 
-        if (!chat || !composer) return false;
+        Array.from(document.querySelectorAll("body *")).forEach((el) => {
+            if (!el || el.closest("#nova-mobile-primary-action-row")) return;
+            if (el.closest("#nova-mobile-composer, .nova-mobile-composer, .mobile-composer")) return;
+            if (el.closest("#mobileChatMessages, .mobile-chat-container")) return;
+            if (el.closest("#mobileMenuPanel, #nova-mobile-menu, #novaMobileMenu, .mobile-menu, .nova-mobile-menu, [data-menu], [data-panel='menu']")) return;
 
-        const cr = composer.getBoundingClientRect();
-        const tr = chat.getBoundingClientRect();
+            const tag = clean(el.tagName);
+            if (["input", "textarea", "button"].includes(tag)) return;
 
-        const nextBottom = Math.max(80, Math.round(cr.top - 9));
-        const nextHeight = Math.max(80, Math.round(nextBottom - tr.top));
+            const raw = clean([
+                el.id || "",
+                el.className || "",
+                el.getAttribute?.("aria-label") || "",
+                el.innerText || el.textContent || ""
+            ].join(" "));
 
-        setImportant(chat, "bottom", "auto");
-        setImportant(chat, "height", `${nextHeight}px`);
-        setImportant(chat, "max-height", `${nextHeight}px`);
-        setImportant(chat, "overflow-y", "auto");
-
-        return true;
-    }
-
-    function findVisibleMenu() {
-        const selectors = [
-            "#mobileMenuPanel",
-            "#nova-mobile-menu",
-            "#novaMobileMenu",
-            ".mobile-menu",
-            ".nova-mobile-menu",
-            "[data-menu]",
-            "[data-panel='menu']",
-            "[role='menu']"
-        ];
-
-        const nodes = Array.from(document.querySelectorAll(selectors.join(",")));
-
-        return nodes.find((el) => {
-            if (!el || el.closest("#nova-mobile-primary-action-row")) return false;
-
-            const cs = getComputedStyle(el);
             const r = el.getBoundingClientRect();
+            const cs = getComputedStyle(el);
 
-            if (cs.display === "none" || cs.visibility === "hidden" || Number(cs.opacity || 1) === 0) return false;
-            if (r.width < 80 || r.height < 40) return false;
+            const bottomish = r.top > vh * 0.45 || r.bottom > vh - 170;
+            const smallish = r.width >= 8 && r.width <= 220 && r.height >= 6 && r.height <= 95;
+            const likelyAccountShell =
+                raw.includes("login") ||
+                raw.includes("logout") ||
+                raw.includes("account") ||
+                raw.includes("bottom") ||
+                raw.includes("rail") ||
+                raw.includes("floating") ||
+                raw.trim() === "";
 
-            return true;
-        }) || null;
-    }
-
-    function ensureFallbackMenu() {
-        let menu = document.getElementById("nova-mobile-account-fallback-menu");
-
-        if (!menu) {
-            menu = document.createElement("div");
-            menu.id = "nova-mobile-account-fallback-menu";
-            menu.innerHTML = `<button id="nova-mobile-account-fallback-button" type="button">Account</button>`;
-            document.body.appendChild(menu);
-        }
-
-        const btn = document.getElementById("nova-mobile-account-fallback-button");
-
-        if (btn && !btn.dataset.novaAccountBoundV7) {
-            btn.dataset.novaAccountBoundV7 = "1";
-            btn.addEventListener("click", (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                clickOriginalAccount();
-            }, true);
-        }
-
-        return menu;
-    }
-
-    function menuHasAccount(menu) {
-        return Array.from(menu.querySelectorAll("button, a, [role='button']"))
-            .some(el => clean(el.textContent) === "account");
-    }
-
-    function injectAccountIntoMenu(menu) {
-        if (!menu || menuHasAccount(menu)) return false;
-
-        const btn = document.createElement("button");
-        btn.id = "nova-mobile-menu-account-restored";
-        btn.type = "button";
-        btn.textContent = "Account";
-        btn.addEventListener("click", (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            clickOriginalAccount();
-        }, true);
-
-        menu.appendChild(btn);
-        return true;
-    }
-
-    function ensureAccountAccess(showFallback = false) {
-        const visibleMenu = findVisibleMenu();
-
-        if (visibleMenu) {
-            injectAccountIntoMenu(visibleMenu);
-            return "menu";
-        }
-
-        const fallback = ensureFallbackMenu();
-
-        if (showFallback) {
-            fallback.classList.add("nova-mobile-account-fallback-open");
-        }
-
-        return showFallback ? "fallback-open" : "fallback-ready";
-    }
-
-    function clickOriginalAccount() {
-        const login = document.getElementById("nova-mobile-bottom-login");
-
-        if (login) {
-            login.dispatchEvent(new MouseEvent("click", {
-                bubbles: true,
-                cancelable: true,
-                view: window
-            }));
-            console.log(TAG, "clicked original account");
-            return true;
-        }
-
-        for (const name of ["NovaMobileOpenAccount", "openAccount", "showAccount", "NovaMobileLogin"]) {
-            if (typeof window[name] === "function") {
-                try {
-                    window[name]();
-                    console.log(TAG, "called", name);
-                    return true;
-                } catch (_) {}
+            if (
+                bottomish &&
+                smallish &&
+                likelyAccountShell &&
+                cs.display !== "none" &&
+                cs.visibility !== "hidden" &&
+                Number(cs.opacity || 1) > 0
+            ) {
+                if (park(el)) killed += 1;
             }
-        }
+        });
 
-        console.warn(TAG, "account fallback missing");
-        return false;
+        return killed;
     }
 
     function textOf(el) {
@@ -7365,8 +6767,7 @@ header {
 
     function allButtons() {
         return Array.from(document.querySelectorAll("button, a, [role='button']"))
-            .filter(el => !el.closest("#nova-mobile-primary-action-row"))
-            .filter(el => !el.closest("#nova-mobile-account-fallback-menu"));
+            .filter(el => !el.closest("#nova-mobile-primary-action-row"));
     }
 
     function clickOriginal(labels) {
@@ -7481,9 +6882,9 @@ header {
 
         binds.forEach(([id, fn]) => {
             const btn = document.getElementById(id);
-            if (!btn || btn.dataset.novaBoundV7) return;
+            if (!btn || btn.dataset.novaBoundV9) return;
 
-            btn.dataset.novaBoundV7 = "1";
+            btn.dataset.novaBoundV9 = "1";
             btn.addEventListener("click", (event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -7494,28 +6895,183 @@ header {
 
         const menuBtn = document.getElementById("nova-mobile-tools-toggle");
 
-        if (menuBtn && !menuBtn.dataset.novaAccountMenuBoundV7) {
-            menuBtn.dataset.novaAccountMenuBoundV7 = "1";
+        if (menuBtn && !menuBtn.dataset.novaMenuAccountV9) {
+            menuBtn.dataset.novaMenuAccountV9 = "1";
             menuBtn.addEventListener("click", () => {
-                setTimeout(() => {
-                    apply("menu-click");
-                    ensureAccountAccess(true);
-                }, 260);
+                setTimeout(() => injectAccountIntoActualOpenMenu("menu-click-300"), 300);
+                setTimeout(() => injectAccountIntoActualOpenMenu("menu-click-800"), 800);
             }, false);
         }
+    }
+
+    function isComposerOrShell(el) {
+        return !!el.closest("#nova-mobile-composer, .nova-mobile-composer, .mobile-composer, .mobile-shell, main");
+    }
+
+    function isActualOpenMenuPanel(el) {
+        if (!el || el === document.body || el === document.documentElement) return false;
+        if (el.closest("#nova-mobile-primary-action-row")) return false;
+        if (isComposerOrShell(el)) return false;
+
+        const r = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+
+        if (cs.display === "none" || cs.visibility === "hidden" || Number(cs.opacity || 1) === 0) return false;
+        if (r.width < 120 || r.height < 50) return false;
+
+        const raw = clean([
+            el.id || "",
+            el.className || "",
+            el.getAttribute?.("role") || "",
+            el.getAttribute?.("aria-label") || "",
+            el.getAttribute?.("data-panel") || "",
+            el.innerText || el.textContent || ""
+        ].join(" "));
+
+        const hasMenuWords =
+            raw.includes("execution") ||
+            raw.includes("artifact") ||
+            raw.includes("memory") ||
+            raw.includes("tools") ||
+            raw.includes("image") ||
+            raw.includes("voice") ||
+            raw.includes("settings") ||
+            raw.includes("history");
+
+        const hasButtonList = el.querySelectorAll("button, a, [role='button']").length >= 2;
+
+        return hasMenuWords && hasButtonList;
+    }
+
+    function findActualOpenMenuPanel() {
+        const exact = [
+            "#mobileMenuPanel",
+            "#nova-mobile-menu",
+            "#novaMobileMenu",
+            "#nova-mobile-tools-panel",
+            "#mobileToolsPanel",
+            "#novaMobileToolsPanel",
+            ".mobile-menu",
+            ".nova-mobile-menu",
+            ".nova-mobile-tools-panel",
+            ".mobile-tools-panel",
+            "[data-menu]",
+            "[data-panel='menu']",
+            "[data-panel='tools']",
+            "[role='menu']"
+        ];
+
+        for (const sel of exact) {
+            const hit = Array.from(document.querySelectorAll(sel)).find(isActualOpenMenuPanel);
+            if (hit) return hit;
+        }
+
+        return Array.from(document.querySelectorAll("div, aside, section, nav"))
+            .filter(isActualOpenMenuPanel)
+            .sort((a, b) => {
+                const ar = a.getBoundingClientRect();
+                const br = b.getBoundingClientRect();
+                return (br.width * br.height) - (ar.width * ar.height);
+            })[0] || null;
+    }
+
+    function panelHasAccount(panel) {
+        return Array.from(panel.querySelectorAll("button, a, [role='button']"))
+            .some(el => clean(el.textContent) === "account");
+    }
+
+    function clickOriginalAccount() {
+        const login = document.getElementById("nova-mobile-bottom-login");
+
+        if (login) {
+            login.dispatchEvent(new MouseEvent("click", {
+                bubbles: true,
+                cancelable: true,
+                view: window
+            }));
+            console.log(TAG, "clicked original account");
+            return true;
+        }
+
+        for (const name of ["NovaMobileOpenAccount", "openAccount", "showAccount", "NovaMobileLogin"]) {
+            if (typeof window[name] === "function") {
+                try {
+                    window[name]();
+                    console.log(TAG, "called", name);
+                    return true;
+                } catch (_) {}
+            }
+        }
+
+        console.warn(TAG, "account handler missing");
+        return false;
+    }
+
+    function injectAccountIntoActualOpenMenu(reason = "manual") {
+        const panel = findActualOpenMenuPanel();
+
+        if (!panel) {
+            console.log(TAG, reason, { accountAdded: false, panel: false });
+            return false;
+        }
+
+        if (panelHasAccount(panel)) {
+            console.log(TAG, reason, { accountAdded: false, panel: true, already: true });
+            return true;
+        }
+
+        const btn = document.createElement("button");
+        btn.id = "nova-mobile-menu-account-final";
+        btn.type = "button";
+        btn.textContent = "Account";
+        btn.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            clickOriginalAccount();
+        }, true);
+
+        panel.appendChild(btn);
+
+        console.log(TAG, reason, {
+            accountAdded: true,
+            panelId: panel.id || "",
+            panelClass: String(panel.className || "").slice(0, 90)
+        });
+
+        return true;
+    }
+
+    function fixChatComposerOverlap() {
+        const chat = document.getElementById("mobileChatMessages") || document.querySelector(".mobile-chat-container");
+        const composer = document.getElementById("nova-mobile-composer") || document.querySelector(".nova-mobile-composer, .mobile-composer");
+
+        if (!chat || !composer) return false;
+
+        const cr = composer.getBoundingClientRect();
+        const tr = chat.getBoundingClientRect();
+
+        const nextBottom = Math.max(80, Math.round(cr.top - 9));
+        const nextHeight = Math.max(80, Math.round(nextBottom - tr.top));
+
+        setImportant(chat, "bottom", "auto");
+        setImportant(chat, "height", `${nextHeight}px`);
+        setImportant(chat, "max-height", `${nextHeight}px`);
+        setImportant(chat, "overflow-y", "auto");
+
+        return true;
     }
 
     function apply(reason = "apply") {
         bindRow();
 
         const parked = parkOldControls();
+        const killedBubble = killTinyBottomBubble();
         const chatFixed = fixChatComposerOverlap();
-        const account = ensureAccountAccess(false);
 
         const row = ensureRow();
         const widths = Array.from(row.querySelectorAll("button")).map(btn => Math.round(btn.getBoundingClientRect().width));
 
-        const msg = JSON.stringify({ parked, chatFixed, account, widths });
+        const msg = JSON.stringify({ parked, killedBubble, chatFixed, widths });
 
         if (msg !== lastLog) {
             lastLog = msg;
@@ -7525,7 +7081,8 @@ header {
         return JSON.parse(msg);
     }
 
-    window.NovaMobileOneRowNewSessionsCopyRegenV7 = () => apply("manual");
+    window.NovaMobileOneRowNewSessionsCopyRegenV9 = () => apply("manual");
+    window.NovaMobileInjectAccountIntoActualOpenMenuV9 = () => injectAccountIntoActualOpenMenu("manual");
 
     apply("boot");
 
@@ -7542,6 +7099,7 @@ header {
     console.log(TAG, "ready");
 })();
 </script>
+
 
 
 </body>
