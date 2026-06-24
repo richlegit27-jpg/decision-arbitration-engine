@@ -6248,39 +6248,24 @@ header {
 
 
 
+
+
 <script>
-/* NOVA_MOBILE_RUNTIME_COMPOSER_GEOMETRY_STABLE_NO_SHAKE_20260624 */
+/* NOVA_MOBILE_RUNTIME_COMPOSER_GEOMETRY_FREEZE_NO_SHAKE_20260624 */
 (function () {
     "use strict";
 
-    var scheduled = false;
-    var last = {
-        chatTop: "",
-        chatBottom: "",
-        composerBottom: "",
-        composerTop: ""
-    };
-
     function important(el, prop, value) {
         if (!el) return;
-
-        if (el.style.getPropertyValue(prop) === value) return;
-
         el.style.setProperty(prop, value, "important");
     }
 
-    function lockMobileGeometry(reason) {
-        scheduled = false;
-
+    function freezeGeometry() {
         try {
             var chat = document.getElementById("mobileChatMessages");
             var composer = document.getElementById("nova-mobile-composer");
 
             if (!chat || !composer) return;
-
-            var composerRect = composer.getBoundingClientRect();
-            var composerHeight = Math.ceil(composerRect.height || 132);
-            var composerSpace = Math.max(136, Math.min(158, composerHeight + 10)) + "px";
 
             important(composer, "position", "fixed");
             important(composer, "left", "0px");
@@ -6292,84 +6277,32 @@ header {
             important(composer, "z-index", "90");
 
             important(chat, "position", "fixed");
+            important(chat, "top", "72px");
             important(chat, "left", "0px");
             important(chat, "right", "0px");
-            important(chat, "bottom", composerSpace);
+            important(chat, "bottom", "138px");
             important(chat, "height", "auto");
             important(chat, "max-height", "none");
             important(chat, "overflow-y", "auto");
             important(chat, "overflow-x", "hidden");
             important(chat, "z-index", "10");
             important(chat, "box-sizing", "border-box");
-            important(chat, "padding-bottom", "14px");
-
-            /*
-              Do not hard-force scrollTop every 750ms.
-              That was the shake source. Only scroll after message mutations.
-            */
-            if (reason === "messages") {
-                chat.scrollTop = chat.scrollHeight;
-            }
-
-            last.chatBottom = composerSpace;
+            important(chat, "padding-bottom", "22px");
         } catch (_) {}
     }
 
-    function scheduleGeometry(reason) {
-        if (scheduled) return;
+    window.NovaMobileLockComposerGeometry = freezeGeometry;
 
-        scheduled = true;
+    document.addEventListener("DOMContentLoaded", freezeGeometry);
+    window.addEventListener("load", freezeGeometry);
+    window.addEventListener("resize", freezeGeometry);
+    window.addEventListener("orientationchange", freezeGeometry);
 
-        requestAnimationFrame(function () {
-            lockMobileGeometry(reason || "scheduled");
-        });
-    }
+    setTimeout(freezeGeometry, 50);
+    setTimeout(freezeGeometry, 300);
+    setTimeout(freezeGeometry, 1000);
 
-    window.NovaMobileLockComposerGeometry = function () {
-        scheduleGeometry("manual");
-    };
-
-    function boot() {
-        scheduleGeometry("boot");
-
-        var chat = document.getElementById("mobileChatMessages");
-        var composer = document.getElementById("nova-mobile-composer");
-
-        if (chat && !chat.__novaNoShakeObserver) {
-            chat.__novaNoShakeObserver = new MutationObserver(function () {
-                scheduleGeometry("messages");
-            });
-
-            chat.__novaNoShakeObserver.observe(chat, {
-                childList: true,
-                subtree: true,
-                characterData: true
-            });
-        }
-
-        if (composer && window.ResizeObserver && !composer.__novaNoShakeResizeObserver) {
-            composer.__novaNoShakeResizeObserver = new ResizeObserver(function () {
-                scheduleGeometry("composer-resize");
-            });
-
-            composer.__novaNoShakeResizeObserver.observe(composer);
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", boot);
-    window.addEventListener("load", boot);
-    window.addEventListener("resize", function () {
-        scheduleGeometry("resize");
-    });
-    window.addEventListener("orientationchange", function () {
-        scheduleGeometry("orientation");
-    });
-
-    setTimeout(boot, 50);
-    setTimeout(boot, 300);
-    setTimeout(boot, 1000);
-
-    console.log("[Nova Mobile] runtime composer geometry stable no-shake active");
+    console.log("[Nova Mobile] runtime composer geometry freeze no-shake active");
 })();
 </script>
 
