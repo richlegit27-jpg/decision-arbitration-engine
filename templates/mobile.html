@@ -5803,6 +5803,47 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
 
 
 
+
+<!-- NOVA_MOBILE_CHAT_BOTTOM_BREATHING_ROOM_20260624 -->
+<style>
+    #mobileChatMessages {
+        padding-bottom: 44px !important;
+        scroll-padding-bottom: 44px !important;
+    }
+
+    #mobileChatMessages::after {
+        content: "";
+        display: block;
+        height: 28px;
+        flex: 0 0 28px;
+    }
+</style>
+<script>
+(function () {
+    "use strict";
+
+    const TAG = "[NOVA_MOBILE_CHAT_BOTTOM_BREATHING_ROOM_20260624]";
+
+    function applyBottomRoom() {
+        const chat = document.getElementById("mobileChatMessages");
+        if (!chat) return false;
+
+        chat.style.setProperty("padding-bottom", "44px", "important");
+        chat.style.setProperty("scroll-padding-bottom", "44px", "important");
+        return true;
+    }
+
+    applyBottomRoom();
+    setTimeout(applyBottomRoom, 250);
+    setTimeout(applyBottomRoom, 900);
+
+    window.NovaMobileChatBottomBreathingRoom = applyBottomRoom;
+
+    console.log(TAG, "ready");
+})();
+</script>
+<!-- /NOVA_MOBILE_CHAT_BOTTOM_BREATHING_ROOM_20260624 -->
+
 </body>
 </html>
 
