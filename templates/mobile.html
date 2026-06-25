@@ -3247,69 +3247,12 @@
 <!-- /NOVA_MOBILE_BLANK_PAGE_RECOVERY_CLEANUP_20260623 -->
 
 
-<!-- NOVA_MOBILE_CHAT_AVOID_COMPOSER_GEOMETRY_20260623 -->
-<style>
-    #mobileChatMessages {
-        min-height: 0 !important;
-        max-height: none !important;
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-        box-sizing: border-box !important;
-    }
-</style>
+<!-- NOVA_MOBILE_CHAT_AVOID_COMPOSER_GEOMETRY_20260623_DISABLED_20260624
+Disabled because it fought the final scroll/composer geometry lock by rewriting
+#mobileChatMessages height/max-height/bottom every 500ms.
+The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
+-->
 
-<script>
-(function () {
-    const MARK = "NOVA_MOBILE_CHAT_AVOID_COMPOSER_GEOMETRY_20260623";
-
-    function fix() {
-        const chat = document.getElementById("mobileChatMessages");
-        const composer =
-            document.getElementById("nova-mobile-composer") ||
-            document.querySelector(".nova-mobile-composer, .mobile-composer");
-
-        if (!chat || !composer) return;
-
-        const composerRect = composer.getBoundingClientRect();
-        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-
-        if (!viewportHeight || composerRect.height <= 0 || composerRect.top <= 0) return;
-
-        const top = 74;
-        const gap = 10;
-        const available = Math.max(80, Math.floor(composerRect.top - top - gap));
-
-        chat.style.setProperty("position", "fixed", "important");
-        chat.style.setProperty("left", "0", "important");
-        chat.style.setProperty("right", "0", "important");
-        chat.style.setProperty("top", top + "px", "important");
-        chat.style.setProperty("bottom", "auto", "important");
-        chat.style.setProperty("height", available + "px", "important");
-        chat.style.setProperty("min-height", "0", "important");
-        chat.style.setProperty("max-height", available + "px", "important");
-        chat.style.setProperty("overflow-y", "auto", "important");
-        chat.style.setProperty("overflow-x", "hidden", "important");
-        chat.style.setProperty("z-index", "30", "important");
-        chat.style.setProperty("opacity", "1", "important");
-        chat.style.setProperty("visibility", "visible", "important");
-
-        chat
-            .querySelectorAll("button, [role='button'], .nova-mobile-message-actions, .nova-mobile-copy-message, .nova-mobile-regen-message")
-            .forEach(el => el.remove());
-    }
-
-    window.NovaMobileChatAvoidComposerGeometry = fix;
-
-    setInterval(fix, 500);
-    setTimeout(fix, 50);
-    setTimeout(fix, 250);
-    setTimeout(fix, 900);
-    setTimeout(fix, 1800);
-
-    console.log("[" + MARK + "] ready");
-})();
-</script>
-<!-- /NOVA_MOBILE_CHAT_AVOID_COMPOSER_GEOMETRY_20260623 -->
 
 
 
