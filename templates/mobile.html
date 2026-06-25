@@ -4747,21 +4747,58 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
                     `;
                 }).join("");
 
+                // NOVA_MOBILE_V10_SESSION_ROW_DIRECT_OPEN_HARDENED_20260625
                 body.querySelectorAll("[data-v10-session-id]").forEach(btn => {
-                    btn.addEventListener("click", () => {
+                    function openV10SessionRow(event) {
+                        if (event) {
+                            try {
+                                event.preventDefault();
+                                event.stopPropagation();
+
+                                if (typeof event.stopImmediatePropagation === "function") {
+                                    event.stopImmediatePropagation();
+                                }
+                            } catch (_) {}
+                        }
+
                         const sid = btn.getAttribute("data-v10-session-id") || "";
 
                         if (!sid) return;
 
-                        setSessionId(sid);
-                        console.log(TAG, "open session", sid);
+                        try {
+                            setSessionId(sid);
+                            localStorage.setItem("nova_mobile_active_session_id", sid);
+                            localStorage.setItem("nova_active_session_id", sid);
+                            localStorage.setItem("nova_session_id", sid);
+                            sessionStorage.setItem("nova_mobile_v10_direct_open_session_id", sid);
+                            window.currentSessionId = sid;
+                            window.NOVA_SESSION_ID = sid;
+                        } catch (_) {}
 
-                        location.href =
+                        console.log(TAG, "open session direct hardened", sid);
+
+                        location.replace(
                             "/mobile?session_id=" +
                             encodeURIComponent(sid) +
-                            "&fresh=v10-open-session-20260625-001&bust=" +
-                            Date.now();
-                    }, true);
+                            "&v10_direct_open=1" +
+                            "&fresh=v10-open-session-direct-hardened-20260625-001&bust=" +
+                            Date.now()
+                        );
+                    }
+
+                    ["pointerdown", "touchstart", "mousedown"].forEach(type => {
+                        btn.addEventListener(type, event => {
+                            try {
+                                event.stopPropagation();
+
+                                if (typeof event.stopImmediatePropagation === "function") {
+                                    event.stopImmediatePropagation();
+                                }
+                            } catch (_) {}
+                        }, true);
+                    });
+
+                    btn.addEventListener("click", openV10SessionRow, true);
                 });
             })
             .catch(error => {
