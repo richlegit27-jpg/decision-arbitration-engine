@@ -12402,3 +12402,12 @@ main {
     bottom: 116px !important;
     padding-bottom: 24px !important;
 }
+
+/* NOVA_MOBILE_CHAT_TOP_MARGIN_RESET_20260625 */
+/* Fix: old webcard spacing pushed the whole mobile chat down by 58px. */
+#mobileChatMessages,
+.mobile-chat-container {
+    margin-top: 0 !important;
+}
+/* /NOVA_MOBILE_CHAT_TOP_MARGIN_RESET_20260625 */
+
