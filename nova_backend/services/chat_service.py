@@ -22824,3 +22824,69 @@ try:
 except Exception as _nova_final_attachment_route_lock_v2_error:
     print("[NOVA_FINAL_ATTACHMENT_ROUTE_BEATS_WEB_LOCK_V2_20260624] failed:", _nova_final_attachment_route_lock_v2_error)
 
+
+# NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V2_20260624
+# Final response cleaner: remove common mojibake before API/mobile output.
+try:
+    import re as _nova_mojibake_re_20260624
+
+    _NOVA_PRE_FINAL_MOJIBAKE_HANDLE_V2_20260624 = ChatService.handle
+
+    def _nova_final_clean_mojibake_text_v2_20260624(value):
+        if not isinstance(value, str):
+            return value
+
+        text = value
+
+        replacements = {
+            "???": "'",
+            "???": "'",
+            "???": '"',
+            "??": '"',
+            "???": '"',
+            "???": "-",
+            "???": "-",
+            "???": "...",
+            "? ": " ",
+            "?": "",
+            "??": "?",
+            "??": "?",
+            "??": "?",
+        }
+
+        for bad, good in replacements.items():
+            text = text.replace(bad, good)
+
+        # Fix damaged contractions like it?s, don?t, you?re, I?m.
+        text = _nova_mojibake_re_20260624.sub(
+            r"\b([A-Za-z]+)?(s|t|re|ve|ll|d|m)\b",
+            r"\1'\2",
+            text,
+        )
+
+        return text
+
+    def _nova_final_clean_mojibake_obj_v2_20260624(obj):
+        if isinstance(obj, str):
+            return _nova_final_clean_mojibake_text_v2_20260624(obj)
+
+        if isinstance(obj, list):
+            return [_nova_final_clean_mojibake_obj_v2_20260624(item) for item in obj]
+
+        if isinstance(obj, dict):
+            return {
+                key: _nova_final_clean_mojibake_obj_v2_20260624(value)
+                for key, value in obj.items()
+            }
+
+        return obj
+
+    def _nova_final_mojibake_clean_handle_v2_20260624(self, *args, **kwargs):
+        result = _NOVA_PRE_FINAL_MOJIBAKE_HANDLE_V2_20260624(self, *args, **kwargs)
+        return _nova_final_clean_mojibake_obj_v2_20260624(result)
+
+    ChatService.handle = _nova_final_mojibake_clean_handle_v2_20260624
+    print("[NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V2_20260624] installed")
+except Exception as _nova_final_mojibake_cleanup_v2_error_20260624:
+    print("[NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V2_20260624] failed:", _nova_final_mojibake_cleanup_v2_error_20260624)
+
