@@ -5713,6 +5713,7 @@
 </script>
 
 
+
 <!-- NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624 -->
 <style>
     html,
@@ -5722,7 +5723,9 @@
     }
 
     #mobileChatMessages {
-        bottom: calc(var(--nova-mobile-composer-live-height, 132px) + env(safe-area-inset-bottom, 0px)) !important;
+        position: fixed !important;
+        left: 0 !important;
+        right: 0 !important;
         overflow-y: auto !important;
         -webkit-overflow-scrolling: touch !important;
         overscroll-behavior: contain !important;
@@ -5731,6 +5734,7 @@
     }
 
     #nova-mobile-composer {
+        position: fixed !important;
         bottom: env(safe-area-inset-bottom, 0px) !important;
     }
 </style>
@@ -5739,29 +5743,60 @@
     "use strict";
 
     const TAG = "[NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624]";
+    let lastKey = "";
+
+    function clampNumber(value, fallback) {
+        value = Number(value);
+        return Number.isFinite(value) ? value : fallback;
+    }
 
     function updateGeometry() {
-        const composer = document.getElementById("nova-mobile-composer");
         const chat = document.getElementById("mobileChatMessages");
+        const composer = document.getElementById("nova-mobile-composer");
 
-        if (!composer || !chat) {
+        if (!chat || !composer) {
             return false;
         }
 
-        const rect = composer.getBoundingClientRect();
-        const height = Math.max(96, Math.ceil(rect.height || composer.offsetHeight || 132));
+        const chatRect = chat.getBoundingClientRect();
+        const composerRect = composer.getBoundingClientRect();
+
+        const viewportHeight = Math.round(
+            window.visualViewport && window.visualViewport.height
+                ? window.visualViewport.height
+                : window.innerHeight
+        );
+
+        const chatTop = Math.round(clampNumber(chatRect.top, 132));
+        const composerTop = Math.round(clampNumber(composerRect.top, viewportHeight - 132));
+        const composerHeight = Math.max(96, Math.round(clampNumber(composerRect.height, 132)));
+
+        const safeGap = 0;
+        const targetBottomPx = Math.max(0, viewportHeight - composerTop + safeGap);
+        const targetHeightPx = Math.max(120, composerTop - chatTop - safeGap);
 
         document.documentElement.style.setProperty(
             "--nova-mobile-composer-live-height",
-            height + "px"
+            composerHeight + "px"
         );
 
-        chat.style.bottom = "calc(" + height + "px + env(safe-area-inset-bottom, 0px))";
-        chat.style.overflowY = "auto";
-        chat.style.webkitOverflowScrolling = "touch";
-        chat.style.overscrollBehavior = "contain";
-        chat.style.paddingBottom = "18px";
-        chat.style.scrollPaddingBottom = "18px";
+        chat.style.setProperty("position", "fixed", "important");
+        chat.style.setProperty("top", chatTop + "px", "important");
+        chat.style.setProperty("bottom", targetBottomPx + "px", "important");
+        chat.style.setProperty("height", targetHeightPx + "px", "important");
+        chat.style.setProperty("overflow-y", "auto", "important");
+        chat.style.setProperty("-webkit-overflow-scrolling", "touch", "important");
+        chat.style.setProperty("overscroll-behavior", "contain", "important");
+        chat.style.setProperty("padding-bottom", "18px", "important");
+        chat.style.setProperty("scroll-padding-bottom", "18px", "important");
+
+        composer.style.setProperty("position", "fixed", "important");
+        composer.style.setProperty("bottom", "env(safe-area-inset-bottom, 0px)", "important");
+
+        const key = chatTop + ":" + composerTop + ":" + targetBottomPx + ":" + targetHeightPx;
+        if (key !== lastKey) {
+            lastKey = key;
+        }
 
         return true;
     }
@@ -5774,6 +5809,10 @@
     setTimeout(updateGeometry, 50);
     setTimeout(updateGeometry, 250);
     setTimeout(updateGeometry, 900);
+    setTimeout(updateGeometry, 1600);
+
+    window.clearInterval(window.__novaMobileScrollComposerGeometryFinalTimer);
+    window.__novaMobileScrollComposerGeometryFinalTimer = window.setInterval(updateGeometry, 350);
 
     window.addEventListener("resize", schedule, { passive: true });
     window.addEventListener("orientationchange", schedule, { passive: true });
@@ -5799,6 +5838,7 @@
 })();
 </script>
 <!-- /NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624 -->
+
 
 </body>
 </html>
