@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 # NOVA_LOCAL_PROJECT_CONTEXT_GUARD_20260607
 def _nova_is_local_project_status_question_20260607(user_text):
     clean = " ".join(str(user_text or "").lower().split())
@@ -4653,6 +4653,40 @@ if (not attachments) and (__name__ == "__main__"):
             )
 
         file_path = path.strip()
+
+        # NOVA_AUTO_FIX_PLACEHOLDER_PATH_GUARD_20260624
+        # Refuse the example path before auto-fix tries to read it.
+        normalized_file_path = file_path.replace("/", "\\").strip().lower()
+        placeholder_path_values = {
+            "c:\\users\\owner\\nova\\path\\file.py",
+            "\\nova\\path\\file.py",
+            "\\path\\file.py",
+        }
+
+        if (
+            not file_path
+            or normalized_file_path.endswith("\\path\\file.py")
+            or normalized_file_path in placeholder_path_values
+            or "\\nova\\path\\" in normalized_file_path
+        ):
+            assistant_text = (
+                "That is the example path, not a real file.\n\n"
+                "Send the real file path and exact error.\n\n"
+                "Example:\n"
+                "fix this file C:\\Users\\Owner\\nova\\app.py\n"
+                "error: paste the traceback"
+            )
+
+            assistant_msg = self._build_assistant_message(text=assistant_text)
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=self._build_user_message(user_text),
+                assistant_msg=assistant_msg,
+                decision={"route": "auto_fix_placeholder_path"},
+            )
+
         pending_fix_mode = (
             self._get_session_meta(session_id, "pending_fix_mode") or "file"
         )
