@@ -5261,7 +5261,11 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
         });
 
         requestAnimationFrame(() => {
-            chat.scrollTop = chat.scrollHeight;
+            if (window.NovaMobileSafeScrollToBottom) {
+                window.NovaMobileSafeScrollToBottom(chat, "templates-mobile-inline");
+            } else {
+                chat.scrollTop = chat.scrollHeight;
+            }
         });
 
         return true;
@@ -6565,7 +6569,11 @@ body {
     function scrollBottomSoon() {
         if (!chat) return;
         requestAnimationFrame(() => {
-            chat.scrollTop = chat.scrollHeight;
+            if (window.NovaMobileSafeScrollToBottom) {
+                window.NovaMobileSafeScrollToBottom(chat, "templates-mobile-inline");
+            } else {
+                chat.scrollTop = chat.scrollHeight;
+            }
         });
     }
 
