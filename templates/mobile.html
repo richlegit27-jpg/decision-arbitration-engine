@@ -5819,6 +5819,102 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
 
 
 
+
+<!-- NOVA_MOBILE_SCROLL_GEOMETRY_USER_TRUCE_20260625 -->
+<script>
+(function () {
+    const FIX_ID = "NOVA_MOBILE_SCROLL_GEOMETRY_USER_TRUCE_20260625";
+
+    if (window.__novaMobileScrollGeometryUserTruce20260625) {
+        return;
+    }
+
+    window.__novaMobileScrollGeometryUserTruce20260625 = true;
+
+    let userScrollingUntil = 0;
+
+    function now() {
+        return Date.now();
+    }
+
+    function getChat() {
+        return document.getElementById("mobileChatMessages");
+    }
+
+    function distanceFromBottom(el) {
+        if (!el) return 0;
+        return el.scrollHeight - el.scrollTop - el.clientHeight;
+    }
+
+    function userIsReading() {
+        const chat = getChat();
+        return !!chat && now() < userScrollingUntil && distanceFromBottom(chat) > 120;
+    }
+
+    function markUserScroll() {
+        const chat = getChat();
+        if (!chat) return;
+
+        if (distanceFromBottom(chat) > 120) {
+            userScrollingUntil = now() + 4500;
+            document.documentElement.dataset.novaUserReadingScroll = "1";
+        }
+    }
+
+    function clearFlagWhenSettled() {
+        if (now() >= userScrollingUntil) {
+            delete document.documentElement.dataset.novaUserReadingScroll;
+        }
+    }
+
+    function wire() {
+        const chat = getChat();
+
+        if (!chat || chat.dataset.novaGeometryTruceWired === "1") {
+            return;
+        }
+
+        chat.dataset.novaGeometryTruceWired = "1";
+
+        ["scroll", "touchstart", "touchmove", "wheel", "pointerdown"].forEach(function (name) {
+            chat.addEventListener(name, markUserScroll, { passive: true });
+        });
+    }
+
+    const nativeSetProperty = CSSStyleDeclaration.prototype.setProperty;
+
+    CSSStyleDeclaration.prototype.setProperty = function (name, value, priority) {
+        try {
+            const chat = getChat();
+
+            if (
+                chat &&
+                this === chat.style &&
+                userIsReading() &&
+                /^(height|max-height|min-height|bottom|padding-bottom)$/i.test(String(name || ""))
+            ) {
+                return;
+            }
+        } catch (error) {}
+
+        return nativeSetProperty.call(this, name, value, priority);
+    };
+
+    function boot() {
+        wire();
+        clearFlagWhenSettled();
+    }
+
+    boot();
+    setTimeout(boot, 250);
+    setTimeout(boot, 900);
+    setInterval(boot, 1000);
+
+    console.log("[" + FIX_ID + "] ready");
+})();
+</script>
+<!-- /NOVA_MOBILE_SCROLL_GEOMETRY_USER_TRUCE_20260625 -->
+
 <!-- NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624 -->
 <style>
     html,
@@ -5964,6 +6060,65 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
 
 
 
+
+
+<!-- NOVA_MOBILE_QUIET_GEOMETRY_INTERVAL_20260625 -->
+<script>
+(function () {
+    const FIX_ID = "NOVA_MOBILE_QUIET_GEOMETRY_INTERVAL_20260625";
+
+    if (window.__novaMobileQuietGeometryInterval20260625) {
+        return;
+    }
+
+    window.__novaMobileQuietGeometryInterval20260625 = true;
+
+    function quietGeometryTimer(reason) {
+        try {
+            if (window.__novaMobileScrollComposerGeometryFinalTimer) {
+                window.clearInterval(window.__novaMobileScrollComposerGeometryFinalTimer);
+                window.__novaMobileScrollComposerGeometryFinalTimer = null;
+                console.log("[" + FIX_ID + "] cleared geometry interval", reason || "");
+            }
+        } catch (error) {}
+    }
+
+    function quietLater(reason) {
+        setTimeout(function () {
+            quietGeometryTimer(reason);
+        }, 50);
+
+        setTimeout(function () {
+            quietGeometryTimer(reason + "-settle");
+        }, 500);
+
+        setTimeout(function () {
+            quietGeometryTimer(reason + "-late");
+        }, 1500);
+    }
+
+    quietLater("boot");
+
+    window.addEventListener("resize", function () {
+        quietLater("resize");
+    }, { passive: true });
+
+    window.addEventListener("orientationchange", function () {
+        quietLater("orientationchange");
+    }, { passive: true });
+
+    document.addEventListener("focusin", function () {
+        quietLater("focusin");
+    }, true);
+
+    document.addEventListener("focusout", function () {
+        quietLater("focusout");
+    }, true);
+
+    console.log("[" + FIX_ID + "] ready");
+})();
+</script>
+<!-- /NOVA_MOBILE_QUIET_GEOMETRY_INTERVAL_20260625 -->
 
 <!-- NOVA_MOBILE_CHAT_BOTTOM_BREATHING_ROOM_20260624 -->
 <style>
