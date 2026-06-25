@@ -4856,6 +4856,43 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
         return true;
     }
 
+    /*
+      NOVA_MOBILE_V10_WINDOW_CAPTURE_ACTION_BRIDGE_20260625
+      Catch top-row clicks before later mobile guards swallow them.
+    */
+    const ACTION_MAP = {};
+
+    function runCapturedRowAction(event) {
+        const target = event.target?.closest?.("#nova-mobile-row-new, #nova-mobile-row-sessions, #nova-mobile-row-copy, #nova-mobile-row-regen");
+
+        if (!target) return;
+
+        const action = ACTION_MAP[target.id] || target.__novaV10Action20260625;
+
+        if (!action) return;
+
+        try {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+        } catch (_) {}
+
+        console.log(TAG, "window capture action", target.id);
+
+        action({
+            preventDefault(){},
+            stopPropagation(){},
+            stopImmediatePropagation(){}
+        });
+
+        return false;
+    }
+
+    ["pointerdown", "click", "touchstart", "mousedown"].forEach(type => {
+        window.addEventListener(type, runCapturedRowAction, true);
+        document.addEventListener(type, runCapturedRowAction, true);
+    });
+
     function bindButton(id, handler) {
         const btn = document.getElementById(id);
 
@@ -4878,6 +4915,8 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
 
             return false;
         }
+
+        ACTION_MAP[id] = run;
 
         btn.__novaV10Action20260625 = run;
         btn.dataset.novaV10Bound = "1";
