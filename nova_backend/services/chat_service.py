@@ -22825,38 +22825,41 @@ except Exception as _nova_final_attachment_route_lock_v2_error:
     print("[NOVA_FINAL_ATTACHMENT_ROUTE_BEATS_WEB_LOCK_V2_20260624] failed:", _nova_final_attachment_route_lock_v2_error)
 
 
-# NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V3_20260624
-# Final response cleaner: conservative only. Do NOT alter normal English word endings.
+# NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V4_20260624
+# Final response cleaner: exact known mojibake only. No broad word-ending regex.
 try:
-    _NOVA_PRE_FINAL_MOJIBAKE_HANDLE_V3_20260624 = ChatService.handle
+    _NOVA_PRE_FINAL_MOJIBAKE_HANDLE_V4_20260624 = ChatService.handle
 
-    def _nova_final_clean_mojibake_text_v3_20260624(value):
+    def _nova_final_clean_mojibake_text_v4_20260624(value):
         if not isinstance(value, str):
             return value
 
         text = value
 
+        # Build bad fragments by bytes so PowerShell/codepage cannot corrupt this patch.
+        apos = bytes([0xE2, 0x80, 0x99]).decode("utf-8", errors="replace")
+        lquote = bytes([0xE2, 0x80, 0x9C]).decode("utf-8", errors="replace")
+        rquote = bytes([0xE2, 0x80, 0x9D]).decode("utf-8", errors="replace")
+        ndash = bytes([0xE2, 0x80, 0x93]).decode("utf-8", errors="replace")
+        mdash = bytes([0xE2, 0x80, 0x94]).decode("utf-8", errors="replace")
+        ellip = bytes([0xE2, 0x80, 0xA6]).decode("utf-8", errors="replace")
+
         replacements = {
-            "???": "'",
-            "???": "'",
-            "???": '"',
-            "??\x9d": '"',
-            "???": '"',
-            "???": "-",
-            "???": "-",
-            "???": "...",
+            apos: "'",
+            lquote: '"',
+            rquote: '"',
+            ndash: "-",
+            mdash: "-",
+            ellip: "...",
             "? ": " ",
             "?": "",
-            "??": "?",
-            "??": "?",
-            "??": "?",
         }
 
         for bad, good in replacements.items():
             text = text.replace(bad, good)
 
-        # Conservative contraction fixes only for literal mojibake fragments.
-        contraction_replacements = {
+        # Exact visible mojibake strings seen in Nova output.
+        exact = {
             "it?s": "it's",
             "It?s": "It's",
             "that?s": "that's",
@@ -22891,32 +22894,32 @@ try:
             "i?ll": "I'll",
         }
 
-        for bad, good in contraction_replacements.items():
+        for bad, good in exact.items():
             text = text.replace(bad, good)
 
         return text
 
-    def _nova_final_clean_mojibake_obj_v3_20260624(obj):
+    def _nova_final_clean_mojibake_obj_v4_20260624(obj):
         if isinstance(obj, str):
-            return _nova_final_clean_mojibake_text_v3_20260624(obj)
+            return _nova_final_clean_mojibake_text_v4_20260624(obj)
 
         if isinstance(obj, list):
-            return [_nova_final_clean_mojibake_obj_v3_20260624(item) for item in obj]
+            return [_nova_final_clean_mojibake_obj_v4_20260624(item) for item in obj]
 
         if isinstance(obj, dict):
             return {
-                key: _nova_final_clean_mojibake_obj_v3_20260624(value)
+                key: _nova_final_clean_mojibake_obj_v4_20260624(value)
                 for key, value in obj.items()
             }
 
         return obj
 
-    def _nova_final_mojibake_clean_handle_v3_20260624(self, *args, **kwargs):
-        result = _NOVA_PRE_FINAL_MOJIBAKE_HANDLE_V3_20260624(self, *args, **kwargs)
-        return _nova_final_clean_mojibake_obj_v3_20260624(result)
+    def _nova_final_mojibake_clean_handle_v4_20260624(self, *args, **kwargs):
+        result = _NOVA_PRE_FINAL_MOJIBAKE_HANDLE_V4_20260624(self, *args, **kwargs)
+        return _nova_final_clean_mojibake_obj_v4_20260624(result)
 
-    ChatService.handle = _nova_final_mojibake_clean_handle_v3_20260624
-    print("[NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V3_20260624] installed")
-except Exception as _nova_final_mojibake_cleanup_v3_error_20260624:
-    print("[NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V3_20260624] failed:", _nova_final_mojibake_cleanup_v3_error_20260624)
+    ChatService.handle = _nova_final_mojibake_clean_handle_v4_20260624
+    print("[NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V4_20260624] installed")
+except Exception as _nova_final_mojibake_cleanup_v4_error_20260624:
+    print("[NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V4_20260624] failed:", _nova_final_mojibake_cleanup_v4_error_20260624)
 
