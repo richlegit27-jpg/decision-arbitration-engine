@@ -4748,6 +4748,199 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
                     `;
                 }).join("");
 
+                // NOVA_MOBILE_V10_SESSION_ACTION_PROMPT_SAFE_20260625
+                function stopV10SessionActionPrompt(event) {
+                    if (!event) return;
+
+                    try {
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        if (typeof event.stopImmediatePropagation === "function") {
+                            event.stopImmediatePropagation();
+                        }
+                    } catch (_) {}
+                }
+
+                async function postV10SessionActionPrompt(url, payload) {
+                    const response = await fetch(url, {
+                        method: "POST",
+                        cache: "no-store",
+                        credentials: "same-origin",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(payload || {})
+                    });
+
+                    let data = null;
+
+                    try {
+                        data = await response.json();
+                    } catch (_) {
+                        data = {
+                            ok: response.ok,
+                            status: response.status
+                        };
+                    }
+
+                    if (!response.ok || data?.ok === false) {
+                        throw new Error(data?.error || data?.message || ("HTTP " + response.status));
+                    }
+
+                    return data;
+                }
+
+                function getV10SessionRowTitle(row) {
+                    const titleEl = row?.querySelector("span");
+                    return String(titleEl?.textContent || "").trim();
+                }
+
+                function setV10SessionRowTitle(row, title) {
+                    const titleEl = row?.querySelector("span");
+
+                    if (titleEl) {
+                        titleEl.textContent = String(title || "").trim() || "New Chat";
+                    }
+                }
+
+                function addV10SessionActionPrompt(row) {
+                    const sessionId = row?.getAttribute?.("data-v10-session-id") || "";
+
+                    if (!sessionId || row.querySelector("[data-v10-session-action-prompt]")) {
+                        return;
+                    }
+
+                    row.style.position = "relative";
+                    row.style.paddingRight = "48px";
+
+                    const action = document.createElement("span");
+                    action.setAttribute("data-v10-session-action-prompt", "1");
+                    action.setAttribute("role", "button");
+                    action.setAttribute("aria-label", "Session actions");
+                    action.textContent = "...";
+                    action.style.cssText = [
+                        "position:absolute",
+                        "top:8px",
+                        "right:8px",
+                        "display:flex",
+                        "align-items:center",
+                        "justify-content:center",
+                        "width:30px",
+                        "height:30px",
+                        "border-radius:999px",
+                        "border:1px solid rgba(255,255,255,.16)",
+                        "background:rgba(255,255,255,.09)",
+                        "color:#fff",
+                        "font:900 15px/1 Arial,sans-serif",
+                        "box-sizing:border-box",
+                        "pointer-events:auto",
+                        "touch-action:manipulation"
+                    ].join(";");
+
+                    ["pointerdown", "touchstart", "mousedown"].forEach(type => {
+                        action.addEventListener(type, stopV10SessionActionPrompt, true);
+                    });
+
+                    action.addEventListener("click", async event => {
+                        stopV10SessionActionPrompt(event);
+
+                        const choice = prompt("Session action: rename, pin, unpin, delete", "rename");
+                        const command = String(choice || "").trim().toLowerCase();
+
+                        if (!command) {
+                            return;
+                        }
+
+                        action.style.opacity = ".5";
+
+                        try {
+                            if (command === "rename" || command === "r") {
+                                const currentTitle = getV10SessionRowTitle(row);
+                                const nextTitle = prompt("Rename session:", currentTitle);
+
+                                if (nextTitle === null) {
+                                    return;
+                                }
+
+                                const cleanTitle = String(nextTitle || "").trim();
+
+                                if (!cleanTitle) {
+                                    return;
+                                }
+
+                                await postV10SessionActionPrompt("/api/sessions/rename", {
+                                    session_id: sessionId,
+                                    title: cleanTitle
+                                });
+
+                                setV10SessionRowTitle(row, cleanTitle);
+                                console.log(TAG, "session renamed", sessionId);
+                                return;
+                            }
+
+                            if (command === "pin" || command === "p") {
+                                await postV10SessionActionPrompt("/api/sessions/pin", {
+                                    session_id: sessionId,
+                                    pinned: true
+                                });
+
+                                const currentTitle = getV10SessionRowTitle(row);
+                                const prefix = "[PIN] ";
+
+                                if (!currentTitle.startsWith(prefix)) {
+                                    setV10SessionRowTitle(row, prefix + currentTitle);
+                                }
+
+                                console.log(TAG, "session pinned", sessionId);
+                                return;
+                            }
+
+                            if (command === "unpin" || command === "u") {
+                                await postV10SessionActionPrompt("/api/sessions/pin", {
+                                    session_id: sessionId,
+                                    pinned: false
+                                });
+
+                                const currentTitle = getV10SessionRowTitle(row);
+                                const prefix = "[PIN] ";
+
+                                if (currentTitle.startsWith(prefix)) {
+                                    setV10SessionRowTitle(row, currentTitle.slice(prefix.length));
+                                }
+
+                                console.log(TAG, "session unpinned", sessionId);
+                                return;
+                            }
+
+                            if (command === "delete" || command === "del" || command === "d") {
+                                if (!confirm("Delete this session?")) {
+                                    return;
+                                }
+
+                                await postV10SessionActionPrompt("/api/sessions/delete", {
+                                    session_id: sessionId
+                                });
+
+                                row.remove();
+                                console.log(TAG, "session deleted", sessionId);
+                                return;
+                            }
+
+                            alert("Use rename, pin, unpin, or delete.");
+                        } catch (error) {
+                            console.warn(TAG, "session action failed", command, sessionId, error);
+                            alert("Session action failed: " + (error?.message || error));
+                        } finally {
+                            action.style.opacity = "1";
+                        }
+                    }, true);
+
+                    row.appendChild(action);
+                }
+
+                body.querySelectorAll("[data-v10-session-id]").forEach(addV10SessionActionPrompt);
+
                 // NOVA_MOBILE_V10_SESSION_ROW_DIRECT_OPEN_HARDENED_20260625
                 body.querySelectorAll("[data-v10-session-id]").forEach(btn => {
                     function openV10SessionRow(event) {
