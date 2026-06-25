@@ -5712,6 +5712,94 @@
 })();
 </script>
 
+
+<!-- NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624 -->
+<style>
+    html,
+    body {
+        height: 100% !important;
+        overflow: hidden !important;
+    }
+
+    #mobileChatMessages {
+        bottom: calc(var(--nova-mobile-composer-live-height, 132px) + env(safe-area-inset-bottom, 0px)) !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior: contain !important;
+        padding-bottom: 18px !important;
+        scroll-padding-bottom: 18px !important;
+    }
+
+    #nova-mobile-composer {
+        bottom: env(safe-area-inset-bottom, 0px) !important;
+    }
+</style>
+<script>
+(function () {
+    "use strict";
+
+    const TAG = "[NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624]";
+
+    function updateGeometry() {
+        const composer = document.getElementById("nova-mobile-composer");
+        const chat = document.getElementById("mobileChatMessages");
+
+        if (!composer || !chat) {
+            return false;
+        }
+
+        const rect = composer.getBoundingClientRect();
+        const height = Math.max(96, Math.ceil(rect.height || composer.offsetHeight || 132));
+
+        document.documentElement.style.setProperty(
+            "--nova-mobile-composer-live-height",
+            height + "px"
+        );
+
+        chat.style.bottom = "calc(" + height + "px + env(safe-area-inset-bottom, 0px))";
+        chat.style.overflowY = "auto";
+        chat.style.webkitOverflowScrolling = "touch";
+        chat.style.overscrollBehavior = "contain";
+        chat.style.paddingBottom = "18px";
+        chat.style.scrollPaddingBottom = "18px";
+
+        return true;
+    }
+
+    function schedule() {
+        requestAnimationFrame(updateGeometry);
+    }
+
+    updateGeometry();
+    setTimeout(updateGeometry, 50);
+    setTimeout(updateGeometry, 250);
+    setTimeout(updateGeometry, 900);
+
+    window.addEventListener("resize", schedule, { passive: true });
+    window.addEventListener("orientationchange", schedule, { passive: true });
+    window.addEventListener("focusin", schedule, true);
+    window.addEventListener("focusout", schedule, true);
+
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", schedule, { passive: true });
+        window.visualViewport.addEventListener("scroll", schedule, { passive: true });
+    }
+
+    if (window.ResizeObserver) {
+        const composer = document.getElementById("nova-mobile-composer");
+        if (composer && !composer.__novaMobileScrollComposerGeometryObserved) {
+            composer.__novaMobileScrollComposerGeometryObserved = "1";
+            new ResizeObserver(schedule).observe(composer);
+        }
+    }
+
+    window.NovaMobileScrollComposerGeometryFinal = updateGeometry;
+
+    console.log(TAG, "ready");
+})();
+</script>
+<!-- /NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624 -->
+
 </body>
 </html>
 
