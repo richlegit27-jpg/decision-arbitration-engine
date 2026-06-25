@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 
@@ -5867,6 +5867,245 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
     }
 </style>
 <!-- /NOVA_MOBILE_LAST_MESSAGE_VISUAL_GAP_20260624 -->
+
+
+<script>
+/* NOVA_MOBILE_FINAL_ATTACHMENT_PAYLOAD_BRIDGE_20260624 */
+(() => {
+    if (window.NOVA_MOBILE_FINAL_ATTACHMENT_PAYLOAD_BRIDGE_20260624) {
+        return;
+    }
+
+    window.NOVA_MOBILE_FINAL_ATTACHMENT_PAYLOAD_BRIDGE_20260624 = true;
+
+    const STORE_KEY = "nova_mobile_final_attachment_payload_queue_20260624";
+
+    function safeArray(value) {
+        return Array.isArray(value) ? value : [];
+    }
+
+    function normalizeAttachment(raw) {
+        if (!raw || typeof raw !== "object") {
+            return null;
+        }
+
+        const source = raw.attachment && typeof raw.attachment === "object"
+            ? raw.attachment
+            : raw;
+
+        const filename = String(
+            source.filename ||
+            source.name ||
+            source.original_filename ||
+            source.display_name ||
+            ""
+        ).trim();
+
+        const url = String(
+            source.url ||
+            source.file_url ||
+            source.upload_url ||
+            source.href ||
+            source.path ||
+            ""
+        ).trim();
+
+        const mimeType = String(
+            source.mime_type ||
+            source.mimetype ||
+            source.content_type ||
+            source.type ||
+            ""
+        ).trim();
+
+        const id = String(
+            source.id ||
+            source.attachment_id ||
+            source.upload_id ||
+            ""
+        ).trim();
+
+        const sizeBytes = source.size_bytes || source.size || source.bytes || null;
+
+        const text = typeof source.text === "string" ? source.text : "";
+
+        if (!filename && !url && !id && !text) {
+            return null;
+        }
+
+        return {
+            id,
+            filename,
+            name: filename,
+            url,
+            file_url: url,
+            path: url,
+            mime_type: mimeType,
+            type: mimeType,
+            size_bytes: sizeBytes,
+            text
+        };
+    }
+
+    function dedupeAttachments(items) {
+        const seen = new Set();
+        const out = [];
+
+        for (const item of safeArray(items)) {
+            const normalized = normalizeAttachment(item);
+
+            if (!normalized) {
+                continue;
+            }
+
+            const key = [
+                normalized.id,
+                normalized.filename,
+                normalized.url,
+                normalized.size_bytes
+            ].join("|");
+
+            if (seen.has(key)) {
+                continue;
+            }
+
+            seen.add(key);
+            out.push(normalized);
+        }
+
+        return out;
+    }
+
+    function readStoredAttachments() {
+        try {
+            return dedupeAttachments(JSON.parse(sessionStorage.getItem(STORE_KEY) || "[]"));
+        } catch (_) {
+            return [];
+        }
+    }
+
+    function writeStoredAttachments(items) {
+        try {
+            const clean = dedupeAttachments(items);
+            sessionStorage.setItem(STORE_KEY, JSON.stringify(clean));
+            window.NovaMobileFinalAttachmentPayloadQueue = clean;
+            return clean;
+        } catch (_) {
+            return [];
+        }
+    }
+
+    function rememberAttachment(raw) {
+        const normalized = normalizeAttachment(raw);
+
+        if (!normalized) {
+            return readStoredAttachments();
+        }
+
+        const merged = dedupeAttachments([
+            ...readStoredAttachments(),
+            ...safeArray(window.NovaMobileFinalAttachmentPayloadQueue),
+            normalized
+        ]);
+
+        return writeStoredAttachments(merged);
+    }
+
+    function collectAttachments() {
+        const candidates = [
+            ...readStoredAttachments(),
+            ...safeArray(window.NovaMobileFinalAttachmentPayloadQueue),
+            ...safeArray(window.NovaMobileUploadedAttachments),
+            ...safeArray(window.NovaMobilePendingAttachments),
+            ...safeArray(window.NovaMobileAttachmentQueue),
+            ...safeArray(window.novaMobileAttachments),
+            ...safeArray(window.NovaMobileSharedAttachments),
+            ...safeArray(window.NovaMobileUploadQueue),
+            ...safeArray(window.NovaMobileUploadState && window.NovaMobileUploadState.attachments),
+            ...safeArray(window.NovaMobileUploadState && window.NovaMobileUploadState.queue)
+        ];
+
+        const clean = dedupeAttachments(candidates);
+
+        if (clean.length) {
+            writeStoredAttachments(clean);
+        }
+
+        return clean;
+    }
+
+    const previousReceiver = window.NovaMobileReceiveUploadedAttachment;
+
+    window.NovaMobileReceiveUploadedAttachment = function(payload) {
+        try {
+            rememberAttachment(payload);
+            console.log("[Nova Mobile Final Attachment Payload Bridge] captured upload", collectAttachments());
+        } catch (error) {
+            console.warn("[Nova Mobile Final Attachment Payload Bridge] capture failed", error);
+        }
+
+        if (typeof previousReceiver === "function") {
+            return previousReceiver.apply(this, arguments);
+        }
+
+        return payload;
+    };
+
+    const originalFetch = window.fetch;
+
+    window.fetch = function(input, init) {
+        try {
+            const url = String(
+                typeof input === "string"
+                    ? input
+                    : input && input.url
+                        ? input.url
+                        : ""
+            );
+
+            const isChat = url.includes("/api/chat");
+
+            if (isChat && init && typeof init === "object") {
+                const method = String(init.method || "GET").toUpperCase();
+
+                if (method === "POST" && typeof init.body === "string") {
+                    const payload = JSON.parse(init.body || "{}");
+                    const existing = Array.isArray(payload.attachments) ? payload.attachments : [];
+                    const collected = collectAttachments();
+
+                    if (!existing.length && collected.length) {
+                        payload.attachments = collected;
+                        payload.session_attachments = collected;
+                        payload.attachment_count = collected.length;
+
+                        init = {
+                            ...init,
+                            body: JSON.stringify(payload)
+                        };
+
+                        console.log(
+                            "[Nova Mobile Final Attachment Payload Bridge] injected attachments into /api/chat",
+                            collected
+                        );
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn("[Nova Mobile Final Attachment Payload Bridge] fetch injection skipped", error);
+        }
+
+        return originalFetch.apply(this, arguments);
+    };
+
+    window.NovaMobileFinalAttachmentPayloadBridge = {
+        collect: collectAttachments,
+        clear: () => writeStoredAttachments([]),
+        remember: rememberAttachment
+    };
+
+    console.log("[Nova Mobile Final Attachment Payload Bridge] ready");
+})();
+</script>
 
 </body>
 </html>
