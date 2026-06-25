@@ -5397,6 +5397,321 @@
 })();
 </script>
 
+
+<!-- NOVA_MOBILE_ATTACHMENT_PREVIEW_MENU_TEXT_POLISH_V1_20260624 -->
+<style>
+/* Attachment preview polish */
+#nova-mobile-attachment-preview,
+.nova-mobile-attachment-preview,
+#mobileAttachmentPreview,
+.mobile-attachment-preview {
+    max-width: calc(100vw - 24px) !important;
+    margin: 6px 10px 4px 10px !important;
+    padding: 7px 8px !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(216, 180, 254, 0.22) !important;
+    background: rgba(20, 16, 32, 0.92) !important;
+    color: #f8fafc !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    box-sizing: border-box !important;
+    min-height: 36px !important;
+}
+
+#nova-mobile-attachment-preview:empty,
+.nova-mobile-attachment-preview:empty,
+#mobileAttachmentPreview:empty,
+.mobile-attachment-preview:empty {
+    display: none !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+}
+
+#nova-mobile-attachment-preview img,
+.nova-mobile-attachment-preview img,
+#mobileAttachmentPreview img,
+.mobile-attachment-preview img {
+    width: 34px !important;
+    height: 34px !important;
+    max-width: 34px !important;
+    max-height: 34px !important;
+    border-radius: 10px !important;
+    object-fit: cover !important;
+    flex: 0 0 auto !important;
+}
+
+#nova-mobile-attachment-preview *,
+.nova-mobile-attachment-preview *,
+#mobileAttachmentPreview *,
+.mobile-attachment-preview * {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Long menu button text should wrap instead of being chopped. */
+#nova-mobile-tools-panel button,
+#nova-mobile-memory-panel button,
+#nova-mobile-execution-panel button,
+#nova-mobile-session-restore-panel-v2 button,
+.mobile-panel button,
+[class*="mobile-panel"] button {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    line-height: 1.15 !important;
+    min-height: 38px !important;
+    height: auto !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    text-align: center !important;
+    word-break: normal !important;
+    overflow-wrap: anywhere !important;
+}
+
+#nova-mobile-execution-panel button,
+#nova-mobile-execution-close,
+[id*="execution" i][id*="close" i] {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+}
+</style>
+
+<script>
+(() => {
+    const TAG = "[NOVA_MOBILE_ATTACHMENT_PREVIEW_MENU_TEXT_POLISH_V1_20260624]";
+
+    if (window.NovaMobileAttachmentPreviewMenuTextPolishV1Installed) {
+        console.log(TAG, "already installed");
+        return;
+    }
+
+    window.NovaMobileAttachmentPreviewMenuTextPolishV1Installed = true;
+
+    const PREVIEW_SELECTORS = [
+        "#nova-mobile-attachment-preview",
+        ".nova-mobile-attachment-preview",
+        "#mobileAttachmentPreview",
+        ".mobile-attachment-preview",
+        "[data-mobile-attachment-preview]"
+    ];
+
+    const PAYLOAD_IDS = [
+        "nova-mobile-attachment-payload",
+        "mobileAttachmentPayload",
+        "attachmentPayload"
+    ];
+
+    const FILE_IDS = [
+        "nova-mobile-file-input",
+        "mobileFileInput",
+        "fileInput"
+    ];
+
+    function findPreview() {
+        for (const selector of PREVIEW_SELECTORS) {
+            const el = document.querySelector(selector);
+            if (el) return el;
+        }
+        return null;
+    }
+
+    function hasPreviewContent(el) {
+        if (!el) return false;
+        return Boolean(
+            el.children.length ||
+            String(el.textContent || "").trim() ||
+            el.querySelector("img, video, audio")
+        );
+    }
+
+    function polishPreview() {
+        const el = findPreview();
+        if (!el) return;
+
+        if (!hasPreviewContent(el)) {
+            el.style.display = "none";
+            return;
+        }
+
+        el.style.display = "flex";
+        el.style.alignItems = "center";
+        el.style.gap = "8px";
+
+        if (!el.querySelector("[data-nova-clear-attachment-v1]")) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.textContent = "?";
+            btn.setAttribute("aria-label", "Clear attachment");
+            btn.dataset.novaClearAttachmentV1 = "1";
+
+            Object.assign(btn.style, {
+                flex: "0 0 auto",
+                width: "28px",
+                height: "28px",
+                minHeight: "28px",
+                borderRadius: "999px",
+                border: "1px solid rgba(255,255,255,.18)",
+                background: "rgba(255,255,255,.10)",
+                color: "#fff",
+                fontWeight: "900",
+                fontSize: "18px",
+                lineHeight: "1",
+                padding: "0",
+                marginLeft: "auto"
+            });
+
+            btn.addEventListener("click", ev => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                clearAttachmentPreview();
+            }, true);
+
+            el.appendChild(btn);
+        }
+    }
+
+    function clearAttachmentPreview() {
+        const previews = PREVIEW_SELECTORS
+            .flatMap(selector => Array.from(document.querySelectorAll(selector)));
+
+        previews.forEach(el => {
+            el.innerHTML = "";
+            el.style.display = "none";
+            el.removeAttribute("data-has-attachment");
+            el.classList.remove("has-attachment", "is-visible", "visible");
+        });
+
+        PAYLOAD_IDS.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.value = "";
+                el.textContent = "";
+                el.removeAttribute("value");
+            }
+        });
+
+        FILE_IDS.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = "";
+        });
+
+        try {
+            [
+                "nova_mobile_pending_attachment",
+                "nova_mobile_attachment",
+                "nova_mobile_upload",
+                "nova_pending_attachment",
+                "pending_attachment"
+            ].forEach(key => {
+                localStorage.removeItem(key);
+                sessionStorage.removeItem(key);
+            });
+        } catch {}
+
+        window.NovaMobilePendingAttachment = null;
+        window.novaMobilePendingAttachment = null;
+        window.NovaMobileCurrentAttachment = null;
+        window.novaMobileCurrentAttachment = null;
+
+        console.log(TAG, "attachment preview cleared");
+    }
+
+    function clearAfterSendSoon() {
+        setTimeout(clearAttachmentPreview, 900);
+        setTimeout(clearAttachmentPreview, 1800);
+        setTimeout(clearAttachmentPreview, 3200);
+    }
+
+    function bindSendClear() {
+        const send =
+            document.getElementById("nova-mobile-send") ||
+            document.getElementById("mobileSendButton") ||
+            document.querySelector("[data-mobile-send]") ||
+            document.querySelector("button[type='submit']");
+
+        if (send && send.dataset.attachmentPreviewClearV1 !== "1") {
+            send.dataset.attachmentPreviewClearV1 = "1";
+            send.addEventListener("click", () => clearAfterSendSoon(), true);
+            send.addEventListener("pointerup", () => clearAfterSendSoon(), true);
+        }
+
+        document.querySelectorAll("form").forEach(form => {
+            if (form.dataset.attachmentPreviewClearV1 === "1") return;
+            form.dataset.attachmentPreviewClearV1 = "1";
+            form.addEventListener("submit", () => clearAfterSendSoon(), true);
+        });
+    }
+
+    function patchFetch() {
+        if (window.__NovaMobileAttachmentPreviewFetchPatchedV1) return;
+        window.__NovaMobileAttachmentPreviewFetchPatchedV1 = true;
+
+        const originalFetch = window.fetch;
+        if (typeof originalFetch !== "function") return;
+
+        window.fetch = async function patchedFetch(input, init) {
+            const url = String(input?.url || input || "");
+            const method = String(init?.method || input?.method || "GET").toUpperCase();
+
+            const isChatSend =
+                method === "POST" &&
+                (
+                    url.includes("/api/chat") ||
+                    url.includes("/api/chat/stream")
+                );
+
+            const response = await originalFetch.apply(this, arguments);
+
+            if (isChatSend) {
+                setTimeout(clearAttachmentPreview, 350);
+                setTimeout(clearAttachmentPreview, 1200);
+            }
+
+            return response;
+        };
+    }
+
+    function boot() {
+        bindSendClear();
+        patchFetch();
+        polishPreview();
+
+        const obs = new MutationObserver(() => {
+            polishPreview();
+            bindSendClear();
+        });
+
+        obs.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+
+        window.NovaMobileClearAttachmentPreviewV1 = clearAttachmentPreview;
+        window.NovaMobileAttachmentPreviewMenuTextPolishV1 = () => {
+            polishPreview();
+            bindSendClear();
+            return {
+                preview: !!findPreview(),
+                send: !!document.getElementById("nova-mobile-send")
+            };
+        };
+
+        console.log(TAG, "ready");
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", boot, { once: true });
+    } else {
+        boot();
+    }
+})();
+</script>
+
 </body>
 </html>
 
