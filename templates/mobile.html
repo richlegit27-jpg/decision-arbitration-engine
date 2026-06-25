@@ -5177,6 +5177,292 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
     console.log(TAG, "ready");
 })();
 </script>
+<!-- NOVA_MOBILE_V9_DIRECT_ROW_OVERRIDE_20260625 -->
+<script>
+(() => {
+    const TAG = "[NOVA_MOBILE_V9_DIRECT_ROW_OVERRIDE_20260625]";
+
+    if (window.__novaMobileV9DirectRowOverride20260625) {
+        return;
+    }
+
+    window.__novaMobileV9DirectRowOverride20260625 = true;
+
+    function setSessionId(sid) {
+        if (!sid) return;
+        localStorage.setItem("nova_mobile_active_session_id", sid);
+        localStorage.setItem("nova_active_session_id", sid);
+        window.currentSessionId = sid;
+        window.NOVA_SESSION_ID = sid;
+    }
+
+    function directNew() {
+        fetch("/api/sessions/new", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ source: "mobile-v9-direct-row" })
+        })
+            .then(r => r.json())
+            .then(data => {
+                const sid = data.session_id || data.id || data.sessionId || data?.session?.id || "";
+                if (!sid) {
+                    console.warn(TAG, "new failed: no session id", data);
+                    return;
+                }
+
+                setSessionId(sid);
+                console.log(TAG, "new session", sid);
+                location.href = "/mobile?session_id=" + encodeURIComponent(sid) + "&fresh=v9-direct-new-20260625-002&bust=" + Date.now();
+            })
+            .catch(error => console.warn(TAG, "new failed", error));
+
+        return true;
+    }
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
+
+    function directSessions() {
+        const existing = document.getElementById("nova-mobile-v9-direct-sessions-panel");
+        if (existing) {
+            existing.remove();
+            console.log(TAG, "closed sessions");
+            return true;
+        }
+
+        const panel = document.createElement("div");
+        panel.id = "nova-mobile-v9-direct-sessions-panel";
+        panel.style.cssText = [
+            "position:fixed!important",
+            "top:50px!important",
+            "left:8px!important",
+            "right:8px!important",
+            "bottom:86px!important",
+            "z-index:2147483646!important",
+            "display:flex!important",
+            "flex-direction:column!important",
+            "gap:8px!important",
+            "padding:10px!important",
+            "box-sizing:border-box!important",
+            "overflow-y:auto!important",
+            "background:rgba(15,23,42,.97)!important",
+            "border:1px solid rgba(168,85,247,.35)!important",
+            "border-radius:18px!important",
+            "box-shadow:0 24px 80px rgba(0,0,0,.55)!important",
+            "color:#fff!important"
+        ].join(";");
+
+        panel.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;">
+                <strong style="font:900 14px Arial,sans-serif;">Sessions</strong>
+                <button id="nova-mobile-v9-direct-sessions-close" type="button" style="height:30px;border-radius:999px;padding:0 12px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;font-weight:900;">Close</button>
+            </div>
+            <div id="nova-mobile-v9-direct-sessions-body" style="display:grid;gap:7px;">Loading sessions...</div>
+        `;
+
+        document.body.appendChild(panel);
+
+        document.getElementById("nova-mobile-v9-direct-sessions-close")?.addEventListener("click", () => {
+            panel.remove();
+        }, true);
+
+        const body = document.getElementById("nova-mobile-v9-direct-sessions-body");
+
+        fetch("/api/sessions", { cache: "no-store" })
+            .then(r => r.json())
+            .then(data => {
+                const sessions =
+                    Array.isArray(data) ? data :
+                    Array.isArray(data.sessions) ? data.sessions :
+                    Array.isArray(data.items) ? data.items :
+                    Array.isArray(data.data) ? data.data :
+                    [];
+
+                if (!sessions.length) {
+                    body.innerHTML = `<div style="opacity:.75;font-size:13px;">No sessions found.</div>`;
+                    return;
+                }
+
+                body.innerHTML = sessions.slice(0, 60).map((s, index) => {
+                    const sid = s.session_id || s.id || s.sessionId || s.key || "";
+                    const title = s.title || s.name || s.label || "Untitled session";
+                    const count = s.count || s.message_count || s.messages_count || s.messageCount || "";
+                    const meta = count ? `${count} messages` : (s.updated_at || s.updatedAt || s.created_at || "");
+
+                    return `
+                        <button type="button" data-session-id="${escapeHtml(sid)}" style="display:flex;flex-direction:column;align-items:flex-start;gap:3px;width:100%;min-height:44px;padding:9px 10px;border-radius:13px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.07);color:#fff;text-align:left;">
+                            <span style="font:900 13px Arial,sans-serif;">${escapeHtml(title)}</span>
+                            <span style="font:700 10.5px Arial,sans-serif;opacity:.62;">${escapeHtml(meta || sid || ("#" + (index + 1)))}</span>
+                        </button>
+                    `;
+                }).join("");
+
+                body.querySelectorAll("[data-session-id]").forEach(btn => {
+                    btn.addEventListener("click", () => {
+                        const sid = btn.getAttribute("data-session-id") || "";
+                        if (!sid) return;
+
+                        setSessionId(sid);
+                        console.log(TAG, "open session", sid);
+                        location.href = "/mobile?session_id=" + encodeURIComponent(sid) + "&fresh=v9-direct-session-20260625-002&bust=" + Date.now();
+                    }, true);
+                });
+            })
+            .catch(error => {
+                console.warn(TAG, "sessions failed", error);
+                body.innerHTML = `<div style="opacity:.75;font-size:13px;">Sessions failed. Check console.</div>`;
+            });
+
+        console.log(TAG, "opened sessions");
+        return true;
+    }
+
+    function cleanTextFrom(el) {
+        if (!el) return "";
+
+        const clone = el.cloneNode(true);
+        clone.querySelectorAll("button, [role='button'], .nova-mobile-message-actions, .message-actions, .bubble-actions, .source-card, .sources, .web-sources").forEach(x => x.remove());
+
+        return String(clone.innerText || clone.textContent || "")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim();
+    }
+
+    async function directCopy() {
+        const root = document.getElementById("mobileChatMessages");
+        let text = cleanTextFrom(root);
+
+        if (!text) {
+            text = Array.from(document.querySelectorAll(".message, .assistant, .user, [data-role]"))
+                .map(cleanTextFrom)
+                .filter(Boolean)
+                .join("\n\n")
+                .trim();
+        }
+
+        if (!text) {
+            console.warn(TAG, "copy failed: no text");
+            return false;
+        }
+
+        try {
+            await navigator.clipboard.writeText(text);
+            console.log(TAG, "copied chat", { chars: text.length });
+            return true;
+        } catch (error) {
+            const area = document.createElement("textarea");
+            area.value = text;
+            area.style.position = "fixed";
+            area.style.left = "-9999px";
+            area.style.top = "0";
+            document.body.appendChild(area);
+            area.focus();
+            area.select();
+            document.execCommand("copy");
+            area.remove();
+
+            console.log(TAG, "copied chat fallback", { chars: text.length });
+            return true;
+        }
+    }
+
+    function directRegen() {
+        const root = document.getElementById("mobileChatMessages");
+
+        let lastUserText = Array.from(document.querySelectorAll(
+            "#mobileChatMessages .user, #mobileChatMessages .message-user, #mobileChatMessages .nova-message-user, #mobileChatMessages .nova-mobile-restored-user, #mobileChatMessages [data-role='user']"
+        )).reverse().map(cleanTextFrom).find(Boolean) || "";
+
+        if (!lastUserText && root) {
+            lastUserText = Array.from(root.children).reverse()
+                .filter(el => String(el.className || "").toLowerCase().includes("user"))
+                .map(cleanTextFrom)
+                .find(Boolean) || "";
+        }
+
+        lastUserText = lastUserText.replace(/^you\s*[:\-]\s*/i, "").trim();
+
+        if (!lastUserText) {
+            console.warn(TAG, "regen failed: no last user message");
+            return false;
+        }
+
+        const input = document.getElementById("nova-mobile-input") || document.querySelector("textarea, input[type='text']");
+        const send = document.getElementById("nova-mobile-send") || document.querySelector("[data-action='send'], button[aria-label='Send']");
+
+        if (!input || !send) {
+            console.warn(TAG, "regen failed: missing input/send", { input: !!input, send: !!send });
+            return false;
+        }
+
+        input.focus();
+        input.value = lastUserText;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+
+        setTimeout(() => {
+            send.dispatchEvent(new MouseEvent("click", {
+                bubbles: true,
+                cancelable: true,
+                view: window
+            }));
+
+            console.log(TAG, "resent last user message", { chars: lastUserText.length });
+        }, 50);
+
+        return true;
+    }
+
+    function replaceAndBind(id, label, handler) {
+        const old = document.getElementById(id);
+        if (!old) return false;
+
+        const btn = old.cloneNode(true);
+        btn.id = id;
+        btn.textContent = label;
+        btn.dataset.novaBoundV9 = "1";
+        btn.dataset.novaDirectRowOverride = "1";
+
+        old.replaceWith(btn);
+
+        btn.addEventListener("click", event => {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            handler();
+        }, true);
+
+        return true;
+    }
+
+    function bind() {
+        const result = {
+            new: replaceAndBind("nova-mobile-row-new", "New", directNew),
+            sessions: replaceAndBind("nova-mobile-row-sessions", "Sessions", directSessions),
+            copy: replaceAndBind("nova-mobile-row-copy", "Copy", directCopy),
+            regen: replaceAndBind("nova-mobile-row-regen", "Regen", directRegen)
+        };
+
+        console.log(TAG, "bound", result);
+        return result;
+    }
+
+    window.NovaMobileV9DirectRowOverride20260625 = bind;
+
+    bind();
+
+    [150, 500, 1200, 2500, 5000].forEach(ms => {
+        setTimeout(bind, ms);
+    });
+})();
+</script>
+<!-- /NOVA_MOBILE_V9_DIRECT_ROW_OVERRIDE_20260625 -->
+
 
 
 
@@ -6872,6 +7158,219 @@ body {
 
 
 
+
+<!-- NOVA_MOBILE_TOP_ROW_CAPTURE_FINAL_20260625 -->
+<script>
+(() => {
+    const TAG = "[NOVA_MOBILE_TOP_ROW_CAPTURE_FINAL_20260625]";
+
+    if (window.__novaMobileTopRowCaptureFinal20260625) return;
+    window.__novaMobileTopRowCaptureFinal20260625 = true;
+
+    function setSessionId(sid) {
+        if (!sid) return;
+        localStorage.setItem("nova_mobile_active_session_id", sid);
+        localStorage.setItem("nova_active_session_id", sid);
+        window.currentSessionId = sid;
+        window.NOVA_SESSION_ID = sid;
+    }
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
+
+    function openSessionsPanel() {
+        const old = document.getElementById("nova-mobile-capture-sessions-panel");
+        if (old) {
+            old.remove();
+            console.log(TAG, "closed sessions");
+            return true;
+        }
+
+        const panel = document.createElement("div");
+        panel.id = "nova-mobile-capture-sessions-panel";
+        panel.style.cssText = [
+            "position:fixed!important",
+            "top:50px!important",
+            "left:8px!important",
+            "right:8px!important",
+            "bottom:86px!important",
+            "z-index:2147483647!important",
+            "display:flex!important",
+            "flex-direction:column!important",
+            "gap:8px!important",
+            "padding:10px!important",
+            "box-sizing:border-box!important",
+            "overflow-y:auto!important",
+            "background:rgba(15,23,42,.97)!important",
+            "border:1px solid rgba(168,85,247,.45)!important",
+            "border-radius:18px!important",
+            "box-shadow:0 24px 80px rgba(0,0,0,.58)!important",
+            "color:#fff!important"
+        ].join(";");
+
+        panel.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                <strong style="font:900 14px Arial,sans-serif;">Sessions</strong>
+                <button id="nova-mobile-capture-sessions-close" type="button" style="height:30px;border-radius:999px;padding:0 12px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;font-weight:900;">Close</button>
+            </div>
+            <div id="nova-mobile-capture-sessions-body" style="display:grid;gap:7px;">Loading sessions...</div>
+        `;
+
+        document.body.appendChild(panel);
+
+        document.getElementById("nova-mobile-capture-sessions-close")?.addEventListener("click", () => {
+            panel.remove();
+        }, true);
+
+        const body = document.getElementById("nova-mobile-capture-sessions-body");
+
+        fetch("/api/sessions", { cache: "no-store" })
+            .then(r => r.json())
+            .then(data => {
+                const sessions =
+                    Array.isArray(data) ? data :
+                    Array.isArray(data.sessions) ? data.sessions :
+                    Array.isArray(data.items) ? data.items :
+                    Array.isArray(data.data) ? data.data :
+                    [];
+
+                console.log(TAG, "sessions loaded", { count: sessions.length, data });
+
+                if (!sessions.length) {
+                    body.innerHTML = `<div style="opacity:.75;font-size:13px;">No sessions found.</div>`;
+                    return;
+                }
+
+                body.innerHTML = sessions.slice(0, 60).map((s, index) => {
+                    const sid = s.session_id || s.id || s.sessionId || s.key || "";
+                    const title = s.title || s.name || s.label || "Untitled session";
+                    const count = s.count || s.message_count || s.messages_count || s.messageCount || "";
+                    const meta = count ? `${count} messages` : (s.updated_at || s.updatedAt || s.created_at || "");
+
+                    return `
+                        <button type="button" data-capture-session-id="${escapeHtml(sid)}" style="display:flex;flex-direction:column;align-items:flex-start;gap:3px;width:100%;min-height:44px;padding:9px 10px;border-radius:13px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.07);color:#fff;text-align:left;">
+                            <span style="font:900 13px Arial,sans-serif;">${escapeHtml(title)}</span>
+                            <span style="font:700 10.5px Arial,sans-serif;opacity:.62;">${escapeHtml(meta || sid || ("#" + (index + 1)))}</span>
+                        </button>
+                    `;
+                }).join("");
+
+                body.querySelectorAll("[data-capture-session-id]").forEach(btn => {
+                    btn.addEventListener("click", () => {
+                        const sid = btn.getAttribute("data-capture-session-id") || "";
+                        if (!sid) return;
+
+                        setSessionId(sid);
+                        console.log(TAG, "open session", sid);
+                        location.href = "/mobile?session_id=" + encodeURIComponent(sid) + "&fresh=capture-session-20260625-001&bust=" + Date.now();
+                    }, true);
+                });
+            })
+            .catch(error => {
+                console.warn(TAG, "sessions failed", error);
+                body.innerHTML = `<div style="opacity:.75;font-size:13px;">Sessions failed. Check console.</div>`;
+            });
+
+        console.log(TAG, "opened sessions");
+        return true;
+    }
+
+    function cleanText(el) {
+        if (!el) return "";
+        const clone = el.cloneNode(true);
+        clone.querySelectorAll("button, [role='button'], .message-actions, .bubble-actions, .source-card, .sources").forEach(x => x.remove());
+        return String(clone.innerText || clone.textContent || "").replace(/\n{3,}/g, "\n\n").trim();
+    }
+
+    async function copyChat() {
+        const root = document.getElementById("mobileChatMessages");
+        const text = cleanText(root);
+
+        if (!text) {
+            console.warn(TAG, "copy skipped: no chat text");
+            return false;
+        }
+
+        try {
+            await navigator.clipboard.writeText(text);
+            console.log(TAG, "copied chat", { chars: text.length });
+            return true;
+        } catch (_) {
+            const area = document.createElement("textarea");
+            area.value = text;
+            area.style.position = "fixed";
+            area.style.left = "-9999px";
+            document.body.appendChild(area);
+            area.focus();
+            area.select();
+            document.execCommand("copy");
+            area.remove();
+            console.log(TAG, "copied chat fallback", { chars: text.length });
+            return true;
+        }
+    }
+
+    function regenLast() {
+        const root = document.getElementById("mobileChatMessages");
+        let last = "";
+
+        if (root) {
+            last = Array.from(root.children).reverse()
+                .filter(el => String(el.className || "").toLowerCase().includes("user") || el.matches?.("[data-role='user']"))
+                .map(cleanText)
+                .find(Boolean) || "";
+        }
+
+        last = last.replace(/^you\s*[:\-]\s*/i, "").trim();
+
+        if (!last) {
+            console.warn(TAG, "regen skipped: no last user message");
+            return false;
+        }
+
+        const input = document.getElementById("nova-mobile-input") || document.querySelector("textarea, input[type='text']");
+        const send = document.getElementById("nova-mobile-send") || document.querySelector("[data-action='send'], button[aria-label='Send']");
+
+        if (!input || !send) {
+            console.warn(TAG, "regen failed: missing input/send", { input: !!input, send: !!send });
+            return false;
+        }
+
+        input.focus();
+        input.value = last;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+
+        setTimeout(() => {
+            send.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
+            console.log(TAG, "resent last user message", { chars: last.length });
+        }, 80);
+
+        return true;
+    }
+
+    document.addEventListener("click", event => {
+        const btn = event.target.closest?.("#nova-mobile-row-sessions,#nova-mobile-row-copy,#nova-mobile-row-regen");
+        if (!btn) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        if (btn.id === "nova-mobile-row-sessions") openSessionsPanel();
+        if (btn.id === "nova-mobile-row-copy") copyChat();
+        if (btn.id === "nova-mobile-row-regen") regenLast();
+    }, true);
+
+    console.log(TAG, "ready");
+})();
+</script>
+<!-- /NOVA_MOBILE_TOP_ROW_CAPTURE_FINAL_20260625 -->
 </body>
 </html>
 
