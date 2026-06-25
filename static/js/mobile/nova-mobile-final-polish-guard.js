@@ -235,6 +235,7 @@ Final guard:
     }
 
     function forceFinalScrollGeometry() {
+        return; // disabled 20260624: geometry is owned by NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624
         var chat = document.getElementById("mobileChatMessages");
         var comp = document.getElementById("nova-mobile-composer");
         var input = document.getElementById("nova-mobile-input");
@@ -311,6 +312,7 @@ Final guard:
     }
 
     function finalScrollGeometryForceV2() {
+        return; // disabled 20260624: geometry is owned by NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624
         var chat = document.getElementById("mobileChatMessages");
         var comp = document.getElementById("nova-mobile-composer");
         var input = document.getElementById("nova-mobile-input");
