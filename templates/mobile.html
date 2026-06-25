@@ -4758,9 +4758,32 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
       hidden/original mobile controls by ID before falling back to text search.
     */
     function clickByIds(ids, label) {
+        /*
+          NOVA_MOBILE_V9_ROW_HANDLER_REPAIR_SKIP_DEAD_IDS_20260625
+
+          Parked originals exist in the DOM but are hidden/offscreen and often no
+          longer have useful handlers. Do not return true for a dead parked ID.
+        */
         for (const id of ids) {
             const el = document.getElementById(id);
             if (!el) continue;
+
+            const r = el.getBoundingClientRect();
+            const cs = getComputedStyle(el);
+            const dead =
+                cs.display === "none" ||
+                cs.visibility === "hidden" ||
+                cs.opacity === "0" ||
+                cs.pointerEvents === "none" ||
+                r.width <= 2 ||
+                r.height <= 2 ||
+                r.top < -1000 ||
+                r.left < -1000;
+
+            if (dead) {
+                console.log(TAG, "skipped dead original id", { label, id });
+                continue;
+            }
 
             try {
                 el.dispatchEvent(new MouseEvent("click", {
@@ -4769,7 +4792,7 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
                     view: window
                 }));
 
-                console.log(TAG, "clicked original id", { label, id });
+                console.log(TAG, "clicked live original id", { label, id });
                 return true;
             } catch (error) {
                 console.warn(TAG, "failed original id", { label, id, error });
@@ -4821,8 +4844,47 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
             }
         }
 
-        console.warn(TAG, "new fallback missing");
-        return false;
+        /*
+          NOVA_MOBILE_V9_NEW_DIRECT_SESSION_FALLBACK_20260625
+
+          Last resort: create a new mobile session through the existing backend
+          session endpoint, then store it as the active session and reload mobile.
+        */
+        try {
+            fetch("/api/sessions/new", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ source: "mobile-v9-row" })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    const sid =
+                        data.session_id ||
+                        data.id ||
+                        data.sessionId ||
+                        data?.session?.id ||
+                        "";
+
+                    if (!sid) {
+                        console.warn(TAG, "new direct fallback missing session id", data);
+                        return;
+                    }
+
+                    localStorage.setItem("nova_mobile_active_session_id", sid);
+                    localStorage.setItem("nova_active_session_id", sid);
+                    window.currentSessionId = sid;
+                    window.NOVA_SESSION_ID = sid;
+
+                    console.log(TAG, "created direct new session", sid);
+                    location.href = "/mobile?session_id=" + encodeURIComponent(sid) + "&fresh=v9-new-direct-20260625-001&bust=" + Date.now();
+                })
+                .catch(error => console.warn(TAG, "new direct fallback failed", error));
+
+            return true;
+        } catch (error) {
+            console.warn(TAG, "new fallback missing", error);
+            return false;
+        }
     }
 
     function openSessions() {
