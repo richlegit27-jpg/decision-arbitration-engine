@@ -5821,7 +5821,17 @@
     setTimeout(updateGeometry, 1600);
 
     window.clearInterval(window.__novaMobileScrollComposerGeometryFinalTimer);
-    window.__novaMobileScrollComposerGeometryFinalTimer = window.setInterval(updateGeometry, 250);
+
+    let settleRuns = 0;
+    window.__novaMobileScrollComposerGeometryFinalTimer = window.setInterval(function () {
+        settleRuns += 1;
+        updateGeometry();
+
+        if (settleRuns >= 20) {
+            window.clearInterval(window.__novaMobileScrollComposerGeometryFinalTimer);
+            window.__novaMobileScrollComposerGeometryFinalTimer = null;
+        }
+    }, 250);
 
     window.addEventListener("resize", schedule, { passive: true });
     window.addEventListener("orientationchange", schedule, { passive: true });
