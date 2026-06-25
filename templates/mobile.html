@@ -6179,6 +6179,8 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
     "use strict";
 
     const TAG = "[NOVA_MOBILE_MENU_ACCOUNT_RESTORE_FINAL_20260624]";
+    const DEBUG = Boolean(window.NOVA_MOBILE_DEBUG_MENU_POLISH);
+    // NOVA_MOBILE_MENU_BOOT_LOG_QUIET_20260624
     const BTN_ID = "nova-mobile-menu-account-restored";
     const DETAIL_ID = "nova-mobile-menu-account-detail-restored";
 
@@ -6285,7 +6287,7 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
     function ensureAccountButton(reason) {
         const panel = toolsPanel();
         if (!panel) {
-            console.log(TAG, reason || "boot", { panel: false });
+            if (DEBUG) console.log(TAG, reason || "boot", { panel: false });
             return false;
         }
 
@@ -6319,7 +6321,7 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
 
         ensureDetail(panel);
 
-        console.log(TAG, reason || "boot", {
+        if (DEBUG) console.log(TAG, reason || "boot", {
             panel: true,
             accountAdded: true,
             user: username()
@@ -6334,9 +6336,8 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
 
         menu.dataset.novaAccountRestoreFinal = "1";
         menu.addEventListener("click", function () {
-            [80, 180, 350, 700].forEach(ms => {
-                setTimeout(() => ensureAccountButton("menu-click-" + ms), ms);
-            });
+            requestAnimationFrame(() => ensureAccountButton("menu-click"));
+            setTimeout(() => ensureAccountButton("menu-click-late"), 300);
         }, false);
     }
 
@@ -6348,10 +6349,9 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
     window.NovaMobileRestoreMenuAccountFinal = ensureAccountButton;
 
     boot();
-    setTimeout(boot, 250);
-    setTimeout(boot, 900);
+    setTimeout(boot, 300);
 
-    console.log(TAG, "ready");
+    if (DEBUG) console.log(TAG, "ready");
 })();
 </script>
 <!-- /NOVA_MOBILE_MENU_ACCOUNT_RESTORE_FINAL_20260624 -->
@@ -6393,6 +6393,8 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
     "use strict";
 
     const TAG = "[NOVA_MOBILE_MENU_HELP_BLOG_ORDER_FINAL_20260624]";
+    const DEBUG = Boolean(window.NOVA_MOBILE_DEBUG_MENU_POLISH);
+    // NOVA_MOBILE_HELP_BLOG_BOOT_LOG_QUIET_20260624
 
     const ORDER = [
         "account",
@@ -6555,7 +6557,7 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
         const host = panel();
 
         if (!host) {
-            console.log(TAG, reason || "boot", { panel: false });
+            if (DEBUG) console.log(TAG, reason || "boot", { panel: false });
             return false;
         }
 
@@ -6585,7 +6587,7 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
             }
         });
 
-        console.log(TAG, reason || "boot", {
+        if (DEBUG) console.log(TAG, reason || "boot", {
             panel: true,
             ordered: sorted.map(el => ({
                 id: el.id || "",
@@ -6603,9 +6605,8 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
 
         menu.dataset.novaMenuHelpBlogOrderFinal = "1";
         menu.addEventListener("click", function () {
-            [80, 180, 350, 700, 1200].forEach(ms => {
-                setTimeout(() => orderMenu("menu-click-" + ms), ms);
-            });
+            requestAnimationFrame(() => orderMenu("menu-click"));
+            setTimeout(() => orderMenu("menu-click-late"), 300);
         }, false);
     }
 
@@ -6617,10 +6618,9 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
     window.NovaMobileOrderMenuHelpBlogFinal = orderMenu;
 
     boot();
-    setTimeout(boot, 250);
-    setTimeout(boot, 900);
+    setTimeout(boot, 300);
 
-    console.log(TAG, "ready");
+    if (DEBUG) console.log(TAG, "ready");
 })();
 </script>
 <!-- /NOVA_MOBILE_MENU_HELP_BLOG_ORDER_FINAL_20260624 -->
