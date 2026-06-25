@@ -4471,6 +4471,123 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
 
 
 
+
+<!-- NOVA_MOBILE_OWNED_SESSIONS_PRE_V10_CAPTURE_20260625 -->
+<script>
+(() => {
+    const MARKER = "NOVA_MOBILE_OWNED_SESSIONS_PRE_V10_CAPTURE_20260625";
+
+    if (window.__novaMobileOwnedSessionsPreV10Capture20260625) {
+        return;
+    }
+
+    window.__novaMobileOwnedSessionsPreV10Capture20260625 = true;
+
+    function log(...args) {
+        try {
+            console.log("[Nova Owned Sessions Pre-V10 Capture]", ...args);
+        } catch (_) {}
+    }
+
+    function isSessionsButton(target) {
+        return !!(
+            target &&
+            target.closest &&
+            target.closest("#nova-mobile-row-sessions, #nova-mobile-sessions-toggle, #mobileMemoryButton")
+        );
+    }
+
+    function hideLegacySessionsPanels() {
+        const selectors = [
+            "#nova-mobile-sessions-panel",
+            ".nova-mobile-sessions-panel",
+            "#mobileSessionsPanel",
+            "#mobileMemoryPanel",
+            ".mobile-sessions-panel",
+            ".mobile-memory-panel"
+        ];
+
+        document.querySelectorAll(selectors.join(",")).forEach((el) => {
+            if (!el || el.id === "nova-mobile-owned-sessions-panel-20260625") {
+                return;
+            }
+
+            try {
+                el.classList.remove("is-open", "open", "active", "show", "visible");
+                el.style.setProperty("display", "none", "important");
+                el.style.setProperty("visibility", "hidden", "important");
+                el.style.setProperty("pointer-events", "none", "important");
+            } catch (_) {}
+        });
+    }
+
+    function openOwnedSessionsPanel() {
+        hideLegacySessionsPanels();
+
+        const owned = window.NovaMobileOwnedSessionsPanel20260625;
+
+        if (owned && typeof owned.open === "function") {
+            owned.open();
+            log("opened owned panel");
+            return true;
+        }
+
+        const panel = document.getElementById("nova-mobile-owned-sessions-panel-20260625");
+
+        if (panel) {
+            panel.classList.add("is-open");
+
+            if (owned && typeof owned.reload === "function") {
+                owned.reload();
+            }
+
+            log("opened owned panel fallback");
+            return true;
+        }
+
+        log("owned panel not ready");
+        return false;
+    }
+
+    function captureSessionsIntent(event) {
+        if (!isSessionsButton(event.target)) {
+            return;
+        }
+
+        try {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (typeof event.stopImmediatePropagation === "function") {
+                event.stopImmediatePropagation();
+            }
+        } catch (_) {}
+
+        openOwnedSessionsPanel();
+
+        setTimeout(openOwnedSessionsPanel, 0);
+        setTimeout(openOwnedSessionsPanel, 80);
+        setTimeout(openOwnedSessionsPanel, 250);
+        setTimeout(openOwnedSessionsPanel, 600);
+    }
+
+    /*
+      This block is intentionally inserted BEFORE the V10 top-row owner.
+      V10 also uses window capture and stopImmediatePropagation, so a later
+      bridge cannot beat it. This one registers first and wins.
+    */
+    ["pointerdown", "touchstart", "mousedown", "click"].forEach((type) => {
+        window.addEventListener(type, captureSessionsIntent, true);
+        document.addEventListener(type, captureSessionsIntent, true);
+    });
+
+    window.NovaMobileOpenOwnedSessionsPanelPreV1020260625 = openOwnedSessionsPanel;
+
+    log("ready", MARKER);
+})();
+</script>
+<!-- /NOVA_MOBILE_OWNED_SESSIONS_PRE_V10_CAPTURE_20260625 -->
+
 <!-- NOVA_MOBILE_ONE_ROW_NEW_SESSIONS_COPY_REGEN_V10_CONSOLIDATED_20260625 -->
 <style>
 @media (max-width: 900px) {
