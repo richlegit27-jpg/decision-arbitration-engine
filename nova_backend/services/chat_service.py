@@ -11925,6 +11925,21 @@ if (not attachments) and (__name__ == "__main__"):
                 },
             }
 
+        # NOVA_AUTO_FIX_BEFORE_PLANNER_ROUTE_20260624
+        # Exact file-fix commands must route to auto-fix, not execution planner.
+        _nova_auto_fix_direct_phrases = [
+            "fix this file",
+            "auto-fix this file",
+            "autofix this file",
+            "repair this file",
+        ]
+
+        if any(_phrase in lowered for _phrase in _nova_auto_fix_direct_phrases):
+            return self._execute_auto_fix_file(
+                user_text=user_text,
+                session_id=session_id,
+            )
+
         planner_prefixes = (
             "auto-plan",
             "build ",

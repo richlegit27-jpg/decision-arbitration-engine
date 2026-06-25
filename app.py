@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import os
 import re
@@ -3817,7 +3817,19 @@ def api_chat():
             "this file",
         ]
 
-        if any(_word in _nova_exec_clean for _word in _nova_attachment_words):
+        # NOVA_ATTACHMENT_GUARD_IGNORE_AUTO_FIX_20260624
+        # Do not treat auto-fix commands as missing attachment requests.
+        _nova_attachment_guard_auto_fix_phrases = [
+            "fix this file",
+            "auto-fix this file",
+            "autofix this file",
+            "repair this file",
+        ]
+
+        if (
+            not any(_phrase in _nova_exec_clean for _phrase in _nova_attachment_guard_auto_fix_phrases)
+            and any(_word in _nova_exec_clean for _word in _nova_attachment_words)
+        ):
             _nova_current_attachments = _nova_exec_payload.get("attachments") or []
             if not isinstance(_nova_current_attachments, list):
                 _nova_current_attachments = []
