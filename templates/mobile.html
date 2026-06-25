@@ -5232,6 +5232,89 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
         });
     }
 
+    // NOVA_MOBILE_URL_SESSION_ID_AUTORESTORE_20260625
+    function getUrlSessionIdForAutorestore() {
+        try {
+            return String(new URLSearchParams(location.search).get("session_id") || "").trim();
+        } catch (_) {
+            return "";
+        }
+    }
+
+    function isV10DirectOpenForAutorestore() {
+        try {
+            return new URLSearchParams(location.search).get("v10_direct_open") === "1";
+        } catch (_) {
+            return false;
+        }
+    }
+
+    async function restoreUrlSessionIdNow(reason) {
+        const sessionId = getUrlSessionIdForAutorestore();
+
+        if (!sessionId) {
+            return false;
+        }
+
+        try {
+            rememberSession(sessionId);
+
+            const oldV10Panel = document.getElementById("nova-mobile-v10-sessions-panel");
+            if (oldV10Panel) {
+                oldV10Panel.remove();
+            }
+
+            await restoreSession(sessionId);
+
+            const chat = document.getElementById("mobileChatMessages");
+            if (chat) {
+                chat.dataset.restoredSessionId = sessionId;
+            }
+
+            console.log(TAG, "url session autorestore done", {
+                reason,
+                sessionId,
+                direct: isV10DirectOpenForAutorestore(),
+                messages: chat ? chat.children.length : null
+            });
+
+            return true;
+        } catch (error) {
+            console.warn(TAG, "url session autorestore failed", reason, sessionId, error);
+            return false;
+        }
+    }
+
+    function scheduleUrlSessionIdAutorestore() {
+        const sessionId = getUrlSessionIdForAutorestore();
+
+        if (!sessionId) {
+            return;
+        }
+
+        rememberSession(sessionId);
+
+        restoreUrlSessionIdNow("now");
+        setTimeout(() => restoreUrlSessionIdNow("250"), 250);
+        setTimeout(() => restoreUrlSessionIdNow("900"), 900);
+        setTimeout(() => restoreUrlSessionIdNow("1800"), 1800);
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", scheduleUrlSessionIdAutorestore, { once: true });
+    } else {
+        scheduleUrlSessionIdAutorestore();
+    }
+
+    window.addEventListener("load", () => {
+        setTimeout(() => restoreUrlSessionIdNow("load"), 120);
+    }, { once: true });
+
+    window.NovaMobileUrlSessionIdAutorestore20260625 = {
+        restore: restoreUrlSessionIdNow,
+        sessionId: getUrlSessionIdForAutorestore
+    };
+
     function sessionTitle(session) {
         return String(session.title || session.name || session.id || "Session");
     }
