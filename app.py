@@ -14904,6 +14904,16 @@ def _nova_scope_filter_payload_20260623(payload, user):
 
 @app.after_request
 def _nova_user_scoped_sessions_after_request_20260623(response):
+    # NOVA_CHAT_USER_SCOPE_BYPASS_ALL_FILTERS_20260624
+    # Chat responses are already session-targeted by /api/chat.
+    # Do not let user-scope session filters replace assistant replies.
+    try:
+        path_value = str(request.path or "")
+        if path_value == "/api/chat" or path_value.startswith("/api/chat/"):
+            return response
+    except Exception:
+        pass
+
     try:
         from flask import request, jsonify
 
