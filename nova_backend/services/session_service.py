@@ -89,6 +89,52 @@ def new_session(title: str = "New Chat") -> Dict[str, Any]:
         "working_state": _new_working_state(),
     }
 
+
+# NOVA_SESSION_BAD_TITLE_AUTOFIX_HELPERS_20260624
+NOVA_SESSION_BAD_AUTO_TITLES_20260624 = {
+    "",
+    "new chat",
+    "untitled",
+    "untitled session",
+    "web fetch",
+    "webfetch",
+    "1",
+}
+
+def _nova_session_should_auto_title_20260624(title) -> bool:
+    clean = str(title or "").strip()
+    return clean.lower() in NOVA_SESSION_BAD_AUTO_TITLES_20260624
+
+def _nova_session_title_from_message_20260624(message) -> str:
+    if not isinstance(message, dict):
+        return ""
+
+    role = str(message.get("role") or message.get("sender") or "").strip().lower()
+    if role and role not in {"user", "human"}:
+        return ""
+
+    text = (
+        str(message.get("text") or "").strip()
+        or str(message.get("content") or "").strip()
+        or str(message.get("message") or "").strip()
+        or str(message.get("user_text") or "").strip()
+    )
+
+    text = " ".join(text.split())
+    if not text:
+        return ""
+
+    low = text.lower()
+    if low in NOVA_SESSION_BAD_AUTO_TITLES_20260624:
+        return ""
+    if low.startswith("[nova"):
+        return ""
+    if low.startswith("http://") or low.startswith("https://"):
+        return ""
+
+    return text[:60].rstrip(" .,-_:;") or ""
+
+
 class SessionService:
     MAX_SESSION_MESSAGES = 80
     MAX_TEXT_LEN = 20000
@@ -629,6 +675,16 @@ class SessionService:
         sessions[i]["messages"].append(normalized)
 
         sessions[i]["updated_at"] = iso_now()
+
+
+        # NOVA_SESSION_BAD_TITLE_AUTOFIX_20260624
+        try:
+            if _nova_session_should_auto_title_20260624(session.get("title")):
+                candidate = _nova_session_title_from_message_20260624(message)
+                if candidate:
+                    session["title"] = candidate
+        except Exception:
+            pass
 
         self._save_sessions(
             sessions,
