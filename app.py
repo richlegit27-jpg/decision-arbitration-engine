@@ -14909,6 +14909,14 @@ def _nova_user_scoped_sessions_after_request_20260623(response):
 
         path_value = str(request.path or "")
 
+        # NOVA_CHAT_RESPONSE_USER_SCOPE_BYPASS_20260624
+        # Chat responses are already session-targeted by /api/chat.
+        # The user-scope after_request filter is for session list/session read APIs.
+        # Let chat replies pass through so normal assistant text is not replaced
+        # with blocked_by_user_scope payloads.
+        if path_value == "/api/chat" or path_value.startswith("/api/chat/"):
+            return response
+
         session_api = (
             path_value == "/api/sessions"
             or path_value.startswith("/api/sessions/")
