@@ -5028,23 +5028,14 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
     }
 
     function fixChatComposerOverlap() {
-        const chat = document.getElementById("mobileChatMessages") || document.querySelector(".mobile-chat-container");
-        const composer = document.getElementById("nova-mobile-composer") || document.querySelector(".nova-mobile-composer, .mobile-composer");
+        /*
+          NOVA_MOBILE_DISABLE_V9_CHAT_GEOMETRY_20260625
 
-        if (!chat || !composer) return false;
-
-        const cr = composer.getBoundingClientRect();
-        const tr = chat.getBoundingClientRect();
-
-        const nextBottom = Math.max(80, Math.round(cr.top - 9));
-        const nextHeight = Math.max(80, Math.round(nextBottom - tr.top));
-
-        setImportant(chat, "bottom", "auto");
-        setImportant(chat, "height", `${nextHeight}px`);
-        setImportant(chat, "max-height", `${nextHeight}px`);
-        setImportant(chat, "overflow-y", "auto");
-
-        return true;
+          V9 is allowed to own the New/Sessions/Copy/Regen row.
+          V9 is not allowed to rewrite #mobileChatMessages height/bottom.
+          Chat geometry is owned by the existing scroll/composer layout CSS.
+        */
+        return false;
     }
 
     function apply(reason = "apply") {
