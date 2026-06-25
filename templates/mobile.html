@@ -5714,6 +5714,7 @@
 
 
 
+
 <!-- NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624 -->
 <style>
     html,
@@ -5726,6 +5727,9 @@
         position: fixed !important;
         left: 0 !important;
         right: 0 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
         overflow-y: auto !important;
         -webkit-overflow-scrolling: touch !important;
         overscroll-behavior: contain !important;
@@ -5743,9 +5747,8 @@
     "use strict";
 
     const TAG = "[NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624]";
-    let lastKey = "";
 
-    function clampNumber(value, fallback) {
+    function numberOr(value, fallback) {
         value = Number(value);
         return Number.isFinite(value) ? value : fallback;
     }
@@ -5758,22 +5761,29 @@
             return false;
         }
 
-        const chatRect = chat.getBoundingClientRect();
-        const composerRect = composer.getBoundingClientRect();
-
         const viewportHeight = Math.round(
             window.visualViewport && window.visualViewport.height
                 ? window.visualViewport.height
                 : window.innerHeight
         );
 
-        const chatTop = Math.round(clampNumber(chatRect.top, 132));
-        const composerTop = Math.round(clampNumber(composerRect.top, viewportHeight - 132));
-        const composerHeight = Math.max(96, Math.round(clampNumber(composerRect.height, 132)));
+        const composerRect = composer.getBoundingClientRect();
+        const composerTop = Math.round(numberOr(composerRect.top, viewportHeight - 132));
+        const composerHeight = Math.max(96, Math.round(numberOr(composerRect.height, 132)));
 
-        const safeGap = 0;
-        const targetBottomPx = Math.max(0, viewportHeight - composerTop + safeGap);
-        const targetHeightPx = Math.max(120, composerTop - chatTop - safeGap);
+        /*
+          Important:
+          Old patches left inline height/max-height/inset values on #mobileChatMessages.
+          Clear them first or they keep causing the 49px composer overlap.
+        */
+        chat.style.removeProperty("inset");
+        chat.style.removeProperty("height");
+        chat.style.removeProperty("min-height");
+        chat.style.removeProperty("max-height");
+        chat.style.removeProperty("bottom");
+
+        const topPx = 133;
+        const bottomPx = Math.max(0, viewportHeight - composerTop);
 
         document.documentElement.style.setProperty(
             "--nova-mobile-composer-live-height",
@@ -5781,9 +5791,13 @@
         );
 
         chat.style.setProperty("position", "fixed", "important");
-        chat.style.setProperty("top", chatTop + "px", "important");
-        chat.style.setProperty("bottom", targetBottomPx + "px", "important");
-        chat.style.setProperty("height", targetHeightPx + "px", "important");
+        chat.style.setProperty("left", "0px", "important");
+        chat.style.setProperty("right", "0px", "important");
+        chat.style.setProperty("top", topPx + "px", "important");
+        chat.style.setProperty("bottom", bottomPx + "px", "important");
+        chat.style.setProperty("height", "auto", "important");
+        chat.style.setProperty("min-height", "0px", "important");
+        chat.style.setProperty("max-height", "none", "important");
         chat.style.setProperty("overflow-y", "auto", "important");
         chat.style.setProperty("-webkit-overflow-scrolling", "touch", "important");
         chat.style.setProperty("overscroll-behavior", "contain", "important");
@@ -5792,11 +5806,6 @@
 
         composer.style.setProperty("position", "fixed", "important");
         composer.style.setProperty("bottom", "env(safe-area-inset-bottom, 0px)", "important");
-
-        const key = chatTop + ":" + composerTop + ":" + targetBottomPx + ":" + targetHeightPx;
-        if (key !== lastKey) {
-            lastKey = key;
-        }
 
         return true;
     }
@@ -5812,7 +5821,7 @@
     setTimeout(updateGeometry, 1600);
 
     window.clearInterval(window.__novaMobileScrollComposerGeometryFinalTimer);
-    window.__novaMobileScrollComposerGeometryFinalTimer = window.setInterval(updateGeometry, 350);
+    window.__novaMobileScrollComposerGeometryFinalTimer = window.setInterval(updateGeometry, 250);
 
     window.addEventListener("resize", schedule, { passive: true });
     window.addEventListener("orientationchange", schedule, { passive: true });
@@ -5826,8 +5835,8 @@
 
     if (window.ResizeObserver) {
         const composer = document.getElementById("nova-mobile-composer");
-        if (composer && !composer.__novaMobileScrollComposerGeometryObserved) {
-            composer.__novaMobileScrollComposerGeometryObserved = "1";
+        if (composer && !composer.__novaMobileScrollComposerGeometryObservedV3) {
+            composer.__novaMobileScrollComposerGeometryObservedV3 = "1";
             new ResizeObserver(schedule).observe(composer);
         }
     }
@@ -5838,6 +5847,7 @@
 })();
 </script>
 <!-- /NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624 -->
+
 
 
 </body>
