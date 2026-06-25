@@ -5719,36 +5719,246 @@
 <!-- FIX_MOBILE_SCRIPT_BLOCK_HARD_LOCK -->
 
 
+<!-- NOVA_MOBILE_MENU_ACCOUNT_RESTORE_FINAL_20260624 -->
+<style>
+    #nova-mobile-menu-account-restored {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 100% !important;
+        min-height: 42px !important;
+        margin: 8px 0 0 0 !important;
+        padding: 10px 12px !important;
+        border: 1px solid rgba(255,255,255,.14) !important;
+        border-radius: 14px !important;
+        background: rgba(255,255,255,.08) !important;
+        color: #f8fafc !important;
+        font-size: 14px !important;
+        font-weight: 800 !important;
+        line-height: 1.15 !important;
+        text-align: center !important;
+        cursor: pointer !important;
+        box-sizing: border-box !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
 
+    #nova-mobile-menu-account-restored:hover {
+        background: rgba(255,255,255,.12) !important;
+    }
 
+    #nova-mobile-menu-account-detail-restored {
+        display: none;
+        width: 100%;
+        margin-top: 8px;
+        padding: 10px;
+        border: 1px solid rgba(255,255,255,.12);
+        border-radius: 14px;
+        background: rgba(0,0,0,.24);
+        color: #e5e7eb;
+        font-size: 12px;
+        box-sizing: border-box;
+    }
 
+    #nova-mobile-menu-account-detail-restored[data-open="1"] {
+        display: block !important;
+    }
 
+    #nova-mobile-menu-account-detail-restored button {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 100% !important;
+        min-height: 38px !important;
+        margin-top: 8px !important;
+        border: 1px solid rgba(255,255,255,.14) !important;
+        border-radius: 12px !important;
+        background: rgba(255,255,255,.10) !important;
+        color: #fff !important;
+        font-weight: 800 !important;
+    }
+</style>
 
+<script>
+(function () {
+    "use strict";
 
+    const TAG = "[NOVA_MOBILE_MENU_ACCOUNT_RESTORE_FINAL_20260624]";
+    const BTN_ID = "nova-mobile-menu-account-restored";
+    const DETAIL_ID = "nova-mobile-menu-account-detail-restored";
 
+    function visible(el) {
+        if (!el) return false;
+        const cs = getComputedStyle(el);
+        const r = el.getBoundingClientRect();
+        return cs.display !== "none" &&
+            cs.visibility !== "hidden" &&
+            Number(cs.opacity || 1) > 0 &&
+            r.width > 20 &&
+            r.height > 20;
+    }
 
+    function toolsPanel() {
+        const direct = document.getElementById("nova-mobile-tools-panel");
+        if (direct) return direct;
 
+        const candidates = Array.from(document.querySelectorAll(
+            "[id*='tools'][id*='panel'], [class*='tools'][class*='panel'], [id*='menu'][id*='panel'], [class*='menu'][class*='panel']"
+        ));
 
+        return candidates.find(visible) || candidates[0] || null;
+    }
 
+    function username() {
+        const state = window.NovaAuthState || {};
+        return String(
+            state.username ||
+            document.body?.dataset?.novaUsername ||
+            document.body?.dataset?.novaWorkspaceUser ||
+            window.NovaWorkspaceUser ||
+            ""
+        ).trim();
+    }
 
+    function authenticated() {
+        const state = window.NovaAuthState || {};
+        return Boolean(state.authenticated) ||
+            document.body?.dataset?.novaAuthenticated === "true" ||
+            Boolean(username());
+    }
 
+    async function logout() {
+        try {
+            await fetch("/api/auth/logout", {
+                method: "POST",
+                credentials: "include"
+            });
+        } catch (error) {
+            console.warn(TAG, "logout fetch failed", error);
+        }
 
+        try {
+            [
+                "nova_mobile_active_session_id",
+                "nova_active_session_id",
+                "nova_last_auth_username",
+                "nova_workspace_user"
+            ].forEach(key => localStorage.removeItem(key));
+        } catch (_) {}
 
+        window.location.href = "/login";
+    }
 
+    function ensureDetail(panel) {
+        let detail = document.getElementById(DETAIL_ID);
 
+        if (!detail) {
+            detail = document.createElement("div");
+            detail.id = DETAIL_ID;
+            detail.innerHTML = `
+                <div id="nova-mobile-menu-account-detail-text-restored"></div>
+                <button id="nova-mobile-menu-account-logout-restored" type="button">Logout</button>
+            `;
+        }
 
+        if (detail.parentElement !== panel) {
+            panel.appendChild(detail);
+        }
 
+        const text = document.getElementById("nova-mobile-menu-account-detail-text-restored");
+        const logoutBtn = document.getElementById("nova-mobile-menu-account-logout-restored");
 
+        if (text) {
+            const u = username();
+            text.textContent = authenticated()
+                ? ("Signed in" + (u ? ": " + u : ""))
+                : "Not signed in";
+        }
 
+        if (logoutBtn && !logoutBtn.dataset.novaBound) {
+            logoutBtn.dataset.novaBound = "1";
+            logoutBtn.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                logout();
+            }, true);
+        }
 
+        return detail;
+    }
 
+    function ensureAccountButton(reason) {
+        const panel = toolsPanel();
+        if (!panel) {
+            console.log(TAG, reason || "boot", { panel: false });
+            return false;
+        }
 
+        let btn = document.getElementById(BTN_ID);
 
+        if (!btn) {
+            btn = document.createElement("button");
+            btn.id = BTN_ID;
+            btn.type = "button";
+            btn.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
 
+                if (!authenticated()) {
+                    window.location.href = "/login";
+                    return;
+                }
 
+                const detail = ensureDetail(panel);
+                detail.dataset.open = detail.dataset.open === "1" ? "0" : "1";
+            }, true);
+        }
 
+        btn.textContent = authenticated() ? "Account" : "Login";
+        btn.title = username() || btn.textContent;
+        btn.setAttribute("aria-label", btn.textContent);
 
+        if (btn.parentElement !== panel) {
+            panel.appendChild(btn);
+        }
 
+        ensureDetail(panel);
 
+        console.log(TAG, reason || "boot", {
+            panel: true,
+            accountAdded: true,
+            user: username()
+        });
 
+        return true;
+    }
+
+    function bindMenuButton() {
+        const menu = document.getElementById("nova-mobile-tools-toggle");
+        if (!menu || menu.dataset.novaAccountRestoreFinal) return;
+
+        menu.dataset.novaAccountRestoreFinal = "1";
+        menu.addEventListener("click", function () {
+            [80, 180, 350, 700].forEach(ms => {
+                setTimeout(() => ensureAccountButton("menu-click-" + ms), ms);
+            });
+        }, false);
+    }
+
+    function boot() {
+        bindMenuButton();
+        ensureAccountButton("boot");
+    }
+
+    window.NovaMobileRestoreMenuAccountFinal = ensureAccountButton;
+
+    boot();
+    document.addEventListener("DOMContentLoaded", boot);
+    window.addEventListener("load", boot);
+    setInterval(boot, 1500);
+
+    console.log(TAG, "ready");
+})();
+</script>
+<!-- /NOVA_MOBILE_MENU_ACCOUNT_RESTORE_FINAL_20260624 -->
 
