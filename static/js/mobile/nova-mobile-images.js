@@ -50,7 +50,11 @@
         const box = chatBox();
 
         if (box) {
-            box.scrollTop = box.scrollHeight;
+            if (window.NovaMobileSafeScrollToBottom) {
+                window.NovaMobileSafeScrollToBottom(box, "nova-mobile-images.js");
+            } else {
+                box.scrollTop = box.scrollHeight;
+            }
         }
     }
 

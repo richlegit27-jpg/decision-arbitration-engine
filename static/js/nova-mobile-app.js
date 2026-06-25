@@ -40,8 +40,12 @@
         if (!box) return;
 
         setTimeout(function () {
-            box.scrollTop = box.scrollHeight;
-            window.scrollTo(0, document.body.scrollHeight);
+            if (window.NovaMobileSafeScrollToBottom) {
+                window.NovaMobileSafeScrollToBottom(box, "nova-mobile-app.js");
+            } else {
+                box.scrollTop = box.scrollHeight;
+            }
+
         }, 50);
     }
 

@@ -122,8 +122,11 @@
             return;
         }
 
-        chatContainer.scrollTop =
-            chatContainer.scrollHeight;
+        if (window.NovaMobileSafeScrollToBottom) {
+            window.NovaMobileSafeScrollToBottom(chatContainer, "nova-mobile-core.js");
+        } else {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
     }
 
     function setInputText(text) {

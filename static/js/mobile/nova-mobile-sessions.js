@@ -74,7 +74,11 @@
                 if (!chatBox) return;
 
                 try {
-                    chatBox.scrollTop = chatBox.scrollHeight;
+                    if (window.NovaMobileSafeScrollToBottom) {
+                        window.NovaMobileSafeScrollToBottom(chatBox, "nova-mobile-sessions.js");
+                    } else {
+                        chatBox.scrollTop = chatBox.scrollHeight;
+                    }
                 } catch (error) {}
             },
             newChat: existing.newChat || function () {

@@ -664,6 +664,160 @@
 
 <!-- DISABLED_FALLBACK_SEND_BRIDGE_FOR_IMAGE_RENDERING_20260606 -->
 
+
+<!-- NOVA_MOBILE_SCROLL_AUTHORITY_20260625 -->
+<style>
+html,
+body {
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+}
+
+#mobileChatMessages,
+.nova-mobile-messages,
+.mobile-chat-messages,
+.chat-messages {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain !important;
+    touch-action: pan-y !important;
+}
+</style>
+
+<script>
+(function () {
+    const FIX_ID = "NOVA_MOBILE_SCROLL_AUTHORITY_20260625";
+
+    if (window.__novaMobileScrollAuthority20260625) {
+        return;
+    }
+
+    window.__novaMobileScrollAuthority20260625 = true;
+
+    let userReadingUntil = 0;
+    let autoAllowedUntil = Date.now() + 2500;
+
+    function now() {
+        return Date.now();
+    }
+
+    function getRoot() {
+        return (
+            document.getElementById("mobileChatMessages") ||
+            document.querySelector(".nova-mobile-messages") ||
+            document.querySelector(".mobile-chat-messages") ||
+            document.querySelector(".chat-messages")
+        );
+    }
+
+    function distanceFromBottom(el) {
+        if (!el) return 0;
+        return el.scrollHeight - el.scrollTop - el.clientHeight;
+    }
+
+    function nearBottom(el) {
+        return distanceFromBottom(el) < 120;
+    }
+
+    function markUserReading() {
+        const root = getRoot();
+
+        if (!root) {
+            userReadingUntil = now() + 5000;
+            return;
+        }
+
+        if (!nearBottom(root)) {
+            userReadingUntil = now() + 7000;
+        }
+    }
+
+    function allowAuto(reason) {
+        autoAllowedUntil = now() + 2500;
+        window.__novaMobileScrollAuthorityLastAllow = reason || "unknown";
+    }
+
+    window.NovaMobileAllowAutoScroll = allowAuto;
+
+    window.NovaMobileSafeScrollToBottom = function (el, reason, options) {
+        el = el || getRoot();
+
+        if (!el) {
+            return false;
+        }
+
+        const force = !!(options && options.force);
+        const userReading = now() < userReadingUntil && !nearBottom(el);
+        const autoAllowed = now() < autoAllowedUntil;
+
+        if (!force && userReading && !autoAllowed) {
+            return false;
+        }
+
+        try {
+            el.scrollTop = el.scrollHeight;
+            return true;
+        } catch (error) {
+            return false;
+        }
+    };
+
+    function wireRoot() {
+        const root = getRoot();
+
+        if (!root || root.dataset.novaScrollAuthorityWired === "1") {
+            return;
+        }
+
+        root.dataset.novaScrollAuthorityWired = "1";
+
+        ["touchstart", "touchmove", "wheel", "pointerdown"].forEach(function (name) {
+            root.addEventListener(name, markUserReading, { passive: true });
+        });
+
+        root.addEventListener("scroll", function () {
+            if (!nearBottom(root)) {
+                markUserReading();
+            }
+        }, { passive: true });
+    }
+
+    document.addEventListener("click", function (event) {
+        const target = event.target && event.target.closest
+            ? event.target.closest("button, [role='button'], input[type='submit']")
+            : null;
+
+        if (!target) return;
+
+        const text = String(target.textContent || target.value || target.id || "").toLowerCase();
+
+        if (
+            text.includes("send") ||
+            text.includes("retry") ||
+            text.includes("regenerate") ||
+            target.id === "sendButton" ||
+            target.id === "mobileSendButton"
+        ) {
+            allowAuto("send-click");
+        }
+    }, true);
+
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" && !event.shiftKey) {
+            allowAuto("enter");
+        }
+    }, true);
+
+    wireRoot();
+    setTimeout(wireRoot, 250);
+    setTimeout(wireRoot, 900);
+    setInterval(wireRoot, 1500);
+
+    console.log("[" + FIX_ID + "] ready");
+})();
+</script>
+<!-- /NOVA_MOBILE_SCROLL_AUTHORITY_20260625 -->
+
 <script src="/static/js/mobile/nova-mobile-bridge.js?v=session-shape-adapter-inline-20260623-001"></script>
 <script src="/static/js/mobile/nova-mobile-core.js?v=mobile-modular-001"></script>
 <script src="/static/js/mobile/nova-mobile-images.js?v=mobile-modular-001"></script>
@@ -6449,6 +6603,12 @@ body {
 })();
 </script>
 <!-- /NOVA_MOBILE_CHAT_MESSAGE_LAYOUT_SAFE_20260625 -->
+
+
+
+
+
+
 
 </body>
 </html>

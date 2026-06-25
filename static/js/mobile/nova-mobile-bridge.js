@@ -1175,7 +1175,11 @@
             });
 
             try {
-                chatBox.scrollTop = chatBox.scrollHeight;
+                if (window.NovaMobileSafeScrollToBottom) {
+                    window.NovaMobileSafeScrollToBottom(chatBox, "nova-mobile-bridge.js");
+                } else {
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                }
             } catch (error) {}
         }
 
@@ -1531,7 +1535,11 @@
         });
 
         try {
-            target.scrollTop = target.scrollHeight;
+            if (window.NovaMobileSafeScrollToBottom) {
+                window.NovaMobileSafeScrollToBottom(target, "nova-mobile-bridge.js");
+            } else {
+                target.scrollTop = target.scrollHeight;
+            }
         } catch (error) {}
 
         closeSessionsPanel();
@@ -2283,7 +2291,11 @@
         });
 
         try {
-            chat.scrollTop = chat.scrollHeight;
+            if (window.NovaMobileSafeScrollToBottom) {
+                window.NovaMobileSafeScrollToBottom(chat, "nova-mobile-bridge.js");
+            } else {
+                chat.scrollTop = chat.scrollHeight;
+            }
         } catch (error) {}
 
         closePanel();

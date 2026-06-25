@@ -180,7 +180,11 @@
         });
 
         try {
-            chat.scrollTop = chat.scrollHeight;
+            if (window.NovaMobileSafeScrollToBottom) {
+                window.NovaMobileSafeScrollToBottom(chat, "nova-mobile-visible-sessions-fallback.js");
+            } else {
+                chat.scrollTop = chat.scrollHeight;
+            }
         } catch (e) {}
     }
 
