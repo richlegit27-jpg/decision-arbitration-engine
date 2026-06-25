@@ -4751,34 +4751,6 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
         return clean(el?.textContent);
     }
 
-    /*
-      NOVA_MOBILE_V9_ROW_HANDLER_REPAIR_20260625
-
-      Keep the V9 top row, but make its visible buttons trigger the real
-      hidden/original mobile controls by ID before falling back to text search.
-    */
-    function clickByIds(ids, label) {
-        for (const id of ids) {
-            const el = document.getElementById(id);
-            if (!el) continue;
-
-            try {
-                el.dispatchEvent(new MouseEvent("click", {
-                    bubbles: true,
-                    cancelable: true,
-                    view: window
-                }));
-
-                console.log(TAG, "clicked original id", { label, id });
-                return true;
-            } catch (error) {
-                console.warn(TAG, "failed original id", { label, id, error });
-            }
-        }
-
-        return false;
-    }
-
     function allButtons() {
         return Array.from(document.querySelectorAll("button, a, [role='button']"))
             .filter(el => !el.closest("#nova-mobile-primary-action-row"));
@@ -4808,7 +4780,6 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
     }
 
     function openNew() {
-        if (clickByIds(["nova-mobile-new-chat", "mobileNewChatButton", "newChatButton"], "new")) return true;
         if (clickOriginal(["new", "new chat", "new session", "start fresh chat"])) return true;
 
         for (const name of ["newSession", "NovaMobileNewSession", "NovaMobileCreateNewSession", "startNewSession"]) {
@@ -4826,19 +4797,11 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
     }
 
     function openSessions() {
-        if (clickByIds(["nova-mobile-sessions-toggle", "mobileMemoryButton", "mobileSessionsButton"], "sessions")) return true;
-
-        for (const name of ["NovaMobileFinalSessionsOverlay", "NovaMobileSessionsPanelPolish", "NovaMobileSessionsPanelPolishV3", "NovaMobileOpenSessions", "openSessions"]) {
-            if (typeof window[name] === "function") {
-                try {
-                    window[name]();
-                    console.log(TAG, "called", name);
-                    return true;
-                } catch (_) {}
-            }
+        if (typeof window.NovaMobileFinalSessionsOverlay === "function") {
+            window.NovaMobileFinalSessionsOverlay();
+            console.log(TAG, "opened sessions overlay");
+            return true;
         }
-
-        if (clickOriginal(["sessions", "history"])) return true;
 
         console.warn(TAG, "sessions fallback missing");
         return false;
@@ -4871,15 +4834,13 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
     }
 
     function runCopy() {
-        if (clickByIds(["nova-mobile-copy-chat", "nova-mobile-rail-copy"], "copy")) return true;
-        if (clickOriginal(["copy", "copy chat"])) return true;
+        if (clickOriginal(["copy"])) return true;
         fallbackCopy();
         return true;
     }
 
     function runRegen() {
-        if (clickByIds(["nova-mobile-rail-regen", "nova-mobile-regen-chat"], "regen")) return true;
-        if (clickOriginal(["regen", "regenerate"])) return true;
+        if (clickOriginal(["regen"])) return true;
 
         for (const name of ["NovaMobileRegenerate", "NovaMobileRegen", "regenerateLast", "regenLast", "handleRegenerate"]) {
             if (typeof window[name] === "function") {
