@@ -5123,6 +5123,9 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
         return data.messages || data.session?.messages || data.item?.messages || [];
     }
 
+    // NOVA_MOBILE_SESSION_LOG_QUIET_20260624
+    const DEBUG_SESSIONS = Boolean(window.NOVA_MOBILE_DEBUG_SESSIONS);
+
     function rememberSession(sessionId) {
         try {
             localStorage.setItem("nova_mobile_active_session_id", sessionId);
@@ -5134,13 +5137,13 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
         window.novaMobileActiveSessionId = sessionId;
         window.currentSessionId = sessionId;
 
-        console.log(TAG, "remembered", sessionId);
+        if (DEBUG_SESSIONS) console.log(TAG, "remembered", sessionId);
     }
 
     async function restoreSession(sessionId) {
         if (!sessionId) return;
 
-        console.log(TAG, "restore start", sessionId);
+        if (DEBUG_SESSIONS) console.log(TAG, "restore start", sessionId);
 
         const messages = await fetchMessages(sessionId);
 
@@ -5148,7 +5151,7 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
         renderMessages(messages);
         closePanel();
 
-        console.log(TAG, "restore done", {
+        if (DEBUG_SESSIONS) console.log(TAG, "restore done", {
             sessionId,
             messages: messages.length
         });
@@ -5271,7 +5274,7 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
                 listEl.innerHTML = `<div style="opacity:.7;padding:14px;">No sessions found.</div>`;
             }
 
-            console.log(TAG, "panel loaded", { count: sessions.length });
+            if (DEBUG_SESSIONS) console.log(TAG, "panel loaded", { count: sessions.length });
         } catch (err) {
             console.warn(TAG, "panel load failed", err);
             listEl.innerHTML = `<div style="opacity:.7;padding:14px;">Could not load sessions.</div>`;
@@ -5291,7 +5294,7 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
             openPanel();
         }
 
-        console.log(TAG, "sessions click captured");
+        if (DEBUG_SESSIONS) console.log(TAG, "sessions click captured");
         return false;
     }
 
@@ -5309,7 +5312,7 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
         btn.addEventListener("pointerdown", togglePanelFromEvent, true);
         btn.addEventListener("touchstart", togglePanelFromEvent, true);
 
-        console.log(TAG, "sessions button owned");
+        if (DEBUG_SESSIONS) console.log(TAG, "sessions button owned");
         return true;
     }
 

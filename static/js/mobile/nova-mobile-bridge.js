@@ -505,7 +505,7 @@
 
                         if (sessionId) {
                             rememberSessionId(sessionId);
-                            console.log("[Nova Mobile] session remembered", sessionId);
+                            if (Boolean(window.NOVA_MOBILE_DEBUG_SESSIONS)) console.log("[Nova Mobile] session remembered", sessionId);
                         }
                     }).catch(function () {});
                 }
