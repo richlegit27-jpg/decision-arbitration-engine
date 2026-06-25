@@ -6338,6 +6338,199 @@ textarea {
 </script>
 <!-- /NOVA_MOBILE_CHAT_OVERLAP_SCROLL_GUARD_20260625 -->
 
+
+<!-- NOVA_MOBILE_ATTACHMENT_QUEUE_ONE_SHOT_CLEAR_20260625 -->
+<script>
+(function () {
+    "use strict";
+
+    if (window.NOVA_MOBILE_ATTACHMENT_QUEUE_ONE_SHOT_CLEAR_20260625) return;
+    window.NOVA_MOBILE_ATTACHMENT_QUEUE_ONE_SHOT_CLEAR_20260625 = true;
+
+    const DEBUG = Boolean(window.NOVA_MOBILE_DEBUG_ATTACHMENTS);
+    const TAG = "[NOVA_MOBILE_ATTACHMENT_QUEUE_ONE_SHOT_CLEAR_20260625]";
+
+    const KNOWN_KEYS = [
+        "nova_mobile_final_attachment_payload_queue_20260624",
+        "nova_mobile_hard_attachment_payload_queue_20260624",
+        "nova_mobile_attachment_payload_queue",
+        "nova_mobile_uploaded_attachments",
+        "nova_mobile_pending_attachments",
+        "nova_mobile_last_uploaded_attachment"
+    ];
+
+    function eachStorage(fn) {
+        [window.localStorage, window.sessionStorage].forEach(store => {
+            try {
+                if (!store) return;
+                fn(store);
+            } catch {}
+        });
+    }
+
+    function clearStorageKeys(reason) {
+        eachStorage(store => {
+            const keys = [];
+
+            try {
+                for (let i = 0; i < store.length; i += 1) {
+                    const key = String(store.key(i) || "");
+                    if (
+                        KNOWN_KEYS.includes(key) ||
+                        (/nova/i.test(key) && /(attach|upload|file)/i.test(key))
+                    ) {
+                        keys.push(key);
+                    }
+                }
+            } catch {}
+
+            keys.forEach(key => {
+                try { store.removeItem(key); } catch {}
+            });
+
+            KNOWN_KEYS.forEach(key => {
+                try { store.removeItem(key); } catch {}
+            });
+        });
+
+        const globals = [
+            "NovaMobileAttachmentQueue",
+            "NovaMobileUploadedAttachments",
+            "NovaMobilePendingAttachments",
+            "NovaMobileLastUploadedAttachment",
+            "novaMobileAttachmentQueue",
+            "novaMobileUploadedAttachments",
+            "novaMobilePendingAttachments",
+            "novaMobileLastUploadedAttachment"
+        ];
+
+        globals.forEach(name => {
+            try {
+                if (Array.isArray(window[name])) window[name] = [];
+                else window[name] = null;
+            } catch {}
+        });
+
+        if (DEBUG) console.log(TAG, "cleared", reason || "unknown");
+    }
+
+    function visible(el) {
+        if (!el || !el.getBoundingClientRect) return false;
+        const r = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+        return (
+            r.width > 20 &&
+            r.height > 12 &&
+            cs.display !== "none" &&
+            cs.visibility !== "hidden" &&
+            cs.opacity !== "0"
+        );
+    }
+
+    function hasVisiblePreview() {
+        const selectors = [
+            "#mobileAttachmentPreview",
+            "#nova-mobile-attachment-preview",
+            "#attachmentPreview",
+            ".mobile-attachment-preview",
+            ".nova-mobile-attachment-preview",
+            ".attachment-preview",
+            ".attachment-chip",
+            ".nova-attachment-chip",
+            "[data-attachment-preview]",
+            "[data-upload-preview]"
+        ];
+
+        return selectors.some(selector => {
+            try {
+                return Array.from(document.querySelectorAll(selector)).some(visible);
+            } catch {
+                return false;
+            }
+        });
+    }
+
+    function looksLikeAttachmentIntent(text) {
+        const value = String(text || "").toLowerCase();
+        return (
+            /\b(attachment|attached|attach|upload|uploaded|file|document|pdf|image|photo|picture|screenshot)\b/.test(value) ||
+            /\b(what is this|what's this|summarize this|summarise this|analyze this|analyse this|read this|describe this)\b/.test(value)
+        );
+    }
+
+    function bodyText(payload) {
+        if (!payload || typeof payload !== "object") return "";
+        return String(payload.user_text || payload.message || payload.text || payload.prompt || "");
+    }
+
+    function hasPayloadAttachments(payload) {
+        if (!payload || typeof payload !== "object") return false;
+        return (
+            (Array.isArray(payload.attachments) && payload.attachments.length > 0) ||
+            (Array.isArray(payload.session_attachments) && payload.session_attachments.length > 0) ||
+            Number(payload.attachment_count || 0) > 0
+        );
+    }
+
+    const originalFetch = window.fetch;
+
+    window.fetch = function novaMobileAttachmentOneShotFetch(input, init) {
+        const url = String(typeof input === "string" ? input : input?.url || "");
+        const method = String(init?.method || "GET").toUpperCase();
+        const isChatSend = url.includes("/api/chat") && method === "POST";
+
+        let parsedBody = null;
+
+        if (isChatSend && init && typeof init.body === "string") {
+            try {
+                parsedBody = JSON.parse(init.body);
+            } catch {}
+        }
+
+        if (isChatSend && parsedBody && !hasPayloadAttachments(parsedBody)) {
+            const text = bodyText(parsedBody);
+
+            if (!looksLikeAttachmentIntent(text) && !hasVisiblePreview()) {
+                clearStorageKeys("before-normal-chat-send");
+            }
+        }
+
+        const result = originalFetch.apply(this, arguments);
+
+        if (isChatSend && result && typeof result.then === "function") {
+            return result.then(response => {
+                try {
+                    if (response && response.ok) {
+                        clearStorageKeys("after-chat-send");
+                    }
+                } catch {}
+
+                return response;
+            });
+        }
+
+        return result;
+    };
+
+    function bootClear() {
+        if (!hasVisiblePreview()) {
+            clearStorageKeys("boot-no-visible-preview");
+        }
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", () => {
+            setTimeout(bootClear, 250);
+            setTimeout(bootClear, 900);
+        }, { once: true });
+    } else {
+        setTimeout(bootClear, 250);
+        setTimeout(bootClear, 900);
+    }
+})();
+</script>
+<!-- /NOVA_MOBILE_ATTACHMENT_QUEUE_ONE_SHOT_CLEAR_20260625 -->
+
 </body>
 </html>
 
