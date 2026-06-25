@@ -22825,14 +22825,12 @@ except Exception as _nova_final_attachment_route_lock_v2_error:
     print("[NOVA_FINAL_ATTACHMENT_ROUTE_BEATS_WEB_LOCK_V2_20260624] failed:", _nova_final_attachment_route_lock_v2_error)
 
 
-# NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V2_20260624
-# Final response cleaner: remove common mojibake before API/mobile output.
+# NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V3_20260624
+# Final response cleaner: conservative only. Do NOT alter normal English word endings.
 try:
-    import re as _nova_mojibake_re_20260624
+    _NOVA_PRE_FINAL_MOJIBAKE_HANDLE_V3_20260624 = ChatService.handle
 
-    _NOVA_PRE_FINAL_MOJIBAKE_HANDLE_V2_20260624 = ChatService.handle
-
-    def _nova_final_clean_mojibake_text_v2_20260624(value):
+    def _nova_final_clean_mojibake_text_v3_20260624(value):
         if not isinstance(value, str):
             return value
 
@@ -22842,7 +22840,7 @@ try:
             "???": "'",
             "???": "'",
             "???": '"',
-            "??": '"',
+            "??\x9d": '"',
             "???": '"',
             "???": "-",
             "???": "-",
@@ -22857,36 +22855,68 @@ try:
         for bad, good in replacements.items():
             text = text.replace(bad, good)
 
-        # Fix damaged contractions like it?s, don?t, you?re, I?m.
-        text = _nova_mojibake_re_20260624.sub(
-            r"\b([A-Za-z]+)?(s|t|re|ve|ll|d|m)\b",
-            r"\1'\2",
-            text,
-        )
+        # Conservative contraction fixes only for literal mojibake fragments.
+        contraction_replacements = {
+            "it?s": "it's",
+            "It?s": "It's",
+            "that?s": "that's",
+            "That?s": "That's",
+            "there?s": "there's",
+            "There?s": "There's",
+            "what?s": "what's",
+            "What?s": "What's",
+            "don?t": "don't",
+            "Don?t": "Don't",
+            "doesn?t": "doesn't",
+            "Doesn?t": "Doesn't",
+            "isn?t": "isn't",
+            "Isn?t": "Isn't",
+            "aren?t": "aren't",
+            "Aren?t": "Aren't",
+            "can?t": "can't",
+            "Can?t": "Can't",
+            "won?t": "won't",
+            "Won?t": "Won't",
+            "you?re": "you're",
+            "You?re": "You're",
+            "we?re": "we're",
+            "We?re": "We're",
+            "they?re": "they're",
+            "They?re": "They're",
+            "I?m": "I'm",
+            "i?m": "I'm",
+            "I?ve": "I've",
+            "i?ve": "I've",
+            "I?ll": "I'll",
+            "i?ll": "I'll",
+        }
+
+        for bad, good in contraction_replacements.items():
+            text = text.replace(bad, good)
 
         return text
 
-    def _nova_final_clean_mojibake_obj_v2_20260624(obj):
+    def _nova_final_clean_mojibake_obj_v3_20260624(obj):
         if isinstance(obj, str):
-            return _nova_final_clean_mojibake_text_v2_20260624(obj)
+            return _nova_final_clean_mojibake_text_v3_20260624(obj)
 
         if isinstance(obj, list):
-            return [_nova_final_clean_mojibake_obj_v2_20260624(item) for item in obj]
+            return [_nova_final_clean_mojibake_obj_v3_20260624(item) for item in obj]
 
         if isinstance(obj, dict):
             return {
-                key: _nova_final_clean_mojibake_obj_v2_20260624(value)
+                key: _nova_final_clean_mojibake_obj_v3_20260624(value)
                 for key, value in obj.items()
             }
 
         return obj
 
-    def _nova_final_mojibake_clean_handle_v2_20260624(self, *args, **kwargs):
-        result = _NOVA_PRE_FINAL_MOJIBAKE_HANDLE_V2_20260624(self, *args, **kwargs)
-        return _nova_final_clean_mojibake_obj_v2_20260624(result)
+    def _nova_final_mojibake_clean_handle_v3_20260624(self, *args, **kwargs):
+        result = _NOVA_PRE_FINAL_MOJIBAKE_HANDLE_V3_20260624(self, *args, **kwargs)
+        return _nova_final_clean_mojibake_obj_v3_20260624(result)
 
-    ChatService.handle = _nova_final_mojibake_clean_handle_v2_20260624
-    print("[NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V2_20260624] installed")
-except Exception as _nova_final_mojibake_cleanup_v2_error_20260624:
-    print("[NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V2_20260624] failed:", _nova_final_mojibake_cleanup_v2_error_20260624)
+    ChatService.handle = _nova_final_mojibake_clean_handle_v3_20260624
+    print("[NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V3_20260624] installed")
+except Exception as _nova_final_mojibake_cleanup_v3_error_20260624:
+    print("[NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V3_20260624] failed:", _nova_final_mojibake_cleanup_v3_error_20260624)
 
