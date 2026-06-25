@@ -5962,3 +5962,273 @@
 </script>
 <!-- /NOVA_MOBILE_MENU_ACCOUNT_RESTORE_FINAL_20260624 -->
 
+
+<!-- NOVA_MOBILE_MENU_HELP_BLOG_ORDER_FINAL_20260624 -->
+<style>
+    #nova-mobile-menu-help-restored,
+    #nova-mobile-menu-blog-restored {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 100% !important;
+        min-height: 42px !important;
+        margin: 8px 0 0 0 !important;
+        padding: 10px 12px !important;
+        border: 1px solid rgba(255,255,255,.14) !important;
+        border-radius: 14px !important;
+        background: rgba(255,255,255,.08) !important;
+        color: #f8fafc !important;
+        font-size: 14px !important;
+        font-weight: 800 !important;
+        line-height: 1.15 !important;
+        text-align: center !important;
+        cursor: pointer !important;
+        box-sizing: border-box !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+
+    #nova-mobile-menu-help-restored:hover,
+    #nova-mobile-menu-blog-restored:hover {
+        background: rgba(255,255,255,.12) !important;
+    }
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    const TAG = "[NOVA_MOBILE_MENU_HELP_BLOG_ORDER_FINAL_20260624]";
+
+    const ORDER = [
+        "account",
+        "account-detail",
+        "help",
+        "memory",
+        "home",
+        "blog",
+        "artifacts",
+        "mobile-artifacts",
+        "close-execution"
+    ];
+
+    function clean(value) {
+        return String(value || "")
+            .replace(/\s+/g, " ")
+            .trim()
+            .toLowerCase();
+    }
+
+    function visible(el) {
+        if (!el) return false;
+        const cs = getComputedStyle(el);
+        const r = el.getBoundingClientRect();
+        return cs.display !== "none" &&
+            cs.visibility !== "hidden" &&
+            Number(cs.opacity || 1) > 0 &&
+            r.width > 10 &&
+            r.height > 10;
+    }
+
+    function panel() {
+        const direct = document.getElementById("nova-mobile-tools-panel");
+        if (direct) return direct;
+
+        const candidates = Array.from(document.querySelectorAll(
+            "[id*='tools'][id*='panel'], [class*='tools'][class*='panel'], [id*='menu'][id*='panel'], [class*='menu'][class*='panel']"
+        ));
+
+        return candidates.find(visible) || candidates[0] || null;
+    }
+
+    function makeButton(id, text, href) {
+        let btn = document.getElementById(id);
+
+        if (!btn) {
+            btn = document.createElement("button");
+            btn.id = id;
+            btn.type = "button";
+            btn.textContent = text;
+            btn.title = text;
+            btn.setAttribute("aria-label", text);
+
+            btn.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                window.location.href = href;
+            }, true);
+        }
+
+        btn.textContent = text;
+        btn.title = text;
+        btn.setAttribute("aria-label", text);
+
+        return btn;
+    }
+
+    function ensureHelpBlog(host) {
+        if (!host) return;
+
+        const help = makeButton("nova-mobile-menu-help-restored", "Help", "/help");
+        const blog = makeButton("nova-mobile-menu-blog-restored", "Blog", "/blog");
+
+        if (help.parentElement !== host) host.appendChild(help);
+        if (blog.parentElement !== host) host.appendChild(blog);
+    }
+
+    function classify(el) {
+        const id = clean(el.id);
+        const cls = clean(el.className);
+        const text = clean(el.innerText || el.textContent);
+        const raw = `${id} ${cls} ${text}`;
+
+        if (id === "nova-mobile-menu-account-restored") return "account";
+        if (id === "nova-mobile-menu-account-detail-restored") return "account-detail";
+
+        if (id === "nova-mobile-menu-help-restored" || text === "help" || raw.includes("help")) {
+            return "help";
+        }
+
+        if (id === "nova-mobile-menu-blog-restored" || text === "blog" || raw.includes("blog")) {
+            return "blog";
+        }
+
+        if (raw.includes("memory")) return "memory";
+
+        if (
+            raw.includes("mobile artifacts") ||
+            raw.includes("mobile artifact")
+        ) return "mobile-artifacts";
+
+        if (raw.includes("artifacts") || raw.includes("artifact")) return "artifacts";
+
+        if (
+            text === "home" ||
+            raw.includes("back to nova") ||
+            raw.includes("nova home")
+        ) return "home";
+
+        if (
+            raw.includes("close execution") ||
+            raw.includes("execution")
+        ) return "close-execution";
+
+        return "other";
+    }
+
+    function rank(el) {
+        const type = classify(el);
+        const index = ORDER.indexOf(type);
+
+        if (index >= 0) return index;
+
+        return 1000 + Number(el.dataset.novaMenuOriginalIndex || 0);
+    }
+
+    function shouldOrder(el) {
+        if (!el || el.nodeType !== 1) return false;
+
+        const tag = String(el.tagName || "").toLowerCase();
+        const role = clean(el.getAttribute("role"));
+        const text = clean(el.innerText || el.textContent);
+        const id = clean(el.id);
+
+        if (id === "nova-mobile-menu-account-detail-restored") return true;
+        if (tag === "button" || tag === "a" || role === "button") return true;
+
+        return text &&
+            el.children.length <= 4 &&
+            (
+                text.includes("account") ||
+                text.includes("help") ||
+                text.includes("memory") ||
+                text.includes("home") ||
+                text.includes("blog") ||
+                text.includes("artifact") ||
+                text.includes("execution")
+            );
+    }
+
+    function orderMenu(reason) {
+        if (typeof window.NovaMobileRestoreMenuAccountFinal === "function") {
+            try {
+                window.NovaMobileRestoreMenuAccountFinal("order-before-" + (reason || "boot"));
+            } catch (error) {
+                console.warn(TAG, "account restore failed", error);
+            }
+        }
+
+        const host = panel();
+
+        if (!host) {
+            console.log(TAG, reason || "boot", { panel: false });
+            return false;
+        }
+
+        ensureHelpBlog(host);
+
+        const items = Array.from(host.children).filter(shouldOrder);
+
+        items.forEach((el, index) => {
+            if (!el.dataset.novaMenuOriginalIndex) {
+                el.dataset.novaMenuOriginalIndex = String(index);
+            }
+        });
+
+        const sorted = items.slice().sort((a, b) => {
+            const ar = rank(a);
+            const br = rank(b);
+
+            if (ar !== br) return ar - br;
+
+            return Number(a.dataset.novaMenuOriginalIndex || 0) -
+                Number(b.dataset.novaMenuOriginalIndex || 0);
+        });
+
+        sorted.forEach(el => {
+            if (el.parentElement === host) {
+                host.appendChild(el);
+            }
+        });
+
+        console.log(TAG, reason || "boot", {
+            panel: true,
+            ordered: sorted.map(el => ({
+                id: el.id || "",
+                type: classify(el),
+                text: String(el.innerText || el.textContent || "").trim().slice(0, 50)
+            }))
+        });
+
+        return true;
+    }
+
+    function bindMenuButton() {
+        const menu = document.getElementById("nova-mobile-tools-toggle");
+        if (!menu || menu.dataset.novaMenuHelpBlogOrderFinal) return;
+
+        menu.dataset.novaMenuHelpBlogOrderFinal = "1";
+        menu.addEventListener("click", function () {
+            [80, 180, 350, 700, 1200].forEach(ms => {
+                setTimeout(() => orderMenu("menu-click-" + ms), ms);
+            });
+        }, false);
+    }
+
+    function boot() {
+        bindMenuButton();
+        orderMenu("boot");
+    }
+
+    window.NovaMobileOrderMenuHelpBlogFinal = orderMenu;
+
+    boot();
+    document.addEventListener("DOMContentLoaded", boot);
+    window.addEventListener("load", boot);
+    setInterval(boot, 1600);
+
+    console.log(TAG, "ready");
+})();
+</script>
+<!-- /NOVA_MOBILE_MENU_HELP_BLOG_ORDER_FINAL_20260624 -->
+
