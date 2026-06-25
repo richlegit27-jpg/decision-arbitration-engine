@@ -6110,6 +6110,234 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
 })();
 </script>
 
+
+<!-- NOVA_MOBILE_CHAT_OVERLAP_SCROLL_GUARD_20260625 -->
+<style>
+:root {
+    --nova-mobile-composer-space: 176px;
+}
+
+html,
+body {
+    height: 100%;
+    overflow: hidden !important;
+}
+
+/* Keep the message area scrollable above the fixed composer. */
+#mobileChat,
+#mobileChatMessages,
+#chatMessages,
+#messages,
+#nova-mobile-chat,
+#nova-mobile-messages,
+.nova-mobile-chat,
+.nova-mobile-messages,
+.mobile-chat,
+.chat-messages,
+[data-nova-chat],
+[data-chat-messages] {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain !important;
+    padding-bottom: var(--nova-mobile-composer-space) !important;
+    scroll-padding-bottom: var(--nova-mobile-composer-space) !important;
+    box-sizing: border-box !important;
+}
+
+/* If the textarea grows, it scrolls inside itself instead of covering messages. */
+#mobileInput,
+#messageInput,
+#chatInput,
+#nova-mobile-input,
+.nova-mobile-input,
+.mobile-input,
+textarea {
+    max-height: 118px !important;
+    overflow-y: auto !important;
+    resize: none !important;
+    box-sizing: border-box !important;
+}
+
+/* Message bubbles should never sit under the composer when focused/scrolled. */
+.nova-mobile-restored-message,
+.message,
+.chat-message,
+.nova-message {
+    scroll-margin-bottom: var(--nova-mobile-composer-space) !important;
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    if (window.NOVA_MOBILE_CHAT_OVERLAP_SCROLL_GUARD_20260625) return;
+    window.NOVA_MOBILE_CHAT_OVERLAP_SCROLL_GUARD_20260625 = true;
+
+    const DEBUG = Boolean(window.NOVA_MOBILE_DEBUG_LAYOUT);
+    const TAG = "[NOVA_MOBILE_CHAT_OVERLAP_SCROLL_GUARD_20260625]";
+
+    function visible(el) {
+        if (!el || !el.getBoundingClientRect) return false;
+        const r = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+        return (
+            r.width > 40 &&
+            r.height > 20 &&
+            cs.display !== "none" &&
+            cs.visibility !== "hidden" &&
+            cs.opacity !== "0"
+        );
+    }
+
+    function findComposer() {
+        const selectors = [
+            "#mobileComposer",
+            "#mobileInputBar",
+            "#nova-mobile-composer",
+            "#composer",
+            ".nova-mobile-composer",
+            ".mobile-composer",
+            ".chat-composer",
+            ".composer",
+            ".input-bar",
+            ".message-bar"
+        ];
+
+        for (const selector of selectors) {
+            const el = document.querySelector(selector);
+            if (visible(el)) return el;
+        }
+
+        const candidates = Array.from(document.querySelectorAll("body *"))
+            .filter(visible)
+            .map(el => {
+                const r = el.getBoundingClientRect();
+                const cs = getComputedStyle(el);
+                const hasInput = Boolean(el.querySelector("textarea,input,button"));
+                return { el, r, cs, hasInput };
+            })
+            .filter(x =>
+                x.hasInput &&
+                x.r.bottom > window.innerHeight * 0.60 &&
+                (x.cs.position === "fixed" || x.cs.position === "sticky" || x.r.height < 240)
+            )
+            .sort((a, b) => b.r.bottom - a.r.bottom || b.r.height - a.r.height);
+
+        return candidates[0]?.el || null;
+    }
+
+    function findChat() {
+        const selectors = [
+            "#mobileChat",
+            "#mobileChatMessages",
+            "#chatMessages",
+            "#messages",
+            "#nova-mobile-chat",
+            "#nova-mobile-messages",
+            ".nova-mobile-chat",
+            ".nova-mobile-messages",
+            ".mobile-chat",
+            ".chat-messages",
+            "[data-nova-chat]",
+            "[data-chat-messages]"
+        ];
+
+        for (const selector of selectors) {
+            const el = document.querySelector(selector);
+            if (visible(el)) return el;
+        }
+
+        const candidates = Array.from(document.querySelectorAll("body *"))
+            .filter(visible)
+            .map(el => {
+                const r = el.getBoundingClientRect();
+                const cs = getComputedStyle(el);
+                const text = String(el.innerText || el.textContent || "");
+                const looksScrollable = cs.overflowY === "auto" || cs.overflowY === "scroll";
+                const hasMessages = Boolean(el.querySelector(".nova-mobile-restored-message,.message,.chat-message,.nova-message"));
+                return { el, r, cs, text, looksScrollable, hasMessages };
+            })
+            .filter(x =>
+                x.r.height > 180 &&
+                x.r.top < window.innerHeight * 0.75 &&
+                (x.looksScrollable || x.hasMessages || x.text.length > 20)
+            )
+            .sort((a, b) => b.r.height - a.r.height);
+
+        return candidates[0]?.el || null;
+    }
+
+    function apply(reason) {
+        const composer = findComposer();
+        const chat = findChat();
+
+        const composerHeight = composer ? composer.getBoundingClientRect().height : 120;
+        const safeExtra = 42;
+        const space = Math.max(150, Math.min(Math.round(composerHeight + safeExtra), 260));
+
+        document.documentElement.style.setProperty("--nova-mobile-composer-space", space + "px");
+
+        if (chat) {
+            const distanceToBottom = chat.scrollHeight - chat.scrollTop - chat.clientHeight;
+            const wasNearBottom = distanceToBottom < 180;
+
+            chat.style.overflowY = "auto";
+            chat.style.webkitOverflowScrolling = "touch";
+            chat.style.overscrollBehavior = "contain";
+            chat.style.paddingBottom = space + "px";
+            chat.style.scrollPaddingBottom = space + "px";
+            chat.style.boxSizing = "border-box";
+
+            if (wasNearBottom) {
+                requestAnimationFrame(() => {
+                    chat.scrollTop = chat.scrollHeight;
+                });
+            }
+        }
+
+        if (DEBUG) {
+            console.log(TAG, reason || "apply", {
+                composer: composer ? composer.id || composer.className || composer.tagName : null,
+                chat: chat ? chat.id || chat.className || chat.tagName : null,
+                space
+            });
+        }
+    }
+
+    function boot() {
+        apply("boot");
+
+        const composer = findComposer();
+        const chat = findChat();
+
+        if (window.ResizeObserver) {
+            if (composer) new ResizeObserver(() => apply("composer-resize")).observe(composer);
+            if (chat) new ResizeObserver(() => apply("chat-resize")).observe(chat);
+        }
+
+        new MutationObserver(() => apply("mutation")).observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
+
+    ["resize", "orientationchange", "focusin", "focusout"].forEach(name => {
+        window.addEventListener(name, () => setTimeout(() => apply(name), 80), { passive: true });
+    });
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", boot, { once: true });
+    } else {
+        boot();
+    }
+
+    setTimeout(() => apply("late-300"), 300);
+    setTimeout(() => apply("late-900"), 900);
+})();
+</script>
+<!-- /NOVA_MOBILE_CHAT_OVERLAP_SCROLL_GUARD_20260625 -->
+
 </body>
 </html>
 
