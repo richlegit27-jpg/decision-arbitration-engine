@@ -5973,7 +5973,14 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
         chat.style.removeProperty("max-height");
         chat.style.removeProperty("bottom");
 
-        const topPx = 133;
+        /*
+          NOVA_MOBILE_CHAT_TOP_FIXED_20260625
+
+          The top action row is 36px tall at top 6px.
+          50px gives the chat a small gap under that row instead of forcing
+          messages to begin halfway down the screen.
+        */
+        const topPx = 50;
         const bottomPx = Math.max(0, viewportHeight - composerTop);
 
         document.documentElement.style.setProperty(
