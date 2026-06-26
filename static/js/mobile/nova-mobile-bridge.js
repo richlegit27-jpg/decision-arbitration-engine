@@ -2312,11 +2312,14 @@
     }
 
     function renderRow(panel, session) {
+        // NOVA_MOBILE_SESSION_ROW_WRAPPER_REFACTOR_20260625
+        // One wrapper row. One open button. One manage button.
+        // Do not put Pin/Delete/Rename buttons inside or beside the open target.
         var row = document.createElement("div");
         row.setAttribute("data-nova-final-session-row", String(session.id || ""));
         row.style.setProperty("display", "grid", "important");
-        row.style.setProperty("grid-template-columns", "1fr auto auto auto", "important");
-        row.style.setProperty("gap", "6px", "important");
+        row.style.setProperty("grid-template-columns", "1fr auto", "important");
+        row.style.setProperty("gap", "8px", "important");
         row.style.setProperty("align-items", "center", "important");
         row.style.setProperty("margin", "0 0 8px 0", "important");
         row.style.setProperty("padding", "8px", "important");
@@ -2324,84 +2327,98 @@
         row.style.setProperty("background", "rgba(255,255,255,.06)", "important");
         row.style.setProperty("border", "1px solid rgba(255,255,255,.12)", "important");
 
-        var title = button((session.pinned ? "📌 " : "") + String(session.title || session.id || "Saved Session"));
-        title.style.setProperty("text-align", "left", "important");
-        title.style.setProperty("overflow", "hidden", "important");
-        title.style.setProperty("text-overflow", "ellipsis", "important");
-        title.style.setProperty("white-space", "nowrap", "important");
-        title.onclick = function (event) {
+        var open = button((session.pinned ? "Pinned - " : "") + String(session.title || session.id || "Saved Session"));
+        open.className = (open.className || "") + " nova-mobile-session-open";
+        open.style.setProperty("text-align", "left", "important");
+        open.style.setProperty("min-width", "0", "important");
+        open.style.setProperty("overflow", "hidden", "important");
+        open.style.setProperty("text-overflow", "ellipsis", "important");
+        open.style.setProperty("white-space", "nowrap", "important");
+        open.onclick = function (event) {
             event.preventDefault();
             event.stopPropagation();
+
             loadSessionById(session.id).catch(function (error) {
                 console.error("[Nova Mobile Final Session Actions] open failed", error);
                 alert("Open failed");
             });
         };
 
-        var pin = button(session.pinned ? "Unpin" : "Pin");
-        pin.onclick = async function (event) {
+        var manage = button("Manage");
+        manage.className = (manage.className || "") + " nova-mobile-session-manage";
+        manage.style.setProperty("flex", "0 0 auto", "important");
+        manage.style.setProperty("white-space", "nowrap", "important");
+        manage.style.setProperty("background", "rgba(124,92,255,.28)", "important");
+        manage.onclick = async function (event) {
             event.preventDefault();
             event.stopPropagation();
 
-            try {
-                await api("/api/sessions/pin", {
-                    session_id: session.id,
-                    pinned: !session.pinned
-                });
-                await renderFinalSessions(true);
-            } catch (error) {
-                console.error("[Nova Mobile Final Session Actions] pin failed", error);
-                alert("Pin failed");
+            var action = prompt(
+                "Manage session:\n\nType one:\nrename\npin\ndelete",
+                ""
+            );
+
+            if (action === null) return;
+
+            action = String(action || "").trim().toLowerCase();
+
+            if (action === "p" || action === "pin" || action === "unpin") {
+                try {
+                    await api("/api/sessions/pin", {
+                        session_id: session.id,
+                        pinned: !session.pinned
+                    });
+                    await renderFinalSessions(true);
+                } catch (error) {
+                    console.error("[Nova Mobile Final Session Actions] pin failed", error);
+                    alert("Pin failed");
+                }
+                return;
+            }
+
+            if (action === "r" || action === "rename") {
+                var current = String(session.title || "");
+                var next = prompt("Rename session:", current);
+                if (next === null) return;
+
+                next = String(next || "").trim();
+                if (!next) return;
+
+                try {
+                    await api("/api/sessions/rename", {
+                        session_id: session.id,
+                        title: next
+                    });
+                    await renderFinalSessions(true);
+                } catch (error) {
+                    console.error("[Nova Mobile Final Session Actions] rename failed", error);
+                    alert("Rename failed");
+                }
+                return;
+            }
+
+            if (action === "d" || action === "delete") {
+                if (!confirm("Delete this session?")) return;
+
+                try {
+                    await api("/api/sessions/delete", {
+                        session_id: session.id
+                    });
+                    await renderFinalSessions(true);
+                } catch (error) {
+                    console.error("[Nova Mobile Final Session Actions] delete failed", error);
+                    alert("Delete failed");
+                }
+                return;
+            }
+
+            if (action) {
+                alert("Unknown action. Type rename, pin, or delete.");
             }
         };
 
-        var rename = button("Rename");
-        rename.onclick = async function (event) {
-            event.preventDefault();
-            event.stopPropagation();
-
-            var current = String(session.title || "");
-            var next = prompt("Rename session:", current);
-            if (next === null) return;
-
-            next = String(next || "").trim();
-            if (!next) return;
-
-            try {
-                await api("/api/sessions/rename", {
-                    session_id: session.id,
-                    title: next
-                });
-                await renderFinalSessions(true);
-            } catch (error) {
-                console.error("[Nova Mobile Final Session Actions] rename failed", error);
-                alert("Rename failed");
-            }
-        };
-
-        var del = button("Delete");
-        del.style.setProperty("background", "rgba(255,70,70,.22)", "important");
-        del.onclick = async function (event) {
-            event.preventDefault();
-            event.stopPropagation();
-
-            if (!confirm("Delete this session?")) return;
-
-            try {
-                await api("/api/sessions/delete", {
-                    session_id: session.id
-                });
-                await renderFinalSessions(true);
-            } catch (error) {
-                console.error("[Nova Mobile Final Session Actions] delete failed", error);
-                alert("Delete failed");
-            }
-        };
-
-        row.appendChild(title);
-        row.appendChild(pin);
-        row.appendChild(rename);
-        row.appendChild(del);
+        row.appendChild(open);
+        row.appendChild(manage);
         panel.appendChild(row);
     }
 
