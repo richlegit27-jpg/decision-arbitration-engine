@@ -2542,6 +2542,8 @@
     }
 
     function openFinalRowWrapperSessions20260625(event) {
+        var now = Date.now();
+
         if (event) {
             event.preventDefault();
             event.stopPropagation();
@@ -2549,6 +2551,13 @@
             if (event.stopImmediatePropagation) {
                 event.stopImmediatePropagation();
             }
+
+            if (window.__novaMobileTopSessionsRouteLastOpen20260625 &&
+                now - window.__novaMobileTopSessionsRouteLastOpen20260625 < 450) {
+                return;
+            }
+
+            window.__novaMobileTopSessionsRouteLastOpen20260625 = now;
         }
 
         hideLegacySessionPanels20260625();
@@ -2563,12 +2572,20 @@
         if (window.__novaMobileTopSessionsRouteToRowWrapper20260625) return;
         window.__novaMobileTopSessionsRouteToRowWrapper20260625 = true;
 
-        document.addEventListener("click", function (event) {
-            var trigger = isTopRowSessionsTrigger20260625(event.target);
-            if (!trigger) return;
+        // NOVA_MOBILE_TOP_SESSIONS_TOUCH_CAPTURE_ROUTE_20260625
+        // Mobile taps hit touchstart before click, so capture all press paths before
+        // the older inline top-row handler can open the fallback sessions panel.
+        ["touchstart", "pointerdown", "mousedown", "click"].forEach(function (eventName) {
+            document.addEventListener(eventName, function (event) {
+                var trigger = isTopRowSessionsTrigger20260625(event.target);
+                if (!trigger) return;
 
-            openFinalRowWrapperSessions20260625(event);
-        }, true);
+                openFinalRowWrapperSessions20260625(event);
+            }, {
+                capture: true,
+                passive: false
+            });
+        });
 
         window.NovaMobileOpenFinalSessionsPanel = function () {
             openFinalRowWrapperSessions20260625(null);
@@ -2630,6 +2647,125 @@
     };
 
     console.log("[Nova Mobile Final Session Actions] ready");
+
+    // NOVA_MOBILE_REPLACE_TOP_SESSIONS_BUTTON_WITH_CLEAN_CLONE_20260625
+    // The direct console opener works, but the real top-row Sessions button still
+    // has old touch/click handlers attached by the inline V10 top-row owner.
+    // Replace that button with a clean clone so only the row-wrapper panel opens.
+    function novaFindTopSessionsButtonCleanClone20260625() {
+        var row = document.getElementById("nova-mobile-primary-action-row");
+        if (!row) return null;
+
+        var buttons = Array.prototype.slice.call(
+            row.querySelectorAll("button, a, [role='button']")
+        );
+
+        return buttons.find(function (button) {
+            var haystack = [
+                button.id || "",
+                button.className || "",
+                button.getAttribute("data-nova-open-sessions") || "",
+                button.innerText || "",
+                button.textContent || ""
+            ].join(" ");
+
+            return /sessions?/i.test(haystack);
+        }) || null;
+    }
+
+    function novaInstallCleanTopSessionsButtonClone20260625(reason) {
+        var oldButton = novaFindTopSessionsButtonCleanClone20260625();
+        if (!oldButton) return false;
+
+        if (oldButton.getAttribute("data-nova-clean-row-wrapper-sessions") === "1") {
+            return true;
+        }
+
+        var cleanButton = oldButton.cloneNode(true);
+        cleanButton.setAttribute("data-nova-clean-row-wrapper-sessions", "1");
+        cleanButton.setAttribute("data-nova-clean-row-wrapper-reason", String(reason || "install"));
+        cleanButton.removeAttribute("onclick");
+
+        if (!String(cleanButton.textContent || "").trim()) {
+            cleanButton.textContent = "Sessions";
+        }
+
+        function openCleanSessions(event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (event.stopImmediatePropagation) {
+                    event.stopImmediatePropagation();
+                }
+            }
+
+            if (typeof window.NovaMobileOpenFinalSessionsPanel === "function") {
+                window.NovaMobileOpenFinalSessionsPanel();
+                return;
+            }
+
+            console.warn("[NOVA_MOBILE_REPLACE_TOP_SESSIONS_BUTTON_WITH_CLEAN_CLONE_20260625] final opener missing");
+        }
+
+        ["touchstart", "pointerdown", "mousedown", "click"].forEach(function (eventName) {
+            cleanButton.addEventListener(eventName, openCleanSessions, {
+                capture: true,
+                passive: false
+            });
+        });
+
+        oldButton.parentNode.replaceChild(cleanButton, oldButton);
+
+        console.log("[NOVA_MOBILE_REPLACE_TOP_SESSIONS_BUTTON_WITH_CLEAN_CLONE_20260625] replaced", {
+            reason: reason || "install",
+            text: String(cleanButton.innerText || cleanButton.textContent || "").trim()
+        });
+
+        return true;
+    }
+
+    function novaScheduleCleanTopSessionsButtonClone20260625() {
+        if (window.__novaMobileCleanTopSessionsButtonClone20260625) return;
+        window.__novaMobileCleanTopSessionsButtonClone20260625 = true;
+
+        ["now", "150", "700", "1800", "3000", "5000"].forEach(function (label) {
+            var delay = label === "now" ? 0 : Number(label);
+            setTimeout(function () {
+                novaInstallCleanTopSessionsButtonClone20260625(label);
+            }, delay);
+        });
+
+        document.addEventListener("DOMContentLoaded", function () {
+            novaInstallCleanTopSessionsButtonClone20260625("dom");
+        });
+
+        window.addEventListener("load", function () {
+            novaInstallCleanTopSessionsButtonClone20260625("load");
+        });
+
+        var observer = new MutationObserver(function () {
+            novaInstallCleanTopSessionsButtonClone20260625("mutation");
+        });
+
+        function startObserver() {
+            var row = document.getElementById("nova-mobile-primary-action-row");
+            if (!row) return;
+
+            observer.observe(row, {
+                childList: true,
+                subtree: true
+            });
+        }
+
+        setTimeout(startObserver, 250);
+        setTimeout(startObserver, 1000);
+
+        window.NovaMobileReplaceTopSessionsButtonWithCleanClone20260625 = novaInstallCleanTopSessionsButtonClone20260625;
+    }
+
+    novaScheduleCleanTopSessionsButtonClone20260625();
+
 })();
 
 
