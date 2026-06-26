@@ -2501,6 +2501,90 @@
         }
     }
 
+    // NOVA_MOBILE_TOP_SESSIONS_ROUTE_TO_ROW_WRAPPER_20260625
+    // The visible top-row Sessions button was still opening older fallback panels.
+    // Capture that click and route it to the clean final row-wrapper renderer.
+    function hideLegacySessionPanels20260625() {
+        [
+            "nova-mobile-visible-sessions-fallback-panel",
+            "nova-mobile-session-restore-panel-v2"
+        ].forEach(function (id) {
+            var panel = document.getElementById(id);
+            if (!panel) return;
+
+            panel.style.setProperty("display", "none", "important");
+            panel.setAttribute("aria-hidden", "true");
+        });
+    }
+
+    function isTopRowSessionsTrigger20260625(target) {
+        if (!target || !target.closest) return null;
+
+        var trigger = target.closest(
+            "#nova-mobile-primary-action-row button, " +
+            "#nova-mobile-primary-action-row a, " +
+            "#nova-mobile-primary-action-row [role='button']"
+        );
+
+        if (!trigger) return null;
+
+        var haystack = [
+            trigger.id || "",
+            trigger.className || "",
+            trigger.getAttribute("data-nova-open-sessions") || "",
+            trigger.innerText || "",
+            trigger.textContent || ""
+        ].join(" ");
+
+        if (!/sessions?/i.test(haystack)) return null;
+
+        return trigger;
+    }
+
+    function openFinalRowWrapperSessions20260625(event) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (event.stopImmediatePropagation) {
+                event.stopImmediatePropagation();
+            }
+        }
+
+        hideLegacySessionPanels20260625();
+
+        renderFinalSessions(true).catch(function (error) {
+            console.error("[Nova Mobile Session Row Wrapper Route] open failed", error);
+            alert("Sessions failed to open");
+        });
+    }
+
+    function installTopSessionsRouteToRowWrapper20260625() {
+        if (window.__novaMobileTopSessionsRouteToRowWrapper20260625) return;
+        window.__novaMobileTopSessionsRouteToRowWrapper20260625 = true;
+
+        document.addEventListener("click", function (event) {
+            var trigger = isTopRowSessionsTrigger20260625(event.target);
+            if (!trigger) return;
+
+            openFinalRowWrapperSessions20260625(event);
+        }, true);
+
+        window.NovaMobileOpenFinalSessionsPanel = function () {
+            openFinalRowWrapperSessions20260625(null);
+        };
+
+        window.NovaMobileTopSessionsRouteToRowWrapper20260625 = {
+            open: window.NovaMobileOpenFinalSessionsPanel,
+            hideLegacy: hideLegacySessionPanels20260625
+        };
+
+        console.log("[NOVA_MOBILE_TOP_SESSIONS_ROUTE_TO_ROW_WRAPPER_20260625] ready");
+    }
+
+    installTopSessionsRouteToRowWrapper20260625();
+
+
     function isSessionsButton(target) {
         if (!target || !target.closest) return false;
 
