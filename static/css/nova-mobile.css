@@ -12337,12 +12337,6 @@ main {
 }
 
 
-
-
-
-
-
-
 /* NOVA_MOBILE_SINGLE_GEOMETRY_OWNER_CSS_20260624 */
 #mobileChatMessages,
 .mobile-chat-container {
@@ -12411,3 +12405,206 @@ main {
 }
 /* /NOVA_MOBILE_CHAT_TOP_MARGIN_RESET_20260625 */
 
+#nova-mobile-composer {
+    z-index: 1 !important;
+}
+
+#nova-mobile-session-panel,
+#nova-mobile-session-list,
+[class*="session"] {
+    z-index: 9999 !important;
+    position: relative;
+}
+
+/* NOVA_MOBILE_MESSAGE_UI_POLISH_20260627 */
+
+#nova-mobile-chat,
+#nova-mobile-messages {
+    padding: 14px 12px 120px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.nova-message {
+    max-width: 88%;
+    padding: 11px 13px;
+    border-radius: 16px;
+    line-height: 1.42;
+    font-size: 15px;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    position: relative;
+}
+
+.nova-message-user {
+    align-self: flex-end;
+    background: #6d3df5;
+    color: #fff;
+    border-bottom-right-radius: 6px;
+}
+
+.nova-message-assistant {
+    align-self: flex-start;
+    background: rgba(255,255,255,.10);
+    color: #fff;
+    border-bottom-left-radius: 6px;
+}
+
+.nova-message-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+    opacity: .75;
+}
+
+.nova-message-action {
+    border: 0;
+    background: rgba(255,255,255,.12);
+    color: #fff;
+    border-radius: 999px;
+    padding: 5px 9px;
+    font-size: 12px;
+}
+
+.nova-message-action:active {
+    transform: scale(.96);
+}
+
+.nova-message-empty {
+    opacity: .65;
+    font-style: italic;
+}
+
+/* NOVA_MOBILE_SESSIONS_POLISH_20260627 */
+
+#nova-mobile-floating-sessions-button {
+    top: 10px !important;
+    left: 10px !important;
+    height: 34px !important;
+    padding: 0 12px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(255,255,255,.16) !important;
+    background: rgba(17,24,39,.94) !important;
+    color: #f8fafc !important;
+    font-size: 12px !important;
+    font-weight: 900 !important;
+    box-shadow: 0 10px 26px rgba(0,0,0,.35) !important;
+}
+
+#nova-mobile-final-sessions-panel {
+    position: fixed !important;
+    top: 58px !important;
+    left: 10px !important;
+    right: 10px !important;
+    bottom: 90px !important;
+
+    z-index: 2147483647 !important;
+
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+
+    overflow-y: auto !important;
+    box-sizing: border-box !important;
+
+    padding: 12px !important;
+
+    background: rgba(15,23,42,.98) !important;
+    border: 1px solid rgba(168,85,247,.35) !important;
+    border-radius: 18px !important;
+    box-shadow: 0 24px 80px rgba(0,0,0,.55) !important;
+}
+
+#nova-mobile-final-sessions-panel button {
+    min-height: 42px !important;
+    padding: 10px 12px !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(255,255,255,.12) !important;
+    background: rgba(255,255,255,.07) !important;
+    color: #f8fafc !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    text-align: left !important;
+    line-height: 1.25 !important;
+}
+
+#nova-mobile-final-sessions-panel button:first-child {
+    text-align: center !important;
+    background: rgba(255,255,255,.10) !important;
+}
+
+.nova-message {
+    max-width: 88% !important;
+    margin: 10px 12px !important;
+    padding: 12px 14px !important;
+    border-radius: 18px !important;
+    color: #f8fafc !important;
+    font-size: 14px !important;
+    line-height: 1.45 !important;
+    white-space: pre-wrap !important;
+    overflow-wrap: anywhere !important;
+    box-sizing: border-box !important;
+}
+
+.nova-message-user {
+    margin-left: auto !important;
+    background: rgba(124,92,255,.30) !important;
+    border: 1px solid rgba(168,85,247,.24) !important;
+}
+
+.nova-message-assistant {
+    margin-right: auto !important;
+    background: rgba(255,255,255,.08) !important;
+    border: 1px solid rgba(255,255,255,.10) !important;
+}
+
+#nova-mobile-final-sessions-panel button:not(:first-child) {
+    display: block !important;
+    width: 100% !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+#nova-mobile-final-sessions-panel button:not(:first-child):active {
+    transform: scale(.985) !important;
+    background: rgba(168,85,247,.18) !important;
+}
+
+/* NOVA_MOBILE_SESSION_CHAT_TEXT_POLISH_20260627 */
+
+.nova-session-message {
+    max-width: 88% !important;
+    margin: 10px 12px !important;
+    padding: 12px 14px !important;
+    border-radius: 18px !important;
+    color: #f8fafc !important;
+    font-size: 14px !important;
+    line-height: 1.45 !important;
+    white-space: pre-wrap !important;
+    overflow-wrap: anywhere !important;
+    box-sizing: border-box !important;
+}
+
+.nova-session-message-user {
+    align-self: flex-end !important;
+    margin-left: auto !important;
+    background: rgba(124,92,255,.30) !important;
+    border: 1px solid rgba(168,85,247,.24) !important;
+}
+
+.nova-session-message-assistant {
+    align-self: flex-start !important;
+    margin-right: auto !important;
+    background: rgba(255,255,255,.08) !important;
+    border: 1px solid rgba(255,255,255,.10) !important;
+}
+
+.nova-session-message .nova-mobile-assistant-actions,
+.nova-session-message .nova-mobile-message-actions,
+.nova-session-message button {
+    display: none !important;
+}

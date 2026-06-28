@@ -1,127 +1,90 @@
-﻿/* NOVA_MOBILE_SMFF_SESSIONS_STABLE_20260606 */
+﻿/* NOVA_MOBILE_APP_CLEAN_OWNER_20260627 */
 
-(function () {
-    "use strict";
+(() => {
+    if (window.__NOVA_MOBILE_APP_CLEAN_OWNER_20260627__) return;
+    window.__NOVA_MOBILE_APP_CLEAN_OWNER_20260627__ = true;
+
+    console.log("[Nova Mobile App] clean owner loaded");
 
     const state = {
         pendingAttachments: [],
-        abortController: null,
-        isSpeaking: false,
-        recognition: null,
-        cachedMessages: {},
-        sessionTitles: {}
+        abortController: null
     };
 
     function $(id) {
         return document.getElementById(id);
     }
 
+    function chatBox() {
+        return (
+            $("nova-mobile-chat") ||
+            $("nova-mobile-messages") ||
+            $("mobileChatMessages") ||
+            document.querySelector(".mobile-chat-messages")
+        );
+    }
+
+    function inputBox() {
+        return $("nova-mobile-input");
+    }
+
     function getSessionId() {
-        let id = localStorage.getItem("nova_mobile_active_session_id") || "";
+        return (
+            localStorage.getItem("nova_active_session_id") ||
+            localStorage.getItem("nova_mobile_active_session_id") ||
+            window.currentSessionId ||
+            window.NOVA_SESSION_ID ||
+            null
+        );
+    }
+
+    function setSessionId(id) {
+        const clean = String(id || "").trim();
+        if (!clean) return;
+
+        localStorage.setItem("nova_active_session_id", clean);
+        localStorage.setItem("nova_mobile_active_session_id", clean);
+
+        window.currentSessionId = clean;
+        window.NOVA_SESSION_ID = clean;
+    }
+
+    function ensureSessionId() {
+        let id = getSessionId();
 
         if (!id) {
-            id = "mobile_" + Date.now();
-            localStorage.setItem("nova_mobile_active_session_id", id);
+            id = "mobile_" + Date.now() + "_" + Math.random().toString(16).slice(2, 10);
+            setSessionId(id);
         }
 
         return id;
-    }
-
-    function chatBox() {
-        return (
-            $("mobileChatMessages") ||
-            $("nova-mobile-messages") ||
-            document.querySelector(".mobile-chat-messages")
-        );
     }
 
     function scrollBottom() {
         const box = chatBox();
         if (!box) return;
 
-        setTimeout(function () {
-            if (window.NovaMobileSafeScrollToBottom) {
-                window.NovaMobileSafeScrollToBottom(box, "nova-mobile-app.js");
-            } else {
-                box.scrollTop = box.scrollHeight;
-            }
-
-        }, 50);
+        requestAnimationFrame(() => {
+            box.scrollTop = box.scrollHeight;
+        });
     }
 
-    function isImageUrl(text) {
-        const value = String(text || "").trim();
-
-        return (
-            value.includes("/api/uploads/") ||
-            /\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(value)
-        );
-    }
-
-    function ensureActiveSessionBar() {
-        let bar = $("nova-mobile-active-session");
+    function addBubble(role, text) {
         const box = chatBox();
+        if (!box) return null;
 
-        if (bar) return bar;
-        if (!box || !box.parentNode) return null;
+        const el = document.createElement("div");
+        el.className = role === "user"
+            ? "nova-message nova-message-user"
+            : "nova-message nova-message-assistant";
 
-        bar = document.createElement("div");
-        bar.id = "nova-mobile-active-session";
-        bar.style.padding = "6px 12px";
-        bar.style.color = "#f8fafc";
-        bar.style.fontSize = "13px";
-        bar.style.background = "rgba(11,16,32,.92)";
-        bar.style.textAlign = "center";
-        bar.style.borderRadius = "10px";
-        bar.style.margin = "6px 8px";
-        bar.style.border = "1px solid rgba(255,255,255,.12)";
+        el.dataset.role = role;
+        el.textContent = text || "";
 
-        box.parentNode.insertBefore(bar, box);
-        return bar;
-    }
+        box.appendChild(el);
+        scrollBottom();
 
-    function updateActiveSessionTitle(session) {
-        const bar = ensureActiveSessionBar();
-        const id = (session && session.id) || getSessionId();
-        const title =
-            (session && session.title) ||
-            (state.sessionTitles && state.sessionTitles[id]) ||
-            "New Chat";
-        const shortId = String(id || "").slice(-6);
-
-        if (bar) {
-            bar.textContent = "Session: " + title + " · " + shortId;
-        }
-    }
-
-    function ensureButton(id, label, title) {
-        let btn = $(id);
-        const composer = $("nova-mobile-composer");
-        const send = $("nova-mobile-send");
-
-        if (btn) return btn;
-        if (!composer) return null;
-
-        btn = document.createElement("button");
-        btn.id = id;
-        btn.type = "button";
-        btn.textContent = label;
-        btn.title = title || label;
-        btn.style.flex = "0 0 auto";
-        btn.style.width = "40px";
-        btn.style.height = "40px";
-        btn.style.borderRadius = "999px";
-        btn.style.display = "inline-flex";
-        btn.style.alignItems = "center";
-        btn.style.justifyContent = "center";
-
-        if (send && send.parentNode === composer) {
-            composer.insertBefore(btn, send);
-        } else {
-            composer.appendChild(btn);
-        }
-
-        return btn;
+        return el;
     }
 
     function ensurePreviewBar() {
@@ -133,22 +96,8 @@
 
         bar = document.createElement("div");
         bar.id = "nova-mobile-attachment-preview-bar";
-        bar.style.position = "fixed";
-        bar.style.left = "8px";
-        bar.style.right = "8px";
-        bar.style.bottom = "124px";
-        bar.style.zIndex = "45";
-        bar.style.display = "none";
-        bar.style.gap = "6px";
-        bar.style.overflowX = "auto";
-        bar.style.padding = "6px";
-        bar.style.borderRadius = "14px";
-        bar.style.background = "rgba(11,16,32,.96)";
-        bar.style.border = "1px solid rgba(255,255,255,.14)";
-        bar.style.color = "#f8fafc";
-        bar.style.fontSize = "12px";
+        composer.parentNode.insertBefore(bar, composer);
 
-        composer.parentNode.appendChild(bar);
         return bar;
     }
 
@@ -165,37 +114,12 @@
 
         bar.style.display = "flex";
 
-        state.pendingAttachments.forEach(function (fileData, index) {
+        state.pendingAttachments.forEach((fileData, index) => {
             const item = document.createElement("button");
-            const isImage = String(fileData.mime_type || "").startsWith("image/");
-            const fileUrl = fileData.url || fileData.file_url || "";
-            const fileName = fileData.original_filename || fileData.filename || "attachment";
-
             item.type = "button";
+            item.textContent = (fileData.original_filename || fileData.filename || "attachment") + " ×";
 
-            if (isImage && fileUrl) {
-                item.innerHTML =
-                    '<img src="' +
-                    fileUrl +
-                    '" style="width:48px;height:48px;object-fit:cover;border-radius:8px;margin-right:8px;vertical-align:middle;"> ' +
-                    fileName +
-                    " ×";
-            } else {
-                item.textContent = "📎 " + fileName + " ×";
-            }
-
-            item.style.flex = "0 0 auto";
-            item.style.maxWidth = "260px";
-            item.style.overflow = "hidden";
-            item.style.textOverflow = "ellipsis";
-            item.style.whiteSpace = "nowrap";
-            item.style.padding = "8px 10px";
-            item.style.borderRadius = "999px";
-            item.style.background = "rgba(124,92,255,.28)";
-            item.style.border = "1px solid rgba(255,255,255,.14)";
-            item.style.color = "#f8fafc";
-
-            item.onclick = function () {
+            item.onclick = () => {
                 state.pendingAttachments.splice(index, 1);
                 renderAttachmentPreviews();
             };
@@ -204,92 +128,52 @@
         });
     }
 
-    function addBubble(role, text) {
-        const box = chatBox();
-        if (!box) return null;
+    async function uploadFiles(files) {
+        for (const file of files) {
+            const form = new FormData();
+            form.append("file", file);
 
-        const cleanText = String(text || "").trim();
+            try {
+                const res = await fetch("/api/upload", {
+                    method: "POST",
+                    body: form
+                });
 
-        if (
-            cleanText.startsWith("Attachment analysis:") ||
-            cleanText.includes("This attachment appears to contain") ||
-            cleanText.includes("extracted image/PDF content") ||
-            cleanText.includes("[Attachment analysis failed:")
-        ) {
-            console.warn("[Nova Mobile] hidden noisy attachment analysis bubble");
-            return null;
+                const data = await res.json();
+
+                if (data && data.ok) {
+                    state.pendingAttachments.push(data);
+                    renderAttachmentPreviews();
+                }
+            } catch (error) {
+                console.error("[Nova Mobile App] upload failed", error);
+            }
         }
-
-        const bubble = document.createElement("div");
-        bubble.dataset.role = role;
-        bubble.style.margin = role === "user" ? "10px 0 10px auto" : "10px auto 10px 0";
-        bubble.style.maxWidth = "90%";
-        bubble.style.padding = "12px 14px";
-        bubble.style.borderRadius = "16px";
-        bubble.style.whiteSpace = "pre-wrap";
-        bubble.style.background = role === "user" ? "rgba(124,92,255,.28)" : "rgba(255,255,255,.10)";
-        bubble.style.color = "#f8fafc";
-
-        if (isImageUrl(text)) {
-            const img = document.createElement("img");
-            img.src = String(text || "").trim();
-            img.loading = "lazy";
-            img.className = "nova-chat-image";
-            img.style.display = "block";
-            img.style.maxWidth = "100%";
-            img.style.borderRadius = "12px";
-            img.style.marginTop = "4px";
-            bubble.appendChild(img);
-        } else {
-            bubble.textContent = text || "";
-        }
-
-        box.appendChild(bubble);
-        scrollBottom();
-
-        return bubble;
-    }
-
-    function latestAssistantText() {
-        const box = chatBox();
-        if (!box) return "";
-
-        const nodes = Array.from(box.querySelectorAll("[data-role='assistant']"));
-        const last = nodes[nodes.length - 1];
-
-        return last ? String(last.textContent || "").trim() : "";
     }
 
     async function sendText(textOverride) {
-        const input = $("nova-mobile-input");
-        const text = String(textOverride || (input ? input.value : "") || "").trim();
-        const attachments = state.pendingAttachments.slice();
-        const sessionId = getSessionId();
+        const input = inputBox();
+        const text = String(textOverride || input?.value || "").trim();
 
-        if (!text && !attachments.length) return;
+        if (!text) return;
+
+        const sessionId = ensureSessionId();
 
         if (input) input.value = "";
 
-        addBubble("user", text || "Attachment sent.");
+        localStorage.setItem("nova_last_user_message", text);
 
-        if (!state.sessionTitles[sessionId]) {
-            state.sessionTitles[sessionId] = text || "New Chat";
-        }
+        addBubble("user", text);
 
-        updateActiveSessionTitle({
-            id: sessionId,
-            title: state.sessionTitles[sessionId] || text || "New Chat"
-        });
-
-        const thinkingBubble = addBubble("assistant", "Thinking...");
-
-        state.pendingAttachments = [];
-        renderAttachmentPreviews();
+        const thinking = addBubble("assistant", "Thinking...");
 
         state.abortController = new AbortController();
 
+        const stop = $("nova-mobile-stop");
+        if (stop) stop.style.display = "";
+
         try {
-            const response = await fetch("/api/chat", {
+            const res = await fetch("/api/chat", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -298,735 +182,401 @@
                 body: JSON.stringify({
                     user_text: text,
                     session_id: sessionId,
-                    attachments: attachments
+                    attachments: state.pendingAttachments
                 })
             });
 
-            const data = await response.json();
-
-// NOVA_FORCE_JSON_NEWS_CARDS_20260609
-window.__lastNovaPayload = data;
-
-if (
-    data &&
-    data.assistant_message &&
-    data.assistant_message.meta &&
-    (
-        Array.isArray(data.assistant_message.meta.sources) ||
-        Array.isArray(data.assistant_message.meta.source_urls)
-    )
-) {
-    if (typeof window.renderWebSourcesFromPayload === "function") {
-        window.renderWebSourcesFromPayload(data);
-    } else {
-        console.warn("[Nova Mobile Sources] renderWebSourcesFromPayload missing on JSON send");
-    }
-}
-
-            const imageUrl =
-                window.NovaMobileImages &&
-                typeof window.NovaMobileImages.extractImageUrlFromResponse === "function"
-                    ? window.NovaMobileImages.extractImageUrlFromResponse(data)
-                    : "";
+            const data = await res.json();
 
             const answer =
-                imageUrl ||
                 data?.assistant_message?.text ||
-                data?.assistant_message?.content ||
+                data?.assistant_message ||
                 data?.text ||
-                data?.error ||
+                data?.message ||
                 "No response.";
 
-            if (thinkingBubble) {
-                thinkingBubble.innerHTML = "";
+            if (thinking) thinking.remove();
 
-                if (
-                    imageUrl &&
-                    window.NovaMobileImages &&
-                    typeof window.NovaMobileImages.renderImageIntoBubble === "function"
-                ) {
-                    window.NovaMobileImages.renderImageIntoBubble(
-                        thinkingBubble,
-                        imageUrl,
-                        text || "Generated image"
-                    );
-                } else if (isImageUrl(answer)) {
-                    const img = document.createElement("img");
-                    img.src = String(answer || "").trim();
-                    img.loading = "lazy";
-                    img.className = "nova-chat-image";
-                    img.style.display = "block";
-                    img.style.maxWidth = "100%";
-                    img.style.borderRadius = "12px";
-                    img.style.marginTop = "4px";
-                    thinkingBubble.appendChild(img);
-                } else {
-                    thinkingBubble.textContent = answer;
-                }
-
-                scrollBottom();
-            }
+            addBubble("assistant", String(answer || ""));
         } catch (error) {
-            if (thinkingBubble) {
-                thinkingBubble.textContent =
-                    error && error.name === "AbortError"
-                        ? "Stopped."
-                        : "Request failed: " + (error && error.message ? error.message : String(error));
+            if (thinking) thinking.remove();
 
-                scrollBottom();
-            }
+            addBubble(
+                "assistant",
+                error.name === "AbortError" ? "Stopped." : "Request failed."
+            );
         } finally {
             state.abortController = null;
+
+            if (stop) stop.style.display = "none";
+
+            state.pendingAttachments = [];
+            renderAttachmentPreviews();
         }
     }
 
-    async function uploadFiles(files) {
-        for (const file of files) {
-            const form = new FormData();
-            form.append("file", file);
-
-            try {
-                const response = await fetch("/api/upload", {
-                    method: "POST",
-                    body: form
-                });
-
-                const data = await response.json();
-
-                if (data && data.ok) {
-                    state.pendingAttachments.push(data);
-                    renderAttachmentPreviews();
-                    console.log("[Nova Mobile Final] attachment ready", data);
-                }
-            } catch (error) {
-                console.error("[Nova Mobile Final] upload failed", error);
-            }
-        }
-    }
-
-    function stopEverything() {
-        if (state.abortController) {
-            state.abortController.abort();
-        }
-
-        if (window.speechSynthesis) {
-            window.speechSynthesis.cancel();
-            state.isSpeaking = false;
-        }
-
-        if (state.recognition) {
-            try {
-                state.recognition.stop();
-            } catch (_) {}
-        }
-    }
-
-    function speakLatest() {
-        const text = latestAssistantText();
-
-        if (!text || !window.speechSynthesis) return;
-
-        if (state.isSpeaking) {
-            window.speechSynthesis.cancel();
-            state.isSpeaking = false;
-            return;
-        }
-
-        const utterance = new SpeechSynthesisUtterance(text);
-
-        utterance.onend = function () {
-            state.isSpeaking = false;
-        };
-
-        utterance.onerror = function () {
-            state.isSpeaking = false;
-        };
-
-        state.isSpeaking = true;
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(utterance);
-    }
-
-    function startVoice() {
-        const input = $("nova-mobile-input");
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-        if (!input || !SpeechRecognition) {
-            addBubble("assistant", "Voice is not supported in this browser.");
-            return;
-        }
-
-        const rec = new SpeechRecognition();
-        state.recognition = rec;
-
-        rec.lang = "en-US";
-        rec.interimResults = false;
-        rec.maxAlternatives = 1;
-
-        rec.onresult = function (event) {
-            const text = event.results?.[0]?.[0]?.transcript || "";
-            input.value = text;
-            input.focus();
-        };
-
-        rec.onerror = function (event) {
-            addBubble("assistant", "Voice failed: " + (event.error || "unknown error"));
-        };
-
-        rec.start();
-    }
-
-async function newChat(event) {
-    if (event) {
-        event.preventDefault();
-        event.stopPropagation();
-    }
-
-    const currentSessionId = getSessionId();
-    const box = chatBox();
-
-    if (currentSessionId && box) {
-        state.cachedMessages[currentSessionId] = box.innerHTML;
-    }
-
-    let id = "mobile_" + Date.now();
-    let title = "New Chat";
-
-    try {
-        const response = await fetch("/api/sessions/new", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                title: title
-            })
-        });
-
-        const data = await response.json();
-
-        id =
-            data?.session?.id ||
-            data?.id ||
-            data?.session_id ||
-            id;
-
-        title =
-            data?.session?.title ||
-            data?.title ||
-            title;
-    } catch (err) {
-        console.warn("[Nova Mobile] backend session create failed, using local session", err);
-    }
-
-    localStorage.setItem("nova_mobile_active_session_id", id);
-    state.sessionTitles[id] = title;
-
-    if (box) {
-        box.innerHTML = "";
-    }
-
-    updateActiveSessionTitle({
-        id: id,
-        title: title
-    });
-
-    addBubble("assistant", "New chat started and saved to Sessions.");
-
-    scrollBottom();
-
-    console.log("[Nova Mobile] new session saved", id);
-}
-
-    function ensureSessionsPanel() {
-        let panel = $("nova-mobile-sessions-panel");
-
-        if (panel) {
-            return panel;
-        }
-
-        panel = document.createElement("div");
-        panel.id = "nova-mobile-sessions-panel";
-        panel.className = "hidden";
-        panel.style.display = "none";
-
-        document.body.appendChild(panel);
-
-        return panel;
-    }
-
-function openSessionsPanel(panel) {
-    if (!panel) return;
-
-    panel.classList.remove("hidden");
-
-    panel.setAttribute(
-        "style",
-        [
-            "display:block !important",
-            "visibility:visible !important",
-            "opacity:1 !important",
-            "position:fixed !important",
-            "top:60px !important",
-            "left:10px !important",
-            "right:10px !important",
-            "bottom:80px !important",
-            "overflow-y:auto !important",
-            "z-index:2147483647 !important",
-            "background:rgba(11,16,32,.98) !important",
-            "border:2px solid rgba(124,92,255,.95) !important",
-            "border-radius:16px !important",
-            "padding:10px !important",
-            "color:#f8fafc !important",
-            "box-shadow:0 20px 60px rgba(0,0,0,.65) !important"
-        ].join(";")
-    );
-}
-
-function closeSessionsPanel(panel) {
-    if (!panel) return;
-
-    panel.style.setProperty("display", "none", "important");
-    panel.classList.add("hidden");
-}
-
-    function createSessionRow(session, sessionsPanel) {
-        const row = document.createElement("div");
-        row.style.display = "flex";
-        row.style.gap = "6px";
-        row.style.marginBottom = "6px";
-        row.style.background = "rgba(255,255,255,.06)";
-        row.style.border = "1px solid rgba(255,255,255,.14)";
-        row.style.borderRadius = "12px";
-        row.style.padding = "6px";
-
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "mobile-session-item";
-        btn.style.flex = "1";
-        btn.style.color = "#f8fafc";
-        btn.style.background = "rgba(124,92,255,.22)";
-        btn.style.border = "1px solid rgba(255,255,255,.16)";
-        btn.style.borderRadius = "10px";
-        btn.style.padding = "10px";
-        btn.style.textAlign = "left";
-
-        const pinBtn = document.createElement("button");
-        pinBtn.type = "button";
-        pinBtn.textContent = session.pinned ? "📌" : "📍";
-        pinBtn.title = "Pin session";
-        pinBtn.style.width = "42px";
-        pinBtn.style.flex = "0 0 42px";
-        pinBtn.style.color = "#f8fafc";
-        pinBtn.style.background = "rgba(124,92,255,.35)";
-        pinBtn.style.border = "1px solid rgba(255,255,255,.16)";
-        pinBtn.style.borderRadius = "10px";
-
-        const renameBtn = document.createElement("button");
-        renameBtn.type = "button";
-        renameBtn.textContent = "✏";
-        renameBtn.title = "Rename session";
-        renameBtn.style.width = "42px";
-        renameBtn.style.flex = "0 0 42px";
-        renameBtn.style.color = "#f8fafc";
-        renameBtn.style.background = "rgba(124,92,255,.45)";
-        renameBtn.style.border = "1px solid rgba(255,255,255,.16)";
-        renameBtn.style.borderRadius = "10px";
-
-        const deleteBtn = document.createElement("button");
-        deleteBtn.type = "button";
-        deleteBtn.textContent = "🗑";
-        deleteBtn.title = "Delete session";
-        deleteBtn.style.width = "42px";
-        deleteBtn.style.flex = "0 0 42px";
-        deleteBtn.style.color = "#f8fafc";
-        deleteBtn.style.background = "rgba(255,80,80,.35)";
-        deleteBtn.style.border = "1px solid rgba(255,255,255,.16)";
-        deleteBtn.style.borderRadius = "10px";
-
-        const shortId = String(session.id || "").slice(-6);
-
-        function currentTitle() {
-            return (
-                (state.sessionTitles && state.sessionTitles[session.id]) ||
-                session.title ||
-                "New Chat"
-            );
-        }
-
-        function renderTitle() {
-            const pinnedText = session.pinned ? "📌 " : "";
-            btn.textContent = pinnedText + currentTitle() + " · " + shortId;
-            pinBtn.textContent = session.pinned ? "📌" : "📍";
-        }
-
-        renderTitle();
-
-        btn.onclick = async function () {
-            const currentSessionId = getSessionId();
-            const box = chatBox();
-
-            if (currentSessionId && box) {
-                state.cachedMessages[currentSessionId] = box.innerHTML;
-            }
-
-            localStorage.setItem("nova_mobile_active_session_id", session.id);
-            updateActiveSessionTitle(session);
-
-            if (!box) return;
-
-            box.innerHTML = "";
-
-            if (state.cachedMessages[session.id]) {
-                box.innerHTML = state.cachedMessages[session.id];
-            } else {
-                try {
-                    const res = await fetch("/api/sessions/" + encodeURIComponent(session.id));
-                    const sessionData = await res.json();
-                    const messages = Array.isArray(sessionData.messages) ? sessionData.messages : [];
-
-                    messages.forEach(function (msg) {
-                        addBubble(msg.role || "assistant", msg.text || msg.content || "");
-                    });
-                } catch (err) {
-                    addBubble("assistant", "Failed to load session messages.");
-                }
-            }
-
-            closeSessionsPanel(sessionsPanel);
-            scrollBottom();
-        };
-
-        pinBtn.onclick = async function (event) {
-            event.preventDefault();
-            event.stopPropagation();
-
-            const nextPinned = !session.pinned;
-
-            try {
-                const response = await fetch("/api/sessions/pin", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        session_id: session.id,
-                        pinned: nextPinned
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error("Pin failed with HTTP " + response.status);
-                }
-
-                session.pinned = nextPinned;
-                renderTitle();
-                loadSessionsPanel(sessionsPanel);
-            } catch (err) {
-                alert("Pin failed");
-            }
-        };
-
-        renameBtn.onclick = async function (event) {
-            event.preventDefault();
-            event.stopPropagation();
-
-            const newTitle = prompt("Rename session:", currentTitle());
-
-            if (!newTitle) return;
-
-            try {
-                const response = await fetch("/api/sessions/rename", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        session_id: session.id,
-                        title: newTitle
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error("Rename failed with HTTP " + response.status);
-                }
-
-                session.title = newTitle;
-                state.sessionTitles[session.id] = newTitle;
-                renderTitle();
-
-                if (getSessionId() === session.id) {
-                    updateActiveSessionTitle({ id: session.id, title: newTitle });
-                }
-            } catch (err) {
-                alert("Rename failed");
-            }
-        };
-
-        deleteBtn.onclick = async function (event) {
-            event.preventDefault();
-            event.stopPropagation();
-
-            const title = currentTitle();
-            const ok = confirm("Delete session: " + title + "?");
-
-            if (!ok) return;
-
-            try {
-                const response = await fetch("/api/sessions/delete", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        session_id: session.id
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error("Delete failed with HTTP " + response.status);
-                }
-
-                delete state.cachedMessages[session.id];
-                delete state.sessionTitles[session.id];
-
-                if (getSessionId() === session.id) {
-                    newChat();
-                }
-
-                loadSessionsPanel(sessionsPanel);
-            } catch (err) {
-                alert("Delete failed");
-            }
-        };
-
-        row.appendChild(btn);
-        row.appendChild(pinBtn);
-        row.appendChild(renameBtn);
-        row.appendChild(deleteBtn);
-
-        return row;
-    }
-
-    async function loadSessionsPanel(sessionsPanel) {
-        if (!sessionsPanel) return;
-
-        sessionsPanel.innerHTML = "";
-
-        const closeBtn = document.createElement("button");
-        closeBtn.type = "button";
-        closeBtn.className = "mobile-session-item";
-        closeBtn.textContent = "Close Sessions";
-        closeBtn.style.marginBottom = "10px";
-        closeBtn.onclick = function () {
-            closeSessionsPanel(sessionsPanel);
-        };
-        sessionsPanel.appendChild(closeBtn);
-
-        try {
-            const response = await fetch("/api/sessions");
-            const data = await response.json();
-
-            const sessions = (Array.isArray(data.sessions) ? data.sessions : [])
-                .filter(function (session) {
-                    return session && session.id;
-                })
-
-.sort(function (a, b) {
-    if (!!a.pinned !== !!b.pinned) {
-        return a.pinned ? -1 : 1;
-    }
-
-    const aTime = Date.parse(a.updated_at || a.created_at || "") || 0;
-    const bTime = Date.parse(b.updated_at || b.created_at || "") || 0;
-
-    return bTime - aTime;
-})
-
-                .slice(0, 25);
-
-            console.log("[Nova Mobile Sessions]", sessions);
-
-            if (!sessions.length) {
-                addBubble("assistant", "No saved sessions found yet.");
-                return;
-            }
-
-            sessions.forEach(function (session) {
-                sessionsPanel.appendChild(createSessionRow(session, sessionsPanel));
-            });
-        } catch (error) {
-            const err = document.createElement("button");
-            err.type = "button";
-            err.className = "mobile-session-item";
-            err.textContent = "Failed to load sessions";
-            sessionsPanel.appendChild(err);
-        }
-    }
-
-function findSessionsToggle() {
-    let btn =
-        $("nova-mobile-sessions-toggle") ||
-        $("nova-mobile-sessions") ||
-        $("mobileSessionsBtn") ||
-        document.querySelector("[data-mobile-sessions-toggle]") ||
-        document.querySelector("[data-action='sessions']");
-
-    if (btn) {
-        return btn;
-    }
-
-    btn = document.createElement("button");
-    btn.id = "nova-mobile-sessions-toggle";
-    btn.type = "button";
-    btn.textContent = "☰";
-    btn.title = "Sessions";
-
-    btn.style.position = "fixed";
-    btn.style.top = "12px";
-    btn.style.left = "12px";
-    btn.style.width = "44px";
-    btn.style.height = "44px";
-    btn.style.borderRadius = "999px";
-    btn.style.zIndex = "10000";
-    btn.style.background = "rgba(124,92,255,.95)";
-    btn.style.color = "#ffffff";
-    btn.style.border = "1px solid rgba(255,255,255,.25)";
-    btn.style.fontSize = "22px";
-    btn.style.display = "flex";
-    btn.style.alignItems = "center";
-    btn.style.justifyContent = "center";
-
-    document.body.appendChild(btn);
-
-    return btn;
-}
-
-    function wire() {
-        const input = $("nova-mobile-input");
+    function wireSend() {
+        const input = inputBox();
         const send = $("nova-mobile-send");
-const attach =
-    $("mobileAttachBtn") ||
-    $("nova-mobile-attach");
-
-const upload =
-    $("nova-mobile-upload-input") ||
-    $("nova-mobile-file-input");
-        const newSession = $("nova-mobile-new-session");
-        const newTop = $("nova-mobile-new-chat");
-        const sessionsToggle = findSessionsToggle();
-        const sessionsPanel = ensureSessionsPanel();
 
         if (!input || !send) return false;
 
-        const stop = ensureButton("nova-mobile-stop", "■", "Stop");
-        const voice = ensureButton("nova-mobile-voice", "🎙", "Voice");
-        const tts = ensureButton("nova-mobile-tts", "🔊", "Speak");
-
-        send.onclick = function (event) {
+        send.onclick = (event) => {
             event.preventDefault();
             event.stopPropagation();
             sendText();
         };
 
-        input.onkeydown = function (event) {
+        input.onkeydown = (event) => {
             if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
                 sendText();
             }
         };
 
-        if (attach && upload) {
-            attach.onclick = function (event) {
-                event.preventDefault();
-                upload.click();
-            };
-
-            upload.onchange = async function () {
-                const files = Array.from(upload.files || []);
-                if (!files.length) return;
-
-                await uploadFiles(files);
-                upload.value = "";
-            };
-        }
-
-        if (stop) stop.onclick = stopEverything;
-        if (voice) voice.onclick = startVoice;
-        if (tts) tts.onclick = speakLatest;
-        if (newSession) newSession.onclick = newChat;
-        if (newTop) newTop.onclick = newChat;
-
-        if (sessionsToggle) {
-            sessionsToggle.onclick = function (event) {
-                event.preventDefault();
-                event.stopPropagation();
-
-                const isOpen =
-                    sessionsPanel.style.display === "block" &&
-                    !sessionsPanel.classList.contains("hidden");
-
-                if (isOpen) {
-                    closeSessionsPanel(sessionsPanel);
-                    return;
-                }
-
-                openSessionsPanel(sessionsPanel);
-                loadSessionsPanel(sessionsPanel);
-            };
-        } else {
-            console.warn("[Nova Mobile Sessions] toggle button missing");
-        }
-
-        window.NovaMobileAppSend = sendText;
-        window.NovaMobileSendMessage = sendText;
-        window.NovaMobileStop = stopEverything;
-        window.NovaMobileSpeak = speakLatest;
-        window.NovaMobileOpenSessions = function () {
-            openSessionsPanel(sessionsPanel);
-            loadSessionsPanel(sessionsPanel);
-        };
-
-        ensurePreviewBar();
-        updateActiveSessionTitle();
-        scrollBottom();
-
-        console.log("[Nova Mobile SMFF] sessions stable wired");
         return true;
     }
 
-    function boot() {
-        let tries = 0;
+    function wireStop() {
+        const stop = $("nova-mobile-stop");
+        if (!stop) return;
 
-        const timer = setInterval(function () {
-            tries += 1;
+        stop.onclick = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
 
-            if (wire() || tries > 50) {
-                clearInterval(timer);
-
-                if (tries > 50) {
-                    console.warn("[Nova Mobile SMFF] failed to wire required elements");
-                }
+            if (state.abortController) {
+                state.abortController.abort();
+                state.abortController = null;
             }
-        }, 100);
+
+            stop.style.display = "none";
+        };
     }
 
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", boot);
-    } else {
-        boot()
+    function wireAttach() {
+        const attach = $("nova-mobile-attach");
+        const fileInput =
+            $("nova-mobile-file-input") ||
+            $("nova-mobile-upload") ||
+            document.querySelector("input[type='file']");
+
+        if (!attach || !fileInput) return;
+
+        attach.onclick = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            fileInput.click();
+        };
+
+        fileInput.onchange = () => {
+            const files = Array.from(fileInput.files || []);
+            if (files.length) uploadFiles(files);
+            fileInput.value = "";
+        };
     }
+
+function wireSessionsButton() {
+    const btn = $("nova-mobile-sessions-toggle");
+    if (!btn) return;
+
+    btn.style.setProperty("pointer-events", "auto", "important");
+    btn.style.setProperty("visibility", "visible", "important");
+    btn.style.setProperty("opacity", "1", "important");
+    btn.style.setProperty("z-index", "2147483647", "important");
+
+    const open = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (typeof event.stopImmediatePropagation === "function") {
+            event.stopImmediatePropagation();
+        }
+
+        console.log("[Nova Mobile App] sessions button clicked");
+
+if (window.NovaMobileSessions?.open) {
+    window.NovaMobileSessions.open();
+
+    setTimeout(() => {
+        const panel = document.getElementById("nova-mobile-sessions-panel");
+
+        if (panel) {
+            panel.classList.remove("hidden");
+            panel.removeAttribute("aria-hidden");
+
+            panel.style.setProperty("display", "block", "important");
+            panel.style.setProperty("visibility", "visible", "important");
+            panel.style.setProperty("opacity", "1", "important");
+            panel.style.setProperty("pointer-events", "auto", "important");
+            panel.style.setProperty("z-index", "2147483647", "important");
+        }
+    }, 80);
+
+    return;
+}
+
+if (window.NovaMobileOpenSessions) {
+    window.NovaMobileOpenSessions();
+}
+    };
+
+    btn.onclick = open;
+    btn.addEventListener("click", open, true);
+    btn.addEventListener("pointerdown", open, true);
+}
+    function boot() {
+        wireSend();
+        wireStop();
+        wireAttach();
+        wireSessionsButton();
+        ensurePreviewBar();
+
+        console.log("[Nova Mobile App] wired", {
+            input: !!inputBox(),
+            send: !!$("nova-mobile-send"),
+            stop: !!$("nova-mobile-stop"),
+            attach: !!$("nova-mobile-attach"),
+            sessions: !!$("nova-mobile-sessions-toggle"),
+            activeSession: getSessionId()
+        });
+    }
+
+window.NovaMobileApp = {
+    sendText,
+    getSessionId,
+    setSessionId,
+    state
+};
+
+window.sendText = sendText;
+window.getSessionId = getSessionId;
+window.setSessionId = setSessionId;
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot, { once: true });
+} else {
+    boot();
+}
 })();
 
+/* NOVA_MOBILE_FINAL_SESSIONS_PANEL_DIRECT_20260627 */
+(() => {
+    if (window.__NOVA_MOBILE_FINAL_SESSIONS_PANEL_DIRECT_20260627__) return;
+    window.__NOVA_MOBILE_FINAL_SESSIONS_PANEL_DIRECT_20260627__ = true;
+
+    function box() {
+        return (
+            document.getElementById("mobileChatMessages") ||
+            document.getElementById("nova-mobile-chat") ||
+            document.getElementById("nova-mobile-messages")
+        );
+    }
+
+function messageRole(message) {
+    return String(message?.role || message?.sender || "assistant")
+        .toLowerCase()
+        .includes("user")
+        ? "user"
+        : "assistant";
+}
+
+function messageText(message) {
+    return message?.text || message?.content || message?.message || "";
+}
+
+function cleanSessionMessageText(value) {
+    return String(value || "")
+        .replace(/(?:Copy\s*Regen\s*)+/gi, "")
+        .replace(/(?:Copy\s*){2,}/gi, "")
+        .replace(/(?:Regen\s*){2,}/gi, "")
+        .replace(/\bCopy\b/gi, "")
+        .replace(/\bRegen\b/gi, "")
+        .replace(/\s{3,}/g, "\n\n")
+        .trim();
+}
+
+function renderSessionMessage(chat, message) {
+    if (!chat) return;
+
+    const role = messageRole(message);
+    const text = cleanSessionMessageText(messageText(message));
+
+    if (!text) return;
+
+    const bubble = document.createElement("div");
+
+    bubble.className = role === "user"
+        ? "nova-session-message nova-session-message-user"
+        : "nova-session-message nova-session-message-assistant";
+
+    bubble.dataset.role = role;
+    bubble.dataset.novaNoActions = "1";
+    bubble.textContent = text;
+
+    chat.appendChild(bubble);
+}
+
+async function loadSession(id, panel) {
+    console.log("[Nova Final Sessions] openPanel ENTER");
 
 
+    const cleanId = String(id || "").trim();
+    if (!cleanId) return;
 
+    localStorage.setItem("nova_active_session_id", cleanId);
+    localStorage.setItem("nova_mobile_active_session_id", cleanId);
 
+    const chat = box();
+    if (chat) chat.innerHTML = "";
 
+    try {
+        const res = await fetch(`/api/sessions/${encodeURIComponent(cleanId)}`, {
+            cache: "no-store"
+        });
 
+        const data = await res.json();
 
+        const messages =
+            data.messages ||
+            data.session?.messages ||
+            data.data?.messages ||
+            data.chat?.messages ||
+            data.conversation ||
+            data.history ||
+            [];
 
+        messages.forEach((message) => {
+            renderSessionMessage(chat, message);
+        });
 
+        if (chat) chat.scrollTop = chat.scrollHeight;
+    } catch (error) {
+        console.error("[Nova Final Sessions] load failed", error);
+    }
 
+    if (panel) panel.remove();
+}
 
+async function openPanel() {
+    let panel = document.getElementById("nova-mobile-final-sessions-panel");
 
+    if (!panel) {
+        panel = document.createElement("div");
+        panel.id = "nova-mobile-final-sessions-panel";
+        document.body.appendChild(panel);
+    }
+
+panel.style.cssText = `
+    position:fixed!important;
+    top:58px!important;
+    left:10px!important;
+    right:10px!important;
+    bottom:90px!important;
+    z-index:2147483647!important;
+    display:flex!important;
+    flex-direction:column!important;
+    gap:8px!important;
+    overflow-y:auto!important;
+    background:rgba(15,23,42,.98)!important;
+    color:#fff!important;
+    padding:12px!important;
+    border-radius:18px!important;
+    border:1px solid rgba(168,85,247,.35)!important;
+    box-sizing:border-box!important;
+`;
+
+    panel.innerHTML = "Loading sessions...";
+
+    try {
+        const res = await fetch("/api/sessions", { cache: "no-store" });
+        const data = await res.json();
+        const sessions = data.sessions || data.items || data.data?.sessions || [];
+
+        panel.innerHTML = "";
+
+        const close = document.createElement("button");
+        close.type = "button";
+        close.textContent = "Close Sessions";
+        close.onclick = () => panel.remove();
+        panel.appendChild(close);
+
+        sessions.forEach((session) => {
+            const id = session.id || session.session_id || session.sessionId;
+            if (!id) return;
+
+            const row = document.createElement("button");
+            row.type = "button";
+            row.textContent = session.title || id;
+
+            row.onclick = async (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                console.log("[Nova Final Sessions] row clicked", id);
+                await loadSession(id, panel);
+            };
+
+            panel.appendChild(row);
+        });
+
+        if (!sessions.length) {
+            const empty = document.createElement("div");
+            empty.textContent = "No sessions found.";
+            panel.appendChild(empty);
+        }
+    } catch (error) {
+        console.error("[Nova Final Sessions] panel failed", error);
+        panel.innerHTML = "Failed to load sessions.";
+    }
+}
+
+function wire() {
+    const btn =
+        document.getElementById("nova-mobile-sessions-toggle") ||
+        document.getElementById("nova-mobile-floating-sessions-button");
+
+    if (!btn) return;
+
+    btn.textContent = "Sessions";
+    btn.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        openPanel();
+    };
+}
+
+wire();
+setTimeout(wire, 700);
+
+window.NovaMobileOpenFinalSessionsPanel = openPanel;
+
+console.log("[Nova Final Sessions] ready");
+})();
+
+/* NOVA_MOBILE_SESSIONS_BUTTON_FALLBACK_20260627 */
+(() => {
+    function ensureSessionsButton() {
+        let btn =
+            document.getElementById("nova-mobile-sessions-toggle") ||
+            document.getElementById("nova-mobile-floating-sessions-button");
+
+        if (!btn) {
+            btn = document.createElement("button");
+            btn.id = "nova-mobile-floating-sessions-button";
+            btn.type = "button";
+            btn.textContent = "Sessions";
+            document.body.appendChild(btn);
+        }
+
+        btn.onclick = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            window.NovaMobileOpenFinalSessionsPanel?.();
+        };
+    }
+
+    ensureSessionsButton();
+    setTimeout(ensureSessionsButton, 700);
+})();
