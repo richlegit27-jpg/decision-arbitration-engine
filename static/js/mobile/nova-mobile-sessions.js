@@ -78,11 +78,19 @@
                             ? data.data.messages
                             : [];
 
-            box.innerHTML = "";
+box.innerHTML = "";
 
-            for (const m of messages) {
-                box.appendChild(renderMessage(m));
-            }
+if (!messages.length) {
+    const empty = document.createElement("div");
+    empty.className = "nova-mobile-empty-chat";
+    empty.textContent = "Start a new conversation.";
+    box.appendChild(empty);
+    return;
+}
+
+for (const m of messages) {
+    box.appendChild(renderMessage(m));
+}
 
             requestAnimationFrame(() => {
                 box.scrollTop = box.scrollHeight;
@@ -187,6 +195,14 @@ messages:
 
         try {
             const sessions = await Controller.list();
+sessions.sort((a, b) => {
+    if (!!a.pinned !== !!b.pinned) {
+        return a.pinned ? -1 : 1;
+    }
+
+    return String(b.updated_at || b.created_at || "")
+        .localeCompare(String(a.updated_at || a.created_at || ""));
+});
             el.innerHTML = "";
 
             const close = document.createElement("button");
@@ -215,7 +231,12 @@ el.innerHTML = "";
 
                 const row = document.createElement("button");
                 row.type = "button";
-                row.textContent = session.title || session.id;
+const title = session.title || session.id;
+
+row.textContent =
+    title.length > 40
+        ? title.slice(0, 37) + "..."
+        : title;
 
                 row.style.cssText = `
                     display:block;
@@ -230,6 +251,14 @@ el.innerHTML = "";
                     cursor:pointer;
                     pointer-events:auto;
                 `;
+
+const active =
+    localStorage.getItem("nova_active_session_id") === session.id;
+
+if (active) {
+    row.style.background = "#3b82f6";
+    row.style.fontWeight = "600";
+}
  
 row.onclick = async (event) => {
     event.preventDefault();
@@ -320,9 +349,10 @@ function tinyButton(label) {
     return btn;
 }
 
-const pin = tinyButton(session.pinned ? "Unpin" : "Pin");
-const rename = tinyButton("Rename");
-const del = tinyButton("Delete");
+const pin = tinyButton(session.pinned ? "📌 Unpin" : "📌 Pin");
+const rename = tinyButton("✏️ Rename");
+const del = tinyButton("🗑 Delete");
+del.style.background = "#7f1d1d";
 
 pin.onclick = async (event) => {
     event.preventDefault();

@@ -698,3 +698,52 @@ console.log("[Nova Final Sessions] ready");
 
     console.log("[NOVA_MOBILE_COPY_REGEN_SIMPLE_20260628] ready");
 })();
+
+/* NOVA_MOBILE_THINKING_INDICATOR_20260628 */
+(() => {
+    if (window.__NOVA_MOBILE_THINKING_INDICATOR_20260628__) return;
+    window.__NOVA_MOBILE_THINKING_INDICATOR_20260628__ = true;
+
+    function chatBox() {
+        return document.getElementById("mobileChatMessages") ||
+            document.getElementById("nova-mobile-chat") ||
+            document.getElementById("nova-mobile-messages");
+    }
+
+    function showThinking() {
+        const box = chatBox();
+        if (!box || document.getElementById("nova-mobile-thinking")) return;
+
+        const el = document.createElement("div");
+        el.id = "nova-mobile-thinking";
+        el.className = "nova-message nova-message-assistant nova-mobile-thinking";
+        el.textContent = "Nova is thinking…";
+        box.appendChild(el);
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function hideThinking() {
+        document.getElementById("nova-mobile-thinking")?.remove();
+    }
+
+    document.addEventListener("click", (event) => {
+        if (event.target.closest("#nova-mobile-send")) {
+            setTimeout(showThinking, 80);
+        }
+    }, true);
+
+    const observer = new MutationObserver(() => {
+        const box = chatBox();
+        if (!box) return;
+
+        const assistantMessages = box.querySelectorAll(".nova-message-assistant:not(.nova-mobile-thinking)");
+        if (assistantMessages.length) hideThinking();
+    });
+
+    setTimeout(() => {
+        const box = chatBox();
+        if (box) observer.observe(box, { childList: true, subtree: true });
+    }, 500);
+
+    console.log("[NOVA_MOBILE_THINKING_INDICATOR_20260628] ready");
+})();

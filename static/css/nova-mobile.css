@@ -10128,11 +10128,11 @@ body.is-generating #nova-mobile-stop,
     box-sizing: border-box !important;
 }
 
-#nova-mobile-input,
 .nova-mobile-input {
-    min-width: 0 !important;
-    flex: 1 1 auto !important;
-}
+    min-height: 36px !important;
+    max-height: 140px !important;
+    height: auto !important;
+    overflow-y: hidden !important;
 
 #nova-mobile-send,
 #mobileSendBtn,
@@ -12732,4 +12732,37 @@ a[href*="logout"] {
 #nova-mobile-input-row {
     align-items: flex-end !important;
     min-height: 112px !important;
+}
+
+/* NOVA_MOBILE_EMPTY_CHAT_POLISH_20260628 */
+.nova-mobile-empty-chat {
+    margin: 32px auto;
+    padding: 18px;
+    max-width: 280px;
+    text-align: center;
+    color: rgba(255,255,255,.55);
+    font-size: 14px;
+    border: 1px dashed rgba(255,255,255,.18);
+    border-radius: 16px;
+}
+
+/* NOVA_MOBILE_THINKING_INDICATOR_20260628 */
+.nova-mobile-thinking {
+    opacity: .7;
+    font-style: italic;
+}
+
+/* NOVA_MOBILE_COPY_REGEN_HOVER_POLISH_20260628 */
+.nova-mobile-copy-regen-actions {
+    opacity: .75;
+    transition: opacity .15s ease, transform .15s ease;
+}
+
+.nova-message-assistant:hover .nova-mobile-copy-regen-actions {
+    opacity: 1;
+    transform: translateY(-1px);
+}
+
+.nova-mobile-copy-regen-actions button {
+    min-width: 64px;
 }
