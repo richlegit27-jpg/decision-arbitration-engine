@@ -580,3 +580,121 @@ console.log("[Nova Final Sessions] ready");
     ensureSessionsButton();
     setTimeout(ensureSessionsButton, 700);
 })();
+
+/* NOVA_MOBILE_COPY_REGEN_SIMPLE_20260628 */
+(() => {
+    if (window.__NOVA_MOBILE_COPY_REGEN_SIMPLE_20260628__) return;
+    window.__NOVA_MOBILE_COPY_REGEN_SIMPLE_20260628__ = true;
+
+    function chatBox() {
+        return document.getElementById("mobileChatMessages") ||
+            document.getElementById("nova-mobile-chat") ||
+            document.getElementById("nova-mobile-messages");
+    }
+
+    function inputBox() {
+        return document.getElementById("nova-mobile-input") ||
+            document.querySelector("textarea");
+    }
+
+    function sendButton() {
+        return document.getElementById("nova-mobile-send");
+    }
+
+    function lastUserText() {
+        const box = chatBox();
+        if (!box) return "";
+
+        const users = [...box.querySelectorAll(".nova-message-user, [data-role='user']")];
+        const last = users[users.length - 1];
+
+        return (last?.innerText || last?.textContent || "").trim();
+    }
+
+    function ensureActions() {
+        const box = chatBox();
+        if (!box) return;
+
+        [...box.querySelectorAll(".nova-message-assistant")].forEach((msg) => {
+            if (msg.querySelector(".nova-mobile-copy-regen-actions")) return;
+
+            const actions = document.createElement("div");
+            actions.className = "nova-mobile-copy-regen-actions";
+            actions.style.cssText = `
+                display:flex;
+                gap:6px;
+                margin-top:8px;
+                opacity:.9;
+            `;
+
+            const copy = document.createElement("button");
+            copy.type = "button";
+            copy.textContent = "Copy";
+            copy.style.cssText = `
+                padding:6px 10px;
+                border:0;
+                border-radius:8px;
+                background:#333;
+                color:#fff;
+                font-size:12px;
+            `;
+
+            const regen = document.createElement("button");
+            regen.type = "button";
+            regen.textContent = "Regen";
+            regen.style.cssText = copy.style.cssText;
+
+            copy.onclick = async (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                const clone = msg.cloneNode(true);
+                clone.querySelectorAll(".nova-mobile-copy-regen-actions").forEach(el => el.remove());
+
+                const text = (clone.innerText || clone.textContent || "").trim();
+
+                try {
+                    await navigator.clipboard.writeText(text);
+                    copy.textContent = "Copied";
+                    setTimeout(() => copy.textContent = "Copy", 900);
+                } catch (err) {
+                    console.error("[Nova Copy] failed", err);
+                }
+            };
+
+            regen.onclick = (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                const text = lastUserText();
+                const input = inputBox();
+                const send = sendButton();
+
+                if (!text || !input || !send) return;
+
+                input.value = text;
+                input.dispatchEvent(new Event("input", { bubbles: true }));
+                send.click();
+            };
+
+            actions.appendChild(copy);
+            actions.appendChild(regen);
+            msg.appendChild(actions);
+        });
+    }
+
+    const observer = new MutationObserver(ensureActions);
+
+    function boot() {
+        const box = chatBox();
+        if (!box) return;
+
+        ensureActions();
+        observer.observe(box, { childList: true, subtree: true });
+    }
+
+    setTimeout(boot, 300);
+    setTimeout(boot, 1000);
+
+    console.log("[NOVA_MOBILE_COPY_REGEN_SIMPLE_20260628] ready");
+})();

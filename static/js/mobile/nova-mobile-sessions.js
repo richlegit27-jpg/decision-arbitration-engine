@@ -296,7 +296,91 @@ el.setAttribute("aria-hidden", "true");
 el.innerHTML = "";
 };
 
-                el.appendChild(row);
+const actions = document.createElement("div");
+actions.style.cssText = `
+    display:flex;
+    gap:6px;
+    margin:0 0 10px 0;
+`;
+
+function tinyButton(label) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = label;
+    btn.style.cssText = `
+        flex:1;
+        padding:8px;
+        background:#333;
+        color:#fff;
+        border:0;
+        border-radius:8px;
+        font-size:12px;
+        cursor:pointer;
+    `;
+    return btn;
+}
+
+const pin = tinyButton(session.pinned ? "Unpin" : "Pin");
+const rename = tinyButton("Rename");
+const del = tinyButton("Delete");
+
+pin.onclick = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    await fetch("/api/sessions/pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            session_id: session.id
+        })
+    });
+
+    openSessionsPanel();
+};
+
+rename.onclick = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const title = prompt("Rename session:", session.title || "");
+    if (!title) return;
+
+    await fetch("/api/sessions/rename", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            session_id: session.id,
+            title: title
+        })
+    });
+
+    openSessionsPanel();
+};
+
+del.onclick = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!confirm("Delete this session?")) return;
+
+    await fetch("/api/sessions/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            session_id: session.id
+        })
+    });
+
+    openSessionsPanel();
+};
+
+actions.appendChild(pin);
+actions.appendChild(rename);
+actions.appendChild(del);
+
+el.appendChild(row);
+el.appendChild(actions);
             });
 
             if (!sessions.length) {
