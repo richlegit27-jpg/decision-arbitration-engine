@@ -1,194 +1,125 @@
 ﻿(() => {
-  "use strict";
+    if (window.__NOVA_SESSIONS_FINAL__) return;
+    window.__NOVA_SESSIONS_FINAL__ = true;
 
-  const Nova = (window.Nova = window.Nova || {});
+    const PANEL_ID = "nova-mobile-sessions-panel";
 
-  if (Nova.coreLoaded) return;
-  Nova.coreLoaded = true;
+    // -----------------------------
+    // STATE (SINGLE SOURCE)
+    // -----------------------------
+    const State = {
+        activeId: localStorage.getItem("nova_active_session_id") || null,
 
-  const API = {
-    state: "/api/state",
-    models: "/api/models",
-    memory: "/api/memory",
-    addMemory: "/api/memory/add",
-    deleteMemory: "/api/memory/delete",
-    newSession: "/api/session/new",
-    deleteSession: "/api/session/delete",
-    renameSession: "/api/session/rename",
-    duplicateSession: "/api/session/duplicate",
-    pinSession: "/api/session/pin",
-    getChat: (sessionId) => `/api/chat/${encodeURIComponent(sessionId)}`,
-    stream: "/api/chat/stream",
-    upload: "/api/upload",
-    webFetch: "/api/web/fetch",
-  };
+        set(id) {
+            if (!id) return;
+            this.activeId = id;
+            localStorage.setItem("nova_active_session_id", id);
+            localStorage.setItem("nova_mobile_active_session_id", id);
+        },
 
-  const STORAGE = {
-    activeSessionId: "nova_active_session_id",
-    currentModel: "nova_selected_model",
-    sidebarOpen: "nova_sidebar_open",
-    memoryOpen: "nova_memory_open",
-    themeMode: "nova_theme_mode",
-    backgroundMode: "nova_background_mode",
-    pinnedSessionIds: "nova_pinned_session_ids",
-  };
+        get() {
+            return this.activeId;
+        }
+    };
 
-  const DEFAULT_MODEL = "gpt-4.1-mini";
-  const MAX_INPUT_HEIGHT = 180;
+    // -----------------------------
+    // PANEL
+    // -----------------------------
+    function getPanel() {
+        let panel = document.getElementById(PANEL_ID);
 
-  const state = (Nova.state = Nova.state || {
-    sessions: [],
-    messages: [],
-    memoryItems: [],
-    attachedFiles: [],
-    activeSessionId: null,
-    currentModel: DEFAULT_MODEL,
-    isSending: false,
-    isStreaming: false,
-    isRecording: false,
-    lastUserMessage: "",
-    lastAssistantMessage: "",
-    lastRouter: null,
-    sidebarOpen: true,
-    memoryOpen: true,
-    pinnedSessionIds: [],
-    themeMode: "dark",
-    backgroundMode: "default",
-  });
+        if (!panel) {
+            panel = document.createElement("div");
+            panel.id = PANEL_ID;
+            document.body.appendChild(panel);
+        }
 
-  const dom = (Nova.dom = Nova.dom || {});
+        panel.style.cssText = `
+            position:fixed;
+            top:60px;
+            left:10px;
+            right:10px;
+            bottom:80px;
+            z-index:2147483647;
+            background:#111;
+            color:#fff;
+            padding:12px;
+            overflow-y:auto;
+            border-radius:12px;
+        `;
 
-  function byId(id) {
-    return document.getElementById(id);
-  }
-
-  function qs(selector, root = document) {
-    return root.querySelector(selector);
-  }
-
-  function qsa(selector, root = document) {
-    return Array.from(root.querySelectorAll(selector));
-  }
-
-  function safeJsonParse(value, fallback) {
-    try {
-      return JSON.parse(value);
-    } catch {
-      return fallback;
-    }
-  }
-
-  function loadStorage(key, fallback = null) {
-    try {
-      const value = localStorage.getItem(key);
-      return value == null ? fallback : value;
-    } catch {
-      return fallback;
-    }
-  }
-
-  function saveStorage(key, value) {
-    try {
-      localStorage.setItem(key, value);
-    } catch {}
-  }
-
-  function removeStorage(key) {
-    try {
-      localStorage.removeItem(key);
-    } catch {}
-  }
-
-  async function apiGet(url) {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      throw new Error(data.error || `GET failed: ${url}`);
+        return panel;
     }
 
-    return data;
-  }
+    // -----------------------------
+    // LOAD SESSIONS
+    // -----------------------------
+    async function load(panel) {
+        panel.innerHTML = "Loading...";
 
-  async function apiPost(url, payload = {}) {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
+        try {
+            const res = await fetch("/api/sessions");
+            const data = await res.json();
 
-    const data = await response.json().catch(() => ({}));
+            const sessions = Array.isArray(data.sessions) ? data.sessions : [];
 
-    if (!response.ok) {
-      throw new Error(data.error || `POST failed: ${url}`);
+            panel.innerHTML = "";
+
+            const close = document.createElement("button");
+            close.textContent = "Close";
+            close.onclick = () => (panel.style.display = "none");
+            panel.appendChild(close);
+
+            sessions.forEach(s => {
+                if (!s?.id) return;
+
+                const row = document.createElement("div");
+                row.textContent = s.title || s.id;
+                row.style.cssText = `
+                    padding:10px;
+                    margin:6px 0;
+                    background:#222;
+                    border-radius:8px;
+                    cursor:pointer;
+                `;
+
+                row.onclick = () => {
+                    State.set(s.id);
+                    window.location.href = "/mobile?session_id=" + encodeURIComponent(s.id);
+                };
+
+                panel.appendChild(row);
+            });
+
+        } catch (e) {
+            panel.innerHTML = "Failed to load sessions";
+        }
     }
 
-    return data;
-  }
+    // -----------------------------
+    // OPEN
+    // -----------------------------
+    function open() {
+        const panel = getPanel();
+        panel.style.display = "block";
+        load(panel);
+    }
 
-  function formatTime(value) {
-    if (!value) return "";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "";
-    return date.toLocaleTimeString([], {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  }
+    function close() {
+        const panel = document.getElementById(PANEL_ID);
+        if (panel) panel.style.display = "none";
+    }
 
-  function formatDateLabel(value) {
-    if (!value) return "";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "";
-    return date.toLocaleDateString([], {
-      month: "short",
-      day: "numeric",
-    });
-  }
+    // -----------------------------
+    // PUBLIC API (NO OVERWRITES, NO DUPES)
+    // -----------------------------
+    window.NovaMobileSessions = {
+        open,
+        close,
+        state: State
+    };
 
-  function escapeHtml(value) {
-    return String(value || "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#39;");
-  }
+    window.NovaMobileOpenSessions = open;
 
-  function setText(id, value) {
-    const el = byId(id);
-    if (el) el.textContent = value;
-  }
-
-  dom.byId = byId;
-  dom.qs = qs;
-  dom.qsa = qsa;
-
-  Nova.config = {
-    API,
-    STORAGE,
-    DEFAULT_MODEL,
-    MAX_INPUT_HEIGHT,
-  };
-
-  Nova.utils = {
-    safeJsonParse,
-    loadStorage,
-    saveStorage,
-    removeStorage,
-    apiGet,
-    apiPost,
-    formatTime,
-    formatDateLabel,
-    escapeHtml,
-    setText,
-  };
+    console.log("[SESSIONS SMFF FINAL] loaded");
 })();
-

@@ -46,7 +46,7 @@
             window.NovaMobileBridge.scrollBottom();
         }
 
-        if (role !== "system") {
+        if (role !== "system" && !window.__NOVA_SESSION_RENDERING__) {
             setTimeout(function () {
                 if (
                     window.NovaMobileBridge &&
@@ -68,8 +68,12 @@
     }
 
     function createThinkingBubble(label) {
-        const bubble =
-            appendMessage("assistant", "");
+let bubble = appendMessage("assistant", "");
+
+if (!bubble && window.__NOVA_SESSION_RENDERING__) {
+    return null;
+}
+
 
         if (!bubble) return null;
 

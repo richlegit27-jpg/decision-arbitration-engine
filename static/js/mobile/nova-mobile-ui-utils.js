@@ -733,7 +733,6 @@
             });
         }
 
-        setInterval(cleanupWhiteBlobs, 1200);
     });
 
     window.NovaMobileCleanupWhiteBlobs = cleanupWhiteBlobs;
@@ -741,7 +740,7 @@
     console.log("[Nova Mobile UI] white blob cleanup ready");
 })();
 
-
+/* DISABLED */
 /* NOVA_MOBILE_RUNTIME_INPUT_HEIGHT_LOCK_20260607 */
 (function () {
     "use strict";
@@ -898,7 +897,7 @@
     console.log("[Nova Mobile] runtime icon repair ready");
 })();
 
-
+/* DISABLED */
 /* NOVA_MOBILE_COMPACT_INPUT_FINAL_20260607 */
 (function () {
     "use strict";
@@ -1698,10 +1697,11 @@
     window.NovaMobileScanCodeCopy = scanCodeBlocks;
 })();
 
-
-// NOVA_MOBILE_RUNTIME_MESSAGE_BAR_FIX_20260609
+/* DISABLED - FINAL COLLAPSE - MESSAGE BAR FIX */
 (function () {
     "use strict";
+
+    return; // <-- HARD STOP (this is the important part)
 
     if (window.__NOVA_MOBILE_RUNTIME_MESSAGE_BAR_FIX__) {
         return;
@@ -1795,7 +1795,7 @@
 
         composer.id = composer.id || "nova-mobile-runtime-fixed-composer";
 
-        composer.style.position = "fixed";
+        composer.style.position = "relative";
         composer.style.left = "0";
         composer.style.right = "0";
         composer.style.bottom = "0";
@@ -1856,12 +1856,6 @@
         return true;
     }
 
-    function run() { if (window.__NOVA_FINAL_COMPOSER_LAYOUT_ACTIVE_20260609) { return; }
-        fixComposer();
-    }
-
-    window.NovaMobileRuntimeFixMessageBar = run;
-
     window.addEventListener("load", function () {
         setTimeout(run, 0);
         setTimeout(run, 150);
@@ -1869,82 +1863,23 @@
         setTimeout(run, 1500);
     });
 
-    window.addEventListener("resize", function () {
-        setTimeout(run, 50);
-    });
-
-    window.addEventListener("focusin", function () {
-        setTimeout(run, 50);
-        setTimeout(run, 350);
-    }, true);
-
-    document.addEventListener("input", function () {
-        setTimeout(run, 0);
-    }, true);
-
     // NOVA_STOP_MESSAGE_BAR_FIGHTING_LOOPS_20260609: disabled Runtime Message Bar Fix interval
 
     console.log("[Nova Mobile Runtime Message Bar Fix] ready");
 })();
 
-// NOVA_FINAL_INPUT_HEIGHT_OVERRIDE_20260609
 (function () {
     "use strict";
 
-    function forceFinalInputHeight() { window.__NOVA_FINAL_COMPOSER_LAYOUT_ACTIVE_20260609 = true;
-        var input = document.getElementById("nova-mobile-input");
-        var composer = document.getElementById("nova-mobile-composer") || document.querySelector(".mobile-composer");
+    // FULLY DISABLED FINAL INPUT OVERRIDE
+    window.NovaFinalInputHeightOverride = function () {};
 
-        if (!input || !composer) {
-            return;
-        }
+    console.log("[DISABLED] Final Input Height Override removed");
 
-        composer.style.setProperty("height", "132px", "important");
-        composer.style.setProperty("min-height", "132px", "important");
-        composer.style.setProperty("max-height", "132px", "important");
-        composer.style.setProperty("display", "flex", "important");
-        composer.style.setProperty("flex-wrap", "wrap", "important");
-        composer.style.setProperty("align-items", "center", "important");
+window.__NOVA_UI_CLEAN_MODE__ = true;
 
-        input.style.setProperty("flex", "0 0 100%", "important");
-        input.style.setProperty("width", "100%", "important");
-        input.style.setProperty("min-width", "100%", "important");
-        input.style.setProperty("max-width", "100%", "important");
-        input.style.setProperty("height", "68px", "important");
-        input.style.setProperty("min-height", "68px", "important");
-        input.style.setProperty("max-height", "68px", "important");
-        input.style.setProperty("padding", "14px", "important");
-        input.style.setProperty("line-height", "21px", "important");
-        input.style.setProperty("box-sizing", "border-box", "important");
-        input.style.setProperty("resize", "none", "important");
+console.log("[NOVA UI] CLEAN MODE ACTIVE - layout systems removed");
 
-        composer.querySelectorAll("button, .mobile-composer-btn, .mobile-icon-action").forEach(function (button) {
-            button.style.setProperty("flex", "0 0 42px", "important");
-            button.style.setProperty("width", "42px", "important");
-            button.style.setProperty("min-width", "42px", "important");
-            button.style.setProperty("max-width", "42px", "important");
-            button.style.setProperty("height", "42px", "important");
-            button.style.setProperty("min-height", "42px", "important");
-            button.style.setProperty("max-height", "42px", "important");
-        });
-
-        document.body.style.setProperty("padding-bottom", "148px", "important");
-    }
-
-    forceFinalInputHeight();
-    setTimeout(forceFinalInputHeight, 50);
-    setTimeout(forceFinalInputHeight, 250);
-    setTimeout(forceFinalInputHeight, 750);
-    setTimeout(forceFinalInputHeight, 1500);
-
-    window.addEventListener("load", forceFinalInputHeight);
-    window.addEventListener("resize", function () {
-        setTimeout(forceFinalInputHeight, 50);
-    });
-
-    window.NovaFinalInputHeightOverride = forceFinalInputHeight;
-
-    console.log("[Nova Final Input Height Override] ready");
 })();
 
 // NOVA_STOP_MESSAGE_BAR_FIGHTING_LOOPS_20260609
