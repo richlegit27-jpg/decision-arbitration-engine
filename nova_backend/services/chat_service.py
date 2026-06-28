@@ -9139,6 +9139,22 @@ if (not attachments) and (__name__ == "__main__"):
 
                 _top = _lines[:8]
 
+                _bad_context_markers = (
+                    "project-aware context for nova:",
+                    "relevant persistent memory:",
+                    "recent session context:",
+                    "persistent memory:",
+                    "[preference]",
+                    "[user_fact]",
+                    "[people]",
+                )
+
+                if any(
+                    _marker in str(user_text or "").lower()
+                    for _marker in _bad_context_markers
+                ):
+                    raise RuntimeError("ignored injected Nova context as attachment text")
+
                 if _top:
                     _topic = "; ".join(_top[:3])
                     _reply = "Attachment received:\n"
@@ -11428,6 +11444,22 @@ if (not attachments) and (__name__ == "__main__"):
 
     def handle(self, user_text: str, session_id: str = "", attachments=None):
 
+        user_text = self._safe_str(user_text).strip()
+
+        for _nova_context_marker in (
+            "Project-aware context for Nova:",
+            "Relevant persistent memory:",
+            "Recent session context:",
+            "Session context:",
+            "[RANKED MEMORY + WORKING STATE]",
+            "HIGH PRIORITY MEMORY:",
+            "Web results:",
+        ):
+            if _nova_context_marker in user_text:
+                user_text = user_text.split(_nova_context_marker, 1)[0].strip()
+
+        original_user_text = user_text
+
         # CHAT_SERVICE_HARD_ATTACHMENT_FINAL_LOCK
         try:
             if not attachments:
@@ -11469,6 +11501,23 @@ if (not attachments) and (__name__ == "__main__"):
                     _seen.add(key)
                     _lines.append(clean)
                 top = _lines[:8]
+
+                bad_context_markers = (
+                    "project-aware context for nova:",
+                    "relevant persistent memory:",
+                    "recent session context:",
+                    "persistent memory:",
+                    "[preference]",
+                    "[user_fact]",
+                    "[people]",
+                )
+
+                if any(
+                    marker in str(user_text or "").lower()
+                    for marker in bad_context_markers
+                ):
+                    raise RuntimeError("ignored injected Nova context as attachment text")
+
                 if top:
                     topic = "; ".join(top[:3])
                     reply = "Attachment received:\\n"
@@ -11626,6 +11675,22 @@ if (not attachments) and (__name__ == "__main__"):
 
                 _nova_top = _nova_lines[:8]
 
+                _nova_bad_context_markers = (
+                    "project-aware context for nova:",
+                    "relevant persistent memory:",
+                    "recent session context:",
+                    "persistent memory:",
+                    "[preference]",
+                    "[user_fact]",
+                    "[people]",
+                )
+
+                if any(
+                    _nova_marker in str(user_text or "").lower()
+                    for _nova_marker in _nova_bad_context_markers
+                ):
+                    raise RuntimeError("ignored injected Nova context as attachment text")
+
                 if _nova_top:
                     _nova_topic = "; ".join(_nova_top[:3])
                     _nova_reply = "Attachment received:\n"
@@ -11702,6 +11767,9 @@ if (not attachments) and (__name__ == "__main__"):
 
         if not clean_interpretation_text:
             clean_interpretation_text = original_user_text
+
+        original_user_text = clean_interpretation_text
+        user_text = clean_interpretation_text
 
         # NOVA_TOPIC_RECALL_BEFORE_INTERPRETATION_WEB_20260612
         # Generic conversation-recall phrases must never be routed to web search.
@@ -20004,30 +20072,28 @@ def _save_artifact_fallback(self, artifact: dict):
             print("[NOVA_OPENAI_VISION_ATTACHMENT_ANALYSIS] failed:", exc)
             return ""
 
-    def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict:
-        attachments = attachments or []
+def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict:
+    attachments = attachments or []
 
-        image_url = ""
-        image_name = ""
+    for item in attachments:
+        if not isinstance(item, dict):
+            continue
 
-        for item in attachments:
-            if not isinstance(item, dict):
-                continue
+        att_type = self._safe_str(item.get("type")).lower()
+        mime_type = self._safe_str(item.get("mime_type") or item.get("content_type")).lower()
+        url = self._safe_str(item.get("url") or item.get("file_url"))
+        name = self._safe_str(
+            item.get("original_filename")
+            or item.get("name")
+            or item.get("filename")
+            or item.get("stored_name")
+            or "attachment"
+        )
 
-            att_type = self._safe_str(item.get("type")).lower()
-            mime_type = self._safe_str(item.get("mime_type")).lower()
-            url = self._safe_str(item.get("url"))
-            name = self._safe_str(item.get("name") or item.get("filename") or "image")
-
-            if url and (att_type == "image" or mime_type.startswith("image/")):
-                image_url = url
-                image_name = name
-                break
-
-        if image_url:
+        if url and (att_type == "image" or mime_type.startswith("image/")):
             vision_text = self._nova_describe_image_with_openai_20260607(
-                image_url=image_url,
-                image_name=image_name,
+                image_url=url,
+                image_name=name,
                 user_text=user_text,
             )
 
@@ -20035,6 +20101,10 @@ def _save_artifact_fallback(self, artifact: dict):
                 return {
                     "ok": True,
                     "text": vision_text,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": vision_text,
+                    },
                     "attachment_analysis": True,
                     "vision_used": True,
                     "ocr_used": False,
@@ -20043,47 +20113,53 @@ def _save_artifact_fallback(self, artifact: dict):
                     "saved_artifact": None,
                 }
 
-            try:
-                prompt = self._safe_str(user_text) or "what is in this image"
+        path = _nova_resolve_attachment_path_20260608(item)
 
-                response = self.client.responses.create(
-                    model=self.chat_model,
-                    input=[
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "input_text", "text": prompt},
-                                {"type": "input_image", "image_url": image_url},
-                            ],
-                        }
-                    ],
-                )
+        if path:
+            text = _nova_extract_attachment_text_string_safe_20260608(path)
 
-                assistant_text = self._extract_response_text(response)
+            if text:
+                preview = text[:6000].strip()
 
-            except Exception:
-                assistant_text = "I couldnÃ¢â‚¬â„¢t analyze that image."
+                return {
+                    "ok": True,
+                    "text": (
+                        "Attachment analysis:\n"
+                        f"Attachment {name} content:\n"
+                        f"{preview}"
+                    ),
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": (
+                            "Attachment analysis:\n"
+                            f"Attachment {name} content:\n"
+                            f"{preview}"
+                        ),
+                    },
+                    "attachment_analysis": True,
+                    "vision_used": False,
+                    "ocr_used": False,
+                    "source_urls": [],
+                    "sources": [],
+                    "saved_artifact": None,
+                }
 
-        else:
-            assistant_text = "I couldnÃ¢â‚¬â„¢t find an image attachment to analyze."
+    fallback = "Attachment received, but Nova could not extract readable text from it."
 
-        return {
-            "ok": True,
-            "assistant_text": assistant_text,
-            "assistant_message": {
-                "role": "assistant",
-                "text": assistant_text,
-            },
-            "debug": {
-                "route_taken": "attachment_analysis",
-                "image_name": image_name,
-                "has_image": bool(image_url),
-            },
-        }
-
-        # ==============================
-        # MODEL HELPERS
-        # ==============================
+    return {
+        "ok": True,
+        "text": fallback,
+        "assistant_message": {
+            "role": "assistant",
+            "text": fallback,
+        },
+        "attachment_analysis": True,
+        "vision_used": False,
+        "ocr_used": False,
+        "source_urls": [],
+        "sources": [],
+        "saved_artifact": None,
+    }
 
     def _format_response_policy_for_prompt(self, response_policy=None) -> str:
         response_policy = response_policy if isinstance(response_policy, dict) else {}
@@ -22322,7 +22398,15 @@ def _nova_resolve_attachment_path_string_safe_20260608(attachment):
             candidates.append(candidate)
             candidates.append(uploads / candidate.name)
 
-    for key in ("filename", "stored_filename", "name", "original_filename"):
+    for key in (
+    "stored_name",
+    "saved_name",
+    "filename",
+    "stored_filename",
+    "name",
+    "original_filename",
+):
+
         value = attachment.get(key)
         if value:
             candidates.append(uploads / Path(str(value)).name)
