@@ -231,7 +231,7 @@ async function sendText(textOverride) {
 
     state.abortController = new AbortController();
 
-    const stop = $("nova-mobile-stop");
+    const stop = $("nova-mobile-stop") || $("nova-mobile-stop-generation");
     if (stop) stop.style.display = "";
 
     try {
@@ -322,7 +322,7 @@ const answer =
     }
 
     function wireStop() {
-        const stop = $("nova-mobile-stop");
+const stop = $("nova-mobile-stop") || $("nova-mobile-stop-generation");
         if (!stop) return;
 
         stop.onclick = (event) => {
@@ -414,22 +414,88 @@ const answer =
         btn.addEventListener("pointerdown", open, true);
     }
 
-    function boot() {
-        wireSend();
-        wireStop();
-        wireAttach();
-        wireSessionsButton();
-        ensurePreviewBar();
+function fixComposerLayout() {
+    const composer = $("nova-mobile-composer");
+    const input = $("nova-mobile-input");
 
-        console.log("[Nova Mobile App] wired", {
-            input: !!inputBox(),
-            send: !!$("nova-mobile-send"),
-            stop: !!$("nova-mobile-stop"),
-            attach: !!$("nova-mobile-attach"),
-            sessions: !!$("nova-mobile-sessions-toggle"),
-            activeSession: getSessionId()
-        });
+    if (!composer || !input) return;
+
+    let actions = $("nova-mobile-composer-actions");
+
+    if (!actions) {
+        actions = document.createElement("div");
+        actions.id = "nova-mobile-composer-actions";
+        actions.className = "nova-mobile-composer-actions";
     }
+
+    [
+        "nova-mobile-send",
+        "nova-mobile-stop-generation",
+        "nova-mobile-voice",
+        "nova-mobile-stop-speech",
+        "nova-mobile-tts",
+        "nova-mobile-attach",
+        "nova-mobile-tools-toggle"
+
+    ].forEach((id) => {
+        const btn = $(id);
+        if (btn && btn.parentNode !== actions) {
+            actions.appendChild(btn);
+        }
+
+        if (btn && id === "nova-mobile-stop-generation") {
+            btn.style.setProperty("display", "inline-flex", "important");
+        }
+    });
+
+    if (input.parentNode !== composer) {
+        composer.insertBefore(input, composer.firstChild);
+    }
+
+    if (actions.parentNode !== composer) {
+        composer.appendChild(actions);
+    }
+
+    actions.style.setProperty("display", "flex", "important");
+    actions.style.setProperty("gap", "6px", "important");
+    actions.style.setProperty("row-gap", "6px", "important");
+    actions.style.setProperty("align-items", "center", "important");
+actions.style.setProperty("justify-content", "space-evenly", "important");
+actions.style.setProperty("width", "100%", "important");
+    actions.style.setProperty("flex-wrap", "wrap", "important");
+    actions.style.setProperty("max-width", "100%", "important");
+    actions.style.setProperty("min-height", "34px", "important");
+    actions.style.setProperty("height", "auto", "important");
+    actions.style.setProperty("padding-bottom", "14px", "important");
+    actions.style.setProperty("overflow", "visible", "important");
+
+    composer.style.setProperty("min-height", "132px", "important");
+    composer.style.setProperty("height", "auto", "important");
+    composer.style.setProperty("max-height", "none", "important");
+    composer.style.setProperty("overflow", "visible", "important");
+}
+
+function boot() {
+
+    wireSend();
+    wireStop();
+    wireAttach();
+    wireSessionsButton();
+    ensurePreviewBar();
+    fixComposerLayout();
+    setTimeout(fixComposerLayout, 300);
+    setTimeout(fixComposerLayout, 900);
+    setTimeout(fixComposerLayout, 1600);
+
+    console.log("[Nova Mobile App] wired", {
+        input: !!inputBox(),
+        send: !!$("nova-mobile-send"),
+        stop: !!($("nova-mobile-stop") || $("nova-mobile-stop-generation")),
+        attach: !!$("nova-mobile-attach"),
+        sessions: !!$("nova-mobile-sessions-toggle"),
+        activeSession: getSessionId()
+    });
+}
 
     window.NovaMobileApp = {
         sendText,

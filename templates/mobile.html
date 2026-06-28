@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 
@@ -323,7 +323,7 @@
     type="button"
     title="Send"
 >
-    <span class="mobile-action-icon">Ã¢Å¾Â¤</span>
+    <span class="mobile-action-icon">ÃƒÂ¢Ã…Â¾Ã‚Â¤</span>
 </button>
 
 <button
@@ -333,7 +333,7 @@
     title="Stop generation"
     data-active="false"
 >
-    <span class="mobile-action-icon">Ã¢â€“Â </span>
+    <span class="mobile-action-icon">ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â </span>
 </button>
 
 <button
@@ -342,7 +342,7 @@
     type="button"
     title="Voice input"
 >
-    <span class="mobile-action-icon">Ã°Å¸Å½â„¢</span>
+    <span class="mobile-action-icon">ÃƒÂ°Ã…Â¸Ã…Â½Ã¢â€žÂ¢</span>
 </button>
 
 <button
@@ -352,7 +352,7 @@
     title="Stop speech"
     data-active="false"
 >
-    <span class="mobile-action-icon">Ã°Å¸â€â€¡</span>
+    <span class="mobile-action-icon">ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â‚¬Â¡</span>
 </button>
 
 <button
@@ -361,7 +361,7 @@
     type="button"
     title="Read aloud"
 >
-    <span class="mobile-action-icon">Ã°Å¸â€Å </span>
+    <span class="mobile-action-icon">ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ…Â </span>
 </button>
 
 <button
@@ -370,7 +370,7 @@
     type="button"
     title="Attach file"
 >
-    <span class="mobile-action-icon">Ã¯Â¼â€¹</span>
+    <span class="mobile-action-icon">ÃƒÂ¯Ã‚Â¼Ã¢â‚¬Â¹</span>
 </button>
 
 <button
@@ -386,7 +386,7 @@
         }
     "
 >
-    <span class="mobile-action-icon">Ã¢â€¹Â¯</span>
+    <span class="mobile-action-icon">ÃƒÂ¢Ã¢â‚¬Â¹Ã‚Â¯</span>
 </button>
 
 <input
@@ -854,13 +854,19 @@ body {
      ATTACHMENTS / ADVANCED UI40
 ========================= -->
 
+<!-- DISABLED - handled by nova-mobile-app.js
 <script src="/static/js/mobile/nova-mobile-attachment-payload.js?v=attachment-revert-clean-20260609-001"></script>
+-->
 
+<!-- DISABLED - duplicate attachment preview owner
+<!-- DISABLED - duplicate attachment preview owner
 <script src="/static/js/mobile/nova-mobile-attachment-preview.js?v=quiet-preview-cache-20260608"></script>
+-->
+-->
 
 <script src="/static/js/mobile/nova-mobile-execution-panel.js?v=execution-panel-cache-state-20260623"></script>
 
-<!-- DISABLED: causes session Copy/Regen nesting loop
+<!-- DISABLED - causes session Copy/Regen nesting loop
 <script src="/static/js/mobile/nova-mobile-assistant-actions.js?v=assistant-actions-retry-20260623"></script>
 -->
 
@@ -4909,7 +4915,7 @@ html, body {
           messages to begin halfway down the screen.
         */
         const topPx = 50;
-        const bottomPx = Math.max(0, viewportHeight - composerTop);
+        const bottomPx = Math.max(110, composerHeight);
 
         document.documentElement.style.setProperty(
             "--nova-mobile-composer-live-height",
@@ -4931,7 +4937,10 @@ html, body {
         chat.style.setProperty("scroll-padding-bottom", "44px", "important");
 
         composer.style.setProperty("position", "fixed", "important");
-        composer.style.setProperty("bottom", "env(safe-area-inset-bottom, 0px)", "important");
+        composer.style.setProperty("bottom", "0px", "important");
+composer.style.setProperty("min-height", "110px", "important");
+composer.style.setProperty("height", "auto", "important");
+composer.style.setProperty("overflow", "visible", "important");
 
         return true;
     }
@@ -5296,46 +5305,6 @@ html, body {
     const originalFetch = window.fetch;
 
     window.fetch = function(input, init) {
-        try {
-            const url = String(
-                typeof input === "string"
-                    ? input
-                    : input && input.url
-                        ? input.url
-                        : ""
-            );
-
-            const isChat = url.includes("/api/chat");
-
-            if (isChat && init && typeof init === "object") {
-                const method = String(init.method || "GET").toUpperCase();
-
-                if (method === "POST" && typeof init.body === "string") {
-                    const payload = JSON.parse(init.body || "{}");
-                    const existing = Array.isArray(payload.attachments) ? payload.attachments : [];
-                    const collected = collectAttachments();
-
-                    if (!existing.length && collected.length) {
-                        payload.attachments = collected;
-                        payload.session_attachments = collected;
-                        payload.attachment_count = collected.length;
-
-                        init = {
-                            ...init,
-                            body: JSON.stringify(payload)
-                        };
-
-                        console.log(
-                            "[Nova Mobile Final Attachment Payload Bridge] injected attachments into /api/chat",
-                            collected
-                        );
-                    }
-                }
-            }
-        } catch (error) {
-            console.warn("[Nova Mobile Final Attachment Payload Bridge] fetch injection skipped", error);
-        }
-
         return originalFetch.apply(this, arguments);
     };
 
@@ -5345,7 +5314,7 @@ html, body {
         remember: rememberAttachment
     };
 
-    console.log("[Nova Mobile Final Attachment Payload Bridge] ready");
+    console.log("[Nova Mobile Final Attachment Payload Bridge] DISABLED");
 })();
 </script>
 
@@ -5510,7 +5479,7 @@ html, body {
 async function openUniqueFinalSessionsPanel(reason) {
     hideOldPanels();
 
-    // 🔥 ALWAYS CREATE OR RECOVER PANEL (CRITICAL FIX)
+    // ðŸ”¥ ALWAYS CREATE OR RECOVER PANEL (CRITICAL FIX)
     let panel = document.getElementById("nova-mobile-sessions-panel");
 
     if (!panel) {
@@ -5519,7 +5488,7 @@ async function openUniqueFinalSessionsPanel(reason) {
         document.body.appendChild(panel);
     }
 
-    // 🔥 HARD VISIBILITY OVERRIDE (IMPORTANT FOR YOUR UI BUGS)
+    // ðŸ”¥ HARD VISIBILITY OVERRIDE (IMPORTANT FOR YOUR UI BUGS)
     panel.style.setProperty("position", "fixed", "important");
     panel.style.setProperty("top", "60px", "important");
     panel.style.setProperty("left", "10px", "important");
@@ -5611,7 +5580,7 @@ async function openUniqueFinalSessionsPanel(reason) {
         row.style.setProperty("pointer-events", "auto", "important");
 
         const open = makeButton(
-            (session.pinned ? "📌 " : "") + (session.title || session.id)
+            (session.pinned ? "ðŸ“Œ " : "") + (session.title || session.id)
         );
 
         open.style.setProperty("text-align", "left", "important");
@@ -6324,4 +6293,5 @@ body:not(.nova-ready) #nova-composer {
 </script>
 
 <!-- /NOVA_MOBILE_MENU_HELP_BLOG_ORDER_FINAL_20260624 -->
+
 

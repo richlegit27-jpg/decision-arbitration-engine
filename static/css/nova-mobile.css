@@ -12766,3 +12766,136 @@ a[href*="logout"] {
 .nova-mobile-copy-regen-actions button {
     min-width: 64px;
 }
+
+/* NOVA_ATTACHMENT_CHIP_FINAL_OVERRIDE_20260628 */
+#nova-mobile-attachment-preview-bar {
+    display: contents !important;
+    background: transparent !important;
+    border: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: 0 !important;
+    height: 0 !important;
+    width: 0 !important;
+}
+
+#nova-mobile-attachment-preview-bar button,
+#nova-mobile-attachment-preview-bar > button {
+    position: fixed !important;
+    left: 14px !important;
+    bottom: 78px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    width: auto !important;
+    max-width: 70vw !important;
+    min-width: 0 !important;
+    height: 26px !important;
+    min-height: 26px !important;
+    max-height: 26px !important;
+    padding: 0 10px !important;
+    margin: 0 !important;
+    border-radius: 999px !important;
+    background: rgba(17,24,39,.96) !important;
+    border: 1px solid rgba(168,85,247,.45) !important;
+    color: #fff !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    line-height: 26px !important;
+    text-align: left !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,.28) !important;
+    z-index: 2147483647 !important;
+}
+
+/* NOVA_MOBILE_COMPOSER_RESTORE_20260628 */
+
+.mobile-composer,
+.mobile-composer-shell,
+.mobile-input-bar,
+#nova-mobile-composer {
+    position: sticky !important;
+    bottom: 0 !important;
+    z-index: 2147483000 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    padding: 8px 10px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.mobile-input-row,
+.nova-mobile-input-row {
+    order: 1 !important;
+}
+
+.mobile-composer-actions,
+.mobile-composer-buttons,
+.nova-mobile-composer-actions,
+.nova-mobile-composer-buttons {
+    order: 2 !important;
+}
+
+#nova-mobile-stop {
+    display: inline-flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* NOVA_MOBILE_INPUT_ABOVE_BUTTONS_20260628 */
+#nova-mobile-composer {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+}
+
+#nova-mobile-input {
+    order: 1 !important;
+    width: 100% !important;
+}
+
+#nova-mobile-send,
+#nova-mobile-stop-generation,
+#nova-mobile-voice,
+#nova-mobile-stop-speech,
+#nova-mobile-tts,
+#nova-mobile-attach,
+#nova-mobile-tools-toggle {
+    order: 2 !important;
+}
+
+/* NOVA_MOBILE_BUTTON_ROW_SAFE_BOTTOM_20260628 */
+#nova-mobile-composer {
+    padding-bottom: calc(22px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+#nova-mobile-composer-actions {
+    padding-bottom: 8px !important;
+    margin-bottom: 4px !important;
+    flex-wrap: nowrap !important;
+    overflow: visible !important;
+}
+
+#nova-mobile-send,
+#nova-mobile-stop-generation,
+#nova-mobile-voice,
+#nova-mobile-stop-speech,
+#nova-mobile-tts,
+#nova-mobile-attach,
+#nova-mobile-tools-toggle {
+    transform: none !important;
+}
+
+/* NOVA_MOBILE_SMALL_SAFE_BUTTON_ROW_20260628 */
+#nova-mobile-composer-actions .mobile-composer-btn {
+    width: 34px !important;
+    min-width: 34px !important;
+    max-width: 34px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    max-height: 34px !important;
+    flex: 0 0 34px !important;
+    padding: 0 !important;
+}
