@@ -75,6 +75,9 @@ async function readChatStream(response, thinking) {
 
             try {
                 const data = JSON.parse(raw);
+if (window.NovaMobileStream && typeof window.NovaMobileStream.renderGeneratedImagePayload === "function") {
+    window.NovaMobileStream.renderGeneratedImagePayload(data);
+}
 
                 window.NovaMobileBridge.syncSessionFromResponse(data);
 
@@ -235,11 +238,13 @@ async function readChatStream(response, thinking) {
         return payload;
     }
 
-    window.NovaMobileStream = {
-        appendStreamDelta,
-        readChatStream,
-        sendChatJsonFallback
-    };
+window.NovaMobileStream = {
+    appendStreamDelta,
+    readChatStream,
+    sendChatJsonFallback,
+    renderGeneratedImagePayload,
+    pickGeneratedImageUrl
+};
 
     console.log("[Nova Mobile] stream handler module ready");
 })();

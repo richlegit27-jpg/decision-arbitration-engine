@@ -235,27 +235,42 @@ async function sendText(textOverride) {
     if (stop) stop.style.display = "";
 
     try {
-        const res = await fetch("/api/chat", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            signal: state.abortController.signal,
-            body: JSON.stringify({
-                user_text: text,
-                session_id: sessionId,
-                attachments: attachmentsToSend
-            })
-        });
 
-        const data = await res.json();
+const res = await fetch("/api/chat", {
+    method: "POST",
+    headers: {
+        "Content-Type": "application/json"
+    },
+    signal: state.abortController.signal,
+    body: JSON.stringify({
+        user_text: text,
+        session_id: sessionId,
+        attachments: attachmentsToSend
+    })
+});
 
-        const answer =
-            data?.assistant_message?.text ||
-            data?.assistant_message ||
-            data?.text ||
-            data?.message ||
-            "No response.";
+const data = await res.json();   
+
+window.__lastNovaChatPayload = data;
+console.log("[Nova Mobile App] chat payload", data);
+
+try {
+    if (
+        window.NovaMobileStream &&
+        typeof window.NovaMobileStream.renderGeneratedImagePayload === "function"
+    ) {
+        window.NovaMobileStream.renderGeneratedImagePayload(data);
+    }
+} catch (error) {
+    console.warn("[Nova Mobile App] image payload render failed", error);
+}
+
+const answer =
+    data?.assistant_message?.text ||
+    data?.assistant_message ||
+    data?.text ||
+    data?.message ||
+    "No response.";
 
         if (thinking) thinking.remove();
 
