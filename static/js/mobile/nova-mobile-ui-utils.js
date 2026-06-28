@@ -546,10 +546,18 @@
 
     if (!inputEl) return;
 
-    function autoResizeInput() { if (window.__NOVA_FINAL_COMPOSER_LAYOUT_ACTIVE_20260609) { return; }
-        inputEl.style.height = "36px";
-        inputEl.style.height = Math.min(inputEl.scrollHeight, 140) + "px";
+function autoResizeInput() {
+    if (window.__NOVA_FINAL_COMPOSER_LAYOUT_ACTIVE_20260609) {
+        return;
     }
+
+    const max = 96;
+
+    inputEl.style.height = "36px";
+    inputEl.style.height = Math.min(inputEl.scrollHeight, max) + "px";
+    inputEl.style.overflowY = inputEl.scrollHeight > max ? "auto" : "hidden";
+    inputEl.style.setProperty("-webkit-overflow-scrolling", "touch");
+}
 
     inputEl.addEventListener("input", autoResizeInput, false);
     inputEl.addEventListener("focus", autoResizeInput, false);
