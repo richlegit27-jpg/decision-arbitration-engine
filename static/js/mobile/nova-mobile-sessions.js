@@ -163,7 +163,7 @@ messages:
 
         el.style.cssText = `
             position:fixed;
-            top:60px;
+            el.style.display = "none";
             left:10px;
             right:10px;
             bottom:80px;
@@ -204,7 +204,9 @@ messages:
                 cursor:pointer;
             `;
             close.onclick = () => {
-                el.style.display = "none";
+el.style.setProperty("display", "none", "important");
+el.setAttribute("aria-hidden", "true");
+el.innerHTML = "";
             };
             el.appendChild(close);
 
@@ -289,7 +291,9 @@ row.onclick = async (event) => {
         console.error("[Nova Sessions] direct session load failed", error);
     }
 
-    el.style.display = "none";
+    el.style.setProperty("display", "none", "important");
+el.setAttribute("aria-hidden", "true");
+el.innerHTML = "";
 };
 
                 el.appendChild(row);

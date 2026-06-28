@@ -12518,6 +12518,33 @@ main {
     box-shadow: 0 24px 80px rgba(0,0,0,.55) !important;
 }
 
+/* NOVA_MOBILE_ACCOUNT_OVERLAP_FIX_20260628 */
+.mobile-header-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+}
+
+#nova-mobile-user-pill,
+#nova-mobile-account-pill,
+#nova-mobile-auth-pill,
+.mobile-account-pill,
+.mobile-user-pill {
+    max-width: 92px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+#nova-mobile-logout,
+.mobile-logout,
+button[id*="logout"],
+a[href*="logout"] {
+    max-width: 64px !important;
+    white-space: nowrap !important;
+}
+
 #nova-mobile-final-sessions-panel button {
     min-height: 42px !important;
     padding: 10px 12px !important;
