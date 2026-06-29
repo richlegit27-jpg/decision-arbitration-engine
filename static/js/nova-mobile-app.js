@@ -2730,3 +2730,825 @@ function fixChatTopSafeArea() {
 
     window.NovaMobileNormalizeRealMessageActions = normalizeActions;
 })();
+
+/* -------------------------------------------------
+   NOVA MOBILE CODE SYNTAX COLORIZER FINAL
+   Lightweight syntax color for rendered code blocks.
+   Also wraps raw code-looking assistant replies.
+   20260629
+-------------------------------------------------- */
+(() => {
+    if (window.__NOVA_MOBILE_CODE_SYNTAX_COLORIZER_20260629__) return;
+    window.__NOVA_MOBILE_CODE_SYNTAX_COLORIZER_20260629__ = true;
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function chatRoot() {
+        return (
+            $("mobileChatMessages") ||
+            $("nova-mobile-messages") ||
+            $("nova-mobile-chat") ||
+            document.querySelector("[data-mobile-chat-messages]") ||
+            document.querySelector(".mobile-chat-messages") ||
+            document.querySelector(".nova-mobile-messages") ||
+            document.querySelector(".nova-mobile-chat")
+        );
+    }
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function isAssistantBubble(el) {
+        const raw = [
+            el?.dataset?.role,
+            el?.dataset?.messageRole,
+            el?.dataset?.novaPolishedRole,
+            el?.className,
+            el?.getAttribute?.("class")
+        ].join(" ").toLowerCase();
+
+        return raw.includes("assistant") || raw.includes("bot");
+    }
+
+    function looksLikeCode(text) {
+        const raw = String(text || "").trim();
+
+        return (
+            /^def\s+\w+\s*\(/m.test(raw) ||
+            /^function\s+\w+\s*\(/m.test(raw) ||
+            /^(const|let|var)\s+\w+\s*=/m.test(raw) ||
+            /^class\s+\w+/m.test(raw) ||
+            /^import\s+/m.test(raw) ||
+            /^from\s+\w+/m.test(raw)
+        );
+    }
+
+    function inferLanguage(text) {
+        const raw = String(text || "");
+
+        if (/^def\s+\w+\s*\(/m.test(raw) || /^from\s+\w+/m.test(raw)) return "python";
+        if (/^function\s+\w+\s*\(/m.test(raw) || /^(const|let|var)\s+\w+\s*=/m.test(raw)) return "js";
+
+        return "";
+    }
+
+    function highlightCode(text, lang) {
+        let html = escapeHtml(text);
+
+        html = html.replace(/(&quot;.*?&quot;|&#039;.*?&#039;|`.*?`)/g, '<span class="nova-syntax-string">$1</span>');
+        html = html.replace(/\b(\d+)\b/g, '<span class="nova-syntax-number">$1</span>');
+
+        if (lang === "python") {
+            html = html.replace(/\b(def|return|if|else|elif|for|while|in|import|from|class|try|except|with|as|None|True|False)\b/g, '<span class="nova-syntax-keyword">$1</span>');
+            html = html.replace(/\bdef\s+([a-zA-Z_][a-zA-Z0-9_]*)/g, '<span class="nova-syntax-keyword">def</span> <span class="nova-syntax-function">$1</span>');
+        } else {
+            html = html.replace(/\b(function|return|const|let|var|if|else|for|while|class|new|await|async|try|catch|true|false|null)\b/g, '<span class="nova-syntax-keyword">$1</span>');
+            html = html.replace(/\bfunction\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/g, '<span class="nova-syntax-keyword">function</span> <span class="nova-syntax-function">$1</span>');
+        }
+
+        return html;
+    }
+
+    function styleCodeBlock(pre) {
+        pre.style.setProperty("display", "block", "important");
+        pre.style.setProperty("width", "100%", "important");
+        pre.style.setProperty("max-width", "100%", "important");
+        pre.style.setProperty("overflow-x", "auto", "important");
+        pre.style.setProperty("white-space", "pre", "important");
+        pre.style.setProperty("background", "rgba(3, 7, 18, 0.92)", "important");
+        pre.style.setProperty("border", "1px solid rgba(139, 92, 246, 0.35)", "important");
+        pre.style.setProperty("border-radius", "13px", "important");
+        pre.style.setProperty("padding", "10px 12px", "important");
+        pre.style.setProperty("box-sizing", "border-box", "important");
+        pre.style.setProperty("margin", "7px 0 0", "important");
+        pre.style.setProperty("box-shadow", "0 10px 22px rgba(0, 0, 0, 0.25)", "important");
+    }
+
+    function colorizeCodeElement(code) {
+        if (!code || code.dataset.novaSyntaxColored === "1") return;
+
+        const raw = String(code.textContent || "");
+        const pre = code.closest("pre");
+        const label = pre?.querySelector(".nova-mobile-code-lang");
+        const lang = String(label?.textContent || inferLanguage(raw) || "").trim().toLowerCase();
+
+        code.innerHTML = highlightCode(raw, lang || "js");
+        code.dataset.novaSyntaxColored = "1";
+
+        code.style.setProperty("display", "block", "important");
+        code.style.setProperty("white-space", "pre", "important");
+        code.style.setProperty("background", "transparent", "important");
+        code.style.setProperty("color", "rgba(248, 250, 255, 0.96)", "important");
+        code.style.setProperty("font-family", "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace", "important");
+        code.style.setProperty("font-size", "13px", "important");
+        code.style.setProperty("line-height", "1.5", "important");
+
+        if (pre) styleCodeBlock(pre);
+    }
+
+    function wrapRawCodeBubble(el) {
+        if (!isAssistantBubble(el)) return;
+        if (el.querySelector("pre, code")) return;
+
+        const raw = String(el.textContent || "").trim();
+        if (!looksLikeCode(raw)) return;
+
+        const lang = inferLanguage(raw);
+
+        el.innerHTML =
+            '<pre class="nova-mobile-code-block">' +
+                (lang ? '<div class="nova-mobile-code-lang">' + lang + '</div>' : "") +
+                '<code>' + highlightCode(raw, lang || "js") + '</code>' +
+            '</pre>';
+
+        const pre = el.querySelector("pre");
+        const code = el.querySelector("code");
+
+        if (pre) styleCodeBlock(pre);
+        if (code) {
+            code.dataset.novaSyntaxColored = "1";
+            code.style.setProperty("display", "block", "important");
+            code.style.setProperty("white-space", "pre", "important");
+            code.style.setProperty("background", "transparent", "important");
+            code.style.setProperty("font-family", "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace", "important");
+            code.style.setProperty("font-size", "13px", "important");
+            code.style.setProperty("line-height", "1.5", "important");
+        }
+    }
+
+    function colorizeAllCode() {
+        const chat = chatRoot();
+        if (!chat) return false;
+
+        Array.from(chat.children || []).forEach(wrapRawCodeBubble);
+        Array.from(chat.querySelectorAll("pre")).forEach(styleCodeBlock);
+        Array.from(chat.querySelectorAll("pre code")).forEach(colorizeCodeElement);
+
+        console.log("[Nova Mobile Code Syntax Colorizer] ready");
+        return true;
+    }
+
+    colorizeAllCode();
+
+    setTimeout(colorizeAllCode, 100);
+    setTimeout(colorizeAllCode, 500);
+    setTimeout(colorizeAllCode, 1200);
+
+    const chat = chatRoot();
+    if (chat && window.MutationObserver) {
+        const observer = new MutationObserver(() => {
+            requestAnimationFrame(colorizeAllCode);
+        });
+
+        observer.observe(chat, {
+            childList: true,
+            subtree: true,
+            characterData: true
+        });
+
+        window.__NovaMobileCodeSyntaxColorizerObserver = observer;
+    }
+
+    window.NovaMobileColorizeCode = colorizeAllCode;
+})();
+
+/* -------------------------------------------------
+   NOVA MOBILE FLOATING MESSAGE ACTION BAR
+   Fixed screen Copy / Copy Code / Regen controls.
+   20260629
+-------------------------------------------------- */
+(() => { return;
+
+    if (window.__NOVA_MOBILE_FLOATING_MESSAGE_ACTION_BAR_20260629__) return;
+    window.__NOVA_MOBILE_FLOATING_MESSAGE_ACTION_BAR_20260629__ = true;
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function chatRoot() {
+        return (
+            $("mobileChatMessages") ||
+            $("nova-mobile-messages") ||
+            $("nova-mobile-chat") ||
+            document.querySelector("[data-mobile-chat-messages]") ||
+            document.querySelector(".mobile-chat-messages") ||
+            document.querySelector(".nova-mobile-messages") ||
+            document.querySelector(".nova-mobile-chat")
+        );
+    }
+
+    function inputBox() {
+        return (
+            $("nova-mobile-input") ||
+            $("mobileInput") ||
+            document.querySelector("textarea") ||
+            document.querySelector("input[type='text']")
+        );
+    }
+
+    function roleOf(el) {
+        if (!el || el.nodeType !== 1) return "";
+
+        const raw = [
+            el.dataset.role,
+            el.dataset.messageRole,
+            el.dataset.novaPolishedRole,
+            el.className,
+            el.getAttribute("class")
+        ].join(" ").toLowerCase();
+
+        if (raw.includes("user")) return "user";
+        if (raw.includes("assistant") || raw.includes("bot")) return "assistant";
+
+        return "";
+    }
+
+    function messageNodes() {
+        const chat = chatRoot();
+        if (!chat) return [];
+
+        return Array.from(chat.children || []).filter((el) => {
+            const text = String(el.innerText || el.textContent || "").trim();
+            return text || el.querySelector("img, pre, code");
+        });
+    }
+
+    function latestAssistantBubble() {
+        const nodes = messageNodes();
+
+        for (let i = nodes.length - 1; i >= 0; i -= 1) {
+            if (roleOf(nodes[i]) === "assistant") {
+                return nodes[i];
+            }
+        }
+
+        return null;
+    }
+
+    function previousUserTextFromAssistant(assistant) {
+        const nodes = messageNodes();
+        const index = nodes.indexOf(assistant);
+
+        for (let i = index - 1; i >= 0; i -= 1) {
+            if (roleOf(nodes[i]) === "user") {
+                return String(nodes[i].innerText || nodes[i].textContent || "").trim();
+            }
+        }
+
+        return "";
+    }
+
+    function cleanMessageText(el) {
+        if (!el) return "";
+
+        const clone = el.cloneNode(true);
+
+        clone.querySelectorAll(
+            ".nova-real-message-actions, #nova-mobile-floating-actions, button"
+        ).forEach((node) => node.remove());
+
+        return String(clone.innerText || clone.textContent || "").trim();
+    }
+
+    function latestCodeText(el) {
+        if (!el) return "";
+
+        const code = el.querySelector("pre code");
+        if (code) return String(code.innerText || code.textContent || "").trim();
+
+        const raw = cleanMessageText(el);
+
+        if (/^(python|js|javascript)\s*\n/i.test(raw)) {
+            return raw.replace(/^(python|js|javascript)\s*\n/i, "").trim();
+        }
+
+        return "";
+    }
+
+    async function copyText(text, button) {
+        const clean = String(text || "").trim();
+
+        if (!clean) {
+            button.textContent = "None";
+            setTimeout(() => {
+                button.textContent = button.dataset.label || "Copy";
+            }, 900);
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(clean);
+            button.textContent = "Copied";
+            button.classList.add("nova-floating-action-success");
+
+            setTimeout(() => {
+                button.textContent = button.dataset.label || "Copy";
+                button.classList.remove("nova-floating-action-success");
+            }, 900);
+        } catch (e) {
+            console.warn("[Nova Floating Actions] copy failed", e);
+            button.textContent = "Fail";
+
+            setTimeout(() => {
+                button.textContent = button.dataset.label || "Copy";
+            }, 900);
+        }
+    }
+
+    function createButton(label) {
+        const button = document.createElement("button");
+
+        button.type = "button";
+        button.textContent = label;
+        button.dataset.label = label;
+        button.className = "nova-mobile-floating-action-btn";
+        button.setAttribute("aria-label", label);
+
+        return button;
+    }
+
+    function ensureBar() {
+        let bar = $("nova-mobile-floating-actions");
+
+        if (bar) return bar;
+
+        bar = document.createElement("div");
+        bar.id = "nova-mobile-floating-actions";
+
+        const copy = createButton("Copy Last");
+        const copyCode = createButton("Copy Code");
+        const regen = createButton("Regen");
+
+        copy.id = "nova-mobile-floating-copy-last";
+        copyCode.id = "nova-mobile-floating-copy-code";
+        regen.id = "nova-mobile-floating-regen";
+
+        copy.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const assistant = latestAssistantBubble();
+            copyText(cleanMessageText(assistant), copy);
+        });
+
+        copyCode.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const assistant = latestAssistantBubble();
+            copyText(latestCodeText(assistant), copyCode);
+        });
+
+        regen.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const assistant = latestAssistantBubble();
+            const text = previousUserTextFromAssistant(assistant);
+            const input = inputBox();
+
+            if (!text || !input) {
+                regen.textContent = "None";
+                setTimeout(() => {
+                    regen.textContent = "Regen";
+                }, 900);
+                return;
+            }
+
+            input.value = text;
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+
+            regen.textContent = "Again";
+
+            if (typeof window.NovaMobileSendNow === "function") {
+                window.NovaMobileSendNow();
+            } else if (typeof window.NovaMobileSendText === "function") {
+                window.NovaMobileSendText(text);
+            } else if (typeof window.sendText === "function") {
+                window.sendText(text);
+            } else {
+                $("nova-mobile-send")?.click?.();
+            }
+
+            setTimeout(() => {
+                regen.textContent = "Regen";
+            }, 900);
+        });
+
+        bar.appendChild(copy);
+        bar.appendChild(copyCode);
+        bar.appendChild(regen);
+
+        document.body.appendChild(bar);
+
+        return bar;
+    }
+
+    function updateBar() {
+        const bar = ensureBar();
+        const assistant = latestAssistantBubble();
+
+        if (!assistant) {
+            bar.style.setProperty("display", "none", "important");
+            return false;
+        }
+
+        bar.style.setProperty("display", "flex", "important");
+
+        const copyCode = $("nova-mobile-floating-copy-code");
+        const hasCode = !!latestCodeText(assistant);
+
+        if (copyCode) {
+            copyCode.style.setProperty("display", hasCode ? "inline-flex" : "none", "important");
+        }
+
+        return true;
+    }
+
+    updateBar();
+
+    setTimeout(updateBar, 100);
+    setTimeout(updateBar, 500);
+    setTimeout(updateBar, 1200);
+    setTimeout(updateBar, 2500);
+
+    const chat = chatRoot();
+
+    if (chat && window.MutationObserver) {
+        const observer = new MutationObserver(() => {
+            requestAnimationFrame(updateBar);
+        });
+
+        observer.observe(chat, {
+            childList: true,
+            subtree: true,
+            characterData: true
+        });
+
+        window.__NovaMobileFloatingMessageActionObserver = observer;
+    }
+
+    window.NovaMobileUpdateFloatingActions = updateBar;
+
+    console.log("[Nova Mobile Floating Actions] ready");
+})();
+
+/* -------------------------------------------------
+   NOVA MOBILE SCREEN ACTION DOCK FINAL
+   Permanent bottom Copy / Code / Regen dock.
+   20260629
+-------------------------------------------------- */
+(() => { return;
+    if (window.__NOVA_MOBILE_SCREEN_ACTION_DOCK_FINAL_20260629__) return;
+    window.__NOVA_MOBILE_SCREEN_ACTION_DOCK_FINAL_20260629__ = true;
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function chatRoot() {
+        return (
+            $("mobileChatMessages") ||
+            $("nova-mobile-messages") ||
+            $("nova-mobile-chat") ||
+            document.querySelector("[data-mobile-chat-messages]") ||
+            document.querySelector(".mobile-chat-messages") ||
+            document.querySelector(".nova-mobile-messages") ||
+            document.querySelector(".nova-mobile-chat")
+        );
+    }
+
+    function inputBox() {
+        return (
+            $("nova-mobile-input") ||
+            $("mobileInput") ||
+            document.querySelector("textarea") ||
+            document.querySelector("input[type='text']")
+        );
+    }
+
+    function roleOf(el) {
+        if (!el || el.nodeType !== 1) return "";
+
+        const raw = [
+            el.dataset.role,
+            el.dataset.messageRole,
+            el.dataset.novaPolishedRole,
+            el.className,
+            el.getAttribute("class")
+        ].join(" ").toLowerCase();
+
+        if (raw.includes("user")) return "user";
+        if (raw.includes("assistant") || raw.includes("bot")) return "assistant";
+
+        return "";
+    }
+
+    function messageNodes() {
+        const chat = chatRoot();
+        if (!chat) return [];
+
+        return Array.from(chat.children || []).filter((el) => {
+            const text = String(el.innerText || el.textContent || "").trim();
+            return text || el.querySelector("img, pre, code");
+        });
+    }
+
+    function latestAssistantBubble() {
+        const nodes = messageNodes();
+
+        for (let i = nodes.length - 1; i >= 0; i -= 1) {
+            if (roleOf(nodes[i]) === "assistant") return nodes[i];
+        }
+
+        return null;
+    }
+
+    function previousUserTextFromAssistant(assistant) {
+        const nodes = messageNodes();
+        const index = nodes.indexOf(assistant);
+
+        for (let i = index - 1; i >= 0; i -= 1) {
+            if (roleOf(nodes[i]) === "user") {
+                return String(nodes[i].innerText || nodes[i].textContent || "").trim();
+            }
+        }
+
+        return "";
+    }
+
+    function cleanMessageText(el) {
+        if (!el) return "";
+
+        const clone = el.cloneNode(true);
+
+        clone.querySelectorAll(
+            ".nova-real-message-actions, #nova-mobile-screen-action-dock, button"
+        ).forEach((node) => node.remove());
+
+        return String(clone.innerText || clone.textContent || "").trim();
+    }
+
+    function latestCodeText(el) {
+        if (!el) return "";
+
+        const code = el.querySelector("pre code");
+        if (code) return String(code.innerText || code.textContent || "").trim();
+
+        const raw = cleanMessageText(el);
+
+        if (/^(python|js|javascript)\s*\n/i.test(raw)) {
+            return raw.replace(/^(python|js|javascript)\s*\n/i, "").trim();
+        }
+
+        if (/^def\s+\w+\s*\(/m.test(raw)) return raw;
+        if (/^function\s+\w+\s*\(/m.test(raw)) return raw;
+
+        return "";
+    }
+
+    function flash(button, label) {
+        button.textContent = label;
+
+        setTimeout(() => {
+            button.textContent = button.dataset.label || label;
+        }, 900);
+    }
+
+    async function copyText(text, button) {
+        const clean = String(text || "").trim();
+
+        if (!clean) {
+            flash(button, "None");
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(clean);
+            flash(button, "Copied");
+        } catch (e) {
+            console.warn("[Nova Screen Action Dock] copy failed", e);
+            flash(button, "Fail");
+        }
+    }
+
+function styleDock(dock) {
+    dock.style.setProperty("position", "fixed", "important");
+
+    /* top-left under Nova Mobile header */
+    dock.style.setProperty("left", "10px", "important");
+    dock.style.setProperty("right", "auto", "important");
+    dock.style.setProperty("top", "calc(50px + env(safe-area-inset-top))", "important");
+    dock.style.setProperty("bottom", "auto", "important");
+    dock.style.setProperty("transform", "none", "important");
+
+    dock.style.setProperty("z-index", "2147483647", "important");
+    dock.style.setProperty("display", "flex", "important");
+    dock.style.setProperty("align-items", "center", "important");
+    dock.style.setProperty("justify-content", "flex-start", "important");
+    dock.style.setProperty("gap", "6px", "important");
+
+    dock.style.setProperty("width", "auto", "important");
+    dock.style.setProperty("max-width", "calc(100vw - 20px)", "important");
+    dock.style.setProperty("padding", "6px", "important");
+
+    dock.style.setProperty("border-radius", "14px", "important");
+    dock.style.setProperty("border", "1px solid rgba(139, 92, 246, 0.32)", "important");
+    dock.style.setProperty("background", "rgba(8, 13, 28, 0.92)", "important");
+    dock.style.setProperty("box-shadow", "0 10px 24px rgba(0, 0, 0, 0.28)", "important");
+    dock.style.setProperty("backdrop-filter", "blur(14px)", "important");
+    dock.style.setProperty("-webkit-backdrop-filter", "blur(14px)", "important");
+
+    dock.style.setProperty("pointer-events", "auto", "important");
+    dock.style.setProperty("visibility", "visible", "important");
+    dock.style.setProperty("opacity", "1", "important");
+}
+
+    function styleButton(button) {
+        button.style.setProperty("display", "inline-flex", "important");
+        button.style.setProperty("align-items", "center", "important");
+        button.style.setProperty("justify-content", "center", "important");
+        button.style.setProperty("height", "31px", "important");
+        button.style.setProperty("min-width", "62px", "important");
+        button.style.setProperty("padding", "0 10px", "important");
+        button.style.setProperty("border-radius", "999px", "important");
+        button.style.setProperty("border", "1px solid rgba(196, 181, 253, 0.34)", "important");
+        button.style.setProperty("background", "rgba(139, 92, 246, 0.18)", "important");
+        button.style.setProperty("color", "#ffffff", "important");
+        button.style.setProperty("font-size", "12px", "important");
+        button.style.setProperty("font-weight", "700", "important");
+        button.style.setProperty("line-height", "1", "important");
+        button.style.setProperty("cursor", "pointer", "important");
+        button.style.setProperty("pointer-events", "auto", "important");
+        button.style.setProperty("visibility", "visible", "important");
+        button.style.setProperty("opacity", "1", "important");
+    }
+
+    function makeButton(id, label) {
+        const button = document.createElement("button");
+
+        button.id = id;
+        button.type = "button";
+        button.textContent = label;
+        button.dataset.label = label;
+        button.className = "nova-screen-action-button";
+        button.setAttribute("aria-label", label);
+
+        styleButton(button);
+
+        return button;
+    }
+
+    function ensureDock() {
+        let dock = $("nova-mobile-screen-action-dock");
+
+        if (!dock) {
+            dock = document.createElement("div");
+            dock.id = "nova-mobile-screen-action-dock";
+
+            const copyLast = makeButton("nova-screen-act-last", "Copy");
+            const copyCode = makeButton("nova-screen-act-code", "Code");
+            const regen = makeButton("nova-screen-act-regen", "Regen");
+
+            copyLast.addEventListener("click", (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                copyText(cleanMessageText(latestAssistantBubble()), copyLast);
+            });
+
+            copyCode.addEventListener("click", (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                copyText(latestCodeText(latestAssistantBubble()), copyCode);
+            });
+
+            regen.addEventListener("click", (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                const assistant = latestAssistantBubble();
+                const text = previousUserTextFromAssistant(assistant);
+                const input = inputBox();
+
+                if (!text || !input) {
+                    flash(regen, "None");
+                    return;
+                }
+
+                input.value = text;
+                input.dispatchEvent(new Event("input", { bubbles: true }));
+
+                if (typeof window.NovaMobileSendNow === "function") {
+                    window.NovaMobileSendNow();
+                } else if (typeof window.NovaMobileSendText === "function") {
+                    window.NovaMobileSendText(text);
+                } else {
+                    $("nova-mobile-send")?.click?.();
+                }
+
+                flash(regen, "Again");
+            });
+
+            dock.appendChild(copyLast);
+            dock.appendChild(copyCode);
+            dock.appendChild(regen);
+        }
+
+        if (dock.parentElement !== document.body) {
+            document.body.appendChild(dock);
+        }
+
+        styleDock(dock);
+        Array.from(dock.querySelectorAll("button")).forEach(styleButton);
+
+        return dock;
+    }
+
+    function syncDock() {
+        const dock = ensureDock();
+        const assistant = latestAssistantBubble();
+        const codeButton = $("nova-screen-act-code");
+
+        styleDock(dock);
+
+        if (codeButton) {
+            codeButton.style.setProperty(
+                "display",
+                latestCodeText(assistant) ? "inline-flex" : "none",
+                "important"
+            );
+        }
+
+        return true;
+    }
+
+    syncDock();
+
+    setInterval(syncDock, 700);
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", syncDock, { once: true });
+    }
+
+    window.addEventListener("resize", syncDock);
+    window.addEventListener("orientationchange", syncDock);
+
+    const observer = new MutationObserver(() => {
+        requestAnimationFrame(syncDock);
+    });
+
+    observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true
+    });
+
+    window.__NovaMobileScreenActionDockObserver = observer;
+    window.NovaMobileSyncScreenActionDock = syncDock;
+
+    console.log("[Nova Mobile Screen Action Dock] ready");
+})();
+
+/* -------------------------------------------------
+   NOVA MOBILE REMOVE FLOATING ACTION DOCKS
+   Keeps in-chat Copy/Regen only.
+   20260629
+-------------------------------------------------- */
+(() => {
+    if (window.__NOVA_MOBILE_REMOVE_FLOATING_ACTION_DOCKS_20260629__) return;
+    window.__NOVA_MOBILE_REMOVE_FLOATING_ACTION_DOCKS_20260629__ = true;
+
+    function removeFloatingActionDocks() {
+        document.getElementById("nova-mobile-screen-action-dock")?.remove();
+        document.getElementById("nova-mobile-floating-actions")?.remove();
+
+        document.querySelectorAll("#nova-mobile-screen-action-dock, #nova-mobile-floating-actions").forEach((el) => {
+            el.remove();
+        });
+
+        return true;
+    }
+
+    removeFloatingActionDocks();
+
+    setTimeout(removeFloatingActionDocks, 50);
+    setTimeout(removeFloatingActionDocks, 250);
+    setTimeout(removeFloatingActionDocks, 800);
+    setTimeout(removeFloatingActionDocks, 1800);
+
+    setInterval(removeFloatingActionDocks, 700);
+
+    window.NovaMobileRemoveFloatingActionDocks = removeFloatingActionDocks;
+
+    console.log("[Nova Mobile] floating action docks removed");
+})();

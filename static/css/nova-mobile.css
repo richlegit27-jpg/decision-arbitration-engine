@@ -14116,3 +14116,138 @@ button {
     background: rgba(139, 92, 246, 0.42) !important;
     color: #ffffff !important;
 }
+
+/* -------------------------------------------------
+   NOVA MOBILE SYNTAX COLORS
+   20260629
+-------------------------------------------------- */
+
+.nova-syntax-keyword {
+    color: #c4b5fd !important;
+    font-weight: 700 !important;
+}
+
+.nova-syntax-function {
+    color: #93c5fd !important;
+    font-weight: 700 !important;
+}
+
+.nova-syntax-string {
+    color: #86efac !important;
+}
+
+.nova-syntax-number {
+    color: #fde68a !important;
+}
+
+.nova-mobile-code-block {
+    background: rgba(3, 7, 18, 0.92) !important;
+    border-color: rgba(139, 92, 246, 0.35) !important;
+}
+
+.nova-mobile-code-lang {
+    color: #c4b5fd !important;
+}
+
+/* -------------------------------------------------
+   NOVA MOBILE FLOATING MESSAGE ACTION BAR
+   20260629
+-------------------------------------------------- */
+
+#nova-mobile-floating-actions {
+    position: fixed !important;
+    left: 50% !important;
+    bottom: calc(82px + env(safe-area-inset-bottom)) !important;
+    transform: translateX(-50%) !important;
+    z-index: 2147483646 !important;
+
+    display: none !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 7px !important;
+
+    width: auto !important;
+    max-width: calc(100vw - 20px) !important;
+    padding: 7px !important;
+
+    border-radius: 999px !important;
+    border: 1px solid rgba(139, 92, 246, 0.28) !important;
+    background: rgba(8, 13, 28, 0.88) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+
+    box-shadow:
+        0 14px 32px rgba(0, 0, 0, 0.34),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+.nova-mobile-floating-action-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    height: 31px !important;
+    min-width: 66px !important;
+    padding: 0 11px !important;
+
+    border-radius: 999px !important;
+    border: 1px solid rgba(196, 181, 253, 0.32) !important;
+    background: rgba(139, 92, 246, 0.16) !important;
+    color: rgba(255, 255, 255, 0.94) !important;
+
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    letter-spacing: 0.01em !important;
+
+    cursor: pointer !important;
+    user-select: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+
+    box-shadow: none !important;
+}
+
+.nova-mobile-floating-action-btn:hover {
+    background: rgba(139, 92, 246, 0.28) !important;
+    border-color: rgba(216, 203, 255, 0.48) !important;
+    color: #ffffff !important;
+}
+
+.nova-mobile-floating-action-btn:active {
+    transform: translateY(1px) !important;
+    background: rgba(91, 124, 255, 0.3) !important;
+}
+
+.nova-mobile-floating-action-success {
+    background: rgba(70, 211, 125, 0.2) !important;
+    border-color: rgba(70, 211, 125, 0.45) !important;
+    color: #d7ffe5 !important;
+}
+
+@media (max-width: 420px) {
+    #nova-mobile-floating-actions {
+        bottom: calc(78px + env(safe-area-inset-bottom)) !important;
+        gap: 5px !important;
+        padding: 6px !important;
+    }
+
+    .nova-mobile-floating-action-btn {
+        min-width: 58px !important;
+        height: 30px !important;
+        padding: 0 9px !important;
+        font-size: 11.5px !important;
+    }
+}
+
+/* -------------------------------------------------
+   NOVA MOBILE DISABLE FLOATING CHAT ACTION DOCKS
+   20260629
+-------------------------------------------------- */
+
+#nova-mobile-screen-action-dock,
+#nova-mobile-floating-actions {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
