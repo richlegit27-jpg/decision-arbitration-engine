@@ -13470,3 +13470,98 @@ textarea#nova-mobile-input {
     opacity: 0 !important;
     pointer-events: none !important;
 }
+
+/* -------------------------------------------------
+   NOVA MOBILE CHAT TOP BREATHING ROOM
+   Prevent first message hiding under top strip/header
+   20260629
+-------------------------------------------------- */
+
+#mobileChatMessages,
+#nova-mobile-messages,
+#nova-mobile-chat {
+    padding-top: calc(86px + env(safe-area-inset-top)) !important;
+    scroll-padding-top: calc(86px + env(safe-area-inset-top)) !important;
+    box-sizing: border-box !important;
+}
+
+#mobileChatMessages > :first-child,
+#nova-mobile-messages > :first-child,
+#nova-mobile-chat > :first-child {
+    margin-top: 10px !important;
+}
+
+/* -------------------------------------------------
+   NOVA MOBILE CHAT MESSAGE STACK NORMALIZER
+   Stops message/text overlap in scroll area
+   20260629
+-------------------------------------------------- */
+
+#mobileChatMessages,
+#nova-mobile-messages,
+#nova-mobile-chat {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+    -webkit-overflow-scrolling: touch !important;
+}
+
+#mobileChatMessages > *,
+#nova-mobile-messages > *,
+#nova-mobile-chat > * {
+    position: relative !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    transform: none !important;
+    flex: 0 0 auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+    clear: both !important;
+}
+
+.mobile-chat-message,
+.nova-mobile-message,
+.nova-message,
+.nova-message-user,
+.nova-message-assistant,
+.message,
+.msg,
+.bubble,
+[data-message-role],
+[data-role="user"],
+[data-role="assistant"] {
+    position: relative !important;
+    transform: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+    line-height: 1.42 !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+.mobile-chat-message *,
+.nova-mobile-message *,
+.nova-message *,
+.message *,
+.msg *,
+.bubble * {
+    line-height: 1.42 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
