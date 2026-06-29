@@ -14251,3 +14251,233 @@ button {
     opacity: 0 !important;
     pointer-events: none !important;
 }
+
+/* -------------------------------------------------
+   NOVA MOBILE SESSIONS RESCUE SAFETY
+   20260629
+-------------------------------------------------- */
+
+#nova-mobile-sessions,
+#nova-mobile-sessions-button,
+#nova-mobile-sessions-btn,
+#mobileSessionsButton,
+[data-mobile-sessions] {
+    pointer-events: auto !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 2147483647 !important;
+}
+
+#nova-mobile-screen-action-dock,
+#nova-mobile-floating-actions {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* -------------------------------------------------
+   NOVA MOBILE SESSIONS PANEL V2 POLISH
+   20260629
+-------------------------------------------------- */
+
+#nova-mobile-emergency-sessions-panel {
+    background:
+        radial-gradient(circle at top left, rgba(124, 58, 237, .28), transparent 32%),
+        rgba(12, 12, 16, .98) !important;
+    color: #fff !important;
+    border: 1px solid rgba(255, 255, 255, .14) !important;
+    border-radius: 18px !important;
+    box-shadow: 0 18px 60px rgba(0, 0, 0, .55) !important;
+    overflow: hidden !important;
+    backdrop-filter: blur(16px) !important;
+}
+
+.nova-sessions-v2-header {
+    height: 58px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+    padding: 10px 12px !important;
+    border-bottom: 1px solid rgba(255, 255, 255, .12) !important;
+    background: rgba(255, 255, 255, .04) !important;
+}
+
+.nova-sessions-v2-title {
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    letter-spacing: .2px !important;
+}
+
+.nova-sessions-v2-subtitle {
+    margin-top: 2px !important;
+    font-size: 11px !important;
+    color: rgba(255, 255, 255, .62) !important;
+}
+
+.nova-sessions-v2-header-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.nova-sessions-v2-header-actions button {
+    min-height: 34px !important;
+    border: 1px solid rgba(255, 255, 255, .16) !important;
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, .08) !important;
+    color: #fff !important;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    pointer-events: auto !important;
+}
+
+#nova-sessions-v2-close {
+    width: 34px !important;
+    padding: 0 !important;
+    font-size: 22px !important;
+    line-height: 1 !important;
+}
+
+.nova-sessions-v2-body {
+    height: calc(100% - 58px) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 10px !important;
+}
+
+.nova-sessions-v2-loading,
+.nova-sessions-v2-empty {
+    padding: 14px !important;
+    color: rgba(255, 255, 255, .72) !important;
+    font-size: 14px !important;
+}
+
+.nova-sessions-v2-card {
+    position: relative !important;
+    display: block !important;
+    margin: 0 0 10px 0 !important;
+    padding: 10px !important;
+    border: 1px solid rgba(255, 255, 255, .12) !important;
+    border-radius: 16px !important;
+    background: rgba(255, 255, 255, .065) !important;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, .22) !important;
+    pointer-events: auto !important;
+}
+
+.nova-sessions-v2-card.is-active {
+    border-color: rgba(168, 85, 247, .75) !important;
+    box-shadow:
+        0 0 0 1px rgba(168, 85, 247, .28),
+        0 8px 26px rgba(0, 0, 0, .28) !important;
+}
+
+.nova-sessions-v2-card.is-pinned {
+    background: rgba(124, 58, 237, .14) !important;
+}
+
+.nova-sessions-v2-open {
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+    padding: 2px 2px 8px 2px !important;
+    cursor: pointer !important;
+    pointer-events: auto !important;
+}
+
+.nova-sessions-v2-card-main {
+    min-width: 0 !important;
+    flex: 1 !important;
+}
+
+.nova-sessions-v2-card-title {
+    font-size: 14px !important;
+    font-weight: 750 !important;
+    line-height: 1.25 !important;
+    color: #fff !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+.nova-sessions-v2-card-meta {
+    margin-top: 4px !important;
+    font-size: 11px !important;
+    color: rgba(255, 255, 255, .55) !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+.nova-sessions-v2-pin-badge,
+.nova-sessions-v2-active-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 999px !important;
+    padding: 3px 7px !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    line-height: 1 !important;
+}
+
+.nova-sessions-v2-pin-badge {
+    margin-right: 6px !important;
+    background: rgba(168, 85, 247, .26) !important;
+    color: #eadcff !important;
+}
+
+.nova-sessions-v2-active-badge {
+    flex: 0 0 auto !important;
+    background: rgba(34, 197, 94, .16) !important;
+    color: #bbf7d0 !important;
+    border: 1px solid rgba(34, 197, 94, .28) !important;
+}
+
+.nova-sessions-v2-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 7px !important;
+    padding-top: 8px !important;
+    border-top: 1px solid rgba(255, 255, 255, .08) !important;
+    pointer-events: auto !important;
+    position: relative !important;
+    z-index: 2147483647 !important;
+}
+
+.nova-sessions-v2-actions button {
+    min-height: 32px !important;
+    flex: 0 0 auto !important;
+    border: 1px solid rgba(255, 255, 255, .14) !important;
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, .08) !important;
+    color: #fff !important;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+    font-weight: 750 !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    position: relative !important;
+    z-index: 2147483647 !important;
+}
+
+.nova-sessions-v2-actions button:active,
+.nova-sessions-v2-header-actions button:active {
+    transform: scale(.97) !important;
+    background: rgba(168, 85, 247, .22) !important;
+}
+
+.nova-sessions-v2-actions button.danger {
+    color: #fecaca !important;
+    border-color: rgba(248, 113, 113, .28) !important;
+    background: rgba(127, 29, 29, .18) !important;
+}
+
+.nova-mobile-session-force-action-bar {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
