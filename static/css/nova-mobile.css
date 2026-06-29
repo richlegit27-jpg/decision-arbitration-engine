@@ -14678,3 +14678,16 @@ body.nova-mobile-sessions-closing [class*="session"][class*="modal"] {
     opacity: 0 !important;
     pointer-events: none !important;
 }
+
+/* -------------------------------------------------
+   NOVA MOBILE SESSION SINGLE OPEN ARBITER
+   20260629
+-------------------------------------------------- */
+body.nova-mobile-session-single-open [data-nova-session-arbiter-hidden="1"],
+body.nova-mobile-session-single-open #nova-sessions-v2-panel[data-nova-session-arbiter-hidden="1"],
+body.nova-mobile-session-single-open [class*="sessions-v2"][data-nova-session-arbiter-hidden="1"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}

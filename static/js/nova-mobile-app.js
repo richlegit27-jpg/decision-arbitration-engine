@@ -5878,3 +5878,244 @@ row.onclick = async () => {
 
     console.log("[Nova Mobile Session Governor] ready");
 })();
+
+/* -------------------------------------------------
+   NOVA MOBILE SESSION SINGLE OPEN ARBITER
+   Allows only one mobile sessions panel to remain open.
+   20260629
+-------------------------------------------------- */
+(() => {
+    if (window.__NOVA_MOBILE_SESSION_SINGLE_OPEN_ARBITER_20260629__) return;
+    window.__NOVA_MOBILE_SESSION_SINGLE_OPEN_ARBITER_20260629__ = true;
+
+    let lastOpenRequestAt = 0;
+    let chosenPanel = null;
+
+    function textOf(value) {
+        return String(value || "").trim();
+    }
+
+    function lower(value) {
+        return textOf(value).toLowerCase();
+    }
+
+    function sig(el) {
+        return lower(
+            (el?.id || "") + " " +
+            (el?.className || "") + " " +
+            (el?.getAttribute?.("aria-label") || "") + " " +
+            (el?.getAttribute?.("title") || "")
+        );
+    }
+
+    function isSessionPanel(el) {
+        if (!el || el.nodeType !== 1) return false;
+
+        const raw = sig(el);
+
+        if (!raw.includes("session")) return false;
+
+        return (
+            raw.includes("panel") ||
+            raw.includes("drawer") ||
+            raw.includes("modal") ||
+            raw.includes("sheet") ||
+            raw.includes("overlay") ||
+            raw.includes("fallback") ||
+            raw.includes("v2")
+        );
+    }
+
+    function panels() {
+        return Array.from(document.querySelectorAll([
+            "#nova-mobile-sessions-panel",
+            "#nova-sessions-v2-panel",
+            "#nova-mobile-session-panel",
+            "#mobile-sessions-panel",
+            "#sessions-panel",
+            "[id*='session'][id*='panel']",
+            "[id*='session'][id*='drawer']",
+            "[id*='session'][id*='modal']",
+            "[id*='sessions'][id*='panel']",
+            "[class*='session'][class*='panel']",
+            "[class*='session'][class*='drawer']",
+            "[class*='session'][class*='modal']",
+            "[class*='sessions-v2']"
+        ].join(","))).filter(isSessionPanel);
+    }
+
+    function visible(el) {
+        if (!el || el.hidden) return false;
+
+        const style = getComputedStyle(el);
+
+        if (
+            style.display === "none" ||
+            style.visibility === "hidden" ||
+            Number(style.opacity || "1") === 0 ||
+            style.pointerEvents === "none"
+        ) {
+            return false;
+        }
+
+        const rect = el.getBoundingClientRect();
+
+        return rect.width > 10 && rect.height > 10;
+    }
+
+    function panelScore(panel) {
+        if (!panel) return -999999;
+
+        const raw = sig(panel);
+        const rect = panel.getBoundingClientRect();
+        const style = getComputedStyle(panel);
+
+        let score = 0;
+
+        if (visible(panel)) score += 1000;
+        if (raw.includes("nova-mobile-sessions-panel")) score += 500;
+        if (raw.includes("visible-sessions")) score += 400;
+        if (raw.includes("fallback")) score += 350;
+        if (raw.includes("sessions-v2")) score -= 250;
+        if (raw.includes("v2")) score -= 150;
+
+        score += Math.min(300, Math.round((rect.width * rect.height) / 1000));
+
+        const z = parseInt(style.zIndex || "0", 10);
+        if (Number.isFinite(z)) score += Math.min(100, z / 1000000);
+
+        return score;
+    }
+
+    function forceHide(panel) {
+        if (!panel) return;
+
+        panel.classList.remove(
+            "open",
+            "show",
+            "active",
+            "visible",
+            "is-open",
+            "is-visible",
+            "nova-open",
+            "sessions-open"
+        );
+
+        panel.setAttribute("aria-hidden", "true");
+        panel.hidden = true;
+
+        panel.style.setProperty("display", "none", "important");
+        panel.style.setProperty("visibility", "hidden", "important");
+        panel.style.setProperty("opacity", "0", "important");
+        panel.style.setProperty("pointer-events", "none", "important");
+        panel.style.setProperty("transform", "translateX(110%)", "important");
+        panel.dataset.novaSessionArbiterHidden = "1";
+    }
+
+    function forceShow(panel) {
+        if (!panel) return;
+
+        panel.hidden = false;
+        panel.removeAttribute("aria-hidden");
+
+        panel.classList.add("open");
+
+        panel.style.removeProperty("display");
+        panel.style.setProperty("display", "flex", "important");
+        panel.style.setProperty("visibility", "visible", "important");
+        panel.style.setProperty("opacity", "1", "important");
+        panel.style.setProperty("pointer-events", "auto", "important");
+        panel.style.setProperty("transform", "none", "important");
+        panel.dataset.novaSessionArbiterPrimary = "1";
+    }
+
+    function choosePrimary(list) {
+        const visiblePanels = list.filter(visible);
+
+        if (!visiblePanels.length && chosenPanel && document.body.contains(chosenPanel)) {
+            return chosenPanel;
+        }
+
+        const sorted = visiblePanels.slice().sort((a, b) => panelScore(b) - panelScore(a));
+
+        return sorted[0] || null;
+    }
+
+    function arbitrate(reason) {
+        const list = panels();
+
+        if (!list.length) return false;
+
+        const primary = choosePrimary(list);
+
+        if (!primary) return false;
+
+        chosenPanel = primary;
+
+        list.forEach((panel) => {
+            if (panel === primary) {
+                forceShow(panel);
+            } else {
+                forceHide(panel);
+            }
+        });
+
+        document.body.classList.add("nova-mobile-session-single-open");
+
+        console.log("[Nova Mobile Session Arbiter] primary panel", {
+            reason: reason || "arbitrate",
+            primary: primary.id || primary.className || "session-panel",
+            panels: list.map((p) => p.id || p.className || "session-panel")
+        });
+
+        return true;
+    }
+
+    function isSessionToggle(target) {
+        if (!target || target.nodeType !== 1) return false;
+
+        const button = target.closest?.("button, a, [role='button'], [data-mobile-sessions], [data-sessions-toggle]");
+        if (!button) return false;
+
+        const raw = sig(button);
+        const label = lower(button.innerText || button.textContent || "");
+
+        return (
+            raw.includes("session") ||
+            label === "sessions" ||
+            label.includes("sessions")
+        );
+    }
+
+    document.addEventListener("click", (event) => {
+        if (!isSessionToggle(event.target)) return;
+
+        lastOpenRequestAt = Date.now();
+
+        setTimeout(() => arbitrate("toggle-50"), 50);
+        setTimeout(() => arbitrate("toggle-150"), 150);
+        setTimeout(() => arbitrate("toggle-350"), 350);
+        setTimeout(() => arbitrate("toggle-700"), 700);
+    }, true);
+
+    const observer = new MutationObserver(() => {
+        if (Date.now() - lastOpenRequestAt > 1200) return;
+
+        clearTimeout(window.__novaMobileSessionArbiterTimer);
+        window.__novaMobileSessionArbiterTimer = setTimeout(() => {
+            arbitrate("mutation");
+        }, 80);
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["class", "style", "hidden", "aria-hidden"]
+    });
+
+    window.__NovaMobileSessionSingleOpenArbiterObserver = observer;
+    window.NovaMobileArbitrateSessionPanels = arbitrate;
+
+    console.log("[Nova Mobile Session Arbiter] ready");
+})();
