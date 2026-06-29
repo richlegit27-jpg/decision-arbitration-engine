@@ -1,0 +1,723 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="theme-color" content="#0b1020">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nova Mobile</title>
+
+<link rel="stylesheet" href="/static/css/nova-mobile.css?v=answer-readability-20260607182523">
+<style>
+    html,
+    body,
+    *,
+    *::before,
+    *::after {
+        cursor: auto !important;
+    }
+
+    .cursor,
+    .custom-cursor,
+    .nova-cursor,
+    .cursor-ring,
+    .cursor-dot,
+    #cursor,
+    #customCursor,
+    #novaCursor,
+    #cursorRing,
+    #cursorDot,
+    #nova-mobile-scroll-bottom,
+    .mobile-scroll-bottom {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        animation: none !important;
+        box-shadow: none !important;
+    }
+
+    #nova-mobile-stop-generation,
+    #nova-mobile-stop-speech {
+        display: none;
+    }
+
+    #nova-mobile-stop-generation[data-active="true"],
+    #nova-mobile-stop-speech[data-active="true"] {
+        display: inline-flex;
+    }
+</style>
+</head>
+
+<body>
+<main class="mobile-shell">
+
+    <header class="mobile-header">
+        <div class="mobile-header-title">Nova Mobile</div>
+
+        <div class="mobile-header-actions">
+            <button
+                id="nova-mobile-new-chat"
+                class="mobile-header-btn"
+                type="button"
+                onclick="window.location.href = '/mobile?new=' + Date.now();"
+            >New</button>
+
+            <button
+                id="nova-mobile-copy-chat"
+                class="mobile-header-btn"
+                type="button"
+            >Copy</button>
+
+            <button
+                id="nova-mobile-export-chat"
+                class="mobile-header-btn"
+                type="button"
+            >Export</button>
+
+            <button
+                id="nova-mobile-sessions-toggle"
+                class="mobile-header-btn"
+                type="button"
+                onclick="window.NovaOpenMobileSessions && window.NovaOpenMobileSessions();"
+            >Sessions</button>
+
+            <div class="mobile-status" aria-label="Nova online"></div>
+        </div>
+    </header>
+
+    <div id="mobileChatMessages" class="mobile-chat-container"></div>
+
+<section
+    id="nova-mobile-sessions-panel"
+    class="hidden"
+    aria-label="Mobile sessions"
+    style="display:none;"
+>
+
+<button
+    type="button"
+    class="mobile-session-item"
+    onclick="window.NovaCloseMobileSessions && window.NovaCloseMobileSessions();"
+>Close Sessions</button>
+
+    <button
+        type="button"
+        class="mobile-session-item"
+        onclick="window.location.href = '/mobile?new=' + Date.now();"
+    >Start Fresh Chat</button>
+
+    <button
+        type="button"
+        class="mobile-session-item"
+        onclick="alert('Mobile session history is not fully wired yet. New Chat works. Full session switching still needs a backend/frontend session list lock.');"
+    >Session History Not Ready Yet</button>
+</section>
+
+<div class="mobile-quick-prompts">
+    <button
+        type="button"
+        data-quick-prompt="Continue"
+        onclick="
+            const input = document.getElementById('nova-mobile-input');
+
+            if (input) {
+                input.value = 'Continue from where we left off. Keep it direct and tell me the next move.';
+                input.focus();
+            }
+        "
+    >Continue</button>
+
+    <button
+        type="button"
+        data-quick-prompt="Summarize this"
+        onclick="
+            const input = document.getElementById('nova-mobile-input');
+
+            if (input) {
+                input.value = 'Summarize the current situation in plain English and tell me what matters most.';
+                input.focus();
+            }
+        "
+    >Summarize</button>
+
+    <button
+        type="button"
+        data-quick-prompt="Make this better"
+        onclick="
+            const input = document.getElementById('nova-mobile-input');
+
+            if (input) {
+                input.value = 'Improve this and make it cleaner, more direct, and more useful.';
+                input.focus();
+            }
+        "
+    >Improve</button>
+
+    <button
+        type="button"
+        data-quick-prompt="What should I do next?"
+        onclick="
+            const input = document.getElementById('nova-mobile-input');
+
+            if (input) {
+                input.value = 'What should I do next? Give me the best next step only.';
+                input.focus();
+            }
+        "
+    >Next</button>
+</div>
+<section
+    id="nova-mobile-tools-panel"
+    class="mobile-panel hidden"
+    aria-label="Mobile tools"
+    style="display:none;"
+>
+    <button
+        id="nova-mobile-memory-toggle"
+        type="button"
+        onclick="
+            const toolsPanel = document.getElementById('nova-mobile-tools-panel');
+            const memoryPanel = document.getElementById('nova-mobile-memory-panel');
+
+            if (toolsPanel) {
+                toolsPanel.classList.add('hidden');
+                toolsPanel.style.cssText = 'display:none !important;';
+            }
+
+            if (memoryPanel) {
+                memoryPanel.classList.remove('hidden');
+                memoryPanel.style.cssText = 'display:flex !important; position:fixed !important; left:10px !important; right:10px !important; top:90px !important; z-index:999999 !important; flex-direction:column !important; gap:10px !important; padding:14px !important; background:#111827 !important; border:1px solid rgba(255,255,255,.18) !important; border-radius:18px !important;';
+            }
+        "
+    >Memory</button>
+
+    <button
+        type="button"
+        data-mobile-tool="upload"
+        onclick="
+            const toolsPanel = document.getElementById('nova-mobile-tools-panel');
+            const input = document.getElementById('nova-mobile-file-input');
+
+            if (toolsPanel) {
+                toolsPanel.classList.add('hidden');
+                toolsPanel.style.cssText = 'display:none !important;';
+            }
+
+            if (input) {
+                input.click();
+            }
+        "
+    >Upload</button>
+
+    <button
+        type="button"
+        data-mobile-tool="execution"
+        onclick="
+            const toolsPanel = document.getElementById('nova-mobile-tools-panel');
+            const executionPanel = document.getElementById('nova-mobile-execution-panel');
+
+            if (toolsPanel) {
+                toolsPanel.classList.add('hidden');
+                toolsPanel.style.cssText = 'display:none !important;';
+            }
+
+            if (executionPanel) {
+                executionPanel.classList.remove('hidden');
+                executionPanel.style.cssText = 'display:flex !important; position:fixed !important; left:10px !important; right:10px !important; top:90px !important; z-index:999999 !important; flex-direction:column !important; gap:10px !important; padding:14px !important; background:#111827 !important; border:1px solid rgba(255,255,255,.18) !important; border-radius:18px !important;';
+            }
+        "
+    >Open Execution Panel</button>
+
+    <button
+        type="button"
+        onclick="
+            const panel = document.getElementById('nova-mobile-tools-panel');
+
+            if (panel) {
+                panel.classList.add('hidden');
+                panel.style.cssText = 'display:none !important;';
+            }
+        "
+    >Close</button>
+</section>
+
+<section id="nova-mobile-memory-panel" class="mobile-panel hidden" aria-label="Mobile memory">
+
+<button
+    id="nova-mobile-memory-close"
+    type="button"
+    onclick="
+        const panel = document.getElementById('nova-mobile-memory-panel');
+
+        if (panel) {
+            panel.classList.add('hidden');
+            panel.style.cssText = 'display:none !important;';
+        }
+    "
+>Close Memory</button>
+    <div class="mobile-panel-title">Memory</div>
+    <div id="nova-mobile-memory-status" class="mobile-panel-text">
+        Memory ready.
+    </div>
+</section>
+
+<section id="nova-mobile-execution-panel" class="mobile-panel hidden" aria-label="Mobile execution">
+<button
+    id="nova-mobile-execution-close"
+    type="button"
+    onclick="
+        const panel = document.getElementById('nova-mobile-execution-panel');
+
+        if (panel) {
+            panel.classList.add('hidden');
+            panel.style.cssText = 'display:none !important;';
+        }
+    "
+>Close Execution</button>
+    <div class="mobile-panel-title">Execution</div>
+<button
+    type="button"
+    data-mobile-tool="refresh_execution"
+>
+    Refresh Status
+</button>
+<div id="nova-mobile-execution-status" class="mobile-panel-text">
+    No active execution loaded.
+</div>
+
+<div class="mobile-execution-progress">
+    <div
+        id="nova-mobile-execution-progress-bar"
+        class="mobile-execution-progress-bar"
+        style="width: 0%;"
+    ></div>
+</div>
+
+<div
+    id="nova-mobile-execution-badge"
+    class="mobile-execution-badge"
+>
+    idle
+</div>
+
+<div
+    id="nova-mobile-execution-last-update"
+    class="mobile-panel-text"
+>
+    Last update: never
+</div>
+
+<button type="button" data-mobile-tool="run_step">Run Step</button>
+<button type="button" data-mobile-tool="run_all">Run All</button>
+</section>
+
+    <div class="mobile-composer">
+        <textarea
+            id="nova-mobile-input"
+            rows="1"
+            placeholder="Type a message..."
+        ></textarea>
+
+<button
+    id="nova-mobile-send"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    type="button"
+    title="Send"
+>
+    <span class="mobile-action-icon">➤</span>
+</button>
+
+<button
+    id="nova-mobile-stop-generation"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    type="button"
+    title="Stop generation"
+    data-active="false"
+>
+    <span class="mobile-action-icon">■</span>
+</button>
+
+<button
+    id="nova-mobile-voice"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    type="button"
+    title="Voice input"
+>
+    <span class="mobile-action-icon">🎙</span>
+</button>
+
+<button
+    id="nova-mobile-stop-speech"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    type="button"
+    title="Stop speech"
+    data-active="false"
+>
+    <span class="mobile-action-icon">🔇</span>
+</button>
+
+<button
+    id="nova-mobile-tts"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    type="button"
+    title="Read aloud"
+>
+    <span class="mobile-action-icon">🔊</span>
+</button>
+
+<button
+    id="nova-mobile-attach"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    type="button"
+    title="Attach file"
+>
+    <span class="mobile-action-icon">＋</span>
+</button>
+
+<button
+    id="nova-mobile-tools-toggle"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    type="button"
+    title="Tools"
+    onclick="
+        const panel = document.getElementById('nova-mobile-tools-panel');
+        if (panel) {
+            panel.classList.remove('hidden');
+            panel.style.cssText = 'display:flex !important; position:fixed !important; left:10px !important; right:10px !important; bottom:90px !important; z-index:999999 !important; flex-direction:column !important; gap:10px !important; padding:14px !important; background:#111827 !important; border:1px solid rgba(255,255,255,.18) !important; border-radius:18px !important;';
+        }
+    "
+>
+    <span class="mobile-action-icon">⋯</span>
+</button>
+
+<input
+    id="nova-mobile-file-input"
+    type="file"
+    accept="image/*,.txt,.md,.pdf,.doc,.docx"
+    hidden
+    multiple
+/>
+    </div>
+
+</main>
+
+<script src="/static/js/mobile-source-drawer.js?v=mobile-source-drawer-001"></script>
+<script src="/static/js/mobile/nova-mobile-bridge.js?v=mobile-bridge-003"></script>
+<script src="/static/js/mobile/nova-mobile-core.js?v=mobile-modular-001"></script>
+<script src="/static/js/mobile/nova-mobile-images.js?v=mobile-modular-001"></script>
+<script src="/static/js/mobile/nova-mobile-code-ui.js?v=mobile-modular-001"></script>
+<script src="/static/js/mobile/nova-mobile-chat-ui.js?v=mobile-modular-001"></script>
+<script src="/static/js/mobile/nova-mobile-message-actions.js?v=mobile-actions-fix-007"></script>
+<script src="/static/js/mobile/nova-mobile-webcards.js?v=mobile-webcards-dedupe-011"></script>
+<script src="/static/js/mobile/nova-mobile-upload.js?v=mobile-upload-rebind-012"></script>
+<script src="/static/js/mobile/nova-mobile-sessions.js?v=mobile-sessions-fix-20260527b"></script>
+<script src="/static/js/mobile/nova-mobile-ui-utils.js?v=mobile-ui-utils-fix-001"></script>
+<script src="/static/js/mobile/nova-mobile-voice.js?v=mobile-voice-endgame-002"></script>
+<script src="/static/js/mobile/nova-mobile-listeners.js?v=mobile-modular-001"></script>
+<script src="/static/js/mobile/nova-mobile-stream.js?v=mobile-final-payload-006"></script>
+<script src="/static/js/mobile/nova-mobile-storage.js?v=mobile-storage-003"></script>
+<script src="/static/js/mobile/nova-mobile-events.js?v=mobile-events-005"></script>
+<script src="/static/js/mobile/nova-mobile-state.js?v=mobile-state-002"></script>
+
+<script src="/static/js/nova-mobile-app.js?v=attachment-payload-bridge-20260607204432"></script>
+
+<script>
+window.NovaOpenMobileSessions = function () {
+    var panel = document.getElementById("nova-mobile-sessions-panel");
+
+    if (!panel) {
+        alert("Sessions panel not found.");
+        return;
+    }
+
+    panel.classList.remove("hidden");
+    panel.style.cssText =
+        "display:flex !important;" +
+        "position:fixed !important;" +
+        "left:10px !important;" +
+        "right:10px !important;" +
+        "top:76px !important;" +
+        "z-index:999999 !important;" +
+        "flex-direction:column !important;" +
+        "gap:10px !important;" +
+        "padding:14px !important;" +
+        "background:#111827 !important;" +
+        "border:1px solid rgba(255,255,255,.18) !important;" +
+        "border-radius:18px !important;" +
+        "box-shadow:0 24px 80px rgba(0,0,0,.55) !important;";
+};
+
+window.NovaCloseMobileSessions = function () {
+    var panel = document.getElementById("nova-mobile-sessions-panel");
+
+    if (!panel) return;
+
+    panel.classList.add("hidden");
+    panel.style.cssText = "display:none !important;";
+};
+</script>
+
+<script>
+(function () {
+    "use strict";
+
+    function ready(fn) {
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", fn);
+            return;
+        }
+
+        fn();
+    }
+
+    ready(function () {
+        const toolsButton = document.getElementById("nova-mobile-tools-toggle");
+        const toolsPanel = document.getElementById("nova-mobile-tools-panel");
+
+        if (!toolsButton || !toolsPanel) {
+            console.warn("[Nova Mobile] tools menu fallback missing elements", {
+                toolsButton: !!toolsButton,
+                toolsPanel: !!toolsPanel,
+            });
+            return;
+        }
+
+        toolsButton.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            toolsPanel.classList.toggle("hidden");
+
+            const isOpen = !toolsPanel.classList.contains("hidden");
+            toolsButton.setAttribute("aria-expanded", isOpen ? "true" : "false");
+        });
+
+        toolsButton.setAttribute("aria-controls", "nova-mobile-tools-panel");
+        toolsButton.setAttribute("aria-expanded", "false");
+
+        console.log("[Nova Mobile] tools menu fallback wired");
+    });
+})();
+</script>
+
+<!-- NOVA MOBILE PANEL HARD LOCK START -->
+<script>
+(function () {
+    "use strict";
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function forceHide(panel) {
+        if (!panel) return;
+
+        panel.classList.add("hidden");
+        panel.setAttribute("aria-hidden", "true");
+        panel.style.setProperty("display", "none", "important");
+    }
+
+    function forceShow(panel, topOrBottom) {
+        if (!panel) return;
+
+        panel.classList.remove("hidden");
+        panel.setAttribute("aria-hidden", "false");
+
+        panel.style.setProperty("display", "flex", "important");
+        panel.style.setProperty("position", "fixed", "important");
+        panel.style.setProperty("left", "10px", "important");
+        panel.style.setProperty("right", "10px", "important");
+        panel.style.setProperty("z-index", "999999", "important");
+        panel.style.setProperty("flex-direction", "column", "important");
+        panel.style.setProperty("gap", "10px", "important");
+        panel.style.setProperty("padding", "14px", "important");
+        panel.style.setProperty("background", "#111827", "important");
+        panel.style.setProperty("border", "1px solid rgba(255,255,255,.18)", "important");
+        panel.style.setProperty("border-radius", "18px", "important");
+        panel.style.setProperty("box-shadow", "0 24px 80px rgba(0,0,0,.55)", "important");
+
+        if (topOrBottom === "bottom") {
+            panel.style.setProperty("bottom", "90px", "important");
+            panel.style.removeProperty("top");
+        } else {
+            panel.style.setProperty("top", "76px", "important");
+            panel.style.removeProperty("bottom");
+        }
+    }
+
+    function replaceButton(id) {
+        var oldButton = $(id);
+
+        if (!oldButton || !oldButton.parentNode) {
+            return null;
+        }
+
+        var newButton = oldButton.cloneNode(true);
+        newButton.removeAttribute("onclick");
+        oldButton.parentNode.replaceChild(newButton, oldButton);
+
+        return newButton;
+    }
+
+    function closeAllPanels() {
+        forceHide($("nova-mobile-sessions-panel"));
+        forceHide($("nova-mobile-tools-panel"));
+        forceHide($("nova-mobile-memory-panel"));
+        forceHide($("nova-mobile-execution-panel"));
+    }
+
+    function wire() {
+        var sessionsButton = replaceButton("nova-mobile-sessions-toggle");
+        var toolsButton = replaceButton("nova-mobile-tools-toggle");
+
+        var sessionsPanel = $("nova-mobile-sessions-panel");
+        var toolsPanel = $("nova-mobile-tools-panel");
+        var memoryPanel = $("nova-mobile-memory-panel");
+        var executionPanel = $("nova-mobile-execution-panel");
+
+        closeAllPanels();
+
+        window.NovaOpenMobileSessions = function () {
+            closeAllPanels();
+            forceShow(sessionsPanel, "top");
+        };
+
+        window.NovaCloseMobileSessions = function () {
+            forceHide(sessionsPanel);
+        };
+
+        window.NovaOpenMobileTools = function () {
+            closeAllPanels();
+            forceShow(toolsPanel, "bottom");
+        };
+
+        window.NovaCloseMobileTools = function () {
+            forceHide(toolsPanel);
+        };
+
+        window.NovaOpenMobileMemory = function () {
+            closeAllPanels();
+            forceShow(memoryPanel, "top");
+        };
+
+        window.NovaCloseMobileMemory = function () {
+            forceHide(memoryPanel);
+        };
+
+        window.NovaOpenMobileExecution = function () {
+            closeAllPanels();
+            forceShow(executionPanel, "top");
+        };
+
+        window.NovaCloseMobileExecution = function () {
+            forceHide(executionPanel);
+        };
+
+        if (sessionsButton) {
+            sessionsButton.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                window.NovaOpenMobileSessions();
+            });
+        }
+
+        if (toolsButton) {
+            toolsButton.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                window.NovaOpenMobileTools();4:58 PM 2026-06-03
+            });
+        }
+
+        document.querySelectorAll("button").forEach(function (button) {
+            var text = (button.textContent || "").trim().toLowerCase();
+            var tool = button.getAttribute("data-mobile-tool");
+
+            if (text === "close sessions") {
+                button.removeAttribute("onclick");
+                button.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    window.NovaCloseMobileSessions();
+                });
+            }
+
+            if (text === "close") {
+                button.removeAttribute("onclick");
+                button.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    window.NovaCloseMobileTools();
+                });
+            }
+
+            if (text === "memory" || button.id === "nova-mobile-memory-toggle") {
+                button.removeAttribute("onclick");
+                button.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    window.NovaOpenMobileMemory();
+                });
+            }
+
+            if (text === "close memory" || button.id === "nova-mobile-memory-close") {
+                button.removeAttribute("onclick");
+                button.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    window.NovaCloseMobileMemory();
+                });
+            }
+
+            if (tool === "execution" || text === "open execution panel") {
+                button.removeAttribute("onclick");
+                button.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    window.NovaOpenMobileExecution();
+                });
+            }
+
+            if (text === "close execution" || button.id === "nova-mobile-execution-close") {
+                button.removeAttribute("onclick");
+                button.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    window.NovaCloseMobileExecution();
+                });
+            }
+        });
+
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                closeAllPanels();
+            }
+        });
+
+        console.log("[Nova Mobile] panel hard lock active");
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", wire);
+    } else {
+        wire();
+    }
+})();
+</script>
+<!-- NOVA MOBILE PANEL HARD LOCK END -->
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+

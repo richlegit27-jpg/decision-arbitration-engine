@@ -5452,6 +5452,16 @@ def api_chat():
                     "direct_url_patch_hit",
                 )
 
+
+                _raw_low_for_fake_context = str(_raw_text or "").lower()
+
+                if (
+                    "project-aware context for nova:" in _raw_low_for_fake_context
+                    or "relevant persistent memory:" in _raw_low_for_fake_context
+                    or "recent session context:" in _raw_low_for_fake_context
+                    or "persistent memory:" in _raw_low_for_fake_context
+                ):
+                    raise RuntimeError("attachment prehandle ignored injected Nova memory context")
                 _lines = []
                 _seen = set()
 
@@ -5487,6 +5497,27 @@ def api_chat():
 
                 _top = _lines[:8]
 
+                _fake_context_markers = (
+                    "project-aware context for nova:",
+                    "relevant persistent memory:",
+                    "recent session context:",
+                    "persistent memory:",
+                    "[preference]",
+                    "[user_fact]",
+                    "[people]",
+                )
+
+                _top = [
+                    _item for _item in _top
+                    if not any(
+                        _marker in str(_item or "").lower()
+                        for _marker in _fake_context_markers
+                    )
+                ]
+
+                if not _top:
+                    raise RuntimeError("attachment prehandle ignored fake memory context")
+
                 if _top:
                     _topic = "; ".join(_top[:3])
                     _reply = "Attachment analysis:\n"
@@ -5499,6 +5530,22 @@ def api_chat():
                     _reply = (
                         "Attachment analysis:\n"
                         "The attachment was received and processed, but the extracted text is too limited or noisy to summarize cleanly."
+                    )
+
+                _reply_low = str(_reply or "").lower()
+
+                if (
+                    "project-aware context for nova:" in _reply_low
+                    or "relevant persistent memory:" in _reply_low
+                    or "recent session context:" in _reply_low
+                    or "persistent memory:" in _reply_low
+                    or "[preference]" in _reply_low
+                    or "[user_fact]" in _reply_low
+                    or "[people]" in _reply_low
+                ):
+                    _reply = (
+                        "Attachment received.\n"
+                        "The file was uploaded, but Nova ignored internal memory/context text that was accidentally mixed into the attachment analyzer."
                     )
 
                 app.logger.info(
@@ -14158,11 +14205,11 @@ def nova_history_direct_send_20260622(session_id):
 
 if __name__ == "__main__":
     create_startup_backup()
-    app.run(
-        host="127.0.0.1",
-        port=5001,
-        debug=True,
-    )
+app.run(
+    host="0.0.0.0",
+    port=5001,
+    debug=True,
+)
 
 
 # NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611

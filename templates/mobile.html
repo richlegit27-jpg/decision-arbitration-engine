@@ -4894,7 +4894,7 @@ html, body {
 
         const composerRect = composer.getBoundingClientRect();
         const composerTop = Math.round(numberOr(composerRect.top, viewportHeight - 132));
-        const composerHeight = Math.max(96, Math.round(numberOr(composerRect.height, 132)));
+        const composerHeight = 150;
 
         /*
           Important:
@@ -4915,7 +4915,7 @@ html, body {
           messages to begin halfway down the screen.
         */
         const topPx = 50;
-        const bottomPx = Math.max(110, composerHeight);
+        const bottomPx = 150;
 
         document.documentElement.style.setProperty(
             "--nova-mobile-composer-live-height",
@@ -4938,7 +4938,7 @@ html, body {
 
         composer.style.setProperty("position", "fixed", "important");
         composer.style.setProperty("bottom", "0px", "important");
-composer.style.setProperty("min-height", "110px", "important");
+document.getElementById("nova-mobile-composer").getBoundingClientRect().height
 composer.style.setProperty("height", "auto", "important");
 composer.style.setProperty("overflow", "visible", "important");
 
