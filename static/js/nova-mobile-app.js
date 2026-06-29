@@ -738,16 +738,73 @@ function messageTextFromResponse(data, userText) {
         }
     }
 
-    function clearAttachmentsAfterSend() {
-        try {
-            window.NovaMobilePendingAttachments = [];
-            window.__novaMobilePendingAttachments = [];
-            localStorage.removeItem("nova_mobile_pending_attachments");
-            localStorage.removeItem("nova_mobile_last_uploaded_attachment");
-        } catch (e) {}
+function clearAttachmentsAfterSend() {
+    try {
+        window.NovaMobileAttachments = [];
+        window.NovaMobilePendingAttachments = [];
+        window.__novaMobilePendingAttachments = [];
+        window.NovaMobileUploadedAttachments = [];
+        window.NovaMobileSharedAttachments = [];
+        window.NovaMobileFinalAttachmentPayloadQueue = [];
+        window.NovaMobileAttachmentQueue = [];
+        window.novaMobileAttachments = [];
+        window.NovaMobileUploadQueue = [];
+
+        localStorage.removeItem("nova_mobile_pending_attachments");
+        localStorage.removeItem("nova_mobile_last_uploaded_attachment");
+
+        const visiblePreview = document.getElementById("nova-main-visible-attachment-preview");
+        if (visiblePreview) {
+            visiblePreview.remove();
+        }
+
+        const oldPreview = document.getElementById("nova-mobile-attachment-preview");
+        if (oldPreview) {
+            oldPreview.remove();
+        }
+    } catch (e) {
+        console.warn("[Nova Send Final Owner] clear attachments failed", e);
+    }
+}
+
+function currentAttachmentsForSend() {
+    function safeArray(value) {
+        return Array.isArray(value) ? value : [];
     }
 
-    let sending = false;
+    const all = [
+        ...safeArray(window.NovaMobileAttachments),
+        ...safeArray(window.NovaMobilePendingAttachments),
+        ...safeArray(window.__novaMobilePendingAttachments),
+        ...safeArray(window.NovaMobileFinalAttachmentPayloadQueue),
+        ...safeArray(window.NovaMobileUploadedAttachments),
+        ...safeArray(window.NovaMobileAttachmentQueue),
+        ...safeArray(window.novaMobileAttachments),
+        ...safeArray(window.NovaMobileSharedAttachments),
+        ...safeArray(window.NovaMobileUploadQueue)
+    ];
+
+    const seen = new Set();
+
+    return all.filter((item) => {
+        if (!item || typeof item !== "object") return false;
+
+        const key =
+            item.id ||
+            item.file_url ||
+            item.url ||
+            item.filename ||
+            item.name ||
+            JSON.stringify(item);
+
+        if (seen.has(key)) return false;
+        seen.add(key);
+
+        return true;
+    });
+}
+
+let sending = false;
 
 async function sendNow(event) {
     if (event) {
@@ -773,8 +830,11 @@ async function sendNow(event) {
     if (!text) return false;
 
     const sessionId = getSessionId();
-    const attachments = [];
-    clearAttachmentsAfterSend();
+const attachments = currentAttachmentsForSend();
+
+console.log("[Nova Send Final Owner] sending attachments", attachments);
+
+clearAttachmentsAfterSend();
 
     sending = true;
 
@@ -886,4 +946,308 @@ setTimeout(wireSend, 250);
 setTimeout(wireSend, 1000);
 
 console.log("[Nova Send Final Owner] ready");
+})();
+
+/* NOVA_MOBILE_MAIN_ATTACH_BUTTON_OWNER_20260629 */
+(() => {
+    if (window.__NOVA_MOBILE_MAIN_ATTACH_BUTTON_OWNER_20260629__) return;
+    window.__NOVA_MOBILE_MAIN_ATTACH_BUTTON_OWNER_20260629__ = true;
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+function wireMainFileInputUpload() {
+    const input =
+        $("nova-mobile-file-input") ||
+        $("mobileFileInput") ||
+        $("fileInput");
+
+    if (!input) {
+        console.warn("[Nova Main Attach Owner] file input missing");
+        return false;
+    }
+
+    if (input.dataset.novaMainUploadOwner === "1") {
+        return true;
+    }
+
+    input.dataset.novaMainUploadOwner = "1";
+
+    async function handleMainFileInputChange(event) {
+        const file = event.target.files && event.target.files[0];
+
+        if (!file) {
+            console.warn("[Nova Main Attach Owner] no file selected");
+            return;
+        }
+
+        console.log("[Nova Main Attach Owner] selected file", {
+            name: file.name,
+            type: file.type,
+            size: file.size
+        });
+
+        const form = new FormData();
+        form.append("file", file);
+
+        try {
+            const res = await fetch("/api/upload", {
+                method: "POST",
+                credentials: "same-origin",
+                body: form
+            });
+
+            const data = await res.json().catch(() => ({}));
+
+            console.log("[Nova Main Attach Owner] upload response", data);
+
+            if (!res.ok || data.ok === false) {
+                throw new Error(data.error || data.message || "Upload failed");
+            }
+
+            const payload = {
+                id: data.id || crypto.randomUUID(),
+                file_url: data.file_url || data.url || data.path || "",
+                url: data.file_url || data.url || data.path || "",
+                filename: data.filename || data.original_filename || file.name,
+                original_filename: data.original_filename || file.name,
+                mime_type: data.mime_type || file.type || "application/octet-stream",
+                type: data.mime_type || file.type || "application/octet-stream"
+            };
+
+            window.NovaMobileAttachments = [payload];
+            window.NovaMobilePendingAttachments = [payload];
+            window.__novaMobilePendingAttachments = [payload];
+            window.NovaMobileUploadedAttachments = [payload];
+            window.NovaMobileSharedAttachments = [payload];
+
+            try {
+                localStorage.setItem("nova_mobile_pending_attachments", JSON.stringify([payload]));
+                localStorage.setItem("nova_mobile_last_uploaded_attachment", JSON.stringify(payload));
+            } catch (e) {}
+
+            renderMainAttachmentPreview(payload);
+
+            console.log("[Nova Main Attach Owner] attachment stored", payload);
+        } catch (error) {
+            console.error("[Nova Main Attach Owner] upload failed", error);
+        } finally {
+            input.value = "";
+        }
+}
+
+input.onchange = handleMainFileInputChange;
+
+    console.log("[Nova Main Attach Owner] upload input wired", input.id);
+
+    return true;
+}
+
+function renderMainAttachmentPreview(payload) {
+    let preview = document.getElementById("nova-main-visible-attachment-preview");
+
+    if (!preview) {
+        preview = document.createElement("div");
+        preview.id = "nova-main-visible-attachment-preview";
+        document.body.appendChild(preview);
+
+        console.log("[Nova Main Attach Owner] visible preview created");
+    }
+
+    document.body.appendChild(preview);
+
+    function important(name, value) {
+        preview.style.setProperty(name, value, "important");
+    }
+
+    preview.innerHTML = "";
+
+important("position", "fixed");
+important("top", "auto");
+important("bottom", "92px");
+important("left", "10px");
+important("right", "10px");
+important("width", "calc(100vw - 20px)");
+important("height", "58px");
+important("z-index", "2147483647");
+important("display", "flex");
+important("visibility", "visible");
+important("opacity", "1");
+important("align-items", "center");
+important("gap", "10px");
+important("padding", "8px");
+important("box-sizing", "border-box");
+important("border-radius", "14px");
+important("background", "rgba(30,20,45,0.96)");
+important("border", "1px solid rgba(255,255,255,0.16)");
+important("box-shadow", "0 8px 28px rgba(0,0,0,0.35)");
+important("outline", "none");
+important("color", "#fff");
+important("font-size", "14px");
+important("font-weight", "700");
+important("pointer-events", "auto");
+
+    if (payload.file_url || payload.url) {
+        const img = document.createElement("img");
+        img.src = payload.file_url || payload.url;
+        img.alt = payload.original_filename || payload.filename || "attachment";
+
+        img.style.setProperty("width", "44px", "important");
+        img.style.setProperty("height", "44px", "important");
+        img.style.setProperty("object-fit", "cover", "important");
+        img.style.setProperty("border-radius", "10px", "important");
+        img.style.setProperty("background", "#111", "important");
+        img.style.setProperty("flex", "0 0 auto", "important");
+
+        preview.appendChild(img);
+    }
+
+    const label = document.createElement("div");
+    label.textContent = "ATTACHED: " + (payload.original_filename || payload.filename || "file");
+
+    label.style.setProperty("overflow", "hidden", "important");
+    label.style.setProperty("white-space", "nowrap", "important");
+    label.style.setProperty("text-overflow", "ellipsis", "important");
+
+    preview.appendChild(label);
+
+const close = document.createElement("button");
+close.type = "button";
+close.textContent = "×";
+
+close.style.setProperty("margin-left", "auto", "important");
+close.style.setProperty("width", "32px", "important");
+close.style.setProperty("height", "32px", "important");
+close.style.setProperty("border", "0", "important");
+close.style.setProperty("border-radius", "999px", "important");
+close.style.setProperty("background", "rgba(255,255,255,0.14)", "important");
+close.style.setProperty("color", "#fff", "important");
+close.style.setProperty("font-size", "22px", "important");
+close.style.setProperty("line-height", "28px", "important");
+close.style.setProperty("cursor", "pointer", "important");
+
+close.onclick = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    preview.remove();
+
+    window.NovaMobileAttachments = [];
+    window.NovaMobilePendingAttachments = [];
+    window.__novaMobilePendingAttachments = [];
+    window.NovaMobileUploadedAttachments = [];
+    window.NovaMobileSharedAttachments = [];
+    window.NovaMobileFinalAttachmentPayloadQueue = [];
+    window.NovaMobileAttachmentQueue = [];
+    window.novaMobileAttachments = [];
+    window.NovaMobileUploadQueue = [];
+
+    localStorage.removeItem("nova_mobile_pending_attachments");
+    localStorage.removeItem("nova_mobile_last_uploaded_attachment");
+
+    console.log("[Nova Main Attach Owner] preview closed and attachments cleared");
+};
+
+preview.appendChild(close);
+
+    console.log("[Nova Main Attach Owner] visible preview rendered", {
+        preview,
+        parent: preview.parentElement,
+        rect: preview.getBoundingClientRect(),
+        style: {
+            display: getComputedStyle(preview).display,
+            visibility: getComputedStyle(preview).visibility,
+            opacity: getComputedStyle(preview).opacity,
+            zIndex: getComputedStyle(preview).zIndex,
+            position: getComputedStyle(preview).position,
+            top: getComputedStyle(preview).top,
+            width: getComputedStyle(preview).width,
+            height: getComputedStyle(preview).height
+        }
+    });
+}
+
+
+
+    function wireMainAttachButton() {
+        const attach = $("nova-mobile-attach");
+        const input =
+            $("nova-mobile-file-input") ||
+            $("mobileFileInput") ||
+            $("fileInput");
+
+        if (!attach || !input) {
+            console.warn("[Nova Main Attach Owner] missing", {
+                attach: !!attach,
+                input: !!input
+            });
+            return false;
+        }
+
+        attach.disabled = false;
+        attach.removeAttribute("disabled");
+        attach.style.pointerEvents = "auto";
+        attach.style.visibility = "visible";
+        attach.style.opacity = "1";
+        attach.style.zIndex = "2147483647";
+
+        attach.onclick = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (typeof event.stopImmediatePropagation === "function") {
+                event.stopImmediatePropagation();
+            }
+
+            console.log("[Nova Main Attach Owner] opening file picker");
+            input.click();
+
+            return false;
+        };
+
+        if (attach.dataset.novaMainAttachCapture !== "1") {
+            attach.dataset.novaMainAttachCapture = "1";
+
+            attach.addEventListener("click", (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (typeof event.stopImmediatePropagation === "function") {
+                    event.stopImmediatePropagation();
+                }
+
+                console.log("[Nova Main Attach Owner] capture opening file picker");
+                input.click();
+
+                return false;
+            }, true);
+        }
+
+        console.log("[Nova Main Attach Owner] wired", {
+            attach: attach.id,
+            input: input.id
+        });
+
+        return true;
+    }
+
+wireMainAttachButton();
+wireMainFileInputUpload();
+
+setTimeout(() => {
+    wireMainAttachButton();
+    wireMainFileInputUpload();
+}, 100);
+
+setTimeout(() => {
+    wireMainAttachButton();
+    wireMainFileInputUpload();
+}, 500);
+
+setTimeout(() => {
+    wireMainAttachButton();
+    wireMainFileInputUpload();
+}, 1200);
+
 })();
