@@ -4606,3 +4606,257 @@ row.onclick = async () => {
     console.log("[Nova Mobile Action Markdown Dedupe] ready");
 })();
 
+
+/* -------------------------------------------------
+   NOVA MOBILE GENERATED IMAGE RESULT RENDERER
+   Renders assistant_message.image_url from /api/chat results.
+   20260629
+-------------------------------------------------- */
+(() => {
+    if (window.__NOVA_MOBILE_GENERATED_IMAGE_RESULT_RENDERER_20260629__) return;
+    window.__NOVA_MOBILE_GENERATED_IMAGE_RESULT_RENDERER_20260629__ = true;
+
+    const IMAGE_TEXT_PREFIX = "Generated image for:";
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function chatRoot() {
+        return (
+            $("mobileChatMessages") ||
+            $("nova-mobile-messages") ||
+            $("nova-mobile-chat") ||
+            document.querySelector("[data-mobile-chat-messages]") ||
+            document.querySelector(".mobile-chat-messages") ||
+            document.querySelector(".nova-mobile-messages") ||
+            document.querySelector(".nova-mobile-chat") ||
+            document.querySelector(".chat-messages")
+        );
+    }
+
+    function activeSessionId() {
+        try {
+            return (
+                localStorage.getItem("nova_mobile_active_session_id") ||
+                localStorage.getItem("nova_active_session_id") ||
+                window.NOVA_ACTIVE_SESSION_ID ||
+                window.NovaActiveSessionId ||
+                window.activeSessionId ||
+                ""
+            );
+        } catch (e) {
+            return "";
+        }
+    }
+
+    function cleanText(value) {
+        return String(value || "").replace(/\s+/g, " ").trim();
+    }
+
+    function imageUrlOf(message) {
+        if (!message || typeof message !== "object") return "";
+
+        const meta = message.meta && typeof message.meta === "object" ? message.meta : {};
+        const viewer = message.viewer && typeof message.viewer === "object" ? message.viewer : {};
+
+        return String(
+            message.image_url ||
+            message.imageUrl ||
+            message.preview ||
+            viewer.image_url ||
+            meta.image_url ||
+            meta.url ||
+            ""
+        ).trim();
+    }
+
+    function messageTextOf(message) {
+        if (!message || typeof message !== "object") return "";
+        return cleanText(message.text || message.content || message.body || "");
+    }
+
+    function promptFromGeneratedText(text) {
+        const clean = cleanText(text);
+        const index = clean.indexOf(IMAGE_TEXT_PREFIX);
+
+        if (index < 0) return "";
+
+        return clean.slice(index + IMAGE_TEXT_PREFIX.length).trim();
+    }
+
+    function findAssistantGeneratedBubbles() {
+        const root = chatRoot();
+        if (!root) return [];
+
+        return Array.from(root.querySelectorAll("*")).filter((el) => {
+            if (!el || el.dataset.novaGeneratedImageRendered === "1") return false;
+            if (el.querySelector && el.querySelector(".nova-generated-image-result")) return false;
+
+            const text = cleanText(el.innerText || el.textContent || "");
+            if (!text.includes(IMAGE_TEXT_PREFIX)) return false;
+
+            const looksLikeBubble =
+                el.classList.contains("assistant") ||
+                el.className.toString().toLowerCase().includes("assistant") ||
+                el.className.toString().toLowerCase().includes("message") ||
+                el.className.toString().toLowerCase().includes("bubble");
+
+            return looksLikeBubble;
+        });
+    }
+
+    function makeImageNode(url, prompt) {
+        const wrap = document.createElement("div");
+        wrap.className = "nova-generated-image-result";
+
+        const img = document.createElement("img");
+        img.className = "nova-generated-image-result-img";
+        img.src = url;
+        img.alt = prompt || "Generated image";
+        img.loading = "lazy";
+        img.decoding = "async";
+
+        img.addEventListener("click", () => {
+            try {
+                if (typeof window.openNovaImageViewer === "function") {
+                    window.openNovaImageViewer(url);
+                    return;
+                }
+            } catch (e) {}
+
+            try {
+                window.open(url, "_blank", "noopener,noreferrer");
+            } catch (e) {}
+        });
+
+        wrap.appendChild(img);
+        return wrap;
+    }
+
+    function appendImageToBubble(bubble, url, prompt) {
+        if (!bubble || !url) return false;
+        if (bubble.dataset.novaGeneratedImageRendered === "1") return false;
+        if (bubble.querySelector(".nova-generated-image-result")) return false;
+
+        bubble.appendChild(makeImageNode(url, prompt));
+        bubble.dataset.novaGeneratedImageRendered = "1";
+        bubble.classList.add("nova-generated-image-message");
+
+        return true;
+    }
+
+    async function fetchActiveSession() {
+        const sid = activeSessionId();
+        if (!sid) return null;
+
+        const urls = [
+            "/api/sessions/" + encodeURIComponent(sid),
+            "/api/chat/" + encodeURIComponent(sid)
+        ];
+
+        for (const url of urls) {
+            try {
+                const res = await fetch(url, {
+                    credentials: "same-origin",
+                    cache: "no-store"
+                });
+
+                if (!res.ok) continue;
+
+                const data = await res.json();
+
+                if (data && Array.isArray(data.messages)) return data;
+                if (data && data.session && Array.isArray(data.session.messages)) return data.session;
+            } catch (e) {}
+        }
+
+        return null;
+    }
+
+    function imageMessagesFromSession(session) {
+        const messages = Array.isArray(session && session.messages) ? session.messages : [];
+
+        return messages
+            .filter((message) => {
+                const role = String(message.role || "").toLowerCase();
+                return role === "assistant" && imageUrlOf(message);
+            })
+            .map((message) => ({
+                text: messageTextOf(message),
+                prompt: promptFromGeneratedText(messageTextOf(message)),
+                url: imageUrlOf(message)
+            }));
+    }
+
+    async function renderGeneratedImages() {
+        const bubbles = findAssistantGeneratedBubbles();
+        if (!bubbles.length) return false;
+
+        const session = await fetchActiveSession();
+        const imageMessages = imageMessagesFromSession(session);
+
+        if (!imageMessages.length) return false;
+
+        let rendered = 0;
+
+        bubbles.forEach((bubble) => {
+            const bubbleText = cleanText(bubble.innerText || bubble.textContent || "");
+            const bubblePrompt = promptFromGeneratedText(bubbleText);
+
+            let match = imageMessages.find((item) => {
+                return item.text && cleanText(item.text) === bubbleText;
+            });
+
+            if (!match && bubblePrompt) {
+                match = imageMessages.find((item) => {
+                    return item.prompt && cleanText(item.prompt) === cleanText(bubblePrompt);
+                });
+            }
+
+            if (!match) {
+                match = imageMessages[imageMessages.length - 1];
+            }
+
+            if (match && appendImageToBubble(bubble, match.url, match.prompt || bubblePrompt)) {
+                rendered += 1;
+            }
+        });
+
+        if (rendered) {
+            console.log("[Nova Mobile Generated Image Renderer] rendered", rendered);
+        }
+
+        return rendered > 0;
+    }
+
+    function scheduleRender() {
+        clearTimeout(window.__novaMobileGeneratedImageRenderTimer);
+        window.__novaMobileGeneratedImageRenderTimer = setTimeout(() => {
+            renderGeneratedImages();
+        }, 150);
+    }
+
+    scheduleRender();
+    setTimeout(scheduleRender, 500);
+    setTimeout(scheduleRender, 1200);
+    setTimeout(scheduleRender, 2500);
+
+    document.addEventListener("DOMContentLoaded", scheduleRender);
+    window.addEventListener("nova:session-changed", scheduleRender);
+    window.addEventListener("nova:message-rendered", scheduleRender);
+
+    const root = chatRoot();
+    if (root && window.MutationObserver) {
+        const observer = new MutationObserver(scheduleRender);
+        observer.observe(root, {
+            childList: true,
+            subtree: true
+        });
+        window.__NovaMobileGeneratedImageResultObserver = observer;
+    }
+
+    window.NovaMobileRenderGeneratedImages = renderGeneratedImages;
+
+    console.log("[Nova Mobile Generated Image Renderer] ready");
+})();

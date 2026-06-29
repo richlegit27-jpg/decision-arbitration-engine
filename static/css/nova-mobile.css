@@ -14481,3 +14481,30 @@ button {
     visibility: hidden !important;
     pointer-events: none !important;
 }
+/* -------------------------------------------------
+   NOVA MOBILE GENERATED IMAGE RESULT DISPLAY
+   20260629
+-------------------------------------------------- */
+.nova-generated-image-message {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+}
+
+.nova-generated-image-result {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-top: 8px !important;
+    border-radius: 18px !important;
+    overflow: hidden !important;
+}
+
+.nova-generated-image-result-img {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    border-radius: 18px !important;
+    object-fit: contain !important;
+    cursor: pointer !important;
+}
