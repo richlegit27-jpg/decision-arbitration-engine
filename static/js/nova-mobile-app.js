@@ -5175,3 +5175,121 @@ row.onclick = async () => {
 
     console.log("[Nova Mobile Final Actions Cleanup] ready");
 })();
+
+/* -------------------------------------------------
+   NOVA MOBILE OLD LOWER ACTION ROW KILLER
+   Removes old flashing lower Copy/Regen rows.
+   Keeps only .nova-final-message-actions.
+   20260629
+-------------------------------------------------- */
+(() => {
+    if (window.__NOVA_MOBILE_OLD_LOWER_ACTION_ROW_KILLER_20260629__) return;
+    window.__NOVA_MOBILE_OLD_LOWER_ACTION_ROW_KILLER_20260629__ = true;
+
+    const OLD_ACTION_SELECTORS = [
+        ".nova-mobile-message-actions",
+        ".nova-mobile-assistant-actions",
+        ".nova-mobile-copy-regen-actions",
+        ".nova-real-message-actions",
+        ".mobile-message-actions",
+        ".message-actions",
+        ".mobile-inline-action",
+        ".nova-code-copy-btn",
+        ".mobile-code-copy-btn",
+        ".nova-mobile-copy-chat",
+        ".nova-mobile-regen-chat",
+        ".nova-mobile-copy-message",
+        ".nova-mobile-regenerate-message",
+        "[data-mobile-assistant-action]"
+    ].join(",");
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function chatRoot() {
+        return (
+            $("mobileChatMessages") ||
+            $("nova-mobile-messages") ||
+            $("nova-mobile-chat") ||
+            document.querySelector("[data-mobile-chat-messages]") ||
+            document.querySelector(".mobile-chat-messages") ||
+            document.querySelector(".nova-mobile-messages") ||
+            document.querySelector(".nova-mobile-chat") ||
+            document.querySelector(".chat-messages")
+        );
+    }
+
+    function killOldLowerActions() {
+        const chat = chatRoot();
+        if (!chat) return false;
+
+        let killed = 0;
+
+        Array.from(chat.querySelectorAll(OLD_ACTION_SELECTORS)).forEach((node) => {
+            if (!node || node.closest(".nova-final-message-actions")) return;
+
+            try {
+                node.remove();
+                killed += 1;
+            } catch (e) {}
+        });
+
+        if (killed) {
+            console.log("[Nova Mobile Old Lower Action Killer] removed", killed);
+        }
+
+        return killed > 0;
+    }
+
+    function scheduleKill() {
+        clearTimeout(window.__novaMobileOldLowerActionKillerTimer);
+        window.__novaMobileOldLowerActionKillerTimer = setTimeout(killOldLowerActions, 40);
+    }
+
+    document.addEventListener("click", (event) => {
+        const chat = chatRoot();
+        const target = event.target && event.target.closest
+            ? event.target.closest(OLD_ACTION_SELECTORS)
+            : null;
+
+        if (chat && target && chat.contains(target) && !target.closest(".nova-final-message-actions")) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (typeof event.stopImmediatePropagation === "function") {
+                event.stopImmediatePropagation();
+            }
+
+            target.remove();
+            scheduleKill();
+        }
+    }, true);
+
+    killOldLowerActions();
+    setTimeout(killOldLowerActions, 100);
+    setTimeout(killOldLowerActions, 400);
+    setTimeout(killOldLowerActions, 1000);
+    setTimeout(killOldLowerActions, 2000);
+
+    document.addEventListener("DOMContentLoaded", scheduleKill);
+    window.addEventListener("nova:session-changed", scheduleKill);
+    window.addEventListener("nova:message-rendered", scheduleKill);
+
+    const chat = chatRoot();
+
+    if (chat && window.MutationObserver) {
+        const observer = new MutationObserver(scheduleKill);
+
+        observer.observe(chat, {
+            childList: true,
+            subtree: true
+        });
+
+        window.__NovaMobileOldLowerActionKillerObserver = observer;
+    }
+
+    window.NovaMobileKillOldLowerActions = killOldLowerActions;
+
+    console.log("[Nova Mobile Old Lower Action Killer] ready");
+})();

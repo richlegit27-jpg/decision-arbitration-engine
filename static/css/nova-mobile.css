@@ -14550,3 +14550,74 @@ button {
 .message-actions {
     display: none !important;
 }
+
+/* -------------------------------------------------
+   NOVA MOBILE OLD LOWER ACTION ROW KILLER
+   Hide legacy duplicate Copy/Regen rows.
+   20260629
+-------------------------------------------------- */
+#mobileChatMessages .nova-mobile-message-actions,
+#nova-mobile-messages .nova-mobile-message-actions,
+#nova-mobile-chat .nova-mobile-message-actions,
+.mobile-chat-messages .nova-mobile-message-actions,
+.nova-mobile-messages .nova-mobile-message-actions,
+.nova-mobile-chat .nova-mobile-message-actions,
+#mobileChatMessages .nova-mobile-assistant-actions,
+#nova-mobile-messages .nova-mobile-assistant-actions,
+#nova-mobile-chat .nova-mobile-assistant-actions,
+.mobile-chat-messages .nova-mobile-assistant-actions,
+.nova-mobile-messages .nova-mobile-assistant-actions,
+.nova-mobile-chat .nova-mobile-assistant-actions,
+#mobileChatMessages .nova-mobile-copy-regen-actions,
+#nova-mobile-messages .nova-mobile-copy-regen-actions,
+#nova-mobile-chat .nova-mobile-copy-regen-actions,
+.mobile-chat-messages .nova-mobile-copy-regen-actions,
+.nova-mobile-messages .nova-mobile-copy-regen-actions,
+.nova-mobile-chat .nova-mobile-copy-regen-actions,
+#mobileChatMessages .nova-real-message-actions,
+#nova-mobile-messages .nova-real-message-actions,
+#nova-mobile-chat .nova-real-message-actions,
+.mobile-chat-messages .nova-real-message-actions,
+.nova-mobile-messages .nova-real-message-actions,
+.nova-mobile-chat .nova-real-message-actions,
+#mobileChatMessages .mobile-message-actions,
+#nova-mobile-messages .mobile-message-actions,
+#nova-mobile-chat .mobile-message-actions,
+.mobile-chat-messages .mobile-message-actions,
+.nova-mobile-messages .mobile-message-actions,
+.nova-mobile-chat .mobile-message-actions,
+#mobileChatMessages .message-actions,
+#nova-mobile-messages .message-actions,
+#nova-mobile-chat .message-actions,
+.mobile-chat-messages .message-actions,
+.nova-mobile-messages .message-actions,
+.nova-mobile-chat .message-actions {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+}
+
+/* Re-enable the one real owner */
+#mobileChatMessages .nova-final-message-actions,
+#nova-mobile-messages .nova-final-message-actions,
+#nova-mobile-chat .nova-final-message-actions,
+.mobile-chat-messages .nova-final-message-actions,
+.nova-mobile-messages .nova-final-message-actions,
+.nova-mobile-chat .nova-final-message-actions {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 26px !important;
+    overflow: visible !important;
+}
