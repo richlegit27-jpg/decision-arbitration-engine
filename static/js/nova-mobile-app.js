@@ -3572,8 +3572,8 @@ function styleDock(dock) {
             $("nova-mobile-sessions-button") ||
             $("nova-mobile-sessions-btn") ||
             $("mobileSessionsButton") ||
-            document.querySelector("[data-mobile-sessions]") ||
-            Array.from(document.querySelectorAll("button, [role='button'], a")).find((el) => {
+document.querySelector("[data-mobile-sessions]") ||
+Array.from(document.querySelectorAll("button, [role='button'], a")).find((el) => {
                 const text = String(el.textContent || el.ariaLabel || el.title || "").toLowerCase();
                 return text.includes("session");
             })
@@ -3721,8 +3721,8 @@ function styleDock(dock) {
             $("nova-mobile-sessions-button") ||
             $("nova-mobile-sessions-btn") ||
             $("mobileSessionsButton") ||
-            document.querySelector("[data-mobile-sessions]") ||
-            Array.from(document.querySelectorAll("button, [role='button'], a, div")).find((el) => {
+document.querySelector("[data-mobile-sessions]") ||
+Array.from(document.querySelectorAll("button, [role='button'], a")).find((el) => {
                 const text = String(el.textContent || el.ariaLabel || el.title || "").toLowerCase().trim();
                 return text === "sessions" || text.includes("sessions");
             })
