@@ -5621,6 +5621,7 @@ row.onclick = async () => {
 
     console.log("[Nova Mobile Action Stability] ready");
 })();
+<<<<<<< HEAD
 
 /* -------------------------------------------------
    NOVA MOBILE SESSION PANEL GOVERNOR
@@ -6118,4 +6119,146 @@ row.onclick = async () => {
     window.NovaMobileArbitrateSessionPanels = arbitrate;
 
     console.log("[Nova Mobile Session Arbiter] ready");
+})();
+=======
+>>>>>>> parent of d0bf57c (Stop duplicate mobile session panels from reopening)
+
+/* -------------------------------------------------
+   NOVA MOBILE SAFE SESSION CLOSE ONLY
+   Closes duplicate session panels without blocking row/actions.
+   20260629
+-------------------------------------------------- */
+(() => {
+    if (window.__NOVA_MOBILE_SAFE_SESSION_CLOSE_ONLY_20260629__) return;
+    window.__NOVA_MOBILE_SAFE_SESSION_CLOSE_ONLY_20260629__ = true;
+
+    function text(value) {
+        return String(value || "").trim();
+    }
+
+    function lower(value) {
+        return text(value).toLowerCase();
+    }
+
+    function allSessionPanels() {
+        return Array.from(document.querySelectorAll([
+            "#nova-mobile-sessions-panel",
+            "#nova-sessions-v2-panel",
+            "#nova-mobile-session-panel",
+            "#mobile-sessions-panel",
+            "#sessions-panel",
+            "[id*='session'][id*='panel']",
+            "[id*='session'][id*='drawer']",
+            "[id*='session'][id*='modal']",
+            "[id*='sessions'][id*='panel']",
+            "[class*='session'][class*='panel']",
+            "[class*='session'][class*='drawer']",
+            "[class*='session'][class*='modal']",
+            "[class*='sessions-v2']"
+        ].join(","))).filter((el) => {
+            const raw = lower((el.id || "") + " " + (el.className || ""));
+            return raw.includes("session");
+        });
+    }
+
+    function closePanel(panel) {
+        if (!panel) return;
+
+        panel.classList.remove(
+            "open",
+            "show",
+            "active",
+            "visible",
+            "is-open",
+            "is-visible",
+            "nova-open",
+            "sessions-open"
+        );
+
+        panel.setAttribute("aria-hidden", "true");
+        panel.hidden = true;
+
+        panel.style.setProperty("display", "none", "important");
+        panel.style.setProperty("visibility", "hidden", "important");
+        panel.style.setProperty("opacity", "0", "important");
+        panel.style.setProperty("pointer-events", "none", "important");
+    }
+
+    function closeAll(reason) {
+        allSessionPanels().forEach(closePanel);
+
+        document.body.classList.remove("nova-mobile-sessions-open");
+        document.body.classList.remove("sessions-open");
+
+        console.log("[Nova Mobile Safe Session Close] closed", reason || "close");
+    }
+
+    function closestSessionPanel(target) {
+        if (!target || !target.closest) return null;
+
+        return (
+            target.closest("#nova-mobile-sessions-panel") ||
+            target.closest("#nova-sessions-v2-panel") ||
+            target.closest("#mobile-sessions-panel") ||
+            target.closest("[id*='session'][id*='panel']") ||
+            target.closest("[class*='session'][class*='panel']") ||
+            target.closest("[class*='session'][class*='drawer']")
+        );
+    }
+
+    function isCloseTarget(target) {
+        if (!target || target.nodeType !== 1) return false;
+
+        const button = target.closest("button, a, [role='button'], [data-close], [data-dismiss], .close, .modal-close");
+
+        if (!button) return false;
+
+        const raw = lower(
+            (button.id || "") + " " +
+            (button.className || "") + " " +
+            (button.getAttribute("aria-label") || "") + " " +
+            (button.getAttribute("title") || "") + " " +
+            (button.dataset ? Object.keys(button.dataset).join(" ") : "")
+        );
+
+        const label = lower(button.innerText || button.textContent || "");
+
+        return (
+            raw.includes("close") ||
+            raw.includes("dismiss") ||
+            label === "×" ||
+            label === "x" ||
+            label === "close" ||
+            label === "done"
+        );
+    }
+
+    document.addEventListener("click", (event) => {
+        const panel = closestSessionPanel(event.target);
+
+        if (!panel) return;
+        if (!isCloseTarget(event.target)) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (typeof event.stopImmediatePropagation === "function") {
+            event.stopImmediatePropagation();
+        }
+
+        closeAll("close-button");
+
+        setTimeout(() => closeAll("close-lock-120"), 120);
+        setTimeout(() => closeAll("close-lock-300"), 300);
+    }, true);
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+            closeAll("escape");
+        }
+    }, true);
+
+    window.NovaMobileCloseAllSessionPanels = closeAll;
+
+    console.log("[Nova Mobile Safe Session Close] ready");
 })();

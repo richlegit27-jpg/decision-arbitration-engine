@@ -14656,6 +14656,7 @@ button {
 .nova-final-message-actions button:active {
     transform: none !important;
 }
+<<<<<<< HEAD
 
 /* -------------------------------------------------
    NOVA MOBILE SESSION PANEL GOVERNOR
@@ -14690,4 +14691,23 @@ body.nova-mobile-session-single-open [class*="sessions-v2"][data-nova-session-ar
     visibility: hidden !important;
     opacity: 0 !important;
     pointer-events: none !important;
+}
+=======
+>>>>>>> parent of d0bf57c (Stop duplicate mobile session panels from reopening)
+
+/* -------------------------------------------------
+   NOVA MOBILE SAFE SESSION CLOSE ONLY
+   Do not block clicks inside session panels.
+   20260629
+-------------------------------------------------- */
+#nova-mobile-sessions-panel,
+#nova-sessions-v2-panel,
+#nova-mobile-session-panel,
+#mobile-sessions-panel,
+#sessions-panel,
+[id*="session"][id*="panel"],
+[id*="session"][id*="drawer"],
+[class*="session"][class*="panel"],
+[class*="session"][class*="drawer"] {
+    pointer-events: auto;
 }
