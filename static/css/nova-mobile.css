@@ -14508,3 +14508,45 @@ button {
     object-fit: contain !important;
     cursor: pointer !important;
 }
+
+/* -------------------------------------------------
+   NOVA MOBILE MESSAGE ACTIONS SINGLE OWNER CLEANUP
+   20260629
+-------------------------------------------------- */
+.mobile-chat-message pre::after,
+.nova-mobile-message pre::after,
+.nova-message pre::after {
+    content: none !important;
+    display: none !important;
+}
+
+.nova-final-message-actions {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 8px !important;
+    width: 100% !important;
+    margin-top: 8px !important;
+    padding-top: 6px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-sizing: border-box !important;
+}
+
+.nova-final-message-actions button {
+    appearance: none !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: rgba(245, 248, 255, 0.95) !important;
+    border-radius: 999px !important;
+    padding: 5px 10px !important;
+    font-size: 12px !important;
+    line-height: 1 !important;
+    font-weight: 700 !important;
+    min-height: 26px !important;
+}
+
+.nova-real-message-actions,
+.mobile-message-actions,
+.message-actions {
+    display: none !important;
+}

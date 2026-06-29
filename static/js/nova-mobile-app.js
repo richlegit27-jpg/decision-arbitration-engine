@@ -4860,3 +4860,318 @@ row.onclick = async () => {
 
     console.log("[Nova Mobile Generated Image Renderer] ready");
 })();
+
+/* -------------------------------------------------
+   NOVA MOBILE MESSAGE ACTIONS SINGLE OWNER CLEANUP
+   Keeps one Copy/Regen row and removes leaked action text.
+   20260629
+-------------------------------------------------- */
+(() => {
+    if (window.__NOVA_MOBILE_MESSAGE_ACTIONS_SINGLE_OWNER_CLEANUP_20260629__) return;
+    window.__NOVA_MOBILE_MESSAGE_ACTIONS_SINGLE_OWNER_CLEANUP_20260629__ = true;
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function chatRoot() {
+        return (
+            $("mobileChatMessages") ||
+            $("nova-mobile-messages") ||
+            $("nova-mobile-chat") ||
+            document.querySelector("[data-mobile-chat-messages]") ||
+            document.querySelector(".mobile-chat-messages") ||
+            document.querySelector(".nova-mobile-messages") ||
+            document.querySelector(".nova-mobile-chat") ||
+            document.querySelector(".chat-messages")
+        );
+    }
+
+    function inputBox() {
+        return (
+            $("nova-mobile-input") ||
+            $("mobileInput") ||
+            document.querySelector("textarea") ||
+            document.querySelector("[contenteditable='true']")
+        );
+    }
+
+    function sendButton() {
+        return (
+            $("nova-mobile-send") ||
+            $("mobileSendButton") ||
+            document.querySelector("[data-mobile-send]") ||
+            document.querySelector("button[type='submit']")
+        );
+    }
+
+    function classText(el) {
+        return String(el?.className || "").toLowerCase();
+    }
+
+    function isActionNode(el) {
+        if (!el || el.nodeType !== 1) return false;
+
+        const cls = classText(el);
+
+        return (
+            cls.includes("nova-real-message-actions") ||
+            cls.includes("nova-final-message-actions") ||
+            cls.includes("mobile-message-actions") ||
+            cls.includes("message-actions") ||
+            cls.includes("mobile-inline-action") ||
+            cls.includes("mobile-code-copy-btn") ||
+            el.dataset?.novaMessageActions === "1"
+        );
+    }
+
+    function isAssistantBubble(el) {
+        if (!el || el.nodeType !== 1) return false;
+        if (isActionNode(el)) return false;
+
+        const cls = classText(el);
+
+        if (
+            cls.includes("assistant") ||
+            cls.includes("bot") ||
+            cls.includes("nova-message-assistant") ||
+            cls.includes("mobile-chat-message-assistant")
+        ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    function isUserBubble(el) {
+        if (!el || el.nodeType !== 1) return false;
+
+        const cls = classText(el);
+
+        return (
+            cls.includes("user") ||
+            cls.includes("nova-message-user") ||
+            cls.includes("mobile-chat-message-user")
+        );
+    }
+
+    function cleanActionText(value) {
+        return String(value || "")
+            .replace(/(?:\s*Copy\s*Regen\s*)+$/gi, "")
+            .replace(/(?:\s*Copy\s*Regenerate\s*)+$/gi, "")
+            .replace(/(?:\s*Copied\s*Regen\s*)+$/gi, "")
+            .replace(/(?:\s*Copy\s*)+$/gi, "")
+            .replace(/(?:\s*Regen\s*)+$/gi, "")
+            .replace(/(?:\s*Regenerate\s*)+$/gi, "")
+            .trim();
+    }
+
+    function stripLeakedActionText(el) {
+        if (!el || el.nodeType !== 1) return;
+
+        Array.from(el.childNodes || []).forEach((node) => {
+            if (node.nodeType !== Node.TEXT_NODE) return;
+
+            const original = String(node.nodeValue || "");
+            const cleaned = cleanActionText(original);
+
+            if (cleaned !== original.trim()) {
+                if (cleaned) {
+                    node.nodeValue = cleaned;
+                } else {
+                    node.remove();
+                }
+            }
+        });
+    }
+
+    function messageText(el) {
+        const clone = el.cloneNode(true);
+
+        clone.querySelectorAll(
+            ".nova-real-message-actions, .nova-final-message-actions, .mobile-message-actions, .message-actions, .mobile-inline-action, .mobile-code-copy-btn"
+        ).forEach((node) => node.remove());
+
+        return cleanActionText(String(clone.innerText || clone.textContent || "").trim());
+    }
+
+    function previousUserText(el) {
+        const siblings = Array.from(el.parentElement?.children || []);
+        const index = siblings.indexOf(el);
+
+        for (let i = index - 1; i >= 0; i -= 1) {
+            const candidate = siblings[i];
+
+            if (isUserBubble(candidate)) {
+                return messageText(candidate);
+            }
+        }
+
+        return "";
+    }
+
+    async function copyText(text) {
+        const clean = String(text || "").trim();
+        if (!clean) return false;
+
+        try {
+            await navigator.clipboard.writeText(clean);
+            return true;
+        } catch (e) {}
+
+        try {
+            const area = document.createElement("textarea");
+            area.value = clean;
+            area.style.position = "fixed";
+            area.style.left = "-9999px";
+            area.style.top = "0";
+            document.body.appendChild(area);
+            area.focus();
+            area.select();
+            const ok = document.execCommand("copy");
+            area.remove();
+            return !!ok;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function styleButton(button) {
+        button.style.setProperty("appearance", "none", "important");
+        button.style.setProperty("border", "1px solid rgba(255,255,255,0.14)", "important");
+        button.style.setProperty("background", "rgba(255,255,255,0.08)", "important");
+        button.style.setProperty("color", "rgba(245,248,255,0.95)", "important");
+        button.style.setProperty("border-radius", "999px", "important");
+        button.style.setProperty("padding", "5px 10px", "important");
+        button.style.setProperty("font-size", "12px", "important");
+        button.style.setProperty("line-height", "1", "important");
+        button.style.setProperty("font-weight", "700", "important");
+        button.style.setProperty("cursor", "pointer", "important");
+        button.style.setProperty("min-height", "26px", "important");
+    }
+
+    function makeActionRow(el) {
+        const row = document.createElement("div");
+        row.className = "nova-final-message-actions";
+        row.dataset.novaMessageActions = "1";
+
+        const copy = document.createElement("button");
+        copy.type = "button";
+        copy.textContent = "Copy";
+        copy.title = "Copy message";
+        copy.setAttribute("aria-label", "Copy message");
+        styleButton(copy);
+
+        copy.addEventListener("click", async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const ok = await copyText(messageText(el));
+
+            copy.textContent = ok ? "Copied" : "Fail";
+
+            setTimeout(() => {
+                copy.textContent = "Copy";
+            }, 900);
+        });
+
+        const regen = document.createElement("button");
+        regen.type = "button";
+        regen.textContent = "Regen";
+        regen.title = "Regenerate response";
+        regen.setAttribute("aria-label", "Regenerate response");
+        styleButton(regen);
+
+        regen.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const text = previousUserText(el);
+            const input = inputBox();
+
+            if (!text || !input) {
+                console.warn("[Nova Mobile Final Actions] regen missing previous prompt");
+                return;
+            }
+
+            if ("value" in input) {
+                input.value = text;
+                input.dispatchEvent(new Event("input", { bubbles: true }));
+            } else {
+                input.textContent = text;
+                input.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+
+            const send = sendButton();
+
+            if (send && typeof send.click === "function") {
+                send.click();
+            } else if (typeof window.NovaMobileSendText === "function") {
+                window.NovaMobileSendText(text);
+            } else if (typeof window.sendText === "function") {
+                window.sendText(text);
+            }
+        });
+
+        row.appendChild(copy);
+        row.appendChild(regen);
+
+        return row;
+    }
+
+    function normalizeOneBubble(el) {
+        if (!isAssistantBubble(el)) return;
+
+        stripLeakedActionText(el);
+
+        const actionRows = Array.from(el.querySelectorAll(
+            ".nova-real-message-actions, .nova-final-message-actions, .mobile-message-actions, .message-actions"
+        ));
+
+        actionRows.forEach((row) => row.remove());
+
+        el.appendChild(makeActionRow(el));
+        el.dataset.novaFinalActionsOwner = "1";
+    }
+
+    function normalizeAllActions() {
+        const chat = chatRoot();
+        if (!chat) return false;
+
+        Array.from(chat.children || []).forEach(normalizeOneBubble);
+        return true;
+    }
+
+    function schedule() {
+        clearTimeout(window.__novaMobileFinalActionsCleanupTimer);
+        window.__novaMobileFinalActionsCleanupTimer = setTimeout(normalizeAllActions, 120);
+    }
+
+    normalizeAllActions();
+
+    setTimeout(normalizeAllActions, 250);
+    setTimeout(normalizeAllActions, 800);
+    setTimeout(normalizeAllActions, 1600);
+
+    document.addEventListener("DOMContentLoaded", schedule);
+    window.addEventListener("nova:session-changed", schedule);
+    window.addEventListener("nova:message-rendered", schedule);
+
+    const chat = chatRoot();
+
+    if (chat && window.MutationObserver) {
+        const observer = new MutationObserver(schedule);
+
+        observer.observe(chat, {
+            childList: true,
+            subtree: true,
+            characterData: true
+        });
+
+        window.__NovaMobileFinalActionsCleanupObserver = observer;
+    }
+
+    window.NovaMobileNormalizeFinalActions = normalizeAllActions;
+
+    console.log("[Nova Mobile Final Actions Cleanup] ready");
+})();
