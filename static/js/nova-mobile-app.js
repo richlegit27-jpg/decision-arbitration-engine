@@ -5621,3 +5621,260 @@ row.onclick = async () => {
 
     console.log("[Nova Mobile Action Stability] ready");
 })();
+
+/* -------------------------------------------------
+   NOVA MOBILE SESSION PANEL GOVERNOR
+   Stops duplicate session panels from ping-pong opening.
+   20260629
+-------------------------------------------------- */
+(() => {
+    if (window.__NOVA_MOBILE_SESSION_PANEL_GOVERNOR_20260629__) return;
+    window.__NOVA_MOBILE_SESSION_PANEL_GOVERNOR_20260629__ = true;
+
+    let closingUntil = 0;
+
+    function textOf(value) {
+        return String(value || "").trim();
+    }
+
+    function lower(value) {
+        return textOf(value).toLowerCase();
+    }
+
+    function signature(el) {
+        return lower(
+            (el.id || "") + " " +
+            (el.className || "") + " " +
+            (el.getAttribute?.("aria-label") || "") + " " +
+            (el.getAttribute?.("title") || "") + " " +
+            (el.dataset ? Object.keys(el.dataset).join(" ") : "")
+        );
+    }
+
+    function isSessionPanel(el) {
+        if (!el || el.nodeType !== 1) return false;
+
+        const sig = signature(el);
+
+        if (!sig.includes("session")) return false;
+
+        return (
+            sig.includes("panel") ||
+            sig.includes("drawer") ||
+            sig.includes("modal") ||
+            sig.includes("sheet") ||
+            sig.includes("overlay") ||
+            sig.includes("fallback") ||
+            sig.includes("v2")
+        );
+    }
+
+    function allSessionPanels() {
+        const candidates = Array.from(document.querySelectorAll(
+            [
+                "#nova-mobile-sessions-panel",
+                "#nova-sessions-v2-panel",
+                "#nova-mobile-session-panel",
+                "#mobile-sessions-panel",
+                "#sessions-panel",
+                "[id*='session'][id*='panel']",
+                "[id*='session'][id*='drawer']",
+                "[id*='session'][id*='modal']",
+                "[id*='sessions'][id*='panel']",
+                "[class*='session'][class*='panel']",
+                "[class*='session'][class*='drawer']",
+                "[class*='session'][class*='modal']",
+                "[class*='sessions-v2']"
+            ].join(",")
+        ));
+
+        return candidates.filter(isSessionPanel);
+    }
+
+    function isVisible(el) {
+        if (!el || el.hidden) return false;
+
+        const style = getComputedStyle(el);
+
+        if (
+            style.display === "none" ||
+            style.visibility === "hidden" ||
+            Number(style.opacity || "1") === 0
+        ) {
+            return false;
+        }
+
+        const rect = el.getBoundingClientRect();
+
+        return rect.width > 5 && rect.height > 5;
+    }
+
+    function forceClosePanel(panel) {
+        if (!panel) return;
+
+        panel.classList.remove(
+            "open",
+            "show",
+            "active",
+            "visible",
+            "is-open",
+            "is-visible",
+            "nova-open",
+            "sessions-open"
+        );
+
+        panel.setAttribute("aria-hidden", "true");
+        panel.hidden = true;
+
+        panel.style.setProperty("display", "none", "important");
+        panel.style.setProperty("visibility", "hidden", "important");
+        panel.style.setProperty("opacity", "0", "important");
+        panel.style.setProperty("pointer-events", "none", "important");
+        panel.style.setProperty("transform", "translateX(110%)", "important");
+    }
+
+    function closeAllSessionPanels(reason) {
+        const panels = allSessionPanels();
+        let closed = 0;
+
+        panels.forEach((panel) => {
+            if (isVisible(panel) || panel.className.toString().includes("open")) {
+                closed += 1;
+            }
+
+            forceClosePanel(panel);
+        });
+
+        document.body.classList.remove("nova-mobile-sessions-open");
+        document.body.classList.remove("sessions-open");
+        document.body.classList.add("nova-mobile-sessions-closing");
+
+        closingUntil = Date.now() + 700;
+
+        setTimeout(() => {
+            document.body.classList.remove("nova-mobile-sessions-closing");
+        }, 720);
+
+        if (closed) {
+            console.log("[Nova Mobile Session Governor] closed panels", {
+                closed,
+                reason: reason || "close"
+            });
+        }
+
+        return closed;
+    }
+
+    function prevent(event) {
+        try {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (typeof event.stopImmediatePropagation === "function") {
+                event.stopImmediatePropagation();
+            }
+        } catch (e) {}
+    }
+
+    function closestSessionPanel(target) {
+        if (!target || !target.closest) return null;
+
+        return (
+            target.closest("#nova-mobile-sessions-panel") ||
+            target.closest("#nova-sessions-v2-panel") ||
+            target.closest("#mobile-sessions-panel") ||
+            target.closest("[id*='session'][id*='panel']") ||
+            target.closest("[class*='session'][class*='panel']") ||
+            target.closest("[class*='session'][class*='drawer']") ||
+            null
+        );
+    }
+
+    function isSessionCloseTarget(target) {
+        if (!target || target.nodeType !== 1) return false;
+
+        const sig = signature(target);
+        const label = lower(target.innerText || target.textContent || "");
+
+        if (
+            sig.includes("close") ||
+            sig.includes("dismiss") ||
+            sig.includes("backdrop") ||
+            sig.includes("overlay") ||
+            sig.includes("x-button") ||
+            target.matches?.("[data-close], [data-dismiss], .close, .modal-close")
+        ) {
+            return true;
+        }
+
+        return (
+            label === "×" ||
+            label === "x" ||
+            label === "close" ||
+            label === "done"
+        );
+    }
+
+    function isSessionToggleTarget(target) {
+        if (!target || target.nodeType !== 1) return false;
+
+        const el = target.closest?.("button, a, [role='button'], [data-mobile-sessions], [data-sessions-toggle]");
+        if (!el) return false;
+
+        const sig = signature(el);
+        const label = lower(el.innerText || el.textContent || "");
+
+        return (
+            sig.includes("session") ||
+            label === "sessions" ||
+            label.includes("sessions")
+        );
+    }
+
+    function handleCloseEvent(event) {
+        const target = event.target;
+        const panel = closestSessionPanel(target);
+
+        if (Date.now() < closingUntil && isSessionToggleTarget(target)) {
+            prevent(event);
+            closeAllSessionPanels("blocked-toggle-during-close");
+            return;
+        }
+
+        if (panel && isSessionCloseTarget(target)) {
+            prevent(event);
+
+            closeAllSessionPanels("close-button");
+
+            setTimeout(() => closeAllSessionPanels("close-lock-50"), 50);
+            setTimeout(() => closeAllSessionPanels("close-lock-160"), 160);
+            setTimeout(() => closeAllSessionPanels("close-lock-320"), 320);
+            setTimeout(() => closeAllSessionPanels("close-lock-520"), 520);
+        }
+    }
+
+    function protectPanelClicks(event) {
+        const panel = closestSessionPanel(event.target);
+
+        if (!panel) return;
+        if (isSessionCloseTarget(event.target)) return;
+
+        event.stopPropagation();
+    }
+
+    document.addEventListener("pointerdown", handleCloseEvent, true);
+    document.addEventListener("click", handleCloseEvent, true);
+
+    document.addEventListener("pointerdown", protectPanelClicks, true);
+    document.addEventListener("click", protectPanelClicks, true);
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+            closeAllSessionPanels("escape");
+        }
+    }, true);
+
+    window.NovaMobileCloseAllSessionPanels = closeAllSessionPanels;
+
+    console.log("[Nova Mobile Session Governor] ready");
+})();

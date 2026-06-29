@@ -14656,3 +14656,25 @@ button {
 .nova-final-message-actions button:active {
     transform: none !important;
 }
+
+/* -------------------------------------------------
+   NOVA MOBILE SESSION PANEL GOVERNOR
+   Prevent duplicate session panels during close.
+   20260629
+-------------------------------------------------- */
+body.nova-mobile-sessions-closing #nova-mobile-sessions-panel,
+body.nova-mobile-sessions-closing #nova-sessions-v2-panel,
+body.nova-mobile-sessions-closing #nova-mobile-session-panel,
+body.nova-mobile-sessions-closing #mobile-sessions-panel,
+body.nova-mobile-sessions-closing #sessions-panel,
+body.nova-mobile-sessions-closing [id*="session"][id*="panel"],
+body.nova-mobile-sessions-closing [id*="session"][id*="drawer"],
+body.nova-mobile-sessions-closing [id*="session"][id*="modal"],
+body.nova-mobile-sessions-closing [class*="session"][class*="panel"],
+body.nova-mobile-sessions-closing [class*="session"][class*="drawer"],
+body.nova-mobile-sessions-closing [class*="session"][class*="modal"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
