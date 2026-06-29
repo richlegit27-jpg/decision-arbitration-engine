@@ -594,6 +594,149 @@ console.log("[NOVA FILE ENDED]");
 
 function messageTextFromResponse(data, userText) {
     console.log("[Nova Send Final Owner] raw response", data);
+console.log("[Nova Send Final Owner] response data json", JSON.stringify(data, null, 2));
+
+function novaFindGeneratedImageUrl(value, depth = 0) {
+    if (!value || depth > 8) return "";
+
+    if (typeof value === "string") {
+        const textValue = value.trim();
+
+        if (
+            textValue.startsWith("data:image/") ||
+            textValue.startsWith("blob:") ||
+            textValue.startsWith("/uploads/") ||
+            textValue.startsWith("/api/uploads/") ||
+            /^https?:\/\/.+\.(png|jpg|jpeg|webp|gif)(\?|#|$)/i.test(textValue)
+        ) {
+            return textValue;
+        }
+
+        const match = textValue.match(
+            /(\/(?:api\/)?uploads\/[^"'`\s)]+|https?:\/\/[^"'`\s)]+\.(?:png|jpg|jpeg|webp|gif)(?:\?[^"'`\s)]*)?)/i
+        );
+
+        return match ? match[1] : "";
+    }
+
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            const found = novaFindGeneratedImageUrl(item, depth + 1);
+            if (found) return found;
+        }
+        return "";
+    }
+
+    if (typeof value === "object") {
+        const preferredKeys = [
+            "image_url",
+            "imageUrl",
+            "generated_image_url",
+            "generatedImageUrl",
+            "output_url",
+            "outputUrl",
+            "file_url",
+            "fileUrl",
+            "src",
+            "url"
+        ];
+
+        for (const key of preferredKeys) {
+            if (Object.prototype.hasOwnProperty.call(value, key)) {
+                const found = novaFindGeneratedImageUrl(value[key], depth + 1);
+                if (found) return found;
+            }
+        }
+
+        for (const key in value) {
+            const found = novaFindGeneratedImageUrl(value[key], depth + 1);
+            if (found) return found;
+        }
+    }
+
+    return "";
+}
+
+function novaGeneratedImageAlreadyRendered(imageUrl) {
+    try {
+        const absolute = new URL(imageUrl, window.location.origin).href;
+
+        return Array.from(document.images || []).some((img) => {
+            return img.src === absolute || img.dataset.novaGeneratedImageUrl === imageUrl;
+        });
+    } catch (e) {
+        return false;
+    }
+}
+
+function novaRenderGeneratedImageFromResponse(responseData) {
+    let imageUrl = novaFindGeneratedImageUrl(responseData);
+
+    if (!imageUrl) {
+        console.warn("[Nova Send Final Owner] no generated image url found in response");
+        return false;
+    }
+
+    if (imageUrl.startsWith("uploads/")) {
+        imageUrl = "/" + imageUrl;
+    }
+
+    if (novaGeneratedImageAlreadyRendered(imageUrl)) {
+        console.log("[Nova Send Final Owner] generated image already rendered", imageUrl);
+        return true;
+    }
+
+    const label =
+        responseData?.prompt ||
+        responseData?.assistant_message?.prompt ||
+        responseData?.assistant_message?.content ||
+        responseData?.assistant_message?.text ||
+        responseData?.text ||
+        text ||
+        "Generated image";
+
+    if (window.NovaMobileImages?.appendImage) {
+        window.NovaMobileImages.appendImage(imageUrl, label);
+        console.log("[Nova Send Final Owner] rendered generated image via NovaMobileImages", imageUrl);
+        return true;
+    }
+
+    const box =
+        document.getElementById("mobileChatMessages") ||
+        document.getElementById("nova-mobile-chat") ||
+        document.getElementById("nova-mobile-messages");
+
+    if (!box) {
+        console.warn("[Nova Send Final Owner] no chat box found for generated image");
+        return false;
+    }
+
+    const wrap = document.createElement("div");
+    wrap.className = "nova-message nova-message-assistant";
+    wrap.dataset.role = "assistant";
+
+    const img = document.createElement("img");
+    img.src = imageUrl;
+    img.alt = "Generated image";
+    img.dataset.novaGeneratedImageUrl = imageUrl;
+    img.style.maxWidth = "100%";
+    img.style.borderRadius = "12px";
+    img.style.display = "block";
+    img.style.marginTop = "8px";
+
+    wrap.appendChild(img);
+    box.appendChild(wrap);
+    box.scrollTop = box.scrollHeight;
+
+    console.log("[Nova Send Final Owner] rendered generated image fallback", imageUrl);
+    return true;
+}
+
+try {
+    novaRenderGeneratedImageFromResponse(data);
+} catch (e) {
+    console.warn("[Nova Send Final Owner] generated image render failed", e);
+}
 
     const originalUserText = String(userText || "").trim();
 
@@ -865,6 +1008,35 @@ clearAttachmentsAfterSend();
 
         const data = await res.json().catch(() => ({}));
 
+console.log("[Nova Send Final Owner] response data", data);
+
+try {
+    const imageUrl =
+        data?.image_url ||
+        data?.imageUrl ||
+        data?.url ||
+        data?.preview ||
+        data?.assistant_message?.image_url ||
+        data?.assistant_message?.imageUrl ||
+        data?.artifact?.image_url ||
+        data?.artifact?.imageUrl ||
+        data?.artifact?.viewer?.image_url ||
+        data?.artifacts?.[0]?.image_url ||
+        data?.artifacts?.[0]?.viewer?.image_url ||
+        "";
+
+    if (imageUrl && window.NovaMobileImages?.appendImage) {
+        window.NovaMobileImages.appendImage(
+            imageUrl,
+            data?.prompt || data?.text || text || "Generated image"
+        );
+
+        console.log("[Nova Send Final Owner] rendered generated image", imageUrl);
+    }
+} catch (e) {
+    console.warn("[Nova Send Final Owner] generated image render failed", e);
+}
+
         console.log("[Nova Send Final Owner] raw response", data);
 
         if (!res.ok) {
@@ -1000,7 +1172,56 @@ function wireMainFileInputUpload() {
 
             const data = await res.json().catch(() => ({}));
 
-            console.log("[Nova Main Attach Owner] upload response", data);
+console.log("[Nova Send Final Owner] response data", data);
+
+try {
+    const imageUrl =
+        data?.image_url ||
+        data?.imageUrl ||
+        data?.assistant_message?.image_url ||
+        data?.assistant_message?.imageUrl ||
+        data?.artifact?.image_url ||
+        data?.artifact?.imageUrl ||
+        data?.artifact?.viewer?.image_url ||
+        data?.artifacts?.[0]?.image_url ||
+        data?.artifacts?.[0]?.viewer?.image_url ||
+        "";
+
+    if (imageUrl) {
+        if (window.NovaMobileImages?.appendImage) {
+            window.NovaMobileImages.appendImage(
+                imageUrl,
+                data?.prompt || data?.text || text || "Generated image"
+            );
+        } else {
+            const box =
+                document.getElementById("mobileChatMessages") ||
+                document.getElementById("nova-mobile-chat") ||
+                document.getElementById("nova-mobile-messages");
+
+            if (box) {
+                const wrap = document.createElement("div");
+                wrap.className = "nova-message nova-message-assistant";
+                wrap.dataset.role = "assistant";
+
+                const img = document.createElement("img");
+                img.src = imageUrl;
+                img.alt = "Generated image";
+                img.style.maxWidth = "100%";
+                img.style.borderRadius = "12px";
+                img.style.display = "block";
+
+                wrap.appendChild(img);
+                box.appendChild(wrap);
+                box.scrollTop = box.scrollHeight;
+            }
+        }
+
+        console.log("[Nova Send Final Owner] rendered generated image", imageUrl);
+    }
+} catch (e) {
+    console.warn("[Nova Send Final Owner] generated image render failed", e);
+}
 
             if (!res.ok || data.ok === false) {
                 throw new Error(data.error || data.message || "Upload failed");
@@ -1250,4 +1471,333 @@ setTimeout(() => {
     wireMainFileInputUpload();
 }, 1200);
 
+})();
+/* -------------------------------------------------
+   NOVA MOBILE COMPOSER FINAL GEOMETRY OVERRIDE
+   Input on top, buttons inside composer underneath.
+   Order: Send / Stop / Mic / Stop Speech / TTS / Attach / Menu
+   20260629
+-------------------------------------------------- */
+(() => {
+    if (window.__NOVA_MOBILE_COMPOSER_FINAL_GEOMETRY_20260629_V2__) return;
+    window.__NOVA_MOBILE_COMPOSER_FINAL_GEOMETRY_20260629_V2__ = true;
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function firstExisting(ids) {
+        for (const id of ids) {
+            const el = $(id);
+            if (el) return el;
+        }
+        return null;
+    }
+
+    function installFinalComposerStyle() {
+        let style = $("nova-mobile-composer-final-geometry-style");
+
+        if (!style) {
+            style = document.createElement("style");
+            style.id = "nova-mobile-composer-final-geometry-style";
+            document.head.appendChild(style);
+        }
+
+        style.textContent = `
+            #nova-mobile-composer {
+                position: fixed !important;
+                left: 50% !important;
+                right: auto !important;
+                bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+                width: min(calc(100vw - 16px), 760px) !important;
+                max-width: 760px !important;
+                transform: translateX(-50%) !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: stretch !important;
+                justify-content: flex-end !important;
+                gap: 8px !important;
+                height: auto !important;
+                min-height: 0 !important;
+                max-height: 45vh !important;
+                overflow: visible !important;
+                box-sizing: border-box !important;
+                z-index: 2147483646 !important;
+            }
+
+            #nova-mobile-input,
+            #mobileInput,
+            textarea#nova-mobile-input {
+                width: 100% !important;
+                min-height: 44px !important;
+                max-height: 130px !important;
+                box-sizing: border-box !important;
+                flex: 0 0 auto !important;
+            }
+
+            #nova-mobile-composer-actions {
+                display: flex !important;
+                position: relative !important;
+                left: auto !important;
+                right: auto !important;
+                top: auto !important;
+                bottom: auto !important;
+                width: 100% !important;
+                height: 44px !important;
+                min-height: 44px !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 7px !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                box-sizing: border-box !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                pointer-events: auto !important;
+                overflow: visible !important;
+                transform: none !important;
+                z-index: 2147483647 !important;
+            }
+
+            #nova-mobile-composer-actions button,
+            #nova-mobile-send,
+            #nova-mobile-stop-generation,
+            #nova-mobile-stop,
+            #nova-mobile-voice,
+            #nova-mobile-stop-speech,
+            #nova-mobile-tts,
+            #nova-mobile-attach,
+            #nova-mobile-tools-toggle {
+                display: inline-flex !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                pointer-events: auto !important;
+                position: relative !important;
+                width: 39px !important;
+                height: 39px !important;
+                min-width: 39px !important;
+                min-height: 39px !important;
+                max-width: 39px !important;
+                max-height: 39px !important;
+                border-radius: 999px !important;
+                align-items: center !important;
+                justify-content: center !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                flex: 0 0 auto !important;
+                transform: none !important;
+                z-index: 2147483647 !important;
+            }
+
+            #nova-mobile-send,
+            .nova-mobile-send-action {
+                animation: novaMobileSendGlow 1.8s ease-in-out infinite !important;
+            }
+
+            @keyframes novaMobileSendGlow {
+                0% { filter: brightness(1); }
+                50% { filter: brightness(1.18); }
+                100% { filter: brightness(1); }
+            }
+
+            #nova-mobile-menu-rescue-btn,
+            #nova-mobile-voice-stop-rescue-btn,
+            #nova-mobile-bottom-rescue-rail {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+            }
+        `;
+    }
+
+    function normalizeFinalComposerGeometry() {
+        installFinalComposerStyle();
+
+        const composer =
+            $("nova-mobile-composer") ||
+            document.querySelector(".nova-mobile-composer") ||
+            document.querySelector("[data-nova-mobile-composer]");
+
+        if (!composer) return false;
+
+        const input =
+            $("nova-mobile-input") ||
+            $("mobileInput") ||
+            composer.querySelector("textarea") ||
+            composer.querySelector("input[type='text']");
+
+        if (!input) return false;
+
+        let row = $("nova-mobile-composer-actions");
+
+        if (!row) {
+            row = document.createElement("div");
+            row.id = "nova-mobile-composer-actions";
+            row.className = "nova-mobile-composer-actions";
+        }
+
+        const sendButton = firstExisting(["nova-mobile-send"]);
+        const generationStopButton = firstExisting(["nova-mobile-stop-generation", "nova-mobile-stop"]);
+        const micButton = firstExisting(["nova-mobile-voice"]);
+        const speechStopButton = firstExisting(["nova-mobile-stop-speech"]);
+        const ttsButton = firstExisting(["nova-mobile-tts"]);
+        const attachButton = firstExisting(["nova-mobile-attach"]);
+        const menuButton = firstExisting([
+            "nova-mobile-tools-toggle",
+            "nova-mobile-menu",
+            "nova-mobile-menu-btn",
+            "nova-mobile-sessions-toggle"
+        ]);
+
+        const buttons = [
+            sendButton,
+            generationStopButton,
+            micButton,
+            speechStopButton,
+            ttsButton,
+            attachButton,
+            menuButton
+        ].filter(Boolean);
+
+        composer.hidden = false;
+        composer.removeAttribute("hidden");
+        composer.removeAttribute("aria-hidden");
+
+        composer.style.setProperty("position", "fixed", "important");
+        composer.style.setProperty("left", "50%", "important");
+        composer.style.setProperty("right", "auto", "important");
+        composer.style.setProperty("bottom", "calc(10px + env(safe-area-inset-bottom))", "important");
+        composer.style.setProperty("width", "min(calc(100vw - 16px), 760px)", "important");
+        composer.style.setProperty("max-width", "760px", "important");
+        composer.style.setProperty("transform", "translateX(-50%)", "important");
+        composer.style.setProperty("display", "flex", "important");
+        composer.style.setProperty("flex-direction", "column", "important");
+        composer.style.setProperty("gap", "8px", "important");
+        composer.style.setProperty("height", "auto", "important");
+        composer.style.setProperty("overflow", "visible", "important");
+        composer.style.setProperty("box-sizing", "border-box", "important");
+
+        if (input.parentNode !== composer) {
+            composer.insertBefore(input, composer.firstChild);
+        }
+
+        input.style.setProperty("width", "100%", "important");
+        input.style.setProperty("box-sizing", "border-box", "important");
+
+        if (row.parentNode !== composer) {
+            composer.appendChild(row);
+        }
+
+        row.hidden = false;
+        row.removeAttribute("hidden");
+        row.removeAttribute("aria-hidden");
+
+        row.style.setProperty("display", "flex", "important");
+        row.style.setProperty("position", "relative", "important");
+        row.style.setProperty("left", "auto", "important");
+        row.style.setProperty("right", "auto", "important");
+        row.style.setProperty("top", "auto", "important");
+        row.style.setProperty("bottom", "auto", "important");
+        row.style.setProperty("width", "100%", "important");
+        row.style.setProperty("height", "44px", "important");
+        row.style.setProperty("min-height", "44px", "important");
+        row.style.setProperty("align-items", "center", "important");
+        row.style.setProperty("justify-content", "center", "important");
+        row.style.setProperty("gap", "7px", "important");
+        row.style.setProperty("padding", "0", "important");
+        row.style.setProperty("margin", "0", "important");
+        row.style.setProperty("overflow", "visible", "important");
+        row.style.setProperty("transform", "none", "important");
+
+        buttons.forEach((button) => {
+            if (button.parentNode !== row) {
+                row.appendChild(button);
+            }
+
+            button.hidden = false;
+            button.removeAttribute("hidden");
+            button.removeAttribute("aria-hidden");
+
+            button.classList.remove(
+                "nova-mobile-send-action",
+                "nova-mobile-generation-stop-action",
+                "nova-mobile-mic-action",
+                "nova-mobile-speech-stop-action",
+                "nova-mobile-tts-action",
+                "nova-mobile-attach-action",
+                "nova-mobile-menu-action"
+            );
+
+            if (button === sendButton) button.classList.add("nova-mobile-send-action");
+            if (button === generationStopButton) button.classList.add("nova-mobile-generation-stop-action");
+            if (button === micButton) button.classList.add("nova-mobile-mic-action");
+            if (button === speechStopButton) button.classList.add("nova-mobile-speech-stop-action");
+            if (button === ttsButton) button.classList.add("nova-mobile-tts-action");
+            if (button === attachButton) button.classList.add("nova-mobile-attach-action");
+            if (button === menuButton) button.classList.add("nova-mobile-menu-action");
+
+            button.style.setProperty("display", "inline-flex", "important");
+            button.style.setProperty("visibility", "visible", "important");
+            button.style.setProperty("opacity", "1", "important");
+            button.style.setProperty("pointer-events", "auto", "important");
+            button.style.setProperty("position", "relative", "important");
+            button.style.setProperty("width", "39px", "important");
+            button.style.setProperty("height", "39px", "important");
+            button.style.setProperty("min-width", "39px", "important");
+            button.style.setProperty("min-height", "39px", "important");
+            button.style.setProperty("max-width", "39px", "important");
+            button.style.setProperty("max-height", "39px", "important");
+            button.style.setProperty("border-radius", "999px", "important");
+            button.style.setProperty("align-items", "center", "important");
+            button.style.setProperty("justify-content", "center", "important");
+            button.style.setProperty("padding", "0", "important");
+            button.style.setProperty("margin", "0", "important");
+            button.style.setProperty("flex", "0 0 auto", "important");
+            button.style.setProperty("transform", "none", "important");
+        });
+
+        const chat =
+            $("nova-mobile-chat") ||
+            $("nova-mobile-messages") ||
+            $("mobileChatMessages") ||
+            document.querySelector(".nova-mobile-chat") ||
+            document.querySelector(".nova-mobile-messages");
+
+        if (chat) {
+            chat.style.setProperty("padding-bottom", "155px", "important");
+            chat.style.setProperty("scroll-padding-bottom", "155px", "important");
+        }
+
+        console.log("[Nova Mobile Composer Final Geometry] ready", {
+            composer: !!composer,
+            input: !!input,
+            rowParent: row.parentElement ? row.parentElement.id : "",
+            buttons: buttons.map((button) => button.id)
+        });
+
+        return true;
+    }
+
+    normalizeFinalComposerGeometry();
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", normalizeFinalComposerGeometry, { once: true });
+    }
+
+    setTimeout(normalizeFinalComposerGeometry, 100);
+    setTimeout(normalizeFinalComposerGeometry, 500);
+    setTimeout(normalizeFinalComposerGeometry, 1200);
+    setTimeout(normalizeFinalComposerGeometry, 2500);
+    setTimeout(normalizeFinalComposerGeometry, 4500);
+
+    window.addEventListener("resize", normalizeFinalComposerGeometry);
+    window.addEventListener("orientationchange", normalizeFinalComposerGeometry);
+
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", normalizeFinalComposerGeometry);
+        window.visualViewport.addEventListener("scroll", normalizeFinalComposerGeometry);
+    }
+
+    window.NovaMobileNormalizeFinalComposerGeometry = normalizeFinalComposerGeometry;
 })();
