@@ -904,6 +904,182 @@ function currentAttachmentsForSend() {
 
 let sending = false;
 
+function escapeNovaMobileHtml(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function renderNovaMobileMarkdown(text) {
+    const raw = String(text || "");
+    const blocks = [];
+    let safe = raw.replace(/```([a-zA-Z0-9_-]*)\s*\n([\s\S]*?)```/g, function (_, lang, code) {
+        const index = blocks.length;
+        blocks.push({
+            lang: String(lang || "").trim(),
+            code: String(code || "").replace(/\n$/, "")
+        });
+        return "\n@@NOVA_CODE_BLOCK_" + index + "@@\n";
+    });
+
+    safe = escapeNovaMobileHtml(safe);
+
+    safe = safe.replace(/`([^`]+)`/g, "<code>$1</code>");
+    safe = safe.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+
+    const lines = safe.split("\n");
+    const out = [];
+    let inList = false;
+
+    lines.forEach(function (line) {
+        const codeMatch = line.match(/^@@NOVA_CODE_BLOCK_(\d+)@@$/);
+
+        if (codeMatch) {
+            if (inList) {
+                out.push("</ul>");
+                inList = false;
+            }
+
+            const block = blocks[Number(codeMatch[1])] || {};
+            const lang = escapeNovaMobileHtml(block.lang || "");
+            const code = escapeNovaMobileHtml(block.code || "");
+
+            out.push(
+                '<pre class="nova-mobile-code-block">' +
+                    (lang ? '<div class="nova-mobile-code-lang">' + lang + '</div>' : "") +
+                    '<code>' + code + '</code>' +
+                '</pre>'
+            );
+            return;
+        }
+
+        const bullet = line.match(/^\s*[-*]\s+(.+)$/);
+
+        if (bullet) {
+            if (!inList) {
+                out.push("<ul>");
+                inList = true;
+            }
+
+            out.push("<li>" + bullet[1] + "</li>");
+            return;
+        }
+
+        if (inList) {
+            out.push("</ul>");
+            inList = false;
+        }
+
+        if (line.trim()) {
+            out.push("<p>" + line + "</p>");
+        }
+    });
+
+    if (inList) {
+        out.push("</ul>");
+    }
+
+    return out.join("");
+}
+
+function setNovaMobileBubbleHtml(bubble, text) {
+    if (!bubble) return;
+
+    const raw = String(text || "");
+
+    console.log("[Nova Chat Markdown HARD] rendering", raw.slice(0, 120));
+
+    function esc(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    const fence = raw.match(/^```([a-zA-Z0-9_-]*)\s*\n([\s\S]*?)\n?```$/);
+
+    if (fence) {
+        const lang = esc(fence[1] || "");
+        const code = esc(fence[2] || "");
+
+        bubble.innerHTML =
+            '<pre class="nova-mobile-code-block">' +
+                (lang ? '<div class="nova-mobile-code-lang">' + lang + '</div>' : "") +
+                '<code>' + code + '</code>' +
+            '</pre>';
+    } else {
+        let safe = esc(raw);
+
+        safe = safe.replace(/`([^`]+)`/g, "<code>$1</code>");
+        safe = safe.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+
+        const lines = safe.split("\n");
+        const out = [];
+        let inList = false;
+
+        lines.forEach((line) => {
+            const bullet = line.match(/^\s*[-*]\s+(.+)$/);
+
+            if (bullet) {
+                if (!inList) {
+                    out.push("<ul>");
+                    inList = true;
+                }
+
+                out.push("<li>" + bullet[1] + "</li>");
+                return;
+            }
+
+            if (inList) {
+                out.push("</ul>");
+                inList = false;
+            }
+
+            if (line.trim()) {
+                out.push("<p>" + line + "</p>");
+            }
+        });
+
+        if (inList) {
+            out.push("</ul>");
+        }
+
+        bubble.innerHTML = out.join("");
+    }
+
+    Array.from(bubble.querySelectorAll("pre")).forEach((pre) => {
+        pre.style.setProperty("display", "block", "important");
+        pre.style.setProperty("width", "100%", "important");
+        pre.style.setProperty("max-width", "100%", "important");
+        pre.style.setProperty("overflow-x", "auto", "important");
+        pre.style.setProperty("white-space", "pre", "important");
+        pre.style.setProperty("background", "rgba(0, 0, 0, 0.36)", "important");
+        pre.style.setProperty("border", "1px solid rgba(255, 255, 255, 0.12)", "important");
+        pre.style.setProperty("border-radius", "12px", "important");
+        pre.style.setProperty("padding", "10px", "important");
+        pre.style.setProperty("box-sizing", "border-box", "important");
+        pre.style.setProperty("margin", "4px 0 0", "important");
+    });
+
+    Array.from(bubble.querySelectorAll(".nova-mobile-code-lang")).forEach((lang) => {
+        lang.style.setProperty("font-size", "11px", "important");
+        lang.style.setProperty("opacity", "0.72", "important");
+        lang.style.setProperty("margin-bottom", "6px", "important");
+        lang.style.setProperty("text-transform", "uppercase", "important");
+    });
+
+    Array.from(bubble.querySelectorAll("code")).forEach((code) => {
+        code.style.setProperty("font-family", "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace", "important");
+        code.style.setProperty("font-size", "13px", "important");
+        code.style.setProperty("line-height", "1.45", "important");
+    });
+}
+
 async function sendNow(event) {
     if (event) {
         event.preventDefault();
@@ -1000,11 +1176,12 @@ try {
 
         const reply = messageTextFromResponse(data, text) || "No response text returned.";
 
-        if (assistantBubble) {
-            assistantBubble.textContent = reply;
-        } else {
-            appendBubble("assistant", reply);
-        }
+if (assistantBubble) {
+    setNovaMobileBubbleHtml(assistantBubble, reply);
+} else {
+    const bubble = appendBubble("assistant", "");
+    setNovaMobileBubbleHtml(bubble, reply);
+}
 
         window.dispatchEvent(new CustomEvent("nova:chat-sent", {
             detail: {
@@ -1963,4 +2140,366 @@ function fixChatTopSafeArea() {
     }
 
     window.NovaMobileNormalizeChatStack = normalizeChatStack;
+})();
+
+/* -------------------------------------------------
+   NOVA MOBILE CHAT BUBBLE ROLE TAGGER + POLISH
+   Runtime visual polish for real live message nodes.
+   20260629
+-------------------------------------------------- */
+(() => {
+    if (window.__NOVA_MOBILE_CHAT_BUBBLE_POLISH_20260629__) return;
+    window.__NOVA_MOBILE_CHAT_BUBBLE_POLISH_20260629__ = true;
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function chatRoot() {
+        return (
+            $("mobileChatMessages") ||
+            $("nova-mobile-messages") ||
+            $("nova-mobile-chat") ||
+            document.querySelector("[data-mobile-chat-messages]") ||
+            document.querySelector(".mobile-chat-messages") ||
+            document.querySelector(".nova-mobile-messages") ||
+            document.querySelector(".nova-mobile-chat")
+        );
+    }
+
+    function detectRole(el) {
+        const raw = [
+            el.dataset.role,
+            el.dataset.messageRole,
+            el.getAttribute("role"),
+            el.className,
+            el.getAttribute("class")
+        ].join(" ").toLowerCase();
+
+        if (raw.includes("user")) return "user";
+        if (raw.includes("assistant") || raw.includes("bot") || raw.includes("nova")) return "assistant";
+
+        const text = String(el.textContent || "").trim();
+
+        if (text === "Thinking..." || text.startsWith("Send failed:")) {
+            return "assistant";
+        }
+
+        const children = Array.from(el.parentElement?.children || []);
+        const index = children.indexOf(el);
+
+        return index % 2 === 0 ? "user" : "assistant";
+    }
+
+    function polishBubble(el) {
+        if (!el || el.nodeType !== 1) return;
+
+        const role = detectRole(el);
+
+        el.classList.add("nova-mobile-polished-bubble");
+        el.classList.toggle("nova-mobile-polished-user", role === "user");
+        el.classList.toggle("nova-mobile-polished-assistant", role === "assistant");
+
+        el.dataset.novaPolishedRole = role;
+
+        el.style.setProperty("position", "relative", "important");
+        el.style.setProperty("display", "block", "important");
+        el.style.setProperty("width", "fit-content", "important");
+        el.style.setProperty("max-width", "min(86%, 720px)", "important");
+        el.style.setProperty("padding", "11px 13px", "important");
+        el.style.setProperty("border-radius", "18px", "important");
+        el.style.setProperty("font-size", "15px", "important");
+        el.style.setProperty("line-height", "1.45", "important");
+        el.style.setProperty("white-space", "pre-wrap", "important");
+        el.style.setProperty("word-break", "break-word", "important");
+        el.style.setProperty("overflow-wrap", "anywhere", "important");
+        el.style.setProperty("box-sizing", "border-box", "important");
+        el.style.setProperty("height", "auto", "important");
+        el.style.setProperty("min-height", "0", "important");
+        el.style.setProperty("max-height", "none", "important");
+        el.style.setProperty("overflow", "visible", "important");
+        el.style.setProperty("box-shadow", "0 8px 22px rgba(0, 0, 0, 0.18)", "important");
+
+        if (role === "user") {
+            el.style.setProperty("align-self", "flex-end", "important");
+            el.style.setProperty("margin-left", "auto", "important");
+            el.style.setProperty("margin-right", "0", "important");
+            el.style.setProperty("border-bottom-right-radius", "6px", "important");
+            el.style.setProperty("background", "linear-gradient(135deg, rgba(123, 92, 255, 0.96), rgba(75, 126, 255, 0.94))", "important");
+            el.style.setProperty("color", "#ffffff", "important");
+        } else {
+            el.style.setProperty("align-self", "flex-start", "important");
+            el.style.setProperty("margin-left", "0", "important");
+            el.style.setProperty("margin-right", "auto", "important");
+            el.style.setProperty("border-bottom-left-radius", "6px", "important");
+            el.style.setProperty("background", "rgba(12, 22, 42, 0.9)", "important");
+            el.style.setProperty("border", "1px solid rgba(255, 255, 255, 0.08)", "important");
+            el.style.setProperty("color", "rgba(255, 255, 255, 0.94)", "important");
+        }
+
+        Array.from(el.querySelectorAll("*")).forEach((child) => {
+            child.style.setProperty("max-width", "100%", "important");
+            child.style.setProperty("box-sizing", "border-box", "important");
+            child.style.setProperty("line-height", "1.45", "important");
+        });
+
+        Array.from(el.querySelectorAll("img")).forEach((img) => {
+            img.style.setProperty("max-width", "100%", "important");
+            img.style.setProperty("height", "auto", "important");
+            img.style.setProperty("display", "block", "important");
+            img.style.setProperty("border-radius", "14px", "important");
+            img.style.setProperty("margin-top", "6px", "important");
+        });
+    }
+
+    function polishChatBubbles() {
+        const chat = chatRoot();
+        if (!chat) return false;
+
+        chat.style.setProperty("display", "flex", "important");
+        chat.style.setProperty("flex-direction", "column", "important");
+        chat.style.setProperty("align-items", "stretch", "important");
+        chat.style.setProperty("justify-content", "flex-start", "important");
+        chat.style.setProperty("gap", "12px", "important");
+        chat.style.setProperty("padding-left", "10px", "important");
+        chat.style.setProperty("padding-right", "10px", "important");
+        chat.style.setProperty("box-sizing", "border-box", "important");
+
+        const nodes = Array.from(chat.children || []).filter((el) => {
+            const text = String(el.textContent || "").trim();
+            return text || el.querySelector("img");
+        });
+
+        nodes.forEach(polishBubble);
+
+        console.log("[Nova Mobile Chat Bubble Polish] ready", {
+            chat: chat.id || chat.className || "chat",
+            bubbles: nodes.length
+        });
+
+        return true;
+    }
+
+    polishChatBubbles();
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", polishChatBubbles, { once: true });
+    }
+
+    setTimeout(polishChatBubbles, 100);
+    setTimeout(polishChatBubbles, 500);
+    setTimeout(polishChatBubbles, 1200);
+    setTimeout(polishChatBubbles, 2500);
+
+    const chat = chatRoot();
+    if (chat && window.MutationObserver) {
+        const observer = new MutationObserver(() => {
+            requestAnimationFrame(polishChatBubbles);
+        });
+
+        observer.observe(chat, {
+            childList: true,
+            subtree: true
+        });
+
+        window.__NovaMobileChatBubblePolishObserver = observer;
+    }
+
+    window.NovaMobilePolishChatBubbles = polishChatBubbles;
+})();
+
+/* -------------------------------------------------
+   NOVA MOBILE FINAL MARKDOWN NORMALIZER
+   Converts raw ```code``` and dash bullets after bubbles render.
+   20260629
+-------------------------------------------------- */
+(() => {
+    if (window.__NOVA_MOBILE_FINAL_MARKDOWN_NORMALIZER_20260629__) return;
+    window.__NOVA_MOBILE_FINAL_MARKDOWN_NORMALIZER_20260629__ = true;
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function chatRoot() {
+        return (
+            $("mobileChatMessages") ||
+            $("nova-mobile-messages") ||
+            $("nova-mobile-chat") ||
+            document.querySelector("[data-mobile-chat-messages]") ||
+            document.querySelector(".mobile-chat-messages") ||
+            document.querySelector(".nova-mobile-messages") ||
+            document.querySelector(".nova-mobile-chat")
+        );
+    }
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function looksLikeAssistantBubble(el) {
+        const raw = [
+            el.dataset.role,
+            el.dataset.messageRole,
+            el.dataset.novaPolishedRole,
+            el.className,
+            el.getAttribute("class")
+        ].join(" ").toLowerCase();
+
+        return raw.includes("assistant") || raw.includes("bot") || raw.includes("nova-message-assistant");
+    }
+
+    function renderMarkdownLite(text) {
+        const raw = String(text || "");
+        const blocks = [];
+
+        let safe = raw.replace(/```([a-zA-Z0-9_-]*)\s*\n([\s\S]*?)```/g, function (_, lang, code) {
+            const index = blocks.length;
+            blocks.push({
+                lang: String(lang || "").trim(),
+                code: String(code || "").replace(/\n$/, "")
+            });
+            return "\n@@NOVA_CODE_BLOCK_" + index + "@@\n";
+        });
+
+        safe = escapeHtml(safe);
+        safe = safe.replace(/`([^`]+)`/g, "<code>$1</code>");
+        safe = safe.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+
+        const lines = safe.split("\n");
+        const out = [];
+        let inList = false;
+
+        lines.forEach((line) => {
+            const codeMatch = line.match(/^@@NOVA_CODE_BLOCK_(\d+)@@$/);
+
+            if (codeMatch) {
+                if (inList) {
+                    out.push("</ul>");
+                    inList = false;
+                }
+
+                const block = blocks[Number(codeMatch[1])] || {};
+                const lang = escapeHtml(block.lang || "");
+                const code = escapeHtml(block.code || "");
+
+                out.push(
+                    '<pre class="nova-mobile-code-block">' +
+                        (lang ? '<div class="nova-mobile-code-lang">' + lang + '</div>' : "") +
+                        '<code>' + code + '</code>' +
+                    '</pre>'
+                );
+                return;
+            }
+
+            const bullet = line.match(/^\s*[-*]\s+(.+)$/);
+
+            if (bullet) {
+                if (!inList) {
+                    out.push("<ul>");
+                    inList = true;
+                }
+
+                out.push("<li>" + bullet[1] + "</li>");
+                return;
+            }
+
+            if (inList) {
+                out.push("</ul>");
+                inList = false;
+            }
+
+            if (line.trim()) {
+                out.push("<p>" + line + "</p>");
+            }
+        });
+
+        if (inList) out.push("</ul>");
+
+        return out.join("");
+    }
+
+    function normalizeMarkdownBubble(el) {
+        if (!el || el.nodeType !== 1) return;
+
+        if (!looksLikeAssistantBubble(el)) return;
+
+        if (el.querySelector("pre, ul, ol")) return;
+
+        const raw = String(el.textContent || "").trim();
+
+        if (!raw) return;
+
+        const hasMarkdown =
+            raw.includes("```") ||
+            /^\s*[-*]\s+/m.test(raw) ||
+            raw.includes("**") ||
+            /`[^`]+`/.test(raw);
+
+        if (!hasMarkdown) return;
+
+        el.innerHTML = renderMarkdownLite(raw);
+
+        Array.from(el.querySelectorAll("pre")).forEach((pre) => {
+            pre.style.setProperty("max-width", "100%", "important");
+            pre.style.setProperty("overflow-x", "auto", "important");
+            pre.style.setProperty("white-space", "pre", "important");
+            pre.style.setProperty("background", "rgba(0, 0, 0, 0.34)", "important");
+            pre.style.setProperty("border", "1px solid rgba(255, 255, 255, 0.1)", "important");
+            pre.style.setProperty("border-radius", "12px", "important");
+            pre.style.setProperty("padding", "10px", "important");
+            pre.style.setProperty("box-sizing", "border-box", "important");
+            pre.style.setProperty("margin", "6px 0 0", "important");
+        });
+
+        Array.from(el.querySelectorAll(".nova-mobile-code-lang")).forEach((lang) => {
+            lang.style.setProperty("font-size", "11px", "important");
+            lang.style.setProperty("opacity", "0.72", "important");
+            lang.style.setProperty("margin-bottom", "6px", "important");
+            lang.style.setProperty("text-transform", "uppercase", "important");
+        });
+
+        Array.from(el.querySelectorAll("code")).forEach((code) => {
+            code.style.setProperty("font-family", "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace", "important");
+            code.style.setProperty("font-size", "13px", "important");
+        });
+
+        console.log("[Nova Mobile Final Markdown] normalized", raw.slice(0, 80));
+    }
+
+    function normalizeAllMarkdown() {
+        const chat = chatRoot();
+        if (!chat) return false;
+
+        Array.from(chat.children || []).forEach(normalizeMarkdownBubble);
+        return true;
+    }
+
+    normalizeAllMarkdown();
+
+    setTimeout(normalizeAllMarkdown, 100);
+    setTimeout(normalizeAllMarkdown, 500);
+    setTimeout(normalizeAllMarkdown, 1200);
+
+    const chat = chatRoot();
+    if (chat && window.MutationObserver) {
+        const observer = new MutationObserver(() => {
+            requestAnimationFrame(normalizeAllMarkdown);
+        });
+
+        observer.observe(chat, {
+            childList: true,
+            subtree: true,
+            characterData: true
+        });
+
+        window.__NovaMobileFinalMarkdownObserver = observer;
+    }
+
+    window.NovaMobileNormalizeMarkdown = normalizeAllMarkdown;
 })();

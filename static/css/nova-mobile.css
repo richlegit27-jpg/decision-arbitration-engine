@@ -13565,3 +13565,237 @@ textarea#nova-mobile-input {
     max-width: 100% !important;
     box-sizing: border-box !important;
 }
+
+/* -------------------------------------------------
+   NOVA MOBILE CHAT BUBBLE POLISH
+   Visual only. Does not touch send/session logic.
+   20260629
+-------------------------------------------------- */
+
+#mobileChatMessages,
+#nova-mobile-messages,
+#nova-mobile-chat {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+    gap: 12px !important;
+}
+
+/* Base message bubble */
+.mobile-chat-message,
+.nova-mobile-message,
+.nova-message,
+.message,
+.msg,
+.bubble,
+[data-message-role],
+[data-role="user"],
+[data-role="assistant"] {
+    width: fit-content !important;
+    max-width: min(82%, 720px) !important;
+    padding: 11px 13px !important;
+    border-radius: 18px !important;
+    font-size: 15px !important;
+    line-height: 1.45 !important;
+    letter-spacing: 0.01em !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+    box-sizing: border-box !important;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18) !important;
+}
+
+/* User bubbles */
+.mobile-chat-message.user,
+.mobile-chat-message[data-role="user"],
+.nova-mobile-message.user,
+.nova-message-user,
+.nova-message[data-role="user"],
+.message.user,
+.msg.user,
+.bubble.user,
+[data-message-role="user"],
+[data-role="user"] {
+    align-self: flex-end !important;
+    margin-left: auto !important;
+    margin-right: 0 !important;
+    border-bottom-right-radius: 6px !important;
+    background: linear-gradient(135deg, rgba(123, 92, 255, 0.95), rgba(75, 126, 255, 0.92)) !important;
+    color: #ffffff !important;
+}
+
+/* Assistant bubbles */
+.mobile-chat-message.assistant,
+.mobile-chat-message[data-role="assistant"],
+.nova-mobile-message.assistant,
+.nova-message-assistant,
+.nova-message[data-role="assistant"],
+.message.assistant,
+.msg.assistant,
+.bubble.assistant,
+[data-message-role="assistant"],
+[data-role="assistant"] {
+    align-self: flex-start !important;
+    margin-left: 0 !important;
+    margin-right: auto !important;
+    border-bottom-left-radius: 6px !important;
+    background: rgba(12, 22, 42, 0.88) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    color: rgba(255, 255, 255, 0.94) !important;
+}
+
+/* Assistant text spacing */
+.mobile-chat-message.assistant p,
+.nova-message-assistant p,
+[data-role="assistant"] p {
+    margin-top: 0 !important;
+    margin-bottom: 0.65em !important;
+}
+
+.mobile-chat-message.assistant p:last-child,
+.nova-message-assistant p:last-child,
+[data-role="assistant"] p:last-child {
+    margin-bottom: 0 !important;
+}
+
+/* Lists inside assistant replies */
+.mobile-chat-message.assistant ul,
+.mobile-chat-message.assistant ol,
+.nova-message-assistant ul,
+.nova-message-assistant ol,
+[data-role="assistant"] ul,
+[data-role="assistant"] ol {
+    margin-top: 6px !important;
+    margin-bottom: 6px !important;
+    padding-left: 20px !important;
+}
+
+/* Code and pre blocks */
+.mobile-chat-message code,
+.nova-message code,
+.message code,
+.msg code,
+.bubble code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+    font-size: 13px !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-radius: 6px !important;
+    padding: 2px 5px !important;
+}
+
+.mobile-chat-message pre,
+.nova-message pre,
+.message pre,
+.msg pre,
+.bubble pre {
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    white-space: pre !important;
+    background: rgba(0, 0, 0, 0.28) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 12px !important;
+    padding: 10px !important;
+    box-sizing: border-box !important;
+}
+
+/* Generated images inside messages */
+.mobile-chat-message img,
+.nova-message img,
+.message img,
+.msg img,
+.bubble img {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    border-radius: 14px !important;
+    margin-top: 6px !important;
+}
+
+/* Smaller phones */
+@media (max-width: 420px) {
+    .mobile-chat-message,
+    .nova-mobile-message,
+    .nova-message,
+    .message,
+    .msg,
+    .bubble,
+    [data-message-role],
+    [data-role="user"],
+    [data-role="assistant"] {
+        max-width: 88% !important;
+        font-size: 14.5px !important;
+        padding: 10px 12px !important;
+    }
+}
+
+.nova-mobile-polished-bubble {
+    width: fit-content !important;
+    max-width: min(86%, 720px) !important;
+    padding: 11px 13px !important;
+    border-radius: 18px !important;
+    line-height: 1.45 !important;
+}
+
+.nova-mobile-polished-user {
+    align-self: flex-end !important;
+    margin-left: auto !important;
+    margin-right: 0 !important;
+}
+
+.nova-mobile-polished-assistant {
+    align-self: flex-start !important;
+    margin-left: 0 !important;
+    margin-right: auto !important;
+}
+
+/* -------------------------------------------------
+   NOVA MOBILE CODE BLOCK FINAL VISUAL LOCK
+   20260629
+-------------------------------------------------- */
+
+.nova-mobile-code-block,
+.nova-mobile-polished-bubble pre,
+.nova-message-assistant pre,
+[data-role="assistant"] pre {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 6px 0 0 0 !important;
+    padding: 10px 12px !important;
+    box-sizing: border-box !important;
+    overflow-x: auto !important;
+    white-space: pre !important;
+    background: rgba(0, 0, 0, 0.42) !important;
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    border-radius: 12px !important;
+    color: rgba(255, 255, 255, 0.96) !important;
+}
+
+.nova-mobile-code-block code,
+.nova-mobile-polished-bubble pre code,
+.nova-message-assistant pre code,
+[data-role="assistant"] pre code {
+    display: block !important;
+    white-space: pre !important;
+    background: transparent !important;
+    border: 0 !important;
+    padding: 0 !important;
+    color: rgba(255, 255, 255, 0.96) !important;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+}
+
+.nova-mobile-code-lang {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 0 7px 0 !important;
+    padding: 0 0 6px 0 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+    color: rgba(255, 255, 255, 0.62) !important;
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.08em !important;
+}
