@@ -5293,3 +5293,331 @@ row.onclick = async () => {
 
     console.log("[Nova Mobile Old Lower Action Killer] ready");
 })();
+
+/* -------------------------------------------------
+   NOVA MOBILE ACTION HOVER STABILITY FIX
+   Stops Copy/Regen from being removed/rebuilt under the cursor.
+   20260629
+-------------------------------------------------- */
+(() => {
+    if (window.__NOVA_MOBILE_ACTION_HOVER_STABILITY_FIX_20260629__) return;
+    window.__NOVA_MOBILE_ACTION_HOVER_STABILITY_FIX_20260629__ = true;
+
+    [
+        "__NovaMobileFinalActionsCleanupObserver",
+        "__NovaMobileOldLowerActionKillerObserver",
+        "__NovaMobileRealMessageActionsObserver",
+        "__NovaMobileMessageActionsObserver",
+        "__NovaMobileFinalMessageActionsObserver"
+    ].forEach((key) => {
+        try {
+            if (window[key] && typeof window[key].disconnect === "function") {
+                window[key].disconnect();
+                console.log("[Nova Mobile Action Stability] disconnected", key);
+            }
+        } catch (e) {}
+    });
+
+    try {
+        clearTimeout(window.__novaMobileFinalActionsCleanupTimer);
+        clearTimeout(window.__novaMobileOldLowerActionKillerTimer);
+    } catch (e) {}
+
+    const FINAL_ROW = "nova-final-message-actions";
+
+    const OLD_ACTION_SELECTORS = [
+        ".nova-mobile-message-actions",
+        ".nova-mobile-assistant-actions",
+        ".nova-mobile-copy-regen-actions",
+        ".nova-real-message-actions",
+        ".mobile-message-actions",
+        ".message-actions",
+        ".mobile-inline-action",
+        ".nova-code-copy-btn",
+        ".mobile-code-copy-btn",
+        ".nova-mobile-copy-chat",
+        ".nova-mobile-regen-chat",
+        ".nova-mobile-copy-message",
+        ".nova-mobile-regenerate-message",
+        "[data-mobile-assistant-action]"
+    ].join(",");
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function chatRoot() {
+        return (
+            $("mobileChatMessages") ||
+            $("nova-mobile-messages") ||
+            $("nova-mobile-chat") ||
+            document.querySelector("[data-mobile-chat-messages]") ||
+            document.querySelector(".mobile-chat-messages") ||
+            document.querySelector(".nova-mobile-messages") ||
+            document.querySelector(".nova-mobile-chat") ||
+            document.querySelector(".chat-messages")
+        );
+    }
+
+    function inputBox() {
+        return (
+            $("nova-mobile-input") ||
+            $("mobileInput") ||
+            document.querySelector("textarea") ||
+            document.querySelector("[contenteditable='true']")
+        );
+    }
+
+    function sendButton() {
+        return (
+            $("nova-mobile-send") ||
+            $("mobileSendButton") ||
+            document.querySelector("[data-mobile-send]") ||
+            document.querySelector("button[type='submit']")
+        );
+    }
+
+    function cls(el) {
+        return String(el?.className || "").toLowerCase();
+    }
+
+    function isAssistantBubble(el) {
+        if (!el || el.nodeType !== 1) return false;
+
+        const raw = cls(el);
+
+        return (
+            raw.includes("assistant") ||
+            raw.includes("bot") ||
+            raw.includes("nova-message-assistant") ||
+            raw.includes("mobile-chat-message-assistant")
+        );
+    }
+
+    function isUserBubble(el) {
+        if (!el || el.nodeType !== 1) return false;
+
+        const raw = cls(el);
+
+        return (
+            raw.includes("user") ||
+            raw.includes("nova-message-user") ||
+            raw.includes("mobile-chat-message-user")
+        );
+    }
+
+    function cleanActionText(value) {
+        return String(value || "")
+            .replace(/(?:\s*Copy\s*Regen\s*)+$/gi, "")
+            .replace(/(?:\s*Copy\s*Regenerate\s*)+$/gi, "")
+            .replace(/(?:\s*Copied\s*Regen\s*)+$/gi, "")
+            .replace(/(?:\s*Copy\s*)+$/gi, "")
+            .replace(/(?:\s*Regen\s*)+$/gi, "")
+            .replace(/(?:\s*Regenerate\s*)+$/gi, "")
+            .trim();
+    }
+
+    function messageText(el) {
+        const clone = el.cloneNode(true);
+
+        clone.querySelectorAll(
+            "." + FINAL_ROW + ", " + OLD_ACTION_SELECTORS
+        ).forEach((node) => node.remove());
+
+        return cleanActionText(String(clone.innerText || clone.textContent || "").trim());
+    }
+
+    function previousUserText(el) {
+        const siblings = Array.from(el.parentElement?.children || []);
+        const index = siblings.indexOf(el);
+
+        for (let i = index - 1; i >= 0; i -= 1) {
+            const candidate = siblings[i];
+
+            if (isUserBubble(candidate)) {
+                return messageText(candidate);
+            }
+        }
+
+        return "";
+    }
+
+    async function copyText(text) {
+        const clean = String(text || "").trim();
+        if (!clean) return false;
+
+        try {
+            await navigator.clipboard.writeText(clean);
+            return true;
+        } catch (e) {}
+
+        try {
+            const area = document.createElement("textarea");
+            area.value = clean;
+            area.style.position = "fixed";
+            area.style.left = "-9999px";
+            area.style.top = "0";
+            document.body.appendChild(area);
+            area.focus();
+            area.select();
+            const ok = document.execCommand("copy");
+            area.remove();
+            return !!ok;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function styleButton(button) {
+        button.style.setProperty("appearance", "none", "important");
+        button.style.setProperty("border", "1px solid rgba(255,255,255,0.16)", "important");
+        button.style.setProperty("background", "rgba(255,255,255,0.10)", "important");
+        button.style.setProperty("color", "rgba(245,248,255,0.96)", "important");
+        button.style.setProperty("border-radius", "999px", "important");
+        button.style.setProperty("padding", "6px 11px", "important");
+        button.style.setProperty("font-size", "12px", "important");
+        button.style.setProperty("line-height", "1", "important");
+        button.style.setProperty("font-weight", "800", "important");
+        button.style.setProperty("cursor", "pointer", "important");
+        button.style.setProperty("min-height", "28px", "important");
+        button.style.setProperty("pointer-events", "auto", "important");
+        button.style.setProperty("touch-action", "manipulation", "important");
+    }
+
+    function createStableRow(el) {
+        const row = document.createElement("div");
+        row.className = FINAL_ROW;
+        row.dataset.novaMessageActions = "1";
+        row.dataset.novaStableActions = "1";
+
+        const copy = document.createElement("button");
+        copy.type = "button";
+        copy.textContent = "Copy";
+        copy.title = "Copy message";
+        copy.setAttribute("aria-label", "Copy message");
+        styleButton(copy);
+
+        copy.addEventListener("click", async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const ok = await copyText(messageText(el));
+
+            copy.textContent = ok ? "Copied" : "Fail";
+
+            setTimeout(() => {
+                copy.textContent = "Copy";
+            }, 900);
+        });
+
+        const regen = document.createElement("button");
+        regen.type = "button";
+        regen.textContent = "Regen";
+        regen.title = "Regenerate response";
+        regen.setAttribute("aria-label", "Regenerate response");
+        styleButton(regen);
+
+        regen.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const text = previousUserText(el);
+            const input = inputBox();
+
+            if (!text || !input) {
+                console.warn("[Nova Mobile Action Stability] regen missing previous prompt");
+                return;
+            }
+
+            if ("value" in input) {
+                input.value = text;
+                input.dispatchEvent(new Event("input", { bubbles: true }));
+            } else {
+                input.textContent = text;
+                input.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+
+            const send = sendButton();
+
+            if (send && typeof send.click === "function") {
+                send.click();
+            } else if (typeof window.NovaMobileSendText === "function") {
+                window.NovaMobileSendText(text);
+            } else if (typeof window.sendText === "function") {
+                window.sendText(text);
+            }
+        });
+
+        row.appendChild(copy);
+        row.appendChild(regen);
+
+        return row;
+    }
+
+    function normalizeBubble(el) {
+        if (!isAssistantBubble(el)) return;
+
+        Array.from(el.querySelectorAll(OLD_ACTION_SELECTORS)).forEach((node) => {
+            if (!node.closest("." + FINAL_ROW)) {
+                node.remove();
+            }
+        });
+
+        const finalRows = Array.from(el.querySelectorAll(":scope > ." + FINAL_ROW));
+
+        finalRows.slice(1).forEach((row) => row.remove());
+
+        let row = finalRows[0];
+
+        if (!row) {
+            row = createStableRow(el);
+            el.appendChild(row);
+        }
+
+        row.dataset.novaStableActions = "1";
+        row.style.setProperty("display", "flex", "important");
+        row.style.setProperty("pointer-events", "auto", "important");
+        row.style.setProperty("position", "relative", "important");
+        row.style.setProperty("z-index", "4", "important");
+    }
+
+    function normalizeStableActions() {
+        const chat = chatRoot();
+        if (!chat) return false;
+
+        Array.from(chat.children || []).forEach(normalizeBubble);
+        return true;
+    }
+
+    function schedule() {
+        clearTimeout(window.__novaMobileStableActionsTimer);
+        window.__novaMobileStableActionsTimer = setTimeout(normalizeStableActions, 160);
+    }
+
+    normalizeStableActions();
+
+    setTimeout(normalizeStableActions, 250);
+    setTimeout(normalizeStableActions, 900);
+    setTimeout(normalizeStableActions, 1800);
+
+    document.addEventListener("DOMContentLoaded", schedule);
+    window.addEventListener("nova:session-changed", schedule);
+    window.addEventListener("nova:message-rendered", schedule);
+
+    const chat = chatRoot();
+
+    if (chat && window.MutationObserver) {
+        const observer = new MutationObserver(schedule);
+
+        observer.observe(chat, {
+            childList: true,
+            subtree: true
+        });
+
+        window.__NovaMobileStableActionsObserver = observer;
+    }
+
+    window.NovaMobileNormalizeStableActions = normalizeStableActions;
+
+    console.log("[Nova Mobile Action Stability] ready");
+})();
