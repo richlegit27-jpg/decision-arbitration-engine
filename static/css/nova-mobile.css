@@ -13799,3 +13799,320 @@ textarea#nova-mobile-input {
     text-transform: uppercase !important;
     letter-spacing: 0.08em !important;
 }
+
+/* -------------------------------------------------
+   NOVA MOBILE CHAT TEXT + ACTION BUTTON POLISH
+   Visual only. Keeps existing copy/regen logic.
+   20260629
+-------------------------------------------------- */
+
+/* Global chat text readability */
+#mobileChatMessages,
+#nova-mobile-messages,
+#nova-mobile-chat {
+    color: rgba(255, 255, 255, 0.94) !important;
+}
+
+/* Assistant text */
+.nova-mobile-polished-assistant,
+.nova-message-assistant,
+[data-role="assistant"] {
+    color: rgba(245, 248, 255, 0.96) !important;
+}
+
+/* User text */
+.nova-mobile-polished-user,
+.nova-message-user,
+[data-role="user"] {
+    color: #ffffff !important;
+}
+
+/* Paragraphs/lists inside assistant bubbles */
+.nova-mobile-polished-assistant p,
+.nova-mobile-polished-assistant li,
+.nova-message-assistant p,
+.nova-message-assistant li,
+[data-role="assistant"] p,
+[data-role="assistant"] li {
+    color: rgba(245, 248, 255, 0.96) !important;
+}
+
+/* Muted helper/meta text */
+.nova-mobile-polished-assistant small,
+.nova-message-assistant small,
+[data-role="assistant"] small,
+.nova-message-meta,
+.mobile-message-meta,
+.message-meta {
+    color: rgba(210, 220, 245, 0.68) !important;
+}
+
+/* Message action rows */
+.nova-mobile-message-actions,
+.mobile-message-actions,
+.message-actions,
+.nova-assistant-actions,
+.assistant-actions,
+[data-message-actions] {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 6px !important;
+    margin-top: 7px !important;
+    padding-top: 2px !important;
+    opacity: 0.88 !important;
+}
+
+/* Copy / regenerate / speak action buttons */
+.nova-mobile-message-actions button,
+.mobile-message-actions button,
+.message-actions button,
+.nova-assistant-actions button,
+.assistant-actions button,
+[data-message-actions] button,
+button[data-action="copy"],
+button[data-action="regenerate"],
+button[data-action="regen"],
+button[data-action="speak"],
+button[aria-label*="Copy"],
+button[aria-label*="Regenerate"],
+button[title*="Copy"],
+button[title*="Regenerate"] {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 30px !important;
+    height: 28px !important;
+    padding: 0 9px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    background: rgba(255, 255, 255, 0.07) !important;
+    color: rgba(245, 248, 255, 0.88) !important;
+    font-size: 12px !important;
+    line-height: 1 !important;
+    box-shadow: none !important;
+    cursor: pointer !important;
+}
+
+/* Button hover / active */
+.nova-mobile-message-actions button:hover,
+.mobile-message-actions button:hover,
+.message-actions button:hover,
+.nova-assistant-actions button:hover,
+.assistant-actions button:hover,
+[data-message-actions] button:hover,
+button[data-action="copy"]:hover,
+button[data-action="regenerate"]:hover,
+button[data-action="regen"]:hover {
+    background: rgba(123, 92, 255, 0.18) !important;
+    border-color: rgba(165, 145, 255, 0.35) !important;
+    color: #ffffff !important;
+}
+
+.nova-mobile-message-actions button:active,
+.mobile-message-actions button:active,
+.message-actions button:active,
+.nova-assistant-actions button:active,
+.assistant-actions button:active,
+[data-message-actions] button:active {
+    transform: translateY(1px) !important;
+}
+
+/* Keep action buttons from stretching bubbles */
+.nova-mobile-polished-bubble .nova-mobile-message-actions,
+.nova-mobile-polished-bubble .mobile-message-actions,
+.nova-mobile-polished-bubble .message-actions,
+.nova-mobile-polished-bubble .nova-assistant-actions,
+.nova-mobile-polished-bubble .assistant-actions {
+    width: auto !important;
+    max-width: 100% !important;
+}
+
+/* Links inside assistant text */
+.nova-mobile-polished-assistant a,
+.nova-message-assistant a,
+[data-role="assistant"] a {
+    color: rgba(178, 196, 255, 0.98) !important;
+    text-decoration: underline !important;
+    text-underline-offset: 3px !important;
+}
+
+/* -------------------------------------------------
+   NOVA MOBILE FULL CHAT COLOR THEME PASS
+   Purple accent / readable text / clean states
+   20260629
+-------------------------------------------------- */
+
+:root {
+    --nova-mobile-accent: #8b5cf6;
+    --nova-mobile-accent-2: #5b7cff;
+    --nova-mobile-accent-soft: rgba(139, 92, 246, 0.22);
+    --nova-mobile-user-bg: linear-gradient(135deg, rgba(139, 92, 246, 0.98), rgba(91, 124, 255, 0.94));
+    --nova-mobile-assistant-bg: rgba(12, 22, 42, 0.92);
+    --nova-mobile-assistant-border: rgba(255, 255, 255, 0.1);
+    --nova-mobile-text-main: rgba(248, 250, 255, 0.97);
+    --nova-mobile-text-muted: rgba(210, 220, 245, 0.68);
+    --nova-mobile-code-bg: rgba(0, 0, 0, 0.42);
+    --nova-mobile-success: #46d37d;
+    --nova-mobile-warning: #f7c948;
+    --nova-mobile-error: #ff6b6b;
+}
+
+/* Chat global readability */
+#mobileChatMessages,
+#nova-mobile-messages,
+#nova-mobile-chat {
+    color: var(--nova-mobile-text-main) !important;
+}
+
+/* User bubble final color */
+.nova-mobile-polished-user {
+    background: var(--nova-mobile-user-bg) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    box-shadow:
+        0 10px 24px rgba(91, 124, 255, 0.22),
+        0 4px 12px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Assistant bubble final color */
+.nova-mobile-polished-assistant {
+    background: var(--nova-mobile-assistant-bg) !important;
+    color: var(--nova-mobile-text-main) !important;
+    border: 1px solid var(--nova-mobile-assistant-border) !important;
+    box-shadow:
+        0 10px 24px rgba(0, 0, 0, 0.24),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+/* Text inside assistant */
+.nova-mobile-polished-assistant p,
+.nova-mobile-polished-assistant li,
+.nova-mobile-polished-assistant span,
+.nova-mobile-polished-assistant div {
+    color: var(--nova-mobile-text-main) !important;
+}
+
+/* Links */
+.nova-mobile-polished-assistant a,
+.nova-message-assistant a,
+[data-role="assistant"] a {
+    color: #b8c4ff !important;
+    text-decoration: underline !important;
+    text-decoration-color: rgba(184, 196, 255, 0.52) !important;
+    text-underline-offset: 3px !important;
+}
+
+/* Muted/meta text */
+.nova-message-meta,
+.mobile-message-meta,
+.message-meta,
+.nova-mobile-polished-assistant small {
+    color: var(--nova-mobile-text-muted) !important;
+}
+
+/* Code block final color */
+.nova-mobile-code-block,
+.nova-mobile-polished-bubble pre,
+.nova-message-assistant pre,
+[data-role="assistant"] pre {
+    background: var(--nova-mobile-code-bg) !important;
+    border: 1px solid rgba(139, 92, 246, 0.22) !important;
+    color: rgba(255, 255, 255, 0.97) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.04),
+        0 8px 18px rgba(0, 0, 0, 0.18) !important;
+}
+
+.nova-mobile-code-block code,
+.nova-mobile-polished-bubble pre code,
+.nova-message-assistant pre code,
+[data-role="assistant"] pre code {
+    color: rgba(255, 255, 255, 0.97) !important;
+    background: transparent !important;
+}
+
+/* Code language label */
+.nova-mobile-code-lang {
+    color: rgba(196, 181, 253, 0.9) !important;
+    border-bottom: 1px solid rgba(139, 92, 246, 0.22) !important;
+}
+
+/* Inline code */
+.nova-mobile-polished-assistant code:not(pre code),
+.nova-message-assistant code:not(pre code),
+[data-role="assistant"] code:not(pre code) {
+    background: rgba(139, 92, 246, 0.16) !important;
+    border: 1px solid rgba(139, 92, 246, 0.22) !important;
+    color: rgba(238, 232, 255, 0.98) !important;
+}
+
+/* Real Copy/Regen action row */
+.nova-real-message-actions {
+    border-top: 1px solid rgba(139, 92, 246, 0.16) !important;
+}
+
+.nova-real-message-actions button {
+    background: rgba(255, 255, 255, 0.075) !important;
+    border: 1px solid rgba(139, 92, 246, 0.22) !important;
+    color: rgba(245, 248, 255, 0.9) !important;
+}
+
+.nova-real-message-actions button:hover {
+    background: rgba(139, 92, 246, 0.24) !important;
+    border-color: rgba(196, 181, 253, 0.42) !important;
+    color: #ffffff !important;
+}
+
+.nova-real-message-actions button:active {
+    background: rgba(91, 124, 255, 0.28) !important;
+    transform: translateY(1px) !important;
+}
+
+/* Success / copied state if text changes to Copied */
+.nova-real-message-actions button,
+button {
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease,
+        transform 0.08s ease !important;
+}
+
+/* Thinking/loading style */
+.nova-mobile-polished-assistant[data-thinking="true"],
+.nova-mobile-polished-assistant.thinking,
+.nova-mobile-polished-assistant:empty {
+    color: var(--nova-mobile-text-muted) !important;
+    border-color: rgba(139, 92, 246, 0.18) !important;
+    background: rgba(12, 22, 42, 0.78) !important;
+}
+
+/* Error text/buttons */
+.nova-mobile-polished-assistant.error,
+.nova-mobile-polished-assistant[data-error="true"],
+.nova-error,
+.error {
+    color: var(--nova-mobile-error) !important;
+    border-color: rgba(255, 107, 107, 0.28) !important;
+}
+
+/* Warning text */
+.nova-warning,
+.warning {
+    color: var(--nova-mobile-warning) !important;
+}
+
+/* Generated images in assistant bubbles */
+.nova-mobile-polished-assistant img {
+    border: 1px solid rgba(139, 92, 246, 0.22) !important;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24) !important;
+}
+
+/* Selection color */
+#mobileChatMessages ::selection,
+#nova-mobile-messages ::selection,
+#nova-mobile-chat ::selection {
+    background: rgba(139, 92, 246, 0.42) !important;
+    color: #ffffff !important;
+}

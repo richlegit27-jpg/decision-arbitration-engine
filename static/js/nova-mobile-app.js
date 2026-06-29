@@ -2503,3 +2503,230 @@ function fixChatTopSafeArea() {
 
     window.NovaMobileNormalizeMarkdown = normalizeAllMarkdown;
 })();
+
+/* -------------------------------------------------
+   NOVA MOBILE REAL MESSAGE ACTIONS FINAL
+   Adds visible Copy + Regen buttons to real assistant bubbles.
+   20260629
+-------------------------------------------------- */
+(() => {
+    if (window.__NOVA_MOBILE_REAL_MESSAGE_ACTIONS_FINAL_20260629__) return;
+    window.__NOVA_MOBILE_REAL_MESSAGE_ACTIONS_FINAL_20260629__ = true;
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function chatRoot() {
+        return (
+            $("mobileChatMessages") ||
+            $("nova-mobile-messages") ||
+            $("nova-mobile-chat") ||
+            document.querySelector("[data-mobile-chat-messages]") ||
+            document.querySelector(".mobile-chat-messages") ||
+            document.querySelector(".nova-mobile-messages") ||
+            document.querySelector(".nova-mobile-chat")
+        );
+    }
+
+    function inputBox() {
+        return (
+            $("nova-mobile-input") ||
+            $("mobileInput") ||
+            document.querySelector("textarea") ||
+            document.querySelector("input[type='text']")
+        );
+    }
+
+    function isAssistantBubble(el) {
+        if (!el || el.nodeType !== 1) return false;
+
+        const raw = [
+            el.dataset.role,
+            el.dataset.messageRole,
+            el.dataset.novaPolishedRole,
+            el.className,
+            el.getAttribute("class")
+        ].join(" ").toLowerCase();
+
+        if (raw.includes("assistant")) return true;
+        if (raw.includes("bot")) return true;
+        if (raw.includes("nova-mobile-polished-assistant")) return true;
+
+        return false;
+    }
+
+    function isUserBubble(el) {
+        if (!el || el.nodeType !== 1) return false;
+
+        const raw = [
+            el.dataset.role,
+            el.dataset.messageRole,
+            el.dataset.novaPolishedRole,
+            el.className,
+            el.getAttribute("class")
+        ].join(" ").toLowerCase();
+
+        return raw.includes("user");
+    }
+
+    function previousUserText(el) {
+        const siblings = Array.from(el.parentElement?.children || []);
+        const index = siblings.indexOf(el);
+
+        for (let i = index - 1; i >= 0; i -= 1) {
+            if (isUserBubble(siblings[i])) {
+                return String(siblings[i].innerText || siblings[i].textContent || "").trim();
+            }
+        }
+
+        return "";
+    }
+
+    function styleButton(button) {
+        button.style.setProperty("display", "inline-flex", "important");
+        button.style.setProperty("align-items", "center", "important");
+        button.style.setProperty("justify-content", "center", "important");
+        button.style.setProperty("height", "28px", "important");
+        button.style.setProperty("min-width", "34px", "important");
+        button.style.setProperty("padding", "0 10px", "important");
+        button.style.setProperty("border-radius", "999px", "important");
+        button.style.setProperty("border", "1px solid rgba(255, 255, 255, 0.14)", "important");
+        button.style.setProperty("background", "rgba(255, 255, 255, 0.08)", "important");
+        button.style.setProperty("color", "rgba(245, 248, 255, 0.92)", "important");
+        button.style.setProperty("font-size", "12px", "important");
+        button.style.setProperty("line-height", "1", "important");
+        button.style.setProperty("cursor", "pointer", "important");
+        button.style.setProperty("box-shadow", "none", "important");
+    }
+
+    function addActions(el) {
+        if (!isAssistantBubble(el)) return;
+        if (el.querySelector(":scope > .nova-real-message-actions")) return;
+
+        el.style.setProperty("color", "rgba(245, 248, 255, 0.96)", "important");
+
+        const row = document.createElement("div");
+        row.className = "nova-real-message-actions";
+
+        row.style.setProperty("display", "flex", "important");
+        row.style.setProperty("align-items", "center", "important");
+        row.style.setProperty("justify-content", "flex-start", "important");
+        row.style.setProperty("gap", "7px", "important");
+        row.style.setProperty("margin-top", "9px", "important");
+        row.style.setProperty("padding-top", "4px", "important");
+        row.style.setProperty("border-top", "1px solid rgba(255, 255, 255, 0.08)", "important");
+
+        const copy = document.createElement("button");
+        copy.type = "button";
+        copy.textContent = "Copy";
+        copy.title = "Copy message";
+        copy.setAttribute("aria-label", "Copy message");
+        styleButton(copy);
+
+        copy.addEventListener("click", async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const clone = el.cloneNode(true);
+            clone.querySelectorAll(".nova-real-message-actions").forEach((node) => node.remove());
+
+            const text = String(clone.innerText || clone.textContent || "").trim();
+
+            try {
+                await navigator.clipboard.writeText(text);
+                copy.textContent = "Copied";
+                setTimeout(() => {
+                    copy.textContent = "Copy";
+                }, 900);
+            } catch (e) {
+                console.warn("[Nova Mobile Actions] copy failed", e);
+                copy.textContent = "Fail";
+                setTimeout(() => {
+                    copy.textContent = "Copy";
+                }, 900);
+            }
+        });
+
+        const regen = document.createElement("button");
+        regen.type = "button";
+        regen.textContent = "Regen";
+        regen.title = "Regenerate response";
+        regen.setAttribute("aria-label", "Regenerate response");
+        styleButton(regen);
+
+        regen.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const text = previousUserText(el);
+            const input = inputBox();
+
+            if (!text || !input) {
+                console.warn("[Nova Mobile Actions] regen missing previous user text or input");
+                return;
+            }
+
+            input.value = text;
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+
+            if (typeof window.NovaMobileSendNow === "function") {
+                window.NovaMobileSendNow();
+                return;
+            }
+
+            if (typeof window.NovaMobileSendText === "function") {
+                window.NovaMobileSendText(text);
+                return;
+            }
+
+            const send =
+                $("nova-mobile-send") ||
+                $("mobileSend") ||
+                document.querySelector("[data-send]");
+
+            send?.click?.();
+        });
+
+        row.appendChild(copy);
+        row.appendChild(regen);
+        el.appendChild(row);
+    }
+
+    function normalizeActions() {
+        const chat = chatRoot();
+        if (!chat) return false;
+
+        Array.from(chat.children || []).forEach(addActions);
+
+        console.log("[Nova Mobile Real Message Actions] ready", {
+            chat: chat.id || chat.className || "chat",
+            bubbles: Array.from(chat.children || []).length
+        });
+
+        return true;
+    }
+
+    normalizeActions();
+
+    setTimeout(normalizeActions, 100);
+    setTimeout(normalizeActions, 500);
+    setTimeout(normalizeActions, 1200);
+    setTimeout(normalizeActions, 2500);
+
+    const chat = chatRoot();
+    if (chat && window.MutationObserver) {
+        const observer = new MutationObserver(() => {
+            requestAnimationFrame(normalizeActions);
+        });
+
+        observer.observe(chat, {
+            childList: true,
+            subtree: true
+        });
+
+        window.__NovaMobileRealMessageActionsObserver = observer;
+    }
+
+    window.NovaMobileNormalizeRealMessageActions = normalizeActions;
+})();
