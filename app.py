@@ -4190,7 +4190,17 @@ def api_chat():
 
     data = request_json()
 
-    user_text = str(data.get("user_text") or "").strip()
+    user_text = str(
+        data.get("user_text")
+        or data.get("text")
+        or data.get("message")
+        or ""
+    ).strip()
+
+    if isinstance(data, dict) and user_text:
+        data["user_text"] = user_text
+        data["text"] = user_text
+        data["message"] = user_text
 
     _nova_user_text_lower = str(user_text or "").strip().lower()
 
@@ -10159,7 +10169,12 @@ def _nova_attachment_followup_recall_gate():
             return None
 
         payload = request.get_json(silent=True) or {}
-        user_text = str(payload.get("user_text") or "").strip()
+        user_text = str(
+            payload.get("user_text")
+            or payload.get("text")
+            or payload.get("message")
+            or ""
+        ).strip()
         session_id = str(payload.get("session_id") or "").strip()
         attachments = payload.get("attachments") or []
 
@@ -13439,17 +13454,56 @@ def nova_final_session_detail_response_cache_20260612(response):
             if assistant_text and assistant_text in existing_messages_blob:
                 assistant_already_saved = True
 
+            # NOVA_FINAL_CACHE_SKIP_DOUBLE_ASSISTANT_20260630
+            # If chat_service.handle or another bridge already saved an assistant turn,
+            # do not let the final session-detail cache append another assistant variant.
+            try:
+                last_saved_role = ""
+
+                for existing_msg in reversed(messages):
+                    if not isinstance(existing_msg, dict):
+                        continue
+
+                    existing_role = str(
+                        existing_msg.get("role")
+                        or existing_msg.get("sender")
+                        or ""
+                    ).strip().lower()
+
+                    existing_text = str(
+                        existing_msg.get("text")
+                        or existing_msg.get("content")
+                        or existing_msg.get("message")
+                        or ""
+                    ).strip()
+
+                    if existing_role and existing_text:
+                        last_saved_role = existing_role
+                        break
+
+                if last_saved_role == "assistant":
+                    assistant_already_saved = True
+
+            except Exception:
+                pass
+
             # NOVA_FINAL_SESSION_CACHE_SAME_TEXT_DEDUPE_20260622
             # If another bridge already placed the same assistant text in session.messages,
             # do not append the top-level assistant_message again.
             if assistant_text and not assistant_already_saved:
                 try:
                     _assistant_text_norm = str(assistant_text or "").strip()
+
                     for _existing_msg in messages:
                         if not isinstance(_existing_msg, dict):
                             continue
 
-                        _existing_role = str(_existing_msg.get("role") or _existing_msg.get("sender") or "").strip().lower()
+                        _existing_role = str(
+                            _existing_msg.get("role")
+                            or _existing_msg.get("sender")
+                            or ""
+                        ).strip().lower()
+
                         _existing_text = str(
                             _existing_msg.get("text")
                             or _existing_msg.get("content")
@@ -13464,6 +13518,7 @@ def nova_final_session_detail_response_cache_20260612(response):
                         ):
                             assistant_already_saved = True
                             break
+
                 except Exception:
                     pass
 
@@ -13473,12 +13528,15 @@ def nova_final_session_detail_response_cache_20260612(response):
                 saved_assistant["role"] = "assistant"
                 saved_assistant["text"] = assistant_text
                 saved_assistant["content"] = assistant_text
+
                 session_meta = saved_assistant.get("meta")
                 if not isinstance(session_meta, dict):
                     session_meta = {}
                     saved_assistant["meta"] = session_meta
+
                 session_meta["route"] = session_meta.get("route") or "final_session_detail_response_cache"
                 session_meta["session_id"] = session_id
+
                 messages.append(saved_assistant)
 
             cleaned_messages = []

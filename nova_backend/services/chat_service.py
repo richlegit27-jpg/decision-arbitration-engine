@@ -6580,20 +6580,111 @@ if (not attachments) and (__name__ == "__main__"):
 
         assistant_text = " ".join(assistant_text.split())
 
-        ws = self._get_working_state(session_id) or {}
+        # NOVA ANSWER QUALITY DIRECTIVE 20260630
+        # Normal chat only. Do not touch web, image, or execution routes here.
+        quality_directive = {
+            "role": "system",
+            "content": (
+                "Nova answer quality rules: "
+                "Answer the user's latest message first. "
+                "Give the most concrete next action early, especially for Nova project work. "
+                "Avoid abstract labels like continuity, action shaping, workspace anchoring, or response selection unless the user asks for theory. "
+                "For coding/debugging, name the exact file path and exact command or patch before giving explanation. "
+                "Match the user's practical, get-to-the-point style. "
+                "Do not claim background work, future monitoring, or hidden async progress. "
+                "Do not say 'if you want', 'let me know', or add generic follow-up offers. "
+                "Do not repeat the same answer, paragraph, list, or conclusion twice. "
+                "Do not invent certainty; say when something is uncertain. "
+                "For attachments, describe only the provided file or image. "
+                "For current facts/news/prices/schedules, use the web route instead of guessing. "
+                "Keep replies concise unless the user asks for detail."
+            ),
+        }
 
-        if ws.get("active_task") and ws.get("next_move") and assistant_text:
-            assistant_text = (
-                assistant_text.strip()
-                + "\n\n(I m tracking this and continuing in the background.)"
-            )
+        if isinstance(model_messages, list):
+            insert_at = 1 if (
+                model_messages
+                and isinstance(model_messages[0], dict)
+                and model_messages[0].get("role") == "system"
+            ) else 0
 
+            model_messages.insert(insert_at, quality_directive)
+
+        def dedupe_repeated_answer_20260630(value: str) -> str:
+            import re
+
+            clean = self._safe_str(value).strip()
+
+            if not clean:
+                return ""
+
+            compact = " ".join(clean.split())
+
+            # Exact duplicated paragraph/list halves.
+            paragraphs = [p.strip() for p in clean.split("\n\n") if p.strip()]
+            if len(paragraphs) >= 2 and len(paragraphs) % 2 == 0:
+                half = len(paragraphs) // 2
+                if paragraphs[:half] == paragraphs[half:]:
+                    return "\n\n".join(paragraphs[:half]).strip()
+
+            # Exact duplicated text with only spaces between copies.
+            if len(compact) >= 80:
+                midpoint = len(compact) // 2
+
+                for cut in range(
+                    max(1, midpoint - 160),
+                    min(len(compact), midpoint + 160),
+                ):
+                    left = compact[:cut].strip()
+                    right = compact[cut:].strip()
+
+                    if len(left) >= 40 and left == right:
+                        return left
+
+                    if len(left) >= 40 and right.startswith(left):
+                        return left
+
+            # Sentence-level duplicate cleaner.
+            sentence_parts = re.split(r"(?<=[.!?])\s+", clean)
+            sentence_parts = [part.strip() for part in sentence_parts if part.strip()]
+
+            if len(sentence_parts) >= 2 and len(sentence_parts) % 2 == 0:
+                half = len(sentence_parts) // 2
+                left = " ".join(sentence_parts[:half]).strip()
+                right = " ".join(sentence_parts[half:]).strip()
+
+                if left and left == right:
+                    return left
+
+            # Remove repeated individual sentences while preserving order.
+            if len(sentence_parts) >= 4:
+                seen = set()
+                output = []
+
+                for sentence in sentence_parts:
+                    key = " ".join(sentence.lower().split())
+
+                    if key in seen:
+                        continue
+
+                    seen.add(key)
+                    output.append(sentence)
+
+                cleaned = " ".join(output).strip()
+
+                if cleaned and len(cleaned) < len(clean):
+                    return cleaned
+
+            return clean
         try:
             response = self.client.responses.create(
                 model=self.chat_model,
                 input=model_messages,
             )
-            assistant_text = self._extract_response_text(response)
+
+            assistant_text = dedupe_repeated_answer_20260630(
+                self._extract_response_text(response)
+            )
 
         except Exception as e:
             import traceback
@@ -6673,6 +6764,8 @@ if (not attachments) and (__name__ == "__main__"):
 
             elif rewritten_text and len(rewritten_text.split()) >= 3:
                 assistant_text = rewritten_text
+
+        assistant_text = dedupe_repeated_answer_20260630(assistant_text)
 
         intelligence = intelligence_result.get("intelligence", {})
         self_check = intelligence_result.get("self_check", {})
@@ -6831,6 +6924,8 @@ if (not attachments) and (__name__ == "__main__"):
             ),
             "next_step": next_step_out,
         }
+
+        assistant_text = dedupe_repeated_answer_20260630(assistant_text)
 
         # === BUILD FINAL MESSAGE ===
         if assistant_text:
@@ -14821,27 +14916,48 @@ Auto-fix result:
 
         return "Working context:\n" + "\n".join(lines)
 
-    def _build_continuity_context(self, session=None):
+    def _build_continuity_context(self, session=None, limit: int = 14):
         session = session or {}
         messages = session.get("messages") if isinstance(session, dict) else []
+
         if not isinstance(messages, list) or not messages:
             return ""
 
-        recent = messages[-6:]
+        recent = messages[-limit:]
         lines = []
 
         for msg in recent:
             if not isinstance(msg, dict):
                 continue
-            role = str(msg.get("role") or "").strip()
+
+            role = str(msg.get("role") or "").strip().lower()
             text = str(msg.get("text") or msg.get("content") or "").strip()
-            if role and text:
-                lines.append(f"{role}: {text[:500]}")
+
+            if not text:
+                continue
+
+            if role in {"human", "user"}:
+                role = "user"
+            elif role in {"assistant", "nova"}:
+                role = "assistant"
+            else:
+                continue
+
+            text = " ".join(text.split())
+
+            if len(text) > 900:
+                text = text[:900].rstrip() + "..."
+
+            lines.append(f"{role}: {text}")
 
         if not lines:
             return ""
 
-        return "Recent conversation:\n" + "\n".join(lines)
+        return (
+            "Recent conversation context. Highest priority after the current user message.\n"
+            "Use this before older saved memory. The latest user correction or instruction overrides earlier context.\n"
+            + "\n".join(lines)
+        )
 
     def _compose_model_messages(
         self, user_text, session=None, decision=None, memory_context=None
@@ -14879,7 +14995,8 @@ Auto-fix result:
                 {
                     "role": "system",
                     "content": (
-                        "Memory about the user (use this as ground truth when relevant):\n"
+                        "Older saved memory. Lower priority than the current user message and recent conversation. "
+                        "Use only when relevant and not contradicted by the latest context:\n"
                         f"{memory_context}"
                     ),
                 }
