@@ -7367,8 +7367,29 @@ if (
         });
 
         return true;
+    }
+
+    colorizeAllCodeBlocks();
+
+    setTimeout(colorizeAllCodeBlocks, 100);
+    setTimeout(colorizeAllCodeBlocks, 500);
+    setTimeout(colorizeAllCodeBlocks, 1200);
+    setTimeout(colorizeAllCodeBlocks, 2500);
+
+    const root = chatRoot();
+    if (root && window.MutationObserver) {
+        const observer = new MutationObserver(() => {
+            requestAnimationFrame(colorizeAllCodeBlocks);
+        });
+
+        observer.observe(root, {
+            childList: true,
+            subtree: true
+        });
+
+        window.__NovaMobileCodeColorizerObserver = observer;
+    }
 
     window.NovaMobileColorizeCodeBlocks = colorizeAllCodeBlocks;
     console.log("[Nova Mobile Code Colorizer] ready");
-
-    }})();
+})();
