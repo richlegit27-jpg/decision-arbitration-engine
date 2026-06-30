@@ -23350,6 +23350,94 @@ try:
 except Exception as _nova_final_attachment_route_lock_v2_error:
     print("[NOVA_FINAL_ATTACHMENT_ROUTE_BEATS_WEB_LOCK_V2_20260624] failed:", _nova_final_attachment_route_lock_v2_error)
 
+# NOVA_INTENT_AUTHORITY_DECIDE_ROUTE_20260630
+# Final lightweight intent authority wrapper.
+# Keeps hard attachment protections, but lets IntentService own high-confidence
+# route selection for image/web/planning/chat metadata.
+try:
+    _nova_previous_decide_route_intent_authority_20260630 = ChatService._decide_route
+
+    def _nova_intent_authority_decide_route_20260630(
+        self,
+        user_text="",
+        attachments=None,
+        memory_context="",
+        working_context_block="",
+        session_id="",
+        **kwargs,
+    ):
+        attachments = attachments if isinstance(attachments, list) else []
+
+        # Real attachments always stay attachment-analysis.
+        if attachments:
+            return {
+                "route": self.ROUTE_ATTACHMENT_ANALYSIS,
+                "mode": "attachment_analysis",
+                "intent": "attachment",
+                "confidence": 1.0,
+                "reasons": ["intent_authority_real_attachments"],
+                "save_artifact": True,
+                "save_memory": True,
+                "use_memory": True,
+                "source_urls": [],
+                "sources": [],
+            }
+
+        intent_decision = {}
+
+        try:
+            intent_service = getattr(self, "intent_service", None)
+
+            if intent_service is not None and hasattr(intent_service, "detect"):
+                intent_decision = intent_service.detect(user_text)
+        except Exception:
+            intent_decision = {}
+
+        if isinstance(intent_decision, dict):
+            intent_route = str(intent_decision.get("route") or "").strip()
+            intent_confidence = float(intent_decision.get("confidence") or 0)
+
+            if intent_route and intent_confidence >= 0.94:
+                return {
+                    "route": intent_route,
+                    "mode": intent_decision.get("mode") or intent_decision.get("intent") or "chat",
+                    "intent": intent_decision.get("intent") or "",
+                    "confidence": intent_confidence,
+                    "reasons": list(intent_decision.get("reasons") or []) + ["intent_authority"],
+                    "save_artifact": bool(intent_decision.get("save_artifact", False)),
+                    "save_memory": bool(intent_decision.get("save_memory", True)),
+                    "use_memory": bool(intent_decision.get("use_memory", True)),
+                    "source_urls": [],
+                    "sources": [],
+                    "prompt": intent_decision.get("prompt") or user_text,
+                }
+
+        decision = _nova_previous_decide_route_intent_authority_20260630(
+            self,
+            user_text=user_text,
+            attachments=attachments,
+            memory_context=memory_context,
+            working_context_block=working_context_block,
+            session_id=session_id,
+            **kwargs,
+        )
+
+        if isinstance(decision, dict) and isinstance(intent_decision, dict):
+            decision.setdefault("intent", intent_decision.get("intent") or "")
+            decision.setdefault("intent_confidence", intent_decision.get("confidence") or 0)
+            decision.setdefault("intent_reasons", intent_decision.get("reasons") or [])
+
+        return decision
+
+    ChatService._decide_route = _nova_intent_authority_decide_route_20260630
+    print("[NOVA_INTENT_AUTHORITY_DECIDE_ROUTE_20260630] installed")
+
+except Exception as _nova_intent_authority_install_error:
+    print(
+        "[NOVA_INTENT_AUTHORITY_DECIDE_ROUTE_20260630] failed:",
+        _nova_intent_authority_install_error,
+    )
+
 
 # NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V4_20260624
 # Final response cleaner: exact known mojibake only. No broad word-ending regex.
