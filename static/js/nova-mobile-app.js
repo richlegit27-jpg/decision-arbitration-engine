@@ -2617,98 +2617,184 @@ function fixChatTopSafeArea() {
         button.style.setProperty("box-shadow", "none", "important");
     }
 
-    function addActions(el) {
-        if (!isAssistantBubble(el)) return;
-        if (el.querySelector(":scope > .nova-real-message-actions")) return;
+function addActions(el) {
+    if (!isAssistantBubble(el)) return;
+    if (el.querySelector(":scope > .nova-real-message-actions")) return;
 
-        el.style.setProperty("color", "rgba(245, 248, 255, 0.96)", "important");
+    const hasContent =
+        String(el.innerText || el.textContent || "").trim() ||
+        el.querySelector("img[src]") ||
+        el.querySelector("pre code") ||
+        el.querySelector("pre");
 
-        const row = document.createElement("div");
-        row.className = "nova-real-message-actions";
+    if (!hasContent) return;
 
-        row.style.setProperty("display", "flex", "important");
-        row.style.setProperty("align-items", "center", "important");
-        row.style.setProperty("justify-content", "flex-start", "important");
-        row.style.setProperty("gap", "7px", "important");
-        row.style.setProperty("margin-top", "9px", "important");
-        row.style.setProperty("padding-top", "4px", "important");
-        row.style.setProperty("border-top", "1px solid rgba(255, 255, 255, 0.08)", "important");
+    el.style.setProperty("color", "rgba(245, 248, 255, 0.96)", "important");
 
-        const copy = document.createElement("button");
-        copy.type = "button";
-        copy.textContent = "Copy";
-        copy.title = "Copy message";
-        copy.setAttribute("aria-label", "Copy message");
-        styleButton(copy);
+    function cleanMessageTextForCopy(source) {
+        const clone = source.cloneNode(true);
 
-        copy.addEventListener("click", async (event) => {
+        clone.querySelectorAll(
+            ".nova-real-message-actions, .nova-mobile-message-actions, button"
+        ).forEach((node) => node.remove());
+
+        const text = String(clone.innerText || clone.textContent || "").trim();
+
+        if (text) return text;
+
+        const img = source.querySelector("img[src]");
+        if (img) {
+            return String(img.getAttribute("src") || img.src || "").trim();
+        }
+
+        return "";
+    }
+
+    function codeTextFrom(source) {
+        const code =
+            source.querySelector("pre code") ||
+            source.querySelector("pre");
+
+        return String(code?.innerText || code?.textContent || "").trim();
+    }
+
+    async function copyToClipboard(value, button, resetLabel) {
+        const text = String(value || "").trim();
+
+        if (!text) {
+            button.textContent = "None";
+            setTimeout(() => {
+                button.textContent = resetLabel;
+            }, 900);
+            return;
+        }
+
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                const area = document.createElement("textarea");
+                area.value = text;
+                area.setAttribute("readonly", "readonly");
+                area.style.position = "fixed";
+                area.style.left = "-9999px";
+                document.body.appendChild(area);
+                area.select();
+                document.execCommand("copy");
+                area.remove();
+            }
+
+            button.textContent = "Copied";
+            setTimeout(() => {
+                button.textContent = resetLabel;
+            }, 900);
+        } catch (e) {
+            console.warn("[Nova Mobile Actions] copy failed", e);
+            button.textContent = "Fail";
+            setTimeout(() => {
+                button.textContent = resetLabel;
+            }, 900);
+        }
+    }
+
+    function makeActionButton(label, title) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = label;
+        button.title = title || label;
+        button.setAttribute("aria-label", title || label);
+        styleButton(button);
+        return button;
+    }
+
+    const row = document.createElement("div");
+    row.className = "nova-real-message-actions";
+
+    row.style.setProperty("display", "flex", "important");
+    row.style.setProperty("align-items", "center", "important");
+    row.style.setProperty("justify-content", "flex-start", "important");
+    row.style.setProperty("gap", "7px", "important");
+    row.style.setProperty("margin-top", "9px", "important");
+    row.style.setProperty("padding-top", "4px", "important");
+    row.style.setProperty("border-top", "1px solid rgba(255, 255, 255, 0.08)", "important");
+
+    const copy = makeActionButton("Copy", "Copy message");
+
+    copy.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        await copyToClipboard(
+            cleanMessageTextForCopy(el),
+            copy,
+            "Copy"
+        );
+    });
+
+    row.appendChild(copy);
+
+    if (codeTextFrom(el)) {
+        const copyCode = makeActionButton("Code", "Copy code");
+
+        copyCode.addEventListener("click", async (event) => {
             event.preventDefault();
             event.stopPropagation();
 
-            const clone = el.cloneNode(true);
-            clone.querySelectorAll(".nova-real-message-actions").forEach((node) => node.remove());
-
-            const text = String(clone.innerText || clone.textContent || "").trim();
-
-            try {
-                await navigator.clipboard.writeText(text);
-                copy.textContent = "Copied";
-                setTimeout(() => {
-                    copy.textContent = "Copy";
-                }, 900);
-            } catch (e) {
-                console.warn("[Nova Mobile Actions] copy failed", e);
-                copy.textContent = "Fail";
-                setTimeout(() => {
-                    copy.textContent = "Copy";
-                }, 900);
-            }
+            await copyToClipboard(
+                codeTextFrom(el),
+                copyCode,
+                "Code"
+            );
         });
 
-        const regen = document.createElement("button");
-        regen.type = "button";
-        regen.textContent = "Regen";
-        regen.title = "Regenerate response";
-        regen.setAttribute("aria-label", "Regenerate response");
-        styleButton(regen);
+        row.appendChild(copyCode);
+    }
 
-        regen.addEventListener("click", (event) => {
-            event.preventDefault();
-            event.stopPropagation();
+    const regen = makeActionButton("Regen", "Regenerate response");
 
-            const text = previousUserText(el);
-            const input = inputBox();
+    regen.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
 
-            if (!text || !input) {
-                console.warn("[Nova Mobile Actions] regen missing previous user text or input");
-                return;
-            }
+        const text = previousUserText(el);
+        const input = inputBox();
 
-            input.value = text;
-            input.dispatchEvent(new Event("input", { bubbles: true }));
+        if (!text || !input) {
+            regen.textContent = "None";
+            setTimeout(() => {
+                regen.textContent = "Regen";
+            }, 900);
+            return;
+        }
 
-            if (typeof window.NovaMobileSendNow === "function") {
-                window.NovaMobileSendNow();
-                return;
-            }
+        input.value = text;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
 
-            if (typeof window.NovaMobileSendText === "function") {
-                window.NovaMobileSendText(text);
-                return;
-            }
+        regen.textContent = "Again";
 
+        if (typeof window.NovaMobileSendNow === "function") {
+            window.NovaMobileSendNow();
+        } else if (typeof window.NovaMobileSendText === "function") {
+            window.NovaMobileSendText(text);
+        } else if (typeof window.sendText === "function") {
+            window.sendText(text);
+        } else {
             const send =
                 $("nova-mobile-send") ||
                 $("mobileSend") ||
                 document.querySelector("[data-send]");
 
             send?.click?.();
-        });
+        }
 
-        row.appendChild(copy);
-        row.appendChild(regen);
-        el.appendChild(row);
-    }
+        setTimeout(() => {
+            regen.textContent = "Regen";
+        }, 900);
+    });
+
+    row.appendChild(regen);
+    el.appendChild(row);
+}
 
     function normalizeActions() {
         const chat = chatRoot();
@@ -4429,15 +4515,18 @@ setTimeout(wireSessionsButton, 2500);
     function isActionContainer(el) {
         if (!el || !el.className) return false;
 
-        const cls = String(el.className || "").toLowerCase();
+const cls = String(el.className || "").toLowerCase();
 
-        return (
-            cls.includes("message-action") ||
-            cls.includes("real-message-action") ||
-            cls.includes("inline-action") ||
-            cls.includes("copy-regen") ||
-            cls.includes("regen-action")
-        );
+if (cls.includes("nova-real-message-actions")) {
+    return false;
+}
+
+return (
+    cls.includes("message-action") ||
+    cls.includes("inline-action") ||
+    cls.includes("copy-regen") ||
+    cls.includes("regen-action")
+);
     }
 
     function messageRootFrom(el) {
@@ -4467,13 +4556,14 @@ setTimeout(wireSessionsButton, 2500);
 
             if (!parent) return;
 
-            if (
-                parent.closest("button") ||
-                parent.closest(".nova-mobile-message-actions") ||
-                parent.closest(".nova-mobile-owned-actions")
-            ) {
-                return;
-            }
+if (
+    parent.closest("button") ||
+    parent.closest(".nova-real-message-actions") ||
+    parent.closest(".nova-mobile-message-actions") ||
+    parent.closest(".nova-mobile-owned-actions")
+) {
+    return;
+}
 
             const raw = String(node.nodeValue || "");
             const clean = stripActionTextSuffix(raw);
