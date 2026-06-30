@@ -177,8 +177,15 @@ if (window.NovaMobileStream && typeof window.NovaMobileStream.renderGeneratedIma
     async function sendChatJsonFallback(message, thinking, attachments) {
         const safeAttachments = Array.isArray(attachments) ? attachments : [];
 
+        /* NOVA_STREAM_ABORT_CONTROLLER_WIRE_20260629 */
+        const controller = new AbortController();
+        window.NovaMobileAbortController = controller;
+        window.__novaMobileAbortController = controller;
+        window.__NOVA_ABORT_CONTROLLER__ = controller;
+
         const response = await fetch("/api/chat", {
             method: "POST",
+            signal: controller.signal,
             headers: {
                 "Content-Type": "application/json"
             },
@@ -285,6 +292,7 @@ window.NovaMobileStream = {
     // Expose globally for render calls
     window.NovaAttachBubbleActions = attachBubbleActions;
 })();
+
 
 
 
