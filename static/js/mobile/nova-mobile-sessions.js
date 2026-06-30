@@ -480,7 +480,10 @@ document.addEventListener("click", (event) => {
 (() => {
     "use strict";
 
-    if (window.__NOVA_MOBILE_SESSION_MESSAGE_RESTORE_20260630__) return;
+    
+    console.warn("[NOVA_MOBILE_SESSION_MESSAGE_RESTORE_20260630] disabled for freeze recovery");
+    return;
+if (window.__NOVA_MOBILE_SESSION_MESSAGE_RESTORE_20260630__) return;
     window.__NOVA_MOBILE_SESSION_MESSAGE_RESTORE_20260630__ = true;
 
     function getChatContainer() {
@@ -771,7 +774,10 @@ document.addEventListener("click", (event) => {
 (() => {
     "use strict";
 
-    if (window.__NOVA_MOBILE_ACTIVE_SESSION_SEND_BRIDGE_20260630__) return;
+    
+    console.warn("[NOVA_MOBILE_ACTIVE_SESSION_SEND_BRIDGE_20260630] disabled for freeze recovery");
+    return;
+if (window.__NOVA_MOBILE_ACTIVE_SESSION_SEND_BRIDGE_20260630__) return;
     window.__NOVA_MOBILE_ACTIVE_SESSION_SEND_BRIDGE_20260630__ = true;
 
     function cleanId(value) {
@@ -969,7 +975,10 @@ document.addEventListener("click", (event) => {
 (() => {
     "use strict";
 
-    if (window.__NOVA_MOBILE_SESSION_TITLE_REFRESH_20260630__) return;
+    
+    console.warn("[NOVA_MOBILE_SESSION_TITLE_REFRESH_20260630] disabled for freeze recovery");
+    return;
+if (window.__NOVA_MOBILE_SESSION_TITLE_REFRESH_20260630__) return;
     window.__NOVA_MOBILE_SESSION_TITLE_REFRESH_20260630__ = true;
 
     function clean(value) {
@@ -1258,7 +1267,10 @@ document.addEventListener("click", (event) => {
 (() => {
     "use strict";
 
-    if (window.__NOVA_MOBILE_SESSION_ACTIONS_POLISH_20260630__) return;
+    
+    console.warn("[NOVA_MOBILE_SESSION_ACTIONS_POLISH_20260630] disabled for freeze recovery");
+    return;
+if (window.__NOVA_MOBILE_SESSION_ACTIONS_POLISH_20260630__) return;
     window.__NOVA_MOBILE_SESSION_ACTIONS_POLISH_20260630__ = true;
 
     function clean(value) {
@@ -1636,7 +1648,10 @@ document.addEventListener("click", (event) => {
 (() => {
     "use strict";
 
-    if (window.__NOVA_MOBILE_SESSION_FINAL_OWNER_SHIELD_20260630__) return;
+    
+    console.warn("[NOVA_MOBILE_SESSION_FINAL_OWNER_SHIELD_20260630] disabled for freeze recovery");
+    return;
+if (window.__NOVA_MOBILE_SESSION_FINAL_OWNER_SHIELD_20260630__) return;
     window.__NOVA_MOBILE_SESSION_FINAL_OWNER_SHIELD_20260630__ = true;
 
     function textOf(node) {
