@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 # NOVA_LOCAL_PROJECT_CONTEXT_GUARD_20260607
 def _nova_is_local_project_status_question_20260607(user_text):
     clean = " ".join(str(user_text or "").lower().split())
@@ -69,7 +69,7 @@ def _nova_local_project_status_answer_20260607(user_text):
     return (
         "Here is what we actually fixed today:\n\n"
         "- Fixed the mobile composer buttons so the send/voice/attach/tools buttons stopped stretching and now hold a clean square size.\n"
-        "- Fixed the mojibukakke icon problem where symbols were showing as broken text like âž¤, ðŸŽ™, and ï¼‹.\n"
+        "- Fixed the mojibukakke icon problem where symbols were showing as broken text like Ã¢Å¾Â¤, Ã°Å¸Å½â„¢, and Ã¯Â¼â€¹.\n"
         "- Fixed the stale frontend cache problem where /mobile kept loading an old nova-mobile-app.js?v=attachment-payload-bridge-20260607204432 version instead of the patched one.\n"
         "- Slimmed the mobile input/composer bar down so the textarea and main composer buttons are now 40px high.\n"
         "- Found the next real issue: Nova's answer quality is contaminated by stale web/search context, so normal project questions can get wrong web-result answers.\n\n"
@@ -691,7 +691,7 @@ class ChatService:
                         or ""
                     ).strip()
 
-                    if "Generated image for:" in text:
+                    if "Generated image:" in text:
                         continue
 
                     if role and text:
@@ -956,7 +956,7 @@ Rules:
         if not code:
             return code
 
-        # 1. convert tabs â†’ 4 spaces
+        # 1. convert tabs Ã¢â€ â€™ 4 spaces
         code = code.replace("\t", "    ")
 
         # 2. normalize line endings
@@ -3227,9 +3227,9 @@ if (not attachments) and (__name__ == "__main__"):
                 "assembly news headlines today",
                 "curated for you",
                 "you're my favorite song",
-                "you’re my favorite song",
+                "youâ€™re my favorite song",
                 "introduces today's new top stars",
-                "introduces today’s new top stars",
+                "introduces todayâ€™s new top stars",
                 "gma network",
                 "kanak news odisha",
                 "odia news",
@@ -6027,7 +6027,7 @@ if (not attachments) and (__name__ == "__main__"):
                 answer_text = "No active task is currently tracked."
 
             assistant_msg = self._build_assistant_message(
-                text=f"We’re working on {answer_text}."
+                text=f"Weâ€™re working on {answer_text}."
             )
 
             return self._finalize_response(
@@ -7231,7 +7231,7 @@ if (not attachments) and (__name__ == "__main__"):
 
         user_text_lc = str(user_text or "").lower().strip()
 
-        # Ã°Å¸â€Â¥ 1. HARD USER OVERRIDE (strongest)
+        # ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ 1. HARD USER OVERRIDE (strongest)
         if any(
             p in user_text_lc
             for p in [
@@ -7258,7 +7258,7 @@ if (not attachments) and (__name__ == "__main__"):
         ):
             return "short"
 
-        # Ã°Å¸â€Â¥ 2. MEMORY (most recent wins)
+        # ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ 2. MEMORY (most recent wins)
         for m in reversed(memory_items or []):
             if not isinstance(m, dict):
                 continue
@@ -7271,7 +7271,7 @@ if (not attachments) and (__name__ == "__main__"):
             if "short answers" in text:
                 return "short"
 
-        # Ã°Å¸â€Â¥ 3. DEFAULT
+        # ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ 3. DEFAULT
         return "normal"
 
     def _build_diff_preview(self, old: str, new: str, file_path: str) -> str:
@@ -7620,7 +7620,7 @@ if (not attachments) and (__name__ == "__main__"):
             "send the code",
             "send one of these",
             "send the code and",
-            "whatÃ¢â‚¬â„¢s the symptom",
+            "whatÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s the symptom",
             "what's the symptom",
             "tell me what you need",
             "i can help",
@@ -8082,7 +8082,7 @@ if (not attachments) and (__name__ == "__main__"):
                 "SMFF mode:\n"
                 "- Send full file path.\n"
                 "- Send the full broken function or file.\n"
-                "- Iâ€™ll return the full replacement, cleanly indented."
+                "- IÃ¢â‚¬â„¢ll return the full replacement, cleanly indented."
             ).strip()
 
         stuck_exact = {
@@ -8120,7 +8120,7 @@ if (not attachments) and (__name__ == "__main__"):
             return {
                 "assistant_text": (
                     "Send the full function and file path.\n"
-                    "Iâ€™ll return the full replacement block, cleanly indented."
+                    "IÃ¢â‚¬â„¢ll return the full replacement block, cleanly indented."
                 ),
                 "intelligence": {
                     "strategy": "smff_bug_intake",
@@ -8136,7 +8136,7 @@ if (not attachments) and (__name__ == "__main__"):
             return {
                 "assistant_text": (
                     "Paste the error, file path, or failing behavior.\n"
-                    "Iâ€™ll help patch it."
+                    "IÃ¢â‚¬â„¢ll help patch it."
                 ),
                 "intelligence": {
                     "strategy": "bug_intake",
@@ -8153,7 +8153,7 @@ if (not attachments) and (__name__ == "__main__"):
             return {
                 "assistant_text": (
                     "Paste the text, code, error, screenshot, or link.\n"
-                    "Iâ€™ll break it down clearly."
+                    "IÃ¢â‚¬â„¢ll break it down clearly."
                 ),
                 "intelligence": {
                     "strategy": "clarify_missing_subject",
@@ -8173,7 +8173,7 @@ if (not attachments) and (__name__ == "__main__"):
         hard_override_applied = False
 
         if not assistant_text:
-            assistant_text = "I couldnâ€™t generate a useful answer from that. Send the exact thing you want handled."
+            assistant_text = "I couldnÃ¢â‚¬â„¢t generate a useful answer from that. Send the exact thing you want handled."
 
         try:
             intelligence = self._fuse_response_intelligence(
@@ -8373,18 +8373,18 @@ if (not attachments) and (__name__ == "__main__"):
         if smff_active and code_intent and not asks_alternatives:
             return (
                 "Send full file path + full broken code.\n"
-                "Iâ€™ll return the full replacement, cleanly indented.\n\n"
+                "IÃ¢â‚¬â„¢ll return the full replacement, cleanly indented.\n\n"
                 "PowerShell test:\n"
                 "python -m py_compile <file_path>"
             )
 
         if smff_active and code_intent and asks_alternatives:
             return (
-                "Option A â€” safest:\n"
-                "Send the full file path + full broken file. Iâ€™ll return the full-file replacement.\n\n"
-                "Option B â€” faster:\n"
-                "Send the full function only. Iâ€™ll return the full function replacement.\n\n"
-                "Option C â€” debug-only:\n"
+                "Option A Ã¢â‚¬â€ safest:\n"
+                "Send the full file path + full broken file. IÃ¢â‚¬â„¢ll return the full-file replacement.\n\n"
+                "Option B Ã¢â‚¬â€ faster:\n"
+                "Send the full function only. IÃ¢â‚¬â„¢ll return the full function replacement.\n\n"
+                "Option C Ã¢â‚¬â€ debug-only:\n"
                 "Run this and send the exact error:\n"
                 "python -m py_compile <file_path>"
             )
@@ -8416,7 +8416,7 @@ if (not attachments) and (__name__ == "__main__"):
         if not text:
             return ""
 
-        if "Generated image for:" in text:
+        if "Generated image:" in text:
             return text
 
         # === PREVENT DUPLICATE SMFF INTAKE ===
@@ -8426,7 +8426,7 @@ if (not attachments) and (__name__ == "__main__"):
         ):
             return (
                 "Send the full function and file path.\n"
-                "Iâ€™ll return the full replacement block, cleanly indented."
+                "IÃ¢â‚¬â„¢ll return the full replacement block, cleanly indented."
             )
 
         kill_phrases = [
@@ -8457,7 +8457,7 @@ if (not attachments) and (__name__ == "__main__"):
 
         bad_endings = [
             "Example:",
-            "Hereâ€™s how:",
+            "HereÃ¢â‚¬â„¢s how:",
             "Here's how:",
             "This prints:",
             "That prints:",
@@ -8479,7 +8479,7 @@ if (not attachments) and (__name__ == "__main__"):
                 last.endswith(":")
                 or last.endswith("-")
                 or last_lc
-                in {"example", "output", "result", "hereâ€™s how", "here's how"}
+                in {"example", "output", "result", "hereÃ¢â‚¬â„¢s how", "here's how"}
             ):
                 lines.pop()
                 continue
@@ -9201,7 +9201,7 @@ if (not attachments) and (__name__ == "__main__"):
 
         clean_query = re.sub(r"\s+", " ", clean_query).strip()
 
-        # ðŸ”¥ empty â†’ global news
+        # Ã°Å¸â€Â¥ empty Ã¢â€ â€™ global news
         if not clean_query:
             return [
                 "world news",
@@ -9442,7 +9442,7 @@ if (not attachments) and (__name__ == "__main__"):
                     "eye-catching prints",
                     "url removed from extracted attachment text",
                     "free_shipping",
-                    "furniture & dÃ©cor",
+                    "furniture & dÃƒÂ©cor",
                     "kitchen appliances",
                     "love, horror and more themes",
                     "plain field in front of mountain peak",
@@ -9465,7 +9465,7 @@ if (not attachments) and (__name__ == "__main__"):
                     if not _line:
                         continue
 
-                    _low = _line.lower().strip(" :;-â€¢*|")
+                    _low = _line.lower().strip(" :;-Ã¢â‚¬Â¢*|")
                     _compact = _nova_attach_re.sub(r"[^a-z0-9]+", " ", _low).strip()
 
                     if _compact in _noise_exact:
@@ -9837,11 +9837,11 @@ if (not attachments) and (__name__ == "__main__"):
                 summary_looks_raw = (
                     len(summary) > 400
                     or "search wikipedia" in summary.lower()
-                    or "Ã˜" in summary
-                    or "Ã™" in summary
-                    or "Ã" in summary
-                    or "Ãƒ" in summary
-                    or "Ã Â¦" in summary
+                    or "ÃƒËœ" in summary
+                    or "Ãƒâ„¢" in summary
+                    or "ÃƒÂ" in summary
+                    or "ÃƒÆ’" in summary
+                    or "ÃƒÂ Ã‚Â¦" in summary
                 )
 
                 assistant_text = "" if summary_looks_raw else summary
@@ -11744,9 +11744,9 @@ if (not attachments) and (__name__ == "__main__"):
         lowered = text.lower().strip()
         attachments = attachments or []
 
-        # ─────────────────────────────
+        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         # LOAD EXECUTION STATE
-        # ─────────────────────────────
+        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         execution_state = (
             self._get_session_meta(session_id, "execution_state")
             or self._get_session_meta(session_id, "active_execution")
@@ -11765,23 +11765,23 @@ if (not attachments) and (__name__ == "__main__"):
             "retry", "run it"
         }
 
-        # ─────────────────────────────
+        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         # 1. EXECUTION MODE
-        # ─────────────────────────────
+        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if execution_active:
             if lowered in execution_commands:
                 return ("execution", "run")
             return ("chat", "escape_execution")
 
-        # ─────────────────────────────
+        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         # 2. ATTACHMENTS
-        # ─────────────────────────────
+        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if attachments:
             return ("attachment", "analyze")
 
-        # ─────────────────────────────
+        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         # 3. WEB (STRICT ONLY)
-        # ─────────────────────────────
+        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         web_keywords = (
             "news",
             "weather",
@@ -11794,15 +11794,15 @@ if (not attachments) and (__name__ == "__main__"):
         if any(keyword in lowered for keyword in web_keywords):
             return ("web", "fetch")
 
-        # ─────────────────────────────
+        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         # 4. START EXECUTION
-        # ─────────────────────────────
+        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if lowered.startswith(("auto-plan", "build", "create", "fix", "implement", "upgrade")):
             return ("execution", "start")
 
-        # ─────────────────────────────
+        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         # 5. DEFAULT (IMPORTANT FIX)
-        # ─────────────────────────────
+        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         return ("chat", "normal")
 
     def handle(self, user_text: str, session_id: str = "", attachments=None):
@@ -11968,7 +11968,7 @@ if (not attachments) and (__name__ == "__main__"):
                     "eye-catching prints",
                     "url removed from extracted attachment text",
                     "free_shipping",
-                    "furniture & dÃ©cor",
+                    "furniture & dÃƒÂ©cor",
                     "kitchen appliances",
                     "love, horror and more themes",
                     "plain field in front of mountain peak",
@@ -11994,7 +11994,7 @@ if (not attachments) and (__name__ == "__main__"):
                     if not _nova_line:
                         continue
 
-                    _nova_low = _nova_line.lower().strip(" :;-â€¢*|")
+                    _nova_low = _nova_line.lower().strip(" :;-Ã¢â‚¬Â¢*|")
                     _nova_low_compact = _nova_attach_re.sub(
                         r"[^a-z0-9]+", " ", _nova_low
                     ).strip()
@@ -12625,10 +12625,10 @@ if (not attachments) and (__name__ == "__main__"):
 
         lowered = self._safe_str(user_text).lower().strip()
 
-        # 🚨 HARD RULE: execution cannot be bypassed by other routers
-        # ─────────────────────────────
+        # ðŸš¨ HARD RULE: execution cannot be bypassed by other routers
+        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         # SAFE ROUTE DISPATCH (FIXED)
-        # ─────────────────────────────
+        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         route, command = self._single_router(
             user_text,
@@ -15525,7 +15525,7 @@ Auto-fix result:
             if text_parts:
                 return "\n".join(text_parts).strip()
 
-        return "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢m here, but the model returned an empty response."
+        return "IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢m here, but the model returned an empty response."
 
     # ==============================
     # DECISION CONTRACT
@@ -16243,11 +16243,11 @@ Auto-fix result:
         if not text:
             return False
 
-        # Ã°Å¸â€Â¥ PLAN CREATION
+        # ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ PLAN CREATION
         if any(x in text for x in ["plan", "steps", "how to", "next steps"]):
             return True
 
-        # Ã°Å¸â€Â¥ FALLBACK: coding / structured intent
+        # ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ FALLBACK: coding / structured intent
         if decision and decision.get("mode") in {"coding", "analysis"}:
             return True
 
@@ -17675,7 +17675,7 @@ Next action:
         current_index = -1
 
         for i, line in enumerate(lines):
-            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "Ã¢Å“â€", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â"]):
+            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â", "ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â"]):
                 step_indexes.append(i)
 
             if "[>]" in line:
@@ -17689,12 +17689,12 @@ Next action:
         total = sum(
             1
             for line in lines
-            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "Ã¢Å“â€", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â"])
+            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â", "ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â"])
         )
         done = sum(
             1
             for line in lines
-            if any(x in line for x in ["[x]", "[X]", "Ã¢Å“â€", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â"])
+            if any(x in line for x in ["[x]", "[X]", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â", "ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â"])
         )
 
         updated = "\n".join(lines)
@@ -17712,8 +17712,8 @@ Next action:
                     .replace("[ ]", "")
                     .replace("[x]", "")
                     .replace("[X]", "")
-                    .replace("Ã¢Å“â€", "")
                     .replace("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â", "")
+                    .replace("ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â", "")
                     .strip(" -")
                     .strip()
                 )
@@ -18391,7 +18391,7 @@ Next action:
         def _clean_value(value: str) -> str:
             value = self._safe_str(value).strip()
             value = value.strip(
-                "+    Ã¢â€ Â (FOUR SPACES Ã¢â‚¬â€ press space 4 times)\r\n-:;,."
+                "+    ÃƒÂ¢Ã¢â‚¬Â Ã‚Â (FOUR SPACES ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â press space 4 times)\r\n-:;,."
             )
             return value
 
@@ -19754,7 +19754,7 @@ Next action:
             return 9.0
 
         if k in {"style"}:
-            return 8.0  # Ã°Å¸â€Â¥ NEW Ã¢â‚¬â€ how you want responses
+            return 8.0  # ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ NEW ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â how you want responses
 
         if k in {"preference"}:
             return 7.0
@@ -19810,7 +19810,7 @@ Next action:
         item_session = self._safe_str(item.get("session_id"))
 
         if current_session and item_session and current_session == item_session:
-            return 0.75  # Ã¢â€ â€œ reduced from 1.5
+            return 0.75  # ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬Å“ reduced from 1.5
 
         return 0.0
 
@@ -19965,7 +19965,7 @@ Next action:
         generation_mode: str = "text_to_image",
     ) -> dict:
         clean_prompt = str(prompt or "").strip()
-        artifact_text = f'Generated image for: "{clean_prompt}"'
+        artifact_text = f'Generated image: {clean_prompt}'
 
         meta = self._build_image_generation_meta(
             prompt=clean_prompt,
@@ -20102,7 +20102,7 @@ def _save_artifact_fallback(self, artifact: dict):
                     type="image_generation",
                     title="Generated image",
                     body=prompt,
-                    summary=f"Generated image for: {prompt}",
+                    summary=f"Generated image: {prompt}",
                     preview=image_url,
                     session_id=session_id,
                     source="generated",
@@ -20131,7 +20131,8 @@ def _save_artifact_fallback(self, artifact: dict):
                 exec_debug("FORCED ARTIFACT SYNC FAILED:", e)
             assistant_image_message = {
                 "role": "assistant",
-                "text": f"Generated image for: {prompt}",
+                "text": f"Generated image: {prompt}",
+                "content": f"Generated image: {prompt}",
                 "attachments": [
                     {
                         "id": filename,
@@ -20171,7 +20172,8 @@ def _save_artifact_fallback(self, artifact: dict):
                 "skip_post_processing": True,
                 "assistant_message": {
                     "role": "assistant",
-                    "text": f"Generated image for: {prompt}",
+                    "text": f"Generated image: {prompt}",
+                    "content": f"Generated image: {prompt}",
                     "image_url": image_url,
                 },
                 "image_url": image_url,
@@ -20566,7 +20568,7 @@ def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict
             return ""
 
         return (
-            "\n\nRESPONSE POLICY â€” HIGH PRIORITY:\n"
+            "\n\nRESPONSE POLICY Ã¢â‚¬â€ HIGH PRIORITY:\n"
             f"- Mode: {mode or 'normal'}\n"
             f"- Answer length: {answer_length or 'normal'}\n"
             f"- Tone: {tone or 'direct'}\n"
@@ -22161,7 +22163,7 @@ def _nova_runtime_handle_image_generation(
                     "type": "image_generation",
                     "title": "Generated image",
                     "body": prompt,
-                    "summary": f"Generated image for: {prompt}",
+                    "summary": f"Generated image: {prompt}",
                     "preview": image_url,
                     "session_id": session_id,
                     "source": source_type,
@@ -22194,7 +22196,8 @@ def _nova_runtime_handle_image_generation(
             "skip_post_processing": True,
             "assistant_message": {
                 "role": "assistant",
-                "text": f"Generated image for: {prompt}",
+                "text": f"Generated image: {prompt}",
+                "content": f"Generated image: {prompt}",
                 "image_url": image_url,
             },
             "image_url": image_url,
@@ -23537,3 +23540,571 @@ try:
 except Exception as _nova_final_mojibake_cleanup_v4_error_20260624:
     print("[NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V4_20260624] failed:", _nova_final_mojibake_cleanup_v4_error_20260624)
 
+# NOVA_IMAGE_GENERATION_RESPONSE_POLISH_20260630
+# Final response polish for generated images.
+# Cleans awkward labels like "Generated image: of a robot"
+# and corrects stale "Web Fetch" session titles on image responses.
+try:
+    _NOVA_PRE_IMAGE_RESPONSE_POLISH_HANDLE_20260630 = ChatService.handle
+
+    def _nova_clean_image_prompt_label_20260630(value):
+        text = str(value or "").strip()
+
+        if not text:
+            return "image"
+
+        lower = " ".join(text.lower().split())
+
+        prefixes = [
+            "generate an image of ",
+            "generate image of ",
+            "generate a picture of ",
+            "generate picture of ",
+            "create an image of ",
+            "create image of ",
+            "create a picture of ",
+            "create picture of ",
+            "make an image of ",
+            "make image of ",
+            "make a picture of ",
+            "make picture of ",
+            "draw an image of ",
+            "draw image of ",
+            "draw a picture of ",
+            "draw picture of ",
+        ]
+
+        normalized = " ".join(text.split())
+        normalized_lower = normalized.lower()
+
+        for prefix in prefixes:
+            if normalized_lower.startswith(prefix):
+                normalized = normalized[len(prefix):].strip()
+                normalized_lower = normalized.lower()
+                break
+
+        if normalized_lower.startswith("of "):
+            normalized = normalized[3:].strip()
+
+        normalized = normalized.strip(" .")
+
+        return normalized or "image"
+
+    def _nova_polish_generated_image_result_20260630(result):
+        if not isinstance(result, dict):
+            return result
+
+        assistant_message = result.get("assistant_message")
+        saved_artifact = result.get("saved_artifact")
+        session = result.get("session")
+
+        is_image_result = False
+        prompt = ""
+
+        if isinstance(assistant_message, dict):
+            if assistant_message.get("image_url"):
+                is_image_result = True
+
+            meta = assistant_message.get("meta")
+            if isinstance(meta, dict) and meta.get("source") == "image_generation":
+                is_image_result = True
+
+            prompt = (
+                str(result.get("prompt") or "").strip()
+                or str(assistant_message.get("text") or "").replace("Generated image:", "").strip()
+            )
+
+        if isinstance(saved_artifact, dict):
+            if (
+                saved_artifact.get("kind") == "image"
+                or saved_artifact.get("kind") == "image_generation"
+                or saved_artifact.get("type") == "image_generation"
+                or saved_artifact.get("image_url")
+            ):
+                is_image_result = True
+
+            prompt = (
+                prompt
+                or str(saved_artifact.get("prompt") or "").strip()
+                or str(saved_artifact.get("body") or "").strip()
+            )
+
+        if not is_image_result:
+            return result
+
+        clean_prompt = _nova_clean_image_prompt_label_20260630(prompt)
+        clean_text = f"Generated image: {clean_prompt}"
+
+        if isinstance(assistant_message, dict):
+            assistant_message["text"] = clean_text
+            assistant_message["content"] = clean_text
+
+        if isinstance(saved_artifact, dict):
+            saved_artifact["title"] = "Generated Image"
+            saved_artifact["summary"] = clean_text
+
+            viewer = saved_artifact.get("viewer")
+            if isinstance(viewer, dict):
+                viewer["title"] = "Generated Image"
+                viewer["summary"] = clean_text
+
+        if isinstance(session, dict):
+            if str(session.get("title") or "").strip().lower() == "web fetch":
+                session["title"] = "Generated Image"
+
+            working_state = session.get("working_state")
+            if isinstance(working_state, dict):
+                last_assistant = str(working_state.get("last_assistant_message") or "")
+                if last_assistant.startswith("Generated image:"):
+                    working_state["last_assistant_message"] = clean_text
+
+        return result
+
+    def _nova_image_generation_response_polish_handle_20260630(self, *args, **kwargs):
+        result = _NOVA_PRE_IMAGE_RESPONSE_POLISH_HANDLE_20260630(self, *args, **kwargs)
+        return _nova_polish_generated_image_result_20260630(result)
+
+    ChatService.handle = _nova_image_generation_response_polish_handle_20260630
+    print("[NOVA_IMAGE_GENERATION_RESPONSE_POLISH_20260630] installed")
+
+except Exception as _nova_image_response_polish_error_20260630:
+    print(
+        "[NOVA_IMAGE_GENERATION_RESPONSE_POLISH_20260630] failed:",
+        _nova_image_response_polish_error_20260630,
+    )
+
+# NOVA_IMAGE_GENERATION_RESPONSE_POLISH_20260630_FINAL
+# Cleans image-generation response text and prevents stale "Web Fetch" titles.
+try:
+    import json as _nova_img_polish_json_20260630
+    import re as _nova_img_polish_re_20260630
+    from pathlib import Path as _nova_img_polish_Path_20260630
+
+    _NOVA_PRE_IMAGE_RESPONSE_POLISH_FINAL_HANDLE_20260630 = ChatService.handle
+
+    def _nova_clean_image_generation_prompt_20260630(text):
+        raw = str(text or "").strip()
+
+        raw = _nova_img_polish_re_20260630.sub(
+            r"^\s*(please\s+)?(generate|create|make|draw|render|produce)\s+",
+            "",
+            raw,
+            flags=_nova_img_polish_re_20260630.I,
+        )
+
+        raw = _nova_img_polish_re_20260630.sub(
+            r"^\s*(an?\s+)?(image|picture|photo|illustration|artwork|drawing)\s+",
+            "",
+            raw,
+            flags=_nova_img_polish_re_20260630.I,
+        )
+
+        raw = _nova_img_polish_re_20260630.sub(
+            r"^\s*of\s+",
+            "",
+            raw,
+            flags=_nova_img_polish_re_20260630.I,
+        )
+
+        raw = raw.strip(" .")
+        return raw or "your image"
+
+    def _nova_image_generation_title_20260630(prompt):
+        clean = _nova_clean_image_generation_prompt_20260630(prompt)
+        title = "Image: " + clean
+        return title[:60].rstrip()
+
+    def _nova_polish_image_generation_response_json_20260630(data):
+        if not isinstance(data, dict):
+            return data
+
+        assistant_message = data.get("assistant_message") or {}
+        saved_artifact = data.get("saved_artifact") or {}
+        session = data.get("session") or {}
+
+        meta = assistant_message.get("meta") or {}
+        source = str(meta.get("source") or saved_artifact.get("type") or "").lower()
+
+        has_image = bool(
+            assistant_message.get("image_url")
+            or saved_artifact.get("image_url")
+            or meta.get("image_url")
+            or source == "image_generation"
+        )
+
+        if not has_image:
+            return data
+
+        prompt = (
+            saved_artifact.get("prompt")
+            or saved_artifact.get("body")
+            or session.get("working_state", {}).get("last_user_message")
+            or assistant_message.get("content")
+            or assistant_message.get("text")
+            or ""
+        )
+
+        clean_prompt = _nova_clean_image_generation_prompt_20260630(prompt)
+        clean_message = f"Generated image: {clean_prompt}"
+
+        assistant_message["content"] = clean_message
+        assistant_message["text"] = clean_message
+        data["assistant_message"] = assistant_message
+
+        if isinstance(saved_artifact, dict):
+            saved_artifact["summary"] = clean_message
+            saved_artifact["title"] = "Generated image"
+            data["saved_artifact"] = saved_artifact
+
+        if isinstance(session, dict):
+            if str(session.get("title") or "").strip().lower() in {"", "web fetch", "new chat"}:
+                session["title"] = _nova_image_generation_title_20260630(prompt)
+
+            working_state = session.get("working_state")
+            if isinstance(working_state, dict):
+                working_state["last_assistant_message"] = clean_message
+                session["working_state"] = working_state
+
+            data["session"] = session
+
+        session_id = data.get("session_id") or session.get("id")
+        if session_id:
+            try:
+                sessions_path = _nova_img_polish_Path_20260630("data/nova_sessions.json")
+                if sessions_path.exists():
+                    sessions_data = _nova_img_polish_json_20260630.loads(
+                        sessions_path.read_text(encoding="utf-8")
+                    )
+
+                    sessions = sessions_data
+                    if isinstance(sessions_data, dict):
+                        sessions = sessions_data.get("sessions", sessions_data)
+
+                    if isinstance(sessions, dict):
+                        target = sessions.get(session_id)
+                    elif isinstance(sessions, list):
+                        target = next(
+                            (
+                                item for item in sessions
+                                if isinstance(item, dict) and item.get("id") == session_id
+                            ),
+                            None,
+                        )
+                    else:
+                        target = None
+
+                    if isinstance(target, dict):
+                        if str(target.get("title") or "").strip().lower() in {"", "web fetch", "new chat"}:
+                            target["title"] = _nova_image_generation_title_20260630(prompt)
+
+                        working_state = target.get("working_state")
+                        if isinstance(working_state, dict):
+                            working_state["last_assistant_message"] = clean_message
+
+                        sessions_path.write_text(
+                            _nova_img_polish_json_20260630.dumps(
+                                sessions_data,
+                                ensure_ascii=False,
+                                indent=2,
+                            ),
+                            encoding="utf-8",
+                        )
+            except Exception as _nova_image_title_persist_error_20260630:
+                print(
+                    "[NOVA_IMAGE_GENERATION_RESPONSE_POLISH_20260630_FINAL] title persist skipped:",
+                    _nova_image_title_persist_error_20260630,
+                )
+
+        return data
+
+    def _nova_image_generation_response_polish_handle_20260630(self, *args, **kwargs):
+        result = _NOVA_PRE_IMAGE_RESPONSE_POLISH_FINAL_HANDLE_20260630(self, *args, **kwargs)
+
+        try:
+            if hasattr(result, "get_data") and hasattr(result, "set_data"):
+                raw = result.get_data(as_text=True)
+                data = _nova_img_polish_json_20260630.loads(raw)
+                data = _nova_polish_image_generation_response_json_20260630(data)
+
+                new_raw = _nova_img_polish_json_20260630.dumps(data, ensure_ascii=False)
+                result.set_data(new_raw)
+                result.headers["Content-Length"] = str(len(result.get_data()))
+                result.headers["Content-Type"] = "application/json"
+                return result
+
+            if isinstance(result, dict):
+                return _nova_polish_image_generation_response_json_20260630(result)
+
+        except Exception as _nova_image_response_polish_error_20260630:
+            print(
+                "[NOVA_IMAGE_GENERATION_RESPONSE_POLISH_20260630_FINAL] skipped:",
+                _nova_image_response_polish_error_20260630,
+            )
+
+        return result
+
+    ChatService.handle = _nova_image_generation_response_polish_handle_20260630
+    print("[NOVA_IMAGE_GENERATION_RESPONSE_POLISH_20260630_FINAL] installed")
+
+except Exception as _nova_image_generation_response_polish_install_error_20260630:
+    print(
+        "[NOVA_IMAGE_GENERATION_RESPONSE_POLISH_20260630_FINAL] failed:",
+        _nova_image_generation_response_polish_install_error_20260630,
+    )
+
+# NOVA_IMAGE_GENERATION_FINAL_TEXT_SYNC_20260630
+# Absolute last-pass cleanup for generated image responses.
+# Fixes assistant_message.content/text and working_state after final session cache rewrites.
+try:
+    import json as _nova_img_final_json_20260630
+    import re as _nova_img_final_re_20260630
+    from pathlib import Path as _nova_img_final_Path_20260630
+
+    _NOVA_PRE_IMAGE_FINAL_TEXT_SYNC_HANDLE_20260630 = ChatService.handle
+
+    def _nova_img_final_clean_prompt_20260630(value):
+        text = str(value or "").strip()
+
+        text = _nova_img_final_re_20260630.sub(
+            r"^\s*generated\s+image\s*(for)?\s*:?\s*",
+            "",
+            text,
+            flags=_nova_img_final_re_20260630.I,
+        )
+
+        text = _nova_img_final_re_20260630.sub(
+            r"^\s*(please\s+)?(generate|create|make|draw|render|produce)\s+",
+            "",
+            text,
+            flags=_nova_img_final_re_20260630.I,
+        )
+
+        text = _nova_img_final_re_20260630.sub(
+            r"^\s*(an?\s+)?(image|picture|photo|illustration|artwork|drawing)\s+",
+            "",
+            text,
+            flags=_nova_img_final_re_20260630.I,
+        )
+
+        text = _nova_img_final_re_20260630.sub(
+            r"^\s*of\s+",
+            "",
+            text,
+            flags=_nova_img_final_re_20260630.I,
+        )
+
+        return text.strip(" .") or "your image"
+
+    def _nova_img_final_is_generated_image_response_20260630(data):
+        if not isinstance(data, dict):
+            return False
+
+        assistant_message = data.get("assistant_message") or {}
+        saved_artifact = data.get("saved_artifact") or {}
+
+        meta = assistant_message.get("meta") or {}
+        source = str(meta.get("source") or "").lower()
+        artifact_type = str(saved_artifact.get("type") or "").lower()
+        artifact_kind = str(saved_artifact.get("kind") or "").lower()
+
+        if source == "image_generation":
+            return True
+
+        if artifact_type == "image_generation":
+            return True
+
+        if artifact_kind == "image":
+            return True
+
+        if assistant_message.get("image_url") or saved_artifact.get("image_url"):
+            return True
+
+        attachments = assistant_message.get("attachments") or []
+        for item in attachments:
+            if not isinstance(item, dict):
+                continue
+
+            mime = str(item.get("mime_type") or item.get("type") or "").lower()
+            filename = str(item.get("filename") or item.get("stored_name") or "").lower()
+
+            if mime.startswith("image/") and filename.startswith("generated_"):
+                return True
+
+        return False
+
+    def _nova_img_final_sync_session_file_20260630(session_id, clean_message, clean_title):
+        if not session_id:
+            return
+
+        try:
+            sessions_path = _nova_img_final_Path_20260630("data/nova_sessions.json")
+
+            if not sessions_path.exists():
+                return
+
+            sessions_data = _nova_img_final_json_20260630.loads(
+                sessions_path.read_text(encoding="utf-8")
+            )
+
+            sessions = sessions_data
+            if isinstance(sessions_data, dict):
+                sessions = sessions_data.get("sessions", sessions_data)
+
+            target = None
+
+            if isinstance(sessions, dict):
+                target = sessions.get(session_id)
+            elif isinstance(sessions, list):
+                for item in sessions:
+                    if isinstance(item, dict) and item.get("id") == session_id:
+                        target = item
+                        break
+
+            if not isinstance(target, dict):
+                return
+
+            old_title = str(target.get("title") or "").strip().lower()
+            if old_title in {"", "web fetch", "new chat", "generated image"}:
+                target["title"] = clean_title
+
+            working_state = target.get("working_state")
+            if isinstance(working_state, dict):
+                working_state["last_assistant_message"] = clean_message
+                target["working_state"] = working_state
+
+            messages = target.get("messages")
+            if isinstance(messages, list):
+                for message in reversed(messages):
+                    if not isinstance(message, dict):
+                        continue
+
+                    role = str(message.get("role") or "").lower()
+                    body = str(message.get("content") or message.get("text") or "")
+
+                    looks_like_generated_image = (
+                        role == "assistant"
+                        and (
+                            message.get("image_url")
+                            or "generated image for:" in body.lower()
+                            or "generated image:" in body.lower()
+                        )
+                    )
+
+                    if looks_like_generated_image:
+                        message["content"] = clean_message
+                        message["text"] = clean_message
+                        break
+
+            sessions_path.write_text(
+                _nova_img_final_json_20260630.dumps(
+                    sessions_data,
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+
+        except Exception as _nova_img_final_session_sync_error_20260630:
+            print(
+                "[NOVA_IMAGE_GENERATION_FINAL_TEXT_SYNC_20260630] session sync skipped:",
+                _nova_img_final_session_sync_error_20260630,
+            )
+
+    def _nova_img_final_sync_response_20260630(data):
+        if not _nova_img_final_is_generated_image_response_20260630(data):
+            return data
+
+        assistant_message = data.get("assistant_message")
+        if not isinstance(assistant_message, dict):
+            assistant_message = {}
+
+        saved_artifact = data.get("saved_artifact")
+        if not isinstance(saved_artifact, dict):
+            saved_artifact = {}
+
+        session = data.get("session")
+        if not isinstance(session, dict):
+            session = {}
+
+        working_state = session.get("working_state")
+        if not isinstance(working_state, dict):
+            working_state = {}
+
+        prompt_source = (
+            saved_artifact.get("prompt")
+            or saved_artifact.get("body")
+            or working_state.get("last_user_message")
+            or assistant_message.get("content")
+            or assistant_message.get("text")
+            or ""
+        )
+
+        clean_prompt = _nova_img_final_clean_prompt_20260630(prompt_source)
+        clean_message = f"Generated image: {clean_prompt}"
+        clean_title = f"Image: {clean_prompt}"[:80].rstrip()
+
+        assistant_message["content"] = clean_message
+        assistant_message["text"] = clean_message
+        data["assistant_message"] = assistant_message
+
+        saved_artifact["summary"] = clean_message
+
+        viewer = saved_artifact.get("viewer")
+        if isinstance(viewer, dict):
+            viewer["summary"] = clean_message
+            viewer["title"] = "Generated image"
+            saved_artifact["viewer"] = viewer
+
+        data["saved_artifact"] = saved_artifact
+
+        old_title = str(session.get("title") or "").strip().lower()
+        if old_title in {"", "web fetch", "new chat", "generated image"}:
+            session["title"] = clean_title
+
+        working_state["last_assistant_message"] = clean_message
+        session["working_state"] = working_state
+        data["session"] = session
+
+        session_id = data.get("session_id") or session.get("id")
+        _nova_img_final_sync_session_file_20260630(
+            session_id,
+            clean_message,
+            clean_title,
+        )
+
+        return data
+
+    def _nova_image_generation_final_text_sync_handle_20260630(self, *args, **kwargs):
+        result = _NOVA_PRE_IMAGE_FINAL_TEXT_SYNC_HANDLE_20260630(self, *args, **kwargs)
+
+        try:
+            if hasattr(result, "get_data") and hasattr(result, "set_data"):
+                raw = result.get_data(as_text=True)
+                data = _nova_img_final_json_20260630.loads(raw)
+                data = _nova_img_final_sync_response_20260630(data)
+
+                new_raw = _nova_img_final_json_20260630.dumps(data, ensure_ascii=False)
+                result.set_data(new_raw)
+                result.headers["Content-Length"] = str(len(result.get_data()))
+                result.headers["Content-Type"] = "application/json"
+                return result
+
+            if isinstance(result, dict):
+                return _nova_img_final_sync_response_20260630(result)
+
+        except Exception as _nova_img_final_text_sync_error_20260630:
+            print(
+                "[NOVA_IMAGE_GENERATION_FINAL_TEXT_SYNC_20260630] skipped:",
+                _nova_img_final_text_sync_error_20260630,
+            )
+
+        return result
+
+    ChatService.handle = _nova_image_generation_final_text_sync_handle_20260630
+    print("[NOVA_IMAGE_GENERATION_FINAL_TEXT_SYNC_20260630] installed")
+
+except Exception as _nova_img_final_text_sync_install_error_20260630:
+    print(
+        "[NOVA_IMAGE_GENERATION_FINAL_TEXT_SYNC_20260630] failed:",
+        _nova_img_final_text_sync_install_error_20260630,
+    )
