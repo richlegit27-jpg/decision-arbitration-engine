@@ -6441,3 +6441,140 @@ row.onclick = async () => {
 
     console.log("[Nova Mobile TTS Audio Stop] ready");
 })();
+
+/* -------------------------------------------------
+   NOVA MOBILE CHAT FETCH ABORT OWNER
+   Makes Stop Send / Stop Generation actually abort chat fetches.
+   Does not touch sessions.
+   20260629
+-------------------------------------------------- */
+(() => {
+    if (window.__NOVA_MOBILE_CHAT_FETCH_ABORT_OWNER_20260629__) return;
+    window.__NOVA_MOBILE_CHAT_FETCH_ABORT_OWNER_20260629__ = true;
+
+    const originalFetch = window.fetch.bind(window);
+    const activeControllers = new Set();
+
+    function isChatRequest(input) {
+        try {
+            const url = typeof input === "string"
+                ? input
+                : input && input.url
+                    ? input.url
+                    : "";
+
+            return (
+                url.includes("/api/chat") ||
+                url.includes("/api/chat/stream") ||
+                url.includes("/api/stream")
+            );
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function makeInitWithSignal(init, controller) {
+        const next = Object.assign({}, init || {});
+        const originalSignal = next.signal;
+
+        if (originalSignal && typeof originalSignal.addEventListener === "function") {
+            originalSignal.addEventListener("abort", () => {
+                try {
+                    controller.abort();
+                } catch (e) {}
+            }, { once: true });
+        }
+
+        next.signal = controller.signal;
+        return next;
+    }
+
+    window.fetch = function novaMobileAbortableFetch(input, init) {
+        if (!isChatRequest(input)) {
+            return originalFetch(input, init);
+        }
+
+        const controller = new AbortController();
+
+        activeControllers.add(controller);
+
+        window.NovaMobileAbortController = controller;
+        window.__novaMobileAbortController = controller;
+        window.__NOVA_ABORT_CONTROLLER__ = controller;
+
+        const nextInit = makeInitWithSignal(init, controller);
+
+        return originalFetch(input, nextInit).finally(() => {
+            activeControllers.delete(controller);
+        });
+    };
+
+    function stopChatFetches() {
+        let stopped = 0;
+
+        activeControllers.forEach((controller) => {
+            try {
+                controller.abort();
+                stopped += 1;
+            } catch (e) {}
+        });
+
+        activeControllers.clear();
+
+        try {
+            if (window.NovaMobileAbortController?.abort) {
+                window.NovaMobileAbortController.abort();
+            }
+        } catch (e) {}
+
+        try {
+            window.dispatchEvent(new CustomEvent("nova:chat-aborted"));
+            window.dispatchEvent(new CustomEvent("nova:stop-generation"));
+        } catch (e) {}
+
+        console.log("[Nova Mobile Chat Fetch Abort] stopped", stopped);
+
+        return stopped;
+    }
+
+    function isStopButton(el) {
+        if (!el || el.nodeType !== 1) return false;
+
+        const raw = String(
+            (el.id || "") + " " +
+            (el.className || "") + " " +
+            (el.getAttribute?.("aria-label") || "") + " " +
+            (el.getAttribute?.("title") || "") + " " +
+            (el.innerText || el.textContent || "")
+        ).toLowerCase();
+
+        return (
+            raw.includes("stop") ||
+            raw.includes("cancel") ||
+            raw.includes("abort")
+        );
+    }
+
+    function wireStops() {
+        Array.from(document.querySelectorAll("button, [role='button']")).filter(isStopButton).forEach((button) => {
+            if (button.dataset.novaChatFetchAbortOwner === "1") return;
+
+            button.dataset.novaChatFetchAbortOwner = "1";
+
+            button.addEventListener("click", () => {
+                stopChatFetches();
+            }, true);
+        });
+    }
+
+    wireStops();
+    setTimeout(wireStops, 300);
+    setTimeout(wireStops, 900);
+    setTimeout(wireStops, 1800);
+
+    document.addEventListener("DOMContentLoaded", wireStops);
+
+    window.NovaMobileStopChatFetches = stopChatFetches;
+
+    console.log("[Nova Mobile Chat Fetch Abort] ready");
+})();
