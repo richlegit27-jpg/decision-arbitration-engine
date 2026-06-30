@@ -214,10 +214,63 @@ class ChatService:
 
             state = session.get("working_state")
 
-            if isinstance(state, dict):
-                return state
+            if not isinstance(state, dict):
+                state = {}
 
-            return {}
+            active_task = self._safe_str(state.get("active_task")).strip()
+
+            if not active_task:
+                title = self._safe_str(session.get("title")).strip()
+                inferred_task = ""
+
+                lowered_title = title.lower()
+
+                if lowered_title.startswith("we are working on "):
+                    inferred_task = title[len("we are working on "):].strip(" .")
+                elif lowered_title.startswith("we're working on "):
+                    inferred_task = title[len("we're working on "):].strip(" .")
+                elif lowered_title.startswith("working on "):
+                    inferred_task = title[len("working on "):].strip(" .")
+
+                if not inferred_task:
+                    messages = session.get("messages") or []
+
+                    for msg in reversed(messages):
+                        if not isinstance(msg, dict):
+                            continue
+
+                        if msg.get("role") != "user":
+                            continue
+
+                        text = self._safe_str(
+                            msg.get("text") or msg.get("content")
+                        ).strip()
+
+                        lowered_text = text.lower()
+
+                        if lowered_text.startswith("we are working on "):
+                            inferred_task = text[len("we are working on "):].strip(" .")
+                            break
+
+                        if lowered_text.startswith("we're working on "):
+                            inferred_task = text[len("we're working on "):].strip(" .")
+                            break
+
+                        if lowered_text.startswith("working on "):
+                            inferred_task = text[len("working on "):].strip(" .")
+                            break
+
+                if inferred_task:
+                    state["active_task"] = inferred_task
+
+                    if ".py" in inferred_task and not state.get("current_file"):
+                        for part in inferred_task.replace("\\", "/").split():
+                            clean_part = part.strip("`'\".,:;()[]{}")
+                            if clean_part.endswith(".py"):
+                                state["current_file"] = clean_part.split("/")[-1]
+                                break
+
+            return state
 
         except Exception as e:
             exec_debug("GET WORKING STATE FAILED:", e)
@@ -3742,9 +3795,40 @@ if (not attachments) and (__name__ == "__main__"):
         self.memory_core = MemoryCore()
         self.executor = Executor()
 
-    # =========================
-    # DEBUG / TEST HARNESS LAYER
-    # =========================
+
+    def _answer_working_state_question(
+        self,
+        user_text: str,
+        session: dict | None = None,
+    ) -> str | None:
+        text = (user_text or "").strip().lower().rstrip("?")
+
+        working_state = {}
+        if isinstance(session, dict):
+            working_state = session.get("working_state") or {}
+
+        active_task = (working_state.get("active_task") or "").strip()
+        current_file = (working_state.get("current_file") or "").strip()
+
+        if text in {
+            "what file are we in",
+            "what file are we working in",
+            "what file are we working on",
+            "current file",
+            "file",
+        }:
+            return f"Current file:\n{current_file or 'No active file is currently tracked.'}"
+
+        if text in {
+            "active task",
+            "current task",
+            "what are we working on",
+            "what are we working on now",
+            "what are we doing",
+        }:
+            return f"Active task:\n{active_task or 'No active task is currently tracked.'}"
+
+        return None
 
     def _debug(self, *args):
         exec_debug(*args)
@@ -5222,23 +5306,169 @@ if (not attachments) and (__name__ == "__main__"):
         # =====================================
         # OPERATIONAL CONTEXT INTERCEPTS
         # =====================================
-
+        # NOVA_DIRECT_WORKING_ON_RECALL_20260630
+        # "What are we working on?" means session-topic recall.
         if text_lc in {
-            "what is the active task",
-            "active task",
-            "what are we doing",
             "what are we working on",
-            "what were we working on",
             "what are we working on?",
+            "what were we working on",
             "what were we working on?",
         }:
+            answer_text = ""
 
-            ws = self._get_working_state(session_id) or {}
+            target_session_id = session_id
+
+            try:
+                from flask import request
+
+                payload = request.get_json(silent=True) or {}
+
+                if isinstance(payload, dict):
+                    requested_session_id = str(
+                        payload.get("session_id")
+                        or payload.get("client_session_id")
+                        or payload.get("active_session_id")
+                        or ""
+                    ).strip()
+
+                    if requested_session_id:
+                        target_session_id = requested_session_id
+
+            except Exception:
+                target_session_id = session_id
+
+            try:
+                session_obj = (
+                    self._get_session_payload(target_session_id)
+                    or self._get_session(target_session_id)
+                    or {}
+                )
+
+                if not isinstance(session_obj, dict):
+                    session_obj = {}
+
+                working_state = session_obj.get("working_state") or {}
+                if not isinstance(working_state, dict):
+                    working_state = {}
+
+                active_task = str(
+                    working_state.get("active_task")
+                    or ""
+                ).strip()
+
+                if active_task and active_task != "No active task is currently tracked.":
+                    answer_text = active_task
+
+                if not answer_text:
+                    session_title = str(session_obj.get("title") or "").strip()
+                    lowered_title = session_title.lower()
+
+                    if lowered_title.startswith("we are working on "):
+                        answer_text = session_title[len("we are working on "):].strip(" .")
+                    elif lowered_title.startswith("we're working on "):
+                        answer_text = session_title[len("we're working on "):].strip(" .")
+                    elif lowered_title.startswith("working on "):
+                        answer_text = session_title[len("working on "):].strip(" .")
+
+                if not answer_text:
+                    messages = session_obj.get("messages") or []
+
+                    for msg in reversed(messages):
+                        if not isinstance(msg, dict):
+                            continue
+
+                        if str(msg.get("role") or "").strip().lower() != "user":
+                            continue
+
+                        msg_text = str(
+                            msg.get("text")
+                            or msg.get("content")
+                            or ""
+                        ).strip()
+
+                        lowered_msg = msg_text.lower()
+
+                        if lowered_msg in {
+                            "what are we working on",
+                            "what are we working on?",
+                            "what were we working on",
+                            "what were we working on?",
+                        }:
+                            continue
+
+                        if lowered_msg.startswith("we are working on "):
+                            answer_text = msg_text[len("we are working on "):].strip(" .")
+                            break
+
+                        if lowered_msg.startswith("we're working on "):
+                            answer_text = msg_text[len("we're working on "):].strip(" .")
+                            break
+
+                        if lowered_msg.startswith("working on "):
+                            answer_text = msg_text[len("working on "):].strip(" .")
+                            break
+
+                if answer_text:
+                    self._update_working_state(
+                        target_session_id,
+                        {
+                            "active_task": answer_text,
+                        },
+                    )
+
+            except Exception:
+                answer_text = ""
+
+            if not answer_text:
+                final_text = "No active task is currently tracked yet."
+            else:
+                final_text = f"We're working on {answer_text}."
+
+            assistant_msg = self._build_assistant_message(
+                text=final_text,
+                meta={
+                    "route": "direct_working_on_recall",
+                    "session_id": target_session_id,
+                },
+                attachments=[],
+            )
+
+            return self._finalize_response(
+                session_id=target_session_id,
+                user_text=user_text,
+                user_msg=self._build_user_message(
+                    user_text,
+                    attachments=attachments,
+                ),
+                assistant_msg=assistant_msg,
+                saved_artifact=None,
+            )
+
+        if text_lc in {
+            "what file are we in",
+            "what fiel are we in",
+            "which file",
+            "current file",
+            "what file",
+            "what fiel",
+            "what file we are in",
+            "what file are we working in",
+        }:
+
+            effective_session_id = (
+                str(locals().get("target_session_id") or "").strip()
+                or str(session_id or "").strip()
+                or str(getattr(self.session_service, "active_session_id", "") or "").strip()
+            )
+
+            ws = self._get_working_state(effective_session_id) or {}
+
+            if not isinstance(ws, dict):
+                ws = {}
 
             current_file = str(ws.get("current_file") or "").strip()
 
             if not current_file:
-
                 current_file = "No active file is currently tracked."
 
             assistant_msg = self._build_assistant_message(
@@ -5251,7 +5481,8 @@ if (not attachments) and (__name__ == "__main__"):
                 user_msg={
                     "role": "user",
                     "text": user_text,
-                    "attachments": [],
+                    "content": user_text,
+                    "attachments": attachments or [],
                     "meta": {},
                 },
                 assistant_msg=assistant_msg,
@@ -5263,13 +5494,20 @@ if (not attachments) and (__name__ == "__main__"):
             "active task",
             "what are we doing",
         }:
+            effective_session_id = (
+                str(locals().get("target_session_id") or "").strip()
+                or str(session_id or "").strip()
+                or str(getattr(self.session_service, "active_session_id", "") or "").strip()
+            )
 
-            ws = self._get_working_state(session_id) or {}
+            ws = self._get_working_state(effective_session_id) or {}
+
+            if not isinstance(ws, dict):
+                ws = {}
 
             active_task = str(ws.get("active_task") or "").strip()
 
             if not active_task:
-
                 active_task = "No active task is currently tracked."
 
             assistant_msg = self._build_assistant_message(
@@ -5282,7 +5520,8 @@ if (not attachments) and (__name__ == "__main__"):
                 user_msg={
                     "role": "user",
                     "text": user_text,
-                    "attachments": [],
+                    "content": user_text,
+                    "attachments": attachments or [],
                     "meta": {},
                 },
                 assistant_msg=assistant_msg,
@@ -5294,7 +5533,6 @@ if (not attachments) and (__name__ == "__main__"):
             "what did i say",
             "what was my last message",
         }:
-
             print("RECALL INTERCEPT HIT")
 
             all_sessions = self.sessions.list_sessions()
@@ -5330,20 +5568,8 @@ if (not attachments) and (__name__ == "__main__"):
                 user_msg={
                     "role": "user",
                     "text": user_text,
-                    "attachments": [],
-                    "meta": {},
-                },
-                assistant_msg=assistant_msg,
-                saved_artifact=None,
-            )
-
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg={
-                    "role": "user",
-                    "text": user_text,
-                    "attachments": [],
+                    "content": user_text,
+                    "attachments": attachments or [],
                     "meta": {},
                 },
                 assistant_msg=assistant_msg,
@@ -5777,6 +6003,45 @@ if (not attachments) and (__name__ == "__main__"):
         # Normal chat should not be hijacked just because working_state exists.
         if False:
             exec_debug("FORCING EXECUTION MODE FROM WORKING STATE")
+
+        # NOVA_DIRECT_WORKING_ON_RECALL_20260630
+        # This question means "recall the active session topic", not "current file".
+        if text_lc in {
+            "what are we working on",
+            "what are we working on?",
+            "what were we working on",
+            "what were we working on?",
+        }:
+            session_title = ""
+
+            try:
+                session_obj = self._get_session(session_id) or {}
+                if isinstance(session_obj, dict):
+                    session_title = str(session_obj.get("title") or "").strip()
+            except Exception:
+                session_title = ""
+
+            if session_title:
+                answer_text = session_title
+            else:
+                answer_text = "No active task is currently tracked."
+
+            assistant_msg = self._build_assistant_message(
+                text=f"We’re working on {answer_text}."
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg={
+                    "role": "user",
+                    "text": user_text,
+                    "content": user_text,
+                    "attachments": attachments or [],
+                },
+                assistant_msg=assistant_msg,
+                saved_artifact=None,
+            )
 
         operational_queries = {
             "what file are we in",

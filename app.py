@@ -591,10 +591,122 @@ def api_health():
 
 @app.get("/api/state")
 def api_state():
+    sessions = session_service.get_all()
+    active_session = session_service.get_active() or {}
+
+    if not isinstance(active_session, dict):
+        active_session = {}
+
+    active_session_id = str(
+        getattr(session_service, "active_session_id", "")
+        or active_session.get("id")
+        or active_session.get("session_id")
+        or ""
+    ).strip()
+
+    messages = active_session.get("messages")
+    if not isinstance(messages, list):
+        messages = []
+
+    working_state = active_session.get("working_state")
+    if not isinstance(working_state, dict):
+        working_state = {}
+
+    active_task = str(
+        working_state.get("active_task")
+        or working_state.get("task")
+        or ""
+    ).strip()
+
+    current_file = str(
+        working_state.get("current_file")
+        or working_state.get("file")
+        or ""
+    ).strip()
+
+    last_user_message = ""
+    last_assistant_message = ""
+
+    for message in reversed(messages):
+        if not isinstance(message, dict):
+            continue
+
+        role = str(message.get("role") or "").strip().lower()
+        text = str(
+            message.get("text")
+            or message.get("content")
+            or ""
+        ).strip()
+
+        if role == "user" and not last_user_message:
+            last_user_message = text
+
+        if role == "assistant" and not last_assistant_message:
+            last_assistant_message = text
+
+        if last_user_message and last_assistant_message:
+            break
+
+    if not active_task:
+        for message in reversed(messages):
+            if not isinstance(message, dict):
+                continue
+
+            if str(message.get("role") or "").strip().lower() != "user":
+                continue
+
+            text = str(
+                message.get("text")
+                or message.get("content")
+                or ""
+            ).strip()
+
+            text_lc = text.lower()
+
+            if "we are working on" in text_lc:
+                active_task = text_lc.split("we are working on", 1)[1].strip(" .")
+                break
+
+            if "working on" in text_lc:
+                active_task = text_lc.split("working on", 1)[1].strip(" .")
+                break
+
+    if not current_file and active_task:
+        parts = active_task.replace(",", " ").split()
+
+        for part in parts:
+            clean_part = part.strip("`'\".,:;()[]{}")
+
+            if clean_part.endswith((".py", ".js", ".css", ".html", ".json", ".md", ".txt")):
+                current_file = clean_part
+                break
+
+    normalized_working_state = {
+        "active_task": active_task,
+        "current_file": current_file,
+        "last_user_message": last_user_message,
+        "last_assistant_message": last_assistant_message,
+    }
+
+    state = {
+        "active_session_id": active_session_id,
+        "active_task": active_task,
+        "current_file": current_file,
+        "last_user_message": last_user_message,
+        "last_assistant_message": last_assistant_message,
+        "working_state": normalized_working_state,
+    }
+
     return json_ok(
-        sessions=session_service.get_all(),
-        active_session_id=session_service.active_session_id,
-        session=session_service.get_active(),
+        state=state,
+        sessions=sessions,
+        active_session_id=active_session_id,
+        session=active_session,
+        working_state=normalized_working_state,
+        active_task=active_task,
+        current_file=current_file,
+        last_user_message=last_user_message,
+        last_assistant_message=last_assistant_message,
         artifacts=artifact_service.build_list_payload(),
         memory=memory_service.build_list_payload(),
     )
@@ -13454,6 +13566,268 @@ def nova_final_session_detail_response_cache_20260612(response):
                     or ""
                 ).strip()
 
+            # NOVA_FINAL_CACHE_WORKING_ON_RECALL_REPAIR_20260630
+            # chat_service can answer before the requested-session bridge/final cache
+            # has the right session loaded. At this point app.py already has the
+            # correct session messages, so repair the visible answer here.
+            try:
+                working_question = str(user_text or "").strip().lower() in {
+                    "what are we working on",
+                    "what are we working on?",
+                    "what were we working on",
+                    "what were we working on?",
+                }
+
+                bad_working_answer = str(assistant_text or "").strip() in {
+                    "",
+                    "No active task is currently tracked yet.",
+                    "We're working on No active task is currently tracked..",
+                    "We're working on No active task is currently tracked.",
+                }
+
+                if working_question and bad_working_answer:
+                    inferred_task = ""
+
+                    session_title = str(session_obj.get("title") or "").strip()
+                    lowered_title = session_title.lower()
+
+                    if lowered_title.startswith("we are working on "):
+                        inferred_task = session_title[len("we are working on "):].strip(" .")
+                    elif lowered_title.startswith("we're working on "):
+                        inferred_task = session_title[len("we're working on "):].strip(" .")
+                    elif lowered_title.startswith("working on "):
+                        inferred_task = session_title[len("working on "):].strip(" .")
+
+                    if not inferred_task:
+                        for msg in reversed(messages):
+                            if not isinstance(msg, dict):
+                                continue
+
+                            role = str(
+                                msg.get("role")
+                                or msg.get("sender")
+                                or ""
+                            ).strip().lower()
+
+                            if role != "user":
+                                continue
+
+                            msg_text = str(
+                                msg.get("text")
+                                or msg.get("content")
+                                or ""
+                            ).strip()
+
+                            lowered_msg = msg_text.lower()
+
+                            if lowered_msg in {
+                                "what are we working on",
+                                "what are we working on?",
+                                "what were we working on",
+                                "what were we working on?",
+                            }:
+                                continue
+
+                            if lowered_msg.startswith("we are working on "):
+                                inferred_task = msg_text[len("we are working on "):].strip(" .")
+                                break
+
+                            if lowered_msg.startswith("we're working on "):
+                                inferred_task = msg_text[len("we're working on "):].strip(" .")
+                                break
+
+                            if lowered_msg.startswith("working on "):
+                                inferred_task = msg_text[len("working on "):].strip(" .")
+                                break
+
+                    if inferred_task:
+                        fixed_text = f"We're working on {inferred_task}."
+
+                        bad_saved_working_answers = {
+                            "",
+                            "No active task is currently tracked yet.",
+                            "We're working on No active task is currently tracked..",
+                            "We're working on No active task is currently tracked.",
+                        }
+
+                        try:
+                            for msg in reversed(messages):
+                                if not isinstance(msg, dict):
+                                    continue
+
+                                role = str(
+                                    msg.get("role")
+                                    or msg.get("sender")
+                                    or ""
+                                ).strip().lower()
+
+                                if role != "assistant":
+                                    continue
+
+                                msg_text = str(
+                                    msg.get("text")
+                                    or msg.get("content")
+                                    or ""
+                                ).strip()
+
+                                if msg_text in bad_saved_working_answers:
+                                    msg["text"] = fixed_text
+                                    msg["content"] = fixed_text
+
+                                    msg_meta = msg.get("meta")
+                                    if not isinstance(msg_meta, dict):
+                                        msg_meta = {}
+
+                                    msg_meta["route"] = "final_cache_working_on_recall_repair"
+                                    msg_meta["repaired_saved_working_recall"] = True
+                                    msg_meta["session_id"] = session_id
+
+                                    msg["meta"] = msg_meta
+                                    break
+
+                            session_obj["messages"] = messages
+
+                        except Exception:
+                            pass
+
+                        assistant_text = fixed_text
+
+                        if isinstance(assistant_message, dict):
+                            assistant_message["text"] = fixed_text
+                            assistant_message["content"] = fixed_text
+
+                            assistant_meta = assistant_message.get("meta")
+                            if not isinstance(assistant_meta, dict):
+                                assistant_meta = {}
+
+                            assistant_meta["route"] = "final_cache_working_on_recall_repair"
+                            assistant_meta["repaired_working_recall"] = True
+                            assistant_meta["session_id"] = session_id
+
+                            assistant_message["meta"] = assistant_meta
+                            response_json["assistant_message"] = assistant_message
+
+                        working_state = session_obj.get("working_state")
+                        if not isinstance(working_state, dict):
+                            working_state = {}
+
+                        working_state["active_task"] = inferred_task
+
+                        if ".py" in inferred_task and not working_state.get("current_file"):
+                            for part in inferred_task.replace("\\", "/").split():
+                                clean_part = part.strip("`'\".,:;()[]{}")
+                                if clean_part.endswith(".py"):
+                                    working_state["current_file"] = clean_part.split("/")[-1]
+                                    break
+
+                        session_obj["working_state"] = working_state
+
+            except Exception:
+                pass
+
+            # NOVA_FINAL_CACHE_CURRENT_FILE_RECALL_REPAIR_20260630
+            # chat_service can answer before the final requested session state is attached.
+            # At this point app.py has the correct session_obj, so repair current-file recall.
+            try:
+                file_question = str(user_text or "").strip().lower() in {
+                    "what file are we in",
+                    "which file",
+                    "current file",
+                    "what file",
+                }
+
+                bad_file_answer = str(assistant_text or "").strip() in {
+                    "",
+                    "Current file:\nNo active file is currently tracked.",
+                    "No active file is currently tracked.",
+                    "No active file is currently tracked",
+                }
+
+                if file_question and bad_file_answer:
+                    working_state = session_obj.get("working_state")
+                    if not isinstance(working_state, dict):
+                        working_state = {}
+
+                    current_file = str(
+                        working_state.get("current_file")
+                        or ""
+                    ).strip()
+
+                    if current_file:
+                        fixed_text = f"Current file:\n{current_file}"
+
+                        assistant_text = fixed_text
+
+                        if isinstance(assistant_message, dict):
+                            assistant_message["text"] = fixed_text
+                            assistant_message["content"] = fixed_text
+
+                            assistant_meta = assistant_message.get("meta")
+                            if not isinstance(assistant_meta, dict):
+                                assistant_meta = {}
+
+                            assistant_meta["route"] = "final_cache_current_file_recall_repair"
+                            assistant_meta["repaired_current_file_recall"] = True
+                            assistant_meta["session_id"] = session_id
+
+                            assistant_message["meta"] = assistant_meta
+                            response_json["assistant_message"] = assistant_message
+
+            except Exception:
+                pass
+
+            # NOVA_FINAL_CACHE_ACTIVE_TASK_RECALL_REPAIR_20260630
+            # chat_service can answer before the final requested session state is attached.
+            # At this point app.py has the correct session_obj, so repair active-task recall.
+            try:
+                active_task_question = str(user_text or "").strip().lower() in {
+                    "what is the active task",
+                    "active task",
+                    "what are we doing",
+                }
+
+                bad_active_task_answer = str(assistant_text or "").strip() in {
+                    "",
+                    "Active task:\nNo active task is currently tracked.",
+                    "Active task:\nNo active task is currently tracked yet.",
+                    "No active task is currently tracked.",
+                    "No active task is currently tracked",
+                    "No active task is currently tracked yet.",
+                }
+
+                if active_task_question and bad_active_task_answer:
+                    working_state = session_obj.get("working_state")
+                    if not isinstance(working_state, dict):
+                        working_state = {}
+
+                    active_task = str(
+                        working_state.get("active_task")
+                        or ""
+                    ).strip()
+
+                    if active_task:
+                        fixed_text = f"Active task:\n{active_task}"
+
+                        assistant_text = fixed_text
+
+                        if isinstance(assistant_message, dict):
+                            assistant_message["text"] = fixed_text
+                            assistant_message["content"] = fixed_text
+
+                            assistant_meta = assistant_message.get("meta")
+                            if not isinstance(assistant_meta, dict):
+                                assistant_meta = {}
+
+                            assistant_meta["route"] = "final_cache_active_task_recall_repair"
+                            assistant_meta["repaired_active_task_recall"] = True
+                            assistant_meta["session_id"] = session_id
+
+                            assistant_message["meta"] = assistant_meta
+                            response_json["assistant_message"] = assistant_message
+
+            except Exception:
+                pass
+
             if user_text and user_text not in json.dumps(messages, ensure_ascii=False):
                 messages.append({
                     "role": "user",
@@ -13587,12 +13961,397 @@ def nova_final_session_detail_response_cache_20260612(response):
             session_obj["message_count"] = len(messages)
             session_obj["active_session_id"] = session_id
 
+            # NOVA_FINAL_CACHE_WORKING_STATE_PERSIST_20260630
+            # Persist inferred working_state into the session itself so /api/chat,
+            # /api/state, mobile, and session restore all agree.
+            try:
+                working_state = session_obj.get("working_state")
+
+                if not isinstance(working_state, dict):
+                    working_state = {}
+
+                active_task = str(
+                    working_state.get("active_task")
+                    or working_state.get("task")
+                    or ""
+                ).strip()
+
+                current_file = str(
+                    working_state.get("current_file")
+                    or working_state.get("file")
+                    or ""
+                ).strip()
+
+                last_user_message = ""
+                last_assistant_message = ""
+
+                session_messages = session_obj.get("messages")
+                if not isinstance(session_messages, list):
+                    session_messages = []
+
+                for message in reversed(session_messages):
+                    if not isinstance(message, dict):
+                        continue
+
+                    role = str(message.get("role") or "").strip().lower()
+                    message_text = str(
+                        message.get("text")
+                        or message.get("content")
+                        or ""
+                    ).strip()
+
+                    if role == "user" and not last_user_message:
+                        last_user_message = message_text
+
+                    if role == "assistant" and not last_assistant_message:
+                        last_assistant_message = message_text
+
+                    if last_user_message and last_assistant_message:
+                        break
+
+                if not active_task:
+                    session_title = str(session_obj.get("title") or "").strip()
+                    lowered_title = session_title.lower()
+
+                    if lowered_title.startswith("we are working on "):
+                        active_task = session_title[len("we are working on "):].strip(" .")
+
+                    elif lowered_title.startswith("we're working on "):
+                        active_task = session_title[len("we're working on "):].strip(" .")
+
+                    elif lowered_title.startswith("working on "):
+                        active_task = session_title[len("working on "):].strip(" .")
+
+                if not active_task:
+                    for message in reversed(session_messages):
+                        if not isinstance(message, dict):
+                            continue
+
+                        if str(message.get("role") or "").strip().lower() != "user":
+                            continue
+
+                        message_text = str(
+                            message.get("text")
+                            or message.get("content")
+                            or ""
+                        ).strip()
+
+                        lowered_message = message_text.lower()
+
+                        if lowered_message in {
+                            "what are we working on",
+                            "what are we working on?",
+                            "what were we working on",
+                            "what were we working on?",
+                            "what file are we in",
+                            "what file are we in?",
+                            "current file",
+                            "active task",
+                        }:
+                            continue
+
+                        if lowered_message.startswith("we are working on "):
+                            active_task = message_text[len("we are working on "):].strip(" .")
+                            break
+
+                        if lowered_message.startswith("we're working on "):
+                            active_task = message_text[len("we're working on "):].strip(" .")
+                            break
+
+                        if lowered_message.startswith("working on "):
+                            active_task = message_text[len("working on "):].strip(" .")
+                            break
+
+                if not current_file and active_task:
+                    for part in active_task.replace(",", " ").split():
+                        clean_part = part.strip("`'\".,:;()[]{}")
+
+                        if clean_part.endswith((
+                            ".py",
+                            ".js",
+                            ".css",
+                            ".html",
+                            ".json",
+                            ".md",
+                            ".txt",
+                        )):
+                            current_file = clean_part
+                            break
+
+                working_state["active_task"] = active_task
+                working_state["current_file"] = current_file
+                working_state["last_user_message"] = last_user_message
+                working_state["last_assistant_message"] = last_assistant_message
+
+                session_obj["working_state"] = working_state
+                session_obj["active_session_id"] = session_id
+
+            except Exception:
+                pass
+
             cached = _nova_final_upsert_session_in_store_20260612(session_id, session_obj)
 
             if isinstance(cached, dict):
-                response_json["session"] = cached
+                response_session = dict(cached)
+
+                # NOVA_HIDE_TOP_LEVEL_ASSISTANT_DUPLICATE_FROM_RESPONSE_20260630
+                # The assistant reply is already returned as response_json["assistant_message"].
+                # Do not also include the same newest assistant bubble inside response_json["session"]
+                # for this immediate /api/chat response, or the frontend can render it twice.
+                try:
+                    response_messages = response_session.get("messages")
+
+                    if isinstance(response_messages, list) and assistant_text:
+                        stripped_messages = []
+                        removed_current_assistant = False
+
+                        for msg in reversed(response_messages):
+                            if not isinstance(msg, dict):
+                                stripped_messages.append(msg)
+                                continue
+
+                            role = str(
+                                msg.get("role")
+                                or msg.get("sender")
+                                or ""
+                            ).strip().lower()
+
+                            msg_text = str(
+                                msg.get("text")
+                                or msg.get("content")
+                                or ""
+                            ).strip()
+
+                            if (
+                                not removed_current_assistant
+                                and role == "assistant"
+                                and msg_text == assistant_text
+                            ):
+                                removed_current_assistant = True
+                                continue
+
+                            stripped_messages.append(msg)
+
+                        stripped_messages.reverse()
+                        response_session["messages"] = stripped_messages
+
+                    if isinstance(response_json.get("assistant_message"), dict):
+                        response_json["assistant_message"].setdefault("meta", {})
+                        response_json["assistant_message"]["meta"]["render_source"] = "assistant_message_only"
+                        response_json["assistant_message"]["meta"]["already_saved_to_session"] = True
+
+                    # NOVA_FINAL_CACHE_REPAIRED_RECALL_SESSION_MESSAGE_SYNC_20260630
+                    # If app.py repaired the top-level assistant_message, keep the returned
+                    # session.messages payload in sync so the UI cannot render stale cache text.
+                    try:
+                        repaired_assistant = response_json.get("assistant_message")
+
+                        if isinstance(repaired_assistant, dict):
+                            repaired_meta = repaired_assistant.get("meta")
+                            if not isinstance(repaired_meta, dict):
+                                repaired_meta = {}
+
+                            repaired_recall = bool(
+                                repaired_meta.get("repaired_current_file_recall")
+                                or repaired_meta.get("repaired_active_task_recall")
+                            )
+
+                            fixed_text = str(
+                                repaired_assistant.get("text")
+                                or repaired_assistant.get("content")
+                                or ""
+                            ).strip()
+
+                            if repaired_recall and fixed_text and isinstance(response_session, dict):
+                                response_session["active_session_id"] = session_id
+
+                                working_state = response_session.get("working_state")
+                                if not isinstance(working_state, dict):
+                                    working_state = {}
+
+                                working_state["last_user_message"] = str(user_text or "")
+                                working_state["last_assistant_message"] = fixed_text
+                                response_session["working_state"] = working_state
+
+                                returned_messages = response_session.get("messages")
+                                if not isinstance(returned_messages, list):
+                                    returned_messages = []
+
+                                assistant_id = str(
+                                    repaired_assistant.get("id")
+                                    or repaired_assistant.get("message_id")
+                                    or ""
+                                ).strip()
+
+                                stale_recall_answers = {
+                                    "Current file:\nNo active file is currently tracked.",
+                                    "No active file is currently tracked.",
+                                    "No active file is currently tracked",
+                                    "Active task:\nNo active task is currently tracked.",
+                                    "Active task:\nNo active task is currently tracked yet.",
+                                    "No active task is currently tracked.",
+                                    "No active task is currently tracked",
+                                    "No active task is currently tracked yet.",
+                                }
+
+                                patched_existing_message = False
+
+                                for msg in reversed(returned_messages):
+                                    if not isinstance(msg, dict):
+                                        continue
+
+                                    if str(msg.get("role") or "").lower() != "assistant":
+                                        continue
+
+                                    msg_id = str(msg.get("id") or "").strip()
+                                    msg_text = str(
+                                        msg.get("text")
+                                        or msg.get("content")
+                                        or ""
+                                    ).strip()
+
+                                    same_message_id = bool(
+                                        assistant_id
+                                        and msg_id
+                                        and msg_id == assistant_id
+                                    )
+
+                                    stale_recall_message = msg_text in stale_recall_answers
+
+                                    if same_message_id or stale_recall_message:
+                                        msg["text"] = fixed_text
+                                        msg["content"] = fixed_text
+                                        msg["attachments"] = msg.get("attachments") or []
+
+                                        msg_meta = msg.get("meta")
+                                        if not isinstance(msg_meta, dict):
+                                            msg_meta = {}
+
+                                        msg_meta.update(repaired_meta)
+                                        msg_meta["session_id"] = session_id
+                                        msg_meta["render_source"] = "assistant_message_only"
+                                        msg_meta["already_saved_to_session"] = True
+
+                                        msg["meta"] = msg_meta
+                                        msg["session_id"] = session_id
+                                        msg["active_session_id"] = session_id
+
+                                        patched_existing_message = True
+                                        break
+
+                                if not patched_existing_message:
+                                    returned_messages.append(
+                                        {
+                                            "id": assistant_id,
+                                            "role": "assistant",
+                                            "text": fixed_text,
+                                            "content": fixed_text,
+                                            "attachments": [],
+                                            "meta": repaired_meta,
+                                            "session_id": session_id,
+                                            "active_session_id": session_id,
+                                        }
+                                    )
+
+                                response_session["messages"] = returned_messages
+
+                    except Exception:
+                        pass
+
+                except Exception:
+                    response_session = dict(cached)
+
+                # NOVA_FINAL_CACHE_STALE_WORKING_STATE_HISTORY_CLEANUP_20260630
+                # Clean stale direct-recall answers inside returned session.messages.
+                # This prevents the UI from rendering old "No active..." text when
+                # working_state already has the truth.
+                try:
+                    if isinstance(response_session, dict):
+                        working_state = response_session.get("working_state")
+                        if not isinstance(working_state, dict):
+                            working_state = {}
+
+                        current_file = str(
+                            working_state.get("current_file")
+                            or ""
+                        ).strip()
+
+                        active_task = str(
+                            working_state.get("active_task")
+                            or ""
+                        ).strip()
+
+                        returned_messages = response_session.get("messages")
+                        if isinstance(returned_messages, list):
+                            for msg in returned_messages:
+                                if not isinstance(msg, dict):
+                                    continue
+
+                                if str(msg.get("role") or "").lower() != "assistant":
+                                    continue
+
+                                msg_text = str(
+                                    msg.get("text")
+                                    or msg.get("content")
+                                    or ""
+                                ).strip()
+
+                                fixed_text = ""
+
+                                if (
+                                    current_file
+                                    and msg_text in {
+                                        "Current file:\nNo active file is currently tracked.",
+                                        "No active file is currently tracked.",
+                                        "No active file is currently tracked",
+                                    }
+                                ):
+                                    fixed_text = f"Current file:\n{current_file}"
+
+                                if (
+                                    active_task
+                                    and msg_text in {
+                                        "Active task:\nNo active task is currently tracked.",
+                                        "Active task:\nNo active task is currently tracked yet.",
+                                        "No active task is currently tracked.",
+                                        "No active task is currently tracked",
+                                        "No active task is currently tracked yet.",
+                                    }
+                                ):
+                                    fixed_text = f"Active task:\n{active_task}"
+
+                                if not fixed_text:
+                                    continue
+
+                                msg["text"] = fixed_text
+                                msg["content"] = fixed_text
+                                msg["attachments"] = msg.get("attachments") or []
+                                msg["session_id"] = session_id
+                                msg["active_session_id"] = session_id
+
+                                msg_meta = msg.get("meta")
+                                if not isinstance(msg_meta, dict):
+                                    msg_meta = {}
+
+                                msg_meta["route"] = "final_cache_stale_working_state_history_cleanup"
+                                msg_meta["session_id"] = session_id
+                                msg_meta["render_source"] = "assistant_message_only"
+                                msg_meta["stale_working_state_history_cleaned"] = True
+
+                                msg["meta"] = msg_meta
+
+                            response_session["messages"] = returned_messages
+
+                except Exception:
+                    pass
+
+                response_json["session"] = response_session
                 response_json["session_id"] = session_id
                 response_json["active_session_id"] = session_id
+            try:
+                session_service.active_session_id = session_id
+            except Exception:
+                pass
                 response_json["final_session_detail_response_cache"] = True
                 response.set_data(json.dumps(response_json, ensure_ascii=False))
                 response.headers["Content-Length"] = str(len(response.get_data()))
