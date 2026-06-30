@@ -15089,3 +15089,79 @@ pre code .nova-code-operator,
 code .nova-code-operator {
     color: #f472b6 !important;
 }
+
+/* =========================================================
+   NOVA MOBILE UPLOAD PREVIEW OWNER 20260630
+========================================================= */
+
+#nova-mobile-upload-preview-owner {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: none;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 6px 8px 8px !important;
+    box-sizing: border-box !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    position: relative !important;
+    z-index: 40 !important;
+}
+
+#nova-mobile-upload-preview-owner[hidden] {
+    display: none !important;
+}
+
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-chip {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 7px !important;
+    max-width: 92vw !important;
+    flex: 0 0 auto !important;
+    min-height: 34px !important;
+    padding: 5px 8px !important;
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, 0.10) !important;
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    color: rgba(255, 255, 255, 0.94) !important;
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+}
+
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-thumb {
+    width: 26px !important;
+    height: 26px !important;
+    min-width: 26px !important;
+    border-radius: 8px !important;
+    object-fit: cover !important;
+    display: block !important;
+}
+
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-icon {
+    font-size: 15px !important;
+    line-height: 1 !important;
+}
+
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-name {
+    max-width: 62vw !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-remove {
+    width: 22px !important;
+    height: 22px !important;
+    min-width: 22px !important;
+    border: 0 !important;
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, 0.16) !important;
+    color: #ffffff !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 16px !important;
+    line-height: 1 !important;
+    padding: 0 !important;
+}

@@ -847,8 +847,12 @@ function clearAttachmentsAfterSend() {
         window.NovaMobileAttachmentQueue = [];
         window.novaMobileAttachments = [];
         window.NovaMobileUploadQueue = [];
+        window.NovaPendingAttachments = [];
+        window.pendingAttachments = [];
 
         localStorage.removeItem("nova_mobile_pending_attachments");
+        localStorage.removeItem("nova_mobile_latest_attachments");
+        localStorage.removeItem("novaPendingAttachments");
         localStorage.removeItem("nova_mobile_last_uploaded_attachment");
 
         const visiblePreview = document.getElementById("nova-main-visible-attachment-preview");
@@ -860,11 +864,27 @@ function clearAttachmentsAfterSend() {
         if (oldPreview) {
             oldPreview.remove();
         }
+
+        const uploadPreviewOwner = document.getElementById("nova-mobile-upload-preview-owner");
+        if (uploadPreviewOwner) {
+            uploadPreviewOwner.innerHTML = "";
+            uploadPreviewOwner.hidden = true;
+            uploadPreviewOwner.style.display = "none";
+        }
+
+        if (typeof window.NovaMobileClearUploadPreview === "function") {
+            window.NovaMobileClearUploadPreview();
+        }
+
+        window.dispatchEvent(new CustomEvent("nova-mobile-attachments-cleared", {
+            detail: {
+                pendingAttachments: []
+            }
+        }));
     } catch (e) {
         console.warn("[Nova Send Final Owner] clear attachments failed", e);
     }
 }
-
 function currentAttachmentsForSend() {
     function safeArray(value) {
         return Array.isArray(value) ? value : [];

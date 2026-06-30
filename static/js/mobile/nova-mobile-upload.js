@@ -605,4 +605,350 @@ function storeUploadPayload(data, file) {
     console.log("[Nova Mobile Clear Attachment After Send] ready");
 })();
 
+/* =========================================================
+   NOVA MOBILE UPLOAD PREVIEW OWNER 20260630
+   Single visible phone preview owned by nova-mobile-upload.js.
+========================================================= */
+(() => {
+    "use strict";
+
+    if (window.__NOVA_MOBILE_UPLOAD_PREVIEW_OWNER_20260630__) return;
+    window.__NOVA_MOBILE_UPLOAD_PREVIEW_OWNER_20260630__ = true;
+
+    const PREVIEW_ID = "nova-mobile-upload-preview-owner";
+
+    function safeArray(value) {
+        return Array.isArray(value) ? value : [];
+    }
+
+    function readJson(key, fallback) {
+        try {
+            const raw = localStorage.getItem(key);
+            if (!raw) return fallback;
+            const parsed = JSON.parse(raw);
+            return parsed || fallback;
+        } catch (_) {
+            return fallback;
+        }
+    }
+
+    function writeJson(key, value) {
+        try {
+            localStorage.setItem(key, JSON.stringify(value));
+        } catch (_) {}
+    }
+
+    function removeKey(key) {
+        try {
+            localStorage.removeItem(key);
+        } catch (_) {}
+    }
+
+    function normalizeAttachment(raw) {
+        if (!raw || typeof raw !== "object") return null;
+
+        const source =
+            raw.attachment && typeof raw.attachment === "object" ? raw.attachment :
+            raw.file && typeof raw.file === "object" ? raw.file :
+            raw.data && typeof raw.data === "object" ? raw.data :
+            raw;
+
+        const url =
+            source.url ||
+            source.file_url ||
+            source.preview_url ||
+            source.path ||
+            "";
+
+        const filename =
+            source.original_filename ||
+            source.filename ||
+            source.name ||
+            source.title ||
+            (url ? String(url).split("/").pop() : "") ||
+            "attachment";
+
+        const mimeType =
+            source.mime_type ||
+            source.mimeType ||
+            source.type ||
+            source.mime ||
+            "";
+
+        return {
+            url: String(url || ""),
+            file_url: String(source.file_url || url || ""),
+            filename: String(source.filename || filename || "attachment"),
+            original_filename: String(source.original_filename || filename || "attachment"),
+            name: String(filename || "attachment"),
+            mime_type: String(mimeType || ""),
+            size: source.size || source.file_size || source.bytes || 0
+        };
+    }
+
+    function attachmentKey(item) {
+        return [
+            item.url,
+            item.file_url,
+            item.original_filename,
+            item.filename,
+            item.name,
+            item.size
+        ].join("|").toLowerCase();
+    }
+
+    function collectAttachments() {
+        const found = [];
+
+        function addMany(items) {
+            safeArray(items).forEach((item) => {
+                const clean = normalizeAttachment(item);
+                if (clean) found.push(clean);
+            });
+        }
+
+        addMany(window.NovaMobileAttachments);
+        addMany(window.NovaMobilePendingAttachments);
+        addMany(window.__novaMobilePendingAttachments);
+        addMany(window.NovaMobileUploadedAttachments);
+        addMany(window.NovaMobileSharedAttachments);
+        addMany(window.NovaMobileAttachmentQueue);
+        addMany(window.NovaMobileUploadQueue);
+        addMany(window.NovaPendingAttachments);
+        addMany(window.pendingAttachments);
+
+        addMany(readJson("nova_mobile_pending_attachments", []));
+        addMany(readJson("nova_mobile_latest_attachments", []));
+        addMany(readJson("novaPendingAttachments", []));
+
+        const last = readJson("nova_mobile_last_uploaded_attachment", null);
+        if (last && typeof last === "object") {
+            const clean = normalizeAttachment(last);
+            if (clean) found.push(clean);
+        }
+
+        const seen = new Set();
+        return found.filter((item) => {
+            const key = attachmentKey(item);
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    }
+
+    function saveAttachments(attachments) {
+        const clean = safeArray(attachments).map(normalizeAttachment).filter(Boolean);
+
+        window.NovaMobileAttachments = clean;
+        window.NovaMobilePendingAttachments = clean;
+        window.__novaMobilePendingAttachments = clean;
+        window.NovaMobileUploadedAttachments = clean;
+        window.NovaMobileSharedAttachments = clean;
+        window.NovaPendingAttachments = clean;
+        window.pendingAttachments = clean;
+
+        if (window.NovaMobileState && typeof window.NovaMobileState === "object") {
+            window.NovaMobileState.pendingAttachments = clean;
+        }
+
+        if (clean.length) {
+            writeJson("nova_mobile_pending_attachments", clean);
+            writeJson("nova_mobile_latest_attachments", clean);
+            writeJson("novaPendingAttachments", clean);
+            writeJson("nova_mobile_last_uploaded_attachment", clean[clean.length - 1]);
+        } else {
+            removeKey("nova_mobile_pending_attachments");
+            removeKey("nova_mobile_latest_attachments");
+            removeKey("novaPendingAttachments");
+            removeKey("nova_mobile_last_uploaded_attachment");
+        }
+
+        return clean;
+    }
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
+
+    function getComposer() {
+        return (
+            document.getElementById("nova-mobile-composer") ||
+            document.querySelector(".nova-mobile-composer") ||
+            document.querySelector(".mobile-composer") ||
+            document.querySelector("[data-mobile-composer]") ||
+            document.querySelector("form")
+        );
+    }
+
+    function ensurePreviewHost() {
+        let host = document.getElementById(PREVIEW_ID);
+        if (host) return host;
+
+        const composer = getComposer();
+        if (!composer) return null;
+
+        host = document.createElement("div");
+        host.id = PREVIEW_ID;
+        host.className = "nova-mobile-upload-preview-owner";
+        host.setAttribute("data-mobile-attachment-preview-owner", "true");
+
+        composer.insertBefore(host, composer.firstChild);
+
+        return host;
+    }
+
+    function isImageAttachment(item) {
+        const name = item.original_filename || item.filename || item.name || "";
+        const url = item.url || item.file_url || "";
+        const mime = item.mime_type || "";
+
+        return (
+            mime.indexOf("image/") === 0 ||
+            /\.(png|jpg|jpeg|gif|webp|bmp)$/i.test(name) ||
+            /\.(png|jpg|jpeg|gif|webp|bmp)$/i.test(url)
+        );
+    }
+
+    function shortName(value) {
+        const name = String(value || "attachment").trim() || "attachment";
+        if (name.length <= 30) return name;
+
+        const dot = name.lastIndexOf(".");
+        const ext = dot > 0 ? name.slice(dot) : "";
+        const base = dot > 0 ? name.slice(0, dot) : name;
+
+        return base.slice(0, Math.max(10, 27 - ext.length)) + "..." + ext;
+    }
+
+    function renderUploadPreview() {
+        const host = ensurePreviewHost();
+        if (!host) return;
+
+        const attachments = saveAttachments(collectAttachments());
+
+        if (!attachments.length) {
+            host.innerHTML = "";
+            host.hidden = true;
+            host.style.display = "none";
+            return;
+        }
+
+        host.hidden = false;
+        host.style.display = "flex";
+
+        host.innerHTML = attachments.map((item, index) => {
+            const fullName = item.original_filename || item.filename || item.name || "attachment";
+            const name = shortName(fullName);
+            const url = item.url || item.file_url || "";
+            const image = isImageAttachment(item) && url
+                ? `<img class="nova-mobile-upload-preview-thumb" src="${escapeHtml(url)}" alt="${escapeHtml(fullName)}">`
+                : `<span class="nova-mobile-upload-preview-icon" aria-hidden="true">📎</span>`;
+
+            return (
+                `<div class="nova-mobile-upload-preview-chip" data-upload-preview-index="${index}" title="${escapeHtml(fullName)}">` +
+                    image +
+                    `<span class="nova-mobile-upload-preview-name">${escapeHtml(name)}</span>` +
+                    `<button type="button" class="nova-mobile-upload-preview-remove" data-remove-upload-preview="${index}" aria-label="Remove attachment">×</button>` +
+                `</div>`
+            );
+        }).join("");
+    }
+
+    function removeAttachment(index) {
+        const current = collectAttachments();
+        const cleanIndex = Number(index);
+
+        if (!Number.isFinite(cleanIndex)) return;
+
+        current.splice(cleanIndex, 1);
+        saveAttachments(current);
+        renderUploadPreview();
+
+        window.dispatchEvent(new CustomEvent("nova-mobile-attachments-changed", {
+            detail: {
+                pendingAttachments: current
+            }
+        }));
+    }
+
+    function clearUploadPreview() {
+        saveAttachments([]);
+
+        const host = document.getElementById(PREVIEW_ID);
+        if (host) {
+            host.innerHTML = "";
+            host.hidden = true;
+            host.style.display = "none";
+        }
+
+        window.dispatchEvent(new CustomEvent("nova-mobile-attachments-cleared", {
+            detail: {
+                pendingAttachments: []
+            }
+        }));
+    }
+
+    document.addEventListener("click", (event) => {
+        const button = event.target && event.target.closest
+            ? event.target.closest("[data-remove-upload-preview]")
+            : null;
+
+        if (!button) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        removeAttachment(button.getAttribute("data-remove-upload-preview"));
+    }, true);
+
+    [
+        "nova-mobile-upload-complete",
+        "nova-mobile-attachment-uploaded",
+        "nova-mobile-attachments-changed"
+    ].forEach((eventName) => {
+        window.addEventListener(eventName, () => {
+            setTimeout(renderUploadPreview, 0);
+            setTimeout(renderUploadPreview, 120);
+            setTimeout(renderUploadPreview, 400);
+        }, true);
+    });
+
+    document.addEventListener("change", (event) => {
+        if (event.target && event.target.type === "file") {
+            setTimeout(renderUploadPreview, 120);
+            setTimeout(renderUploadPreview, 500);
+        }
+    }, true);
+
+    const oldClear =
+        window.NovaMobileClearAttachmentsAfterSend ||
+        window.NovaClearMobileAttachmentsAfterSend ||
+        window.NovaMobileCleanAttachmentChipOnlyClear ||
+        null;
+
+    window.NovaMobileRenderUploadPreview = renderUploadPreview;
+    window.NovaMobileClearUploadPreview = clearUploadPreview;
+    window.NovaMobileClearAttachmentsAfterSend = function () {
+        try {
+            if (typeof oldClear === "function") oldClear();
+        } catch (_) {}
+
+        clearUploadPreview();
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+        setTimeout(renderUploadPreview, 0);
+        setTimeout(renderUploadPreview, 300);
+        setTimeout(renderUploadPreview, 900);
+    });
+
+    setTimeout(renderUploadPreview, 1000);
+
+    console.log("[Nova Mobile Upload Preview Owner] ready");
+})();
+
 
