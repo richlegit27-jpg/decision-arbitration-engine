@@ -5762,3 +5762,397 @@ row.onclick = async () => {
     console.log("[Nova Mobile Safe Session Close] ready");
 })();
 
+
+/* -------------------------------------------------
+   NOVA MOBILE VOICE TTS SINGLE OWNER
+   Stabilizes mic, voice stop, and text-to-speech.
+   Does not touch sessions.
+   20260629
+-------------------------------------------------- */
+(() => {
+    if (window.__NOVA_MOBILE_VOICE_TTS_SINGLE_OWNER_20260629__) return;
+    window.__NOVA_MOBILE_VOICE_TTS_SINGLE_OWNER_20260629__ = true;
+
+    let recognition = null;
+    let listening = false;
+    let speaking = false;
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function inputBox() {
+        return (
+            $("nova-mobile-input") ||
+            $("mobileInput") ||
+            document.querySelector("textarea") ||
+            document.querySelector("[contenteditable='true']")
+        );
+    }
+
+    function voiceButton() {
+        return (
+            $("nova-mobile-voice") ||
+            $("mobileVoiceButton") ||
+            document.querySelector("[data-mobile-voice]") ||
+            document.querySelector("[aria-label*='Voice' i]") ||
+            document.querySelector("[title*='Voice' i]")
+        );
+    }
+
+    function ttsButton() {
+        return (
+            $("nova-mobile-tts") ||
+            $("mobileTtsButton") ||
+            document.querySelector("[data-mobile-tts]") ||
+            document.querySelector("[aria-label*='TTS' i]") ||
+            document.querySelector("[title*='TTS' i]") ||
+            document.querySelector("[aria-label*='Speak' i]") ||
+            document.querySelector("[title*='Speak' i]")
+        );
+    }
+
+    function stopButton() {
+        return (
+            $("nova-mobile-stop-generation") ||
+            $("mobileStopButton") ||
+            document.querySelector("[data-mobile-stop]")
+        );
+    }
+
+    function chatRoot() {
+        return (
+            $("mobileChatMessages") ||
+            $("nova-mobile-messages") ||
+            $("nova-mobile-chat") ||
+            document.querySelector("[data-mobile-chat-messages]") ||
+            document.querySelector(".mobile-chat-messages") ||
+            document.querySelector(".nova-mobile-messages") ||
+            document.querySelector(".nova-mobile-chat") ||
+            document.querySelector(".chat-messages")
+        );
+    }
+
+    function toast(message) {
+        try {
+            if (typeof window.showToast === "function") {
+                window.showToast(message);
+                return;
+            }
+        } catch (e) {}
+
+        try {
+            const el = document.createElement("div");
+            el.textContent = message;
+            el.style.position = "fixed";
+            el.style.left = "50%";
+            el.style.bottom = "96px";
+            el.style.transform = "translateX(-50%)";
+            el.style.zIndex = "2147483647";
+            el.style.padding = "8px 12px";
+            el.style.borderRadius = "999px";
+            el.style.background = "rgba(20, 20, 30, 0.92)";
+            el.style.color = "white";
+            el.style.fontSize = "13px";
+            el.style.pointerEvents = "none";
+            document.body.appendChild(el);
+
+            setTimeout(() => {
+                el.remove();
+            }, 1200);
+        } catch (e) {}
+    }
+
+    function setButtonState() {
+        const voice = voiceButton();
+        const tts = ttsButton();
+
+        if (voice) {
+            voice.dataset.novaVoiceActive = listening ? "1" : "0";
+            voice.setAttribute("aria-pressed", listening ? "true" : "false");
+            voice.title = listening ? "Stop voice input" : "Voice input";
+        }
+
+        if (tts) {
+            tts.dataset.novaTtsActive = speaking ? "1" : "0";
+            tts.setAttribute("aria-pressed", speaking ? "true" : "false");
+            tts.title = speaking ? "Stop speaking" : "Read aloud";
+        }
+    }
+
+    function insertIntoInput(text) {
+        const input = inputBox();
+        const clean = String(text || "").trim();
+
+        if (!input || !clean) return false;
+
+        if ("value" in input) {
+            const current = String(input.value || "").trim();
+            input.value = current ? current + " " + clean : clean;
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            input.focus();
+            return true;
+        }
+
+        input.textContent = clean;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.focus();
+
+        return true;
+    }
+
+    function stopVoice(reason) {
+        listening = false;
+
+        try {
+            if (recognition) {
+                recognition.onresult = null;
+                recognition.onerror = null;
+                recognition.onend = null;
+                recognition.stop();
+            }
+        } catch (e) {}
+
+        try {
+            if (recognition) {
+                recognition.abort();
+            }
+        } catch (e) {}
+
+        recognition = null;
+        setButtonState();
+
+        if (reason) {
+            toast(reason);
+        }
+    }
+
+    function startVoice() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (!SpeechRecognition) {
+            toast("Voice not supported here.");
+            return;
+        }
+
+        if (listening) {
+            stopVoice("Voice stopped.");
+            return;
+        }
+
+        try {
+            recognition = new SpeechRecognition();
+            recognition.lang = navigator.language || "en-US";
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            listening = true;
+            setButtonState();
+            toast("Listening...");
+
+            recognition.onresult = (event) => {
+                let transcript = "";
+
+                try {
+                    transcript = Array.from(event.results || [])
+                        .map((result) => result && result[0] ? result[0].transcript : "")
+                        .join(" ")
+                        .trim();
+                } catch (e) {}
+
+                if (transcript) {
+                    insertIntoInput(transcript);
+                    toast("Voice captured.");
+                } else {
+                    toast("No voice captured.");
+                }
+
+                listening = false;
+                setButtonState();
+            };
+
+            recognition.onerror = () => {
+                listening = false;
+                setButtonState();
+                toast("Voice input failed.");
+            };
+
+            recognition.onend = () => {
+                listening = false;
+                setButtonState();
+            };
+
+            recognition.start();
+        } catch (e) {
+            listening = false;
+            setButtonState();
+            toast("Voice input failed.");
+        }
+    }
+
+    function cleanText(value) {
+        return String(value || "")
+            .replace(/\s*Copy\s*Regen\s*$/gi, "")
+            .replace(/\s*Copy\s*Regenerate\s*$/gi, "")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+
+    function isAssistantBubble(el) {
+        if (!el || el.nodeType !== 1) return false;
+
+        const raw = String(el.className || "").toLowerCase();
+
+        return (
+            raw.includes("assistant") ||
+            raw.includes("bot") ||
+            raw.includes("nova-message-assistant") ||
+            raw.includes("mobile-chat-message-assistant")
+        );
+    }
+
+    function lastAssistantText() {
+        const chat = chatRoot();
+        if (!chat) return "";
+
+        const bubbles = Array.from(chat.children || []).filter(isAssistantBubble);
+
+        for (let i = bubbles.length - 1; i >= 0; i -= 1) {
+            const clone = bubbles[i].cloneNode(true);
+
+            clone.querySelectorAll(
+                ".nova-final-message-actions, .nova-real-message-actions, .nova-mobile-message-actions, .message-actions, .mobile-message-actions, .nova-generated-image-result"
+            ).forEach((node) => node.remove());
+
+            const text = cleanText(clone.innerText || clone.textContent || "");
+
+            if (text) return text;
+        }
+
+        return "";
+    }
+
+    function stopTts(reason) {
+        try {
+            window.speechSynthesis.cancel();
+        } catch (e) {}
+
+        speaking = false;
+        setButtonState();
+
+        if (reason) {
+            toast(reason);
+        }
+    }
+
+    function startTts() {
+        if (!("speechSynthesis" in window) || typeof window.SpeechSynthesisUtterance !== "function") {
+            toast("TTS not supported here.");
+            return;
+        }
+
+        if (speaking || window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+            stopTts("Speech stopped.");
+            return;
+        }
+
+        const text = lastAssistantText();
+
+        if (!text) {
+            toast("Nothing to read.");
+            return;
+        }
+
+        try {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = navigator.language || "en-US";
+            utterance.rate = 1;
+            utterance.pitch = 1;
+
+            utterance.onstart = () => {
+                speaking = true;
+                setButtonState();
+                toast("Speaking...");
+            };
+
+            utterance.onend = () => {
+                speaking = false;
+                setButtonState();
+            };
+
+            utterance.onerror = () => {
+                speaking = false;
+                setButtonState();
+                toast("TTS failed.");
+            };
+
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(utterance);
+        } catch (e) {
+            speaking = false;
+            setButtonState();
+            toast("TTS failed.");
+        }
+    }
+
+    function ownClick(button, handler) {
+        if (!button || button.dataset.novaVoiceTtsSingleOwner === "1") return;
+
+        button.dataset.novaVoiceTtsSingleOwner = "1";
+
+        button.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (typeof event.stopImmediatePropagation === "function") {
+                event.stopImmediatePropagation();
+            }
+
+            handler();
+        }, true);
+    }
+
+    function wire() {
+        ownClick(voiceButton(), startVoice);
+        ownClick(ttsButton(), startTts);
+
+        const stop = stopButton();
+
+        if (stop && stop.dataset.novaVoiceTtsStopOwner !== "1") {
+            stop.dataset.novaVoiceTtsStopOwner = "1";
+
+            stop.addEventListener("click", (event) => {
+                if (!listening && !speaking && !window.speechSynthesis?.speaking) {
+                    return;
+                }
+
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (typeof event.stopImmediatePropagation === "function") {
+                    event.stopImmediatePropagation();
+                }
+
+                stopVoice("");
+                stopTts("Stopped.");
+            }, true);
+        }
+
+        setButtonState();
+    }
+
+    wire();
+    setTimeout(wire, 300);
+    setTimeout(wire, 900);
+    setTimeout(wire, 1800);
+
+    document.addEventListener("DOMContentLoaded", wire);
+
+    window.NovaMobileStopVoice = stopVoice;
+    window.NovaMobileStartVoice = startVoice;
+    window.NovaMobileStopTts = stopTts;
+    window.NovaMobileStartTts = startTts;
+
+    console.log("[Nova Mobile Voice/TTS Single Owner] ready");
+})();
