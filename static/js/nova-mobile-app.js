@@ -1149,6 +1149,8 @@ try {
         data?.preview ||
         data?.assistant_message?.image_url ||
         data?.assistant_message?.imageUrl ||
+        data?.assistant_message?.attachments?.[0]?.url ||
+        data?.assistant_message?.attachments?.[0]?.file_url ||
         data?.artifact?.image_url ||
         data?.artifact?.imageUrl ||
         data?.artifact?.viewer?.image_url ||
@@ -1156,13 +1158,36 @@ try {
         data?.artifacts?.[0]?.viewer?.image_url ||
         "";
 
-    if (imageUrl && window.NovaMobileImages?.appendImage) {
-        window.NovaMobileImages.appendImage(
-            imageUrl,
-            data?.prompt || data?.text || text || "Generated image"
-        );
+    if (imageUrl) {
+        const imageLabel =
+            data?.prompt ||
+            data?.assistant_message?.text ||
+            data?.text ||
+            text ||
+            "Generated image";
 
-        console.log("[Nova Send Final Owner] rendered generated image", imageUrl);
+        if (assistantBubble && window.NovaMobileImages?.renderImageIntoBubble) {
+            window.NovaMobileImages.renderImageIntoBubble(
+                assistantBubble,
+                imageUrl,
+                imageLabel
+            );
+        } else if (window.NovaMobileImages?.appendImage) {
+            window.NovaMobileImages.appendImage(imageUrl, imageLabel);
+        } else if (assistantBubble) {
+            assistantBubble.innerHTML = "";
+
+            const img = document.createElement("img");
+            img.src = imageUrl;
+            img.alt = "Generated image";
+            img.style.maxWidth = "100%";
+            img.style.borderRadius = "12px";
+            img.style.display = "block";
+
+            assistantBubble.appendChild(img);
+        }
+
+        console.log("[Nova Send Final Owner] rendered generated image into assistant bubble", imageUrl);
     }
 } catch (e) {
     console.warn("[Nova Send Final Owner] generated image render failed", e);
@@ -1174,13 +1199,26 @@ try {
             throw new Error(data?.error || data?.message || "Chat request failed");
         }
 
-        const reply = messageTextFromResponse(data, text) || "No response text returned.";
+const reply = messageTextFromResponse(data, text) || "No response text returned.";
 
-if (assistantBubble) {
-    setNovaMobileBubbleHtml(assistantBubble, reply);
+const finalImageUrl =
+    data?.assistant_message?.image_url ||
+    data?.assistant_message?.imageUrl ||
+    data?.assistant_message?.attachments?.[0]?.url ||
+    data?.assistant_message?.attachments?.[0]?.file_url ||
+    data?.image_url ||
+    data?.imageUrl ||
+    "";
+
+if (!finalImageUrl) {
+    if (assistantBubble) {
+        setNovaMobileBubbleHtml(assistantBubble, reply);
+    } else {
+        const bubble = appendBubble("assistant", "");
+        setNovaMobileBubbleHtml(bubble, reply);
+    }
 } else {
-    const bubble = appendBubble("assistant", "");
-    setNovaMobileBubbleHtml(bubble, reply);
+    console.log("[Nova Send Final Owner] skipped text overwrite because image rendered", finalImageUrl);
 }
 
         window.dispatchEvent(new CustomEvent("nova:chat-sent", {
@@ -1321,9 +1359,12 @@ function wireMainFileInputUpload() {
 console.log("[Nova Send Final Owner] response data", data);
 
 try {
+
     const imageUrl =
         data?.image_url ||
         data?.imageUrl ||
+        data?.url ||
+        data?.preview ||
         data?.assistant_message?.image_url ||
         data?.assistant_message?.imageUrl ||
         data?.artifact?.image_url ||
@@ -1333,35 +1374,11 @@ try {
         data?.artifacts?.[0]?.viewer?.image_url ||
         "";
 
-    if (imageUrl) {
-        if (window.NovaMobileImages?.appendImage) {
-            window.NovaMobileImages.appendImage(
-                imageUrl,
-                data?.prompt || data?.text || text || "Generated image"
-            );
-        } else {
-            const box =
-                document.getElementById("mobileChatMessages") ||
-                document.getElementById("nova-mobile-chat") ||
-                document.getElementById("nova-mobile-messages");
-
-            if (box) {
-                const wrap = document.createElement("div");
-                wrap.className = "nova-message nova-message-assistant";
-                wrap.dataset.role = "assistant";
-
-                const img = document.createElement("img");
-                img.src = imageUrl;
-                img.alt = "Generated image";
-                img.style.maxWidth = "100%";
-                img.style.borderRadius = "12px";
-                img.style.display = "block";
-
-                wrap.appendChild(img);
-                box.appendChild(wrap);
-                box.scrollTop = box.scrollHeight;
-            }
-        }
+    if (imageUrl && window.NovaMobileImages?.appendImage) {
+        window.NovaMobileImages.appendImage(
+            imageUrl,
+            data?.prompt || data?.text || text || "Generated image"
+        );
 
         console.log("[Nova Send Final Owner] rendered generated image", imageUrl);
     }
@@ -3562,6 +3579,9 @@ function styleDock(dock) {
     if (window.__NOVA_MOBILE_SESSIONS_CLICK_RESCUE_20260629__) return;
     window.__NOVA_MOBILE_SESSIONS_CLICK_RESCUE_20260629__ = true;
 
+    console.log("[DISABLED] old sessions click rescue - owned by static/js/mobile/nova-mobile-sessions.js");
+    return;
+
     function $(id) {
         return document.getElementById(id);
     }
@@ -3672,20 +3692,25 @@ Array.from(document.querySelectorAll("button, [role='button'], a")).find((el) =>
         return true;
     }
 
+/*
+OLD SESSION SYSTEM DISABLED.
+Owned now by: static/js/mobile/nova-mobile-sessions.js
+
+normalizeSessionsButton();
+
+setTimeout(normalizeSessionsButton, 100);
+setTimeout(normalizeSessionsButton, 500);
+setTimeout(normalizeSessionsButton, 1200);
+setTimeout(normalizeSessionsButton, 2500);
+
+setInterval(() => {
+    killFloatingActionDocks();
     normalizeSessionsButton();
+}, 1200);
 
-    setTimeout(normalizeSessionsButton, 100);
-    setTimeout(normalizeSessionsButton, 500);
-    setTimeout(normalizeSessionsButton, 1200);
-    setTimeout(normalizeSessionsButton, 2500);
-
-    setInterval(() => {
-        killFloatingActionDocks();
-        normalizeSessionsButton();
-    }, 1200);
-
-    window.NovaMobileOpenSessionsPanel = showSessionsPanel;
-    window.NovaMobileNormalizeSessionsButton = normalizeSessionsButton;
+window.NovaMobileOpenSessionsPanel = showSessionsPanel;
+window.NovaMobileNormalizeSessionsButton = normalizeSessionsButton;
+*/
 })();
 
 /* -------------------------------------------------
@@ -3696,6 +3721,9 @@ Array.from(document.querySelectorAll("button, [role='button'], a")).find((el) =>
 (() => {
     if (window.__NOVA_MOBILE_EMERGENCY_SESSIONS_PANEL_20260629__) return;
     window.__NOVA_MOBILE_EMERGENCY_SESSIONS_PANEL_20260629__ = true;
+
+    console.log("[DISABLED] old emergency sessions panel - owned by static/js/mobile/nova-mobile-sessions.js");
+    return;
 
     const PANEL_ID = "nova-mobile-emergency-sessions-panel";
 
@@ -4009,27 +4037,32 @@ row.onclick = async () => {
         });
     }
 
-    document.addEventListener("click", (event) => {
-        const target = event.target;
-        const text = String(target?.textContent || target?.ariaLabel || target?.title || "").toLowerCase().trim();
+/*
+OLD EMERGENCY SESSION SYSTEM DISABLED.
+Owned now by: static/js/mobile/nova-mobile-sessions.js
 
-        if (text === "sessions" || text.includes("sessions")) {
-            event.preventDefault();
-            event.stopPropagation();
-            event.stopImmediatePropagation();
-            openEmergencySessions();
-        }
-    }, true);
+document.addEventListener("click", (event) => {
+    const target = event.target;
+    const text = String(target?.textContent || target?.ariaLabel || target?.title || "").toLowerCase().trim();
 
-    window.NovaMobileEmergencySessionsOpen = openEmergencySessions;
-    window.NovaMobileOpenSessionsPanel = openEmergencySessions;
+    if (text === "sessions" || text.includes("sessions")) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        openEmergencySessions();
+    }
+}, true);
 
-    wireSessionsButton();
+window.NovaMobileEmergencySessionsOpen = openEmergencySessions;
+window.NovaMobileOpenSessionsPanel = openEmergencySessions;
 
-    setTimeout(wireSessionsButton, 100);
-    setTimeout(wireSessionsButton, 500);
-    setTimeout(wireSessionsButton, 1200);
-    setTimeout(wireSessionsButton, 2500);
+wireSessionsButton();
+
+setTimeout(wireSessionsButton, 100);
+setTimeout(wireSessionsButton, 500);
+setTimeout(wireSessionsButton, 1200);
+setTimeout(wireSessionsButton, 2500);
+*/
 
     setInterval(() => {
         removeBadDocks();

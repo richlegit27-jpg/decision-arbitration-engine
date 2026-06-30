@@ -5875,7 +5875,188 @@ def api_chat():
             attachments=attachments_for_chat_service,
         )
 
-        # =========================
+        # NOVA_MOBILE_IMAGE_URL_ACTIVE_SESSION_FORCE_20260630
+        # Image generation can create the PNG but leave image_url attached to
+        # a stale/placeholder session. Force the image URL onto the actual
+        # requested mobile session response and latest assistant message.
+        try:
+            if isinstance(result, dict):
+                request_payload_for_image = data if isinstance(data, dict) else (request.get_json(silent=True) or {})
+
+                target_session_id = str(
+                    request_payload_for_image.get("session_id")
+                    or request_payload_for_image.get("sessionId")
+                    or request_payload_for_image.get("active_session_id")
+                    or locals().get("requested_session_id")
+                    or result.get("active_session_id")
+                    or result.get("session_id")
+                    or session_id
+                    or ""
+                ).strip()
+
+                if not target_session_id:
+                    target_session_id = str(session_id or "").strip()
+
+                assistant = result.get("assistant_message")
+                if not isinstance(assistant, dict):
+                    assistant = {
+                        "role": "assistant",
+                        "text": str(result.get("text") or "").strip(),
+                    }
+
+                image_url = str(
+                    result.get("image_url")
+                    or result.get("imageUrl")
+                    or assistant.get("image_url")
+                    or assistant.get("imageUrl")
+                    or ""
+                ).strip()
+
+                result_text_for_image = str(
+                    result.get("text")
+                    or assistant.get("text")
+                    or assistant.get("content")
+                    or ""
+                ).strip()
+
+                if not image_url and result_text_for_image.startswith("Generated image for:"):
+                    try:
+                        generated_files = sorted(
+                            Path(UPLOADS_DIR).glob("generated_*.png"),
+                            key=lambda item: item.stat().st_mtime,
+                            reverse=True,
+                        )
+                        if generated_files:
+                            image_url = f"/api/uploads/{generated_files[0].name}"
+                    except Exception as image_file_error:
+                        app.logger.warning(
+                            "[MobileImageUrlForce] newest generated file lookup failed: %s",
+                            image_file_error,
+                        )
+
+                if image_url:
+                    image_filename = image_url.split("/api/uploads/", 1)[-1].split("?", 1)[0].strip("/\\")
+
+                    image_attachment = {
+                        "id": image_filename,
+                        "filename": image_filename,
+                        "stored_name": image_filename,
+                        "url": image_url,
+                        "file_url": image_url,
+                        "mime_type": "image/png",
+                        "type": "image/png",
+                    }
+
+                    assistant["role"] = "assistant"
+                    assistant["text"] = result_text_for_image or f"Generated image for: {image_command_user_text}"
+                    assistant["content"] = assistant["text"]
+                    assistant["image_url"] = image_url
+                    assistant["attachments"] = [image_attachment]
+
+                    meta = assistant.get("meta")
+                    if not isinstance(meta, dict):
+                        meta = {}
+                    meta["source"] = "image_generation"
+                    meta["image_url"] = image_url
+                    meta["active_session_forced"] = True
+                    meta["forced_target_session_id"] = target_session_id
+                    assistant["meta"] = meta
+
+                    result["assistant_message"] = assistant
+                    result["text"] = assistant["text"]
+                    result["content"] = assistant["text"]
+                    result["image_url"] = image_url
+                    result["active_session_id"] = target_session_id
+                    result["session_id"] = target_session_id
+
+                    # Patch session through session_service.
+                    try:
+                        current_session = session_service.get_session(target_session_id) or {}
+                        messages = current_session.get("messages")
+                        if isinstance(messages, list):
+                            for message in reversed(messages):
+                                if (
+                                    isinstance(message, dict)
+                                    and str(message.get("role") or "").lower() == "assistant"
+                                    and str(message.get("text") or "").startswith("Generated image for:")
+                                ):
+                                    message["image_url"] = image_url
+                                    message["attachments"] = [image_attachment]
+                                    message["meta"] = dict(meta)
+                                    break
+
+                            current_session["messages"] = messages
+                            all_sessions = session_service.get_all()
+
+                            if isinstance(all_sessions, dict):
+                                all_sessions.setdefault("sessions", {})
+                                if isinstance(all_sessions["sessions"], dict):
+                                    all_sessions["sessions"][target_session_id] = current_session
+                                session_service.save(all_sessions, active=target_session_id)
+                    except Exception as session_patch_error:
+                        app.logger.warning(
+                            "[MobileImageUrlForce] session_service patch failed: %s",
+                            session_patch_error,
+                        )
+
+                    # Direct JSON patch fallback. This handles dict or array session stores.
+                    try:
+                        sessions_path = Path(SESSIONS_FILE)
+                        store = json.loads(sessions_path.read_text(encoding="utf-8"))
+
+                        sessions_obj = store.get("sessions")
+                        target_session = None
+
+                        if isinstance(sessions_obj, dict):
+                            target_session = sessions_obj.get(target_session_id)
+                        elif isinstance(sessions_obj, list):
+                            for item in sessions_obj:
+                                if isinstance(item, dict) and str(item.get("id") or "") == target_session_id:
+                                    target_session = item
+                                    break
+
+                        if isinstance(target_session, dict):
+                            target_messages = target_session.get("messages")
+                            if isinstance(target_messages, list):
+                                patched = False
+
+                                for message in reversed(target_messages):
+                                    if (
+                                        isinstance(message, dict)
+                                        and str(message.get("role") or "").lower() == "assistant"
+                                        and str(message.get("text") or "").startswith("Generated image for:")
+                                    ):
+                                        message["image_url"] = image_url
+                                        message["attachments"] = [image_attachment]
+                                        message["meta"] = dict(meta)
+                                        patched = True
+                                        break
+
+                                if patched:
+                                    target_session["messages"] = target_messages
+                                    store["active"] = target_session_id
+                                    store["active_session_id"] = target_session_id
+                                    sessions_path.write_text(
+                                        json.dumps(store, indent=2, ensure_ascii=False),
+                                        encoding="utf-8",
+                                    )
+
+                    except Exception as json_patch_error:
+                        app.logger.warning(
+                            "[MobileImageUrlForce] direct json patch failed: %s",
+                            json_patch_error,
+                        )
+
+                    app.logger.info(
+                        "[MobileImageUrlForce] forced image_url=%s target_session_id=%s old_session_id=%s",
+                        image_url,
+                        target_session_id,
+                        session_id,
+                    )
+        except Exception as image_force_error:
+            app.logger.warning("[MobileImageUrlForce] failed: %s", image_force_error)
+
+         # =========================
         # IMAGE NORMALIZATION BLOCK
         # =========================
         if isinstance(result, dict):
