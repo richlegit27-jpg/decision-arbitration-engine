@@ -15165,3 +15165,51 @@ code .nova-code-operator {
     line-height: 1 !important;
     padding: 0 !important;
 }
+
+/* =========================================================
+   NOVA MOBILE TOP ROW STABILITY LOCK 20260630
+   Prevents New / Sessions / Copy / Regen from shifting.
+========================================================= */
+
+#nova-mobile-one-row-actions,
+.nova-mobile-one-row-actions,
+#nova-mobile-v10-one-row,
+.nova-mobile-v10-one-row {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1.35fr 1fr 1fr !important;
+    gap: 6px !important;
+    align-items: center !important;
+    box-sizing: border-box !important;
+    contain: layout paint !important;
+}
+
+#nova-mobile-row-new,
+#nova-mobile-row-sessions,
+#nova-mobile-row-copy,
+#nova-mobile-row-regen {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    max-height: 34px !important;
+    padding: 0 8px !important;
+    box-sizing: border-box !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    line-height: 1 !important;
+    flex: none !important;
+    transform: translateZ(0) !important;
+}
+
+#nova-mobile-row-new *,
+#nova-mobile-row-sessions *,
+#nova-mobile-row-copy *,
+#nova-mobile-row-regen * {
+    pointer-events: none !important;
+}
