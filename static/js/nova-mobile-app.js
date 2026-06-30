@@ -7393,3 +7393,230 @@ if (
     window.NovaMobileColorizeCodeBlocks = colorizeAllCodeBlocks;
     console.log("[Nova Mobile Code Colorizer] ready");
 })();
+
+/* =========================================================
+   NOVA MOBILE CODE COLOR FORCE OWNER 20260630
+   Final inline syntax colorizer. Runs after all render systems.
+========================================================= */
+(() => {
+    if (window.__NOVA_MOBILE_CODE_COLOR_FORCE_OWNER_20260630__) return;
+    window.__NOVA_MOBILE_CODE_COLOR_FORCE_OWNER_20260630__ = true;
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+    }
+
+    function span(style, text) {
+        return `<span style="${style}">${escapeHtml(text)}</span>`;
+    }
+
+    function colorize(raw) {
+        const source = String(raw || "");
+        let out = "";
+        let i = 0;
+
+        const keywords = new Set([
+            "def", "return", "if", "else", "elif", "for", "while", "in",
+            "import", "from", "class", "try", "except", "with", "as",
+            "None", "True", "False", "function", "const", "let", "var",
+            "await", "async", "new", "catch", "true", "false", "null"
+        ]);
+
+        while (i < source.length) {
+            const ch = source[i];
+
+            if (ch === "#") {
+                const end = source.indexOf("\n", i);
+                const stop = end === -1 ? source.length : end;
+                out += span("color:#94a3b8!important;font-style:italic!important;", source.slice(i, stop));
+                i = stop;
+                continue;
+            }
+
+            if (ch === "\"" || ch === "'" || ch === "`") {
+                const quote = ch;
+                let j = i + 1;
+
+                while (j < source.length) {
+                    if (source[j] === "\\" && j + 1 < source.length) {
+                        j += 2;
+                        continue;
+                    }
+
+                    if (source[j] === quote) {
+                        j += 1;
+                        break;
+                    }
+
+                    j += 1;
+                }
+
+                out += span("color:#86efac!important;", source.slice(i, j));
+                i = j;
+                continue;
+            }
+
+            if (/\d/.test(ch)) {
+                let j = i + 1;
+
+                while (j < source.length && /[\d.]/.test(source[j])) {
+                    j += 1;
+                }
+
+                out += span("color:#fbbf24!important;", source.slice(i, j));
+                i = j;
+                continue;
+            }
+
+            if (/[A-Za-z_$]/.test(ch)) {
+                let j = i + 1;
+
+                while (j < source.length && /[A-Za-z0-9_$]/.test(source[j])) {
+                    j += 1;
+                }
+
+                const word = source.slice(i, j);
+                const next = source.slice(j).trimStart();
+
+                if (keywords.has(word)) {
+                    out += span("color:#c084fc!important;font-weight:800!important;", word);
+                } else if (next.startsWith("(")) {
+                    out += span("color:#93c5fd!important;font-weight:800!important;", word);
+                } else {
+                    out += escapeHtml(word);
+                }
+
+                i = j;
+                continue;
+            }
+
+            if ("+-=*/%<>!&|?:.".includes(ch)) {
+                out += span("color:#f472b6!important;", ch);
+                i += 1;
+                continue;
+            }
+
+            out += escapeHtml(ch);
+            i += 1;
+        }
+
+        return out;
+    }
+
+    function forceColorCodeBlocks() {
+        document.querySelectorAll("pre code").forEach((code) => {
+            if (!code || code.closest(".nova-code-copy-button")) return;
+
+            const raw = code.textContent || "";
+            const hash = `${raw.length}:${raw.slice(0, 40)}:${raw.slice(-40)}`;
+
+            if (!raw.trim()) return;
+            if (code.dataset.novaForceColorHash === hash) return;
+
+            code.innerHTML = colorize(raw);
+            code.dataset.novaForceColorHash = hash;
+            code.dataset.novaForceColored = "1";
+        });
+    }
+
+    window.NovaMobileForceCodeColors = forceColorCodeBlocks;
+
+    [
+        50,
+        150,
+        400,
+        900,
+        1500
+    ].forEach((delay) => {
+        setTimeout(forceColorCodeBlocks, delay);
+    });
+
+    const observer = new MutationObserver(() => {
+        clearTimeout(window.__novaMobileCodeColorForceTimer);
+        window.__novaMobileCodeColorForceTimer = setTimeout(forceColorCodeBlocks, 80);
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+    });
+
+    document.addEventListener("DOMContentLoaded", forceColorCodeBlocks);
+    window.addEventListener("load", forceColorCodeBlocks);
+
+    console.log("[Nova Mobile Code Color Force Owner] ready");
+})();
+
+/* =========================================================
+   NOVA MOBILE FENCED CODE BLOCK RESTORE 20260630
+   Converts flattened assistant markdown fences into real pre/code blocks.
+========================================================= */
+(() => {
+    if (window.__NOVA_MOBILE_FENCED_CODE_BLOCK_RESTORE_20260630__) return;
+    window.__NOVA_MOBILE_FENCED_CODE_BLOCK_RESTORE_20260630__ = true;
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+    }
+
+    function restoreFencedCodeBlocks(root = document) {
+        const messages = root.querySelectorAll(
+            ".mobile-chat-message, .nova-mobile-message, .assistant-message, [data-role='assistant']"
+        );
+
+        messages.forEach((message) => {
+            if (!message || message.dataset.novaCodeFencesRestored === "1") return;
+            if (message.querySelector("pre code")) return;
+
+            const text = message.textContent || "";
+
+            if (!text.includes("```")) return;
+
+            const html = escapeHtml(text).replace(
+                /```([a-zA-Z0-9_-]*)\n?([\s\S]*?)```/g,
+                (_match, lang, code) => {
+                    const safeLang = escapeHtml(lang || "");
+                    const safeCode = escapeHtml(code || "").trim();
+
+                    return `<pre><code class="language-${safeLang}">${safeCode}</code></pre>`;
+                }
+            );
+
+            message.innerHTML = html;
+            message.dataset.novaCodeFencesRestored = "1";
+        });
+
+        window.NovaMobileForceCodeColors?.();
+    }
+
+    window.NovaMobileRestoreFencedCodeBlocks = restoreFencedCodeBlocks;
+
+    [
+        80,
+        250,
+        600,
+        1200
+    ].forEach((delay) => {
+        setTimeout(restoreFencedCodeBlocks, delay);
+    });
+
+    const observer = new MutationObserver(() => {
+        clearTimeout(window.__novaMobileFenceRestoreTimer);
+        window.__novaMobileFenceRestoreTimer = setTimeout(restoreFencedCodeBlocks, 100);
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+    });
+
+    console.log("[Nova Mobile Fenced Code Block Restore] ready");
+})();

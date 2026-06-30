@@ -15023,3 +15023,69 @@ button[style*="visibility: hidden"] {
 .nova-code-operator {
     color: #f0abfc !important;
 }
+
+/* =========================================================
+   NOVA MOBILE CODE COLOR VISIBLE LOCK 20260630
+   Forces visible syntax colors after all older CSS.
+========================================================= */
+
+.mobile-chat-message pre code .nova-code-keyword,
+.mobile-chat-message code .nova-code-keyword,
+pre code .nova-code-keyword,
+code .nova-code-keyword,
+.mobile-chat-message pre code .nova-syntax-keyword,
+.mobile-chat-message code .nova-syntax-keyword,
+pre code .nova-syntax-keyword,
+code .nova-syntax-keyword {
+    color: #c084fc !important;
+    font-weight: 700 !important;
+}
+
+.mobile-chat-message pre code .nova-code-function,
+.mobile-chat-message code .nova-code-function,
+pre code .nova-code-function,
+code .nova-code-function,
+.mobile-chat-message pre code .nova-syntax-function,
+.mobile-chat-message code .nova-syntax-function,
+pre code .nova-syntax-function,
+code .nova-syntax-function {
+    color: #93c5fd !important;
+    font-weight: 700 !important;
+}
+
+.mobile-chat-message pre code .nova-code-string,
+.mobile-chat-message code .nova-code-string,
+pre code .nova-code-string,
+code .nova-code-string,
+.mobile-chat-message pre code .nova-syntax-string,
+.mobile-chat-message code .nova-syntax-string,
+pre code .nova-syntax-string,
+code .nova-syntax-string {
+    color: #86efac !important;
+}
+
+.mobile-chat-message pre code .nova-code-number,
+.mobile-chat-message code .nova-code-number,
+pre code .nova-code-number,
+code .nova-code-number,
+.mobile-chat-message pre code .nova-syntax-number,
+.mobile-chat-message code .nova-syntax-number,
+pre code .nova-syntax-number,
+code .nova-syntax-number {
+    color: #fbbf24 !important;
+}
+
+.mobile-chat-message pre code .nova-code-comment,
+.mobile-chat-message code .nova-code-comment,
+pre code .nova-code-comment,
+code .nova-code-comment {
+    color: #94a3b8 !important;
+    font-style: italic !important;
+}
+
+.mobile-chat-message pre code .nova-code-operator,
+.mobile-chat-message code .nova-code-operator,
+pre code .nova-code-operator,
+code .nova-code-operator {
+    color: #f472b6 !important;
+}
