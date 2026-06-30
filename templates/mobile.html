@@ -2,6 +2,75 @@
 <html lang="en">
 <head>
 
+<script>
+/* NOVA MOBILE CONSOLE STILLNESS SAFE PASS 20260629 */
+(() => {
+    if (window.__NOVA_MOBILE_CONSOLE_STILLNESS_20260629__) return;
+    window.__NOVA_MOBILE_CONSOLE_STILLNESS_20260629__ = true;
+
+    const original = window.__NOVA_ORIGINAL_CONSOLE__ || {
+        log: console.log.bind(console),
+        info: console.info.bind(console),
+        debug: console.debug.bind(console),
+        warn: console.warn.bind(console),
+        error: console.error.bind(console)
+    };
+
+    window.__NOVA_ORIGINAL_CONSOLE__ = original;
+
+    function textOf(args) {
+        try {
+            return args.map((item) => {
+                if (typeof item === "string") return item;
+                if (item && typeof item === "object") return JSON.stringify(item);
+                return String(item);
+            }).join(" ");
+        } catch (e) {
+            return "";
+        }
+    }
+
+    function shouldQuiet(args) {
+        if (window.NOVA_DEBUG_CONSOLE === true) return false;
+
+        const text = textOf(args);
+
+        return (
+            text.includes("[Nova") ||
+            text.includes("[NOVA_") ||
+            text.includes("Nova Mobile") ||
+            text.includes("buttons wired") ||
+            text.includes("ready") ||
+            text.includes("rendered") ||
+            text.includes("preview rendered") ||
+            text.includes("geometry") ||
+            text.includes("scroll") ||
+            text.includes("attachment") ||
+            text.includes("sessions") ||
+            text.includes("voice button wired")
+        );
+    }
+
+    function quiet(method) {
+        return function (...args) {
+            if (shouldQuiet(args)) return;
+            return original[method](...args);
+        };
+    }
+
+    console.log = quiet("log");
+    console.info = quiet("info");
+    console.debug = quiet("debug");
+    console.warn = quiet("warn");
+
+    /* Keep real errors visible */
+    console.error = original.error;
+
+    original.log("[Nova Console Stillness] quiet mode on");
+})();
+</script>
+
+
 <!-- NOVA_MOBILE_CONSOLE_SPAM_STOP_EARLY_QUIET_20260624 -->
 <script>
 (function () {
@@ -112,6 +181,75 @@
 <main class="mobile-shell">
 
     <header class="mobile-header">
+
+<script>
+/* NOVA MOBILE CONSOLE STILLNESS SAFE PASS 20260629 */
+(() => {
+    if (window.__NOVA_MOBILE_CONSOLE_STILLNESS_20260629__) return;
+    window.__NOVA_MOBILE_CONSOLE_STILLNESS_20260629__ = true;
+
+    const original = window.__NOVA_ORIGINAL_CONSOLE__ || {
+        log: console.log.bind(console),
+        info: console.info.bind(console),
+        debug: console.debug.bind(console),
+        warn: console.warn.bind(console),
+        error: console.error.bind(console)
+    };
+
+    window.__NOVA_ORIGINAL_CONSOLE__ = original;
+
+    function textOf(args) {
+        try {
+            return args.map((item) => {
+                if (typeof item === "string") return item;
+                if (item && typeof item === "object") return JSON.stringify(item);
+                return String(item);
+            }).join(" ");
+        } catch (e) {
+            return "";
+        }
+    }
+
+    function shouldQuiet(args) {
+        if (window.NOVA_DEBUG_CONSOLE === true) return false;
+
+        const text = textOf(args);
+
+        return (
+            text.includes("[Nova") ||
+            text.includes("[NOVA_") ||
+            text.includes("Nova Mobile") ||
+            text.includes("buttons wired") ||
+            text.includes("ready") ||
+            text.includes("rendered") ||
+            text.includes("preview rendered") ||
+            text.includes("geometry") ||
+            text.includes("scroll") ||
+            text.includes("attachment") ||
+            text.includes("sessions") ||
+            text.includes("voice button wired")
+        );
+    }
+
+    function quiet(method) {
+        return function (...args) {
+            if (shouldQuiet(args)) return;
+            return original[method](...args);
+        };
+    }
+
+    console.log = quiet("log");
+    console.info = quiet("info");
+    console.debug = quiet("debug");
+    console.warn = quiet("warn");
+
+    /* Keep real errors visible */
+    console.error = original.error;
+
+    original.log("[Nova Console Stillness] quiet mode on");
+})();
+</script>
+
         <div class="mobile-header-title">Nova Mobile</div>
 
         <div class="mobile-header-actions">
@@ -6293,5 +6431,6 @@ body:not(.nova-ready) #nova-composer {
 </script>
 
 <!-- /NOVA_MOBILE_MENU_HELP_BLOG_ORDER_FINAL_20260624 -->
+
 
 
