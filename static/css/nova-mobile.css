@@ -14791,3 +14791,118 @@ body.nova-mobile-session-single-open [class*="sessions-v2"][data-nova-session-ar
     line-height: 1.5 !important;
     font-size: 13px !important;
 }
+
+/* -------------------------------------------------
+   NOVA MOBILE BUTTON FLASH POLISH SAFE PASS
+   CSS-only: stabilizes working mobile buttons.
+   20260629
+-------------------------------------------------- */
+#nova-mobile-send,
+#nova-mobile-stop-generation,
+#nova-mobile-attach,
+#nova-mobile-voice,
+#nova-mobile-tts,
+#nova-mobile-sessions,
+#nova-mobile-new-chat,
+#nova-mobile-tools,
+#nova-mobile-menu,
+.mobile-top-button,
+.mobile-icon-button,
+.nova-mobile-icon-button,
+.nova-final-message-actions button {
+    min-width: 34px !important;
+    min-height: 34px !important;
+    flex: 0 0 auto !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
+    animation: none !important;
+    transition:
+        background-color 120ms ease,
+        border-color 120ms ease,
+        opacity 120ms ease !important;
+    will-change: auto !important;
+    backface-visibility: hidden !important;
+    -webkit-tap-highlight-color: transparent !important;
+}
+
+#nova-mobile-send:hover,
+#nova-mobile-stop-generation:hover,
+#nova-mobile-attach:hover,
+#nova-mobile-voice:hover,
+#nova-mobile-tts:hover,
+#nova-mobile-sessions:hover,
+#nova-mobile-new-chat:hover,
+#nova-mobile-tools:hover,
+#nova-mobile-menu:hover,
+.mobile-top-button:hover,
+.mobile-icon-button:hover,
+.nova-mobile-icon-button:hover,
+.nova-final-message-actions button:hover {
+    transform: none !important;
+    opacity: 1 !important;
+}
+
+#nova-mobile-send:active,
+#nova-mobile-stop-generation:active,
+#nova-mobile-attach:active,
+#nova-mobile-voice:active,
+#nova-mobile-tts:active,
+#nova-mobile-sessions:active,
+#nova-mobile-new-chat:active,
+#nova-mobile-tools:active,
+#nova-mobile-menu:active,
+.mobile-top-button:active,
+.mobile-icon-button:active,
+.nova-mobile-icon-button:active,
+.nova-final-message-actions button:active {
+    transform: none !important;
+    opacity: 0.88 !important;
+}
+
+#nova-mobile-send:focus,
+#nova-mobile-stop-generation:focus,
+#nova-mobile-attach:focus,
+#nova-mobile-voice:focus,
+#nova-mobile-tts:focus,
+#nova-mobile-sessions:focus,
+#nova-mobile-new-chat:focus,
+#nova-mobile-tools:focus,
+#nova-mobile-menu:focus,
+.mobile-top-button:focus,
+.mobile-icon-button:focus,
+.nova-mobile-icon-button:focus,
+.nova-final-message-actions button:focus {
+    outline: none !important;
+}
+
+#nova-mobile-send:focus-visible,
+#nova-mobile-stop-generation:focus-visible,
+#nova-mobile-attach:focus-visible,
+#nova-mobile-voice:focus-visible,
+#nova-mobile-tts:focus-visible,
+#nova-mobile-sessions:focus-visible,
+#nova-mobile-new-chat:focus-visible,
+#nova-mobile-tools:focus-visible,
+#nova-mobile-menu:focus-visible,
+.mobile-top-button:focus-visible,
+.mobile-icon-button:focus-visible,
+.nova-mobile-icon-button:focus-visible,
+.nova-final-message-actions button:focus-visible {
+    outline: 2px solid rgba(139, 92, 246, 0.75) !important;
+    outline-offset: 2px !important;
+}
+
+/* Stop old emergency layers from visually blinking buttons */
+button[style*="opacity: 0"],
+button[style*="visibility: hidden"] {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Keep stop button hidden only when the app explicitly marks it hidden */
+#nova-mobile-stop-generation[hidden],
+#nova-mobile-stop-generation.is-hidden,
+#nova-mobile-stop-generation.nova-hidden {
+    display: none !important;
+}
