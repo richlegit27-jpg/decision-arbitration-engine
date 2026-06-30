@@ -885,6 +885,7 @@ function clearAttachmentsAfterSend() {
         console.warn("[Nova Send Final Owner] clear attachments failed", e);
     }
 }
+
 function currentAttachmentsForSend() {
     function safeArray(value) {
         return Array.isArray(value) ? value : [];
@@ -7639,4 +7640,206 @@ if (
     });
 
     console.log("[Nova Mobile Fenced Code Block Restore] ready");
+})();
+
+/* =========================================================
+   NOVA MOBILE CODE BLOCK CREATION FALLBACK 20260630
+   Creates real pre/code blocks when mobile renderer flattens code.
+========================================================= */
+(() => {
+    "use strict";
+
+    if (window.__NOVA_MOBILE_CODE_BLOCK_CREATION_FALLBACK_20260630__) return;
+    window.__NOVA_MOBILE_CODE_BLOCK_CREATION_FALLBACK_20260630__ = true;
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+    }
+
+    function looksLikeCode(text) {
+        const value = String(text || "");
+
+        return (
+            /```/.test(value) ||
+            /\bdef\s+[a-zA-Z_][a-zA-Z0-9_]*\s*\(/.test(value) ||
+            /\bfunction\s+[a-zA-Z_$][a-zA-Z0-9_$]*\s*\(/.test(value) ||
+            /\bconst\s+[a-zA-Z_$][a-zA-Z0-9_$]*\s*=/.test(value) ||
+            /\blet\s+[a-zA-Z_$][a-zA-Z0-9_$]*\s*=/.test(value) ||
+            /\bclass\s+[a-zA-Z_][a-zA-Z0-9_]*/.test(value) ||
+            /\breturn\s+/.test(value)
+        );
+    }
+
+    function extractFencedCode(text) {
+        const source = String(text || "");
+        const match = source.match(/```([a-zA-Z0-9_-]*)\s*([\s\S]*?)```/);
+
+        if (!match) return null;
+
+        return {
+            lang: match[1] || "",
+            code: String(match[2] || "").trim()
+        };
+    }
+
+    function extractPythonLikeCode(text) {
+        const source = String(text || "");
+        const lines = source.split(/\r?\n/);
+
+        const start = lines.findIndex((line) => {
+            return (
+                /\bdef\s+[a-zA-Z_][a-zA-Z0-9_]*\s*\(/.test(line) ||
+                /\bclass\s+[a-zA-Z_][a-zA-Z0-9_]*/.test(line) ||
+                /^\s*(import|from)\s+/.test(line)
+            );
+        });
+
+        if (start === -1) return null;
+
+        const codeLines = [];
+
+        for (let i = start; i < lines.length; i += 1) {
+            const line = lines[i];
+
+            if (
+                codeLines.length > 0 &&
+                line.trim() &&
+                !/^\s/.test(line) &&
+                !/\b(return|print|if|else|elif|for|while|try|except|with|as)\b/.test(line) &&
+                !/\bdef\s+/.test(line) &&
+                !/\bclass\s+/.test(line) &&
+                !/^#/.test(line.trim())
+            ) {
+                break;
+            }
+
+            codeLines.push(line);
+        }
+
+        const code = codeLines.join("\n").trim();
+
+        if (!code || code.length < 8) return null;
+
+        return {
+            lang: "python",
+            code
+        };
+    }
+
+    function extractJsLikeCode(text) {
+        const source = String(text || "");
+        const lines = source.split(/\r?\n/);
+
+        const start = lines.findIndex((line) => {
+            return (
+                /\bfunction\s+[a-zA-Z_$][a-zA-Z0-9_$]*\s*\(/.test(line) ||
+                /\bconst\s+[a-zA-Z_$][a-zA-Z0-9_$]*\s*=/.test(line) ||
+                /\blet\s+[a-zA-Z_$][a-zA-Z0-9_$]*\s*=/.test(line) ||
+                /\bvar\s+[a-zA-Z_$][a-zA-Z0-9_$]*\s*=/.test(line)
+            );
+        });
+
+        if (start === -1) return null;
+
+        const codeLines = [];
+
+        for (let i = start; i < lines.length; i += 1) {
+            const line = lines[i];
+
+            if (
+                codeLines.length > 0 &&
+                line.trim() &&
+                !/[{};=()]/.test(line) &&
+                !/^\s/.test(line)
+            ) {
+                break;
+            }
+
+            codeLines.push(line);
+        }
+
+        const code = codeLines.join("\n").trim();
+
+        if (!code || code.length < 8) return null;
+
+        return {
+            lang: "js",
+            code
+        };
+    }
+
+    function restoreOneMessage(message) {
+        if (!message || message.dataset.novaCodeBlockCreationFallback === "1") return;
+        if (message.querySelector("pre code")) return;
+
+        const text = message.innerText || message.textContent || "";
+
+        if (!looksLikeCode(text)) return;
+
+        const extracted =
+            extractFencedCode(text) ||
+            extractPythonLikeCode(text) ||
+            extractJsLikeCode(text);
+
+        if (!extracted || !extracted.code) return;
+
+        const codeHtml =
+            `<pre><code class="language-${escapeHtml(extracted.lang)}">${escapeHtml(extracted.code)}</code></pre>`;
+
+        const safeText = escapeHtml(text)
+            .replace(escapeHtml(extracted.code), codeHtml)
+            .replace(/```[a-zA-Z0-9_-]*\s*/g, "")
+            .replace(/```/g, "");
+
+        message.innerHTML = safeText;
+        message.dataset.novaCodeBlockCreationFallback = "1";
+    }
+
+    function runCodeBlockCreationFallback() {
+        const messages = document.querySelectorAll([
+            ".mobile-chat-message",
+            ".nova-mobile-message",
+            ".assistant-message",
+            ".mobile-message",
+            ".message",
+            ".chat-message",
+            "[data-role='assistant']",
+            "[data-message-role='assistant']"
+        ].join(","));
+
+        messages.forEach(restoreOneMessage);
+
+        try {
+            window.NovaMobileRestoreFencedCodeBlocks?.();
+            window.NovaMobileForceCodeColors?.();
+        } catch (_) {}
+    }
+
+    window.NovaMobileCreateMissingCodeBlocks = runCodeBlockCreationFallback;
+
+    [
+        80,
+        250,
+        600,
+        1200,
+        2200
+    ].forEach((delay) => {
+        setTimeout(runCodeBlockCreationFallback, delay);
+    });
+
+    const observer = new MutationObserver(() => {
+        clearTimeout(window.__novaMobileCodeBlockCreationFallbackTimer);
+        window.__novaMobileCodeBlockCreationFallbackTimer = setTimeout(runCodeBlockCreationFallback, 120);
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+    });
+
+    console.log("[Nova Mobile Code Block Creation Fallback] ready");
 })();
