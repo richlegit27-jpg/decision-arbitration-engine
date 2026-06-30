@@ -15276,3 +15276,170 @@ code .nova-code-operator {
     opacity: 0 !important;
     pointer-events: none !important;
 }
+
+.nova-mobile-generated-image-card {
+    margin-top: 10px;
+    max-width: 100%;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.nova-mobile-generated-image {
+    display: block;
+    width: 100%;
+    max-width: 360px;
+    height: auto;
+    border-radius: 16px;
+    cursor: pointer;
+}
+
+.nova-mobile-generated-image-caption {
+    margin-top: 6px;
+    font-size: 13px;
+    line-height: 1.35;
+    opacity: 0.8;
+}
+
+/* NOVA_MOBILE_GENERATED_IMAGE_LIGHTBOX_20260630 */
+
+html.nova-mobile-lightbox-open,
+body.nova-mobile-lightbox-open {
+    overflow: hidden;
+}
+
+.nova-mobile-image-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    background: rgba(0, 0, 0, 0.82);
+}
+
+.nova-mobile-image-lightbox-panel {
+    position: relative;
+    width: min(100%, 460px);
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.nova-mobile-image-lightbox-close {
+    position: absolute;
+    top: -14px;
+    right: -10px;
+    z-index: 2;
+    width: 38px;
+    height: 38px;
+    border: 0;
+    border-radius: 999px;
+    font-size: 30px;
+    line-height: 34px;
+    background: rgba(255, 255, 255, 0.94);
+    color: #111;
+}
+
+.nova-mobile-image-lightbox-img {
+    display: block;
+    width: 100%;
+    max-height: 78vh;
+    object-fit: contain;
+    border-radius: 18px;
+}
+
+.nova-mobile-image-lightbox-caption {
+    width: 100%;
+    margin-top: 10px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.35;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+}
+
+/* NOVA_MOBILE_SESSION_MESSAGE_RESTORE_20260630 */
+
+.mobile-chat-message {
+    max-width: 92%;
+    margin: 8px 10px;
+    padding: 10px 12px;
+    border-radius: 16px;
+    word-break: break-word;
+}
+
+.mobile-chat-message.user {
+    margin-left: auto;
+}
+
+.mobile-chat-message.assistant {
+    margin-right: auto;
+}
+
+.mobile-chat-message-text {
+    white-space: pre-wrap;
+    line-height: 1.4;
+}
+
+.nova-mobile-session-restored-image-card {
+    margin-top: 8px;
+    max-width: 100%;
+}
+
+.nova-mobile-session-restored-image {
+    display: block;
+    width: 100%;
+    max-width: 360px;
+    height: auto;
+    border-radius: 16px;
+    cursor: pointer;
+}
+
+/* NOVA_MOBILE_SESSION_TITLE_REFRESH_20260630 */
+
+.nova-mobile-session-title,
+.mobile-session-title {
+    max-width: calc(100vw - 24px);
+    margin: 4px 12px 8px;
+    font-size: 12px;
+    line-height: 1.25;
+    opacity: 0.72;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* NOVA_MOBILE_COPY_REGENERATE_FINAL_20260630 */
+
+.nova-mobile-copy-regen-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 7px;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+}
+
+.mobile-chat-message.user .nova-mobile-copy-regen-actions {
+    justify-content: flex-end;
+}
+
+.nova-mobile-action-btn {
+    border: 0;
+    border-radius: 999px;
+    padding: 5px 9px;
+    font-size: 11px;
+    line-height: 1;
+    opacity: 0.76;
+    background: rgba(127, 127, 127, 0.16);
+    color: inherit;
+}
+
+.nova-mobile-action-btn:active {
+    transform: scale(0.97);
+    opacity: 1;
+}

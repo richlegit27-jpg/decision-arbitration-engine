@@ -1896,4 +1896,117 @@ console.log("[Nova Stop Message Bar Fighting Loops] ready");
 // NOVA_GUARD_OLD_COMPOSER_RESIZERS_20260609
 console.log("[Nova Guard Old Composer Resizers] ready");
 
+// NOVA_MOBILE_CONSOLE_QUIET_FINAL_20260630
+// Quiet noisy old mobile logs while keeping real errors/warnings visible.
+(() => {
+    "use strict";
 
+    if (window.__NOVA_MOBILE_CONSOLE_QUIET_FINAL_20260630__) return;
+    window.__NOVA_MOBILE_CONSOLE_QUIET_FINAL_20260630__ = true;
+
+    const originalLog = console.log.bind(console);
+    const originalInfo = console.info.bind(console);
+    const originalDebug = console.debug.bind(console);
+
+    const quietPatterns = [
+        "ready",
+        "loaded",
+        "wired",
+        "active",
+        "installed",
+        "boot complete",
+        "runtime app ready",
+        "quiet mode on",
+        "console quiet",
+        "TOAST:",
+        "[NOVA FILE STARTED]",
+        "[NOVA FILE ENDED]",
+        "REACHED WIRE SECTION",
+        "attachment preview cleared",
+        "preview added",
+        "sessions stable wired",
+        "voice button wired",
+        "upload module ready",
+        "payload guard active",
+        "forced attachments into /api/chat",
+        "selected",
+        "rendered"
+    ];
+
+    const keepPatterns = [
+        "failed",
+        "error",
+        "exception",
+        "traceback",
+        "syntax",
+        "uncaught",
+        "not defined",
+        "undefined",
+        "cannot",
+        "blocked",
+        "denied",
+        "timeout",
+        "404",
+        "500",
+        "bad request"
+    ];
+
+    function shouldKeep(args) {
+        const text = args.map((item) => {
+            try {
+                if (typeof item === "string") return item;
+                return JSON.stringify(item);
+            } catch (_) {
+                return String(item);
+            }
+        }).join(" ").toLowerCase();
+
+        if (!text) return true;
+
+        return keepPatterns.some((pattern) => text.includes(pattern));
+    }
+
+    function shouldQuiet(args) {
+        const text = args.map((item) => {
+            try {
+                if (typeof item === "string") return item;
+                return JSON.stringify(item);
+            } catch (_) {
+                return String(item);
+            }
+        }).join(" ").toLowerCase();
+
+        if (!text) return false;
+        if (shouldKeep(args)) return false;
+
+        return quietPatterns.some((pattern) => text.includes(pattern.toLowerCase()));
+    }
+
+    console.log = function novaMobileQuietLog(...args) {
+        if (shouldQuiet(args)) return;
+        originalLog(...args);
+    };
+
+    console.info = function novaMobileQuietInfo(...args) {
+        if (shouldQuiet(args)) return;
+        originalInfo(...args);
+    };
+
+    console.debug = function novaMobileQuietDebug(...args) {
+        if (shouldQuiet(args)) return;
+        originalDebug(...args);
+    };
+
+    window.NovaMobileConsoleQuietFinal = {
+        enabled: true,
+        restore() {
+            console.log = originalLog;
+            console.info = originalInfo;
+            console.debug = originalDebug;
+            this.enabled = false;
+            originalLog("[NOVA_MOBILE_CONSOLE_QUIET_FINAL_20260630] restored");
+        }
+    };
+
+    originalLog("[NOVA_MOBILE_CONSOLE_QUIET_FINAL_20260630] ready");
+})();
