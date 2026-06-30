@@ -15213,3 +15213,66 @@ code .nova-code-operator {
 #nova-mobile-row-regen * {
     pointer-events: none !important;
 }
+
+/* NOVA_MOBILE_HIDDEN_PANEL_HARD_LOCK_20260630 */
+/* Hidden panels must not sit over chat as clickable invisible/preview layers. */
+
+.mobile-panel.hidden,
+#nova-mobile-tools-panel.hidden,
+#nova-mobile-execution-panel.hidden,
+#nova-mobile-memory-panel.hidden,
+#nova-mobile-sessions-panel.hidden,
+#nova-backend-readiness-panel.hidden,
+#nova-mobile-tools-panel[hidden],
+#nova-mobile-execution-panel[hidden],
+#nova-mobile-memory-panel[hidden],
+#nova-mobile-sessions-panel[hidden],
+#nova-backend-readiness-panel[hidden] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateY(120vh) !important;
+}
+
+/* Backend readiness debug UI should not float over mobile chat unless intentionally enabled. */
+#nova-backend-readiness-pill,
+#nova-backend-readiness-panel {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+/* NOVA_MOBILE_HIDDEN_PANEL_HARD_LOCK_20260630 */
+/* Hidden panels must not sit over chat as clickable invisible/preview layers. */
+
+.mobile-panel.hidden,
+#nova-mobile-tools-panel.hidden,
+#nova-mobile-execution-panel.hidden,
+#nova-mobile-memory-panel.hidden,
+#nova-mobile-sessions-panel.hidden,
+#nova-backend-readiness-panel.hidden,
+#nova-mobile-tools-panel[hidden],
+#nova-mobile-execution-panel[hidden],
+#nova-mobile-memory-panel[hidden],
+#nova-mobile-sessions-panel[hidden],
+#nova-backend-readiness-panel[hidden] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateY(120vh) !important;
+}
+
+/* pointer-events: none !important;
+    transform: translateY(120vh) !important;
+}
+
+/* Kill backend readiness debug overlay on mobile. */
+#nova-backend-readiness-pill,
+#nova-backend-readiness-panel {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}

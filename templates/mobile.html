@@ -135,7 +135,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nova Mobile</title>
 
-<link rel="stylesheet" href="/static/css/nova-mobile.css?v=chat-top-margin-reset-20260625-001">
+<link rel="stylesheet" href="/static/css/nova-mobile.css?v=hidden-panel-hard-lock-20260630-001">
+
 <style>
     html,
     body,
@@ -992,9 +993,7 @@ body {
 -->
 
 <!-- DISABLED - duplicate attachment preview owner
-<!-- DISABLED - duplicate attachment preview owner
 <script src="/static/js/mobile/nova-mobile-attachment-preview.js?v=legacy-preview-disabled-20260630-001"></script>
--->
 -->
 
 <script src="/static/js/mobile/nova-mobile-execution-panel.js?v=execution-panel-cache-state-20260623"></script>
@@ -1002,7 +1001,9 @@ body {
 <!-- DISABLED - causes session Copy/Regen nesting loop
 <script src="/static/js/mobile/nova-mobile-assistant-actions.js?v=assistant-actions-retry-20260623"></script>
 -->
-
+<!-- DISABLED - risky broad mobile render guard, not committed
+<script src="/static/js/mobile/nova-mobile-render-guard.js?v=render-guard-20260630-0010"></script>
+-->
 <script src="/static/js/mobile/nova-mobile-artifacts-panel.js"></script>
 
 <!-- NOVA_BACKEND_READINESS_PILL_FINAL_20260608 -->
