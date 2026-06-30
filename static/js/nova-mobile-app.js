@@ -6347,3 +6347,97 @@ row.onclick = async () => {
 
     console.log("[Nova Mobile Stop Bridge] ready");
 })();
+
+/* -------------------------------------------------
+   NOVA MOBILE TTS AUDIO STOP FIX
+   Stops browser audio-element based TTS.
+   Does not touch sessions.
+   20260629
+-------------------------------------------------- */
+(() => {
+    if (window.__NOVA_MOBILE_TTS_AUDIO_STOP_FIX_20260629__) return;
+    window.__NOVA_MOBILE_TTS_AUDIO_STOP_FIX_20260629__ = true;
+
+    function stopAllAudio() {
+        let stopped = 0;
+
+        try {
+            document.querySelectorAll("audio").forEach((audio) => {
+                try {
+                    audio.pause();
+                    audio.currentTime = 0;
+                    stopped += 1;
+                } catch (e) {}
+            });
+        } catch (e) {}
+
+        [
+            "NovaMobileAudio",
+            "novaMobileAudio",
+            "__novaMobileTtsAudio",
+            "__NovaMobileTtsAudio",
+            "currentAudio",
+            "ttsAudio",
+            "novaTtsAudio"
+        ].forEach((name) => {
+            try {
+                const audio = window[name];
+
+                if (audio && typeof audio.pause === "function") {
+                    audio.pause();
+
+                    try {
+                        audio.currentTime = 0;
+                    } catch (e) {}
+
+                    stopped += 1;
+                }
+            } catch (e) {}
+        });
+
+        try {
+            if (window.speechSynthesis) {
+                window.speechSynthesis.cancel();
+            }
+        } catch (e) {}
+
+        console.log("[Nova Mobile TTS Audio Stop] stopped audio", stopped);
+
+        return stopped;
+    }
+
+    function isStopButton(el) {
+        if (!el || el.nodeType !== 1) return false;
+
+        const raw = String(
+            (el.id || "") + " " +
+            (el.className || "") + " " +
+            (el.getAttribute?.("aria-label") || "") + " " +
+            (el.getAttribute?.("title") || "") + " " +
+            (el.innerText || el.textContent || "")
+        ).toLowerCase();
+
+        return raw.includes("stop");
+    }
+
+    function wire() {
+        Array.from(document.querySelectorAll("button, [role='button']")).filter(isStopButton).forEach((button) => {
+            if (button.dataset.novaTtsAudioStopFix === "1") return;
+
+            button.dataset.novaTtsAudioStopFix = "1";
+
+            button.addEventListener("click", () => {
+                stopAllAudio();
+            }, true);
+        });
+    }
+
+    wire();
+    setTimeout(wire, 300);
+    setTimeout(wire, 900);
+    setTimeout(wire, 1800);
+
+    window.NovaMobileStopAllAudio = stopAllAudio;
+
+    console.log("[Nova Mobile TTS Audio Stop] ready");
+})();
