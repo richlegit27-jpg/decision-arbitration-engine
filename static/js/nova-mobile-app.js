@@ -7367,4 +7367,8 @@ if (
         });
 
         return true;
+
+    window.NovaMobileColorizeCodeBlocks = colorizeAllCodeBlocks;
+    console.log("[Nova Mobile Code Colorizer] ready");
+
     }})();
