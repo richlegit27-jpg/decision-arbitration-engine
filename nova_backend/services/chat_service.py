@@ -5224,10 +5224,13 @@ if (not attachments) and (__name__ == "__main__"):
         # =====================================
 
         if text_lc in {
-            "what file are we in",
-            "which file",
-            "current file",
-            "what file",
+            "what is the active task",
+            "active task",
+            "what are we doing",
+            "what are we working on",
+            "what were we working on",
+            "what are we working on?",
+            "what were we working on?",
         }:
 
             ws = self._get_working_state(session_id) or {}
@@ -6389,12 +6392,12 @@ if (not attachments) and (__name__ == "__main__"):
 
         should_apply_dominance = any(q in text_lc for q in continuity_queries)
 
-        if dominant_memory and should_apply_dominance:
+        if dominant_memory:
             dominance_block = (
                 "\n\n"
-                "HIGH PRIORITY MEMORY:\n"
-                "The following memory MUST dominate continuity, "
-                "identity, operational awareness, and response generation.\n\n"
+                "SAVED MEMORY:\n"
+                "Lower priority than the current user message and recent conversation. "
+                "Use only when relevant and never when contradicted by the active session context.\n\n"
                 + "\n".join(dominant_memory)
             )
 
@@ -15565,10 +15568,15 @@ Auto-fix result:
             "where are we",
             "where are we now",
             "what are we doing",
+            "what are we working on",
+            "what were we working on",
+            "what are we working on?",
+            "what were we working on?",
             "what now",
             "status",
             "recap",
         }:
+
             intent = "continuity"
             route = "continuity"
             strategy = "summarize_state"
@@ -18192,12 +18200,15 @@ Next action:
             "where are we",
             "what are we doing",
             "what were we doing",
+            "what are we working on",
+            "what were we working on",
             "what now",
             "what's next",
             "whats next",
             "status",
             "recap",
         ]
+
         if any(q in lowered for q in continuity_queries):
             return {}
 

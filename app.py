@@ -7898,10 +7898,19 @@ def api_uploads(filename: str):
         full_path = (UPLOADS_DIR / raw_name).resolve()
         uploads_root = UPLOADS_DIR.resolve()
 
+        noisy_video_request = raw_name.lower().endswith((
+            ".mp4",
+            ".mov",
+            ".webm",
+            ".m4v",
+        ))
+
         try:
             full_path.relative_to(uploads_root)
         except ValueError:
-            app.logger.warning(f"UPLOAD BLOCKED OUTSIDE ROOT: {full_path}")
+            if not noisy_video_request:
+                app.logger.warning(f"UPLOAD BLOCKED OUTSIDE ROOT: {full_path}")
+
             return jsonify({
                 "ok": False,
                 "error": "Invalid upload path",
@@ -7909,16 +7918,20 @@ def api_uploads(filename: str):
             }), 400
 
         if not full_path.exists() or not full_path.is_file():
-            app.logger.warning(f"UPLOAD MISS: {full_path}")
+            if not noisy_video_request:
+                app.logger.warning(f"UPLOAD MISS: {full_path}")
+
             return jsonify({
                 "ok": False,
-                "error": "File not found",
+                "error": "Upload not found",
                 "filename": raw_name,
                 "full_path": str(full_path),
                 "uploads_dir": str(uploads_root),
             }), 404
 
-        app.logger.info(f"UPLOAD HIT: {full_path}")
+        if not noisy_video_request:
+            app.logger.info(f"UPLOAD HIT: {full_path}")
+
         return send_from_directory(
             directory=str(uploads_root),
             path=raw_name,
@@ -7932,10 +7945,19 @@ def api_uploads(filename: str):
             full_path = (UPLOADS_DIR / raw_name).resolve()
             uploads_root = UPLOADS_DIR.resolve()
 
+            noisy_video_request = raw_name.lower().endswith((
+                ".mp4",
+                ".mov",
+                ".webm",
+                ".m4v",
+            ))
+
             try:
                 full_path.relative_to(uploads_root)
             except ValueError:
-                app.logger.warning(f"UPLOAD BLOCKED OUTSIDE ROOT: {full_path}")
+                if not noisy_video_request:
+                    app.logger.warning(f"UPLOAD BLOCKED OUTSIDE ROOT: {full_path}")
+
                 return jsonify({
                     "ok": False,
                     "error": "Invalid upload path",
@@ -7943,21 +7965,26 @@ def api_uploads(filename: str):
                 }), 400
 
             if not full_path.exists() or not full_path.is_file():
-                app.logger.warning(f"UPLOAD MISS: {full_path}")
+                if not noisy_video_request:
+                    app.logger.warning(f"UPLOAD MISS: {full_path}")
+
                 return jsonify({
                     "ok": False,
-                    "error": "File not found",
+                    "error": "Upload not found",
                     "filename": raw_name,
                     "full_path": str(full_path),
                     "uploads_dir": str(uploads_root),
                 }), 404
 
-            app.logger.info(f"UPLOAD HIT: {full_path}")
+            if not noisy_video_request:
+                app.logger.info(f"UPLOAD HIT: {full_path}")
+
             return send_from_directory(
                 str(uploads_root),
                 raw_name,
                 as_attachment=False,
             )
+
         except Exception as e:
             app.logger.exception("api_uploads failed (compat path)")
             return jsonify({
@@ -7970,7 +7997,6 @@ def api_uploads(filename: str):
         app.logger.exception("api_uploads failed")
         return jsonify({
             "ok": False,
-
             "error": str(e),
             "filename": str(filename or ""),
         }), 500
