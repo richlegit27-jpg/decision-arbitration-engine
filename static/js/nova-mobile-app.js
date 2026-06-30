@@ -6156,3 +6156,194 @@ row.onclick = async () => {
 
     console.log("[Nova Mobile Voice/TTS Single Owner] ready");
 })();
+
+/* -------------------------------------------------
+   NOVA MOBILE STOP BUTTON BRIDGE
+   Makes all Stop buttons stop generation, voice, and TTS.
+   Does not touch sessions.
+   Does not block existing stop handlers.
+   20260629
+-------------------------------------------------- */
+(() => {
+    if (window.__NOVA_MOBILE_STOP_BUTTON_BRIDGE_20260629__) return;
+    window.__NOVA_MOBILE_STOP_BUTTON_BRIDGE_20260629__ = true;
+
+    function stopSpeech() {
+        try {
+            if (window.speechSynthesis) {
+                window.speechSynthesis.cancel();
+            }
+        } catch (e) {}
+
+        try {
+            if (typeof window.NovaMobileStopTts === "function") {
+                window.NovaMobileStopTts("");
+            }
+        } catch (e) {}
+    }
+
+    function stopVoice() {
+        [
+            "NovaMobileStopVoice",
+            "NovaMobileVoiceStop",
+            "stopNovaMobileVoice",
+            "stopVoiceInput"
+        ].forEach((name) => {
+            try {
+                if (typeof window[name] === "function") {
+                    window[name]("");
+                }
+            } catch (e) {}
+        });
+
+        [
+            "NovaMobileRecognition",
+            "novaMobileRecognition",
+            "__novaMobileRecognition",
+            "__NovaMobileRecognition"
+        ].forEach((name) => {
+            try {
+                const item = window[name];
+
+                if (item && typeof item.stop === "function") {
+                    item.stop();
+                }
+
+                if (item && typeof item.abort === "function") {
+                    item.abort();
+                }
+            } catch (e) {}
+        });
+    }
+
+    function stopGeneration() {
+        [
+            "NovaMobileAbortController",
+            "novaMobileAbortController",
+            "__novaMobileAbortController",
+            "__NovaMobileAbortController",
+            "abortController",
+            "__currentAbortController",
+            "__NOVA_ABORT_CONTROLLER__"
+        ].forEach((name) => {
+            try {
+                const controller = window[name];
+
+                if (controller && typeof controller.abort === "function") {
+                    controller.abort();
+                }
+            } catch (e) {}
+        });
+
+        [
+            "NovaMobileStopGeneration",
+            "stopNovaMobileGeneration",
+            "NovaStopGeneration",
+            "stopGeneration",
+            "cancelGeneration",
+            "abortGeneration"
+        ].forEach((name) => {
+            try {
+                if (typeof window[name] === "function") {
+                    window[name]();
+                }
+            } catch (e) {}
+        });
+
+        try {
+            window.dispatchEvent(new CustomEvent("nova:stop-generation"));
+            window.dispatchEvent(new CustomEvent("nova:stop"));
+            window.dispatchEvent(new CustomEvent("nova:cancel"));
+        } catch (e) {}
+    }
+
+    function toast(message) {
+        try {
+            if (typeof window.showToast === "function") {
+                window.showToast(message);
+                return;
+            }
+        } catch (e) {}
+    }
+
+    function runStop(reason) {
+        stopSpeech();
+        stopVoice();
+        stopGeneration();
+
+        if (reason) {
+            toast(reason);
+        }
+
+        console.log("[Nova Mobile Stop Bridge] stop fired");
+    }
+
+    function isStopButton(el) {
+        if (!el || el.nodeType !== 1) return false;
+
+        const raw = String(
+            (el.id || "") + " " +
+            (el.className || "") + " " +
+            (el.getAttribute?.("aria-label") || "") + " " +
+            (el.getAttribute?.("title") || "") + " " +
+            (el.dataset ? Object.keys(el.dataset).join(" ") : "") + " " +
+            (el.innerText || el.textContent || "")
+        ).toLowerCase();
+
+        return (
+            raw.includes("stop") ||
+            raw.includes("cancel generation") ||
+            raw.includes("abort generation")
+        );
+    }
+
+    function stopButtons() {
+        const selectors = [
+            "#nova-mobile-stop-generation",
+            "#nova-mobile-stop",
+            "#mobileStopButton",
+            "[data-mobile-stop]",
+            "[data-stop-generation]",
+            "[aria-label*='Stop' i]",
+            "[title*='Stop' i]",
+            "button"
+        ];
+
+        return Array.from(document.querySelectorAll(selectors.join(",")))
+            .filter(isStopButton);
+    }
+
+    function wireButton(button) {
+        if (!button || button.dataset.novaStopBridge === "1") return;
+
+        button.dataset.novaStopBridge = "1";
+
+        button.addEventListener("click", () => {
+            runStop("Stopped.");
+        }, true);
+
+        button.style.setProperty("pointer-events", "auto", "important");
+        button.style.setProperty("cursor", "pointer", "important");
+        button.style.setProperty("visibility", "visible", "important");
+        button.style.setProperty("opacity", "1", "important");
+    }
+
+    function wireAll() {
+        const buttons = stopButtons();
+
+        buttons.forEach(wireButton);
+
+        console.log("[Nova Mobile Stop Bridge] wired", buttons.length);
+    }
+
+    wireAll();
+    setTimeout(wireAll, 300);
+    setTimeout(wireAll, 900);
+    setTimeout(wireAll, 1800);
+
+    document.addEventListener("DOMContentLoaded", wireAll);
+
+    window.NovaMobileStopEverything = runStop;
+
+    console.log("[Nova Mobile Stop Bridge] ready");
+})();
