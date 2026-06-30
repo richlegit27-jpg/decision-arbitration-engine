@@ -14906,3 +14906,120 @@ button[style*="visibility: hidden"] {
 #nova-mobile-stop-generation.nova-hidden {
     display: none !important;
 }
+
+/* =========================================================
+   NOVA MOBILE CODE BLOCK READABILITY POLISH
+   20260630
+========================================================= */
+
+#nova-mobile-messages pre,
+#mobileChatMessages pre,
+#nova-mobile-chat pre,
+.nova-mobile-messages pre,
+.mobile-chat-message pre,
+.nova-mobile-message pre {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+
+    margin: 10px 0 !important;
+    padding: 12px 13px !important;
+
+    overflow-x: auto !important;
+    white-space: pre !important;
+
+    background: rgba(8, 12, 24, 0.96) !important;
+    border: 1px solid rgba(168, 85, 247, 0.35) !important;
+    border-radius: 12px !important;
+
+    color: #e9d5ff !important;
+    font-family: Consolas, "SFMono-Regular", Menlo, Monaco, monospace !important;
+    font-size: 13px !important;
+    line-height: 1.45 !important;
+
+    -webkit-overflow-scrolling: touch !important;
+}
+
+#nova-mobile-messages pre code,
+#mobileChatMessages pre code,
+#nova-mobile-chat pre code,
+.nova-mobile-messages pre code,
+.mobile-chat-message pre code,
+.nova-mobile-message pre code {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+
+    background: transparent !important;
+    color: #e9d5ff !important;
+
+    font-family: Consolas, "SFMono-Regular", Menlo, Monaco, monospace !important;
+    font-size: 13px !important;
+    line-height: 1.45 !important;
+
+    white-space: pre !important;
+}
+
+#nova-mobile-messages :not(pre) > code,
+#mobileChatMessages :not(pre) > code,
+#nova-mobile-chat :not(pre) > code,
+.nova-mobile-messages :not(pre) > code,
+.mobile-chat-message :not(pre) > code,
+.nova-mobile-message :not(pre) > code {
+    padding: 2px 5px !important;
+    border-radius: 6px !important;
+
+    background: rgba(168, 85, 247, 0.16) !important;
+    color: #f5d0fe !important;
+
+    font-family: Consolas, "SFMono-Regular", Menlo, Monaco, monospace !important;
+    font-size: 0.92em !important;
+}
+
+.mobile-chat-message pre::-webkit-scrollbar,
+.nova-mobile-message pre::-webkit-scrollbar,
+#mobileChatMessages pre::-webkit-scrollbar,
+#nova-mobile-messages pre::-webkit-scrollbar {
+    height: 7px !important;
+}
+
+.mobile-chat-message pre::-webkit-scrollbar-thumb,
+.nova-mobile-message pre::-webkit-scrollbar-thumb,
+#mobileChatMessages pre::-webkit-scrollbar-thumb,
+#nova-mobile-messages pre::-webkit-scrollbar-thumb {
+    background: rgba(168, 85, 247, 0.45) !important;
+    border-radius: 999px !important;
+}
+
+/* =========================================================
+   NOVA MOBILE CODE TOKEN COLORS
+   20260630
+========================================================= */
+
+.nova-code-keyword {
+    color: #c084fc !important;
+    font-weight: 700 !important;
+}
+
+.nova-code-string {
+    color: #86efac !important;
+}
+
+.nova-code-number {
+    color: #fbbf24 !important;
+}
+
+.nova-code-comment {
+    color: #94a3b8 !important;
+    font-style: italic !important;
+}
+
+.nova-code-function {
+    color: #67e8f9 !important;
+    font-weight: 700 !important;
+}
+
+.nova-code-operator {
+    color: #f0abfc !important;
+}

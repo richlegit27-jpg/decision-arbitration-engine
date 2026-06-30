@@ -2796,11 +2796,114 @@ function addActions(el) {
     el.appendChild(row);
 }
 
+    function addCodeCopyButtons(root) {
+        const scope = root || chatRoot();
+        if (!scope) return;
+
+        scope.querySelectorAll("pre").forEach((pre) => {
+            if (pre.querySelector(":scope > .nova-code-copy-button")) return;
+
+            const code = pre.querySelector("code") || pre;
+            const codeText = String(code.innerText || code.textContent || "").trim();
+
+            if (!codeText) return;
+
+            pre.style.setProperty("position", "relative", "important");
+            pre.style.setProperty("padding-top", "42px", "important");
+            pre.style.setProperty("overflow", "auto", "important");
+
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "nova-code-copy-button";
+            button.dataset.novaKeepAction = "1";
+            button.textContent = "Copy";
+            button.title = "Copy code";
+            button.setAttribute("aria-label", "Copy code");
+
+            button.style.setProperty("position", "absolute", "important");
+            button.style.setProperty("top", "8px", "important");
+            button.style.setProperty("right", "8px", "important");
+            button.style.setProperty("z-index", "2147483647", "important");
+
+            button.style.setProperty("display", "inline-flex", "important");
+            button.style.setProperty("align-items", "center", "important");
+            button.style.setProperty("justify-content", "center", "important");
+
+            button.style.setProperty("width", "auto", "important");
+            button.style.setProperty("height", "25px", "important");
+            button.style.setProperty("min-width", "52px", "important");
+            button.style.setProperty("padding", "0 10px", "important");
+
+            button.style.setProperty("border", "1px solid rgba(216, 180, 254, 0.65)", "important");
+            button.style.setProperty("border-radius", "999px", "important");
+            button.style.setProperty("background", "rgba(88, 28, 135, 0.95)", "important");
+            button.style.setProperty("color", "#ffffff", "important");
+
+            button.style.setProperty("font-size", "11px", "important");
+            button.style.setProperty("font-weight", "800", "important");
+            button.style.setProperty("line-height", "1", "important");
+            button.style.setProperty("opacity", "1", "important");
+            button.style.setProperty("visibility", "visible", "important");
+            button.style.setProperty("pointer-events", "auto", "important");
+
+            button.addEventListener("click", async (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                const freshCode = String(
+                    (pre.querySelector("code") || pre).innerText ||
+                    (pre.querySelector("code") || pre).textContent ||
+                    ""
+                )
+                    .replace(/\bCopy\b\s*$/i, "")
+                    .trim();
+
+                if (!freshCode) {
+                    button.textContent = "None";
+                    setTimeout(() => {
+                        button.textContent = "Copy";
+                    }, 900);
+                    return;
+                }
+
+                try {
+                    if (navigator.clipboard?.writeText) {
+                        await navigator.clipboard.writeText(freshCode);
+                    } else {
+                        const area = document.createElement("textarea");
+                        area.value = freshCode;
+                        area.setAttribute("readonly", "readonly");
+                        area.style.position = "fixed";
+                        area.style.left = "-9999px";
+                        document.body.appendChild(area);
+                        area.select();
+                        document.execCommand("copy");
+                        area.remove();
+                    }
+
+                    button.textContent = "Copied";
+                    setTimeout(() => {
+                        button.textContent = "Copy";
+                    }, 900);
+                } catch (e) {
+                    console.warn("[Nova Mobile Code Copy] copy failed", e);
+                    button.textContent = "Fail";
+                    setTimeout(() => {
+                        button.textContent = "Copy";
+                    }, 900);
+                }
+            });
+
+            pre.appendChild(button);
+        });
+    }
+
     function normalizeActions() {
         const chat = chatRoot();
         if (!chat) return false;
 
         Array.from(chat.children || []).forEach(addActions);
+addCodeCopyButtons(chat);
 
         console.log("[Nova Mobile Real Message Actions] ready", {
             chat: chat.id || chat.className || "chat",
@@ -4501,6 +4604,14 @@ setTimeout(wireSessionsButton, 2500);
     function isActionButton(el) {
         if (!el) return false;
 
+        if (el.classList?.contains("nova-code-copy-button")) {
+            return false;
+        }
+
+        if (el.dataset?.novaKeepAction === "1") {
+            return false;
+        }
+
         const text = String(el.textContent || el.ariaLabel || el.title || "").trim().toLowerCase();
 
         return (
@@ -4558,6 +4669,7 @@ return (
 
 if (
     parent.closest("button") ||
+    parent.closest(".nova-code-copy-button") ||
     parent.closest(".nova-real-message-actions") ||
     parent.closest(".nova-mobile-message-actions") ||
     parent.closest(".nova-mobile-owned-actions")
@@ -7085,3 +7197,174 @@ if (
 
     console.log("[Nova Mobile Stop UI Cancel] ready");
 })();
+
+/* -------------------------------------------------
+   NOVA MOBILE LIGHT CODE COLORIZER
+   Simple safe syntax color for mobile code blocks.
+   20260630
+-------------------------------------------------- */
+(() => {
+    if (window.__NOVA_MOBILE_LIGHT_CODE_COLORIZER_20260630__) return;
+    window.__NOVA_MOBILE_LIGHT_CODE_COLORIZER_20260630__ = true;
+
+    function chatRoot() {
+        return (
+            document.getElementById("nova-mobile-messages") ||
+            document.getElementById("mobileChatMessages") ||
+            document.getElementById("nova-mobile-chat") ||
+            document.querySelector(".nova-mobile-messages")
+        );
+    }
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+    }
+
+    function colorizeCode(raw) {
+        const keywords = new Set([
+            "function", "return", "const", "let", "var",
+            "if", "else", "for", "while", "try", "catch",
+            "async", "await", "class", "new", "import", "from", "export",
+            "def", "self", "true", "false", "null", "None", "True", "False"
+        ]);
+
+        const source = String(raw || "");
+        let html = "";
+        let i = 0;
+
+        function esc(value) {
+            return String(value || "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+        }
+
+        while (i < source.length) {
+            const ch = source[i];
+            const next = source[i + 1];
+
+            if (ch === "/" && next === "/") {
+                let end = source.indexOf("\n", i);
+                if (end === -1) end = source.length;
+
+                html += `<span class="nova-code-comment">${esc(source.slice(i, end))}</span>`;
+                i = end;
+                continue;
+            }
+
+            if (ch === "/" && next === "*") {
+                const end = source.indexOf("*/", i + 2);
+                const stop = end === -1 ? source.length : end + 2;
+
+                html += `<span class="nova-code-comment">${esc(source.slice(i, stop))}</span>`;
+                i = stop;
+                continue;
+            }
+
+            if (ch === "#") {
+                let end = source.indexOf("\n", i);
+                if (end === -1) end = source.length;
+
+                html += `<span class="nova-code-comment">${esc(source.slice(i, end))}</span>`;
+                i = end;
+                continue;
+            }
+
+            if (ch === "\"" || ch === "'" || ch === "`") {
+                const quote = ch;
+                let j = i + 1;
+
+                while (j < source.length) {
+                    if (source[j] === "\\") {
+                        j += 2;
+                        continue;
+                    }
+
+                    if (source[j] === quote) {
+                        j += 1;
+                        break;
+                    }
+
+                    j += 1;
+                }
+
+                html += `<span class="nova-code-string">${esc(source.slice(i, j))}</span>`;
+                i = j;
+                continue;
+            }
+
+            if (/\d/.test(ch)) {
+                let j = i + 1;
+
+                while (j < source.length && /[\d.]/.test(source[j])) {
+                    j += 1;
+                }
+
+                html += `<span class="nova-code-number">${esc(source.slice(i, j))}</span>`;
+                i = j;
+                continue;
+            }
+
+            if (/[A-Za-z_$]/.test(ch)) {
+                let j = i + 1;
+
+                while (j < source.length && /[\w$]/.test(source[j])) {
+                    j += 1;
+                }
+
+                const word = source.slice(i, j);
+                let k = j;
+
+                while (k < source.length && /\s/.test(source[k])) {
+                    k += 1;
+                }
+
+                if (keywords.has(word)) {
+                    html += `<span class="nova-code-keyword">${esc(word)}</span>`;
+                } else if (source[k] === "(") {
+                    html += `<span class="nova-code-function">${esc(word)}</span>`;
+                } else {
+                    html += esc(word);
+                }
+
+                i = j;
+                continue;
+            }
+
+            if ("+-*/=!<>".includes(ch)) {
+                html += `<span class="nova-code-operator">${esc(ch)}</span>`;
+                i += 1;
+                continue;
+            }
+
+            html += esc(ch);
+            i += 1;
+        }
+
+        return html;
+    }
+
+    function colorizeAllCodeBlocks() {
+        const root = chatRoot();
+        if (!root) return false;
+
+        root.querySelectorAll("pre").forEach((pre) => {
+            if (pre.closest(".nova-real-message-actions")) return;
+
+            const target = pre.querySelector("code") || pre;
+
+            if (target.dataset.novaCodeColorized === "1") return;
+
+            const raw = String(target.innerText || target.textContent || "").trimEnd();
+            if (!raw) return;
+
+            target.dataset.novaCodeRaw = raw;
+            target.innerHTML = colorizeCode(raw);
+            target.dataset.novaCodeColorized = "1";
+        });
+
+        return true;
+    }})();
