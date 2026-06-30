@@ -6442,3 +6442,263 @@ row.onclick = async () => {
     console.log("[Nova Mobile TTS Audio Stop] ready");
 })();
 
+
+/* -------------------------------------------------
+   NOVA MOBILE STOP UI CANCEL GUARD
+   If backend abort fails, Stop still removes/blocks the current answer.
+   Does not touch sessions.
+   20260629
+-------------------------------------------------- */
+(() => {
+    if (window.__NOVA_MOBILE_STOP_UI_CANCEL_GUARD_20260629__) return;
+    window.__NOVA_MOBILE_STOP_UI_CANCEL_GUARD_20260629__ = true;
+
+    let cancelled = false;
+    let cancelUntil = 0;
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function chatRoot() {
+        return (
+            $("mobileChatMessages") ||
+            $("nova-mobile-messages") ||
+            $("nova-mobile-chat") ||
+            document.querySelector("[data-mobile-chat-messages]") ||
+            document.querySelector(".mobile-chat-messages") ||
+            document.querySelector(".nova-mobile-messages") ||
+            document.querySelector(".nova-mobile-chat") ||
+            document.querySelector(".chat-messages")
+        );
+    }
+
+    function classText(el) {
+        return String(el?.className || "").toLowerCase();
+    }
+
+    function isAssistantBubble(el) {
+        if (!el || el.nodeType !== 1) return false;
+
+        const raw = classText(el);
+
+        return (
+            raw.includes("assistant") ||
+            raw.includes("bot") ||
+            raw.includes("nova-message-assistant") ||
+            raw.includes("mobile-chat-message-assistant")
+        );
+    }
+
+    function isUserBubble(el) {
+        if (!el || el.nodeType !== 1) return false;
+
+        const raw = classText(el);
+
+        return (
+            raw.includes("user") ||
+            raw.includes("nova-message-user") ||
+            raw.includes("mobile-chat-message-user")
+        );
+    }
+
+    function bubbleText(el) {
+        return String(el?.innerText || el?.textContent || "").trim();
+    }
+
+    function looksLikeThinking(el) {
+        const text = bubbleText(el).toLowerCase();
+
+        return (
+            text === "thinking..." ||
+            text === "thinking…" ||
+            text.includes("thinking") ||
+            text.includes("generating") ||
+            text.includes("loading")
+        );
+    }
+
+    function removeCurrentAssistantOutput() {
+        const chat = chatRoot();
+        if (!chat) return 0;
+
+        const children = Array.from(chat.children || []);
+        let lastUserIndex = -1;
+
+        children.forEach((el, index) => {
+            if (isUserBubble(el)) {
+                lastUserIndex = index;
+            }
+        });
+
+        let removed = 0;
+
+        children.forEach((el, index) => {
+            if (!isAssistantBubble(el)) return;
+
+            if (index > lastUserIndex || looksLikeThinking(el)) {
+                try {
+                    el.remove();
+                    removed += 1;
+                } catch (e) {}
+            }
+        });
+
+        return removed;
+    }
+
+    function unlockUi() {
+        [
+            "nova-mobile-send",
+            "mobileSendButton",
+            "nova-mobile-input",
+            "mobileInput"
+        ].forEach((id) => {
+            const el = $(id);
+
+            if (!el) return;
+
+            try {
+                el.disabled = false;
+                el.removeAttribute("disabled");
+                el.removeAttribute("aria-disabled");
+                el.classList.remove("disabled", "is-disabled", "loading", "is-loading");
+                el.style.setProperty("pointer-events", "auto", "important");
+                el.style.setProperty("opacity", "1", "important");
+            } catch (e) {}
+        });
+
+        document.body.classList.remove("nova-generating", "nova-mobile-generating", "is-generating");
+    }
+
+    function cancelCurrentAnswer(reason) {
+        cancelled = true;
+        cancelUntil = Date.now() + 90000;
+
+        const removed = removeCurrentAssistantOutput();
+
+        unlockUi();
+
+        try {
+            window.dispatchEvent(new CustomEvent("nova:mobile-answer-cancelled"));
+        } catch (e) {}
+
+        console.log("[Nova Mobile Stop UI Cancel] cancelled current answer", {
+            reason: reason || "stop",
+            removed
+        });
+    }
+
+    function clearCancelForNewSend() {
+        cancelled = false;
+        cancelUntil = 0;
+    }
+
+    function shouldSuppressAssistantNode(el) {
+        if (!cancelled) return false;
+        if (Date.now() > cancelUntil) return false;
+        if (!isAssistantBubble(el)) return false;
+
+        return true;
+    }
+
+    function suppressLateAnswers(root) {
+        if (!root) return;
+
+        if (shouldSuppressAssistantNode(root)) {
+            try {
+                root.remove();
+                unlockUi();
+                console.log("[Nova Mobile Stop UI Cancel] removed late assistant answer");
+            } catch (e) {}
+            return;
+        }
+
+        try {
+            Array.from(root.querySelectorAll("*")).forEach((el) => {
+                if (shouldSuppressAssistantNode(el)) {
+                    el.remove();
+                    unlockUi();
+                    console.log("[Nova Mobile Stop UI Cancel] removed late assistant answer");
+                }
+            });
+        } catch (e) {}
+    }
+
+    function isStopButton(el) {
+        if (!el || el.nodeType !== 1) return false;
+
+        const raw = String(
+            (el.id || "") + " " +
+            (el.className || "") + " " +
+            (el.getAttribute?.("aria-label") || "") + " " +
+            (el.getAttribute?.("title") || "") + " " +
+            (el.innerText || el.textContent || "")
+        ).toLowerCase();
+
+        return raw.includes("stop") || raw.includes("cancel") || raw.includes("abort");
+    }
+
+    function isSendButton(el) {
+        if (!el || el.nodeType !== 1) return false;
+
+        const raw = String(
+            (el.id || "") + " " +
+            (el.className || "") + " " +
+            (el.getAttribute?.("aria-label") || "") + " " +
+            (el.getAttribute?.("title") || "") + " " +
+            (el.innerText || el.textContent || "")
+        ).toLowerCase();
+
+        return raw.includes("send") || el.id === "nova-mobile-send";
+    }
+
+    document.addEventListener("click", (event) => {
+        const button = event.target?.closest?.("button, [role='button']");
+
+        if (!button) return;
+
+        if (isStopButton(button)) {
+            cancelCurrentAnswer("stop-button");
+            return;
+        }
+
+        if (isSendButton(button)) {
+            clearCancelForNewSend();
+        }
+    }, true);
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+            clearCancelForNewSend();
+        }
+    }, true);
+
+    const chat = chatRoot();
+
+    if (chat && window.MutationObserver) {
+        const observer = new MutationObserver((mutations) => {
+            if (!cancelled) return;
+
+            mutations.forEach((mutation) => {
+                Array.from(mutation.addedNodes || []).forEach((node) => {
+                    if (node.nodeType === 1) {
+                        suppressLateAnswers(node);
+                    }
+                });
+            });
+        });
+
+        observer.observe(chat, {
+            childList: true,
+            subtree: true
+        });
+
+        window.__NovaMobileStopUiCancelObserver = observer;
+    }
+
+    window.NovaMobileCancelCurrentAnswer = cancelCurrentAnswer;
+    window.NovaMobileClearAnswerCancel = clearCancelForNewSend;
+
+    console.log("[Nova Mobile Stop UI Cancel] ready");
+})();
