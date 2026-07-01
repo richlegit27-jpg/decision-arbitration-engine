@@ -1,7 +1,7 @@
 {
   "project": "Nova",
-  "checkpoint": "a70f1ef Add route-level natural project recall",
-  "current_focus": "Nova memory quality phase three locked: route-level natural project recall",
+  "checkpoint": "5a1ed6a Wire compact project state context",
+  "current_focus": "Nova memory quality phase four locked: compact project-state context wired",
   "last_completed": [
     "Router cleanup locked",
     "Web/live price routing locked",
@@ -16,7 +16,9 @@
     "Project-state smoke passed",
     "Project-state sync guardrails passed",
     "Route-level natural project recall locked at a70f1ef",
-    "Project context smoke locked"
+    "Project context smoke locked",
+    "Compact project-state context API locked at 5a1ed6a",
+    "Compact project context route smoke locked"
   ],
   "locked": [
     "Router cleanup",
@@ -28,7 +30,8 @@
     "Project-state recall",
     "Idle next/k recall",
     "Natural project-state recall",
-    "Project context smoke"
+    "Project context smoke",
+    "Compact project-state context API"
   ],
   "remaining": [
     "Add project-state sync helper",
@@ -36,13 +39,15 @@
     "Commit project-state sync helper",
     "Commit one-command checkpoint runner"
   ],
-  "next_move": "Move to memory quality phase four.",
+  "next_move": "Move to final memory quality polish.",
   "git": {
     "branch": "post-frontend-polish-phase",
-    "head": "a70f1ef",
-    "subject": "Add route-level natural project recall",
-    "clean": true,
-    "dirty_files": []
+    "head": "5a1ed6a",
+    "subject": "Wire compact project state context",
+    "clean": false,
+    "dirty_files": [
+      "M data/nova_project_state.json"
+    ]
   },
-  "updated_at_utc": "2026-07-01T02:30:46.163566+00:00"
+  "updated_at_utc": "2026-07-01T02:43:55.251191+00:00"
 }
