@@ -1,11 +1,15 @@
-﻿import json
-import os
-import time
-from urllib import request, error
+﻿import time
+import requests
 
 
-BASE_URL = os.environ.get("NOVA_BASE_URL", "http://127.0.0.1:5001").rstrip("/")
-TIMEOUT = float(os.environ.get("NOVA_SMOKE_TIMEOUT", "20"))
+BASE_URL = "http://127.0.0.1:5001/api/chat"
+
+
+MISSION_CASES = [
+    "give me mission control",
+    "show me the mission card",
+    "operator mode",
+]
 
 
 def assert_true(name, condition, detail=""):
@@ -14,105 +18,93 @@ def assert_true(name, condition, detail=""):
     print(f"PASS {name}")
 
 
-def _extract_answer(data):
-    assistant_message = data.get("assistant_message")
-    if isinstance(assistant_message, dict):
-        for key in ("text", "content"):
-            value = assistant_message.get(key)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-
-    for key in ("text", "content", "answer", "response"):
-        value = data.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-
-    return ""
-
-
-def _extract_route(data):
-    debug = data.get("debug")
-    if isinstance(debug, dict):
-        return str(debug.get("route_taken") or debug.get("route") or "")
-
-    return str(data.get("route_taken") or data.get("route") or "")
-
-
-def ask(message):
-    payload = {
-        "message": message,
-        "session_id": f"mission_control_api_smoke_{int(time.time())}",
-        "attachments": [],
-    }
-
-    body = json.dumps(payload).encode("utf-8")
-    req = request.Request(
-        BASE_URL + "/api/chat",
-        data=body,
-        headers={"Content-Type": "application/json"},
-        method="POST",
+def post_chat(question, session_id):
+    response = requests.post(
+        BASE_URL,
+        json={
+            "message": question,
+            "session_id": session_id,
+            "attachments": [],
+        },
+        timeout=20,
     )
 
-    try:
-        with request.urlopen(req, timeout=TIMEOUT) as response:
-            raw = response.read().decode("utf-8", errors="replace")
-            data = json.loads(raw)
-            return data, _extract_answer(data), _extract_route(data)
-    except error.URLError as exc:
-        raise RuntimeError(f"Request failed for {message!r}: {exc}") from exc
+    assert_true(f"{question} api status", response.status_code == 200, response.text)
+    data = response.json()
 
+    assistant = data.get("assistant_message") or {}
+    answer = (
+        assistant.get("text")
+        or assistant.get("content")
+        or data.get("text")
+        or data.get("content")
+        or ""
+    )
 
-def check_mission_control(question):
+    debug = data.get("debug") or {}
+    route = (
+        debug.get("route_taken")
+        or debug.get("route")
+        or data.get("route")
+        or ""
+    )
+
     print("")
     print(f"QUESTION: {question}")
-
-    data, answer, route = ask(question)
-    lower = answer.lower()
-
     print(f"ROUTE: {route}")
-    print(f"ANSWER: {answer[:1200]}")
+    print(f"ANSWER: {answer[:1400]}")
 
+    return data, route, answer
+
+
+def assert_mission_control_answer(question, route, answer):
     assert_true(f"{question} route", route == "project_brain_general_intelligence", route)
-    assert_true(f"{question} title", "project brain mission control" in lower, answer)
-    assert_true(f"{question} current state", "current state:" in lower, answer)
-    assert_true(f"{question} intent", "intent:" in lower, answer)
-    assert_true(f"{question} mission control intent", "intent: mission_control" in lower, answer)
-    assert_true(f"{question} risk", "risk:" in lower, answer)
-    assert_true(f"{question} focused smoke", "focused smoke:" in lower, answer)
-    assert_true(f"{question} avoid", "avoid:" in lower, answer)
-    assert_true(f"{question} commit rule", "commit rule:" in lower, answer)
-    assert_true(f"{question} decision engine", "decision engine v1" in lower, answer)
+    assert_true(f"{question} title", "Project Brain Mission Control:" in answer, answer)
+    assert_true(f"{question} current state", "Current state:" in answer, answer)
+    assert_true(f"{question} intent", "Intent:" in answer, answer)
+    assert_true(f"{question} mission control intent", "mission_control" in answer, answer)
+    assert_true(f"{question} risk", "Risk:" in answer, answer)
+    assert_true(f"{question} focused smoke", "Focused smoke:" in answer, answer)
+    assert_true(f"{question} avoid", "Avoid:" in answer, answer)
+    assert_true(f"{question} commit rule", "Commit rule:" in answer, answer)
+    assert_true(f"{question} decision engine", "Decision Engine" in answer, answer)
 
-
-def check_direct_recall_still_separate():
-    print("")
-    print("QUESTION: what are we working on now")
-
-    data, answer, route = ask("what are we working on now")
-    lower = answer.lower()
-
-    print(f"ROUTE: {route}")
-    print(f"ANSWER: {answer[:900]}")
-
-    assert_true("direct recall route preserved", route == "project_state_current_memory_direct_recall", route)
-    assert_true("direct recall not mission card title", not lower.startswith("project brain mission control:"), answer)
-    assert_true("direct recall has no mission fields", "focused smoke:" not in lower and "commit rule:" not in lower, answer)
-    assert_true("direct recall has project state", "current nova project state" in lower, answer)
+    assert_true(f"{question} operator plan section", "Operator Plan:" in answer, answer)
+    assert_true(f"{question} operator recommended move", "Operator recommended move:" in answer, answer)
+    assert_true(f"{question} operator why", "Operator why:" in answer, answer)
+    assert_true(f"{question} operator work type", "Operator work type:" in answer, answer)
+    assert_true(f"{question} operator risk", "Operator risk:" in answer, answer)
+    assert_true(f"{question} operator focused smokes", "Operator focused smokes:" in answer, answer)
+    assert_true(f"{question} operator avoid rules", "Operator avoid rules:" in answer, answer)
+    assert_true(f"{question} operator stop rule", "Operator stop rule:" in answer, answer)
 
 
 def main():
     print("NOVA PROJECT BRAIN MISSION CONTROL API SMOKE")
     print("============================================")
 
-    check_mission_control("give me mission control")
-    check_mission_control("show me the mission card")
-    check_mission_control("operator mode")
+    stamp = str(int(time.time()))
 
-    check_direct_recall_still_separate()
+    for index, question in enumerate(MISSION_CASES, start=1):
+        _, route, answer = post_chat(
+            question,
+            session_id=f"mission_control_operator_plan_api_{stamp}_{index}",
+        )
+        assert_mission_control_answer(question, route, answer)
+
+    _, route, answer = post_chat(
+        "what are we working on now",
+        session_id=f"mission_control_direct_recall_guard_{stamp}",
+    )
+
+    assert_true("direct recall route preserved", route == "project_state_current_memory_direct_recall", route)
+    assert_true("direct recall not mission card title", "Project Brain Mission Control:" not in answer, answer)
+    assert_true("direct recall has no mission fields", "Operator Plan:" not in answer, answer)
+    assert_true("direct recall has project state", "Current Nova project state:" in answer, answer)
 
     print("")
     print("NOVA PROJECT BRAIN MISSION CONTROL API SMOKE PASSED")
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()
