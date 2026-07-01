@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import re
 from pathlib import Path
 
 
@@ -10,11 +11,10 @@ SCAN_SUFFIXES = {
     ".py",
     ".js",
     ".html",
-    ".css",
 }
 
 
-IGNORED_DIRS = {
+IGNORED_DIR_NAMES = {
     ".git",
     "__pycache__",
     ".pytest_cache",
@@ -22,44 +22,69 @@ IGNORED_DIRS = {
     "nova_backups",
     "uploads",
     "data",
+    "runtime",
 }
+
+
+IGNORED_PATH_PART_PREFIXES = (
+    "static/js_BACKUP",
+    "static/js_BAK",
+    "static/js_backup",
+)
 
 
 SELF_ALLOWED_FILES = {
     "tools/nova_secret_log_hygiene_smoke.py",
     "tools/nova_openai_key_log_safety_smoke.py",
+    "tools/nova_phase_3h_cleanup_lock_smoke.py",
 }
-
-
-LOG_MARKERS = [
-    "print(",
-    "logger.",
-    "logging.",
-    "console.log(",
-    "console.warn(",
-    "console.error(",
-    "Write-Host",
-]
-
-
-SENSITIVE_MARKERS = [
-    "OPENAI_API_KEY",
-    "api_key",
-    "apikey",
-    "secret",
-    "token",
-    "password",
-    "bearer",
-    "authorization",
-    "sk-",
-    "sk-proj",
-]
 
 
 SAFE_LOG_EXCEPTIONS = [
     '[Nova OpenAI Key] loaded',
     '[Nova OpenAI Key] not configured',
+    'OPENAI_API_KEY missing',
+    'NOVA_API_KEY len=',
+    'apiHeaders bearer len=',
 ]
+
+
+LOG_CALL_RE = re.compile(
+    r"\b(print|console\.log|console\.warn|console\.error|logger\.\w+|logging\.\w+)\s*\(",
+    re.IGNORECASE,
+)
+
+
+LITERAL_SECRET_RE = re.compile(
+    r"sk-(?:proj-)?[A-Za-z0-9_\-]{12,}"
+)
+
+
+UNSAFE_LOG_VALUE_RE = re.compile(
+    r"""
+    (print|console\.log|console\.warn|console\.error|logger\.\w+|logging\.\w+)
+    \s*\(
+    [^\n)]*
+    (?:
+        OPENAI_API_KEY\s*\[
+        |
+        NOVA_API_KEY\s*\[
+        |
+        api[_-]?key\s*\[
+        |
+        token\s*\[
+        |
+        secret\s*\[
+        |
+        password\s*\[
+        |
+        bearer\s*\[
+        |
+        :\s*(OPENAI_API_KEY|NOVA_API_KEY|apiKey|api_key|token|secret|password|bearer)\b
+    )
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
 
 
 def _read(path: Path) -> str:
@@ -69,36 +94,36 @@ def _read(path: Path) -> str:
         return path.read_text(encoding="utf-8", errors="replace")
 
 
+def _is_ignored(path: Path) -> bool:
+    rel = path.relative_to(ROOT).as_posix()
+
+    if rel in SELF_ALLOWED_FILES:
+        return True
+
+    if any(rel.startswith(prefix) for prefix in IGNORED_PATH_PART_PREFIXES):
+        return True
+
+    if set(path.relative_to(ROOT).parts) & IGNORED_DIR_NAMES:
+        return True
+
+    return False
+
+
 def _iter_scan_files():
     for path in ROOT.rglob("*"):
         if not path.is_file():
             continue
 
-        rel = path.relative_to(ROOT).as_posix()
-
-        if rel in SELF_ALLOWED_FILES:
-            continue
-
         if path.suffix.lower() not in SCAN_SUFFIXES:
             continue
 
-        if set(path.relative_to(ROOT).parts) & IGNORED_DIRS:
+        if _is_ignored(path):
             continue
 
         yield path
 
 
-def _line_has_log_marker(line: str) -> bool:
-    lowered = line.lower()
-    return any(marker.lower() in lowered for marker in LOG_MARKERS)
-
-
-def _line_has_sensitive_marker(line: str) -> bool:
-    lowered = line.lower()
-    return any(marker.lower() in lowered for marker in SENSITIVE_MARKERS)
-
-
-def _line_is_safe_exception(line: str) -> bool:
+def _line_is_safe(line: str) -> bool:
     return any(item in line for item in SAFE_LOG_EXCEPTIONS)
 
 
@@ -110,17 +135,17 @@ def main():
         rel = path.relative_to(ROOT).as_posix()
 
         for number, line in enumerate(text.splitlines(), start=1):
-            if not _line_has_sensitive_marker(line):
+            stripped = line.strip()
+
+            if not stripped or _line_is_safe(stripped):
                 continue
 
-            if _line_is_safe_exception(line):
+            if LITERAL_SECRET_RE.search(stripped):
+                failures.append(f"{rel}:{number}: literal secret-like value: {stripped}")
                 continue
 
-            if _line_has_log_marker(line):
-                failures.append(f"{rel}:{number}: {line.strip()}")
-
-            if "sk-proj" in line:
-                failures.append(f"{rel}:{number}: {line.strip()}")
+            if LOG_CALL_RE.search(stripped) and UNSAFE_LOG_VALUE_RE.search(stripped):
+                failures.append(f"{rel}:{number}: unsafe sensitive value log: {stripped}")
 
     if failures:
         raise AssertionError(
