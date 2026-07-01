@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import os
 import re
@@ -16544,6 +16544,143 @@ except Exception as _nova_autonomy_install_error_20260701:
         )
     except Exception:
         pass
+
+
+
+# NOVA_AUTONOMY_PLAN_COMMAND_GUARD_20260630
+# Proposal-only command guard for:
+# autonomy-plan: <goal>
+# This does not edit files, execute commands, or apply patches.
+def _nova_extract_autonomy_plan_goal_20260630(user_text):
+    raw = str(user_text or "").strip()
+    lowered = raw.lower()
+
+    prefixes = (
+        "autonomy-plan:",
+        "autonomy plan:",
+        "patch-plan:",
+        "patch plan:",
+    )
+
+    for prefix in prefixes:
+        if lowered.startswith(prefix):
+            return raw[len(prefix):].strip()
+
+    return ""
+
+
+@app.before_request
+def nova_autonomy_plan_command_guard_20260630():
+    try:
+        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
+            return None
+
+        payload = request.get_json(silent=True) or {}
+
+        user_text = str(
+            payload.get("user_text")
+            or payload.get("text")
+            or payload.get("message")
+            or ""
+        ).strip()
+
+        goal = _nova_extract_autonomy_plan_goal_20260630(user_text)
+
+        if not goal:
+            return None
+
+        from datetime import datetime, timezone
+        from nova_backend.services.autonomy_patch_planner import format_autonomy_patch_plan
+
+        assistant_text = format_autonomy_patch_plan(goal)
+
+        session_id = str(
+            payload.get("session_id")
+            or payload.get("active_session_id")
+            or payload.get("requested_session_id")
+            or ""
+        ).strip()
+
+        if not session_id:
+            try:
+                session_id = str(getattr(session_service, "active_session_id", "") or "").strip()
+            except Exception:
+                session_id = ""
+
+        if not session_id:
+            session_id = "autonomy_plan"
+
+        now = datetime.now(timezone.utc).isoformat()
+
+        user_msg = {
+            "role": "user",
+            "text": user_text,
+            "content": user_text,
+            "attachments": [],
+            "created_at": now,
+            "meta": {
+                "route": "autonomy_plan_command",
+            },
+        }
+
+        assistant_msg = {
+            "role": "assistant",
+            "text": assistant_text,
+            "content": assistant_text,
+            "attachments": [],
+            "created_at": now,
+            "meta": {
+                "route": "autonomy_plan_command",
+                "mode": "proposal_only",
+            },
+        }
+
+        try:
+            session_service.add_message(session_id, user_msg)
+            session_service.add_message(session_id, assistant_msg)
+        except Exception:
+            pass
+
+        try:
+            session = session_service.get_session(session_id)
+        except Exception:
+            session = None
+
+        if not isinstance(session, dict):
+            session = {
+                "id": session_id,
+                "messages": [user_msg, assistant_msg],
+            }
+
+        return jsonify({
+            "ok": True,
+            "session_id": session_id,
+            "active_session_id": session_id,
+            "assistant_message": assistant_msg,
+            "session": session,
+            "runtime": {},
+            "debug": {
+                "route": "autonomy_plan_command",
+                "mode": "proposal_only",
+                "goal": goal,
+            },
+        })
+
+    except Exception as error:
+        try:
+            app.logger.exception("[NOVA_AUTONOMY_PLAN_COMMAND_GUARD_20260630] failed")
+        except Exception:
+            pass
+
+        return jsonify({
+            "ok": False,
+            "error": str(error),
+            "debug": {
+                "route": "autonomy_plan_command",
+                "failed": True,
+            },
+        }), 500
+
 
 if __name__ == "__main__":
     create_startup_backup()
