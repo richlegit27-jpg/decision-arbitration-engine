@@ -17363,29 +17363,8 @@ def nova_autonomy_index_command_guard_20260701():
 
 
 # NOVA_COMMAND_REGISTRY_COMMAND_GUARD_20260701
-# Read-only command registry guard for:
-# command-registry:
-# command-registry: repair-build: FAILED smoke
-# This does not edit files, execute commands, or apply repairs.
-def _nova_extract_command_registry_input_20260701(user_text):
-    raw = str(user_text or "").strip()
-    lowered = raw.lower()
-
-    prefixes = (
-        "command-registry:",
-        "command registry:",
-        "registry:",
-        "autonomy-registry:",
-        "autonomy registry:",
-    )
-
-    for prefix in prefixes:
-        if lowered.startswith(prefix):
-            return raw[len(prefix):].strip()
-
-    return None
-
-
+# Read-only command registry guard.
+# Adapter-owned; behavior must remain command_registry_command + read_only_command_registry.
 @app.before_request
 def nova_command_registry_command_guard_20260701():
     try:
@@ -17394,93 +17373,16 @@ def nova_command_registry_command_guard_20260701():
 
         payload = request.get_json(silent=True) or {}
 
-        user_text = str(
-            payload.get("user_text")
-            or payload.get("text")
-            or payload.get("message")
-            or ""
-        ).strip()
+        from nova_backend.services.autonomy_command_registry_adapter import (
+            build_command_registry_response,
+        )
 
-        registry_input = _nova_extract_command_registry_input_20260701(user_text)
+        response_payload = build_command_registry_response(payload, session_service)
 
-        if registry_input is None:
+        if response_payload is None:
             return None
 
-        from datetime import datetime, timezone
-        from nova_backend.services.autonomy_command_registry import format_autonomy_command_registry
-
-        assistant_text = format_autonomy_command_registry(registry_input)
-
-        session_id = str(
-            payload.get("session_id")
-            or payload.get("active_session_id")
-            or payload.get("requested_session_id")
-            or ""
-        ).strip()
-
-        if not session_id:
-            try:
-                session_id = str(getattr(session_service, "active_session_id", "") or "").strip()
-            except Exception:
-                session_id = ""
-
-        if not session_id:
-            session_id = "command_registry"
-
-        now = datetime.now(timezone.utc).isoformat()
-
-        user_msg = {
-            "role": "user",
-            "text": user_text,
-            "content": user_text,
-            "attachments": [],
-            "created_at": now,
-            "meta": {
-                "route": "command_registry_command",
-            },
-        }
-
-        assistant_msg = {
-            "role": "assistant",
-            "text": assistant_text,
-            "content": assistant_text,
-            "attachments": [],
-            "created_at": now,
-            "meta": {
-                "route": "command_registry_command",
-                "mode": "read_only_command_registry",
-            },
-        }
-
-        try:
-            session_service.add_message(session_id, user_msg)
-            session_service.add_message(session_id, assistant_msg)
-        except Exception:
-            pass
-
-        try:
-            session = session_service.get_session(session_id)
-        except Exception:
-            session = None
-
-        if not isinstance(session, dict):
-            session = {
-                "id": session_id,
-                "messages": [user_msg, assistant_msg],
-            }
-
-        return jsonify({
-            "ok": True,
-            "session_id": session_id,
-            "active_session_id": session_id,
-            "assistant_message": assistant_msg,
-            "session": session,
-            "runtime": {},
-            "debug": {
-                "route": "command_registry_command",
-                "mode": "read_only_command_registry",
-            },
-        })
+        return jsonify(response_payload)
 
     except Exception as error:
         try:
