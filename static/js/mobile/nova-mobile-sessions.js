@@ -480,6 +480,10 @@ document.addEventListener("click", (event) => {
 (() => {
     "use strict";
 
+    console.warn("[NOVA_MOBILE_SESSION_MESSAGE_RESTORE_20260630] disabled - owned by main Controller.open render");
+    return;
+
+
     
     console.warn("[NOVA_MOBILE_SESSION_MESSAGE_RESTORE_20260630] disabled for freeze recovery");
     return;
