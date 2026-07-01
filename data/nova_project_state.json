@@ -55,8 +55,51 @@
     "dirty_files": []
   },
   "updated_at_utc": "2026-07-01T03:18:03.782614+00:00",
-  "just_fixed": "Added nova_backend/services/autonomy_patch_builder.py and tools/nova_autonomy_patch_builder_smoke.py. Builder outputs files to change, PowerShell patch steps, compile checks, smokes, commit commands, rollback commands, and safety rules.",
+  "just_fixed": "Added Nova supervised Patch Builder service with smoke coverage. Memory quality smoke remains part of the locked safety baseline.",
   "remaining_work": "Wire patch-build: chat command into /api/chat so Richard can request supervised patch instructions from chat.",
-  "next_command": "patch-build: make image descriptions better",
-  "k_command": "Wire patch-build command."
+  "next_command": "Wire patch-build: command as proposal/instructions-only route with smoke coverage.",
+  "k_command": "Wire patch-build: command as proposal/instructions-only route with smoke coverage.",
+  "focus": "Nova autonomy phase 1D service locked: supervised Patch Builder creates instructions-only PowerShell patch plans without editing or executing.",
+  "active_focus": "Nova autonomy phase 1D service locked: supervised Patch Builder creates instructions-only PowerShell patch plans without editing or executing.",
+  "working_on": "Nova autonomy phase 1D service locked: supervised Patch Builder creates instructions-only PowerShell patch plans without editing or executing.",
+  "current_work": "Nova autonomy phase 1D service locked: supervised Patch Builder creates instructions-only PowerShell patch plans without editing or executing.",
+  "last_fixed": "Added Nova supervised Patch Builder service with smoke coverage. Memory quality smoke remains part of the locked safety baseline.",
+  "recent_fix": "Added Nova supervised Patch Builder service with smoke coverage. Memory quality smoke remains part of the locked safety baseline.",
+  "just_done": "Added Nova supervised Patch Builder service with smoke coverage. Memory quality smoke remains part of the locked safety baseline.",
+  "last_done": "Added Nova supervised Patch Builder service with smoke coverage. Memory quality smoke remains part of the locked safety baseline.",
+  "recently_done": "Added Nova supervised Patch Builder service with smoke coverage. Memory quality smoke remains part of the locked safety baseline.",
+  "latest_fix": "Added Nova supervised Patch Builder service with smoke coverage. Memory quality smoke remains part of the locked safety baseline.",
+  "fixed": "Added Nova supervised Patch Builder service with smoke coverage. Memory quality smoke remains part of the locked safety baseline.",
+  "left": "Wire patch-build: chat command into /api/chat so Richard can request supervised patch instructions from chat.",
+  "todo": "Wire patch-build: chat command into /api/chat so Richard can request supervised patch instructions from chat.",
+  "remaining_tasks": "Wire patch-build: chat command into /api/chat so Richard can request supervised patch instructions from chat.",
+  "work_left": "Wire patch-build: chat command into /api/chat so Richard can request supervised patch instructions from chat.",
+  "next": "Wire patch-build: command as proposal/instructions-only route with smoke coverage.",
+  "next_step": "Wire patch-build: command as proposal/instructions-only route with smoke coverage.",
+  "locked_work": [
+    "Memory quality smoke",
+    "Autonomy Phase 1D Patch Builder service"
+  ],
+  "locked_features": [
+    "Memory quality smoke",
+    "Autonomy Phase 1D Patch Builder service"
+  ],
+  "locked_items": [
+    "Memory quality smoke",
+    "Autonomy Phase 1D Patch Builder service"
+  ],
+  "completed_locks": [
+    "Memory quality smoke",
+    "Autonomy Phase 1D Patch Builder service"
+  ],
+  "safety_locks": [
+    "Memory quality smoke",
+    "Autonomy Phase 1D Patch Builder service"
+  ],
+  "locks": [
+    "Memory quality smoke",
+    "Autonomy Phase 1D Patch Builder service"
+  ],
+  "memory_status": "Memory quality smoke locked and passing as safety baseline.",
+  "safety_baseline": "Memory quality smoke, regression smoke, autonomy command smoke, patch planner smoke, and patch builder smoke."
 }
