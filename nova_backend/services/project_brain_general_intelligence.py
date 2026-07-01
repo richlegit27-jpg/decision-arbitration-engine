@@ -23,9 +23,9 @@ def _has_any(text: str, terms: tuple[str, ...]) -> bool:
 
 
 def _current_project_answer() -> str:
-    from nova_backend.services.project_brain_context_builder import build_current_project_answer
+    from nova_backend.services.project_brain_live_answer_selector import build_project_brain_live_answer
 
-    return build_current_project_answer()
+    return build_project_brain_live_answer(user_text=user_text).text
 
 def _safe_next_answer() -> str:
     from nova_backend.services.project_brain_context_builder import build_safe_next_answer
