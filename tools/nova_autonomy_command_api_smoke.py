@@ -33,9 +33,10 @@ def extract_text(payload) -> str:
     if isinstance(payload, dict):
         assistant = payload.get("assistant_message")
         if isinstance(assistant, dict):
-            content = assistant.get("content")
-            if isinstance(content, str) and content.strip():
-                return content
+            for key in ("content", "text", "message", "response", "answer"):
+                value = assistant.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value
 
         for key in ("content", "response", "message", "text", "answer"):
             value = payload.get(key)
