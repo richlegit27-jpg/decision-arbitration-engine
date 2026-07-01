@@ -23,8 +23,6 @@ ADAPTER_REQUIRED = [
     "nova_autonomy_plan_adapter_guard_20260701",
     "NOVA_PATCH_BUILD_ADAPTER_GUARD_20260701",
     "nova_patch_build_adapter_guard_20260701",
-    "NOVA_REPAIR_PLAN_ADAPTER_GUARD_20260701",
-    "nova_repair_plan_adapter_guard_20260701",
 ]
 
 FALLBACK_FORBIDDEN_IN_APP = [
@@ -92,3 +90,4 @@ def main():
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
