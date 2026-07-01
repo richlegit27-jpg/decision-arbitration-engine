@@ -1,4 +1,5 @@
 ﻿import requests
+import time
 import traceback
 
 BASE = "http://127.0.0.1:5001"
@@ -128,30 +129,41 @@ CASES = [
 
 
 def ask(message, session_id):
-    response = requests.post(
-        f"{BASE}/api/chat",
-        json={
-            "message": message,
-            "session_id": session_id,
-            "attachments": [],
-        },
-        timeout=35,
-    )
+    last_error = None
 
-    if response.status_code != 200:
-        return "", {"error": response.text[:500], "status": response.status_code}
+    for attempt in range(1, 4):
+        try:
+            response = requests.post(
+                f"{BASE}/api/chat",
+                json={
+                    "message": message,
+                    "session_id": session_id,
+                    "attachments": [],
+                },
+                timeout=35,
+            )
 
-    data = response.json()
-    assistant = data.get("assistant_message") or {}
+            if response.status_code != 200:
+                return "", {"error": response.text[:500], "status": response.status_code}
 
-    text = str(
-        assistant.get("text")
-        or assistant.get("content")
-        or data.get("text")
-        or ""
-    ).strip()
+            data = response.json()
+            assistant = data.get("assistant_message") or {}
 
-    return text, data
+            text = str(
+                assistant.get("text")
+                or assistant.get("content")
+                or data.get("text")
+                or ""
+            ).strip()
+
+            return text, data
+
+        except requests.exceptions.RequestException as exc:
+            last_error = exc
+            print(f"request failed attempt={attempt}/3 error={exc}")
+            time.sleep(1.5)
+
+    raise last_error
 
 
 def main():
