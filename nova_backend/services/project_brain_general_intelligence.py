@@ -213,7 +213,23 @@ def classify_project_brain_intent(user_text: object) -> Optional[str]:
     if (
         _has_any(text, memory_terms)
         and _has_any(text, execution_terms)
-        and _has_any(text, ("nova", "separate", "difference", "distinction", "versus", "vs", "what should", "what is"))
+        and _has_any(
+            text,
+            (
+                "nova",
+                "separate",
+                "difference",
+                "distinction",
+                "versus",
+                "vs",
+                "what should",
+                "what is",
+                "problem",
+                "issue",
+                "this a",
+                "is this",
+            ),
+        )
     ):
         return "memory_execution_distinction"
 
