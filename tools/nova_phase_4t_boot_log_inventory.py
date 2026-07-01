@@ -52,11 +52,11 @@ def read_text(path: Path) -> str:
 def classify_print(line: str) -> str:
     upper = line.upper()
 
-    if any(hint.upper() in upper for hint in BOOT_HINTS):
-        return "boot"
-
     if any(hint.upper() in upper for hint in DEBUG_HINTS):
         return "debug/error"
+
+    if any(hint.upper() in upper for hint in BOOT_HINTS):
+        return "boot"
 
     return "other"
 
