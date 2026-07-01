@@ -24108,3 +24108,135 @@ except Exception as _nova_img_final_text_sync_install_error_20260630:
         "[NOVA_IMAGE_GENERATION_FINAL_TEXT_SYNC_20260630] failed:",
         _nova_img_final_text_sync_install_error_20260630,
     )
+
+# NOVA_ACCIDENTAL_INPUT_GUARD_20260630
+# Final lightweight guard for keyboard-smash / accidental input.
+# Prevents garbage text from triggering web, image generation, planner, memory, or session title changes.
+try:
+    import re as _nova_accidental_re_20260630
+    from collections import Counter as _nova_accidental_counter_20260630
+
+    _NOVA_PRE_ACCIDENTAL_INPUT_GUARD_HANDLE_20260630 = ChatService.handle
+
+    def _nova_is_accidental_input_20260630(value) -> bool:
+        text = str(value or "")
+        compact = "".join(text.split())
+
+        if not compact:
+            return True
+
+        lower = compact.lower()
+
+        allowed_short_commands = {
+            "k",
+            "ok",
+            "okay",
+            "next",
+            "continue",
+            "run",
+            "runit",
+            "stop",
+            "cancel",
+            "yes",
+            "no",
+        }
+
+        if lower in allowed_short_commands:
+            return False
+
+        if len(compact) < 8:
+            return False
+
+        counts = _nova_accidental_counter_20260630(compact)
+        most_common_ratio = counts.most_common(1)[0][1] / max(len(compact), 1)
+
+        alpha_count = sum(1 for ch in compact if ch.isalpha())
+        digit_count = sum(1 for ch in compact if ch.isdigit())
+        symbol_count = sum(1 for ch in compact if not ch.isalnum())
+        symbol_digit_ratio = (digit_count + symbol_count) / max(len(compact), 1)
+
+        if len(compact) >= 12 and most_common_ratio >= 0.75:
+            return True
+
+        if len(compact) >= 20 and alpha_count == 0 and symbol_digit_ratio >= 0.90:
+            return True
+
+        if len(compact) >= 24 and alpha_count <= 2 and symbol_digit_ratio >= 0.80:
+            return True
+
+        repeated_runs = _nova_accidental_re_20260630.search(r"(.)\1{9,}", compact)
+        if repeated_runs and len(compact) >= 12:
+            return True
+
+        bracket_smash = _nova_accidental_re_20260630.search(r"([\[\]\(\)\{\}=\\\/\|'\-]){8,}", compact)
+        if bracket_smash and alpha_count <= 3:
+            return True
+
+        return False
+
+    def _nova_accidental_input_guard_handle_20260630(
+        self,
+        user_text: str = "",
+        session_id: str = "",
+        attachments=None,
+        *args,
+        **kwargs,
+    ):
+        try:
+            has_attachments = bool(attachments)
+
+            if not has_attachments and _nova_is_accidental_input_20260630(user_text):
+                clean_message = "Looks like that was accidental."
+
+                return {
+                    "ok": True,
+                    "route": "accidental_input_guard",
+                    "mode": "guard",
+                    "assistant_text": clean_message,
+                    "response": clean_message,
+                    "message": clean_message,
+                    "content": clean_message,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": clean_message,
+                        "content": clean_message,
+                        "attachments": [],
+                        "meta": {
+                            "source": "accidental_input_guard",
+                            "save_memory": False,
+                            "use_memory": False,
+                            "skip_title_update": True,
+                        },
+                    },
+                    "session_id": session_id,
+                    "active_session_id": session_id,
+                    "attachments": [],
+                    "skip_post_processing": True,
+                    "save_memory": False,
+                    "use_memory": False,
+                    "skip_title_update": True,
+                }
+
+        except Exception as _nova_accidental_guard_error_20260630:
+            print(
+                "[NOVA_ACCIDENTAL_INPUT_GUARD_20260630] skipped:",
+                _nova_accidental_guard_error_20260630,
+            )
+
+        return _NOVA_PRE_ACCIDENTAL_INPUT_GUARD_HANDLE_20260630(
+            self,
+            user_text,
+            session_id,
+            attachments,
+            *args,
+            **kwargs,
+        )
+
+    ChatService.handle = _nova_accidental_input_guard_handle_20260630
+    print("[NOVA_ACCIDENTAL_INPUT_GUARD_20260630] installed")
+
+except Exception as _nova_accidental_input_guard_install_error_20260630:
+    print(
+        "[NOVA_ACCIDENTAL_INPUT_GUARD_20260630] failed:",
+        _nova_accidental_input_guard_install_error_20260630,
+    )

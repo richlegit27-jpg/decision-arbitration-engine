@@ -15226,6 +15226,255 @@ def nova_history_direct_send_20260622(session_id):
     return redirect("/history/" + sid)
 # END_NOVA_HISTORY_DIRECT_SEND_20260622
 
+# NOVA_FINAL_TITLE_GUARD_20260630
+# Last response/disk cleanup for accidental-input and stale Web Fetch session titles.
+try:
+    import json as _nova_title_guard_json_20260630
+    import re as _nova_title_guard_re_20260630
+    from collections import Counter as _nova_title_guard_counter_20260630
+    from pathlib import Path as _nova_title_guard_Path_20260630
+    from flask import request as _nova_title_guard_request_20260630
+
+    def _nova_title_guard_is_garbage_20260630(value) -> bool:
+        text = str(value or "")
+        compact = "".join(text.split())
+
+        if not compact:
+            return False
+
+        lower = compact.lower()
+
+        if lower in {
+            "k",
+            "ok",
+            "okay",
+            "next",
+            "continue",
+            "run",
+            "runit",
+            "stop",
+            "cancel",
+            "yes",
+            "no",
+            "hello",
+            "hi",
+            "hey",
+        }:
+            return False
+
+        if len(compact) < 8:
+            return False
+
+        counts = _nova_title_guard_counter_20260630(compact)
+        most_common_ratio = counts.most_common(1)[0][1] / max(len(compact), 1)
+
+        alpha_count = sum(1 for ch in compact if ch.isalpha())
+        digit_count = sum(1 for ch in compact if ch.isdigit())
+        symbol_count = sum(1 for ch in compact if not ch.isalnum())
+        symbol_digit_ratio = (digit_count + symbol_count) / max(len(compact), 1)
+
+        if len(compact) >= 12 and most_common_ratio >= 0.75:
+            return True
+
+        if len(compact) >= 20 and alpha_count == 0 and symbol_digit_ratio >= 0.90:
+            return True
+
+        if len(compact) >= 24 and alpha_count <= 2 and symbol_digit_ratio >= 0.80:
+            return True
+
+        if _nova_title_guard_re_20260630.search(r"(.)\1{9,}", compact):
+            return True
+
+        if (
+            _nova_title_guard_re_20260630.search(r"([\[\]\(\)\{\}=\\\/\|'\-]){8,}", compact)
+            and alpha_count <= 3
+        ):
+            return True
+
+        return False
+
+    def _nova_title_guard_clean_title_20260630(title, user_text, route, source):
+        current = str(title or "").strip()
+        lowered = current.lower().strip()
+
+        web_like = lowered in {
+            "",
+            "web fetch",
+            "source preview",
+            "generated image",
+        }
+
+        guard_like = (
+            str(route or "").strip().lower() == "accidental_input_guard"
+            or str(source or "").strip().lower() == "accidental_input_guard"
+            or _nova_title_guard_is_garbage_20260630(current)
+            or _nova_title_guard_is_garbage_20260630(user_text)
+        )
+
+        if guard_like:
+            return "New Chat"
+
+        if web_like:
+            candidate = str(user_text or "").replace("\n", " ").strip()
+            if candidate and not _nova_title_guard_is_garbage_20260630(candidate):
+                return candidate[:60]
+            return "New Chat"
+
+        return current or "New Chat"
+
+    def _nova_title_guard_persist_20260630(session_id, clean_title):
+        try:
+            sid = str(session_id or "").strip()
+            if not sid:
+                return
+
+            data_path = _nova_title_guard_Path_20260630(__file__).resolve().parent / "data" / "nova_sessions.json"
+
+            if not data_path.exists():
+                return
+
+            store = _nova_title_guard_json_20260630.loads(data_path.read_text(encoding="utf-8"))
+
+            sessions = store.get("sessions")
+            if not isinstance(sessions, list):
+                return
+
+            changed = False
+
+            for item in sessions:
+                if not isinstance(item, dict):
+                    continue
+
+                item_id = str(item.get("id") or item.get("session_id") or "").strip()
+                if item_id != sid:
+                    continue
+
+                old_title = str(item.get("title") or "").strip()
+
+                if (
+                    old_title.lower() in {"", "web fetch", "source preview", "generated image"}
+                    or _nova_title_guard_is_garbage_20260630(old_title)
+                ):
+                    item["title"] = clean_title
+                    changed = True
+
+            if changed:
+                tmp = data_path.with_suffix(data_path.suffix + ".tmp")
+                tmp.write_text(
+                    _nova_title_guard_json_20260630.dumps(store, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                tmp.replace(data_path)
+
+        except Exception as _nova_title_guard_persist_error_20260630:
+            print(
+                "[NOVA_FINAL_TITLE_GUARD_20260630] persist skipped:",
+                _nova_title_guard_persist_error_20260630,
+            )
+
+    @app.after_request
+    def nova_final_title_guard_20260630(response):
+        try:
+            request_path = str(getattr(_nova_title_guard_request_20260630, "path", "") or "")
+            request_method = str(getattr(_nova_title_guard_request_20260630, "method", "") or "").upper()
+
+            if request_method != "POST" or request_path != "/api/chat":
+                return response
+
+            data = response.get_json(silent=True) or {}
+            if not isinstance(data, dict):
+                return response
+
+            session = data.get("session")
+            if not isinstance(session, dict):
+                return response
+
+            assistant_message = data.get("assistant_message")
+            if not isinstance(assistant_message, dict):
+                assistant_message = {}
+
+            assistant_meta = assistant_message.get("meta")
+            if not isinstance(assistant_meta, dict):
+                assistant_meta = {}
+
+            route = (
+                data.get("route")
+                or data.get("mode")
+                or assistant_meta.get("route")
+                or assistant_meta.get("source")
+                or ""
+            )
+
+            source = assistant_meta.get("source") or data.get("source") or ""
+
+            user_text = ""
+            messages = session.get("messages")
+            if isinstance(messages, list):
+                for msg in messages:
+                    if not isinstance(msg, dict):
+                        continue
+                    if str(msg.get("role") or "").strip().lower() == "user":
+                        user_text = str(msg.get("text") or msg.get("content") or "").strip()
+                        break
+
+            if not user_text:
+                user_text = str(data.get("user_text") or data.get("message") or "").strip()
+
+            old_title = str(session.get("title") or "").strip()
+            clean_title = _nova_title_guard_clean_title_20260630(
+                old_title,
+                user_text,
+                route,
+                source,
+            )
+
+            if clean_title != old_title:
+                session["title"] = clean_title
+                data["session"] = session
+                _nova_title_guard_persist_20260630(
+                    data.get("session_id") or data.get("active_session_id") or session.get("id"),
+                    clean_title,
+                )
+
+                new_raw = _nova_title_guard_json_20260630.dumps(data, ensure_ascii=False)
+                response.set_data(new_raw)
+                response.headers["Content-Length"] = str(len(response.get_data()))
+                response.headers["Content-Type"] = "application/json"
+
+        except Exception as _nova_title_guard_error_20260630:
+            print(
+                "[NOVA_FINAL_TITLE_GUARD_20260630] skipped:",
+                _nova_title_guard_error_20260630,
+            )
+
+        return response
+
+    try:
+        _nova_title_guard_hooks_20260630 = app.after_request_funcs.get(None, [])
+        _nova_title_guard_func_20260630 = None
+
+        for _nova_title_guard_hook_20260630 in list(_nova_title_guard_hooks_20260630):
+            if getattr(_nova_title_guard_hook_20260630, "__name__", "") == "nova_final_title_guard_20260630":
+                _nova_title_guard_func_20260630 = _nova_title_guard_hook_20260630
+                _nova_title_guard_hooks_20260630.remove(_nova_title_guard_hook_20260630)
+                break
+
+        if _nova_title_guard_func_20260630 is not None:
+            _nova_title_guard_hooks_20260630.insert(0, _nova_title_guard_func_20260630)
+
+    except Exception as _nova_title_guard_order_error_20260630:
+        print(
+            "[NOVA_FINAL_TITLE_GUARD_20260630] hook order skipped:",
+            _nova_title_guard_order_error_20260630,
+        )
+
+    print("[NOVA_FINAL_TITLE_GUARD_20260630] installed")
+
+except Exception as _nova_final_title_guard_install_error_20260630:
+    print(
+        "[NOVA_FINAL_TITLE_GUARD_20260630] failed:",
+        _nova_final_title_guard_install_error_20260630,
+    )
 
 if __name__ == "__main__":
     create_startup_backup()
@@ -15237,23 +15486,3 @@ app.run(
 
 
 # NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
