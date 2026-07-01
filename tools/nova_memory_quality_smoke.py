@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import subprocess
 import sys
@@ -73,7 +73,12 @@ def main() -> int:
             print(f"- {name}")
         return 1
 
-    print("\nNOVA MEMORY QUALITY SMOKE PASSED")
+        print("\n=== nova_openai_key_log_safety_smoke ===")
+    _nova_key_log_smoke = Path(__file__).with_name("nova_openai_key_log_safety_smoke.py")
+    subprocess.run([sys.executable, str(_nova_key_log_smoke)], check=True)
+    print("PASS nova_openai_key_log_safety_smoke")
+
+print("\nNOVA MEMORY QUALITY SMOKE PASSED")
     return 0
 
 
