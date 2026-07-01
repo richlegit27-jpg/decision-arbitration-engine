@@ -55,6 +55,20 @@ def main():
     print("========================================")
 
     run_case(
+        name="explicit mission control",
+        user_text="give me mission control",
+        pasted_output="",
+        expected_intent="mission_control",
+        expected_terms=[
+            "Decision Engine v1",
+            "Project Brain Mission Control",
+            "mission_control",
+            "focused smoke",
+            "do not commit",
+        ],
+    )
+
+    run_case(
         name="next move mission",
         user_text="what should we do next?",
         pasted_output="",

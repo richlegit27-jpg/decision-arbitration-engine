@@ -76,6 +76,7 @@ def check_mission_control(question):
     assert_true(f"{question} title", "project brain mission control" in lower, answer)
     assert_true(f"{question} current state", "current state:" in lower, answer)
     assert_true(f"{question} intent", "intent:" in lower, answer)
+    assert_true(f"{question} mission control intent", "intent: mission_control" in lower, answer)
     assert_true(f"{question} risk", "risk:" in lower, answer)
     assert_true(f"{question} focused smoke", "focused smoke:" in lower, answer)
     assert_true(f"{question} avoid", "avoid:" in lower, answer)

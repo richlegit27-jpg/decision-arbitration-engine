@@ -80,6 +80,54 @@ def decide_project_brain_next_move(user_text: str = "", pasted_output: str = "")
     combined = f"{user}\n{output}"
 
     if _contains_any(combined, [
+        "mission control",
+        "mission card",
+        "operator mode",
+        "operator card",
+        "mission brief",
+        "mission plan",
+        "give me mission",
+        "show mission",
+        "show me the mission",
+    ]):
+        return ProjectBrainDecision(
+            intent="mission_control",
+            confidence=0.93,
+            risk="low",
+            recommended_next_move=(
+                "Use Project Brain Mission Control as the operator card: summarize current state, "
+                "classify the request, choose the focused smoke, list target files, and preserve "
+                "avoid-rules before any commit."
+            ),
+            target_layers=[
+                "mission control service",
+                "general intelligence bridge",
+                "api contract smoke",
+            ],
+            target_files=[
+                "nova_backend/services/project_brain_mission_control.py",
+                "nova_backend/services/project_brain_general_intelligence.py",
+                "tools/nova_project_brain_mission_control_smoke.py",
+                "tools/nova_project_brain_mission_control_general_smoke.py",
+                "tools/nova_project_brain_mission_control_api_smoke.py",
+            ],
+            validation=_base_validation() + [
+                "python .\\tools\\nova_project_brain_mission_control_smoke.py",
+                "python .\\tools\\nova_project_brain_mission_control_general_smoke.py",
+                "python .\\tools\\nova_project_brain_mission_control_api_smoke.py",
+                "python .\\tools\\nova_regression_smoke.py",
+            ],
+            avoid=_default_avoid() + [
+                "do not route explicit operator requests to general_project_answer",
+                "do not add app.py wiring for Mission Control",
+            ],
+            rationale=(
+                "Explicit operator requests should return the Mission Control card itself, not the "
+                "generic Project Brain answer intent."
+            ),
+        )
+
+    if _contains_any(combined, [
         "traceback",
         "assertionerror",
         "smoke failed",

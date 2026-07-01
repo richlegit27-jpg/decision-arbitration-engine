@@ -23,6 +23,7 @@ def check(question):
     assert_true(f"{question} title", "project brain mission control" in lower, text)
     assert_true(f"{question} current state", "current state:" in lower, text)
     assert_true(f"{question} intent field", "intent:" in lower, text)
+    assert_true(f"{question} mission control intent", "intent: mission_control" in lower, text)
     assert_true(f"{question} risk field", "risk:" in lower, text)
     assert_true(f"{question} focused smoke", "focused smoke:" in lower, text)
     assert_true(f"{question} avoid rules", "avoid:" in lower, text)
