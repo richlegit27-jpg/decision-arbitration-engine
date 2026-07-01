@@ -16012,33 +16012,56 @@ Auto-fix result:
             or lower_text.startswith("www.")
         )
 
+        # =========================
+        # WEB INTENT SIGNALS
+        # =========================
+        # Keep web explicit. Avoid broad substring triggers like "source",
+        # "update", or "current" because those collide with code/project chat.
         live_web_triggers = (
             "latest",
+            "latest news",
+            "breaking news",
+            "news about",
+            "right now",
+            "today",
             "yesterday",
             "last night",
             "this week",
-            "right now",
-            "current",
-            "news",
-            "update",
-            "updates",
-            "score",
-            "scores",
             "who won",
-            "what happened",
-            "sources",
-            "source",
-            "price",
-            "stock",
-            "bitcoin",
-            "crypto",
-            "nvidia",
+            "current score",
+            "live score",
+            "stock price",
+            "share price",
+            "bitcoin price",
+            "crypto price",
+        )
+
+        explicit_web_prefixes = (
+            "/web",
+            "web search ",
+            "search web ",
+            "search the web ",
+            "look up ",
+            "lookup ",
+            "google ",
+            "browse ",
+            "find sources for ",
+            "find source for ",
+            "get sources for ",
+            "show sources for ",
+        )
+
+        web_topic_terms = {
             "nba",
             "nfl",
             "nhl",
             "mlb",
             "ufc",
-        )
+            "stock",
+            "stocks",
+            "bitcoin",
+            "crypto",
+        }
 
         if self._is_image_generation_request(user_text) and not self._nova_is_web_news_intent_20260609(user_text):
             return {
@@ -16074,9 +16097,40 @@ Auto-fix result:
                 "use_memory": True,
             }
 
-        wants_live_web = any(trigger in lower_text for trigger in live_web_triggers)
+        normalized_web_text = lower_text.strip()
+        web_words = set(
+            normalized_web_text
+            .replace("?", " ")
+            .replace(".", " ")
+            .replace(",", " ")
+            .replace(":", " ")
+            .replace(";", " ")
+            .replace("!", " ")
+            .split()
+        )
 
-        if has_url or wants_live_web or user_text.lower().strip().startswith("/web"):
+        wants_explicit_web = normalized_web_text.startswith(explicit_web_prefixes)
+        wants_live_web = any(trigger in normalized_web_text for trigger in live_web_triggers)
+
+        # Topic terms only force web when paired with a fresh/live/search clue.
+        wants_web_topic = bool(web_words.intersection(web_topic_terms)) and any(
+            clue in normalized_web_text
+            for clue in (
+                "latest",
+                "news",
+                "today",
+                "right now",
+                "current",
+                "price",
+                "score",
+                "scores",
+                "who won",
+                "standings",
+                "schedule",
+            )
+        )
+
+        if has_url or wants_explicit_web or wants_live_web or wants_web_topic:
             return {
                 "route": self.ROUTE_WEB_FETCH,
                 "mode": "web_fetch",
@@ -23077,6 +23131,12 @@ try:
             "score",
             "weather",
             "stock price",
+            "share price",
+            "bitcoin price",
+            "btc price",
+            "crypto price",
+            "price right now",
+            "market price",
         )
 
         return any(term in t for term in explicit_web)
@@ -24229,3 +24289,406 @@ except Exception as _nova_accidental_input_guard_install_error_20260630:
         "[NOVA_ACCIDENTAL_INPUT_GUARD_20260630] failed:",
         _nova_accidental_input_guard_install_error_20260630,
     )
+
+# NOVA_FINAL_LIVE_MARKET_PRICE_ROUTE_AUTHORITY_20260630
+# Final route authority: live market price questions must use web_fetch.
+# This prevents older chat/canned-answer layers from swallowing BTC/crypto/stock price requests.
+try:
+    _NOVA_PRE_FINAL_LIVE_MARKET_PRICE_DECIDE_20260630 = ChatService._decide_route
+
+    def _nova_final_live_market_price_text_20260630(args, kwargs):
+        for key in ("user_text", "text", "message", "prompt", "query"):
+            value = kwargs.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+        for value in args:
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+        return ""
+
+    def _nova_final_live_market_price_attachments_20260630(args, kwargs):
+        value = kwargs.get("attachments")
+        if value:
+            return value
+
+        if len(args) >= 2:
+            return args[1]
+
+        return None
+
+    def _nova_is_live_market_price_request_20260630(value):
+        text = " ".join(str(value or "").lower().replace("?", " ").split())
+        if not text:
+            return False
+
+        market_terms = (
+            "bitcoin",
+            "btc",
+            "crypto",
+            "stock",
+            "stocks",
+            "share",
+            "shares",
+        )
+
+        price_terms = (
+            "price",
+            "worth",
+            "trading at",
+            "right now",
+            "today",
+            "current",
+            "live",
+            "market",
+        )
+
+        return (
+            any(term in text for term in market_terms)
+            and any(term in text for term in price_terms)
+        )
+
+    def _nova_final_live_market_price_decide_20260630(self, *args, **kwargs):
+        user_text = _nova_final_live_market_price_text_20260630(args, kwargs)
+        attachments = _nova_final_live_market_price_attachments_20260630(args, kwargs)
+
+        # Attachments still win. This guard is only for clean text market-price questions.
+        if not attachments and _nova_is_live_market_price_request_20260630(user_text):
+            return {
+                "route": self.ROUTE_WEB_FETCH,
+                "mode": "web_fetch",
+                "confidence": 1.0,
+                "reasons": ["final_live_market_price_route_authority"],
+                "save_artifact": True,
+                "save_memory": False,
+                "use_memory": False,
+                "query": user_text,
+            }
+
+        return _NOVA_PRE_FINAL_LIVE_MARKET_PRICE_DECIDE_20260630(self, *args, **kwargs)
+
+    ChatService._decide_route = _nova_final_live_market_price_decide_20260630
+    print("[NOVA_FINAL_LIVE_MARKET_PRICE_ROUTE_AUTHORITY_20260630] installed")
+except Exception as _nova_final_live_market_price_error_20260630:
+    print("[NOVA_FINAL_LIVE_MARKET_PRICE_ROUTE_AUTHORITY_20260630] failed:", _nova_final_live_market_price_error_20260630)
+
+# NOVA_FINAL_LIVE_MARKET_PRICE_ALL_ROUTE_AUTHORITY_20260630
+# Final route authority across both known route methods.
+# Live market price questions must use web_fetch, not canned chat.
+try:
+    def _nova_all_live_market_price_text_20260630(args, kwargs):
+        for key in ("user_text", "text", "message", "prompt", "query"):
+            value = kwargs.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+        for value in args:
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+        return ""
+
+    def _nova_all_live_market_price_attachments_20260630(args, kwargs):
+        value = kwargs.get("attachments")
+        if value:
+            return value
+
+        # Most route methods use args like: user_text, attachments, ...
+        if len(args) >= 2:
+            maybe_attachments = args[1]
+            if maybe_attachments:
+                return maybe_attachments
+
+        return None
+
+    def _nova_all_is_live_market_price_request_20260630(value):
+        text = " ".join(str(value or "").lower().replace("?", " ").split())
+        if not text:
+            return False
+
+        market_terms = (
+            "bitcoin",
+            "btc",
+            "crypto",
+            "stock",
+            "stocks",
+            "share",
+            "shares",
+        )
+
+        price_terms = (
+            "price",
+            "worth",
+            "trading at",
+            "right now",
+            "today",
+            "current",
+            "live",
+            "spot",
+            "market",
+        )
+
+        return (
+            any(term in text for term in market_terms)
+            and any(term in text for term in price_terms)
+        )
+
+    def _nova_all_live_market_price_decision_20260630(self, user_text):
+        return {
+            "route": self.ROUTE_WEB_FETCH,
+            "mode": "web_fetch",
+            "confidence": 1.0,
+            "reasons": ["final_all_live_market_price_route_authority"],
+            "save_artifact": True,
+            "save_memory": False,
+            "use_memory": False,
+            "query": user_text,
+        }
+
+    def _nova_all_wrap_live_market_price_route_20260630(method_name):
+        original = getattr(ChatService, method_name, None)
+
+        if not callable(original):
+            return False
+
+        if getattr(original, "_nova_all_live_market_price_route_authority_20260630", False):
+            return True
+
+        def _nova_all_live_market_price_route_wrapper_20260630(self, *args, **kwargs):
+            user_text = _nova_all_live_market_price_text_20260630(args, kwargs)
+            attachments = _nova_all_live_market_price_attachments_20260630(args, kwargs)
+
+            # Attachments still win. This only affects clean text market-price requests.
+            if not attachments and _nova_all_is_live_market_price_request_20260630(user_text):
+                return _nova_all_live_market_price_decision_20260630(self, user_text)
+
+            return original(self, *args, **kwargs)
+
+        _nova_all_live_market_price_route_wrapper_20260630._nova_all_live_market_price_route_authority_20260630 = True
+        setattr(ChatService, method_name, _nova_all_live_market_price_route_wrapper_20260630)
+        return True
+
+    _nova_all_live_market_price_installed_20260630 = []
+
+    for _nova_all_route_method_20260630 in ("_make_route_decision", "_decide_route"):
+        if _nova_all_wrap_live_market_price_route_20260630(_nova_all_route_method_20260630):
+            _nova_all_live_market_price_installed_20260630.append(_nova_all_route_method_20260630)
+
+    print(
+        "[NOVA_FINAL_LIVE_MARKET_PRICE_ALL_ROUTE_AUTHORITY_20260630] installed:",
+        ",".join(_nova_all_live_market_price_installed_20260630) or "none",
+    )
+except Exception as _nova_all_live_market_price_error_20260630:
+    print("[NOVA_FINAL_LIVE_MARKET_PRICE_ALL_ROUTE_AUTHORITY_20260630] failed:", _nova_all_live_market_price_error_20260630)
+
+# NOVA_FINAL_LIVE_MARKET_PRICE_HANDLE_REDIRECT_20260630
+# Final handle-level redirect: if route wrappers are bypassed, clean live market
+# price requests are internally redirected into the existing /web path.
+try:
+    _NOVA_PRE_FINAL_LIVE_MARKET_PRICE_HANDLE_20260630 = ChatService.handle
+
+    def _nova_handle_live_market_price_text_20260630(args, kwargs):
+        for key in ("user_text", "text", "message", "prompt", "query"):
+            value = kwargs.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip(), key
+
+        for index, value in enumerate(args):
+            if isinstance(value, str) and value.strip():
+                return value.strip(), index
+
+        return "", None
+
+    def _nova_handle_live_market_price_attachments_20260630(args, kwargs):
+        value = kwargs.get("attachments")
+        if value:
+            return value
+
+        # Common handle args: user_text, session_id, attachments
+        if len(args) >= 3 and args[2]:
+            return args[2]
+
+        return None
+
+    def _nova_handle_is_live_market_price_request_20260630(value):
+        text = " ".join(str(value or "").lower().replace("?", " ").split())
+        if not text:
+            return False
+
+        if text.startswith("/web"):
+            return False
+
+        market_terms = (
+            "bitcoin",
+            "btc",
+            "crypto",
+            "stock",
+            "stocks",
+            "share",
+            "shares",
+        )
+
+        price_terms = (
+            "price",
+            "worth",
+            "trading at",
+            "right now",
+            "today",
+            "current",
+            "live",
+            "spot",
+            "market",
+        )
+
+        return (
+            any(term in text for term in market_terms)
+            and any(term in text for term in price_terms)
+        )
+
+    def _nova_replace_handle_text_20260630(args, kwargs, location, new_text):
+        if isinstance(location, str):
+            new_kwargs = dict(kwargs)
+            new_kwargs[location] = new_text
+            return args, new_kwargs
+
+        if isinstance(location, int):
+            new_args = list(args)
+            new_args[location] = new_text
+            return tuple(new_args), kwargs
+
+        return args, kwargs
+
+    def _nova_final_live_market_price_handle_redirect_20260630(self, *args, **kwargs):
+        user_text, location = _nova_handle_live_market_price_text_20260630(args, kwargs)
+        attachments = _nova_handle_live_market_price_attachments_20260630(args, kwargs)
+
+        # Attachments still win. This is only for clean text market-price requests.
+        if not attachments and _nova_handle_is_live_market_price_request_20260630(user_text):
+            redirected_text = "/web " + user_text
+            args, kwargs = _nova_replace_handle_text_20260630(
+                args,
+                kwargs,
+                location,
+                redirected_text,
+            )
+
+        return _NOVA_PRE_FINAL_LIVE_MARKET_PRICE_HANDLE_20260630(self, *args, **kwargs)
+
+    ChatService.handle = _nova_final_live_market_price_handle_redirect_20260630
+    print("[NOVA_FINAL_LIVE_MARKET_PRICE_HANDLE_REDIRECT_20260630] installed")
+except Exception as _nova_handle_live_market_price_error_20260630:
+    print("[NOVA_FINAL_LIVE_MARKET_PRICE_HANDLE_REDIRECT_20260630] failed:", _nova_handle_live_market_price_error_20260630)
+
+# NOVA_FINAL_LIVE_MARKET_PRICE_GENERAL_CHAT_ESCAPE_20260630
+# Last-resort escape hatch: if live market-price intent reaches general chat,
+# execute web_fetch directly instead of letting the model give a canned "I can't check" answer.
+try:
+    _NOVA_PRE_LIVE_MARKET_PRICE_GENERAL_CHAT_20260630 = ChatService._execute_general_chat
+
+    def _nova_gc_live_market_text_20260630(args, kwargs):
+        for key in ("user_text", "text", "message", "prompt", "query"):
+            value = kwargs.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+        for value in args:
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+        return ""
+
+    def _nova_gc_live_market_session_id_20260630(args, kwargs):
+        value = kwargs.get("session_id")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
+        # Common _execute_general_chat args: user_text, session_id, attachments, decision
+        if len(args) >= 2 and isinstance(args[1], str):
+            return args[1].strip()
+
+        return ""
+
+    def _nova_gc_live_market_attachments_20260630(args, kwargs):
+        value = kwargs.get("attachments")
+        if value:
+            return value
+
+        # Common _execute_general_chat args: user_text, session_id, attachments, decision
+        if len(args) >= 3 and args[2]:
+            return args[2]
+
+        return None
+
+    def _nova_gc_is_live_market_price_request_20260630(value):
+        text = " ".join(str(value or "").lower().replace("?", " ").split())
+        if not text:
+            return False
+
+        market_terms = (
+            "bitcoin",
+            "btc",
+            "crypto",
+            "stock",
+            "stocks",
+            "share",
+            "shares",
+        )
+
+        price_terms = (
+            "price",
+            "worth",
+            "trading at",
+            "right now",
+            "today",
+            "current",
+            "live",
+            "spot",
+            "market",
+        )
+
+        return (
+            any(term in text for term in market_terms)
+            and any(term in text for term in price_terms)
+        )
+
+    def _nova_live_market_price_general_chat_escape_20260630(self, *args, **kwargs):
+        user_text = _nova_gc_live_market_text_20260630(args, kwargs)
+        session_id = _nova_gc_live_market_session_id_20260630(args, kwargs)
+        attachments = _nova_gc_live_market_attachments_20260630(args, kwargs)
+
+        # Attachments still win. This is only for clean text market-price requests.
+        if not attachments and _nova_gc_is_live_market_price_request_20260630(user_text):
+            decision = {
+                "route": self.ROUTE_WEB_FETCH,
+                "mode": "web_fetch",
+                "confidence": 1.0,
+                "reasons": ["final_general_chat_live_market_price_escape"],
+                "save_artifact": True,
+                "save_memory": False,
+                "use_memory": False,
+                "query": user_text,
+            }
+
+            previous_web_intent = globals().get("_NOVA_CURRENT_WEB_INTENT_20260622", None)
+
+            try:
+                if "_NOVA_CURRENT_WEB_INTENT_20260622" in globals():
+                    globals()["_NOVA_CURRENT_WEB_INTENT_20260622"] = True
+
+                return self._execute_web_fetch(
+                    decision=decision,
+                    user_text=user_text,
+                    session_id=session_id,
+                    attachments=[],
+                )
+            finally:
+                if previous_web_intent is not None:
+                    globals()["_NOVA_CURRENT_WEB_INTENT_20260622"] = previous_web_intent
+
+        return _NOVA_PRE_LIVE_MARKET_PRICE_GENERAL_CHAT_20260630(self, *args, **kwargs)
+
+    ChatService._execute_general_chat = _nova_live_market_price_general_chat_escape_20260630
+    print("[NOVA_FINAL_LIVE_MARKET_PRICE_GENERAL_CHAT_ESCAPE_20260630] installed")
+except Exception as _nova_gc_live_market_error_20260630:
+    print("[NOVA_FINAL_LIVE_MARKET_PRICE_GENERAL_CHAT_ESCAPE_20260630] failed:", _nova_gc_live_market_error_20260630)
