@@ -23756,6 +23756,17 @@ try:
         )
 
         raw = raw.strip(" .")
+
+        # Remove leftover connector words after stripping commands like
+        # "generate image of ..." -> "a purple robot", not "of a purple robot".
+        raw = _nova_img_polish_re_20260630.sub(
+            r"^\s*(of|for)\s+",
+            "",
+            raw,
+            flags=_nova_img_polish_re_20260630.I,
+        )
+
+        raw = raw.strip(" .")
         return raw or "your image"
 
     def _nova_image_generation_title_20260630(prompt):

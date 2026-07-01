@@ -15476,6 +15476,207 @@ except Exception as _nova_final_title_guard_install_error_20260630:
         _nova_final_title_guard_install_error_20260630,
     )
 
+
+# NOVA_FINAL_IMAGE_RESPONSE_CACHE_TEXT_GUARD_20260630
+# Final visible-response guard for image generation.
+# This runs after final_session_detail_response_cache so visible assistant text
+# matches the already-clean saved artifact/session title.
+try:
+    import json as _nova_img_cache_json_20260630
+    import re as _nova_img_cache_re_20260630
+
+    def _nova_img_cache_clean_prompt_20260630(value):
+        raw = str(value or "").strip()
+
+        raw = _nova_img_cache_re_20260630.sub(
+            r"^\s*Generated\s+image\s*(for)?\s*:\s*",
+            "",
+            raw,
+            flags=_nova_img_cache_re_20260630.I,
+        )
+
+        raw = _nova_img_cache_re_20260630.sub(
+            r"^\s*Image\s*:\s*",
+            "",
+            raw,
+            flags=_nova_img_cache_re_20260630.I,
+        )
+
+        raw = _nova_img_cache_re_20260630.sub(
+            r"^\s*(please\s+)?(generate|create|make|draw|render|produce)\s+(an?\s+)?(image|picture|photo|illustration|art|drawing)\s*",
+            "",
+            raw,
+            flags=_nova_img_cache_re_20260630.I,
+        )
+
+        raw = _nova_img_cache_re_20260630.sub(
+            r"^\s*(of|for)\s+",
+            "",
+            raw,
+            flags=_nova_img_cache_re_20260630.I,
+        )
+
+        raw = raw.strip(" .")
+        return raw or "your image"
+
+    def _nova_img_cache_is_image_response_20260630(data):
+        if not isinstance(data, dict):
+            return False
+
+        assistant_message = data.get("assistant_message")
+        saved_artifact = data.get("saved_artifact")
+
+        if isinstance(assistant_message, dict):
+            meta = assistant_message.get("meta")
+            if assistant_message.get("image_url"):
+                return True
+            if isinstance(meta, dict) and meta.get("source") == "image_generation":
+                return True
+
+            attachments = assistant_message.get("attachments")
+            if isinstance(attachments, list):
+                for item in attachments:
+                    if isinstance(item, dict) and (
+                        item.get("image_url")
+                        or item.get("url")
+                        or item.get("file_url")
+                    ):
+                        mime = str(item.get("mime_type") or item.get("type") or "").lower()
+                        if mime.startswith("image/") or str(item.get("filename") or "").lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".gif")):
+                            return True
+
+        if isinstance(saved_artifact, dict):
+            if saved_artifact.get("image_url"):
+                return True
+            if str(saved_artifact.get("kind") or "").lower() == "image":
+                return True
+            if str(saved_artifact.get("type") or "").lower() == "image_generation":
+                return True
+
+        return False
+
+    def _nova_img_cache_pick_prompt_20260630(data):
+        assistant_message = data.get("assistant_message") if isinstance(data, dict) else {}
+        saved_artifact = data.get("saved_artifact") if isinstance(data, dict) else {}
+        session = data.get("session") if isinstance(data, dict) else {}
+
+        candidates = []
+
+        if isinstance(saved_artifact, dict):
+            candidates.extend([
+                saved_artifact.get("summary"),
+                saved_artifact.get("prompt"),
+                saved_artifact.get("body"),
+            ])
+
+            meta = saved_artifact.get("meta")
+            if isinstance(meta, dict):
+                candidates.append(meta.get("prompt"))
+
+        if isinstance(session, dict):
+            candidates.append(session.get("title"))
+
+        if isinstance(assistant_message, dict):
+            candidates.extend([
+                assistant_message.get("text"),
+                assistant_message.get("content"),
+            ])
+
+        for candidate in candidates:
+            clean = _nova_img_cache_clean_prompt_20260630(candidate)
+            if clean and clean != "your image":
+                return clean
+
+        return "your image"
+
+    def _nova_img_cache_fix_image_response_20260630(data):
+        if not _nova_img_cache_is_image_response_20260630(data):
+            return data
+
+        prompt = _nova_img_cache_pick_prompt_20260630(data)
+        clean_text = f"Generated image: {prompt}"
+
+        assistant_message = data.get("assistant_message")
+        if isinstance(assistant_message, dict):
+            assistant_message["text"] = clean_text
+            assistant_message["content"] = clean_text
+            data["assistant_message"] = assistant_message
+
+        saved_artifact = data.get("saved_artifact")
+        if isinstance(saved_artifact, dict):
+            saved_artifact["summary"] = clean_text
+
+            viewer = saved_artifact.get("viewer")
+            if isinstance(viewer, dict):
+                viewer["summary"] = clean_text
+                saved_artifact["viewer"] = viewer
+
+            data["saved_artifact"] = saved_artifact
+
+        session = data.get("session")
+        if isinstance(session, dict):
+            working_state = session.get("working_state")
+            if isinstance(working_state, dict):
+                working_state["last_assistant_message"] = clean_text
+                session["working_state"] = working_state
+
+            messages = session.get("messages")
+            if isinstance(messages, list):
+                for message in messages:
+                    if not isinstance(message, dict):
+                        continue
+
+                    if str(message.get("role") or "").lower() == "assistant":
+                        message_text = str(message.get("text") or message.get("content") or "")
+                        if "Generated image" in message_text:
+                            message["text"] = clean_text
+                            message["content"] = clean_text
+
+            data["session"] = session
+
+        return data
+
+    @app.after_request
+    def _nova_final_image_response_cache_text_guard_20260630(response):
+        try:
+            content_type = str(response.headers.get("Content-Type") or "").lower()
+            if "application/json" not in content_type:
+                return response
+
+            raw = response.get_data(as_text=True)
+            if not raw:
+                return response
+
+            data = _nova_img_cache_json_20260630.loads(raw)
+            fixed = _nova_img_cache_fix_image_response_20260630(data)
+
+            if fixed is data:
+                new_raw = _nova_img_cache_json_20260630.dumps(fixed, ensure_ascii=False)
+                response.set_data(new_raw)
+                response.headers["Content-Length"] = str(len(response.get_data()))
+                response.headers["Content-Type"] = "application/json"
+
+            return response
+        except Exception as _nova_img_cache_guard_error_20260630:
+            print("[NOVA_FINAL_IMAGE_RESPONSE_CACHE_TEXT_GUARD_20260630] skipped:", _nova_img_cache_guard_error_20260630)
+            return response
+
+    # Flask runs after_request handlers in reverse registration order.
+    # Move this one to the front so it executes last, after final_session_detail_response_cache.
+    try:
+        _nova_img_cache_funcs_20260630 = app.after_request_funcs.get(None, [])
+        if (
+            _nova_img_cache_funcs_20260630
+            and _nova_img_cache_funcs_20260630[-1].__name__ == "_nova_final_image_response_cache_text_guard_20260630"
+        ):
+            _nova_img_cache_funcs_20260630.insert(0, _nova_img_cache_funcs_20260630.pop())
+    except Exception:
+        pass
+
+    print("[NOVA_FINAL_IMAGE_RESPONSE_CACHE_TEXT_GUARD_20260630] installed")
+except Exception as _nova_img_cache_install_error_20260630:
+    print("[NOVA_FINAL_IMAGE_RESPONSE_CACHE_TEXT_GUARD_20260630] failed:", _nova_img_cache_install_error_20260630)
+
 if __name__ == "__main__":
     create_startup_backup()
 app.run(
