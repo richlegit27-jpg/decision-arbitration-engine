@@ -86,8 +86,12 @@ CASES = [
     {
         "name": "checkpoint summary",
         "message": "summarize the current Nova checkpoint",
-        "must_include": ["memory", "smoke"],
-        "must_not_include": ["I don't know"],
+        "must_include": ["answer-quality", "20/20", "generalize"],
+        "must_not_include": [
+            "I don't know",
+            "Fallback guard cleanup plan locked",
+            "autonomy cleanup Phase 3H",
+        ],
     },
     {
         "name": "failure diagnosis",

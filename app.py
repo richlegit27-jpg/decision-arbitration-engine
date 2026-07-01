@@ -18649,6 +18649,13 @@ try:
                     "One was in the image gate for stale attachments, and one was in the main /api/chat attachment path. "
                     "We clarified the markers instead of deleting behavior."
                 ),
+                "summarize the current nova checkpoint": (
+                    "Current Nova checkpoint: the project-state memory recall fix is complete, the guard-stack audit smoke is installed, "
+                    "the small Nova answer-quality smoke passes 5/5, and the larger Nova answer-quality 95 smoke passes 20/20. "
+                    "Measured answer-policy intelligence is 100% on the current 20-case board. "
+                    "Next useful direction: generalize the answer-quality 95 policy into cleaner prompt, intent, and project-brain layers, "
+                    "then reduce reliance on direct app.py before_request guards."
+                ),
                 "if a smoke fails, what should we do first": (
                     "First read the smoke failure carefully and identify the first real failure line. "
                     "Then rerun once to confirm it is reproducible, inspect the last touched file, fix the smallest cause, and rerun the same smoke. "
