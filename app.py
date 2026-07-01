@@ -17171,23 +17171,49 @@ try:
         if not session_id or not isinstance(patch, dict):
             return False
 
+        service_saved = False
+
         svc = _nova_phase4a_session_service_20260701()
         method = getattr(svc, "update_working_state", None)
 
         if callable(method):
             try:
                 method(session_id, patch)
-                return True
+                service_saved = True
             except Exception:
-                pass
+                service_saved = False
 
         data, path = _nova_phase4a_read_sessions_file_20260701()
         if data is None:
-            return False
+            return service_saved
 
         session = _nova_phase4a_find_session_20260701(data, session_id)
         if not isinstance(session, dict):
-            return False
+            session = {
+                "id": session_id,
+                "title": session_id,
+                "messages": [],
+                "session_attachments": [],
+                "working_state": {},
+                "active_execution": None,
+                "execution_state": None,
+            }
+
+            if isinstance(data, dict):
+                sessions_value = data.get("sessions")
+
+                if isinstance(sessions_value, list):
+                    sessions_value.append(session)
+                elif isinstance(sessions_value, dict):
+                    sessions_value[session_id] = session
+                else:
+                    data[session_id] = session
+
+            elif isinstance(data, list):
+                data.append(session)
+
+            else:
+                return service_saved
 
         state = session.get("working_state")
         if not isinstance(state, dict):
@@ -17196,11 +17222,20 @@ try:
         state.update(patch)
         session["working_state"] = state
 
+        # Phase 4F: persist executable mission state at top-level too.
+        # Some session working_state paths filter unknown keys, so active_execution
+        # must be stored directly on the session for restart recovery.
+        if "active_execution" in patch:
+            session["active_execution"] = patch.get("active_execution")
+
+        if "execution_state" in patch:
+            session["execution_state"] = patch.get("execution_state")
+
         try:
             path.write_text(_nova_phase4a_json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
             return True
         except Exception:
-            return False
+            return service_saved
 
     def _nova_phase4a_get_active_execution_20260701(session_id):
         session_id = str(session_id or "").strip()
