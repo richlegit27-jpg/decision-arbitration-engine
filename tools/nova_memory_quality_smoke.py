@@ -20,9 +20,9 @@ SMOKES = [
 
 
 def run_smoke(filename):
-    path = ROOT / "tools" / filename
-    subprocess.run([sys.executable, str(path)], cwd=ROOT, check=True)
-    print(f"PASS {path.stem}")
+    smoke_path = ROOT / "tools" / filename
+    subprocess.run([sys.executable, str(smoke_path)], cwd=ROOT, check=True)
+    print(f"PASS {smoke_path.stem}")
 
 
 def main():
