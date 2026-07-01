@@ -5,6 +5,17 @@ from typing import Any
 
 
 @dataclass(frozen=True)
+class OperatorMove:
+    name: str
+    rank: int
+    why: str
+    risk: str
+    target_files: list[str]
+    focused_smokes: list[str]
+    loses_to_best_because: str
+
+
+@dataclass(frozen=True)
 class OperatorPlan:
     recommended_move: str
     why: str
@@ -16,6 +27,10 @@ class OperatorPlan:
     rollback_point: str
     commit_rule: str
     stop_rule: str
+    exact_next_command: str
+    loop_guard: str
+    ranked_moves: list[dict[str, Any]]
+    rejected_moves: list[dict[str, Any]]
 
 
 PROJECT_BRAIN_CORE_FILES = [
@@ -38,6 +53,10 @@ DEFAULT_COMMIT_RULE = (
 
 DEFAULT_STOP_RULE = (
     "Stop after one meaningful service-level upgrade or one focused cleanup extraction."
+)
+
+DEFAULT_LOOP_GUARD = (
+    "If the next step only adds a lock for an already-passing lock, stop and choose a real behavior upgrade instead."
 )
 
 
@@ -137,11 +156,152 @@ def choose_recommended_move(work_type: str) -> tuple[str, str, str, list[str]]:
         )
 
     return (
-        "Project Brain Operator Planner v1",
-        "Nova already knows current state; the next intelligence jump is choosing the best move, risk, files, smokes, and stop rule.",
+        "Operator Plan Quality v2",
+        "Nova already has an operator plan; the next jump is ranking moves, rejecting weaker moves, and giving one exact next command.",
         "low",
-        PROJECT_BRAIN_CORE_FILES,
+        [
+            "nova_backend/services/project_brain_operator_planner.py",
+            "nova_backend/services/project_brain_mission_control.py",
+            "tools/nova_project_brain_operator_planner_smoke.py",
+        ],
     )
+
+
+def _move(
+    *,
+    rank: int,
+    name: str,
+    why: str,
+    risk: str,
+    target_files: list[str],
+    focused_smokes: list[str],
+    loses_to_best_because: str = "",
+) -> dict[str, Any]:
+    return asdict(
+        OperatorMove(
+            name=name,
+            rank=rank,
+            why=why,
+            risk=risk,
+            target_files=target_files,
+            focused_smokes=focused_smokes,
+            loses_to_best_because=loses_to_best_because,
+        )
+    )
+
+
+def rank_moves(work_type: str, changed_files: list[str] | None = None) -> list[dict[str, Any]]:
+    if work_type == "failure_repair":
+        return [
+            _move(
+                rank=1,
+                name="Failure Interpreter v2",
+                why="A failure must become a focused repair plan before new work continues.",
+                risk="medium",
+                target_files=["nova_backend/services/project_brain_failure_interpreter.py"],
+                focused_smokes=select_smokes("failure_repair", changed_files),
+            ),
+            _move(
+                rank=2,
+                name="Smoke Selector v1",
+                why="Useful after the failure is understood, but not before.",
+                risk="low",
+                target_files=["nova_backend/services/project_brain_operator_planner.py"],
+                focused_smokes=["python .\\tools\\nova_project_brain_operator_planner_smoke.py"],
+                loses_to_best_because="It optimizes validation but does not fix the failing contract.",
+            ),
+            _move(
+                rank=3,
+                name="Cleanup Strategy Engine v1",
+                why="Cleanup can wait until green behavior is restored.",
+                risk="medium",
+                target_files=["nova_backend/services/project_brain_operator_planner.py"],
+                focused_smokes=["python .\\tools\\nova_project_brain_route_patch_audit_smoke.py"],
+                loses_to_best_because="Cleanup during a failure increases risk.",
+            ),
+        ]
+
+    if work_type in ("cleanup_strategy", "route_cleanup", "app_cleanup"):
+        return [
+            _move(
+                rank=1,
+                name="Cleanup Strategy Engine v1",
+                why="Cleanup needs boundaries, one target family, and a stop rule.",
+                risk="medium",
+                target_files=["nova_backend/services/project_brain_operator_planner.py"],
+                focused_smokes=select_smokes(work_type, changed_files),
+            ),
+            _move(
+                rank=2,
+                name="Smoke Selector v1",
+                why="It reduces repetitive validation but does not pick the cleanup target by itself.",
+                risk="low",
+                target_files=["nova_backend/services/project_brain_operator_planner.py"],
+                focused_smokes=["python .\\tools\\nova_project_brain_operator_planner_smoke.py"],
+                loses_to_best_because="The immediate need is cleanup ranking, not just smoke choice.",
+            ),
+            _move(
+                rank=3,
+                name="New app.py route guard",
+                why="Only valid when no service-level path exists.",
+                risk="high",
+                target_files=["app.py"],
+                focused_smokes=["python .\\tools\\nova_regression_smoke.py"],
+                loses_to_best_because="It violates the current avoid-rule and can recreate guard stack debt.",
+            ),
+        ]
+
+    return [
+        _move(
+            rank=1,
+            name="Operator Plan Quality v2",
+            why="This makes Mission Control choose, rank, reject, and stop instead of repeating commands.",
+            risk="low",
+            target_files=[
+                "nova_backend/services/project_brain_operator_planner.py",
+                "nova_backend/services/project_brain_mission_control.py",
+                "tools/nova_project_brain_operator_planner_smoke.py",
+            ],
+            focused_smokes=[
+                "python .\\tools\\nova_project_brain_operator_planner_smoke.py",
+                "python .\\tools\\nova_project_brain_mission_control_api_smoke.py",
+            ],
+        ),
+        _move(
+            rank=2,
+            name="Smoke Selector v1",
+            why="Still valuable, but it is strongest after the plan quality fields exist.",
+            risk="low",
+            target_files=["nova_backend/services/project_brain_operator_planner.py"],
+            focused_smokes=["python .\\tools\\nova_project_brain_operator_planner_smoke.py"],
+            loses_to_best_because="It solves validation spam but not move quality.",
+        ),
+        _move(
+            rank=3,
+            name="App.py extraction",
+            why="Useful cleanup, but less valuable than making Nova choose better moves first.",
+            risk="medium",
+            target_files=["app.py"],
+            focused_smokes=[
+                "python .\\tools\\nova_project_brain_route_patch_audit_smoke.py",
+                "python .\\tools\\nova_regression_smoke.py",
+            ],
+            loses_to_best_because="Cleanup can continue after the operator brain is sharper.",
+        ),
+    ]
+
+
+def exact_next_command_for(work_type: str) -> str:
+    if work_type == "failure_repair":
+        return "python .\\tools\\nova_project_brain_failure_interpreter_api_smoke.py"
+
+    if work_type in ("cleanup_strategy", "route_cleanup", "app_cleanup"):
+        return "python .\\tools\\nova_project_brain_route_patch_audit_smoke.py"
+
+    if work_type == "smoke_selection":
+        return "python .\\tools\\nova_project_brain_operator_planner_smoke.py"
+
+    return "python .\\tools\\nova_project_brain_operator_planner_smoke.py"
 
 
 def build_operator_plan(
@@ -151,8 +311,8 @@ def build_operator_plan(
 ) -> OperatorPlan:
     work_type = classify_work_type(user_text=user_text, changed_files=changed_files)
     recommended_move, why, risk, target_files = choose_recommended_move(work_type)
-
     smokes = select_smokes(work_type, changed_files=changed_files)
+    moves = rank_moves(work_type, changed_files=changed_files)
 
     avoid_rules = list(PROJECT_BRAIN_SAFE_AVOID_RULES)
 
@@ -162,10 +322,13 @@ def build_operator_plan(
     if work_type == "failure_repair":
         avoid_rules.insert(0, "Do not add new behavior until the failing contract is reproduced.")
 
-    if project_state:
-        rollback_point = "Use the latest clean commit before this operator plan."
-    else:
-        rollback_point = "Use current HEAD as rollback point before patching."
+    rollback_point = (
+        "Use the latest clean commit before this operator plan."
+        if project_state
+        else "Use current HEAD as rollback point before patching."
+    )
+
+    rejected_moves = [move for move in moves if int(move.get("rank", 0)) > 1]
 
     return OperatorPlan(
         recommended_move=recommended_move,
@@ -178,6 +341,10 @@ def build_operator_plan(
         rollback_point=rollback_point,
         commit_rule=DEFAULT_COMMIT_RULE,
         stop_rule=DEFAULT_STOP_RULE,
+        exact_next_command=exact_next_command_for(work_type),
+        loop_guard=DEFAULT_LOOP_GUARD,
+        ranked_moves=moves,
+        rejected_moves=rejected_moves,
     )
 
 
@@ -204,9 +371,22 @@ def format_operator_plan(plan: OperatorPlan | dict[str, Any]) -> str:
         f"Why: {data.get('why', '')}",
         f"Work type: {data.get('work_type', '')}",
         f"Risk: {data.get('risk', '')}",
-        "Target files:",
+        f"Exact next command: {data.get('exact_next_command', '')}",
+        "Ranked moves:",
     ]
 
+    for move in data.get("ranked_moves", []) or []:
+        lines.append(
+            f"- #{move.get('rank')}: {move.get('name')} | risk={move.get('risk')} | why={move.get('why')}"
+        )
+
+    lines.append("Rejected moves:")
+    for move in data.get("rejected_moves", []) or []:
+        lines.append(
+            f"- {move.get('name')}: {move.get('loses_to_best_because')}"
+        )
+
+    lines.append("Target files:")
     for file in data.get("target_files", []) or []:
         lines.append(f"- {file}")
 
@@ -223,6 +403,7 @@ def format_operator_plan(plan: OperatorPlan | dict[str, Any]) -> str:
             f"Rollback point: {data.get('rollback_point', '')}",
             f"Commit rule: {data.get('commit_rule', '')}",
             f"Stop rule: {data.get('stop_rule', '')}",
+            f"Loop guard: {data.get('loop_guard', '')}",
         ]
     )
 
@@ -230,10 +411,13 @@ def format_operator_plan(plan: OperatorPlan | dict[str, Any]) -> str:
 
 
 __all__ = [
+    "OperatorMove",
     "OperatorPlan",
     "build_operator_plan",
     "build_operator_plan_dict",
     "classify_work_type",
     "select_smokes",
+    "rank_moves",
+    "exact_next_command_for",
     "format_operator_plan",
 ]

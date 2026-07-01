@@ -24,6 +24,10 @@ def main():
     assert_true("operator plan has smokes", bool(plan.get("focused_smokes")), plan)
     assert_true("operator plan has avoid rules", bool(plan.get("avoid_rules")), plan)
     assert_true("operator plan has stop rule", bool(plan.get("stop_rule")), plan)
+    assert_true("operator plan has exact next command", bool(plan.get("exact_next_command")), plan)
+    assert_true("operator plan has loop guard", bool(plan.get("loop_guard")), plan)
+    assert_true("operator plan has ranked moves", len(plan.get("ranked_moves", [])) == 3, plan)
+    assert_true("operator plan has rejected moves", len(plan.get("rejected_moves", [])) == 2, plan)
 
     answer = build_project_brain_mission_control_answer("operator mode")
 
@@ -32,7 +36,11 @@ def main():
     assert_true("answer has operator recommended move", "Operator recommended move:" in answer, answer)
     assert_true("answer has operator focused smokes", "Operator focused smokes:" in answer, answer)
     assert_true("answer has operator avoid rules", "Operator avoid rules:" in answer, answer)
+    assert_true("answer has operator exact next command", "Operator exact next command:" in answer, answer)
+    assert_true("answer has operator ranked moves", "Operator ranked moves:" in answer, answer)
+    assert_true("answer has operator rejected moves", "Operator rejected moves:" in answer, answer)
     assert_true("answer has operator stop rule", "Operator stop rule:" in answer, answer)
+    assert_true("answer has operator loop guard", "Operator loop guard:" in answer, answer)
 
     direct_answer = build_project_brain_mission_control_answer("what are we working on now")
     assert_true("direct text still formats mission card service only", "Project Brain Mission Control:" in direct_answer, direct_answer)

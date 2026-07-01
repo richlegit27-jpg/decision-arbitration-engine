@@ -109,6 +109,14 @@ def format_project_brain_mission_card(card: ProjectBrainMissionCard) -> str:
     operator_target_files = ", ".join(operator_plan.get("target_files", []) or [])
     operator_smokes = "; ".join(operator_plan.get("focused_smokes", []) or [])
     operator_avoid = "; ".join(operator_plan.get("avoid_rules", []) or [])
+    operator_ranked_moves = "; ".join(
+        f"#{move.get('rank')}: {move.get('name')}"
+        for move in (operator_plan.get("ranked_moves", []) or [])
+    )
+    operator_rejected_moves = "; ".join(
+        f"{move.get('name')} loses because {move.get('loses_to_best_because')}"
+        for move in (operator_plan.get("rejected_moves", []) or [])
+    )
 
     return (
         "Project Brain Mission Control:\n"
@@ -138,7 +146,11 @@ def format_project_brain_mission_card(card: ProjectBrainMissionCard) -> str:
         f"Operator target files: {operator_target_files}\n"
         f"Operator focused smokes: {operator_smokes}\n"
         f"Operator avoid rules: {operator_avoid}\n"
-        f"Operator stop rule: {operator_plan.get('stop_rule', '')}"
+        f"Operator exact next command: {operator_plan.get('exact_next_command', '')}\n"
+        f"Operator ranked moves: {operator_ranked_moves}\n"
+        f"Operator rejected moves: {operator_rejected_moves}\n"
+        f"Operator stop rule: {operator_plan.get('stop_rule', '')}\n"
+        f"Operator loop guard: {operator_plan.get('loop_guard', '')}"
     )
 
 
