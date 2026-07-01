@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 import os
 import time
 import uuid
@@ -27,7 +27,7 @@ OPENAI_MODEL = (os.getenv("OPENAI_MODEL") or "").strip()
 
 print("RUNNING NOVA APP FROM:", __file__)
 print("OPENAI MODEL:", OPENAI_MODEL if OPENAI_MODEL else "MISSING")
-print("OPENAI KEY PREFIX:", OPENAI_API_KEY[:12] if OPENAI_API_KEY else "MISSING")
+print("[Nova OpenAI Key] loaded" if OPENAI_API_KEY else "[Nova OpenAI Key] not configured")
 
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY is missing")
