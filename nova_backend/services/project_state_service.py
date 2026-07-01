@@ -529,3 +529,360 @@ try:
 except Exception:
     pass
 
+
+# NOVA_PROJECT_STATE_FRESH_SESSION_OWNER_20260701
+# Final fresh-session owner for project-state updates and recall.
+# Keeps stale global project_state.json context from beating current-session updates.
+try:
+    import re as _nova_ps_fresh_re_20260701
+
+    _NOVA_PRE_PROJECT_STATE_ANSWER_FRESH_SESSION_OWNER_20260701 = answer_project_state_question
+
+    def _nova_ps_fresh_now_20260701():
+        try:
+            return _nova_project_state_now()
+        except Exception:
+            from datetime import datetime
+            return datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+
+    def _nova_ps_fresh_clean_20260701(value):
+        try:
+            return _nova_clean_project_state_value(value)
+        except Exception:
+            return str(value or "").strip(" .!?\n\r\t")
+
+
+    def _nova_ps_fresh_session_id_20260701(session_id="", *args, **kwargs):
+        candidates = [
+            session_id,
+            kwargs.get("session_id"),
+            kwargs.get("requested_session_id"),
+            kwargs.get("active_session_id"),
+        ]
+
+        for candidate in candidates:
+            value = str(candidate or "").strip()
+            if value:
+                return value
+
+        return "global"
+
+
+    def _nova_ps_fresh_extract_updates_20260701(user_text):
+        raw_text = str(user_text or "").strip()
+        if not raw_text:
+            return {}
+
+        # Do not scan serialized payloads, session dumps, or context blobs.
+        # Updates must be the user's direct message, not text embedded in history.
+        lowered_head = raw_text[:600].lower()
+        if raw_text[:1] in {"{", "["}:
+            return {}
+
+        if (
+            '"messages"' in lowered_head
+            or "'messages'" in lowered_head
+            or "session_id" in lowered_head
+            or "assistant_message" in lowered_head
+            or "current nova project context" in lowered_head
+        ):
+            return {}
+
+        text_value = _nova_ps_fresh_re_20260701.sub(
+            r"\s+",
+            " ",
+            raw_text,
+        ).strip()
+
+        patterns = [
+            (
+                "current_task",
+                r"^(?:my\s+)?current\s+task\s+is\s+(.+)$",
+            ),
+            (
+                "current_task",
+                r"^task\s*:\s*(.+)$",
+            ),
+            (
+                "next_move",
+                r"^next\s+(?:move|step|command)\s+is\s+(.+)$",
+            ),
+            (
+                "last_checkpoint",
+                r"^(?:last\s+)?checkpoint\s+is\s+(.+)$",
+            ),
+        ]
+
+        updates = {}
+
+        for key, pattern in patterns:
+            match = _nova_ps_fresh_re_20260701.match(
+                pattern,
+                text_value,
+                flags=_nova_ps_fresh_re_20260701.IGNORECASE,
+            )
+
+            if not match:
+                continue
+
+            value = _nova_ps_fresh_clean_20260701(match.group(1))
+            if value:
+                updates[key] = value
+
+        return updates
+
+
+    def _nova_ps_fresh_read_store_20260701():
+        try:
+            store = _nova_read_project_state_store()
+        except Exception:
+            store = {}
+
+        if not isinstance(store, dict):
+            store = {}
+
+        sessions = store.get("sessions")
+        if not isinstance(sessions, dict):
+            store["sessions"] = {}
+
+        return store
+
+
+    def _nova_ps_fresh_write_store_20260701(store):
+        try:
+            return _nova_write_project_state_store(store)
+        except Exception:
+            return False
+
+
+    def _nova_ps_fresh_save_updates_20260701(session_id, updates):
+        if not updates:
+            return {}
+
+        sid = str(session_id or "global").strip() or "global"
+        store = _nova_ps_fresh_read_store_20260701()
+        sessions = store.setdefault("sessions", {})
+
+        state = sessions.get(sid)
+        if not isinstance(state, dict):
+            state = {}
+
+        for key, value in updates.items():
+            clean_value = _nova_ps_fresh_clean_20260701(value)
+            if clean_value:
+                state[key] = clean_value
+
+        state["updated_at"] = _nova_ps_fresh_now_20260701()
+        sessions[sid] = state
+        store["sessions"] = sessions
+
+        _nova_ps_fresh_write_store_20260701(store)
+        return state
+
+
+    def _nova_ps_fresh_get_state_20260701(session_id):
+        sid = str(session_id or "global").strip() or "global"
+        store = _nova_ps_fresh_read_store_20260701()
+        sessions = store.get("sessions")
+
+        if not isinstance(sessions, dict):
+            return {}
+
+        state = sessions.get(sid)
+        if isinstance(state, dict):
+            return state
+
+        return {}
+
+
+    def _nova_ps_fresh_is_recall_20260701(user_text):
+        clean = str(user_text or "").strip().lower().rstrip("?!.")
+
+        return clean in {
+            "what are we working on",
+            "what are we doing",
+            "what are we working on now",
+            "what's next",
+            "whats next",
+            "what is next",
+            "what now",
+            "next move",
+            "current task",
+            "continue",
+        }
+
+
+    def _nova_ps_fresh_format_state_20260701(state):
+        if not isinstance(state, dict):
+            return ""
+
+        current_task = _nova_ps_fresh_clean_20260701(state.get("current_task"))
+        next_move = _nova_ps_fresh_clean_20260701(state.get("next_move"))
+        checkpoint = _nova_ps_fresh_clean_20260701(state.get("last_checkpoint"))
+
+        lines = ["Current Nova project state:"]
+
+        if current_task:
+            lines.append(f"- Working on: {current_task}")
+
+        if checkpoint:
+            lines.append(f"- Checkpoint: {checkpoint}")
+
+        if next_move:
+            lines.append(f"- Next: {next_move}")
+
+        if len(lines) == 1:
+            return ""
+
+        return "\n".join(lines)
+
+
+    def _nova_ps_fresh_format_update_20260701(state, updates):
+        lines = ["Project state updated:"]
+
+        if "current_task" in updates:
+            lines.append(f"- Working on: {state.get('current_task', '')}")
+
+        if "last_checkpoint" in updates:
+            lines.append(f"- Checkpoint: {state.get('last_checkpoint', '')}")
+
+        if "next_move" in updates:
+            lines.append(f"- Next: {state.get('next_move', '')}")
+
+        return "\n".join(line for line in lines if str(line).strip())
+
+
+    def answer_project_state_question(user_text=None, session_id="", *args, **kwargs):
+        sid = _nova_ps_fresh_session_id_20260701(session_id, *args, **kwargs)
+        text_value = str(user_text or "").strip()
+
+        updates = _nova_ps_fresh_extract_updates_20260701(text_value)
+        if updates:
+            state = _nova_ps_fresh_save_updates_20260701(sid, updates)
+            return _nova_ps_fresh_format_update_20260701(state, updates)
+
+        if _nova_ps_fresh_is_recall_20260701(text_value):
+            state = _nova_ps_fresh_get_state_20260701(sid)
+            fresh_answer = _nova_ps_fresh_format_state_20260701(state)
+
+            if fresh_answer:
+                return fresh_answer
+
+        return _NOVA_PRE_PROJECT_STATE_ANSWER_FRESH_SESSION_OWNER_20260701(
+            user_text,
+            session_id=sid,
+            *args,
+            **kwargs,
+        )
+
+except Exception as _nova_project_state_fresh_session_owner_error_20260701:
+    try:
+        print(
+            "[NOVA_PROJECT_STATE_FRESH_SESSION_OWNER_20260701] failed:",
+            _nova_project_state_fresh_session_owner_error_20260701,
+        )
+    except Exception:
+        pass
+
+
+# NOVA_PROJECT_STATE_SESSION_KWARG_COMPAT_20260701
+# Final compatibility owner.
+# Some older ChatService/app wrappers call answer_project_state_question(..., session_id=...).
+# This keeps those wrappers working while preserving fresh session-state behavior.
+try:
+    _NOVA_PRE_PROJECT_STATE_SESSION_KWARG_COMPAT_20260701 = answer_project_state_question
+
+    def answer_project_state_question(user_text=None, *args, **kwargs):
+        session_id = str(kwargs.pop("session_id", "") or "").strip()
+
+        if not session_id:
+            session_id = str(kwargs.pop("requested_session_id", "") or "").strip()
+
+        if not session_id:
+            session_id = str(kwargs.pop("active_session_id", "") or "").strip()
+
+        if not session_id and args:
+            first_arg = args[0]
+            if isinstance(first_arg, str) and first_arg.strip().startswith("session"):
+                session_id = first_arg.strip()
+
+        if not session_id:
+            session_id = "global"
+
+        text_value = str(user_text or "").strip()
+
+        try:
+            updates = _nova_ps_fresh_extract_updates_20260701(text_value)
+
+            if updates:
+                state = _nova_ps_fresh_save_updates_20260701(session_id, updates)
+                return _nova_ps_fresh_format_update_20260701(state, updates)
+
+            if _nova_ps_fresh_is_recall_20260701(text_value):
+                state = _nova_ps_fresh_get_state_20260701(session_id)
+                fresh_answer = _nova_ps_fresh_format_state_20260701(state)
+
+                if fresh_answer:
+                    return fresh_answer
+
+        except Exception as _nova_project_state_session_kwarg_fresh_error_20260701:
+            try:
+                print(
+                    "[NOVA_PROJECT_STATE_SESSION_KWARG_COMPAT_20260701] fresh bypass:",
+                    _nova_project_state_session_kwarg_fresh_error_20260701,
+                )
+            except Exception:
+                pass
+
+        try:
+            call_args = [user_text]
+            call_args.extend(args)
+            return _NOVA_PRE_PROJECT_STATE_SESSION_KWARG_COMPAT_20260701(
+                *call_args,
+                session_id=session_id,
+                **kwargs,
+            )
+        except TypeError as exc:
+            if "unexpected keyword argument 'session_id'" not in str(exc):
+                raise
+
+        try:
+            call_args = [user_text, session_id]
+            call_args.extend(args)
+            return _NOVA_PRE_PROJECT_STATE_SESSION_KWARG_COMPAT_20260701(
+                *call_args,
+                **kwargs,
+            )
+        except TypeError:
+            return _NOVA_PRE_PROJECT_STATE_SESSION_KWARG_COMPAT_20260701(user_text)
+
+except Exception as _nova_project_state_session_kwarg_compat_error_20260701:
+    try:
+        print(
+            "[NOVA_PROJECT_STATE_SESSION_KWARG_COMPAT_20260701] failed:",
+            _nova_project_state_session_kwarg_compat_error_20260701,
+        )
+    except Exception:
+        pass
+
+
+# NOVA_PROJECT_STATE_SESSION_ID_COMPAT_20260701
+# Compatibility shim: older project-state answer function did not accept session_id,
+# but newer chat/app priority guards pass it. Swallow session_id safely.
+try:
+    _NOVA_PRE_PROJECT_STATE_ANSWER_SESSION_ID_COMPAT_20260701 = answer_project_state_question
+
+    def answer_project_state_question(user_text="", *args, session_id=None, **kwargs):
+        return _NOVA_PRE_PROJECT_STATE_ANSWER_SESSION_ID_COMPAT_20260701(user_text)
+
+    print("[NOVA_PROJECT_STATE_SESSION_ID_COMPAT_20260701] installed")
+except Exception as _nova_project_state_session_id_compat_error_20260701:
+    try:
+        print(
+            "[NOVA_PROJECT_STATE_SESSION_ID_COMPAT_20260701] failed:",
+            _nova_project_state_session_id_compat_error_20260701,
+        )
+    except Exception:
+        pass
+

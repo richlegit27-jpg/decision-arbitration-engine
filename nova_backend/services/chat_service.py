@@ -24744,3 +24744,159 @@ except Exception as _nova_project_state_idle_next_response_install_error_2026063
         pass
 
 
+# NOVA_PROJECT_STATE_FRESH_PRIORITY_GUARD_20260701
+# Fresh project-state updates/recall must beat stale project_state_context.
+try:
+    import re as _nova_ps_fresh_priority_re_20260701
+
+    from nova_backend.services.project_state_service import (
+        answer_project_state_question as _nova_answer_project_state_question_fresh_priority_20260701,
+    )
+
+    if not getattr(ChatService, "_NOVA_PROJECT_STATE_FRESH_PRIORITY_GUARD_20260701", False):
+        _NOVA_PRE_PROJECT_STATE_FRESH_PRIORITY_HANDLE_20260701 = ChatService.handle
+
+        def _nova_ps_fresh_priority_text_20260701(args, kwargs):
+            for key in ("user_text", "message", "text", "prompt"):
+                value = kwargs.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+
+            for value in args:
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+
+            for value in args:
+                if isinstance(value, dict):
+                    for key in ("message", "user_text", "text", "prompt"):
+                        candidate = value.get(key)
+                        if isinstance(candidate, str) and candidate.strip():
+                            return candidate.strip()
+
+            return ""
+
+
+        def _nova_ps_fresh_priority_session_20260701(args, kwargs):
+            for key in ("session_id", "active_session_id", "requested_session_id"):
+                value = kwargs.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+
+            for value in args:
+                if isinstance(value, dict):
+                    for key in ("session_id", "active_session_id", "requested_session_id"):
+                        candidate = value.get(key)
+                        if isinstance(candidate, str) and candidate.strip():
+                            return candidate.strip()
+
+            return ""
+
+
+        def _nova_ps_fresh_priority_should_handle_20260701(user_text):
+            clean = str(user_text or "").strip()
+            lowered = clean.lower().rstrip("?!.")
+            if not clean:
+                return False
+
+            update_patterns = [
+                r"^(?:my\s+)?current\s+task\s+is\s+.+",
+                r"^task\s*:\s*.+",
+                r"^next\s+(?:move|step|command)\s+is\s+.+",
+                r"^(?:last\s+)?checkpoint\s+is\s+.+",
+            ]
+
+            for pattern in update_patterns:
+                if _nova_ps_fresh_priority_re_20260701.match(pattern, clean, flags=_nova_ps_fresh_priority_re_20260701.IGNORECASE):
+                    return True
+
+            return lowered in {
+                "what are we working on",
+                "what are we doing",
+                "what are we working on now",
+                "what's next",
+                "whats next",
+                "what is next",
+                "what now",
+                "next move",
+                "current task",
+            }
+
+
+        def _nova_ps_fresh_priority_response_20260701(reply, session_id):
+            text_value = str(reply or "").strip()
+            return {
+                "ok": True,
+                "success": True,
+                "content": text_value,
+                "message": text_value,
+                "response": text_value,
+                "assistant_message": {
+                    "role": "assistant",
+                    "content": text_value,
+                    "text": text_value,
+                    "attachments": [],
+                    "session_id": session_id,
+                    "active_session_id": session_id,
+                    "meta": {
+                        "route": "project_state_fresh_priority",
+                        "strategy": "project_state_fresh_priority",
+                        "source_urls": [],
+                        "sources": [],
+                    },
+                },
+                "route": "project_state_fresh_priority",
+                "route_taken": "project_state_fresh_priority",
+                "debug": {
+                    "route": "project_state_fresh_priority",
+                    "route_taken": "project_state_fresh_priority",
+                },
+                "meta": {
+                    "route": "project_state_fresh_priority",
+                    "strategy": "project_state_fresh_priority",
+                    "source_urls": [],
+                    "sources": [],
+                },
+                "session_id": session_id,
+                "active_session_id": session_id,
+            }
+
+
+        def _nova_project_state_fresh_priority_handle_20260701(self, *args, **kwargs):
+            user_text = _nova_ps_fresh_priority_text_20260701(args, kwargs)
+
+            if _nova_ps_fresh_priority_should_handle_20260701(user_text):
+                session_id = _nova_ps_fresh_priority_session_20260701(args, kwargs)
+
+                try:
+                    reply = _nova_answer_project_state_question_fresh_priority_20260701(
+                        user_text,
+                        session_id=session_id,
+                    )
+
+                    if isinstance(reply, str) and reply.strip():
+                        return _nova_ps_fresh_priority_response_20260701(reply, session_id)
+                except Exception as _nova_ps_fresh_priority_error_20260701:
+                    try:
+                        print(
+                            "[NOVA_PROJECT_STATE_FRESH_PRIORITY_GUARD_20260701] bypass:",
+                            _nova_ps_fresh_priority_error_20260701,
+                        )
+                    except Exception:
+                        pass
+
+            return _NOVA_PRE_PROJECT_STATE_FRESH_PRIORITY_HANDLE_20260701(self, *args, **kwargs)
+
+
+        ChatService.handle = _nova_project_state_fresh_priority_handle_20260701
+        ChatService._NOVA_PROJECT_STATE_FRESH_PRIORITY_GUARD_20260701 = True
+        print("[NOVA_PROJECT_STATE_FRESH_PRIORITY_GUARD_20260701] installed")
+
+except Exception as _nova_project_state_fresh_priority_install_error_20260701:
+    try:
+        print(
+            "[NOVA_PROJECT_STATE_FRESH_PRIORITY_GUARD_20260701] failed:",
+            _nova_project_state_fresh_priority_install_error_20260701,
+        )
+    except Exception:
+        pass
+
