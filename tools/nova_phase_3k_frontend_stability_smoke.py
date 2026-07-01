@@ -161,6 +161,32 @@ def main():
     check_no_static_relics()
     check_js_syntax_with_node()
 
+    
+    # NOVA_PHASE_3K_TEMPLATE_RELIC_GUARD_20260701
+    template_relic_patterns = (
+        "WORKING",
+        "BAD-NOW",
+        "BROKEN_BACKUP",
+        "stability-checkpoint",
+        "backon-",
+        ".bak",
+        ".BAK",
+        "BACKUP",
+        "BAK_",
+        "RESTORE_FROM_BACKUP",
+    )
+    template_relics = []
+    for root in (Path("templates"),):
+        if not root.exists():
+            continue
+        for candidate in root.rglob("*"):
+            if not candidate.is_file():
+                continue
+            normalized = str(candidate).replace("\\", "/")
+            if "/templates/templates/" in "/" + normalized or any(pattern in candidate.name for pattern in template_relic_patterns):
+                template_relics.append(str(candidate))
+    assert_true("no template backup relic files", not template_relics, "\n".join(template_relics[:60]))
+
     print("NOVA PHASE 3K FRONTEND STABILITY SMOKE PASSED")
     return 0
 
