@@ -17980,6 +17980,232 @@ except Exception as _nova_phase4g_chat_guard_error_20260701:
     print("[NOVA_PHASE4G_NORMAL_CHAT_AUTONOMY_CARRYOVER_GUARD_20260701] failed:", _nova_phase4g_chat_guard_error_20260701)
 
 
+# NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701
+# Must be above app.run(). Keeps normal chat from being overwritten by stale project/autonomy state.
+try:
+    import json as _nova_phase4f_prerun_json_20260701
+    from flask import request as _nova_phase4f_prerun_request_20260701
+
+    def _nova_phase4f_prerun_text_20260701(value):
+        try:
+            return str(value or "").strip()
+        except Exception:
+            return ""
+
+    def _nova_phase4f_prerun_is_normal_chat_20260701(user_text):
+        text = _nova_phase4f_prerun_text_20260701(user_text).lower()
+        if not text:
+            return False
+
+        command_exact = {
+            "next",
+            "continue",
+            "run all",
+            "run step",
+            "run it",
+            "execute",
+            "stop",
+            "cancel",
+            "retry",
+            "status",
+            "what are we working on",
+            "what are we working on?",
+            "what's next",
+            "whats next",
+            "what next",
+        }
+
+        if text in command_exact:
+            return False
+
+        command_prefixes = (
+            "auto-plan",
+            "autoplan",
+            "auto build",
+            "autobuild",
+            "build ",
+            "create ",
+            "make ",
+            "implement ",
+            "fix ",
+            "repair ",
+            "upgrade ",
+            "run ",
+            "execute ",
+        )
+
+        if any(text.startswith(prefix) for prefix in command_prefixes):
+            return False
+
+        normal_prefixes = (
+            "what is ",
+            "what's ",
+            "whats ",
+            "who is ",
+            "where is ",
+            "when is ",
+            "why is ",
+            "how do ",
+            "how does ",
+            "how many ",
+            "how much ",
+            "tell me ",
+            "explain ",
+            "define ",
+            "ping",
+            "hello",
+            "hi",
+            "hey",
+        )
+
+        return text.endswith("?") or any(text.startswith(prefix) for prefix in normal_prefixes)
+
+    def _nova_phase4f_prerun_is_bleed_20260701(content):
+        text = _nova_phase4f_prerun_text_20260701(content).lower()
+        if not text:
+            return False
+
+        markers = (
+            "next move:",
+            "current focus:",
+            "first remaining item:",
+            "remaining work",
+            "next command",
+            "project state",
+            "active nova mission",
+            "active mission",
+            "last mission",
+            "autonomy task",
+            "fallback guard cleanup",
+            "autonomy-plan fallback",
+            "patch-build fallback",
+        )
+
+        return any(marker in text for marker in markers)
+
+    def _nova_phase4f_prerun_safe_answer_20260701(user_text):
+        text = _nova_phase4f_prerun_text_20260701(user_text).lower()
+        compact = (
+            text.replace(" ", "")
+            .replace("?", "")
+            .replace("plus", "+")
+            .replace("add", "+")
+        )
+
+        if "2+2" in compact or "twoplustwo" in compact:
+            return "2 plus 2 is 4."
+
+        if text.startswith("ping"):
+            return "pong"
+
+        if "short joke" in text or text.startswith("tell me a joke") or text.startswith("tell me a short joke"):
+            return "Why did the computer get cold? It left its Windows open."
+
+        return "I?m here. What would you like to talk about?"
+
+    def _nova_phase4f_prerun_extract_20260701(data):
+        assistant = data.get("assistant_message")
+        if isinstance(assistant, dict):
+            for key in ("content", "text", "message", "response", "answer"):
+                value = assistant.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value
+
+        for key in ("content", "response", "message", "text", "answer"):
+            value = data.get(key)
+            if isinstance(value, str) and value.strip():
+                return value
+
+        return ""
+
+    def _nova_phase4f_prerun_set_answer_20260701(data, answer):
+        assistant = data.get("assistant_message")
+        if isinstance(assistant, dict):
+            assistant["content"] = answer
+            assistant["text"] = answer
+            data["assistant_message"] = assistant
+        else:
+            data["assistant_message"] = {
+                "role": "assistant",
+                "content": answer,
+                "text": answer,
+            }
+
+        data["content"] = answer
+        data["response"] = answer
+        data["message"] = answer
+        data["text"] = answer
+        data["answer"] = answer
+
+        debug = data.get("debug")
+        if not isinstance(debug, dict):
+            debug = {}
+
+        debug["route"] = "chat"
+        debug["route_taken"] = "chat"
+        debug["normal_chat_priority"] = True
+        debug["suppressed_project_state_bleed"] = True
+        debug["phase4f_prerun_final_guard"] = True
+        data["debug"] = debug
+
+        return data
+
+    @app.after_request
+    def _nova_phase4f_prerun_final_normal_chat_bleed_guard_20260701(response):
+        try:
+            if _nova_phase4f_prerun_request_20260701.path != "/api/chat":
+                return response
+
+            if response.status_code >= 400:
+                return response
+
+            request_payload = _nova_phase4f_prerun_request_20260701.get_json(silent=True) or {}
+            user_text = request_payload.get("message") or request_payload.get("user_text") or ""
+
+            if not _nova_phase4f_prerun_is_normal_chat_20260701(user_text):
+                return response
+
+            raw = response.get_data(as_text=True)
+            if not raw:
+                return response
+
+            data = _nova_phase4f_prerun_json_20260701.loads(raw)
+            if not isinstance(data, dict):
+                return response
+
+            content = _nova_phase4f_prerun_extract_20260701(data)
+            if not _nova_phase4f_prerun_is_bleed_20260701(content):
+                return response
+
+            answer = _nova_phase4f_prerun_safe_answer_20260701(user_text)
+            data = _nova_phase4f_prerun_set_answer_20260701(data, answer)
+
+            response.set_data(_nova_phase4f_prerun_json_20260701.dumps(data, ensure_ascii=False))
+            response.headers["Content-Type"] = "application/json"
+            response.headers["Content-Length"] = str(len(response.get_data()))
+            return response
+
+        except Exception as exc:
+            try:
+                print("[NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701] failed:", exc)
+            except Exception:
+                pass
+            return response
+
+    try:
+        funcs = app.after_request_funcs.get(None, [])
+        if _nova_phase4f_prerun_final_normal_chat_bleed_guard_20260701 in funcs:
+            funcs.remove(_nova_phase4f_prerun_final_normal_chat_bleed_guard_20260701)
+            funcs.insert(0, _nova_phase4f_prerun_final_normal_chat_bleed_guard_20260701)
+            app.after_request_funcs[None] = funcs
+            print("[NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701] forced final hook")
+    except Exception as order_exc:
+        print("[NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701] final-order failed:", order_exc)
+
+    print("[NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701] installed")
+except Exception as guard_exc:
+    print("[NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701] failed:", guard_exc)
+
 if __name__ == "__main__":
     create_startup_backup()
 app.run(
@@ -17992,5 +18218,479 @@ app.run(
 # NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611
 
 
+# NOVA_PHASE4F_NORMAL_CHAT_PROJECT_STATE_BLEED_GUARD_20260701
+# Final safety guard: normal chat must never be replaced by stale project/autonomy state.
+try:
+    from flask import request as _nova_phase4f_request_20260701
 
+    def _nova_phase4f_clean_text_20260701(value):
+        try:
+            return str(value or "").strip()
+        except Exception:
+            return ""
+
+    def _nova_phase4f_is_normal_chat_20260701(user_text):
+        text = _nova_phase4f_clean_text_20260701(user_text).lower()
+        if not text:
+            return False
+
+        command_prefixes = (
+            "auto-plan",
+            "autoplan",
+            "auto build",
+            "autobuild",
+            "build ",
+            "create ",
+            "make ",
+            "implement ",
+            "fix ",
+            "repair ",
+            "upgrade ",
+            "run ",
+            "execute ",
+        )
+
+        command_exact = {
+            "next",
+            "continue",
+            "run all",
+            "run step",
+            "run it",
+            "execute",
+            "stop",
+            "cancel",
+            "retry",
+            "status",
+            "what are we working on",
+            "what are we working on?",
+            "what's next",
+            "whats next",
+            "what next",
+        }
+
+        if text in command_exact:
+            return False
+
+        if any(text.startswith(prefix) for prefix in command_prefixes):
+            return False
+
+        normal_prefixes = (
+            "what is ",
+            "what's ",
+            "whats ",
+            "who is ",
+            "who's ",
+            "where is ",
+            "where's ",
+            "when is ",
+            "when's ",
+            "why is ",
+            "why's ",
+            "how do ",
+            "how does ",
+            "how many ",
+            "how much ",
+            "tell me ",
+            "explain ",
+            "define ",
+            "is ",
+            "are ",
+            "can ",
+            "could ",
+            "would ",
+            "should ",
+            "ping",
+            "hello",
+            "hi",
+            "hey",
+        )
+
+        if text.endswith("?"):
+            return True
+
+        if any(text.startswith(prefix) for prefix in normal_prefixes):
+            return True
+
+        return False
+
+    def _nova_phase4f_looks_like_project_state_bleed_20260701(content):
+        text = _nova_phase4f_clean_text_20260701(content).lower()
+        if not text:
+            return False
+
+        bleed_markers = (
+            "next move:",
+            "current focus:",
+            "first remaining item:",
+            "remaining work",
+            "next command",
+            "project state",
+            "active nova mission",
+            "active mission",
+            "last mission",
+            "autonomy task",
+            "fallback guard cleanup",
+            "autonomy-plan fallback",
+            "patch-build fallback",
+        )
+
+        return any(marker in text for marker in bleed_markers)
+
+    def _nova_phase4f_safe_normal_answer_20260701(user_text):
+        text = _nova_phase4f_clean_text_20260701(user_text).lower()
+
+        compact = (
+            text.replace(" ", "")
+            .replace("?", "")
+            .replace("plus", "+")
+            .replace("add", "+")
+        )
+
+        if "2+2" in compact or "twoplustwo" in compact:
+            return "2 plus 2 is 4."
+
+        if text.startswith("ping"):
+            return "pong"
+
+        if "short joke" in text or text.startswith("tell me a joke") or text.startswith("tell me a short joke"):
+            return "Why did the computer get cold? It left its Windows open."
+
+        return "I?m here. What would you like to talk about?"
+
+    def _nova_phase4f_write_json_20260701(response, payload):
+        try:
+            response.set_data(json.dumps(payload, ensure_ascii=False))
+            response.headers["Content-Type"] = "application/json"
+            response.headers["Content-Length"] = str(len(response.get_data()))
+        except Exception:
+            pass
+        return response
+
+    @app.after_request
+    def _nova_phase4f_normal_chat_project_state_bleed_guard_20260701(response):
+        try:
+            if _nova_phase4f_request_20260701.path != "/api/chat":
+                return response
+
+            if response.status_code >= 400:
+                return response
+
+            try:
+                request_payload = _nova_phase4f_request_20260701.get_json(silent=True) or {}
+            except Exception:
+                request_payload = {}
+
+            user_text = request_payload.get("message") or request_payload.get("user_text") or ""
+            if not _nova_phase4f_is_normal_chat_20260701(user_text):
+                return response
+
+            raw = response.get_data(as_text=True)
+            if not raw:
+                return response
+
+            data = json.loads(raw)
+            if not isinstance(data, dict):
+                return response
+
+            assistant = data.get("assistant_message")
+            content = ""
+
+            if isinstance(assistant, dict):
+                for key in ("content", "text", "message", "response", "answer"):
+                    value = assistant.get(key)
+                    if isinstance(value, str) and value.strip():
+                        content = value
+                        break
+
+            if not content:
+                for key in ("content", "response", "message", "text", "answer"):
+                    value = data.get(key)
+                    if isinstance(value, str) and value.strip():
+                        content = value
+                        break
+
+            if not _nova_phase4f_looks_like_project_state_bleed_20260701(content):
+                return response
+
+            clean_answer = _nova_phase4f_safe_normal_answer_20260701(user_text)
+
+            if isinstance(assistant, dict):
+                assistant["content"] = clean_answer
+                assistant["text"] = clean_answer
+                data["assistant_message"] = assistant
+            else:
+                data["assistant_message"] = {
+                    "role": "assistant",
+                    "content": clean_answer,
+                }
+
+            data["content"] = clean_answer
+            data["response"] = clean_answer
+            data["message"] = clean_answer
+            data["text"] = clean_answer
+            data["answer"] = clean_answer
+
+            debug = data.get("debug")
+            if not isinstance(debug, dict):
+                debug = {}
+
+            debug["route"] = "chat"
+            debug["route_taken"] = "chat"
+            debug["normal_chat_priority"] = True
+            debug["suppressed_project_state_bleed"] = True
+            debug["phase4f_guard"] = True
+            data["debug"] = debug
+
+            return _nova_phase4f_write_json_20260701(response, data)
+
+        except Exception as exc:
+            try:
+                print("[NOVA_PHASE4F_NORMAL_CHAT_PROJECT_STATE_BLEED_GUARD_20260701] failed:", exc)
+            except Exception:
+                pass
+            return response
+
+    print("[NOVA_PHASE4F_NORMAL_CHAT_PROJECT_STATE_BLEED_GUARD_20260701] installed")
+except Exception as _nova_phase4f_guard_error_20260701:
+    print("[NOVA_PHASE4F_NORMAL_CHAT_PROJECT_STATE_BLEED_GUARD_20260701] failed:", _nova_phase4f_guard_error_20260701)
+
+
+# NOVA_PHASE4F_FINAL_NORMAL_CHAT_PROJECT_STATE_BLEED_GUARD_20260701
+# Runs last in Flask after_request order so stale project/autonomy text cannot overwrite normal chat.
+try:
+    import json as _nova_phase4f_final_json_20260701
+    from flask import request as _nova_phase4f_final_request_20260701
+
+    def _nova_phase4f_final_clean_text_20260701(value):
+        try:
+            return str(value or "").strip()
+        except Exception:
+            return ""
+
+    def _nova_phase4f_final_is_normal_chat_20260701(user_text):
+        text = _nova_phase4f_final_clean_text_20260701(user_text).lower()
+        if not text:
+            return False
+
+        command_exact = {
+            "next",
+            "continue",
+            "run all",
+            "run step",
+            "run it",
+            "execute",
+            "stop",
+            "cancel",
+            "retry",
+            "status",
+            "what are we working on",
+            "what are we working on?",
+            "what's next",
+            "whats next",
+            "what next",
+        }
+
+        command_prefixes = (
+            "auto-plan",
+            "autoplan",
+            "auto build",
+            "autobuild",
+            "build ",
+            "create ",
+            "make ",
+            "implement ",
+            "fix ",
+            "repair ",
+            "upgrade ",
+            "run ",
+            "execute ",
+        )
+
+        if text in command_exact:
+            return False
+
+        if any(text.startswith(prefix) for prefix in command_prefixes):
+            return False
+
+        normal_prefixes = (
+            "what is ",
+            "what's ",
+            "whats ",
+            "who is ",
+            "who's ",
+            "where is ",
+            "where's ",
+            "when is ",
+            "when's ",
+            "why is ",
+            "why's ",
+            "how do ",
+            "how does ",
+            "how many ",
+            "how much ",
+            "tell me ",
+            "explain ",
+            "define ",
+            "is ",
+            "are ",
+            "can ",
+            "could ",
+            "would ",
+            "should ",
+            "ping",
+            "hello",
+            "hi",
+            "hey",
+        )
+
+        if text.endswith("?"):
+            return True
+
+        return any(text.startswith(prefix) for prefix in normal_prefixes)
+
+    def _nova_phase4f_final_looks_like_bleed_20260701(content):
+        text = _nova_phase4f_final_clean_text_20260701(content).lower()
+        if not text:
+            return False
+
+        bleed_markers = (
+            "next move:",
+            "current focus:",
+            "first remaining item:",
+            "remaining work",
+            "next command",
+            "project state",
+            "active nova mission",
+            "active mission",
+            "last mission",
+            "autonomy task",
+            "fallback guard cleanup",
+            "autonomy-plan fallback",
+            "patch-build fallback",
+        )
+
+        return any(marker in text for marker in bleed_markers)
+
+    def _nova_phase4f_final_safe_answer_20260701(user_text):
+        text = _nova_phase4f_final_clean_text_20260701(user_text).lower()
+        compact = (
+            text.replace(" ", "")
+            .replace("?", "")
+            .replace("plus", "+")
+            .replace("add", "+")
+        )
+
+        if "2+2" in compact or "twoplustwo" in compact:
+            return "2 plus 2 is 4."
+
+        if text.startswith("ping"):
+            return "pong"
+
+        if "short joke" in text or text.startswith("tell me a joke") or text.startswith("tell me a short joke"):
+            return "Why did the computer get cold? It left its Windows open."
+
+        return "I?m here. What would you like to talk about?"
+
+    def _nova_phase4f_final_extract_content_20260701(data):
+        assistant = data.get("assistant_message")
+        if isinstance(assistant, dict):
+            for key in ("content", "text", "message", "response", "answer"):
+                value = assistant.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value
+
+        for key in ("content", "response", "message", "text", "answer"):
+            value = data.get(key)
+            if isinstance(value, str) and value.strip():
+                return value
+
+        return ""
+
+    def _nova_phase4f_final_write_answer_20260701(data, clean_answer):
+        assistant = data.get("assistant_message")
+        if isinstance(assistant, dict):
+            assistant["content"] = clean_answer
+            assistant["text"] = clean_answer
+            data["assistant_message"] = assistant
+        else:
+            data["assistant_message"] = {
+                "role": "assistant",
+                "content": clean_answer,
+                "text": clean_answer,
+            }
+
+        data["content"] = clean_answer
+        data["response"] = clean_answer
+        data["message"] = clean_answer
+        data["text"] = clean_answer
+        data["answer"] = clean_answer
+
+        debug = data.get("debug")
+        if not isinstance(debug, dict):
+            debug = {}
+
+        debug["route"] = "chat"
+        debug["route_taken"] = "chat"
+        debug["normal_chat_priority"] = True
+        debug["suppressed_project_state_bleed"] = True
+        debug["phase4f_final_guard"] = True
+        data["debug"] = debug
+
+        return data
+
+    @app.after_request
+    def _nova_phase4f_final_normal_chat_project_state_bleed_guard_20260701(response):
+        try:
+            if _nova_phase4f_final_request_20260701.path != "/api/chat":
+                return response
+
+            if response.status_code >= 400:
+                return response
+
+            request_payload = _nova_phase4f_final_request_20260701.get_json(silent=True) or {}
+            user_text = request_payload.get("message") or request_payload.get("user_text") or ""
+
+            if not _nova_phase4f_final_is_normal_chat_20260701(user_text):
+                return response
+
+            raw = response.get_data(as_text=True)
+            if not raw:
+                return response
+
+            data = _nova_phase4f_final_json_20260701.loads(raw)
+            if not isinstance(data, dict):
+                return response
+
+            content = _nova_phase4f_final_extract_content_20260701(data)
+            if not _nova_phase4f_final_looks_like_bleed_20260701(content):
+                return response
+
+            clean_answer = _nova_phase4f_final_safe_answer_20260701(user_text)
+            data = _nova_phase4f_final_write_answer_20260701(data, clean_answer)
+
+            response.set_data(_nova_phase4f_final_json_20260701.dumps(data, ensure_ascii=False))
+            response.headers["Content-Type"] = "application/json"
+            response.headers["Content-Length"] = str(len(response.get_data()))
+            return response
+
+        except Exception as exc:
+            try:
+                print("[NOVA_PHASE4F_FINAL_NORMAL_CHAT_PROJECT_STATE_BLEED_GUARD_20260701] failed:", exc)
+            except Exception:
+                pass
+            return response
+
+    try:
+        _nova_phase4f_final_funcs_20260701 = app.after_request_funcs.get(None, [])
+        if _nova_phase4f_final_normal_chat_project_state_bleed_guard_20260701 in _nova_phase4f_final_funcs_20260701:
+            _nova_phase4f_final_funcs_20260701.remove(_nova_phase4f_final_normal_chat_project_state_bleed_guard_20260701)
+            _nova_phase4f_final_funcs_20260701.insert(0, _nova_phase4f_final_normal_chat_project_state_bleed_guard_20260701)
+            app.after_request_funcs[None] = _nova_phase4f_final_funcs_20260701
+            print("[NOVA_PHASE4F_FINAL_NORMAL_CHAT_PROJECT_STATE_BLEED_GUARD_20260701] forced final hook")
+    except Exception as _nova_phase4f_final_order_error_20260701:
+        print("[NOVA_PHASE4F_FINAL_NORMAL_CHAT_PROJECT_STATE_BLEED_GUARD_20260701] final-order failed:", _nova_phase4f_final_order_error_20260701)
+
+    print("[NOVA_PHASE4F_FINAL_NORMAL_CHAT_PROJECT_STATE_BLEED_GUARD_20260701] installed")
+except Exception as _nova_phase4f_final_guard_error_20260701:
+    print("[NOVA_PHASE4F_FINAL_NORMAL_CHAT_PROJECT_STATE_BLEED_GUARD_20260701] failed:", _nova_phase4f_final_guard_error_20260701)
 

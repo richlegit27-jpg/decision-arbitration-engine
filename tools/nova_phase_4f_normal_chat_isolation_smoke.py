@@ -18,6 +18,11 @@ BAD_NORMAL_CHAT_PHRASES = (
     "project state",
     "remaining work",
     "next command",
+    "next move:",
+    "current focus:",
+    "first remaining item:",
+    "autonomy-plan fallback",
+    "patch-build fallback",
 )
 
 
