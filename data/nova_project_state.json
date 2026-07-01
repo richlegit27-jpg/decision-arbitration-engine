@@ -1,7 +1,7 @@
 {
   "project": "Nova",
-  "checkpoint": "fd0befe Add Nova memory quality smoke",
-  "current_focus": "Nova final memory quality polish locked: smoke coverage",
+  "checkpoint": "6b7fa22 Add Nova release checkpoint",
+  "current_focus": "Nova release checkpoint locked: memory quality and project-state context validated",
   "last_completed": [
     "Router cleanup locked",
     "Web/live price routing locked",
@@ -20,7 +20,9 @@
     "Compact project-state context API locked at 5a1ed6a",
     "Compact project context route smoke locked",
     "Memory quality smoke runner locked",
-    "Checkpoint runner includes memory quality smoke"
+    "Checkpoint runner includes memory quality smoke",
+    "Release checkpoint tool locked at 6b7fa22",
+    "Release checkpoint note committed"
   ],
   "locked": [
     "Router cleanup",
@@ -34,7 +36,8 @@
     "Natural project-state recall",
     "Project context smoke",
     "Compact project-state context API",
-    "Memory quality smoke runner"
+    "Memory quality smoke runner",
+    "Release checkpoint"
   ],
   "remaining": [
     "Add project-state sync helper",
@@ -42,13 +45,13 @@
     "Commit project-state sync helper",
     "Commit one-command checkpoint runner"
   ],
-  "next_move": "Move to final Nova memory cleanup and release checkpoint.",
+  "next_move": "Begin release readiness review.",
   "git": {
     "branch": "post-frontend-polish-phase",
-    "head": "fd0befe",
-    "subject": "Add Nova memory quality smoke",
+    "head": "6b7fa22",
+    "subject": "Add Nova release checkpoint",
     "clean": true,
     "dirty_files": []
   },
-  "updated_at_utc": "2026-07-01T02:48:17.147346+00:00"
+  "updated_at_utc": "2026-07-01T02:53:59.427741+00:00"
 }
