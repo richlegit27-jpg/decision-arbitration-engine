@@ -88,6 +88,11 @@ _nova_fallback_validation_smoke = Path(__file__).with_name("nova_fallback_guard_
 subprocess.run([sys.executable, str(_nova_fallback_validation_smoke)], check=True)
 print("PASS nova_fallback_guard_cleanup_validation_smoke")
 
+print("\n=== nova_phase_3h_cleanup_lock_smoke ===")
+_nova_phase_3h_lock_smoke = Path(__file__).with_name("nova_phase_3h_cleanup_lock_smoke.py")
+subprocess.run([sys.executable, str(_nova_phase_3h_lock_smoke)], check=True)
+print("PASS nova_phase_3h_cleanup_lock_smoke")
+
 print("\nNOVA MEMORY QUALITY SMOKE PASSED")
     return 0
 
