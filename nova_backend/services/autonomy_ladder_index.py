@@ -62,6 +62,14 @@ def create_autonomy_ladder_index() -> Dict[str, object]:
             "Preserve project-state recall and locked smoke coverage.",
             "Use the smallest relevant smoke before broad smokes.",
             "Commit only after tests pass and git status is understood.",
+        {
+            "command": "autonomy-index:",
+            "mode": "autonomy_ladder_index_only",
+            "purpose": "Return the locked autonomy command ladder through chat.",
+            "safety": "Index only; no file edits, no command execution.",
+            "example": "autonomy-index:",
+        },
+
         ],
         "recommended_order": [
             "autonomy:",
