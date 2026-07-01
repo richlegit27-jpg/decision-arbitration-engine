@@ -135,8 +135,8 @@ def build_project_brain_freshness_snapshot() -> ProjectBrainFreshnessSnapshot:
     )
 
     next_move = (
-        "Use the Project Brain freshness snapshot as the source of truth for current checkpoint, blocker, "
-        "next concrete move / safe move, latest commits, and available smoke files."
+        "Use the Project Brain freshness snapshot as the context builder source of truth for current "
+        "checkpoint, blocker, next concrete move / safe move, latest commits, and available smoke files."
     )
 
     from nova_backend.services.project_brain_current_state_adapter import (
