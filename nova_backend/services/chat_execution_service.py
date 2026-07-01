@@ -345,3 +345,266 @@ except Exception:
 
 
 
+
+# NOVA_EXECUTION_CANCEL_COMPAT_20260630
+# Adds the missing cancel(session_id) method expected by the execution command guard.
+# Stop/cancel must clear the active mission so "k" cannot continue it afterward.
+try:
+    import json as _nova_exec_cancel_json_20260630
+    from pathlib import Path as _nova_exec_cancel_Path_20260630
+
+    def _nova_execution_idle_state_20260630(message="Execution stopped."):
+        return {
+            "status": "idle",
+            "complete": False,
+            "current_index": 0,
+            "current_step": None,
+            "goal": None,
+            "steps": [],
+            "history": [],
+            "waiting": False,
+            "error": None,
+            "message": message,
+        }
+
+    def _nova_execution_clear_session_file_20260630(session_id, idle_state):
+        try:
+            sid = str(session_id or "").strip()
+            if not sid:
+                return
+
+            root = _nova_exec_cancel_Path_20260630(__file__).resolve().parents[2]
+            sessions_path = root / "data" / "nova_sessions.json"
+
+            if not sessions_path.exists():
+                return
+
+            data = _nova_exec_cancel_json_20260630.loads(
+                sessions_path.read_text(encoding="utf-8") or "{}"
+            )
+
+            def clear_one(session):
+                if not isinstance(session, dict):
+                    return False
+
+                if str(session.get("id") or "") != sid:
+                    return False
+
+                session["active_execution"] = None
+                session["execution_state"] = idle_state
+
+                working_state = session.get("working_state")
+                if isinstance(working_state, dict):
+                    working_state["active_task"] = ""
+                    working_state["next_move"] = ""
+                    working_state["checkpoint"] = ""
+                    session["working_state"] = working_state
+
+                return True
+
+            changed = False
+
+            if isinstance(data, dict):
+                if isinstance(data.get("sessions"), list):
+                    for session in data["sessions"]:
+                        changed = clear_one(session) or changed
+
+                if isinstance(data.get(sid), dict):
+                    changed = clear_one(data[sid]) or changed
+
+                for value in data.values():
+                    if isinstance(value, dict):
+                        changed = clear_one(value) or changed
+
+            elif isinstance(data, list):
+                for session in data:
+                    changed = clear_one(session) or changed
+
+            if changed:
+                sessions_path.write_text(
+                    _nova_exec_cancel_json_20260630.dumps(
+                        data,
+                        ensure_ascii=False,
+                        indent=2,
+                    ),
+                    encoding="utf-8",
+                )
+        except Exception:
+            pass
+
+    def _nova_execution_cancel_compat_20260630(self, session_id="", *args, **kwargs):
+        sid = str(
+            session_id
+            or kwargs.get("session_id")
+            or kwargs.get("active_session_id")
+            or ""
+        ).strip()
+
+        idle_state = _nova_execution_idle_state_20260630()
+
+        # Clear common in-memory state containers if this service uses any of them.
+        for attr_name in (
+            "active_execution",
+            "execution_state",
+            "state",
+            "current_state",
+        ):
+            try:
+                if hasattr(self, attr_name):
+                    setattr(self, attr_name, idle_state)
+            except Exception:
+                pass
+
+        for attr_name in (
+            "states",
+            "_states",
+            "execution_states",
+            "_execution_states",
+            "active_executions",
+            "_active_executions",
+            "session_states",
+            "_session_states",
+        ):
+            try:
+                box = getattr(self, attr_name, None)
+                if isinstance(box, dict):
+                    if sid:
+                        box[sid] = idle_state
+                    else:
+                        box.clear()
+            except Exception:
+                pass
+
+        _nova_execution_clear_session_file_20260630(sid, idle_state)
+
+        return idle_state
+
+    if "ChatExecutionService" in globals():
+        ChatExecutionService.cancel = _nova_execution_cancel_compat_20260630
+        ChatExecutionService.stop = _nova_execution_cancel_compat_20260630
+        print("[NOVA_EXECUTION_CANCEL_COMPAT_20260630] installed")
+    else:
+        print("[NOVA_EXECUTION_CANCEL_COMPAT_20260630] skipped: ChatExecutionService not found")
+except Exception as _nova_execution_cancel_error_20260630:
+    print("[NOVA_EXECUTION_CANCEL_COMPAT_20260630] failed:", _nova_execution_cancel_error_20260630)
+
+# NOVA_EXECUTION_EMPTY_COMPLETE_NORMALIZER_20260630
+# If an execution command runs after stop/cancel, do not report fake
+# "Execution complete" for an empty/no-goal/no-step state.
+try:
+    def _nova_execution_no_active_state_20260630():
+        return {
+            "status": "idle",
+            "complete": False,
+            "current_index": 0,
+            "current_step": None,
+            "goal": None,
+            "steps": [],
+            "history": [],
+            "waiting": False,
+            "error": "No active execution mission. Start one with: auto-plan <goal>",
+        }
+
+    def _nova_execution_is_empty_complete_20260630(state):
+        if not isinstance(state, dict):
+            return False
+
+        status = str(state.get("status") or "").strip().lower()
+        complete = bool(state.get("complete"))
+        goal = state.get("goal")
+        steps = state.get("steps")
+
+        return (
+            (status == "complete" or complete)
+            and not goal
+            and (not isinstance(steps, list) or len(steps) == 0)
+        )
+
+    def _nova_execution_normalize_empty_complete_result_20260630(result):
+        idle_state = _nova_execution_no_active_state_20260630()
+        message = idle_state["error"]
+
+        if isinstance(result, dict):
+            state = result.get("execution_state")
+
+            if _nova_execution_is_empty_complete_20260630(state):
+                result["execution_state"] = idle_state
+
+                assistant_message = result.get("assistant_message")
+                if isinstance(assistant_message, dict):
+                    assistant_message["text"] = message
+                    assistant_message["content"] = message
+                    assistant_message["execution_state"] = idle_state
+                    result["assistant_message"] = assistant_message
+                else:
+                    result["assistant_message"] = {
+                        "role": "assistant",
+                        "text": message,
+                        "content": message,
+                        "execution_state": idle_state,
+                    }
+
+                result["ok"] = True
+                result["skip_cleanup"] = True
+                result["skip_post_processing"] = True
+                result["skip_rewrite"] = True
+
+                return result
+
+            assistant_message = result.get("assistant_message")
+            if isinstance(assistant_message, dict):
+                msg_state = assistant_message.get("execution_state")
+                if _nova_execution_is_empty_complete_20260630(msg_state):
+                    assistant_message["text"] = message
+                    assistant_message["content"] = message
+                    assistant_message["execution_state"] = idle_state
+                    result["assistant_message"] = assistant_message
+                    result["execution_state"] = idle_state
+                    return result
+
+        if _nova_execution_is_empty_complete_20260630(result):
+            return idle_state
+
+        return result
+
+    def _nova_execution_wrap_empty_complete_method_20260630(method_name):
+        original = getattr(ChatExecutionService, method_name, None)
+
+        if not callable(original):
+            return False
+
+        if getattr(original, "_nova_empty_complete_normalizer_20260630", False):
+            return True
+
+        def _nova_execution_empty_complete_wrapper_20260630(self, *args, **kwargs):
+            result = original(self, *args, **kwargs)
+            return _nova_execution_normalize_empty_complete_result_20260630(result)
+
+        _nova_execution_empty_complete_wrapper_20260630._nova_empty_complete_normalizer_20260630 = True
+        setattr(ChatExecutionService, method_name, _nova_execution_empty_complete_wrapper_20260630)
+        return True
+
+    _nova_execution_normalized_methods_20260630 = []
+
+    if "ChatExecutionService" in globals():
+        for _nova_execution_method_name_20260630 in dir(ChatExecutionService):
+            if _nova_execution_method_name_20260630.startswith("__"):
+                continue
+
+            if _nova_execution_method_name_20260630 in {
+                "cancel",
+                "stop",
+            }:
+                continue
+
+            if _nova_execution_wrap_empty_complete_method_20260630(_nova_execution_method_name_20260630):
+                _nova_execution_normalized_methods_20260630.append(_nova_execution_method_name_20260630)
+
+        print(
+            "[NOVA_EXECUTION_EMPTY_COMPLETE_NORMALIZER_20260630] installed:",
+            ",".join(_nova_execution_normalized_methods_20260630) or "none",
+        )
+    else:
+        print("[NOVA_EXECUTION_EMPTY_COMPLETE_NORMALIZER_20260630] skipped: ChatExecutionService not found")
+except Exception as _nova_execution_empty_complete_error_20260630:
+    print("[NOVA_EXECUTION_EMPTY_COMPLETE_NORMALIZER_20260630] failed:", _nova_execution_empty_complete_error_20260630)
