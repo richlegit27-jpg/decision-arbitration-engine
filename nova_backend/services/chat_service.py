@@ -11585,7 +11585,7 @@ if (not attachments) and (__name__ == "__main__"):
                 ):
                     _nova_pn_answer_20260701 = (
                         "Current Nova project context:\n"
-                        "Current task: Decision Engine v1, broad Project Brain routing, and Mission Control v1.2 / Failure Interpreter API are locked.\n"
+                        "Current task: Decision Engine v1, broad Project Brain routing, Mission Control v1.2 / Failure Interpreter API, and Decision Log API route are locked.\n"
                         "Next move: start Project Brain cleanup/consolidation while preserving direct recall, "
                         "broad Project Brain routing, and avoiding another app.py guard."
                     )
@@ -17675,7 +17675,7 @@ Next action:
         if normalized_text in {"what's next", "whats next", "what is next", "next move", "what now"}:
             assistant_text = (
                 "Current Nova project context:\n"
-                "Current task: Decision Engine v1, broad Project Brain routing, and Mission Control v1.2 / Failure Interpreter API are locked.\n"
+                "Current task: Decision Engine v1, broad Project Brain routing, Mission Control v1.2 / Failure Interpreter API, and Decision Log API route are locked.\n"
                 "Next move: start Project Brain cleanup/consolidation while preserving direct recall, "
                 "broad Project Brain routing, and avoiding another app.py guard."
             )
