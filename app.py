@@ -17997,6 +17997,127 @@ try:
         if not text:
             return False
 
+        project_context_tokens = (
+            "nova",
+            "project",
+            "mission",
+            "checkpoint",
+            "progress",
+            "status",
+            "state",
+            "working on",
+            "where are we",
+            "where we are",
+            "what are we doing",
+            "what we're doing",
+            "what were we doing",
+            "what are we working on",
+            "what we're working on",
+            "what were we working on",
+            "what did we just fix",
+            "what did i just fix",
+            "what was just fixed",
+            "what is left",
+            "what's left",
+            "whats left",
+            "what remains",
+            "remaining work",
+            "next move",
+            "move on",
+            "continue project",
+            "continue nova",
+            "current focus",
+            "current checkpoint",
+        )
+
+        project_context_intent_tokens = (
+            "current",
+            "status",
+            "state",
+            "progress",
+            "where",
+            "working",
+            "doing",
+            "checkpoint",
+            "focus",
+            "left",
+            "remaining",
+            "remain",
+            "next",
+            "move",
+            "continue",
+            "fixed",
+            "fix",
+            "locked",
+            "lock",
+        )
+
+        if any(token in text for token in project_context_tokens):
+            return False
+
+        if ("nova" in text or "project" in text or "mission" in text) and any(token in text for token in project_context_intent_tokens):
+            return False
+
+        project_recall_exact = {
+            "current project state",
+            "project state",
+            "just fixed",
+            "remaining work",
+            "next command",
+            "k command",
+        }
+
+        project_recall_markers = (
+            "current project state",
+            "project state",
+            "just fixed",
+            "what did we just fix",
+            "what did i just fix",
+            "what was just fixed",
+            "remaining work",
+            "what remains",
+            "what's left",
+            "whats left",
+            "what is left",
+            "current focus",
+            "first remaining item",
+            "next command",
+            "k command",
+            "nova status",
+            "current nova",
+            "current status",
+            "locked status",
+            "lock status",
+            "project status",
+            "status of nova",
+            "nova progress",
+            "current progress",
+            "project progress",
+            "how far",
+            "where are we",
+            "where we are",
+            "what are we working on",
+            "what we're working on",
+            "what were we working on",
+            "what should we do next",
+            "what comes next",
+            "what is next",
+            "next move",
+            "move on",
+            "continue project",
+            "continue nova",
+            "nova context",
+            "project context",
+            "current checkpoint",
+            "checkpoint",
+        )
+
+        if text in project_recall_exact:
+            return False
+
+        if any(marker in text for marker in project_recall_markers):
+            return False
+
         command_exact = {
             "next",
             "continue",
@@ -18083,6 +18204,28 @@ try:
 
         return any(marker in text for marker in markers)
 
+
+    def _nova_phase4f_prerun_is_safe_probe_20260701(user_text):
+        text = _nova_phase4f_prerun_text_20260701(user_text).lower()
+        compact = (
+            text.replace(" ", "")
+            .replace("?", "")
+            .replace("plus", "+")
+            .replace("add", "+")
+        )
+
+        if text.startswith("ping"):
+            return True
+
+        if "2+2" in compact or "twoplustwo" in compact:
+            return True
+
+        if "short joke" in text or text.startswith("tell me a joke") or text.startswith("tell me a short joke"):
+            return True
+
+        return False
+
+
     def _nova_phase4f_prerun_safe_answer_20260701(user_text):
         text = _nova_phase4f_prerun_text_20260701(user_text).lower()
         compact = (
@@ -18165,6 +18308,9 @@ try:
             if not _nova_phase4f_prerun_is_normal_chat_20260701(user_text):
                 return response
 
+            if not _nova_phase4f_prerun_is_safe_probe_20260701(user_text):
+                return response
+
             raw = response.get_data(as_text=True)
             if not raw:
                 return response
@@ -18232,6 +18378,127 @@ try:
     def _nova_phase4f_is_normal_chat_20260701(user_text):
         text = _nova_phase4f_clean_text_20260701(user_text).lower()
         if not text:
+            return False
+
+        project_context_tokens = (
+            "nova",
+            "project",
+            "mission",
+            "checkpoint",
+            "progress",
+            "status",
+            "state",
+            "working on",
+            "where are we",
+            "where we are",
+            "what are we doing",
+            "what we're doing",
+            "what were we doing",
+            "what are we working on",
+            "what we're working on",
+            "what were we working on",
+            "what did we just fix",
+            "what did i just fix",
+            "what was just fixed",
+            "what is left",
+            "what's left",
+            "whats left",
+            "what remains",
+            "remaining work",
+            "next move",
+            "move on",
+            "continue project",
+            "continue nova",
+            "current focus",
+            "current checkpoint",
+        )
+
+        project_context_intent_tokens = (
+            "current",
+            "status",
+            "state",
+            "progress",
+            "where",
+            "working",
+            "doing",
+            "checkpoint",
+            "focus",
+            "left",
+            "remaining",
+            "remain",
+            "next",
+            "move",
+            "continue",
+            "fixed",
+            "fix",
+            "locked",
+            "lock",
+        )
+
+        if any(token in text for token in project_context_tokens):
+            return False
+
+        if ("nova" in text or "project" in text or "mission" in text) and any(token in text for token in project_context_intent_tokens):
+            return False
+
+        project_recall_exact = {
+            "current project state",
+            "project state",
+            "just fixed",
+            "remaining work",
+            "next command",
+            "k command",
+        }
+
+        project_recall_markers = (
+            "current project state",
+            "project state",
+            "just fixed",
+            "what did we just fix",
+            "what did i just fix",
+            "what was just fixed",
+            "remaining work",
+            "what remains",
+            "what's left",
+            "whats left",
+            "what is left",
+            "current focus",
+            "first remaining item",
+            "next command",
+            "k command",
+            "nova status",
+            "current nova",
+            "current status",
+            "locked status",
+            "lock status",
+            "project status",
+            "status of nova",
+            "nova progress",
+            "current progress",
+            "project progress",
+            "how far",
+            "where are we",
+            "where we are",
+            "what are we working on",
+            "what we're working on",
+            "what were we working on",
+            "what should we do next",
+            "what comes next",
+            "what is next",
+            "next move",
+            "move on",
+            "continue project",
+            "continue nova",
+            "nova context",
+            "project context",
+            "current checkpoint",
+            "checkpoint",
+        )
+
+        if text in project_recall_exact:
+            return False
+
+        if any(marker in text for marker in project_recall_markers):
             return False
 
         command_prefixes = (
@@ -18470,6 +18737,127 @@ try:
     def _nova_phase4f_final_is_normal_chat_20260701(user_text):
         text = _nova_phase4f_final_clean_text_20260701(user_text).lower()
         if not text:
+            return False
+
+        project_context_tokens = (
+            "nova",
+            "project",
+            "mission",
+            "checkpoint",
+            "progress",
+            "status",
+            "state",
+            "working on",
+            "where are we",
+            "where we are",
+            "what are we doing",
+            "what we're doing",
+            "what were we doing",
+            "what are we working on",
+            "what we're working on",
+            "what were we working on",
+            "what did we just fix",
+            "what did i just fix",
+            "what was just fixed",
+            "what is left",
+            "what's left",
+            "whats left",
+            "what remains",
+            "remaining work",
+            "next move",
+            "move on",
+            "continue project",
+            "continue nova",
+            "current focus",
+            "current checkpoint",
+        )
+
+        project_context_intent_tokens = (
+            "current",
+            "status",
+            "state",
+            "progress",
+            "where",
+            "working",
+            "doing",
+            "checkpoint",
+            "focus",
+            "left",
+            "remaining",
+            "remain",
+            "next",
+            "move",
+            "continue",
+            "fixed",
+            "fix",
+            "locked",
+            "lock",
+        )
+
+        if any(token in text for token in project_context_tokens):
+            return False
+
+        if ("nova" in text or "project" in text or "mission" in text) and any(token in text for token in project_context_intent_tokens):
+            return False
+
+        project_recall_exact = {
+            "current project state",
+            "project state",
+            "just fixed",
+            "remaining work",
+            "next command",
+            "k command",
+        }
+
+        project_recall_markers = (
+            "current project state",
+            "project state",
+            "just fixed",
+            "what did we just fix",
+            "what did i just fix",
+            "what was just fixed",
+            "remaining work",
+            "what remains",
+            "what's left",
+            "whats left",
+            "what is left",
+            "current focus",
+            "first remaining item",
+            "next command",
+            "k command",
+            "nova status",
+            "current nova",
+            "current status",
+            "locked status",
+            "lock status",
+            "project status",
+            "status of nova",
+            "nova progress",
+            "current progress",
+            "project progress",
+            "how far",
+            "where are we",
+            "where we are",
+            "what are we working on",
+            "what we're working on",
+            "what were we working on",
+            "what should we do next",
+            "what comes next",
+            "what is next",
+            "next move",
+            "move on",
+            "continue project",
+            "continue nova",
+            "nova context",
+            "project context",
+            "current checkpoint",
+            "checkpoint",
+        )
+
+        if text in project_recall_exact:
+            return False
+
+        if any(marker in text for marker in project_recall_markers):
             return False
 
         command_exact = {
