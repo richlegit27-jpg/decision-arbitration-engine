@@ -17548,6 +17548,69 @@ try:
 except Exception as _nova_repair_plan_command_priority_error_20260701:
     print("[NOVA_REPAIR_PLAN_COMMAND_PRIORITY_GUARD_20260701] failed:", _nova_repair_plan_command_priority_error_20260701)
 
+
+
+# NOVA_REPAIR_PLAN_API_BEFORE_REQUEST_PRIORITY_20260701
+# Explicit repair-plan / fix-plan commands must bypass project-context recall before /api/chat runs.
+try:
+    from flask import request as _nova_repair_plan_flask_request_20260701
+    from flask import jsonify as _nova_repair_plan_flask_jsonify_20260701
+    from nova_backend.services import repair_plan_adapter as _nova_repair_plan_api_adapter_20260701
+
+    @app.before_request
+    def _nova_repair_plan_api_before_request_priority_20260701():
+        try:
+            if _nova_repair_plan_flask_request_20260701.path != "/api/chat":
+                return None
+
+            if _nova_repair_plan_flask_request_20260701.method != "POST":
+                return None
+
+            data = _nova_repair_plan_flask_request_20260701.get_json(silent=True) or {}
+
+            user_text = str(
+                data.get("user_text")
+                or data.get("message")
+                or data.get("text")
+                or ""
+            )
+
+            repair_input = _nova_repair_plan_api_adapter_20260701.extract_repair_plan_input(user_text)
+
+            if repair_input is None:
+                return None
+
+            session_id = (
+                data.get("session_id")
+                or getattr(globals().get("session_service"), "active_session_id", None)
+                or "default"
+            )
+
+            payload = {
+                "user_text": user_text,
+                "session_id": session_id,
+                "attachments": data.get("attachments") or [],
+            }
+
+            result = _nova_repair_plan_api_adapter_20260701.build_repair_plan_response(
+                payload,
+                globals().get("session_service"),
+            )
+
+            return _nova_repair_plan_flask_jsonify_20260701(result)
+
+        except Exception as exc:
+            try:
+                print("[NOVA_REPAIR_PLAN_API_BEFORE_REQUEST_PRIORITY_20260701] failed:", exc)
+            except Exception:
+                pass
+
+            return None
+
+    print("[NOVA_REPAIR_PLAN_API_BEFORE_REQUEST_PRIORITY_20260701] installed")
+except Exception as _nova_repair_plan_api_before_request_error_20260701:
+    print("[NOVA_REPAIR_PLAN_API_BEFORE_REQUEST_PRIORITY_20260701] failed:", _nova_repair_plan_api_before_request_error_20260701)
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(

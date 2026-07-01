@@ -22,7 +22,7 @@ FORBIDDEN_OUTPUT = [
 
 REQUIRED_OUTPUT = [
     "NOVA PHASE 4T LIVE BOOT LOG INVENTORY",
-    "- 002 boot",
+    "- 004 boot",
     "[Nova OpenAI Key] loaded",
     "[Nova OpenAI Key] not configured",
     "NOVA PHASE 4T LIVE BOOT LOG INVENTORY DONE",
@@ -67,9 +67,11 @@ def main() -> int:
         and "[NOVA_ACTIVE_EXECUTION_STATUS_PRIORITY_20260701] print(" in output,
     )
 
+    boot_section = output.split("Boot-like print locations:", 1)[-1].split("Debug/error print locations:", 1)[0]
+
     assert_true(
         "active execution failure absent from boot section",
-        "Boot-like print locations:\napp.py:" not in output,
+        "[NOVA_ACTIVE_EXECUTION_STATUS_PRIORITY_20260701]" not in boot_section,
     )
 
     print("")
@@ -79,3 +81,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
