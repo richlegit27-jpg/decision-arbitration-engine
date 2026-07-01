@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Optional
@@ -47,6 +47,20 @@ def _practical_project_answer() -> str:
 
     return build_practical_project_answer()
 
+
+# NOVA_PROJECT_BRAIN_MISSION_CONTROL_GENERAL_20260702
+# Service-only Mission Control answer bridge.
+# No Flask wiring and no app.py dependency.
+def _mission_control_answer(user_text: object) -> str:
+    from nova_backend.services.project_brain_mission_control import (
+        build_project_brain_mission_control_answer,
+    )
+
+    return build_project_brain_mission_control_answer(
+        user_text=str(user_text or ""),
+        pasted_output="",
+    )
+
 def _is_direct_project_state_recall_prompt(text: str) -> bool:
     normalized = " ".join(text.replace("?", " ").replace("!", " ").split())
 
@@ -64,6 +78,21 @@ def classify_project_brain_intent(user_text: object) -> Optional[str]:
 
     if not text:
         return None
+
+    mission_terms = (
+        "mission control",
+        "mission card",
+        "operator mode",
+        "operator card",
+        "mission brief",
+        "mission plan",
+        "give me mission",
+        "show mission",
+        "show me the mission",
+    )
+
+    if _has_any(text, mission_terms):
+        return "mission_control"
 
     if _is_direct_project_state_recall_prompt(text):
         return None
@@ -241,6 +270,9 @@ def classify_project_brain_intent(user_text: object) -> Optional[str]:
 
 def build_project_brain_general_answer(user_text: object) -> Optional[ProjectBrainAnswer]:
     intent = classify_project_brain_intent(user_text)
+
+    if intent == "mission_control":
+        return ProjectBrainAnswer(intent=intent, text=_mission_control_answer(user_text))
 
     if intent == "current_project_state":
         return ProjectBrainAnswer(intent=intent, text=_current_project_answer())
