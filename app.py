@@ -17433,8 +17433,8 @@ try:
     def _nova_project_next_answer_20260701():
         return (
             "Current Nova project context:\n"
-            "Current task: finish Nova project brain answer quality.\n"
-            "Next move: make `what's next?` return project context instead of generic chat fallback, then harden "
+            "Current task: Project Brain answer freshness v2.\n"
+            "Next move: use the Project Brain freshness snapshot as the context builder source of truth, then harden "
             "`tools/nova_project_brain_live_answer_sample.py` so the smoke fails if idle/generic fallback text appears."
         )
 
@@ -17572,7 +17572,7 @@ try:
     def _nova_project_next_before_answer_20260701():
         return (
             "Current Nova project context:\n"
-            "Current task: finish Nova project brain answer quality.\n"
+            "Current task: Project Brain answer freshness v2.\n"
             "Next move: keep `what's next?` on the project-brain path before generic chat/model fallback, "
             "then harden `tools/nova_project_brain_live_answer_sample.py` so idle/generic fallback text fails the smoke."
         )
@@ -18219,7 +18219,7 @@ try:
     def _nova_project_next_wrap_answer_20260701():
         return (
             "Current Nova project context:\n"
-            "Current task: finish Nova project brain answer quality.\n"
+            "Current task: Project Brain answer freshness v2.\n"
             "Next move: keep `what's next?` on the project-brain path before generic chat/model fallback, "
             "then harden `tools/nova_project_brain_live_answer_sample.py` so idle/generic fallback text fails the smoke."
         )
@@ -18404,7 +18404,7 @@ try:
     def _nova_next_fixed_answer_20260701():
         return (
             "Current Nova project context:\n"
-            "Current task: finish Nova project brain answer quality.\n"
+            "Current task: Project Brain answer freshness v2.\n"
             "Next move: harden `tools/nova_project_brain_live_answer_sample.py` so idle/generic fallback text fails the smoke, "
             "then clean out the dead project-next hooks that were added while chasing this route."
         )
