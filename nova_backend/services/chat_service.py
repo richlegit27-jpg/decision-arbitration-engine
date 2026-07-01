@@ -1,4 +1,6 @@
 
+from __future__ import annotations
+
 def _nova_boot_log_20260701(*args, **kwargs):
     import os as _nova_boot_log_os_20260701
 
@@ -6,7 +8,6 @@ def _nova_boot_log_20260701(*args, **kwargs):
         print(*args, **kwargs)
 
 
-﻿from __future__ import annotations
 # NOVA_LOCAL_PROJECT_CONTEXT_GUARD_20260607
 def _nova_is_local_project_status_question_20260607(user_text):
     clean = " ".join(str(user_text or "").lower().split())
