@@ -1,6 +1,6 @@
 {
   "project": "Nova",
-  "checkpoint": "Patch-build adapter locked",
+  "checkpoint": "d3d44c6 Update Nova project state after patch build adapter",
   "current_focus": "Nova autonomy Phase 3G locked: patch-build now uses a one-command adapter, and the one-command adapter migration set is complete.",
   "last_completed": [
     "Router cleanup locked",
@@ -84,8 +84,8 @@
     "Autonomy Phase 1C autonomy-plan command",
     "Autonomy Phase 1D Patch Builder service"
   ],
-  "remaining": "Run final adapter inventory and full locked smoke set. Do not rebuild locked adapters.",
-  "next_move": "Run final adapter inventory and locked smokes, then plan cleanup review for old duplicate guards only after all adapter routes are verified.",
+  "remaining": "Run final adapter inventory and full locked smoke set while preserving project-state recall. Do not rebuild locked adapters.",
+  "next_move": "Run final adapter inventory and locked smokes while preserving project-state recall, then plan cleanup review for old duplicate guards only after all adapter routes are verified.",
   "git": {
     "branch": "post-frontend-polish-phase",
     "head": "e84977f",
