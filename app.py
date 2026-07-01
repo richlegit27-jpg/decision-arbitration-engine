@@ -113,7 +113,7 @@ restored_runtime = getattr(
     {},
 )
 
-print(
+_nova_boot_log_20260701(
     "RESTORED RUNTIME OK",
     {
         "runtime_health": restored_runtime.get(
@@ -134,7 +134,7 @@ last_compressed = getattr(
     {},
 )
 
-print(
+_nova_boot_log_20260701(
     "LAST COMPRESSED OK",
     {
         "runtime_health": last_compressed.get(
@@ -4042,8 +4042,8 @@ def api_chat():
                 "skip_rewrite": True,
             })
 
-        print("DEBUG GOAL:", _nova_exec_user_text)
-        print("DEBUG CLEAN:", _nova_exec_clean)
+        _nova_boot_log_20260701("DEBUG GOAL:", _nova_exec_user_text)
+        _nova_boot_log_20260701("DEBUG CLEAN:", _nova_exec_clean)
 
         if _nova_exec_clean.startswith("auto-plan "):
             _nova_exec_goal = (
@@ -4053,7 +4053,7 @@ def api_chat():
 
             _nova_goal_lower = _nova_exec_goal.lower()
 
-            print("DEBUG LOWER:", _nova_goal_lower)
+            _nova_boot_log_20260701("DEBUG LOWER:", _nova_goal_lower)
 
             if "attachment" in _nova_goal_lower or "upload" in _nova_goal_lower or "preview" in _nova_goal_lower:
                 _nova_exec_steps = [
@@ -15148,7 +15148,7 @@ try:
         except Exception:
             pass
 
-    print(
+    _nova_boot_log_20260701(
         "[NOVA_API_CHAT_PROJECT_STATE_IDLE_NEXT_FINAL_20260630] wrapped endpoints:",
         _nova_api_project_state_wrapped_count_20260630,
     )
@@ -15402,7 +15402,7 @@ try:
         except Exception:
             pass
 
-    print(
+    _nova_boot_log_20260701(
         "[NOVA_API_CHAT_NATURAL_PROJECT_RECALL_20260701] wrapped endpoints:",
         _nova_natural_project_wrapped_count_20260701,
     )
@@ -15647,7 +15647,7 @@ try:
         except Exception:
             pass
 
-    print(
+    _nova_boot_log_20260701(
         "[NOVA_API_CHAT_COMPACT_PROJECT_CONTEXT_20260701] wrapped endpoints:",
         _nova_compact_project_wrapped_count_20260701,
     )
@@ -15819,7 +15819,7 @@ try:
         except Exception:
             pass
 
-    print(
+    _nova_boot_log_20260701(
         "[NOVA_API_CHAT_AUTONOMY_TASK_BRIEF_20260701] wrapped endpoints:",
         _nova_autonomy_wrapped_count_20260701,
     )
