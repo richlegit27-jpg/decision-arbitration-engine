@@ -24,6 +24,7 @@ class ProjectBrainMissionCard:
     failure_patch_target: str
     failure_next_command: str
     failure_evidence: list[str]
+    operator_plan: dict[str, Any]
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -57,6 +58,9 @@ def build_project_brain_mission_card(
     from nova_backend.services.project_brain_failure_interpreter import (
         interpret_project_brain_failure,
     )
+    from nova_backend.services.project_brain_operator_planner import (
+        build_operator_plan_dict,
+    )
 
     snapshot = build_project_brain_freshness_snapshot()
     decision = decide_project_brain_next_move(
@@ -66,6 +70,11 @@ def build_project_brain_mission_card(
     failure = interpret_project_brain_failure(
         user_text=user_text,
         pasted_output=pasted_output,
+    )
+    operator_plan = build_operator_plan_dict(
+        user_text=user_text,
+        changed_files=list(decision.target_files),
+        project_state=str(snapshot.checkpoint or ""),
     )
 
     return ProjectBrainMissionCard(
@@ -87,6 +96,7 @@ def build_project_brain_mission_card(
         failure_patch_target=failure.patch_target,
         failure_next_command=failure.next_command,
         failure_evidence=list(failure.evidence),
+        operator_plan=operator_plan,
     )
 
 
@@ -95,6 +105,10 @@ def format_project_brain_mission_card(card: ProjectBrainMissionCard) -> str:
     target_files = ", ".join(card.target_files)
     avoid = "; ".join(card.avoid)
     failure_evidence = "; ".join(card.failure_evidence) if card.failure_evidence else "none"
+    operator_plan = card.operator_plan or {}
+    operator_target_files = ", ".join(operator_plan.get("target_files", []) or [])
+    operator_smokes = "; ".join(operator_plan.get("focused_smokes", []) or [])
+    operator_avoid = "; ".join(operator_plan.get("avoid_rules", []) or [])
 
     return (
         "Project Brain Mission Control:\n"
@@ -115,7 +129,16 @@ def format_project_brain_mission_card(card: ProjectBrainMissionCard) -> str:
         f"Failure patch target: {card.failure_patch_target}\n"
         f"Failure next command: {card.failure_next_command}\n"
         f"Failure evidence: {failure_evidence}\n"
-        f"Rationale: {card.rationale}"
+        f"Rationale: {card.rationale}\n"
+        "Operator Plan:\n"
+        f"Operator recommended move: {operator_plan.get('recommended_move', '')}\n"
+        f"Operator why: {operator_plan.get('why', '')}\n"
+        f"Operator work type: {operator_plan.get('work_type', '')}\n"
+        f"Operator risk: {operator_plan.get('risk', '')}\n"
+        f"Operator target files: {operator_target_files}\n"
+        f"Operator focused smokes: {operator_smokes}\n"
+        f"Operator avoid rules: {operator_avoid}\n"
+        f"Operator stop rule: {operator_plan.get('stop_rule', '')}"
     )
 
 
