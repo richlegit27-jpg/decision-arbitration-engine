@@ -27,17 +27,7 @@ for line in lines:
     if anchor in line and not inserted:
         indent = line[: len(line) - len(line.lstrip())]
 
-        if line.rstrip().endswith("),"):
-            # Tuple/list style, example:
-            # ("name", ["script.py"]),
-            new_lines.append(f'{indent}("{smoke}", ["{smoke}"]),')
-        elif line.rstrip().endswith('",') or line.rstrip().endswith("',"):
-            # Plain list of smoke filenames.
-            quote = '"' if '"' in line else "'"
-            new_lines.append(f"{indent}{quote}{smoke}{quote},")
-        else:
-            # Fallback: insert as a sibling script string.
-            new_lines.append(f'{indent}"{smoke}",')
+        new_lines.append(f'{indent}[str(ROOT / "tools" / "{smoke}")],')
 
         inserted = True
 

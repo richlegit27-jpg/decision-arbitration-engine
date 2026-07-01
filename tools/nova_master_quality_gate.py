@@ -13,7 +13,7 @@ COMMANDS = [
     [str(ROOT / "tools" / "nova_secret_log_hygiene_smoke.py")],
     [str(ROOT / "tools" / "nova_phase_3i_static_backup_review_smoke.py")],
     [str(ROOT / "tools" / "nova_openai_key_log_safety_smoke.py")],
-    "nova_phase_4y_quiet_boot_log_lock_smoke.py",
+    [str(ROOT / "tools" / "nova_phase_4y_quiet_boot_log_lock_smoke.py")],
     [str(ROOT / "tools" / "nova_fallback_guard_cleanup_plan_smoke.py")],
     [str(ROOT / "tools" / "nova_fallback_guard_cleanup_validation_smoke.py")],
     [str(ROOT / "tools" / "nova_phase_3h_cleanup_lock_smoke.py")],
