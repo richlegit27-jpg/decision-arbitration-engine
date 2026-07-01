@@ -186,7 +186,40 @@ class PromptBuilderService:
     ) -> List[str]:
         lines: List[str] = []
 
-        for item in memory_items[:max_memory_items]:
+        def memory_priority(item: Dict[str, Any]) -> tuple:
+            kind = str(item.get("kind") or "").strip().lower()
+            category = str(item.get("category") or "").strip().lower()
+            source = str(item.get("source") or "").strip().lower()
+            pinned = bool(item.get("pinned"))
+
+            try:
+                weight = float(item.get("weight") or 0.0)
+            except Exception:
+                weight = 0.0
+
+            text = self._safe_text(item.get("text") or item.get("content"))
+
+            is_project_state = (
+                kind == "project_state"
+                or category == "project_state"
+            )
+            is_workflow_preference = category == "workflow_preference"
+            is_empty = not bool(text)
+
+            return (
+                0 if is_project_state else 1 if is_workflow_preference else 2,
+                0 if pinned else 1,
+                -weight,
+                1 if is_empty else 0,
+                source,
+            )
+
+        ranked_memory_items = sorted(
+            list(memory_items or []),
+            key=memory_priority,
+        )
+
+        for item in ranked_memory_items[:max_memory_items]:
             text = self._safe_text(
                 item.get("text")
                 or item.get("content")

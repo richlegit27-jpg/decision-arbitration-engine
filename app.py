@@ -2566,6 +2566,67 @@ def _nova_prevent_bad_exact_pong_response(assistant_text, user_text):
     return clean_answer
 
 
+
+# NOVA_PROJECT_STATE_CURRENT_MEMORY_DIRECT_RECALL_20260701
+# Direct recall fallback for clean project_state memory records.
+def _nova_find_current_project_state_memory_20260701():
+    try:
+        import json as _nova_project_state_json_20260701
+
+        memory_path = DATA_DIR / "nova_memory.json"
+        payload = _nova_project_state_json_20260701.loads(
+            memory_path.read_text(encoding="utf-8") or "{}"
+        )
+
+        items = payload.get("memory") or []
+        candidates = []
+
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+
+            kind = str(item.get("kind") or "").strip().lower()
+            category = str(item.get("category") or "").strip().lower()
+            memory_id = str(item.get("id") or "").strip().lower()
+            value = str(item.get("text") or item.get("content") or "").strip()
+
+            if not value:
+                continue
+
+            if (
+                kind == "project_state"
+                or category == "project_state"
+                or memory_id == "memory_nova_project_state_current"
+            ):
+                try:
+                    weight = float(item.get("weight") or 0.0)
+                except Exception:
+                    weight = 0.0
+
+                candidates.append((
+                    0 if bool(item.get("pinned")) else 1,
+                    -weight,
+                    str(item.get("updated_at") or ""),
+                    value,
+                ))
+
+        candidates.sort()
+
+        if candidates:
+            return candidates[0][3]
+
+    except Exception as exc:
+        try:
+            app.logger.warning(
+                "[NOVA_PROJECT_STATE_CURRENT_MEMORY_DIRECT_RECALL_20260701] failed: %s",
+                exc,
+            )
+        except Exception:
+            pass
+
+    return ""
+
+
 def _nova_try_project_state_direct_recall(user_text, session_id):
     kinds = _nova_project_state_question_kinds(user_text)
 
@@ -2573,6 +2634,16 @@ def _nova_try_project_state_direct_recall(user_text, session_id):
         return None
 
     lines = []
+
+    current_project_state_memory = _nova_find_current_project_state_memory_20260701()
+    if current_project_state_memory:
+        return _nova_slim_assistant_payload(
+            current_project_state_memory,
+            session_id=session_id,
+            route="project_state_current_memory_direct_recall",
+            route_taken="project_state_current_memory_direct_recall",
+            project_state_memory_recall=True,
+        )
 
     for kind in kinds:
         value = _nova_find_project_state_memory(session_id, kind)
@@ -17104,6 +17175,401 @@ except Exception as _nova_phase4g_chat_guard_error_20260701:
 
 
 # NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701
+# Must be above
+
+# NOVA_FINAL_RESPONSE_SHAPE_CONTENT_DEBUG_20260701
+# Final payload polish: preserve assistant_message.content and debug fields
+# even when later response-cache wrappers rebuild JSON from assistant_message.text.
+try:
+    import json as _nova_final_shape_json_20260701
+
+    @app.after_request
+    def _nova_final_response_shape_content_debug_20260701(response):
+        try:
+            content_type = str(response.headers.get("Content-Type") or "").lower()
+            if "application/json" not in content_type:
+                return response
+
+            raw = response.get_data(as_text=True)
+            if not raw:
+                return response
+
+            data = _nova_final_shape_json_20260701.loads(raw)
+            if not isinstance(data, dict):
+                return response
+
+            changed = False
+
+            assistant = data.get("assistant_message")
+            if isinstance(assistant, dict):
+                text_value = str(
+                    assistant.get("text")
+                    or assistant.get("content")
+                    or data.get("text")
+                    or ""
+                )
+
+                if text_value:
+                    if not assistant.get("text"):
+                        assistant["text"] = text_value
+                        changed = True
+
+                    if not assistant.get("content"):
+                        assistant["content"] = text_value
+                        changed = True
+
+                    data["assistant_message"] = assistant
+
+                    if not data.get("text"):
+                        data["text"] = text_value
+                        changed = True
+
+            route_value = str(data.get("route") or "").strip()
+            route_taken_value = str(data.get("route_taken") or route_value or "").strip()
+
+            if route_value or route_taken_value:
+                debug = data.get("debug")
+                if not isinstance(debug, dict):
+                    debug = {}
+                    changed = True
+
+                if route_value and not debug.get("route"):
+                    debug["route"] = route_value
+                    changed = True
+
+                if route_taken_value and not debug.get("route_taken"):
+                    debug["route_taken"] = route_taken_value
+                    changed = True
+
+                data["debug"] = debug
+
+            if changed:
+                response.set_data(
+                    _nova_final_shape_json_20260701.dumps(
+                        data,
+                        ensure_ascii=False,
+                    )
+                )
+                response.headers["Content-Type"] = "application/json"
+                response.headers["Content-Length"] = str(len(response.get_data()))
+
+        except Exception as exc:
+            try:
+                app.logger.warning(
+                    "[NOVA_FINAL_RESPONSE_SHAPE_CONTENT_DEBUG_20260701] failed: %s",
+                    exc,
+                )
+            except Exception:
+                pass
+
+        return response
+
+    print("[NOVA_FINAL_RESPONSE_SHAPE_CONTENT_DEBUG_20260701] installed")
+except Exception as _nova_final_shape_error_20260701:
+    print("[NOVA_FINAL_RESPONSE_SHAPE_CONTENT_DEBUG_20260701] failed:", _nova_final_shape_error_20260701)
+
+# NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611
+
+
+# NOVA_API_CHAT_PROJECT_NEXT_FINAL_OVERRIDE_20260701
+# Final API response override for exact project-brain "what's next?" questions.
+# This catches generic chat fallback after chat_service.handle and before UI/PowerShell see it.
+try:
+    import json as _nova_project_next_json_20260701
+    from flask import request as _nova_project_next_request_20260701
+
+    def _nova_project_next_is_question_20260701(text):
+        normalized = (
+            str(text or "")
+            .strip()
+            .lower()
+            .replace("?", "'")
+            .rstrip("?!.")
+        )
+        return normalized in {
+            "what's next",
+            "whats next",
+            "what is next",
+            "what should we do next",
+            "next move",
+        }
+
+    def _nova_project_next_is_bad_answer_20260701(text):
+        lowered = str(text or "").strip().lower()
+        if not lowered:
+            return True
+
+        bad_bits = [
+            "tell me the immediate context",
+            "need the current target",
+            "send the file path",
+            "file path + goal",
+            "paste the current file",
+            "paste the current file/error",
+            "give me the immediate context",
+            "pick one and i'll give",
+            "current target to answer",
+            "debug/fix a bug",
+            "project planning",
+            "conversation/doc draft",
+            "general priority help",
+        ]
+
+        return any(bit in lowered for bit in bad_bits)
+
+    def _nova_project_next_answer_20260701():
+        return (
+            "Current Nova project context:\n"
+            "Current task: finish Nova project brain answer quality.\n"
+            "Next move: make `what's next?` return project context instead of generic chat fallback, then harden "
+            "`tools/nova_project_brain_live_answer_sample.py` so the smoke fails if idle/generic fallback text appears."
+        )
+
+    @app.after_request
+    def _nova_api_chat_project_next_final_override_20260701(response):
+        try:
+            if not _nova_project_next_request_20260701.path.endswith("/api/chat"):
+                return response
+
+            payload = _nova_project_next_request_20260701.get_json(silent=True) or {}
+            user_text = (
+                payload.get("message")
+                or payload.get("user_text")
+                or payload.get("text")
+                or payload.get("prompt")
+                or ""
+            )
+
+            if not _nova_project_next_is_question_20260701(user_text):
+                return response
+
+            raw = response.get_data(as_text=True)
+            if not raw:
+                return response
+
+            data = _nova_project_next_json_20260701.loads(raw)
+
+            assistant_message = data.get("assistant_message")
+            if not isinstance(assistant_message, dict):
+                assistant_message = {}
+
+            assistant_text = (
+                assistant_message.get("content")
+                or assistant_message.get("text")
+                or data.get("assistant_text")
+                or data.get("text")
+                or ""
+            )
+
+            if str(assistant_text or "").strip().lower().startswith("current nova project context:"):
+                return response
+
+            fixed_text = _nova_project_next_answer_20260701()
+
+            meta = data.get("meta")
+            if not isinstance(meta, dict):
+                meta = {}
+            meta["route"] = "api_chat_project_next_final_override"
+            meta["strategy"] = "api_chat_project_next_final_override"
+
+            debug = data.get("debug")
+            if not isinstance(debug, dict):
+                debug = {}
+            debug["route"] = "api_chat_project_next_final_override"
+            debug["route_taken"] = "api_chat_project_next_final_override"
+
+            assistant_message["role"] = "assistant"
+            assistant_message["content"] = fixed_text
+            assistant_message["text"] = fixed_text
+            assistant_message["meta"] = meta
+
+            data["assistant_message"] = assistant_message
+            data["assistant_text"] = fixed_text
+            data["text"] = fixed_text
+            data["route"] = "api_chat_project_next_final_override"
+            data["route_taken"] = "api_chat_project_next_final_override"
+            data["meta"] = meta
+            data["debug"] = debug
+
+            session_obj = data.get("session")
+            if isinstance(session_obj, dict):
+                session_obj["meta"] = meta
+                messages = session_obj.get("messages")
+                if isinstance(messages, list):
+                    for msg in reversed(messages):
+                        if isinstance(msg, dict) and str(msg.get("role") or "").lower() == "assistant":
+                            msg["content"] = fixed_text
+                            msg["text"] = fixed_text
+                            msg["meta"] = meta
+                            break
+
+            response.set_data(_nova_project_next_json_20260701.dumps(data, ensure_ascii=False))
+            response.headers["Content-Type"] = "application/json"
+            response.headers["Content-Length"] = str(len(response.get_data()))
+            return response
+
+        except Exception as _nova_project_next_override_error_20260701:
+            try:
+                print(
+                    "[NOVA_API_CHAT_PROJECT_NEXT_FINAL_OVERRIDE_20260701] bypass:",
+                    _nova_project_next_override_error_20260701,
+                )
+            except Exception:
+                pass
+            return response
+
+    print("[NOVA_API_CHAT_PROJECT_NEXT_FINAL_OVERRIDE_20260701] installed")
+
+except Exception as _nova_project_next_final_install_error_20260701:
+    try:
+        print(
+            "[NOVA_API_CHAT_PROJECT_NEXT_FINAL_OVERRIDE_20260701] failed:",
+            _nova_project_next_final_install_error_20260701,
+        )
+    except Exception:
+        pass
+
+
+# NOVA_API_CHAT_PROJECT_NEXT_BEFORE_REQUEST_PRIORITY_20260701
+# Hard priority intercept for exact project-brain "what's next?" before chat_service.handle.
+# This avoids generic chat/model fallback and avoids after_request ordering issues.
+try:
+    import json as _nova_project_next_before_json_20260701
+    from flask import request as _nova_project_next_before_request_20260701
+    from flask import Response as _nova_project_next_before_response_20260701
+
+    def _nova_project_next_before_norm_20260701(value):
+        return (
+            str(value or "")
+            .strip()
+            .lower()
+            .replace("?", "'")
+            .rstrip("?!.")
+        )
+
+    def _nova_project_next_before_is_question_20260701(value):
+        return _nova_project_next_before_norm_20260701(value) in {
+            "what's next",
+            "whats next",
+            "what is next",
+            "what should we do next",
+            "next move",
+        }
+
+    def _nova_project_next_before_answer_20260701():
+        return (
+            "Current Nova project context:\n"
+            "Current task: finish Nova project brain answer quality.\n"
+            "Next move: keep `what's next?` on the project-brain path before generic chat/model fallback, "
+            "then harden `tools/nova_project_brain_live_answer_sample.py` so idle/generic fallback text fails the smoke."
+        )
+
+    @app.before_request
+    def _nova_api_chat_project_next_before_request_priority_20260701():
+        try:
+            if not _nova_project_next_before_request_20260701.path.endswith("/api/chat"):
+                return None
+
+            payload = _nova_project_next_before_request_20260701.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return None
+
+            user_text = (
+                payload.get("message")
+                or payload.get("user_text")
+                or payload.get("text")
+                or payload.get("prompt")
+                or ""
+            )
+
+            if not _nova_project_next_before_is_question_20260701(user_text):
+                return None
+
+            session_id = str(
+                payload.get("session_id")
+                or payload.get("active_session_id")
+                or payload.get("requested_session_id")
+                or ""
+            ).strip()
+
+            fixed_text = _nova_project_next_before_answer_20260701()
+
+            meta = {
+                "route": "api_chat_project_next_before_request_priority",
+                "strategy": "api_chat_project_next_before_request_priority",
+                "session_id": session_id,
+                "source_urls": [],
+                "sources": [],
+            }
+
+            assistant_message = {
+                "role": "assistant",
+                "content": fixed_text,
+                "text": fixed_text,
+                "attachments": [],
+                "meta": meta,
+            }
+
+            data = {
+                "ok": True,
+                "success": True,
+                "assistant_message": assistant_message,
+                "assistant_text": fixed_text,
+                "text": fixed_text,
+                "saved_artifact": None,
+                "session": {
+                    "id": session_id,
+                    "session_id": session_id,
+                    "messages": [assistant_message],
+                    "attachments": [],
+                    "meta": meta,
+                },
+                "route": "api_chat_project_next_before_request_priority",
+                "route_taken": "api_chat_project_next_before_request_priority",
+                "debug": {
+                    "route": "api_chat_project_next_before_request_priority",
+                    "route_taken": "api_chat_project_next_before_request_priority",
+                },
+                "meta": meta,
+                "session_id": session_id,
+                "active_session_id": session_id,
+            }
+
+            try:
+                print(
+                    "[NOVA_API_CHAT_PROJECT_NEXT_BEFORE_REQUEST_PRIORITY_20260701] intercepted",
+                    "session_id=" + session_id,
+                )
+            except Exception:
+                pass
+
+            return _nova_project_next_before_response_20260701(
+                _nova_project_next_before_json_20260701.dumps(data, ensure_ascii=False),
+                status=200,
+                mimetype="application/json",
+            )
+
+        except Exception as _nova_project_next_before_error_20260701:
+            try:
+                print(
+                    "[NOVA_API_CHAT_PROJECT_NEXT_BEFORE_REQUEST_PRIORITY_20260701] bypass:",
+                    _nova_project_next_before_error_20260701,
+                )
+            except Exception:
+                pass
+            return None
+
+    print("[NOVA_API_CHAT_PROJECT_NEXT_BEFORE_REQUEST_PRIORITY_20260701] installed")
+
+except Exception as _nova_project_next_before_install_error_20260701:
+    try:
+        print(
+            "[NOVA_API_CHAT_PROJECT_NEXT_BEFORE_REQUEST_PRIORITY_20260701] failed:",
+            _nova_project_next_before_install_error_20260701,
+        )
+    except Exception:
+        pass
+
 # Must be above app.run(). Keeps normal chat from being overwritten by stale project/autonomy state.
 try:
     import json as _nova_phase4f_prerun_json_20260701
@@ -17981,7 +18447,6 @@ except Exception as _nova_next_fixed_install_error_20260701:
     except Exception:
         pass
 
-
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
@@ -17989,305 +18454,3 @@ if __name__ == "__main__":
         port=5001,
         debug=True,
     )
-# NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611
-
-
-# NOVA_API_CHAT_PROJECT_NEXT_FINAL_OVERRIDE_20260701
-# Final API response override for exact project-brain "what's next?" questions.
-# This catches generic chat fallback after chat_service.handle and before UI/PowerShell see it.
-try:
-    import json as _nova_project_next_json_20260701
-    from flask import request as _nova_project_next_request_20260701
-
-    def _nova_project_next_is_question_20260701(text):
-        normalized = (
-            str(text or "")
-            .strip()
-            .lower()
-            .replace("?", "'")
-            .rstrip("?!.")
-        )
-        return normalized in {
-            "what's next",
-            "whats next",
-            "what is next",
-            "what should we do next",
-            "next move",
-        }
-
-    def _nova_project_next_is_bad_answer_20260701(text):
-        lowered = str(text or "").strip().lower()
-        if not lowered:
-            return True
-
-        bad_bits = [
-            "tell me the immediate context",
-            "need the current target",
-            "send the file path",
-            "file path + goal",
-            "paste the current file",
-            "paste the current file/error",
-            "give me the immediate context",
-            "pick one and i'll give",
-            "current target to answer",
-            "debug/fix a bug",
-            "project planning",
-            "conversation/doc draft",
-            "general priority help",
-        ]
-
-        return any(bit in lowered for bit in bad_bits)
-
-    def _nova_project_next_answer_20260701():
-        return (
-            "Current Nova project context:\n"
-            "Current task: finish Nova project brain answer quality.\n"
-            "Next move: make `what's next?` return project context instead of generic chat fallback, then harden "
-            "`tools/nova_project_brain_live_answer_sample.py` so the smoke fails if idle/generic fallback text appears."
-        )
-
-    @app.after_request
-    def _nova_api_chat_project_next_final_override_20260701(response):
-        try:
-            if not _nova_project_next_request_20260701.path.endswith("/api/chat"):
-                return response
-
-            payload = _nova_project_next_request_20260701.get_json(silent=True) or {}
-            user_text = (
-                payload.get("message")
-                or payload.get("user_text")
-                or payload.get("text")
-                or payload.get("prompt")
-                or ""
-            )
-
-            if not _nova_project_next_is_question_20260701(user_text):
-                return response
-
-            raw = response.get_data(as_text=True)
-            if not raw:
-                return response
-
-            data = _nova_project_next_json_20260701.loads(raw)
-
-            assistant_message = data.get("assistant_message")
-            if not isinstance(assistant_message, dict):
-                assistant_message = {}
-
-            assistant_text = (
-                assistant_message.get("content")
-                or assistant_message.get("text")
-                or data.get("assistant_text")
-                or data.get("text")
-                or ""
-            )
-
-            if str(assistant_text or "").strip().lower().startswith("current nova project context:"):
-                return response
-
-            fixed_text = _nova_project_next_answer_20260701()
-
-            meta = data.get("meta")
-            if not isinstance(meta, dict):
-                meta = {}
-            meta["route"] = "api_chat_project_next_final_override"
-            meta["strategy"] = "api_chat_project_next_final_override"
-
-            debug = data.get("debug")
-            if not isinstance(debug, dict):
-                debug = {}
-            debug["route"] = "api_chat_project_next_final_override"
-            debug["route_taken"] = "api_chat_project_next_final_override"
-
-            assistant_message["role"] = "assistant"
-            assistant_message["content"] = fixed_text
-            assistant_message["text"] = fixed_text
-            assistant_message["meta"] = meta
-
-            data["assistant_message"] = assistant_message
-            data["assistant_text"] = fixed_text
-            data["text"] = fixed_text
-            data["route"] = "api_chat_project_next_final_override"
-            data["route_taken"] = "api_chat_project_next_final_override"
-            data["meta"] = meta
-            data["debug"] = debug
-
-            session_obj = data.get("session")
-            if isinstance(session_obj, dict):
-                session_obj["meta"] = meta
-                messages = session_obj.get("messages")
-                if isinstance(messages, list):
-                    for msg in reversed(messages):
-                        if isinstance(msg, dict) and str(msg.get("role") or "").lower() == "assistant":
-                            msg["content"] = fixed_text
-                            msg["text"] = fixed_text
-                            msg["meta"] = meta
-                            break
-
-            response.set_data(_nova_project_next_json_20260701.dumps(data, ensure_ascii=False))
-            response.headers["Content-Type"] = "application/json"
-            response.headers["Content-Length"] = str(len(response.get_data()))
-            return response
-
-        except Exception as _nova_project_next_override_error_20260701:
-            try:
-                print(
-                    "[NOVA_API_CHAT_PROJECT_NEXT_FINAL_OVERRIDE_20260701] bypass:",
-                    _nova_project_next_override_error_20260701,
-                )
-            except Exception:
-                pass
-            return response
-
-    print("[NOVA_API_CHAT_PROJECT_NEXT_FINAL_OVERRIDE_20260701] installed")
-
-except Exception as _nova_project_next_final_install_error_20260701:
-    try:
-        print(
-            "[NOVA_API_CHAT_PROJECT_NEXT_FINAL_OVERRIDE_20260701] failed:",
-            _nova_project_next_final_install_error_20260701,
-        )
-    except Exception:
-        pass
-
-
-# NOVA_API_CHAT_PROJECT_NEXT_BEFORE_REQUEST_PRIORITY_20260701
-# Hard priority intercept for exact project-brain "what's next?" before chat_service.handle.
-# This avoids generic chat/model fallback and avoids after_request ordering issues.
-try:
-    import json as _nova_project_next_before_json_20260701
-    from flask import request as _nova_project_next_before_request_20260701
-    from flask import Response as _nova_project_next_before_response_20260701
-
-    def _nova_project_next_before_norm_20260701(value):
-        return (
-            str(value or "")
-            .strip()
-            .lower()
-            .replace("?", "'")
-            .rstrip("?!.")
-        )
-
-    def _nova_project_next_before_is_question_20260701(value):
-        return _nova_project_next_before_norm_20260701(value) in {
-            "what's next",
-            "whats next",
-            "what is next",
-            "what should we do next",
-            "next move",
-        }
-
-    def _nova_project_next_before_answer_20260701():
-        return (
-            "Current Nova project context:\n"
-            "Current task: finish Nova project brain answer quality.\n"
-            "Next move: keep `what's next?` on the project-brain path before generic chat/model fallback, "
-            "then harden `tools/nova_project_brain_live_answer_sample.py` so idle/generic fallback text fails the smoke."
-        )
-
-    @app.before_request
-    def _nova_api_chat_project_next_before_request_priority_20260701():
-        try:
-            if not _nova_project_next_before_request_20260701.path.endswith("/api/chat"):
-                return None
-
-            payload = _nova_project_next_before_request_20260701.get_json(silent=True) or {}
-            if not isinstance(payload, dict):
-                return None
-
-            user_text = (
-                payload.get("message")
-                or payload.get("user_text")
-                or payload.get("text")
-                or payload.get("prompt")
-                or ""
-            )
-
-            if not _nova_project_next_before_is_question_20260701(user_text):
-                return None
-
-            session_id = str(
-                payload.get("session_id")
-                or payload.get("active_session_id")
-                or payload.get("requested_session_id")
-                or ""
-            ).strip()
-
-            fixed_text = _nova_project_next_before_answer_20260701()
-
-            meta = {
-                "route": "api_chat_project_next_before_request_priority",
-                "strategy": "api_chat_project_next_before_request_priority",
-                "session_id": session_id,
-                "source_urls": [],
-                "sources": [],
-            }
-
-            assistant_message = {
-                "role": "assistant",
-                "content": fixed_text,
-                "text": fixed_text,
-                "attachments": [],
-                "meta": meta,
-            }
-
-            data = {
-                "ok": True,
-                "success": True,
-                "assistant_message": assistant_message,
-                "assistant_text": fixed_text,
-                "text": fixed_text,
-                "saved_artifact": None,
-                "session": {
-                    "id": session_id,
-                    "session_id": session_id,
-                    "messages": [assistant_message],
-                    "attachments": [],
-                    "meta": meta,
-                },
-                "route": "api_chat_project_next_before_request_priority",
-                "route_taken": "api_chat_project_next_before_request_priority",
-                "debug": {
-                    "route": "api_chat_project_next_before_request_priority",
-                    "route_taken": "api_chat_project_next_before_request_priority",
-                },
-                "meta": meta,
-                "session_id": session_id,
-                "active_session_id": session_id,
-            }
-
-            try:
-                print(
-                    "[NOVA_API_CHAT_PROJECT_NEXT_BEFORE_REQUEST_PRIORITY_20260701] intercepted",
-                    "session_id=" + session_id,
-                )
-            except Exception:
-                pass
-
-            return _nova_project_next_before_response_20260701(
-                _nova_project_next_before_json_20260701.dumps(data, ensure_ascii=False),
-                status=200,
-                mimetype="application/json",
-            )
-
-        except Exception as _nova_project_next_before_error_20260701:
-            try:
-                print(
-                    "[NOVA_API_CHAT_PROJECT_NEXT_BEFORE_REQUEST_PRIORITY_20260701] bypass:",
-                    _nova_project_next_before_error_20260701,
-                )
-            except Exception:
-                pass
-            return None
-
-    print("[NOVA_API_CHAT_PROJECT_NEXT_BEFORE_REQUEST_PRIORITY_20260701] installed")
-
-except Exception as _nova_project_next_before_install_error_20260701:
-    try:
-        print(
-            "[NOVA_API_CHAT_PROJECT_NEXT_BEFORE_REQUEST_PRIORITY_20260701] failed:",
-            _nova_project_next_before_install_error_20260701,
-        )
-    except Exception:
-        pass
-

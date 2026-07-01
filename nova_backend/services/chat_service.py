@@ -3832,7 +3832,48 @@ if (not attachments) and (__name__ == "__main__"):
             "what are we working on now",
             "what are we doing",
         }:
-            return f"Active task:\n{active_task or 'No active task is currently tracked.'}"
+            if active_task:
+                return f"Active task:\n{active_task}"
+
+            try:
+                import json as _nova_memory_project_state_json_20260701
+                from pathlib import Path as _nova_memory_project_state_path_20260701
+
+                memory_path = _nova_memory_project_state_path_20260701("data/nova_memory.json")
+                memory_data = _nova_memory_project_state_json_20260701.loads(
+                    memory_path.read_text(encoding="utf-8") or "{}"
+                )
+                memory_items = memory_data.get("memory") or []
+
+                project_items = [
+                    item for item in memory_items
+                    if isinstance(item, dict)
+                    and (
+                        str(item.get("kind") or "").strip().lower() == "project_state"
+                        or str(item.get("category") or "").strip().lower() == "project_state"
+                    )
+                ]
+
+                project_items.sort(
+                    key=lambda item: (
+                        0 if bool(item.get("pinned")) else 1,
+                        -float(item.get("weight") or 0.0),
+                        str(item.get("updated_at") or ""),
+                    )
+                )
+
+                for item in project_items:
+                    memory_text = str(item.get("text") or item.get("content") or "").strip()
+                    if memory_text:
+                        return memory_text
+
+            except Exception as _nova_memory_project_state_error_20260701:
+                try:
+                    print("[NOVA_MEMORY_PROJECT_STATE_RECALL_20260701] failed:", _nova_memory_project_state_error_20260701)
+                except Exception:
+                    pass
+
+            return "Active task:\nNo active task is currently tracked."
 
         return None
 
@@ -14120,6 +14161,56 @@ Auto-fix result:
         user_text: str = "",
         limit: int = 5,
     ) -> str:
+
+        normalized_recall_text = " ".join(str(user_text or "").lower().strip().rstrip("?!.").split())
+        project_state_questions = {
+            "what are we working on",
+            "what are we working on now",
+            "what are we doing",
+            "current task",
+            "active task",
+            "current project",
+            "what is the current project",
+        }
+
+        if normalized_recall_text in project_state_questions:
+            try:
+                import json as _nova_project_memory_json_20260701
+                from pathlib import Path as _nova_project_memory_path_20260701
+
+                memory_path = _nova_project_memory_path_20260701("data/nova_memory.json")
+                memory_data = _nova_project_memory_json_20260701.loads(
+                    memory_path.read_text(encoding="utf-8") or "{}"
+                )
+                memory_items = memory_data.get("memory") or []
+
+                project_items = [
+                    item for item in memory_items
+                    if isinstance(item, dict)
+                    and (
+                        str(item.get("kind") or "").strip().lower() == "project_state"
+                        or str(item.get("category") or "").strip().lower() == "project_state"
+                    )
+                ]
+
+                project_items.sort(
+                    key=lambda item: (
+                        0 if bool(item.get("pinned")) else 1,
+                        -float(item.get("weight") or 0.0),
+                        str(item.get("updated_at") or ""),
+                    )
+                )
+
+                for item in project_items:
+                    project_text = str(item.get("text") or item.get("content") or "").strip()
+                    if project_text:
+                        return project_text
+
+            except Exception as _nova_project_memory_error_20260701:
+                try:
+                    print("[NOVA_PROJECT_STATE_MEMORY_RECALL_20260701] failed:", _nova_project_memory_error_20260701)
+                except Exception:
+                    pass
 
         items = []
 

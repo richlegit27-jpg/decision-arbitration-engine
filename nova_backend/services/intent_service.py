@@ -53,10 +53,11 @@ class IntentService:
         }:
             return self._result(
                 self.INTENT_WORKING_STATE,
-                self.ROUTE_GENERAL_CHAT,
+                self.ROUTE_MEMORY_RECALL,
                 "working_state_recall",
                 1.0,
-                ["direct_working_state_recall"],
+                ["direct_working_state_recall", "project_state_memory_recall"],
+                memory_limit=5,
             )
 
         # 2. Attachment/file requests must beat web.
