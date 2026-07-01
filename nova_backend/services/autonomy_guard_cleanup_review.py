@@ -145,7 +145,7 @@ def create_autonomy_guard_cleanup_review(app_path: str = "app.py") -> Dict[str, 
             "Do not execute commands automatically.",
             "Do not edit files automatically.",
         ],
-        "next_step": "Lock this cleanup review first, then create a one-command registry adapter for command-registry only.",
+        "next_step": "Lock this updated cleanup review first, then plan old fallback guard cleanup without deleting guards yet.",
     }
 
 
