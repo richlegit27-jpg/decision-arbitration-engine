@@ -258,3 +258,152 @@ def build_project_brain_general_answer(user_text: object) -> Optional[ProjectBra
         return ProjectBrainAnswer(intent=intent, text=_practical_project_answer())
 
     return None
+
+# NOVA_PROJECT_BRAIN_GENERAL_LIVE_SELECTOR_CLASSIFIER_20260702
+# Broadens Project Brain general question detection so live selector can win
+# before stale compact project_state_context fallback handles paraphrases.
+try:
+    _NOVA_PRE_LIVE_SELECTOR_PROJECT_BRAIN_GENERAL_CLASSIFIER_20260702 = should_handle_project_brain_general_question
+
+    def _nova_project_brain_live_selector_general_phrase_20260702(user_text):
+        q = str(user_text or "").strip().lower()
+        q = " ".join(q.replace("?", " ").replace("!", " ").split())
+
+        exact_direct_project_state = {
+            "what are we working on",
+            "what are we working on now",
+            "what are we working on right now",
+        }
+        if q in exact_direct_project_state:
+            return False
+
+        phrases = [
+            "where are we at with nova right now",
+            "where are we at with nova",
+            "where are we at",
+            "where is nova at",
+            "where's nova at",
+            "where is the project at",
+            "where's the project at",
+            "give me the nova status",
+            "nova status without hype",
+            "what should we do next",
+            "what should we do",
+            "what's next",
+            "next concrete move",
+            "next move",
+            "what now",
+            "should we patch app.py",
+            "should we patch or test",
+            "should we test first",
+            "test first",
+            "safe to code",
+            "what test should we run",
+            "what does this failure mean",
+            "why did this fail",
+            "stale memory",
+            "memory hijacking",
+        ]
+
+        return any(phrase in q for phrase in phrases)
+
+    def should_handle_project_brain_general_question(user_text):
+        q = str(user_text or "").strip().lower()
+        q = " ".join(q.replace("?", " ").replace("!", " ").split())
+
+        if q in {
+            "what are we working on",
+            "what are we working on now",
+            "what are we working on right now",
+        }:
+            return False
+
+        if _nova_project_brain_live_selector_general_phrase_20260702(user_text):
+            return True
+
+        return _NOVA_PRE_LIVE_SELECTOR_PROJECT_BRAIN_GENERAL_CLASSIFIER_20260702(user_text)
+
+except Exception as _nova_project_brain_general_live_selector_classifier_error_20260702:
+    pass
+
+# NOVA_PROJECT_BRAIN_GENERAL_LIVE_SELECTOR_EXPORTED_CLASSIFIER_20260702
+# Exports a stable Project Brain general classifier and routes matched questions
+# through the live answer selector. Service-only. No app.py changes.
+try:
+    _NOVA_PRE_LIVE_SELECTOR_PROJECT_BRAIN_GENERAL_BUILD_20260702 = build_project_brain_general_answer
+except Exception:
+    _NOVA_PRE_LIVE_SELECTOR_PROJECT_BRAIN_GENERAL_BUILD_20260702 = None
+
+
+def _nova_project_brain_general_live_selector_normalize_20260702(user_text):
+    q = str(user_text or "").strip().lower()
+    q = q.replace("?", " ").replace("!", " ").replace(".", " ")
+    q = " ".join(q.split())
+    return q
+
+
+def should_handle_project_brain_general_question(user_text):
+    q = _nova_project_brain_general_live_selector_normalize_20260702(user_text)
+
+    exact_direct_project_state = {
+        "what are we working on",
+        "what are we working on now",
+        "what are we working on right now",
+    }
+    if q in exact_direct_project_state:
+        return False
+
+    phrases = [
+        "where are we at with nova right now",
+        "where are we at with nova",
+        "where are we at",
+        "where is nova at",
+        "where's nova at",
+        "where is the project at",
+        "where's the project at",
+        "give me the nova status",
+        "nova status without hype",
+        "what should we do next",
+        "what should we do",
+        "what's next",
+        "next concrete move",
+        "next move",
+        "what now",
+        "should we patch app py",
+        "should we patch app.py",
+        "should we patch or test",
+        "should we test first",
+        "test first",
+        "safe to code",
+        "what test should we run",
+        "what does this failure mean",
+        "why did this fail",
+        "stale memory",
+        "memory hijacking",
+        "source of truth",
+    ]
+
+    return any(phrase in q for phrase in phrases)
+
+
+def build_project_brain_general_answer(user_text=""):
+    q = _nova_project_brain_general_live_selector_normalize_20260702(user_text)
+
+    if q in {
+        "what are we working on",
+        "what are we working on now",
+        "what are we working on right now",
+    }:
+        return None
+
+    if should_handle_project_brain_general_question(user_text):
+        from nova_backend.services.project_brain_live_answer_selector import (
+            build_project_brain_live_answer,
+        )
+
+        return build_project_brain_live_answer(user_text=user_text).text
+
+    if callable(_NOVA_PRE_LIVE_SELECTOR_PROJECT_BRAIN_GENERAL_BUILD_20260702):
+        return _NOVA_PRE_LIVE_SELECTOR_PROJECT_BRAIN_GENERAL_BUILD_20260702(user_text)
+
+    return None

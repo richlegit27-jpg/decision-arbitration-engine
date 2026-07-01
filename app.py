@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 
 def _nova_boot_log_20260701(*args, **kwargs):
@@ -15708,6 +15708,81 @@ try:
                 return value.strip()
         return ""
 
+    def _nova_compact_project_brain_response_20260701(user_text):
+        # NOVA_COMPACT_PROJECT_CONTEXT_DELEGATE_TO_PROJECT_BRAIN_20260701
+        # Broad Nova project paraphrases belong to Project Brain general intelligence.
+        try:
+            normalized = _nova_compact_project_normalize_20260701(user_text)
+
+            direct_recall_prompts = {
+                "what are we working on",
+                "what are we working on?",
+                "what are we working on now",
+                "what are we working on now?",
+                "what are we working on right now",
+                "what are we working on right now?",
+            }
+
+            if normalized in direct_recall_prompts:
+                return None
+
+            from nova_backend.services.project_brain_general_intelligence import (
+                build_project_brain_general_answer,
+            )
+
+            answer = build_project_brain_general_answer(user_text)
+
+            if not answer:
+                return None
+
+            answer_text = str(getattr(answer, "text", answer) or "").strip()
+            answer_intent = str(
+                getattr(answer, "intent", "general_project_answer")
+                or "general_project_answer"
+            ).strip()
+
+            if not answer_text:
+                return None
+
+            return _NovaCompactProjectResponse20260701(
+                _nova_compact_project_json_20260701.dumps(
+                    {
+                        "ok": True,
+                        "text": answer_text,
+                        "assistant_message": {
+                            "role": "assistant",
+                            "content": answer_text,
+                            "text": answer_text,
+                            "attachments": [],
+                        },
+                        "route": "project_brain_general_intelligence",
+                        "route_taken": "project_brain_general_intelligence",
+                        "debug": {
+                            "route": "project_brain_general_intelligence",
+                            "route_taken": "project_brain_general_intelligence",
+                            "intent": answer_intent,
+                            "compact_project_context_delegated": True,
+                        },
+                        "meta": {
+                            "route": "project_brain_general_intelligence",
+                            "strategy": "project_brain_general_intelligence",
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                mimetype="application/json",
+            )
+
+        except Exception as exc:
+            try:
+                print(
+                    "[NOVA_COMPACT_PROJECT_CONTEXT_DELEGATE_TO_PROJECT_BRAIN_20260701] bypass:",
+                    exc,
+                )
+            except Exception:
+                pass
+            return None
+
     def _nova_compact_project_load_context_20260701():
         service_path = (
             _NovaCompactProjectPath20260701(__file__)
@@ -15779,6 +15854,10 @@ try:
                 data = _nova_compact_project_request_json_20260701()
                 user_text = _nova_compact_project_request_text_20260701(data)
 
+                project_brain_response = _nova_compact_project_brain_response_20260701(user_text)
+                if project_brain_response is not None:
+                    return project_brain_response
+
                 if _nova_compact_project_should_answer_20260701(user_text):
                     context = _nova_compact_project_load_context_20260701()
 
@@ -15788,6 +15867,7 @@ try:
                             f"{context}\n\n"
                             "This is the compact checkpoint view for the current Nova work."
                         )
+
                         payload = _nova_compact_project_payload_20260701(reply, data)
                         encoded = _nova_compact_project_json_20260701.dumps(payload, ensure_ascii=False)
                         return _NovaCompactProjectResponse20260701(
@@ -18612,7 +18692,7 @@ try:
             answer = (
                 "Before touching code, run the smallest checks that prove the current behavior is safe:\n\n"
                 "1. `python -m py_compile` on the Python files you may touch.\n"
-                "2. The most relevant targeted smoke test.\n"
+                "2. The most relevant focused smoke test.\n"
                 "3. `git status --short` before staging or committing.\n\n"
                 "For this Nova intelligence/memory work, use:\n\n"
                 "```powershell\n"
@@ -18623,7 +18703,7 @@ try:
                 "python .\\\\tools\\\nova_phase_4i_guard_stack_audit_smoke.py\n"
                 "git status --short\n"
                 "```\n\n"
-                "Rule: py_compile first, targeted smoke second, git status third, then patch or commit."
+                "Rule: py_compile first, focused smoke second, git status third, then patch or commit."
             )
 
             try:
