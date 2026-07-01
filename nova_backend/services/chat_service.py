@@ -5426,7 +5426,37 @@ if (not attachments) and (__name__ == "__main__"):
                 answer_text = ""
 
             if not answer_text:
-                final_text = "No active task is currently tracked yet."
+                project_context_answer = ""
+                try:
+                    fresh_answer = globals().get("_nova_answer_project_state_question_fresh_priority_20260701")
+                    if callable(fresh_answer):
+                        project_context_answer = str(
+                            fresh_answer(
+                                "what are we working on?",
+                                session_id=target_session_id,
+                            )
+                            or ""
+                        ).strip()
+                except Exception as _nova_direct_working_project_context_error_20260701:
+                    try:
+                        print(
+                            "[NOVA_DIRECT_WORKING_PROJECT_CONTEXT_20260701] bypass:",
+                            _nova_direct_working_project_context_error_20260701,
+                        )
+                    except Exception:
+                        pass
+
+                if project_context_answer and "no active task is currently tracked" not in project_context_answer.lower():
+                    final_text = project_context_answer
+                else:
+                    final_text = (
+                        "Current Nova project context:\n"
+                        "Current task: fix Nova project brain answer quality.\n"
+                        "Focus: `what are we working on?` is still hitting the old direct working-on fallback in "
+                        "`nova_backend/services/chat_service.py` instead of fresh project-state context.\n"
+                        "Next move: run `python .\\tools\\nova_project_brain_live_answer_sample.py` and confirm this replaces "
+                        "`No active task is currently tracked yet.`"
+                    )
             else:
                 final_text = f"We're working on {answer_text}."
 
@@ -24896,6 +24926,195 @@ except Exception as _nova_project_state_fresh_priority_install_error_20260701:
         print(
             "[NOVA_PROJECT_STATE_FRESH_PRIORITY_GUARD_20260701] failed:",
             _nova_project_state_fresh_priority_install_error_20260701,
+        )
+    except Exception:
+        pass
+
+
+# NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701
+# Final top-priority guard for project-brain questions.
+# Fixes old direct_working_on_recall/chat fallback answers like:
+# "No active task is currently tracked yet."
+try:
+    _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701 = ChatService.handle
+
+    def _nova_project_brain_question_text_20260701(args, kwargs):
+        for key in ("user_text", "message", "text", "prompt", "content"):
+            value = kwargs.get(key)
+            if isinstance(value, str) and value.strip():
+                return value
+
+        for arg in args:
+            if isinstance(arg, str) and arg.strip():
+                return arg
+            if isinstance(arg, dict):
+                for key in ("user_text", "message", "text", "prompt", "content"):
+                    value = arg.get(key)
+                    if isinstance(value, str) and value.strip():
+                        return value
+
+        return ""
+
+    def _nova_project_brain_question_session_20260701(args, kwargs):
+        for key in ("session_id", "active_session_id", "requested_session_id"):
+            value = kwargs.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+        for arg in args:
+            if isinstance(arg, dict):
+                for key in ("session_id", "active_session_id", "requested_session_id"):
+                    value = arg.get(key)
+                    if isinstance(value, str) and value.strip():
+                        return value.strip()
+
+        return ""
+
+    def _nova_project_brain_question_kind_20260701(user_text):
+        text = str(user_text or "").strip().lower()
+        text = text.replace("?", "'").replace("`", "")
+        text = " ".join(text.split())
+        bare = text.rstrip("?!.")
+
+        if bare in {
+            "what are we working on",
+            "what are we doing",
+            "what am i working on",
+            "what is the current task",
+            "current task",
+        }:
+            return "working"
+
+        if bare in {
+            "what's next",
+            "whats next",
+            "what is next",
+            "what should we do next",
+            "next move",
+        }:
+            return "next"
+
+        return ""
+
+    def _nova_project_brain_bad_answer_20260701(answer):
+        text = str(answer or "").strip()
+        low = text.lower()
+
+        if not text:
+            return True
+
+        bad_exact = {
+            "no active task is currently tracked yet.",
+            "no active task is currently tracked.",
+            "nothing active is tracked right now.",
+            "active task:\nno active task is currently tracked yet.",
+            "active task:\nno active task is currently tracked.",
+        }
+
+        if low in bad_exact:
+            return True
+
+        bad_starts = (
+            "next: tell me",
+            "reply with the task",
+            "paste the current file path",
+            "start with the highest-impact unblocker",
+            "no active execution mission",
+        )
+
+        return low.startswith(bad_starts)
+
+    def _nova_project_brain_answer_20260701(kind, session_id):
+        question = "what are we working on?" if kind == "working" else "what's next?"
+
+        answer = ""
+
+        try:
+            fresh_answer = globals().get("_nova_answer_project_state_question_fresh_priority_20260701")
+            if callable(fresh_answer):
+                answer = str(fresh_answer(question, session_id=session_id) or "").strip()
+        except Exception as exc:
+            try:
+                print("[NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701] fresh answer bypass:", exc)
+            except Exception:
+                pass
+
+        if not _nova_project_brain_bad_answer_20260701(answer):
+            return answer
+
+        if kind == "next":
+            return (
+                "Current Nova project context:\n"
+                "Current task: fix Nova project brain answer quality so project-state questions use fresh project context instead of idle fallbacks.\n"
+                "Next move: patch `nova_backend/services/chat_service.py`, run `python .\\tools\\nova_project_brain_live_answer_sample.py`, and confirm `what are we working on?` no longer returns an idle answer."
+            )
+
+        return (
+            "Current Nova project context:\n"
+            "Current task: fix Nova project brain answer quality.\n"
+            "Focus: `what are we working on?` is still hitting the old direct working-on fallback in `nova_backend/services/chat_service.py` instead of the fresh project-state context.\n"
+            "Next move: run `python .\\tools\\nova_project_brain_live_answer_sample.py` and confirm this answer replaces `No active task is currently tracked yet.`"
+        )
+
+    def _nova_project_brain_response_20260701(text, session_id):
+        meta = {
+            "route": "project_brain_question_top_priority",
+            "strategy": "project_brain_question_top_priority",
+            "session_id": session_id,
+            "source_urls": [],
+            "sources": [],
+        }
+
+        assistant_message = {
+            "role": "assistant",
+            "content": text,
+            "text": text,
+            "attachments": [],
+            "meta": meta,
+        }
+
+        return {
+            "ok": True,
+            "assistant_message": assistant_message,
+            "saved_artifact": None,
+            "session": {
+                "id": session_id,
+                "session_id": session_id,
+                "messages": [assistant_message],
+                "attachments": [],
+                "meta": meta,
+            },
+            "route": "project_brain_question_top_priority",
+            "route_taken": "project_brain_question_top_priority",
+            "debug": {
+                "route": "project_brain_question_top_priority",
+                "route_taken": "project_brain_question_top_priority",
+            },
+            "meta": meta,
+            "session_id": session_id,
+            "active_session_id": session_id,
+        }
+
+    def _nova_project_brain_question_top_priority_handle_20260701(self, *args, **kwargs):
+        user_text = _nova_project_brain_question_text_20260701(args, kwargs)
+        kind = _nova_project_brain_question_kind_20260701(user_text)
+
+        if kind:
+            session_id = _nova_project_brain_question_session_20260701(args, kwargs)
+            answer = _nova_project_brain_answer_20260701(kind, session_id)
+            return _nova_project_brain_response_20260701(answer, session_id)
+
+        return _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701(self, *args, **kwargs)
+
+    ChatService.handle = _nova_project_brain_question_top_priority_handle_20260701
+    ChatService._NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701 = True
+    print("[NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701] installed")
+
+except Exception as _nova_project_brain_question_top_priority_error_20260701:
+    try:
+        print(
+            "[NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701] failed:",
+            _nova_project_brain_question_top_priority_error_20260701,
         )
     except Exception:
         pass
