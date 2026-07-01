@@ -17095,28 +17095,8 @@ def nova_repair_build_command_guard_20260701():
 
 
 # NOVA_WORKFLOW_CATALOG_COMMAND_GUARD_20260701
-# Manual workflow catalog command guard for:
-# workflow-catalog: <goal>
-# This does not edit files, execute commands, or apply repairs.
-def _nova_extract_workflow_catalog_goal_20260701(user_text):
-    raw = str(user_text or "").strip()
-    lowered = raw.lower()
-
-    prefixes = (
-        "workflow-catalog:",
-        "workflow catalog:",
-        "safe-workflow:",
-        "safe workflow:",
-        "workflow:",
-    )
-
-    for prefix in prefixes:
-        if lowered.startswith(prefix):
-            return raw[len(prefix):].strip()
-
-    return ""
-
-
+# Read-only workflow catalog guard.
+# Adapter-owned; behavior must remain workflow_catalog_command + manual_workflow_catalog_only.
 @app.before_request
 def nova_workflow_catalog_command_guard_20260701():
     try:
@@ -17125,94 +17105,16 @@ def nova_workflow_catalog_command_guard_20260701():
 
         payload = request.get_json(silent=True) or {}
 
-        user_text = str(
-            payload.get("user_text")
-            or payload.get("text")
-            or payload.get("message")
-            or ""
-        ).strip()
+        from nova_backend.services.workflow_catalog_adapter import (
+            build_workflow_catalog_response,
+        )
 
-        goal = _nova_extract_workflow_catalog_goal_20260701(user_text)
+        response_payload = build_workflow_catalog_response(payload, session_service)
 
-        if not goal:
+        if response_payload is None:
             return None
 
-        from datetime import datetime, timezone
-        from nova_backend.services.autonomy_workflow_catalog import format_safe_workflow_catalog
-
-        assistant_text = format_safe_workflow_catalog(goal)
-
-        session_id = str(
-            payload.get("session_id")
-            or payload.get("active_session_id")
-            or payload.get("requested_session_id")
-            or ""
-        ).strip()
-
-        if not session_id:
-            try:
-                session_id = str(getattr(session_service, "active_session_id", "") or "").strip()
-            except Exception:
-                session_id = ""
-
-        if not session_id:
-            session_id = "workflow_catalog"
-
-        now = datetime.now(timezone.utc).isoformat()
-
-        user_msg = {
-            "role": "user",
-            "text": user_text,
-            "content": user_text,
-            "attachments": [],
-            "created_at": now,
-            "meta": {
-                "route": "workflow_catalog_command",
-            },
-        }
-
-        assistant_msg = {
-            "role": "assistant",
-            "text": assistant_text,
-            "content": assistant_text,
-            "attachments": [],
-            "created_at": now,
-            "meta": {
-                "route": "workflow_catalog_command",
-                "mode": "manual_workflow_catalog_only",
-            },
-        }
-
-        try:
-            session_service.add_message(session_id, user_msg)
-            session_service.add_message(session_id, assistant_msg)
-        except Exception:
-            pass
-
-        try:
-            session = session_service.get_session(session_id)
-        except Exception:
-            session = None
-
-        if not isinstance(session, dict):
-            session = {
-                "id": session_id,
-                "messages": [user_msg, assistant_msg],
-            }
-
-        return jsonify({
-            "ok": True,
-            "session_id": session_id,
-            "active_session_id": session_id,
-            "assistant_message": assistant_msg,
-            "session": session,
-            "runtime": {},
-            "debug": {
-                "route": "workflow_catalog_command",
-                "mode": "manual_workflow_catalog_only",
-                "goal": goal,
-            },
-        })
+        return jsonify(response_payload)
 
     except Exception as error:
         try:
@@ -17228,8 +17130,6 @@ def nova_workflow_catalog_command_guard_20260701():
                 "failed": True,
             },
         }), 500
-
-
 
 
 # NOVA_AUTONOMY_INDEX_COMMAND_GUARD_20260701
