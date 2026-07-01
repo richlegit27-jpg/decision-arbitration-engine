@@ -123,7 +123,7 @@ def main():
         ],
         avoided_terms=[
             "execute all",
-            "memory write",
+            "save this memory",
         ],
     )
 
