@@ -15960,21 +15960,24 @@ Auto-fix result:
 
         attachments = attachments or []
 
-        if lower_text.startswith("generate "):
-            return {
-                "route": self.ROUTE_IMAGE_GENERATION,
-                "mode": "image_generation",
-                "confidence": 1.0,
-                "reasons": ["forced_generate_prefix"],
-                "save_artifact": True,
-                "save_memory": False,
-                "use_memory": False,
-                "prompt": user_text,
-            }
-
         # =========================
         # IMAGE GENERATION (PRIORITY)
         # =========================
+
+        # =========================
+        # IMAGE / FILE ANALYSIS
+        # =========================
+        # Real attachments must beat image-generation wording.
+        if attachments:
+            return {
+                "route": self.ROUTE_ATTACHMENT_ANALYSIS,
+                "mode": "attachment_analysis",
+                "confidence": 1.0,
+                "reasons": ["attachment_present_before_image_generation"],
+                "save_artifact": True,
+                "save_memory": False,
+                "use_memory": False,
+            }
 
         explicit_image_request = lower_text.startswith((
             "/image ",
@@ -15993,25 +15996,11 @@ Auto-fix result:
                 "route": self.ROUTE_IMAGE_GENERATION,
                 "mode": "image_generation",
                 "confidence": 0.95,
-                "reasons": ["image_generation_intent"],
+                "reasons": ["explicit_image_generation_intent"],
                 "save_artifact": True,
                 "save_memory": False,
                 "use_memory": False,
                 "prompt": user_text,
-            }
-
-        # =========================
-        # IMAGE / FILE ANALYSIS
-        # =========================
-        if attachments:
-            return {
-                "route": self.ROUTE_ATTACHMENT_ANALYSIS,
-                "mode": "image_analysis",
-                "confidence": 0.9,
-                "reasons": ["attachment_present"],
-                "save_artifact": True,
-                "save_memory": False,
-                "use_memory": False,
             }
 
         # =========================
