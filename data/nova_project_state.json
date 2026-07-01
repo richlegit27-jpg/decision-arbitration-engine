@@ -26,10 +26,12 @@
     "Autonomy task brain locked at 7e7e213",
     "Autonomy command smoke coverage locked at e84977f",
     "Autonomy Phase 1D Patch Builder service locked at c94672d",
-    "Memory quality smoke locked with Patch Builder state at c94672d"
+    "Memory quality smoke locked with Patch Builder state at c94672d",
+    "Memory quality and Project-state recall locked with Patch Builder state at c94672d"
   ],
   "locked": [
     "Memory quality smoke",
+    "Project-state recall",
     "Patch Builder service",
     "Router cleanup",
     "Web/live price",
@@ -37,7 +39,6 @@
     "Attachment cleanup",
     "Execution safety",
     "Regression runner",
-    "Project-state recall",
     "Idle next/k recall",
     "Natural project-state recall",
     "Project context smoke",
@@ -59,7 +60,7 @@
     "dirty_files": []
   },
   "updated_at_utc": "2026-07-01T03:18:03.782614+00:00",
-  "just_fixed": "Memory quality smoke locked with Patch Builder state at c94672d",
+  "just_fixed": "Memory quality and Project-state recall locked with Patch Builder state at c94672d",
   "remaining_work": "Wire patch-build: chat command into /api/chat so Richard can request supervised patch instructions from chat.",
   "next_command": "patch-build: make image descriptions better",
   "k_command": "Wire patch-build command.",
@@ -67,9 +68,9 @@
   "active_focus": "Nova autonomy phase 1D service locked: supervised Patch Builder creates instructions-only PowerShell patch plans without editing or executing.",
   "working_on": "Nova autonomy phase 1D service locked: supervised Patch Builder creates instructions-only PowerShell patch plans without editing or executing.",
   "current_work": "Nova autonomy phase 1D service locked: supervised Patch Builder creates instructions-only PowerShell patch plans without editing or executing.",
-  "last_fixed": "Memory quality smoke locked with Patch Builder state at c94672d",
-  "recent_fix": "Memory quality smoke locked with Patch Builder state at c94672d",
-  "just_done": "Memory quality smoke locked with Patch Builder state at c94672d",
+  "last_fixed": "Memory quality and Project-state recall locked with Patch Builder state at c94672d",
+  "recent_fix": "Memory quality and Project-state recall locked with Patch Builder state at c94672d",
+  "just_done": "Memory quality and Project-state recall locked with Patch Builder state at c94672d",
   "last_done": "Added Nova supervised Patch Builder service with smoke coverage. Memory quality smoke remains part of the locked safety baseline.",
   "recently_done": "Added Nova supervised Patch Builder service with smoke coverage. Memory quality smoke remains part of the locked safety baseline.",
   "latest_fix": "Added Nova supervised Patch Builder service with smoke coverage. Memory quality smoke remains part of the locked safety baseline.",
