@@ -77,14 +77,15 @@ def build_project_brain_context() -> ProjectBrainContext:
     )
 
     blocker = (
-        "The current blocker is answer freshness: project-brain answers are still partly "
-        "static, so they can say yesterday's blocker even after the route and classifier "
-        "smokes are green."
+        "The current blocker is Project Brain answer freshness: fallback-route priority is protected, "
+        "but project-brain answers can still become stale if status, blocker, next move, and validation "
+        "text are repeated as hardcoded paragraphs instead of built from one context source."
     )
 
     next_move = (
-        "Move project-brain answer text into a context builder so status, blocker, next move, "
-        "and validation guidance come from one reusable source instead of repeated hardcoded paragraphs."
+        "Move Project Brain answer text into the context builder so status, blocker, next move, "
+        "fallback priority notes, and validation guidance come from one reusable source instead of "
+        "repeated hardcoded paragraphs."
     )
 
     validation = [
@@ -183,5 +184,5 @@ def build_practical_project_answer() -> str:
         f"Next concrete move: {context.next_move} "
         "Validation: run the context-builder smoke, project-state memory API smoke, general-intelligence smoke, "
         "route-contract smoke, classifier-broadening smoke, answer-quality smoke, and guard-stack audit. "
-        "Then check `git status --short` and commit the clean patch."
+        "Then check `git status --short` and commit only after the board is green."
     )
