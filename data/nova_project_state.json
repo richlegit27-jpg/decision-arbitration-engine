@@ -1,7 +1,7 @@
 {
   "project": "Nova",
-  "checkpoint": "09125e3 Add Nova project state recall",
-  "current_focus": "Nova brain / memory quality upgrade phase 2: automatic project-state syncing",
+  "checkpoint": "99e5ec3 Add Nova project state sync helper",
+  "current_focus": "Nova memory quality upgrade: checkpoint automation",
   "last_completed": [
     "Router cleanup locked",
     "Web/live price routing locked",
@@ -13,7 +13,8 @@
     "Nova project-state recall locked at 09125e3",
     "Idle next/k project-state recall locked",
     "Regression smoke passed",
-    "Project-state smoke passed"
+    "Project-state smoke passed",
+    "Project-state sync guardrails passed"
   ],
   "locked": [
     "Router cleanup",
@@ -28,17 +29,19 @@
   "remaining": [
     "Add project-state sync helper",
     "Run regression and project-state smokes",
-    "Commit project-state sync helper"
+    "Commit project-state sync helper",
+    "Commit one-command checkpoint runner"
   ],
-  "next_move": "Add the project-state sync helper, rerun both smokes, then commit.",
+  "next_move": "Commit the one-command Nova checkpoint runner.",
   "git": {
     "branch": "post-frontend-polish-phase",
-    "head": "09125e3",
-    "subject": "Add Nova project state recall",
+    "head": "99e5ec3",
+    "subject": "Add Nova project state sync helper",
     "clean": false,
     "dirty_files": [
-      "?? tools/nova_project_state_sync.py"
+      "M tools/nova_project_state_sync.py",
+      "?? tools/nova_checkpoint.py"
     ]
   },
-  "updated_at_utc": "2026-07-01T02:10:26.423742+00:00"
+  "updated_at_utc": "2026-07-01T02:17:41.743166+00:00"
 }
