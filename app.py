@@ -884,8 +884,7 @@ def _nova_replace_weak_backend_reply(user_text, result):
         else:
             replacement = (
         
-                "I'm here. The active Nova phase is frontend/mobile polish. "
-                "Give me the next task and Iâ€™ll move directly on it."
+                "I'm here. What would you like to work on?"
             )
 
         assistant["text"] = replacement
@@ -2513,7 +2512,6 @@ def _nova_inject_project_state_context(user_text, session_id):
         return user_text
 
     clean_user_text = str(user_text or "").strip()
-
     if not clean_user_text:
         return context
 
@@ -2554,9 +2552,9 @@ def _nova_prevent_bad_exact_pong_response(assistant_text, user_text):
     }
 
     if clean_user in allowed_pong_requests:
-        return clean_answer
+        return "pong"
 
-    return "I'm here. The active Nova phase is frontend/mobile polish. Give me the next task and Iâ€™ll move directly on it."
+    return clean_answer
 
 
 def _nova_try_project_state_direct_recall(user_text, session_id):
