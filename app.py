@@ -16942,6 +16942,378 @@ def nova_command_registry_command_guard_20260701():
         }), 500
 
 
+
+# NOVA_ACTIVE_EXECUTION_STATUS_PRIORITY_20260701
+# Active execution missions should beat global project-state recall for status questions.
+try:
+    from flask import request as _nova_phase4a_request, jsonify as _nova_phase4a_jsonify, make_response as _nova_phase4a_make_response
+    from pathlib import Path as _NovaPhase4APath
+    import json as _nova_phase4a_json
+    import functools as _nova_phase4a_functools
+
+    _NOVA_PHASE4A_ACTIVE_EXECUTION_CACHE_20260701 = {}
+
+    _NOVA_PHASE4A_STATUS_QUESTIONS_20260701 = {
+        "what are we working on",
+        "what are we working on?",
+        "what are we doing",
+        "what are we doing?",
+        "where are we",
+        "where are we?",
+        "status",
+        "current status",
+        "what is the status",
+        "what's the status",
+        "whats the status",
+        "what comes next",
+        "what comes next?",
+        "what is next",
+        "what's next",
+        "whats next",
+        "next step",
+        "what is the next step",
+        "what's the next step",
+        "whats the next step",
+    }
+
+    def _nova_phase4a_clean_text_20260701(value):
+        return " ".join(str(value or "").strip().lower().split())
+
+    def _nova_phase4a_is_status_question_20260701(user_text):
+        clean = _nova_phase4a_clean_text_20260701(user_text).strip(" .!")
+        return clean in _NOVA_PHASE4A_STATUS_QUESTIONS_20260701
+
+    def _nova_phase4a_execution_is_active_20260701(execution):
+        if not isinstance(execution, dict):
+            return False
+
+        goal = str(execution.get("goal") or "").strip()
+        status = str(execution.get("status") or "").strip().lower()
+
+        if not goal:
+            return False
+
+        if status in {"complete", "completed", "done", "failed", "error", "cancelled", "canceled"}:
+            return False
+
+        return True
+
+    def _nova_phase4a_goal_20260701(execution):
+        return str((execution or {}).get("goal") or "").strip()
+
+    def _nova_phase4a_steps_20260701(execution):
+        raw_steps = (execution or {}).get("steps") or []
+        steps = []
+
+        for item in raw_steps:
+            if isinstance(item, dict):
+                title = str(item.get("title") or item.get("text") or item.get("name") or "").strip()
+            else:
+                title = str(item or "").strip()
+
+            if title:
+                steps.append(title)
+
+        return steps
+
+    def _nova_phase4a_index_20260701(execution, steps):
+        value = (
+            (execution or {}).get("current_index")
+            if "current_index" in (execution or {})
+            else (execution or {}).get("current_step_index", 0)
+        )
+
+        try:
+            index = int(value or 0)
+        except Exception:
+            index = 0
+
+        if steps:
+            index = max(0, min(index, len(steps) - 1))
+        else:
+            index = max(0, index)
+
+        return index
+
+    def _nova_phase4a_current_step_20260701(execution):
+        steps = _nova_phase4a_steps_20260701(execution)
+        index = _nova_phase4a_index_20260701(execution, steps)
+
+        current = str((execution or {}).get("current_step") or "").strip()
+        if current:
+            return current
+
+        if steps and 0 <= index < len(steps):
+            return steps[index]
+
+        return ""
+
+    def _nova_phase4a_execution_status_text_20260701(execution):
+        goal = _nova_phase4a_goal_20260701(execution)
+        status = str((execution or {}).get("status") or "ready").strip() or "ready"
+        steps = _nova_phase4a_steps_20260701(execution)
+        index = _nova_phase4a_index_20260701(execution, steps)
+        current_step = _nova_phase4a_current_step_20260701(execution)
+
+        lines = [
+            f"Active mission: {goal}",
+            f"Status: {status}",
+        ]
+
+        if current_step and steps:
+            lines.append(f"Step {index + 1}/{len(steps)}: {current_step}")
+        elif current_step:
+            lines.append(f"Current step: {current_step}")
+
+        if str((execution or {}).get("waiting") or "").lower() in {"true", "1", "yes"}:
+            lines.append("Next: send next, k, continue, or run it to advance.")
+
+        return "\n".join(lines).strip()
+
+    def _nova_phase4a_session_service_20260701():
+        for name in ("session_service", "sessions", "session_manager"):
+            svc = globals().get(name)
+            if svc is not None:
+                return svc
+        return None
+
+    def _nova_phase4a_read_sessions_file_20260701():
+        path = _NovaPhase4APath(__file__).resolve().parent / "data" / "nova_sessions.json"
+        if not path.exists():
+            return None, path
+
+        try:
+            return _nova_phase4a_json.loads(path.read_text(encoding="utf-8", errors="replace")), path
+        except Exception:
+            return None, path
+
+    def _nova_phase4a_find_session_20260701(container, session_id):
+        if not session_id:
+            return None
+
+        if isinstance(container, dict):
+            direct = container.get(session_id)
+            if isinstance(direct, dict):
+                return direct
+
+            for key in ("sessions", "items", "data"):
+                found = _nova_phase4a_find_session_20260701(container.get(key), session_id)
+                if found is not None:
+                    return found
+
+            for value in container.values():
+                if isinstance(value, dict) and str(value.get("id") or "") == session_id:
+                    return value
+                if isinstance(value, (dict, list)):
+                    found = _nova_phase4a_find_session_20260701(value, session_id)
+                    if found is not None:
+                        return found
+
+        if isinstance(container, list):
+            for item in container:
+                if isinstance(item, dict) and str(item.get("id") or "") == session_id:
+                    return item
+
+        return None
+
+    def _nova_phase4a_get_working_state_20260701(session_id):
+        session_id = str(session_id or "").strip()
+        if not session_id:
+            return {}
+
+        svc = _nova_phase4a_session_service_20260701()
+
+        for method_name in ("get_working_state",):
+            method = getattr(svc, method_name, None)
+            if callable(method):
+                try:
+                    state = method(session_id)
+                    if isinstance(state, dict):
+                        return dict(state)
+                except Exception:
+                    pass
+
+        for method_name in ("get_session", "get"):
+            method = getattr(svc, method_name, None)
+            if callable(method):
+                try:
+                    session = method(session_id)
+                    if isinstance(session, dict) and isinstance(session.get("working_state"), dict):
+                        return dict(session.get("working_state"))
+                except Exception:
+                    pass
+
+        data, _ = _nova_phase4a_read_sessions_file_20260701()
+        session = _nova_phase4a_find_session_20260701(data, session_id)
+        if isinstance(session, dict) and isinstance(session.get("working_state"), dict):
+            return dict(session.get("working_state"))
+
+        return {}
+
+    def _nova_phase4a_persist_working_state_20260701(session_id, patch):
+        session_id = str(session_id or "").strip()
+        if not session_id or not isinstance(patch, dict):
+            return False
+
+        svc = _nova_phase4a_session_service_20260701()
+        method = getattr(svc, "update_working_state", None)
+
+        if callable(method):
+            try:
+                method(session_id, patch)
+                return True
+            except Exception:
+                pass
+
+        data, path = _nova_phase4a_read_sessions_file_20260701()
+        if data is None:
+            return False
+
+        session = _nova_phase4a_find_session_20260701(data, session_id)
+        if not isinstance(session, dict):
+            return False
+
+        state = session.get("working_state")
+        if not isinstance(state, dict):
+            state = {}
+
+        state.update(patch)
+        session["working_state"] = state
+
+        try:
+            path.write_text(_nova_phase4a_json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            return True
+        except Exception:
+            return False
+
+    def _nova_phase4a_get_active_execution_20260701(session_id):
+        session_id = str(session_id or "").strip()
+
+        if session_id:
+            cached = _NOVA_PHASE4A_ACTIVE_EXECUTION_CACHE_20260701.get(session_id)
+            if _nova_phase4a_execution_is_active_20260701(cached):
+                return cached
+
+        state = _nova_phase4a_get_working_state_20260701(session_id)
+        for key in ("active_execution", "execution_state", "execution"):
+            execution = state.get(key)
+            if _nova_phase4a_execution_is_active_20260701(execution):
+                if session_id:
+                    _NOVA_PHASE4A_ACTIVE_EXECUTION_CACHE_20260701[session_id] = execution
+                return execution
+        return None
+
+    def _nova_phase4a_persist_execution_20260701(session_id, execution):
+        session_id = str(session_id or "").strip()
+
+        if not _nova_phase4a_execution_is_active_20260701(execution):
+            return False
+
+        if session_id:
+            _NOVA_PHASE4A_ACTIVE_EXECUTION_CACHE_20260701[session_id] = execution
+
+        goal = _nova_phase4a_goal_20260701(execution)
+        current_step = _nova_phase4a_current_step_20260701(execution)
+
+        patch = {
+            "active_execution": execution,
+            "execution_state": execution,
+            "active_task": goal,
+            "next_move": current_step,
+            "checkpoint": "Active execution mission",
+        }
+
+        return _nova_phase4a_persist_working_state_20260701(session_id, patch)
+
+    def _nova_phase4a_wrap_chat_endpoint_20260701(endpoint, view_func):
+        if getattr(view_func, "_nova_phase4a_active_execution_wrapped", False):
+            return view_func
+
+        @_nova_phase4a_functools.wraps(view_func)
+        def _nova_phase4a_wrapped(*args, **kwargs):
+            payload = {}
+            try:
+                payload = _nova_phase4a_request.get_json(silent=True) or {}
+            except Exception:
+                payload = {}
+
+            user_text = str(payload.get("message") or payload.get("text") or payload.get("user_text") or "").strip()
+            session_id = str(payload.get("session_id") or payload.get("active_session_id") or "").strip()
+
+            if session_id and _nova_phase4a_is_status_question_20260701(user_text):
+                active_execution = _nova_phase4a_get_active_execution_20260701(session_id)
+                if _nova_phase4a_execution_is_active_20260701(active_execution):
+                    text = _nova_phase4a_execution_status_text_20260701(active_execution)
+                    return _nova_phase4a_jsonify({
+                        "ok": True,
+                        "session_id": session_id,
+                        "active_session_id": session_id,
+                        "assistant_message": {
+                            "role": "assistant",
+                            "text": text,
+                            "content": text,
+                            "session_id": session_id,
+                            "active_session_id": session_id,
+                            "execution_state": active_execution,
+                            "meta": {
+                                "render_source": "active_execution_status",
+                            },
+                        },
+                        "execution_state": active_execution,
+                        "debug": {
+                            "route": "active_execution_status",
+                            "route_taken": "active_execution_status",
+                            "suppressed_project_state_recall": True,
+                        },
+                    })
+
+            result = view_func(*args, **kwargs)
+
+            try:
+                response = _nova_phase4a_make_response(result)
+                data = response.get_json(silent=True)
+
+                if isinstance(data, dict) and session_id:
+                    execution = data.get("execution_state")
+                    if not isinstance(execution, dict):
+                        assistant = data.get("assistant_message")
+                        if isinstance(assistant, dict):
+                            execution = assistant.get("execution_state")
+
+                    if _nova_phase4a_execution_is_active_20260701(execution):
+                        _nova_phase4a_persist_execution_20260701(session_id, execution)
+
+                return response
+            except Exception:
+                return result
+
+        _nova_phase4a_wrapped._nova_phase4a_active_execution_wrapped = True
+        return _nova_phase4a_wrapped
+
+    _nova_phase4a_wrapped_count_20260701 = 0
+
+    for _nova_phase4a_endpoint_20260701, _nova_phase4a_view_20260701 in list(app.view_functions.items()):
+        try:
+            _nova_phase4a_rules_20260701 = [
+                str(rule.rule)
+                for rule in app.url_map.iter_rules(_nova_phase4a_endpoint_20260701)
+            ]
+        except Exception:
+            _nova_phase4a_rules_20260701 = []
+
+        if "/api/chat" in _nova_phase4a_rules_20260701:
+            app.view_functions[_nova_phase4a_endpoint_20260701] = _nova_phase4a_wrap_chat_endpoint_20260701(
+                _nova_phase4a_endpoint_20260701,
+                _nova_phase4a_view_20260701,
+            )
+            _nova_phase4a_wrapped_count_20260701 += 1
+
+    print(f"[NOVA_ACTIVE_EXECUTION_STATUS_PRIORITY_20260701] wrapped endpoints: {_nova_phase4a_wrapped_count_20260701}")
+
+except Exception as _nova_phase4a_error_20260701:
+    print("[NOVA_ACTIVE_EXECUTION_STATUS_PRIORITY_20260701] failed:", _nova_phase4a_error_20260701)
+
+
 if __name__ == "__main__":
     create_startup_backup()
 app.run(
