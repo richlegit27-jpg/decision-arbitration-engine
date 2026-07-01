@@ -16720,6 +16720,42 @@ def nova_autonomy_plan_command_guard_20260630():
 
 
 
+
+# NOVA_PATCH_BUILD_ADAPTER_GUARD_20260701
+# One-command adapter migration for patch-build.
+# Keeps old guard below as fallback while adapter owns matching command requests.
+try:
+    @app.before_request
+    def nova_patch_build_adapter_guard_20260701():
+        try:
+            if request.method != "POST":
+                return None
+
+            if request.path not in ("/api/chat", "/api/chat/stream"):
+                return None
+
+            try:
+                payload = request.get_json(silent=True) or {}
+            except Exception:
+                payload = {}
+
+            from nova_backend.services.patch_build_adapter import build_patch_build_response
+
+            response_json = build_patch_build_response(payload, session_service)
+
+            if not response_json:
+                return None
+
+            return jsonify(response_json)
+        except Exception as _nova_patch_build_adapter_error_20260701:
+            print("[NOVA_PATCH_BUILD_ADAPTER_GUARD_20260701] failed:", _nova_patch_build_adapter_error_20260701)
+            return None
+
+    print("[NOVA_PATCH_BUILD_ADAPTER_GUARD_20260701] installed")
+except Exception as _nova_patch_build_adapter_install_error_20260701:
+    print("[NOVA_PATCH_BUILD_ADAPTER_GUARD_20260701] install failed:", _nova_patch_build_adapter_install_error_20260701)
+
+
 # NOVA_PATCH_BUILD_COMMAND_GUARD_20260630
 # Instructions-only command guard for:
 # patch-build: <goal>
