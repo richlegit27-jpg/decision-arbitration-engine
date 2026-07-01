@@ -18954,24 +18954,3 @@ if __name__ == "__main__":
         port=5001,
         debug=True,
     )
-
-# NOVA_PROJECT_BRAIN_DECISION_LOG_ROUTE_KEYWORDS_20260701
-NOVA_PROJECT_BRAIN_DECISION_LOG_ROUTE_KEYWORDS_20260701 = (
-    "what changed recently",
-    "what changed lately",
-    "recent changes",
-    "recent decisions",
-    "decision log",
-    "recent commits",
-    "last commits",
-    "latest commits",
-    "what did we commit",
-    "what did we lock recently",
-    "what got locked recently",
-    "locked upgrades",
-    "operator timeline",
-)
-
-def _nova_project_brain_decision_log_route_question_20260701(user_text):
-    text = str(user_text or '').strip().lower()
-    return any(keyword in text for keyword in NOVA_PROJECT_BRAIN_DECISION_LOG_ROUTE_KEYWORDS_20260701)
