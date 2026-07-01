@@ -5,8 +5,9 @@ import subprocess
 import sys
 import threading
 import time
-import urllib.error
 import urllib.request
+
+from werkzeug.serving import WSGIRequestHandler, make_server
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,6 +19,11 @@ SMOKES = [
     "nova_autonomy_task_brain_smoke.py",
     "nova_autonomy_command_api_smoke.py",
 ]
+
+
+class _NovaQuietWerkzeugRequestHandler(WSGIRequestHandler):
+    def log(self, type, message, *args):
+        return
 
 
 def server_reachable() -> bool:
@@ -44,14 +50,6 @@ def start_test_server():
     sys.path.insert(0, str(ROOT))
 
     from app import app as nova_app
-    from werkzeug.serving import WSGIRequestHandler, make_server
-
-
-class _NovaQuietWerkzeugRequestHandler(WSGIRequestHandler):
-    def log(self, type, message, *args):
-        return
-
-
 
     server = make_server(
         "127.0.0.1",
