@@ -1,7 +1,7 @@
-﻿{
+{
   "project": "Nova",
-  "checkpoint": "510eb27 Add Nova project state recall",
-  "current_focus": "Nova brain / memory quality upgrade: memory + project-state recall",
+  "checkpoint": "09125e3 Add Nova project state recall",
+  "current_focus": "Nova brain / memory quality upgrade phase 2: automatic project-state syncing",
   "last_completed": [
     "Router cleanup locked",
     "Web/live price routing locked",
@@ -9,7 +9,11 @@
     "Attachment cleanup locked",
     "Execution safety locked",
     "Regression runner locked",
-    "Project-state recall service loads and answers current/fixed/remaining"
+    "Project-state recall service loads and answers current/fixed/remaining",
+    "Nova project-state recall locked at 09125e3",
+    "Idle next/k project-state recall locked",
+    "Regression smoke passed",
+    "Project-state smoke passed"
   ],
   "locked": [
     "Router cleanup",
@@ -17,12 +21,24 @@
     "Image text polish",
     "Attachment cleanup",
     "Execution safety",
-    "Regression runner"
+    "Regression runner",
+    "Project-state recall",
+    "Idle next/k recall"
   ],
   "remaining": [
-    "Fix next/k idle fallback so project-state recall owns idle next/k",
-    "Smoke test project-state answers",
-    "Amend the project-state recall commit"
+    "Add project-state sync helper",
+    "Run regression and project-state smokes",
+    "Commit project-state sync helper"
   ],
-  "next_move": "Fix idle next/k fallback in chat_service, then rerun both smoke tests."
+  "next_move": "Add the project-state sync helper, rerun both smokes, then commit.",
+  "git": {
+    "branch": "post-frontend-polish-phase",
+    "head": "09125e3",
+    "subject": "Add Nova project state recall",
+    "clean": false,
+    "dirty_files": [
+      "?? tools/nova_project_state_sync.py"
+    ]
+  },
+  "updated_at_utc": "2026-07-01T02:10:26.423742+00:00"
 }
