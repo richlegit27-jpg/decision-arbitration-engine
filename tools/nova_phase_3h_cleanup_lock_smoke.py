@@ -85,7 +85,7 @@ def main():
 
     key_log_lines = [
         line.strip()
-        for line in app_text.splitlines()
+        for line in runtime_text.splitlines()
         if "[Nova OpenAI Key]" in line
     ]
 
@@ -123,3 +123,4 @@ def main():
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

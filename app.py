@@ -17468,11 +17468,9 @@ except Exception as guard_exc:
 
 if __name__ == "__main__":
     create_startup_backup()
-app.run(
-    host="0.0.0.0",
-    port=5001,
-    debug=True,
-)
-
-
+    app.run(
+        host="0.0.0.0",
+        port=5001,
+        debug=True,
+    )
 # NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611

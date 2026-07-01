@@ -20,6 +20,7 @@ REQUIRED_LOCK_FILES = [
     "tools/nova_fallback_guard_cleanup_validation_smoke.py",
     "tools/nova_fallback_guard_cleanup_plan_smoke.py",
     "tools/nova_phase_3h_cleanup_lock_smoke.py",
+    "tools/nova_master_quality_gate.py",
     "tools/nova_memory_quality_smoke.py",
 ]
 
@@ -87,12 +88,12 @@ def main():
     ]
     assert_true("required lock files exist", not missing_lock_files, f"missing={missing_lock_files}")
 
-    memory_gate_text = _read(ROOT / "tools" / "nova_memory_quality_smoke.py")
+    master_gate_text = _read(ROOT / "tools" / "nova_master_quality_gate.py")
     missing_gate_markers = [
         item for item in REQUIRED_LOCK_MARKERS
-        if item not in memory_gate_text
+        if item not in master_gate_text
     ]
-    assert_true("memory quality gate has lock markers", not missing_gate_markers, f"missing={missing_gate_markers}")
+    assert_true("master quality gate has lock markers", not missing_gate_markers, f"missing={missing_gate_markers}")
 
     existing_candidates = [
         item for item in CANDIDATE_FILES
@@ -141,3 +142,4 @@ def main():
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

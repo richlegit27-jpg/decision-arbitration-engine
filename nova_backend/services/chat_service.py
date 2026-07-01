@@ -3729,13 +3729,10 @@ if (not attachments) and (__name__ == "__main__"):
 
         if env_key:
             os.environ["OPENAI_API_KEY"] = env_key
-            print(
-                "[Nova OpenAI Key] loaded",
-                env_key[:10] + "..." + env_key[-4:],
-            )
+            print("[Nova OpenAI Key] loaded")
             self.client = OpenAI(api_key=env_key)
         else:
-            print("[Nova OpenAI Key] WARNING: OPENAI_API_KEY missing")
+            print("[Nova OpenAI Key] not configured")
             self.client = OpenAI()
         self.agent = AgentService()
         self.memory_ranker = MemoryRankerService()
@@ -25312,4 +25309,5 @@ except Exception as _nova_project_state_idle_next_response_install_error_2026063
         )
     except Exception:
         pass
+
 
