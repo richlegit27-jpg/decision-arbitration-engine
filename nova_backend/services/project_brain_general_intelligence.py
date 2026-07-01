@@ -439,3 +439,74 @@ def build_project_brain_general_answer(user_text=""):
         return _NOVA_PRE_LIVE_SELECTOR_PROJECT_BRAIN_GENERAL_BUILD_20260702(user_text)
 
     return None
+
+
+
+# NOVA_PROJECT_BRAIN_DECISION_LOG_GENERAL_WIRE_20260701
+# Routes recent-change/operator-timeline questions through the Git-backed
+# Decision Log service while preserving direct project-state recall.
+try:
+    from nova_backend.services.project_brain_decision_log import answer_recent_changes as _nova_decision_log_answer_20260701
+
+    _NOVA_DECISION_LOG_PREVIOUS__CURRENT_PROJECT_ANSWER_20260701 = _current_project_answer
+
+    def _nova_decision_log_user_text_20260701(*args, **kwargs):
+        if args:
+            first = args[0]
+            if isinstance(first, str):
+                return first
+            if isinstance(first, dict):
+                for key in ("message", "question", "user_text", "text", "prompt"):
+                    value = first.get(key)
+                    if isinstance(value, str):
+                        return value
+
+        for key in ("message", "question", "user_text", "text", "prompt"):
+            value = kwargs.get(key)
+            if isinstance(value, str):
+                return value
+
+        return ""
+
+    def _nova_is_decision_log_question_20260701(user_text):
+        text = str(user_text or "").strip().lower()
+        if not text:
+            return False
+
+        needles = (
+            "what changed recently",
+            "what changed lately",
+            "recent changes",
+            "recent decisions",
+            "decision log",
+            "recent commits",
+            "last commits",
+            "latest commits",
+            "what did we commit",
+            "what did we lock recently",
+            "what got locked recently",
+            "locked upgrades",
+            "operator timeline",
+            "what changed in project brain",
+            "what changed with project brain",
+        )
+
+        return any(needle in text for needle in needles)
+
+    def _current_project_answer(*args, **kwargs):
+        user_text = _nova_decision_log_user_text_20260701(*args, **kwargs)
+
+        if _nova_is_decision_log_question_20260701(user_text):
+            return {
+                "intent": "decision_log",
+                "answer": _nova_decision_log_answer_20260701(limit=8),
+                "route": "project_brain_general_intelligence",
+                "risk": "low",
+                "confidence": 0.91,
+            }
+
+        return _NOVA_DECISION_LOG_PREVIOUS__CURRENT_PROJECT_ANSWER_20260701(*args, **kwargs)
+
+    print("[NOVA_PROJECT_BRAIN_DECISION_LOG_GENERAL_WIRE_20260701] installed on _current_project_answer")
+except Exception as _nova_decision_log_wire_error_20260701:
+    print("[NOVA_PROJECT_BRAIN_DECISION_LOG_GENERAL_WIRE_20260701] failed:", _nova_decision_log_wire_error_20260701)
