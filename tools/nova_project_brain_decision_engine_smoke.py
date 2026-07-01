@@ -89,6 +89,18 @@ def main():
     )
 
     check_case(
+        name="next move judgment",
+        user_text="what should we do next?",
+        pasted_output="",
+        expected_intent="next_move_judgment",
+        expected_terms=[
+            "live answer selector",
+            "decision gate",
+            "do not classify ordinary next-move",
+        ],
+    )
+
+    check_case(
         name="intelligence upgrade",
         user_text="make Nova smarter with a decision engine",
         pasted_output="",

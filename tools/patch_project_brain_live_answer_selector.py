@@ -317,7 +317,7 @@ def main():
         expected_route="project_brain_decision_context",
         expected_terms=[
             "project brain decision context",
-            "intent:",
+            "intent: next_move_judgment",
             "risk:",
             "validation:",
             "avoid:",
