@@ -128,3 +128,70 @@ def build_repair_plan_response(
             "adapter": "repair_plan_adapter",
         },
     }
+
+# NOVA_REPAIR_PLAN_VISIBLE_SAFETY_LINE_20260701
+# Ensures supervised repair proposals visibly expose the safety contract.
+_NOVA_PRE_SAFETY_BUILD_REPAIR_PLAN_RESPONSE_20260701 = build_repair_plan_response
+
+
+def _nova_repair_plan_add_visible_safety_line_20260701(text: str) -> str:
+    safety_line = "Safety: Proposal only; no file edits, no command execution."
+
+    value = str(text or "")
+
+    if "safety" in value.lower():
+        return value
+
+    if "Failure type:" in value:
+        return value.replace("Failure type:", safety_line + "\nFailure type:", 1)
+
+    if "Mode: repair_proposal_only" in value:
+        return value.replace(
+            "Mode: repair_proposal_only",
+            "Mode: repair_proposal_only\n" + safety_line,
+            1,
+        )
+
+    return value + "\n\n" + safety_line
+
+
+def build_repair_plan_response(payload, session_service):
+    result = _NOVA_PRE_SAFETY_BUILD_REPAIR_PLAN_RESPONSE_20260701(payload, session_service)
+
+    try:
+        assistant_message = result.get("assistant_message") or {}
+        original_text = str(assistant_message.get("text") or "")
+        fixed_text = _nova_repair_plan_add_visible_safety_line_20260701(original_text)
+
+        if fixed_text != original_text:
+            assistant_message["text"] = fixed_text
+            result["assistant_message"] = assistant_message
+
+            try:
+                session_id = (
+                    (payload or {}).get("session_id")
+                    or getattr(session_service, "active_session_id", None)
+                    or "default"
+                )
+                session = session_service.get_session(session_id)
+                messages = session.get("messages") if isinstance(session, dict) else None
+
+                if isinstance(messages, list):
+                    for message in reversed(messages):
+                        if not isinstance(message, dict):
+                            continue
+
+                        if message.get("role") == "assistant":
+                            if message.get("text") == original_text:
+                                message["text"] = fixed_text
+                            if message.get("content") == original_text:
+                                message["content"] = fixed_text
+                            break
+            except Exception:
+                pass
+
+    except Exception:
+        return result
+
+    return result
+
