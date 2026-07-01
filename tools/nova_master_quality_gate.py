@@ -26,6 +26,7 @@ COMMANDS = [
     [str(ROOT / "tools" / "nova_autonomy_plan_adapter_smoke.py")],
     [str(ROOT / "tools" / "nova_autonomy_plan_command_api_smoke.py")],
     [str(ROOT / "tools" / "nova_phase_6d_high_value_smoke_bundle.py")],
+    [str(ROOT / "tools" / "nova_phase_6e_image_web_block_cleanup_plan_smoke.py")],
     [str(ROOT / "tools" / "nova_memory_quality_smoke.py")],
 ]
 
