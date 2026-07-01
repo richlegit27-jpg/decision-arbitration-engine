@@ -78,6 +78,16 @@ def main() -> int:
     subprocess.run([sys.executable, str(_nova_key_log_smoke)], check=True)
     print("PASS nova_openai_key_log_safety_smoke")
 
+print("\n=== nova_fallback_guard_cleanup_plan_smoke ===")
+_nova_fallback_plan_smoke = Path(__file__).with_name("nova_fallback_guard_cleanup_plan_smoke.py")
+subprocess.run([sys.executable, str(_nova_fallback_plan_smoke)], check=True)
+print("PASS nova_fallback_guard_cleanup_plan_smoke")
+
+print("\n=== nova_fallback_guard_cleanup_validation_smoke ===")
+_nova_fallback_validation_smoke = Path(__file__).with_name("nova_fallback_guard_cleanup_validation_smoke.py")
+subprocess.run([sys.executable, str(_nova_fallback_validation_smoke)], check=True)
+print("PASS nova_fallback_guard_cleanup_validation_smoke")
+
 print("\nNOVA MEMORY QUALITY SMOKE PASSED")
     return 0
 
