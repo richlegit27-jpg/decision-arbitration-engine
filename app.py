@@ -16373,6 +16373,178 @@ except Exception as _nova_compact_project_install_error_20260701:
     except Exception:
         pass
 
+# NOVA_API_CHAT_AUTONOMY_TASK_BRIEF_20260701
+# Prefix-only autonomy task brief route.
+# Safe mode: proposal-only. Does not edit files, run commands, or execute plans.
+try:
+    import json as _nova_autonomy_json_20260701
+    import importlib.util as _nova_autonomy_importlib_util_20260701
+    from pathlib import Path as _NovaAutonomyPath20260701
+    from flask import request as _nova_autonomy_request_20260701
+    from flask import Response as _NovaAutonomyResponse20260701
+
+    _NOVA_AUTONOMY_PREFIXES_20260701 = (
+        "autonomy:",
+        "autonomy ",
+        "task brain:",
+        "safe task:",
+        "safe autonomy:",
+    )
+
+    def _nova_autonomy_request_json_20260701():
+        try:
+            data = _nova_autonomy_request_20260701.get_json(silent=True) or {}
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+
+    def _nova_autonomy_request_text_20260701(data):
+        for key in ("message", "user_text", "text", "prompt"):
+            value = data.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return ""
+
+    def _nova_autonomy_goal_from_text_20260701(user_text):
+        text = str(user_text or "").strip()
+        low = text.lower()
+
+        for prefix in _NOVA_AUTONOMY_PREFIXES_20260701:
+            if low.startswith(prefix):
+                return text[len(prefix):].strip() or "Improve Nova safely."
+
+        return ""
+
+    def _nova_autonomy_load_formatter_20260701():
+        service_path = (
+            _NovaAutonomyPath20260701(__file__)
+            .resolve()
+            .parent
+            / "nova_backend"
+            / "services"
+            / "autonomy_task_brain.py"
+        )
+
+        spec = _nova_autonomy_importlib_util_20260701.spec_from_file_location(
+            "_nova_autonomy_task_brain_direct_20260701",
+            str(service_path),
+        )
+
+        if not spec or not spec.loader:
+            return None
+
+        module = _nova_autonomy_importlib_util_20260701.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        formatter = getattr(module, "format_autonomy_task_brief", None)
+        return formatter if callable(formatter) else None
+
+    def _nova_autonomy_payload_20260701(reply, data):
+        session_id = ""
+        if isinstance(data, dict):
+            session_id = str(data.get("session_id") or data.get("active_session_id") or "").strip()
+
+        return {
+            "ok": True,
+            "success": True,
+            "content": reply,
+            "message": reply,
+            "response": reply,
+            "session_id": session_id,
+            "active_session_id": session_id,
+            "assistant_message": {
+                "role": "assistant",
+                "content": reply,
+                "attachments": [],
+            },
+            "route": "autonomy_task_brief",
+            "route_taken": "autonomy_task_brief",
+            "debug": {
+                "route": "autonomy_task_brief",
+                "route_taken": "autonomy_task_brief",
+                "autonomy_mode": "proposal_only",
+            },
+            "meta": {
+                "route": "autonomy_task_brief",
+                "strategy": "proposal_only",
+            },
+        }
+
+    def _nova_autonomy_wrap_endpoint_20260701(endpoint_name):
+        view = app.view_functions.get(endpoint_name)
+        if not callable(view):
+            return False
+
+        if getattr(view, "_NOVA_API_CHAT_AUTONOMY_TASK_BRIEF_20260701", False):
+            return True
+
+        def _nova_autonomy_wrapped_view_20260701(*args, **kwargs):
+            try:
+                data = _nova_autonomy_request_json_20260701()
+                user_text = _nova_autonomy_request_text_20260701(data)
+                goal = _nova_autonomy_goal_from_text_20260701(user_text)
+
+                if goal:
+                    formatter = _nova_autonomy_load_formatter_20260701()
+
+                    if formatter:
+                        reply = formatter(goal)
+                        payload = _nova_autonomy_payload_20260701(reply, data)
+                        encoded = _nova_autonomy_json_20260701.dumps(payload, ensure_ascii=False)
+                        return _NovaAutonomyResponse20260701(
+                            encoded,
+                            status=200,
+                            mimetype="application/json",
+                        )
+            except Exception as _nova_autonomy_route_error_20260701:
+                try:
+                    print(
+                        "[NOVA_API_CHAT_AUTONOMY_TASK_BRIEF_20260701] bypass:",
+                        _nova_autonomy_route_error_20260701,
+                    )
+                except Exception:
+                    pass
+
+            return view(*args, **kwargs)
+
+        _nova_autonomy_wrapped_view_20260701.__name__ = getattr(
+            view,
+            "__name__",
+            "_nova_autonomy_wrapped_view_20260701",
+        )
+        _nova_autonomy_wrapped_view_20260701._NOVA_API_CHAT_AUTONOMY_TASK_BRIEF_20260701 = True
+
+        app.view_functions[endpoint_name] = _nova_autonomy_wrapped_view_20260701
+        return True
+
+    _nova_autonomy_wrapped_count_20260701 = 0
+    for _endpoint_name_20260701, _view_20260701 in list(app.view_functions.items()):
+        try:
+            rule_matches = [
+                rule.rule
+                for rule in app.url_map.iter_rules()
+                if rule.endpoint == _endpoint_name_20260701
+            ]
+
+            if "/api/chat" in rule_matches:
+                if _nova_autonomy_wrap_endpoint_20260701(_endpoint_name_20260701):
+                    _nova_autonomy_wrapped_count_20260701 += 1
+        except Exception:
+            pass
+
+    print(
+        "[NOVA_API_CHAT_AUTONOMY_TASK_BRIEF_20260701] wrapped endpoints:",
+        _nova_autonomy_wrapped_count_20260701,
+    )
+except Exception as _nova_autonomy_install_error_20260701:
+    try:
+        print(
+            "[NOVA_API_CHAT_AUTONOMY_TASK_BRIEF_20260701] failed:",
+            _nova_autonomy_install_error_20260701,
+        )
+    except Exception:
+        pass
+
 if __name__ == "__main__":
     create_startup_backup()
 app.run(
@@ -16383,6 +16555,7 @@ app.run(
 
 
 # NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611
+
 
 
 
