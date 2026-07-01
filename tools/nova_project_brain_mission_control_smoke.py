@@ -34,6 +34,8 @@ def run_case(name, user_text, pasted_output, expected_intent, expected_terms):
     assert_true(f"{name} has validation", bool(card.validation), card)
     assert_true(f"{name} has avoid rules", bool(card.avoid), card)
     assert_true(f"{name} has commit rule", "do not commit" in card.commit_rule.lower(), card.commit_rule)
+    assert_true(f"{name} has failure type", bool(card.failure_type), card)
+    assert_true(f"{name} has failure next command", bool(card.failure_next_command), card)
 
     for term in expected_terms:
         assert_true(
@@ -48,6 +50,8 @@ def run_case(name, user_text, pasted_output, expected_intent, expected_terms):
     assert_true(f"{name} formatted focused smoke", "focused smoke:" in lower, answer)
     assert_true(f"{name} formatted avoid", "avoid:" in lower, answer)
     assert_true(f"{name} formatted commit rule", "commit rule:" in lower, answer)
+    assert_true(f"{name} formatted failure type", "failure type:" in lower, answer)
+    assert_true(f"{name} formatted failure next", "failure next command:" in lower, answer)
 
 
 def main():
@@ -89,8 +93,10 @@ def main():
         expected_intent="diagnose_failed_smoke",
         expected_terms=[
             "diagnose_failed_smoke",
+            "smoke_contract_mismatch",
             "failing",
             "focused smoke",
+            "failure next command",
             "do not weaken the smoke",
         ],
     )

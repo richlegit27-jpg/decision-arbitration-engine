@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass, asdict
 from typing import Any
@@ -19,6 +19,11 @@ class ProjectBrainMissionCard:
     avoid: list[str]
     commit_rule: str
     rationale: str
+    failure_type: str
+    failure_severity: str
+    failure_patch_target: str
+    failure_next_command: str
+    failure_evidence: list[str]
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -49,9 +54,16 @@ def build_project_brain_mission_card(
     from nova_backend.services.project_brain_freshness_snapshot import (
         build_project_brain_freshness_snapshot,
     )
+    from nova_backend.services.project_brain_failure_interpreter import (
+        interpret_project_brain_failure,
+    )
 
     snapshot = build_project_brain_freshness_snapshot()
     decision = decide_project_brain_next_move(
+        user_text=user_text,
+        pasted_output=pasted_output,
+    )
+    failure = interpret_project_brain_failure(
         user_text=user_text,
         pasted_output=pasted_output,
     )
@@ -70,6 +82,11 @@ def build_project_brain_mission_card(
         avoid=list(decision.avoid),
         commit_rule="Do not commit until py_compile and the focused smoke pass; then check git status --short.",
         rationale=decision.rationale,
+        failure_type=failure.failure_type,
+        failure_severity=failure.severity,
+        failure_patch_target=failure.patch_target,
+        failure_next_command=failure.next_command,
+        failure_evidence=list(failure.evidence),
     )
 
 
@@ -77,6 +94,7 @@ def format_project_brain_mission_card(card: ProjectBrainMissionCard) -> str:
     target_layers = ", ".join(card.target_layers)
     target_files = ", ".join(card.target_files)
     avoid = "; ".join(card.avoid)
+    failure_evidence = "; ".join(card.failure_evidence) if card.failure_evidence else "none"
 
     return (
         "Project Brain Mission Control:\n"
@@ -92,6 +110,11 @@ def format_project_brain_mission_card(card: ProjectBrainMissionCard) -> str:
         f"Validation: {'; '.join(card.validation)}\n"
         f"Avoid: {avoid}\n"
         f"Commit rule: {card.commit_rule}\n"
+        f"Failure type: {card.failure_type}\n"
+        f"Failure severity: {card.failure_severity}\n"
+        f"Failure patch target: {card.failure_patch_target}\n"
+        f"Failure next command: {card.failure_next_command}\n"
+        f"Failure evidence: {failure_evidence}\n"
         f"Rationale: {card.rationale}"
     )
 
