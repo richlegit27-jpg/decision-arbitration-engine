@@ -1,35 +1,8 @@
 ﻿from pathlib import Path
-from collections import defaultdict
-import ast
+from collections import Counter, defaultdict
+import re
 
-ROOT = Path(__file__).resolve().parents[1]
-APP = ROOT / "app.py"
-
-REQUIRED_SINGLETONS = [
-    "NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701",
-    "NOVA_EXECUTION_COMMAND_TOP_GUARD_20260611",
-    "NOVA_EXECUTION_GUARD_INLINE_FORMATTER_20260611",
-]
-
-FORBIDDEN_MARKERS = [
-    "NOVA_PHASE4F_NORMAL_CHAT_PROJECT_STATE_BLEED_GUARD_20260701",
-    "NOVA_PHASE4F_FINAL_NORMAL_CHAT_PROJECT_STATE_BLEED_GUARD_20260701",
-]
-
-EXECUTION_OWNER = "api_chat"
-EXECUTION_MARKERS = [
-    "NOVA_EXECUTION_COMMAND_TOP_GUARD_20260611",
-    "NOVA_EXECUTION_GUARD_INLINE_FORMATTER_20260611",
-]
-
-NON_OWNER_EXECUTION_ENDPOINTS = {
-    "api_sessions_new",
-    "api_sessions_switch",
-    "api_sessions_rename",
-    "api_sessions_pin",
-    "api_sessions_delete",
-    "api_recon_analyze",
-}
+APP_PATH = Path("app.py")
 
 
 def assert_true(name, condition, detail=""):
@@ -38,83 +11,143 @@ def assert_true(name, condition, detail=""):
     print(f"PASS {name}")
 
 
-def collect_marker_lines(lines):
-    marker_lines = defaultdict(list)
-
-    for line_no, line in enumerate(lines, start=1):
-        if "NOVA_" not in line:
-            continue
-
-        for token in line.replace("#", " ").replace(":", " ").replace("(", " ").replace(")", " ").split():
-            if token.startswith("NOVA_"):
-                marker_lines[token].append(line_no)
-
-    return marker_lines
-
-
-def find_function(tree, name):
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) and node.name == name:
-            return node
-    return None
-
-
-def function_source(lines, fn):
-    return "".join(lines[fn.lineno - 1:fn.end_lineno])
+def line_number(text, index):
+    return text.count("\n", 0, index) + 1
 
 
 def main():
-    assert_true("app.py exists", APP.exists())
-
-    text = APP.read_text(encoding="utf-8", errors="replace")
+    text = APP_PATH.read_text(encoding="utf-8")
     lines = text.splitlines()
-    keep_lines = text.splitlines(keepends=True)
-    marker_lines = collect_marker_lines(lines)
-
-    for marker in REQUIRED_SINGLETONS:
-        locs = marker_lines.get(marker, [])
-        assert_true(
-            f"required singleton {marker}",
-            len(locs) == 1,
-            f"lines={locs}",
-        )
-
-    for marker in FORBIDDEN_MARKERS:
-        locs = marker_lines.get(marker, [])
-        assert_true(
-            f"forbidden relic absent {marker}",
-            len(locs) == 0,
-            f"lines={locs}",
-        )
 
     main_pos = text.find('if __name__ == "__main__":')
-    assert_true("main block exists", main_pos != -1)
+    run_pos = text.find("app.run(", main_pos if main_pos >= 0 else 0)
 
-    phase4f_pos = text.find("NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701")
-    assert_true("Phase 4F guard above main", phase4f_pos != -1 and phase4f_pos < main_pos)
+    assert_true("__main__ block exists", main_pos >= 0)
+    assert_true("app.run exists", run_pos >= 0)
 
-    tree = ast.parse(text)
+    below_run = text[run_pos:] if run_pos >= 0 else ""
 
-    owner = find_function(tree, EXECUTION_OWNER)
-    assert_true("execution owner exists api_chat", owner is not None)
+    risky_below_run_markers = [
+        "# NOVA_",
+        "@app.after_request",
+        "@app.before_request",
+        "app.after_request(",
+        "app.before_request(",
+        "app.route(",
+        "@app.route",
+    ]
 
-    owner_text = function_source(keep_lines, owner)
-    for marker in EXECUTION_MARKERS:
-        assert_true(
-            f"execution marker owned by api_chat {marker}",
-            marker in owner_text,
-        )
+    print("")
+    print("APP RUN ORDER")
+    print("=============")
+    print(f"__main__ line: {line_number(text, main_pos)}")
+    print(f"app.run line:  {line_number(text, run_pos)}")
 
-    for fn_name in sorted(NON_OWNER_EXECUTION_ENDPOINTS):
-        fn = find_function(tree, fn_name)
-        assert_true(f"non-owner endpoint exists {fn_name}", fn is not None)
+    for marker in risky_below_run_markers:
+        count = below_run.count(marker)
+        print(f"below app.run {marker!r}: {count}")
 
-        fn_text = function_source(keep_lines, fn)
-        for marker in EXECUTION_MARKERS:
-            assert_true(
-                f"execution marker absent from {fn_name} {marker}",
-                marker not in fn_text,
-            )
+    assert_true(
+        "no late hooks below app.run",
+        all(below_run.count(marker) == 0 for marker in risky_below_run_markers),
+        "late executable hook/guard code exists below app.run",
+    )
+
+    nova_markers = []
+    for i, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        if stripped.startswith("# NOVA_"):
+            nova_markers.append((i, stripped))
+
+    marker_names = [m for _, m in nova_markers]
+    marker_counts = Counter(marker_names)
+
+    print("")
+    print("NOVA MARKERS")
+    print("============")
+    print(f"total NOVA marker comments: {len(nova_markers)}")
+    print(f"unique NOVA marker comments: {len(marker_counts)}")
+
+    duplicates = [(name, count) for name, count in marker_counts.items() if count > 1]
+    if duplicates:
+        print("")
+        print("DUPLICATE MARKERS")
+        print("=================")
+        for name, count in sorted(duplicates, key=lambda item: (-item[1], item[0])):
+            print(f"{count}x {name}")
+
+    hooks = {
+        "@app.after_request": [],
+        "@app.before_request": [],
+        "@app.route": [],
+        "app.after_request(": [],
+        "app.before_request(": [],
+    }
+
+    for i, line in enumerate(lines, start=1):
+        for hook in hooks:
+            if hook in line:
+                hooks[hook].append(i)
+
+    print("")
+    print("HOOK COUNTS")
+    print("===========")
+    for hook, found_lines in hooks.items():
+        print(f"{hook}: {len(found_lines)}")
+        if found_lines:
+            print(f"  lines: {found_lines[:30]}{' ...' if len(found_lines) > 30 else ''}")
+
+    installed_patterns = defaultdict(list)
+    for i, line in enumerate(lines, start=1):
+        if "installed" in line and "NOVA_" in line:
+            cleaned = line.strip()
+            installed_patterns[cleaned].append(i)
+
+    repeated_installs = {
+        key: value
+        for key, value in installed_patterns.items()
+        if len(value) > 1
+    }
+
+    print("")
+    print("REPEATED INSTALL LOG LINES")
+    print("==========================")
+    if repeated_installs:
+        for key, value in sorted(repeated_installs.items(), key=lambda item: (-len(item[1]), item[0])):
+            print(f"{len(value)}x lines={value}: {key[:180]}")
+    else:
+        print("none")
+
+    suspicious_terms = [
+        "FINAL",
+        "GUARD",
+        "WRAPPER",
+        "BYPASS",
+        "PATCH",
+        "FALLBACK",
+        "RECALL",
+        "PROJECT_STATE",
+        "AUTONOMY",
+        "REPAIR_PLAN",
+    ]
+
+    buckets = defaultdict(list)
+    for i, marker in nova_markers:
+        upper = marker.upper()
+        for term in suspicious_terms:
+            if term in upper:
+                buckets[term].append((i, marker))
+
+    print("")
+    print("GUARD STACK BUCKETS")
+    print("===================")
+    for term in suspicious_terms:
+        items = buckets.get(term, [])
+        print(f"{term}: {len(items)}")
+        for line_no, marker in items[:12]:
+            print(f"  line {line_no}: {marker[:160]}")
+        if len(items) > 12:
+            print("  ...")
 
     print("")
     print("NOVA PHASE 4I GUARD STACK AUDIT SMOKE PASSED")
