@@ -15,6 +15,7 @@ REQUIRED_SMOKES = [
     "nova_autonomy_command_api_smoke.py",
     "nova_phase_3i_static_backup_review_smoke.py",
     "nova_phase_3j_backup_guard_smoke.py",
+    "nova_phase_3k_frontend_stability_smoke.py",
 ]
 
 
