@@ -101,6 +101,7 @@ CASES = [
         "required": [
             "Project Brain",
             "Decision Engine v1",
+            "Mission Control v1.1",
             "Project Brain cleanup/consolidation",
             "direct recall",
             "broad Project Brain routing",
@@ -121,6 +122,7 @@ CASES = [
             "Project Brain",
             "Decision Engine v1",
             "No active Decision Engine blocker",
+            "Mission Control blocker",
             "cleanup/consolidation",
             "move intelligence into services",
         ],

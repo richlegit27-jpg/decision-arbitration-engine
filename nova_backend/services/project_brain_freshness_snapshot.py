@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import subprocess
 from dataclasses import dataclass
@@ -123,21 +123,22 @@ def build_project_brain_freshness_snapshot() -> ProjectBrainFreshnessSnapshot:
     available_smokes = _available_smoke_files()
 
     checkpoint = (
-        "Decision Engine v1 and broad Project Brain routing are locked: exact project-state recall stays "
-        "on direct recall, broad Nova project paraphrases route through Project Brain general intelligence, "
-        "answer quality is 100%, and regression now protects both route contracts."
+        "Decision Engine v1, broad Project Brain routing, and Mission Control v1.1 are locked: "
+        "exact project-state recall stays on direct recall, broad Nova project paraphrases route through "
+        "Project Brain general intelligence, explicit operator prompts route to Mission Control, answer "
+        "quality is 100%, and regression now protects the route contracts."
     )
 
     blocker = (
-        "No active Decision Engine blocker is open. The remaining risk is cleanup/consolidation: app.py still "
-        "has many historical guards and wrappers, so future work should avoid new route-layer patches and move "
-        "intelligence into services."
+        "No active Decision Engine blocker is open, and no active Mission Control blocker is open. "
+        "The remaining risk is cleanup/consolidation: app.py still has many historical guards and wrappers, "
+        "so future work should avoid new route-layer patches and move intelligence into services."
     )
 
     next_move = (
-        "Start Project Brain cleanup/consolidation: keep the locked Decision Engine v1 behavior, preserve "
-        "direct recall and broad Project Brain routing, and consolidate stale route/context wording without "
-        "adding another app.py guard."
+        "Start Project Brain cleanup/consolidation: keep the locked Decision Engine v1 and Mission Control "
+        "v1.1 behavior, preserve direct recall, broad Project Brain routing, and explicit operator Mission "
+        "Control prompts, and consolidate stale route/context wording without adding another app.py guard."
     )
 
     from nova_backend.services.project_brain_current_state_adapter import (
@@ -176,21 +177,22 @@ try:
     _NOVA_PRE_SANITIZED_BUILD_PROJECT_BRAIN_FRESHNESS_SNAPSHOT_20260702 = build_project_brain_freshness_snapshot
 
     _NOVA_CLEAN_CHECKPOINT_20260702 = (
-        "Decision Engine v1 and broad Project Brain routing are locked: exact project-state recall stays "
-        "on direct recall, broad Nova project paraphrases route through Project Brain general intelligence, "
-        "answer quality is 100%, and regression now protects both route contracts."
+        "Decision Engine v1, broad Project Brain routing, and Mission Control v1.1 are locked: "
+        "exact project-state recall stays on direct recall, broad Nova project paraphrases route through "
+        "Project Brain general intelligence, explicit operator prompts route to Mission Control, answer "
+        "quality is 100%, and regression now protects the route contracts."
     )
 
     _NOVA_CLEAN_BLOCKER_20260702 = (
-        "No active Decision Engine blocker is open. The remaining risk is cleanup/consolidation: app.py still "
-        "has many historical guards and wrappers, so future work should avoid new route-layer patches and move "
-        "intelligence into services."
+        "No active Decision Engine blocker is open, and no active Mission Control blocker is open. "
+        "The remaining risk is cleanup/consolidation: app.py still has many historical guards and wrappers, "
+        "so future work should avoid new route-layer patches and move intelligence into services."
     )
 
     _NOVA_CLEAN_NEXT_MOVE_20260702 = (
-        "Start Project Brain cleanup/consolidation: keep the locked Decision Engine v1 behavior, preserve "
-        "direct recall and broad Project Brain routing, and consolidate stale route/context wording without "
-        "adding another app.py guard."
+        "Start Project Brain cleanup/consolidation: keep the locked Decision Engine v1 and Mission Control "
+        "v1.1 behavior, preserve direct recall, broad Project Brain routing, and explicit operator Mission "
+        "Control prompts, and consolidate stale route/context wording without adding another app.py guard."
     )
 
     def _nova_project_brain_snapshot_bad_field_20260702(value, required_terms=None):
@@ -233,19 +235,19 @@ try:
 
         if _nova_project_brain_snapshot_bad_field_20260702(
             checkpoint,
-            ["Decision Engine v1", "Project Brain routing"],
+            ["Decision Engine v1", "Project Brain routing", "Mission Control v1.1"],
         ):
             updates["checkpoint"] = _NOVA_CLEAN_CHECKPOINT_20260702
 
         if _nova_project_brain_snapshot_bad_field_20260702(
             blocker,
-            ["No active Decision Engine blocker", "cleanup/consolidation"],
+            ["No active Decision Engine blocker", "Mission Control blocker", "cleanup/consolidation"],
         ):
             updates["blocker"] = _NOVA_CLEAN_BLOCKER_20260702
 
         if _nova_project_brain_snapshot_bad_field_20260702(
             next_move,
-            ["Project Brain cleanup/consolidation", "without adding another app.py guard"],
+            ["Project Brain cleanup/consolidation", "Mission Control v1.1", "without adding another app.py guard"],
         ):
             updates["next_move"] = _NOVA_CLEAN_NEXT_MOVE_20260702
 
