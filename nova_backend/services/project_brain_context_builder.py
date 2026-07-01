@@ -50,66 +50,21 @@ def _recent_commits(limit: int = 4) -> List[str]:
 
 
 def build_project_brain_context() -> ProjectBrainContext:
-    completed = [
-        "project-state memory recall fix",
-        "answer-quality smoke",
-        "answer-quality 95 policy",
-        "guard-stack audit smoke",
-        "project-brain general-intelligence route",
-    ]
-
-    if _exists("tools/nova_project_brain_route_contract_smoke.py"):
-        completed.append("project-brain route contract smoke")
-
-    if _exists("tools/nova_project_brain_classifier_broadening_smoke.py"):
-        completed.append("project-brain classifier broadening smoke")
-
-    if _exists("tools/nova_general_intelligence_smoke.py"):
-        completed.append("general intelligence smoke")
-
-    if _exists("nova_backend/services/project_brain_context_builder.py"):
-        completed.append("project-brain context builder")
-
-    active_checkpoint = (
-        "Project-brain routing is now protected: exact project-state recall stays on the "
-        "direct project-state route, while paraphrases and judgment questions use the "
-        "general-intelligence service layer."
+    from nova_backend.services.project_brain_freshness_snapshot import (
+        build_project_brain_freshness_snapshot,
     )
 
-    blocker = (
-        "The current blocker is Project Brain answer freshness v2: fallback-route priority and the "
-        "context-builder path are protected, but the builder still needs a cleaner source-of-truth model "
-        "so checkpoint, blocker, next move, recent commits, and validation state can update without another "
-        "wording patch."
-    )
-
-    next_move = (
-        "Add a Project Brain freshness snapshot so the context builder can report current checkpoint, "
-        "blocker, next move, latest commits, and available smoke files from one structured source."
-    )
-
-    validation = [
-        "python -m py_compile .\\nova_backend\\services\\project_brain_context_builder.py",
-        "python -m py_compile .\\nova_backend\\services\\project_brain_general_intelligence.py",
-        "python .\\tools\\nova_project_brain_context_builder_smoke.py",
-        "python .\\tools\\nova_project_state_memory_api_smoke.py",
-        "python .\\tools\\nova_general_intelligence_smoke.py",
-        "python .\\tools\\nova_project_brain_route_contract_smoke.py",
-        "python .\\tools\\nova_project_brain_classifier_broadening_smoke.py",
-        "python .\\tools\\nova_answer_quality_smoke.py",
-        "python .\\tools\\nova_phase_4i_guard_stack_audit_smoke.py",
-        "git status --short",
-    ]
+    snapshot = build_project_brain_freshness_snapshot()
 
     return ProjectBrainContext(
         project_name="Nova",
         local_app="local Nova Flask app",
-        completed=completed,
-        active_checkpoint=active_checkpoint,
-        blocker=blocker,
-        next_move=next_move,
-        validation=validation,
-        recent_commits=_recent_commits(),
+        completed=snapshot.completed,
+        active_checkpoint=snapshot.checkpoint,
+        blocker=snapshot.blocker,
+        next_move=snapshot.next_move,
+        validation=snapshot.validation,
+        recent_commits=snapshot.recent_commits,
     )
 
 
