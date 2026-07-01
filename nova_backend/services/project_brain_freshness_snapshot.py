@@ -139,6 +139,20 @@ def build_project_brain_freshness_snapshot() -> ProjectBrainFreshnessSnapshot:
         "next concrete move / safe move, latest commits, and available smoke files."
     )
 
+    from nova_backend.services.project_brain_current_state_adapter import (
+        build_project_brain_current_state,
+    )
+
+    current_state = build_project_brain_current_state(
+        default_checkpoint=checkpoint,
+        default_blocker=blocker,
+        default_next_move=next_move,
+    )
+
+    checkpoint = current_state.checkpoint
+    blocker = current_state.blocker
+    next_move = current_state.next_move
+
     return ProjectBrainFreshnessSnapshot(
         version=SNAPSHOT_VERSION,
         checkpoint=checkpoint,
