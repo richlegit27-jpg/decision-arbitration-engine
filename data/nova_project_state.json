@@ -1,7 +1,7 @@
 {
   "project": "Nova",
-  "checkpoint": "713e04d Repair Nova project state after patch build adapter",
-  "current_focus": "Nova autonomy Phase 3G locked: all one-command adapters exist, adapter inventory is clean, API smokes pass, guard cleanup review passes, memory quality smoke passes, and git status is clean.",
+  "checkpoint": "9ee2673 Repair Nova cleanup review command registry wording",
+  "current_focus": "Nova autonomy cleanup review locked: all one-command adapters are complete, cleanup review wording is current, guard review smoke passes, memory quality smoke passes, and git status is clean.",
   "last_completed": [
     "Router cleanup locked",
     "Web/live price routing locked",
@@ -45,7 +45,9 @@
     "Patch-build adapter locked",
     "All one-command adapters verified",
     "Final adapter inventory clean",
-    "Final locked smoke set passed"
+    "Final locked smoke set passed",
+    "Autonomy cleanup review wording locked",
+    "One-command adapter migration complete"
   ],
   "locked": [
     "Memory quality smoke",
@@ -87,8 +89,8 @@
     "Autonomy Phase 1C autonomy-plan command",
     "Autonomy Phase 1D Patch Builder service"
   ],
-  "remaining": "Begin cleanup review only. Do not remove old duplicate guards yet; first identify exact duplicate guard blocks and prove adapter-owned routes stay locked.",
-  "next_move": "Run a no-behavior-change cleanup review for old duplicate app.py command guards while preserving project-state recall, adapter routes, command modes, API smokes, and memory quality smoke.",
+  "remaining": "Plan old fallback guard cleanup only. Do not delete guards yet; first identify exact old fallback blocks shadowed by adapter-owned guards.",
+  "next_move": "Create a no-delete fallback guard cleanup plan while preserving project-state recall, adapter routes, command modes, API smokes, guard cleanup review smoke, and memory quality smoke.",
   "git": {
     "branch": "post-frontend-polish-phase",
     "head": "e84977f",
