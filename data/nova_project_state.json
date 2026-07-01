@@ -1,7 +1,7 @@
 {
   "project": "Nova",
-  "checkpoint": "99e5ec3 Add Nova project state sync helper",
-  "current_focus": "Nova memory quality upgrade: checkpoint automation",
+  "checkpoint": "a70f1ef Add route-level natural project recall",
+  "current_focus": "Nova memory quality phase three locked: route-level natural project recall",
   "last_completed": [
     "Router cleanup locked",
     "Web/live price routing locked",
@@ -14,7 +14,9 @@
     "Idle next/k project-state recall locked",
     "Regression smoke passed",
     "Project-state smoke passed",
-    "Project-state sync guardrails passed"
+    "Project-state sync guardrails passed",
+    "Route-level natural project recall locked at a70f1ef",
+    "Project context smoke locked"
   ],
   "locked": [
     "Router cleanup",
@@ -24,7 +26,9 @@
     "Execution safety",
     "Regression runner",
     "Project-state recall",
-    "Idle next/k recall"
+    "Idle next/k recall",
+    "Natural project-state recall",
+    "Project context smoke"
   ],
   "remaining": [
     "Add project-state sync helper",
@@ -32,16 +36,13 @@
     "Commit project-state sync helper",
     "Commit one-command checkpoint runner"
   ],
-  "next_move": "Commit the one-command Nova checkpoint runner.",
+  "next_move": "Move to memory quality phase four.",
   "git": {
     "branch": "post-frontend-polish-phase",
-    "head": "99e5ec3",
-    "subject": "Add Nova project state sync helper",
-    "clean": false,
-    "dirty_files": [
-      "M tools/nova_project_state_sync.py",
-      "?? tools/nova_checkpoint.py"
-    ]
+    "head": "a70f1ef",
+    "subject": "Add route-level natural project recall",
+    "clean": true,
+    "dirty_files": []
   },
-  "updated_at_utc": "2026-07-01T02:17:41.743166+00:00"
+  "updated_at_utc": "2026-07-01T02:30:46.163566+00:00"
 }
