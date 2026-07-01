@@ -30,6 +30,14 @@ CHECKS: List[Tuple[str, List[str]]] = [
         "nova_project_compact_context_api_smoke",
         [sys.executable, str(ROOT / "tools" / "nova_project_compact_context_api_smoke.py")],
     ),
+    (
+        "nova_autonomy_task_brain_smoke",
+        [sys.executable, str(ROOT / "tools" / "nova_autonomy_task_brain_smoke.py")],
+    ),
+    (
+        "nova_autonomy_command_api_smoke",
+        [sys.executable, str(ROOT / "tools" / "nova_autonomy_command_api_smoke.py")],
+    ),
 ]
 
 
@@ -71,3 +79,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
