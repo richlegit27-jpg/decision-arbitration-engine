@@ -878,12 +878,63 @@ function storeUploadPayload(data, file) {
     function clearUploadPreview() {
         saveAttachments([]);
 
+        try {
+            window.NovaMobileAttachments = [];
+            window.NovaMobilePendingAttachments = [];
+            window.__novaMobilePendingAttachments = [];
+            window.NovaMobileUploadedAttachments = [];
+            window.NovaMobileSharedAttachments = [];
+            window.NovaMobileFinalAttachmentPayloadQueue = [];
+            window.NovaMobileAttachmentQueue = [];
+            window.novaMobileAttachments = [];
+            window.NovaMobileUploadQueue = [];
+            window.NovaPendingAttachments = [];
+            window.__novaPendingAttachments = [];
+            window.pendingAttachments = [];
+
+            if (window.NovaMobileState && typeof window.NovaMobileState === "object") {
+                window.NovaMobileState.pendingAttachments = [];
+            }
+
+            [
+                "nova_mobile_pending_attachments",
+                "nova-mobile-pending-attachments",
+                "nova_pending_attachments",
+                "novaPendingAttachments",
+                "nova_mobile_latest_attachments",
+                "nova_mobile_last_uploaded_attachment",
+                "nova_desktop_pending_attachments"
+            ].forEach(removeKey);
+        } catch (_) {}
+
         const host = document.getElementById(PREVIEW_ID);
         if (host) {
             host.innerHTML = "";
             host.hidden = true;
             host.style.display = "none";
         }
+
+        [
+            "nova-main-visible-attachment-preview",
+            "nova-mobile-attachment-preview"
+        ].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.innerHTML = "";
+                el.hidden = true;
+                el.style.display = "none";
+            }
+        });
+
+        document
+            .querySelectorAll(".nova-clean-attachment-preview,[data-nova-attachment-preview='true']")
+            .forEach((el) => {
+                el.innerHTML = "";
+                el.hidden = true;
+                el.style.display = "none";
+                el.setAttribute("data-nova-empty", "true");
+                el.setAttribute("data-empty", "true");
+            });
 
         window.dispatchEvent(new CustomEvent("nova-mobile-attachments-cleared", {
             detail: {
@@ -930,15 +981,28 @@ function storeUploadPayload(data, file) {
         window.NovaMobileCleanAttachmentChipOnlyClear ||
         null;
 
-    window.NovaMobileRenderUploadPreview = renderUploadPreview;
-    window.NovaMobileClearUploadPreview = clearUploadPreview;
-    window.NovaMobileClearAttachmentsAfterSend = function () {
+    function clearAllMobileAttachmentStateAfterSend() {
         try {
             if (typeof oldClear === "function") oldClear();
         } catch (_) {}
 
         clearUploadPreview();
-    };
+    }
+
+    window.NovaMobileRenderUploadPreview = renderUploadPreview;
+    window.NovaMobileClearUploadPreview = clearUploadPreview;
+    window.NovaMobileClearAttachmentsAfterSend = clearAllMobileAttachmentStateAfterSend;
+    window.NovaClearMobileAttachmentsAfterSend = clearAllMobileAttachmentStateAfterSend;
+    window.NovaMobileCleanAttachmentChipOnlyClear = clearAllMobileAttachmentStateAfterSend;
+
+    [
+        "nova-mobile-after-send",
+        "nova-mobile-message-sent",
+        "nova-mobile-send-complete",
+        "nova-mobile-attachments-clear-request"
+    ].forEach((eventName) => {
+        window.addEventListener(eventName, clearAllMobileAttachmentStateAfterSend);
+    });
 
     document.addEventListener("DOMContentLoaded", () => {
         setTimeout(renderUploadPreview, 0);
