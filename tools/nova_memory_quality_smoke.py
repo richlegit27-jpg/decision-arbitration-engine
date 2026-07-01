@@ -44,9 +44,22 @@ def start_test_server():
     sys.path.insert(0, str(ROOT))
 
     from app import app as nova_app
-    from werkzeug.serving import make_server
+    from werkzeug.serving import WSGIRequestHandler, make_server
 
-    server = make_server("127.0.0.1", 5001, nova_app, threaded=True)
+
+class _NovaQuietWerkzeugRequestHandler(WSGIRequestHandler):
+    def log(self, type, message, *args):
+        return
+
+
+
+    server = make_server(
+        "127.0.0.1",
+        5001,
+        nova_app,
+        threaded=True,
+        request_handler=_NovaQuietWerkzeugRequestHandler,
+    )
 
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
