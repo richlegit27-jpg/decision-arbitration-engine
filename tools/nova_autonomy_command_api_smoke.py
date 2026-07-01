@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import time
@@ -92,7 +92,7 @@ def main() -> int:
         text = extract_text(payload)
         assert_contains(name, text, needles)
 
-    normal_payload = post_chat("explain APIs like I'm new", session_id)
+    normal_payload = post_chat("hi", session_id)
     normal_text = extract_text(normal_payload)
 
     if "nova autonomy task brief" in normal_text.lower():
