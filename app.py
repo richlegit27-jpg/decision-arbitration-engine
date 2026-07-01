@@ -17513,7 +17513,7 @@ try:
     def _nova_project_next_answer_20260701():
         return (
             "Current Nova project context:\n"
-            "Current task: Decision Engine v1 and broad Project Brain routing are locked.\n"
+            "Current task: Decision Engine v1, broad Project Brain routing, and Mission Control v1.1 are locked.\n"
             "Next move: start Project Brain cleanup/consolidation while preserving direct recall, "
             "broad Project Brain routing, and avoiding another app.py guard."
         )
@@ -17652,7 +17652,7 @@ try:
     def _nova_project_next_before_answer_20260701():
         return (
             "Current Nova project context:\n"
-            "Current task: Decision Engine v1 and broad Project Brain routing are locked.\n"
+            "Current task: Decision Engine v1, broad Project Brain routing, and Mission Control v1.1 are locked.\n"
             "Next move: start Project Brain cleanup/consolidation while preserving direct recall, "
             "broad Project Brain routing, and avoiding another app.py guard."
         )
@@ -18299,7 +18299,7 @@ try:
     def _nova_project_next_wrap_answer_20260701():
         return (
             "Current Nova project context:\n"
-            "Current task: Decision Engine v1 and broad Project Brain routing are locked.\n"
+            "Current task: Decision Engine v1, broad Project Brain routing, and Mission Control v1.1 are locked.\n"
             "Next move: start Project Brain cleanup/consolidation while preserving direct recall, "
             "broad Project Brain routing, and avoiding another app.py guard."
         )
@@ -18484,7 +18484,7 @@ try:
     def _nova_next_fixed_answer_20260701():
         return (
             "Current Nova project context:\n"
-            "Current task: Decision Engine v1 and broad Project Brain routing are locked.\n"
+            "Current task: Decision Engine v1, broad Project Brain routing, and Mission Control v1.1 are locked.\n"
             "Next move: start Project Brain cleanup/consolidation while preserving direct recall, "
             "broad Project Brain routing, and avoiding another app.py guard."
         )
