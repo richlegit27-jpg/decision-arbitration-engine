@@ -96,10 +96,14 @@ def main() -> int:
         "adapter repair-build response",
         text,
         [
-            "repair",
-            "instructions",
-            "FAILED nova_project_state_smoke",
+            "Nova supervised repair build",
+            "Mode: repair_instructions_only",
+            "Failure type:",
+            "PowerShell repair steps:",
             "python",
+            "Smokes:",
+            "Rollback commands:",
+            "Richard must run every command manually",
         ],
     )
 
