@@ -1,5 +1,14 @@
 from __future__ import annotations
 
+
+def _nova_boot_log_20260701(*args, **kwargs):
+    import os as _nova_boot_log_os_20260701
+
+    if str(_nova_boot_log_os_20260701.getenv("NOVA_VERBOSE_BOOT_LOGS", "")).strip().lower() in {"1", "true", "yes", "on"}:
+        print(*args, **kwargs)
+
+
+
 import os
 import re
 import shutil
@@ -8375,7 +8384,7 @@ try:
         for _nova_rule in app.url_map.iter_rules():
             if str(_nova_rule.rule) == "/api/chat":
                 app.view_functions[_nova_rule.endpoint] = api_chat
-                print(f"[NOVA ROUTE REPAIR] /api/chat endpoint={_nova_rule.endpoint} rebound to api_chat")
+                _nova_boot_log_20260701(f"[NOVA ROUTE REPAIR] /api/chat endpoint={_nova_rule.endpoint} rebound to api_chat")
 except Exception as _nova_route_repair_error:
     print(f"[NOVA ROUTE REPAIR FAILED] {_nova_route_repair_error}")
 
@@ -10493,7 +10502,7 @@ def _nova_install_auth_compat_alias_routes_safe_20260611():
             app.add_url_rule(rule_path, endpoint, view, methods=missing)
             installed += 1
 
-        print("[NOVA AUTH] safe compat alias routes installed:", installed)
+        _nova_boot_log_20260701("[NOVA AUTH] safe compat alias routes installed:", installed)
 
     except Exception as exc:
         print("[NOVA AUTH] safe compat alias install failed:", exc)
@@ -12304,7 +12313,7 @@ def _nova_install_api_chat_attachment_view_wrapper_20260611():
             app.view_functions[endpoint] = _wrapped_api_chat_view
             wrapped += 1
 
-        print("[NOVA ATTACHMENT SYNC] wrapped /api/chat endpoints:", wrapped)
+        _nova_boot_log_20260701("[NOVA ATTACHMENT SYNC] wrapped /api/chat endpoints:", wrapped)
     except Exception as exc:
         print("[NOVA ATTACHMENT SYNC] wrapper install failed:", exc)
 
@@ -12519,7 +12528,7 @@ try:
     if _nova_bridge_func is not None:
         _nova_after_hooks.insert(0, _nova_bridge_func)
         app.after_request_funcs[None] = _nova_after_hooks
-        print("[NOVA_WEB_FETCH_BRIDGE_ORDER] forced bridge to run last")
+        _nova_boot_log_20260701("[NOVA_WEB_FETCH_BRIDGE_ORDER] forced bridge to run last")
     else:
         print("[NOVA_WEB_FETCH_BRIDGE_ORDER] bridge function not found")
 except Exception as _nova_bridge_order_error:
@@ -13705,7 +13714,7 @@ try:
     if _nova_func is not None:
         _nova_hooks.insert(0, _nova_func)
         app.after_request_funcs[None] = _nova_hooks
-        print("[NOVA_FINAL_SESSION_DETAIL_CACHE] forced final hook to run last")
+        _nova_boot_log_20260701("[NOVA_FINAL_SESSION_DETAIL_CACHE] forced final hook to run last")
 except Exception:
     pass
 
@@ -14746,7 +14755,7 @@ try:
             _nova_title_guard_order_error_20260630,
         )
 
-    print("[NOVA_FINAL_TITLE_GUARD_20260630] installed")
+    _nova_boot_log_20260701("[NOVA_FINAL_TITLE_GUARD_20260630] installed")
 
 except Exception as _nova_final_title_guard_install_error_20260630:
     print(
@@ -14951,7 +14960,7 @@ try:
     except Exception:
         pass
 
-    print("[NOVA_FINAL_IMAGE_RESPONSE_CACHE_TEXT_GUARD_20260630] installed")
+    _nova_boot_log_20260701("[NOVA_FINAL_IMAGE_RESPONSE_CACHE_TEXT_GUARD_20260630] installed")
 except Exception as _nova_img_cache_install_error_20260630:
     print("[NOVA_FINAL_IMAGE_RESPONSE_CACHE_TEXT_GUARD_20260630] failed:", _nova_img_cache_install_error_20260630)
 
@@ -15856,7 +15865,7 @@ try:
             print("[NOVA_AUTONOMY_PLAN_ADAPTER_GUARD_20260701] failed:", _nova_autonomy_plan_adapter_error_20260701)
             return None
 
-    print("[NOVA_AUTONOMY_PLAN_ADAPTER_GUARD_20260701] installed")
+    _nova_boot_log_20260701("[NOVA_AUTONOMY_PLAN_ADAPTER_GUARD_20260701] installed")
 except Exception as _nova_autonomy_plan_adapter_install_error_20260701:
     print("[NOVA_AUTONOMY_PLAN_ADAPTER_GUARD_20260701] install failed:", _nova_autonomy_plan_adapter_install_error_20260701)
 
@@ -15890,7 +15899,7 @@ try:
             print("[NOVA_PATCH_BUILD_ADAPTER_GUARD_20260701] failed:", _nova_patch_build_adapter_error_20260701)
             return None
 
-    print("[NOVA_PATCH_BUILD_ADAPTER_GUARD_20260701] installed")
+    _nova_boot_log_20260701("[NOVA_PATCH_BUILD_ADAPTER_GUARD_20260701] installed")
 except Exception as _nova_patch_build_adapter_install_error_20260701:
     print("[NOVA_PATCH_BUILD_ADAPTER_GUARD_20260701] install failed:", _nova_patch_build_adapter_install_error_20260701)
 
@@ -16562,7 +16571,7 @@ try:
             )
             _nova_phase4a_wrapped_count_20260701 += 1
 
-    print(f"[NOVA_ACTIVE_EXECUTION_STATUS_PRIORITY_20260701] wrapped endpoints: {_nova_phase4a_wrapped_count_20260701}")
+    _nova_boot_log_20260701(f"[NOVA_ACTIVE_EXECUTION_STATUS_PRIORITY_20260701] wrapped endpoints: {_nova_phase4a_wrapped_count_20260701}")
 
 except Exception as _nova_phase4a_error_20260701:
     print("[NOVA_ACTIVE_EXECUTION_STATUS_PRIORITY_20260701] failed:", _nova_phase4a_error_20260701)
@@ -16951,7 +16960,7 @@ try:
 
     app.after_request(_nova_phase4g_after_response_20260701)
 
-    print("[NOVA_PHASE4G_SESSION_HISTORY_RENAME_PERSISTENCE_20260701] installed")
+    _nova_boot_log_20260701("[NOVA_PHASE4G_SESSION_HISTORY_RENAME_PERSISTENCE_20260701] installed")
 except Exception as _nova_phase4g_error_20260701:
     print("[NOVA_PHASE4G_SESSION_HISTORY_RENAME_PERSISTENCE_20260701] failed:", _nova_phase4g_error_20260701)
 
@@ -17089,7 +17098,7 @@ try:
 
     app.after_request(_nova_phase4g_normal_chat_carryover_guard_20260701)
 
-    print("[NOVA_PHASE4G_NORMAL_CHAT_AUTONOMY_CARRYOVER_GUARD_20260701] installed")
+    _nova_boot_log_20260701("[NOVA_PHASE4G_NORMAL_CHAT_AUTONOMY_CARRYOVER_GUARD_20260701] installed")
 except Exception as _nova_phase4g_chat_guard_error_20260701:
     print("[NOVA_PHASE4G_NORMAL_CHAT_AUTONOMY_CARRYOVER_GUARD_20260701] failed:", _nova_phase4g_chat_guard_error_20260701)
 
@@ -17458,11 +17467,11 @@ try:
             funcs.remove(_nova_phase4f_prerun_final_normal_chat_bleed_guard_20260701)
             funcs.insert(0, _nova_phase4f_prerun_final_normal_chat_bleed_guard_20260701)
             app.after_request_funcs[None] = funcs
-            print("[NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701] forced final hook")
+            _nova_boot_log_20260701("[NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701] forced final hook")
     except Exception as order_exc:
         print("[NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701] final-order failed:", order_exc)
 
-    print("[NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701] installed")
+    _nova_boot_log_20260701("[NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701] installed")
 except Exception as guard_exc:
     print("[NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701] failed:", guard_exc)
 

@@ -1,3 +1,11 @@
+
+def _nova_boot_log_20260701(*args, **kwargs):
+    import os as _nova_boot_log_os_20260701
+
+    if str(_nova_boot_log_os_20260701.getenv("NOVA_VERBOSE_BOOT_LOGS", "")).strip().lower() in {"1", "true", "yes", "on"}:
+        print(*args, **kwargs)
+
+
 ﻿from __future__ import annotations
 
 import json
@@ -516,7 +524,7 @@ def compact_project_state_context_block(max_locked: int = 6) -> str:
     )
 
 try:
-    print("[NOVA_PROJECT_STATE_COMPACT_CONTEXT_20260701] installed")
+    _nova_boot_log_20260701("[NOVA_PROJECT_STATE_COMPACT_CONTEXT_20260701] installed")
 except Exception:
     pass
 

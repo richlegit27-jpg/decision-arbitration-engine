@@ -1,3 +1,11 @@
+
+def _nova_boot_log_20260701(*args, **kwargs):
+    import os as _nova_boot_log_os_20260701
+
+    if str(_nova_boot_log_os_20260701.getenv("NOVA_VERBOSE_BOOT_LOGS", "")).strip().lower() in {"1", "true", "yes", "on"}:
+        print(*args, **kwargs)
+
+
 ﻿from __future__ import annotations
 # NOVA_LOCAL_PROJECT_CONTEXT_GUARD_20260607
 def _nova_is_local_project_status_question_20260607(user_text):
@@ -23067,7 +23075,7 @@ try:
 
     _nova_chat_service_handle_attachment_text_sync_20260611._nova_attachment_text_sync_20260611 = True
     ChatService.handle = _nova_chat_service_handle_attachment_text_sync_20260611
-    print("[NOVA ATTACHMENT SYNC] ChatService.handle attachment text sync installed")
+    _nova_boot_log_20260701("[NOVA ATTACHMENT SYNC] ChatService.handle attachment text sync installed")
 except Exception as exc:
     print("[NOVA ATTACHMENT SYNC] ChatService.handle attachment text sync install failed:", exc)
 
@@ -23252,7 +23260,7 @@ try:
 
         ChatService.handle = _nova_handle_nonweb_guard_20260622
 
-    print("[Nova] non-web source leak guard installed")
+    _nova_boot_log_20260701("[Nova] non-web source leak guard installed")
 
 except Exception as _nova_nonweb_guard_error_20260622:
     print("[Nova] non-web source leak guard skipped:", _nova_nonweb_guard_error_20260622)
@@ -23395,7 +23403,7 @@ try:
         )
 
     ChatService._decide_route = _nova_attachment_route_beats_web_decide_v2_20260624
-    print("[NOVA_FINAL_ATTACHMENT_ROUTE_BEATS_WEB_LOCK_V2_20260624] installed")
+    _nova_boot_log_20260701("[NOVA_FINAL_ATTACHMENT_ROUTE_BEATS_WEB_LOCK_V2_20260624] installed")
 except Exception as _nova_final_attachment_route_lock_v2_error:
     print("[NOVA_FINAL_ATTACHMENT_ROUTE_BEATS_WEB_LOCK_V2_20260624] failed:", _nova_final_attachment_route_lock_v2_error)
 
@@ -23479,7 +23487,7 @@ try:
         return decision
 
     ChatService._decide_route = _nova_intent_authority_decide_route_20260630
-    print("[NOVA_INTENT_AUTHORITY_DECIDE_ROUTE_20260630] installed")
+    _nova_boot_log_20260701("[NOVA_INTENT_AUTHORITY_DECIDE_ROUTE_20260630] installed")
 
 except Exception as _nova_intent_authority_install_error:
     print(
@@ -23582,7 +23590,7 @@ try:
         return _nova_final_clean_mojibake_obj_v4_20260624(result)
 
     ChatService.handle = _nova_final_mojibake_clean_handle_v4_20260624
-    print("[NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V4_20260624] installed")
+    _nova_boot_log_20260701("[NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V4_20260624] installed")
 except Exception as _nova_final_mojibake_cleanup_v4_error_20260624:
     print("[NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V4_20260624] failed:", _nova_final_mojibake_cleanup_v4_error_20260624)
 
@@ -23711,7 +23719,7 @@ try:
         return _nova_polish_generated_image_result_20260630(result)
 
     ChatService.handle = _nova_image_generation_response_polish_handle_20260630
-    print("[NOVA_IMAGE_GENERATION_RESPONSE_POLISH_20260630] installed")
+    _nova_boot_log_20260701("[NOVA_IMAGE_GENERATION_RESPONSE_POLISH_20260630] installed")
 
 except Exception as _nova_image_response_polish_error_20260630:
     print(
@@ -23901,7 +23909,7 @@ try:
         return result
 
     ChatService.handle = _nova_image_generation_response_polish_handle_20260630
-    print("[NOVA_IMAGE_GENERATION_RESPONSE_POLISH_20260630_FINAL] installed")
+    _nova_boot_log_20260701("[NOVA_IMAGE_GENERATION_RESPONSE_POLISH_20260630_FINAL] installed")
 
 except Exception as _nova_image_generation_response_polish_install_error_20260630:
     print(
@@ -24158,7 +24166,7 @@ try:
         return result
 
     ChatService.handle = _nova_image_generation_final_text_sync_handle_20260630
-    print("[NOVA_IMAGE_GENERATION_FINAL_TEXT_SYNC_20260630] installed")
+    _nova_boot_log_20260701("[NOVA_IMAGE_GENERATION_FINAL_TEXT_SYNC_20260630] installed")
 
 except Exception as _nova_img_final_text_sync_install_error_20260630:
     print(
@@ -24290,7 +24298,7 @@ try:
         )
 
     ChatService.handle = _nova_accidental_input_guard_handle_20260630
-    print("[NOVA_ACCIDENTAL_INPUT_GUARD_20260630] installed")
+    _nova_boot_log_20260701("[NOVA_ACCIDENTAL_INPUT_GUARD_20260630] installed")
 
 except Exception as _nova_accidental_input_guard_install_error_20260630:
     print(
@@ -24377,7 +24385,7 @@ try:
         return _NOVA_PRE_FINAL_LIVE_MARKET_PRICE_DECIDE_20260630(self, *args, **kwargs)
 
     ChatService._decide_route = _nova_final_live_market_price_decide_20260630
-    print("[NOVA_FINAL_LIVE_MARKET_PRICE_ROUTE_AUTHORITY_20260630] installed")
+    _nova_boot_log_20260701("[NOVA_FINAL_LIVE_MARKET_PRICE_ROUTE_AUTHORITY_20260630] installed")
 except Exception as _nova_final_live_market_price_error_20260630:
     print("[NOVA_FINAL_LIVE_MARKET_PRICE_ROUTE_AUTHORITY_20260630] failed:", _nova_final_live_market_price_error_20260630)
 
@@ -24584,7 +24592,7 @@ try:
         return _NOVA_PRE_FINAL_LIVE_MARKET_PRICE_HANDLE_20260630(self, *args, **kwargs)
 
     ChatService.handle = _nova_final_live_market_price_handle_redirect_20260630
-    print("[NOVA_FINAL_LIVE_MARKET_PRICE_HANDLE_REDIRECT_20260630] installed")
+    _nova_boot_log_20260701("[NOVA_FINAL_LIVE_MARKET_PRICE_HANDLE_REDIRECT_20260630] installed")
 except Exception as _nova_handle_live_market_price_error_20260630:
     print("[NOVA_FINAL_LIVE_MARKET_PRICE_HANDLE_REDIRECT_20260630] failed:", _nova_handle_live_market_price_error_20260630)
 
@@ -24697,7 +24705,7 @@ try:
         return _NOVA_PRE_LIVE_MARKET_PRICE_GENERAL_CHAT_20260630(self, *args, **kwargs)
 
     ChatService._execute_general_chat = _nova_live_market_price_general_chat_escape_20260630
-    print("[NOVA_FINAL_LIVE_MARKET_PRICE_GENERAL_CHAT_ESCAPE_20260630] installed")
+    _nova_boot_log_20260701("[NOVA_FINAL_LIVE_MARKET_PRICE_GENERAL_CHAT_ESCAPE_20260630] installed")
 except Exception as _nova_gc_live_market_error_20260630:
     print("[NOVA_FINAL_LIVE_MARKET_PRICE_GENERAL_CHAT_ESCAPE_20260630] failed:", _nova_gc_live_market_error_20260630)
 
@@ -24794,7 +24802,7 @@ try:
 
         ChatService.handle = _nova_project_state_recall_handle_20260630
         ChatService._NOVA_PROJECT_STATE_RECALL_20260630 = True
-        print("[NOVA_PROJECT_STATE_RECALL_20260630] installed")
+        _nova_boot_log_20260701("[NOVA_PROJECT_STATE_RECALL_20260630] installed")
 except Exception as _nova_project_state_install_error_20260630:
     try:
         print("[NOVA_PROJECT_STATE_RECALL_20260630] failed:", _nova_project_state_install_error_20260630)
@@ -24923,7 +24931,7 @@ try:
 
         ChatService.handle = _nova_project_state_recall_final_handle_20260630
         ChatService._NOVA_PROJECT_STATE_RECALL_FINAL_20260630 = True
-        print("[NOVA_PROJECT_STATE_RECALL_FINAL_20260630] installed")
+        _nova_boot_log_20260701("[NOVA_PROJECT_STATE_RECALL_FINAL_20260630] installed")
 except Exception as _nova_project_state_final_install_error_20260630:
     try:
         print(
@@ -25093,7 +25101,7 @@ try:
 
         ChatService.handle = _nova_project_state_idle_next_handle_20260630
         ChatService._NOVA_PROJECT_STATE_IDLE_NEXT_FALLBACK_REPAIR_20260630 = True
-        print("[NOVA_PROJECT_STATE_IDLE_NEXT_FALLBACK_REPAIR_20260630] installed")
+        _nova_boot_log_20260701("[NOVA_PROJECT_STATE_IDLE_NEXT_FALLBACK_REPAIR_20260630] installed")
 except Exception as _nova_project_state_idle_next_install_error_20260630:
     try:
         print(
@@ -25300,7 +25308,7 @@ try:
 
         ChatService.handle = _nova_project_state_idle_next_response_handle_20260630
         ChatService._NOVA_PROJECT_STATE_IDLE_NEXT_RESPONSE_REPAIR_FINAL_20260630 = True
-        print("[NOVA_PROJECT_STATE_IDLE_NEXT_RESPONSE_REPAIR_FINAL_20260630] installed")
+        _nova_boot_log_20260701("[NOVA_PROJECT_STATE_IDLE_NEXT_RESPONSE_REPAIR_FINAL_20260630] installed")
 except Exception as _nova_project_state_idle_next_response_install_error_20260630:
     try:
         print(
