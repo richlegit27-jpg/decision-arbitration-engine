@@ -18447,6 +18447,114 @@ except Exception as _nova_next_fixed_install_error_20260701:
     except Exception:
         pass
 
+
+
+# NOVA_CODING_JUDGMENT_DIRECT_ANSWER_20260701
+# Direct answer-quality guard for coding judgment questions.
+# Keeps Nova from suggesting broad tests while omitting py_compile.
+try:
+    from flask import request as _nova_coding_judgment_request_20260701
+    from flask import jsonify as _nova_coding_judgment_jsonify_20260701
+
+    @_nova_app.before_request if False else app.before_request
+    def _nova_coding_judgment_direct_answer_20260701():
+        try:
+            if _nova_coding_judgment_request_20260701.path != "/api/chat":
+                return None
+
+            if _nova_coding_judgment_request_20260701.method != "POST":
+                return None
+
+            data = _nova_coding_judgment_request_20260701.get_json(silent=True) or {}
+            user_text = str(
+                data.get("message")
+                or data.get("user_text")
+                or data.get("text")
+                or ""
+            ).strip()
+
+            clean = " ".join(user_text.lower().split())
+
+            triggers = (
+                "what test should we run before touching code",
+                "what tests should we run before touching code",
+                "what should we run before touching code",
+                "what test before touching code",
+                "what tests before touching code",
+                "before touching code",
+                "before we touch code",
+                "before patching",
+                "before we patch",
+            )
+
+            if not any(trigger in clean for trigger in triggers):
+                return None
+
+            session_id = str(
+                data.get("session_id")
+                or data.get("active_session_id")
+                or ""
+            ).strip()
+
+            answer = (
+                "Before touching code, run the smallest checks that prove the current behavior is safe:\n\n"
+                "1. `python -m py_compile` on the Python files you may touch.\n"
+                "2. The most relevant targeted smoke test.\n"
+                "3. `git status --short` before staging or committing.\n\n"
+                "For this Nova intelligence/memory work, use:\n\n"
+                "```powershell\n"
+                "python -m py_compile .\\\\app.py\n"
+                "python -m py_compile .\\\\tools\\\nova_answer_quality_smoke.py\n"
+                "python .\\\\tools\\\nova_answer_quality_smoke.py\n"
+                "python .\\\\tools\\\nova_project_state_memory_api_smoke.py\n"
+                "python .\\\\tools\\\nova_phase_4i_guard_stack_audit_smoke.py\n"
+                "git status --short\n"
+                "```\n\n"
+                "Rule: py_compile first, targeted smoke second, git status third, then patch or commit."
+            )
+
+            try:
+                return _nova_slim_assistant_payload(
+                    answer,
+                    session_id=session_id,
+                    route="coding_judgment_direct_answer",
+                    route_taken="coding_judgment_direct_answer",
+                    coding_judgment_policy=True,
+                )
+            except Exception:
+                return _nova_coding_judgment_jsonify_20260701({
+                    "ok": True,
+                    "session_id": session_id,
+                    "active_session_id": session_id,
+                    "text": answer,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": answer,
+                        "content": answer,
+                    },
+                    "debug": {
+                        "route": "coding_judgment_direct_answer",
+                        "route_taken": "coding_judgment_direct_answer",
+                    },
+                    "route": "coding_judgment_direct_answer",
+                    "route_taken": "coding_judgment_direct_answer",
+                })
+
+        except Exception as exc:
+            try:
+                app.logger.warning(
+                    "[NOVA_CODING_JUDGMENT_DIRECT_ANSWER_20260701] failed: %s",
+                    exc,
+                )
+            except Exception:
+                pass
+
+        return None
+
+    print("[NOVA_CODING_JUDGMENT_DIRECT_ANSWER_20260701] installed")
+except Exception as _nova_coding_judgment_error_20260701:
+    print("[NOVA_CODING_JUDGMENT_DIRECT_ANSWER_20260701] failed:", _nova_coding_judgment_error_20260701)
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
