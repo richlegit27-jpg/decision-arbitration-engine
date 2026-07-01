@@ -1,3 +1,8 @@
+﻿from pathlib import Path
+
+path = Path("nova_backend/services/project_state_direct_freshness_bridge.py")
+
+code = r'''
 """Project-state direct freshness bridge helpers.
 
 Keeps project-state recall and adjacent project-status questions fresh while
@@ -110,3 +115,6 @@ def build_project_state_direct_fresh_response(payload):
         },
         "debug": debug,
     }
+'''
+path.write_text(code.lstrip(), encoding="utf-8")
+print("extended project-state freshness bridge to next/blocker prompts")

@@ -1,3 +1,8 @@
+﻿from pathlib import Path
+
+path = Path("tools/nova_answer_quality_smoke.py")
+
+code = r'''
 import json
 import sys
 import time
@@ -206,3 +211,6 @@ if __name__ == "__main__":
         print("NOVA ANSWER QUALITY SMOKE FAILED")
         print(exc)
         raise SystemExit(1)
+'''
+path.write_text(code.lstrip(), encoding="utf-8")
+print("hardened nova_answer_quality_smoke freshness checks")
