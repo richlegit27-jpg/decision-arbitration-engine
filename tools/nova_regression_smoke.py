@@ -48,6 +48,9 @@ def route_of(result):
 
     return (
         debug.get("route_taken")
+        or debug.get("route")
+        or result.get("route_taken")
+        or result.get("route")
         or decision.get("route")
         or meta.get("strategy")
         or meta.get("route")
@@ -82,7 +85,10 @@ def run():
     )
     assert_true(
         "generate_summary_not_image",
-        not (summary.get("image_url") or (summary.get("assistant_message") or {}).get("image_url")),
+        not (
+            summary.get("image_url")
+            or (summary.get("assistant_message") or {}).get("image_url")
+        ),
         json.dumps(summary.get("debug", {}), indent=2),
     )
 
@@ -114,7 +120,8 @@ def run():
     k_active = post_chat("k", exec_session)
     assert_true(
         "execution_k_active_advances",
-        "Step 2/3" in text_of(k_active) or "Execution waiting" in text_of(k_active),
+        "Step 2/3" in text_of(k_active)
+        or "Execution waiting" in text_of(k_active),
         text_of(k_active),
     )
 
@@ -144,6 +151,38 @@ def run():
         "live_market_price_web",
         route_of(btc) in {"web_fetch", "web"} or "web" in route_of(btc),
         json.dumps(btc.get("debug", {}), indent=2),
+    )
+
+    # 9. Exact current-project recall stays on direct recall.
+    project_direct = post_chat(
+        "what are we working on now",
+        f"regression_project_direct_{stamp}",
+    )
+    assert_true(
+        "project_direct_recall_route",
+        route_of(project_direct) == "project_state_current_memory_direct_recall",
+        json.dumps(project_direct.get("debug", {}), indent=2),
+    )
+    assert_true(
+        "project_direct_recall_answer",
+        "project brain" in text_of(project_direct).lower(),
+        text_of(project_direct),
+    )
+
+    # 10. Broad project paraphrase routes through Project Brain intelligence.
+    project_paraphrase = post_chat(
+        "where are we at with Nova right now?",
+        f"regression_project_paraphrase_{stamp}",
+    )
+    assert_true(
+        "project_paraphrase_general_intelligence_route",
+        route_of(project_paraphrase) == "project_brain_general_intelligence",
+        json.dumps(project_paraphrase.get("debug", {}), indent=2),
+    )
+    assert_true(
+        "project_paraphrase_general_intelligence_answer",
+        "project brain" in text_of(project_paraphrase).lower(),
+        text_of(project_paraphrase),
     )
 
     print("\nNOVA REGRESSION SMOKE PASSED")
