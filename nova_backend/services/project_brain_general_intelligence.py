@@ -82,10 +82,25 @@ def _practical_project_answer() -> str:
     )
 
 
+def _is_direct_project_state_recall_prompt(text: str) -> bool:
+    normalized = " ".join(text.replace("?", " ").replace("!", " ").split())
+
+    direct_prompts = {
+        "what are we working on now",
+        "what are we working on",
+        "what are we working on right now",
+    }
+
+    return normalized in direct_prompts
+
+
 def classify_project_brain_intent(user_text: object) -> Optional[str]:
     text = _lower(user_text)
 
     if not text:
+        return None
+
+    if _is_direct_project_state_recall_prompt(text):
         return None
 
     if _has_any(text, ("attached", "image", "photo", "picture", "upload", "summarize this file")):
