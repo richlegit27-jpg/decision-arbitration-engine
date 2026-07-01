@@ -182,7 +182,7 @@ def build_practical_project_answer() -> str:
         "route contract, and classifier broadening are green. "
         f"Current blocker: {context.blocker} "
         f"Next concrete move: {context.next_move} "
-        "Validation: run the context-builder smoke, project-state memory API smoke, general-intelligence smoke, "
+        "Safe validation: run the context-builder smoke, project-state memory API smoke, general-intelligence smoke, "
         "route-contract smoke, classifier-broadening smoke, answer-quality smoke, and guard-stack audit. "
         "Then check `git status --short` and commit only after the board is green."
     )
