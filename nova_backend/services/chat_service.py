@@ -24492,7 +24492,7 @@ try:
         if _nova_all_wrap_live_market_price_route_20260630(_nova_all_route_method_20260630):
             _nova_all_live_market_price_installed_20260630.append(_nova_all_route_method_20260630)
 
-    print(
+    _nova_boot_log_20260701(
         "[NOVA_FINAL_LIVE_MARKET_PRICE_ALL_ROUTE_AUTHORITY_20260630] installed:",
         ",".join(_nova_all_live_market_price_installed_20260630) or "none",
     )

@@ -1,4 +1,13 @@
-﻿from __future__ import annotations
+from __future__ import annotations
+
+
+def _nova_boot_log_20260701(*args, **kwargs):
+    import os as _nova_boot_log_os_20260701
+
+    if str(_nova_boot_log_os_20260701.getenv("NOVA_VERBOSE_BOOT_LOGS", "")).strip().lower() in {"1", "true", "yes", "on"}:
+        print(*args, **kwargs)
+
+
 
 import json
 import logging
@@ -482,7 +491,7 @@ try:
     if "ChatExecutionService" in globals():
         ChatExecutionService.cancel = _nova_execution_cancel_compat_20260630
         ChatExecutionService.stop = _nova_execution_cancel_compat_20260630
-        print("[NOVA_EXECUTION_CANCEL_COMPAT_20260630] installed")
+        _nova_boot_log_20260701("[NOVA_EXECUTION_CANCEL_COMPAT_20260630] installed")
     else:
         print("[NOVA_EXECUTION_CANCEL_COMPAT_20260630] skipped: ChatExecutionService not found")
 except Exception as _nova_execution_cancel_error_20260630:
@@ -600,7 +609,7 @@ try:
             if _nova_execution_wrap_empty_complete_method_20260630(_nova_execution_method_name_20260630):
                 _nova_execution_normalized_methods_20260630.append(_nova_execution_method_name_20260630)
 
-        print(
+        _nova_boot_log_20260701(
             "[NOVA_EXECUTION_EMPTY_COMPLETE_NORMALIZER_20260630] installed:",
             ",".join(_nova_execution_normalized_methods_20260630) or "none",
         )
