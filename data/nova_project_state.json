@@ -1,7 +1,7 @@
 {
   "project": "Nova",
-  "checkpoint": "7e7e213 Add Nova autonomy task brain",
-  "current_focus": "Nova autonomy phase 1A locked: proposal-only task brain",
+  "checkpoint": "e84977f Add autonomy command to memory quality smoke",
+  "current_focus": "Nova autonomy phase 1B locked: proposal-only chat command with smoke coverage",
   "last_completed": [
     "Router cleanup locked",
     "Web/live price routing locked",
@@ -23,7 +23,8 @@
     "Checkpoint runner includes memory quality smoke",
     "Release checkpoint tool locked at 6b7fa22",
     "Release checkpoint note committed",
-    "Autonomy task brain locked at 7e7e213"
+    "Autonomy task brain locked at 7e7e213",
+    "Autonomy command smoke coverage locked at e84977f"
   ],
   "locked": [
     "Router cleanup",
@@ -39,7 +40,8 @@
     "Compact project-state context API",
     "Memory quality smoke runner",
     "Release checkpoint",
-    "Autonomy task brain"
+    "Autonomy task brain",
+    "Autonomy command smoke"
   ],
   "remaining": [
     "Add project-state sync helper",
@@ -47,13 +49,13 @@
     "Commit project-state sync helper",
     "Commit one-command checkpoint runner"
   ],
-  "next_move": "Wire autonomy proposal command into chat.",
+  "next_move": "Begin autonomy phase 1C: supervised patch proposal planning.",
   "git": {
     "branch": "post-frontend-polish-phase",
-    "head": "7e7e213",
-    "subject": "Add Nova autonomy task brain",
+    "head": "e84977f",
+    "subject": "Add autonomy command to memory quality smoke",
     "clean": true,
     "dirty_files": []
   },
-  "updated_at_utc": "2026-07-01T03:11:50.524350+00:00"
+  "updated_at_utc": "2026-07-01T03:18:03.782614+00:00"
 }
