@@ -77,15 +77,15 @@ def build_project_brain_context() -> ProjectBrainContext:
     )
 
     blocker = (
-        "The current blocker is Project Brain answer freshness: fallback-route priority is protected, "
-        "but project-brain answers can still become stale if status, blocker, next move, and validation "
-        "text are repeated as hardcoded paragraphs instead of built from one context source."
+        "The current blocker is Project Brain answer freshness v2: fallback-route priority and the "
+        "context-builder path are protected, but the builder still needs a cleaner source-of-truth model "
+        "so checkpoint, blocker, next move, recent commits, and validation state can update without another "
+        "wording patch."
     )
 
     next_move = (
-        "Move Project Brain answer text into the context builder so status, blocker, next move, "
-        "fallback priority notes, and validation guidance come from one reusable source instead of "
-        "repeated hardcoded paragraphs."
+        "Add a Project Brain freshness snapshot so the context builder can report current checkpoint, "
+        "blocker, next move, latest commits, and available smoke files from one structured source."
     )
 
     validation = [
