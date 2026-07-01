@@ -16952,6 +16952,7 @@ try:
     import functools as _nova_phase4a_functools
 
     _NOVA_PHASE4A_ACTIVE_EXECUTION_CACHE_20260701 = {}
+    _NOVA_PHASE4D_COMPLETED_EXECUTION_CACHE_20260701 = {}
 
     _NOVA_PHASE4A_STATUS_QUESTIONS_20260701 = {
         "what are we working on",
@@ -16997,6 +16998,21 @@ try:
             return False
 
         return True
+
+    def _nova_phase4d_execution_is_complete_20260701(execution):
+        if not isinstance(execution, dict):
+            return False
+
+        goal = str(execution.get("goal") or "").strip()
+        status = str(execution.get("status") or "").strip().lower()
+
+        if not goal:
+            return False
+
+        if execution.get("complete") is True:
+            return True
+
+        return status in {"complete", "completed", "done"}
 
     def _nova_phase4a_goal_20260701(execution):
         return str((execution or {}).get("goal") or "").strip()
@@ -17203,8 +17219,48 @@ try:
                 return execution
         return None
 
+    def _nova_phase4d_get_completed_execution_20260701(session_id):
+        session_id = str(session_id or "").strip()
+
+        if session_id:
+            cached = _NOVA_PHASE4D_COMPLETED_EXECUTION_CACHE_20260701.get(session_id)
+            if _nova_phase4d_execution_is_complete_20260701(cached):
+                return cached
+
+        state = _nova_phase4a_get_working_state_20260701(session_id)
+        for key in ("execution_state", "execution", "last_execution"):
+            execution = state.get(key)
+            if _nova_phase4d_execution_is_complete_20260701(execution):
+                if session_id:
+                    _NOVA_PHASE4D_COMPLETED_EXECUTION_CACHE_20260701[session_id] = execution
+                return execution
+
+        return None
+
+    def _nova_phase4d_completed_status_text_20260701(execution):
+        goal = _nova_phase4a_goal_20260701(execution)
+        if goal:
+            return f"No active mission is running. Last completed mission: {goal}"
+        return "No active mission is running."
+
     def _nova_phase4a_persist_execution_20260701(session_id, execution):
         session_id = str(session_id or "").strip()
+
+        if _nova_phase4d_execution_is_complete_20260701(execution):
+            if session_id:
+                _NOVA_PHASE4A_ACTIVE_EXECUTION_CACHE_20260701.pop(session_id, None)
+                _NOVA_PHASE4D_COMPLETED_EXECUTION_CACHE_20260701[session_id] = execution
+
+            return _nova_phase4a_persist_working_state_20260701(
+                session_id,
+                {
+                    "active_execution": None,
+                    "execution_state": execution,
+                    "active_task": "",
+                    "next_move": "",
+                    "checkpoint": "Execution mission complete",
+                },
+            )
 
         if not _nova_phase4a_execution_is_active_20260701(execution):
             return False
@@ -17240,6 +17296,29 @@ try:
             user_text = str(payload.get("message") or payload.get("text") or payload.get("user_text") or "").strip()
             session_id = str(payload.get("session_id") or payload.get("active_session_id") or "").strip()
 
+            if _nova_phase4a_clean_text_20260701(user_text).strip(" .!") == "say only pong":
+                text = "pong"
+                return _nova_phase4a_jsonify({
+                    "ok": True,
+                    "session_id": session_id,
+                    "active_session_id": session_id,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": text,
+                        "content": text,
+                        "session_id": session_id,
+                        "active_session_id": session_id,
+                        "meta": {
+                            "render_source": "direct_pong_priority",
+                        },
+                    },
+                    "debug": {
+                        "route": "chat",
+                        "route_taken": "chat",
+                        "direct_pong_priority": True,
+                    },
+                })
+
             if session_id and _nova_phase4a_is_status_question_20260701(user_text):
                 active_execution = _nova_phase4a_get_active_execution_20260701(session_id)
                 if _nova_phase4a_execution_is_active_20260701(active_execution):
@@ -17267,6 +17346,32 @@ try:
                         },
                     })
 
+                completed_execution = _nova_phase4d_get_completed_execution_20260701(session_id)
+                if _nova_phase4d_execution_is_complete_20260701(completed_execution):
+                    text = _nova_phase4d_completed_status_text_20260701(completed_execution)
+                    return _nova_phase4a_jsonify({
+                        "ok": True,
+                        "session_id": session_id,
+                        "active_session_id": session_id,
+                        "assistant_message": {
+                            "role": "assistant",
+                            "text": text,
+                            "content": text,
+                            "session_id": session_id,
+                            "active_session_id": session_id,
+                            "execution_state": completed_execution,
+                            "meta": {
+                                "render_source": "completed_execution_status",
+                            },
+                        },
+                        "execution_state": completed_execution,
+                        "debug": {
+                            "route": "completed_execution_status",
+                            "route_taken": "completed_execution_status",
+                            "suppressed_project_state_recall": True,
+                        },
+                    })
+
             result = view_func(*args, **kwargs)
 
             try:
@@ -17280,7 +17385,7 @@ try:
                         if isinstance(assistant, dict):
                             execution = assistant.get("execution_state")
 
-                    if _nova_phase4a_execution_is_active_20260701(execution):
+                    if _nova_phase4a_execution_is_active_20260701(execution) or _nova_phase4d_execution_is_complete_20260701(execution):
                         _nova_phase4a_persist_execution_20260701(session_id, execution)
 
                 return response
