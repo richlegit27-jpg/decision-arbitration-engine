@@ -1,7 +1,7 @@
 {
   "project": "Nova",
-  "checkpoint": "4aacd7d Update Nova project state after repair plan adapter",
-  "current_focus": "Nova autonomy Phase 3E adapter locked: repair-plan now uses a one-command adapter and its adapter smoke matches the supervised repair proposal response.",
+  "checkpoint": "4b4ddbc Repair Nova project state next wording",
+  "current_focus": "Nova autonomy Phase 3E locked: repair-plan adapter is committed, command-registry adapter already exists, and command-registry smokes pass clean.",
   "last_completed": [
     "Router cleanup locked",
     "Web/live price routing locked",
@@ -39,7 +39,8 @@
     "Added autonomy-index adapter at f999681 and repaired nova_backend/services/autonomy_ladder_index.py at 91cd974 so adapter smoke can verify autonomy-index is visible in the ladder output.",
     "Added nova_backend/services/workflow_catalog_adapter.py and tools/nova_workflow_catalog_adapter_smoke.py. Workflow-catalog adapter smoke, workflow-catalog API smoke, guard cleanup review, and memory quality smoke all passed.",
     "Added repair-build adapter at 46fbf24 and repaired tools/nova_repair_build_adapter_smoke.py at 378b621 so repair-build adapter smoke, API smoke, guard review, and memory quality can stay green.",
-    "Repair-plan adapter locked"
+    "Repair-plan adapter locked",
+    "Command-registry adapter verified locked"
   ],
   "locked": [
     "Memory quality smoke",
@@ -81,8 +82,8 @@
     "Autonomy Phase 1C autonomy-plan command",
     "Autonomy Phase 1D Patch Builder service"
   ],
-  "remaining": "Continue one-command adapter migration only after clean smokes and clean git status. Next safest candidate is command-registry because it is read-only, registry-backed, and preserves project-state recall.",
-  "next_move": "Create the command-registry one-command adapter next while preserving project-state recall, all locked guards, command modes, route debug fields, and memory quality smoke.",
+  "remaining": "Inventory existing one-command adapters before creating anything new. Do not rebuild command-registry because it is already locked.",
+  "next_move": "Run adapter inventory for autonomy-plan, patch-build, repair-plan, repair-build, workflow-catalog, autonomy-index, and command-registry, then migrate only the first missing adapter while preserving project-state recall and memory quality smoke.",
   "git": {
     "branch": "post-frontend-polish-phase",
     "head": "e84977f",
