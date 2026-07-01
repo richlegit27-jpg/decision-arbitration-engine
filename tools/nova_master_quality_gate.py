@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import subprocess
 import sys
@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 COMMANDS = [
     ["-m", "py_compile", str(ROOT / "app.py")],
     [str(ROOT / "tools" / "nova_secret_log_hygiene_smoke.py")],
+    [str(ROOT / "tools" / "nova_phase_3i_static_backup_review_smoke.py")],
     [str(ROOT / "tools" / "nova_openai_key_log_safety_smoke.py")],
     [str(ROOT / "tools" / "nova_fallback_guard_cleanup_plan_smoke.py")],
     [str(ROOT / "tools" / "nova_fallback_guard_cleanup_validation_smoke.py")],
