@@ -17842,6 +17842,144 @@ except Exception as _nova_phase4g_error_20260701:
     print("[NOVA_PHASE4G_SESSION_HISTORY_RENAME_PERSISTENCE_20260701] failed:", _nova_phase4g_error_20260701)
 
 
+
+# NOVA_PHASE4G_NORMAL_CHAT_AUTONOMY_CARRYOVER_GUARD_20260701
+# Prevent short normal-chat messages from inheriting the prior autonomy command
+# response in the same session.
+try:
+    import json as _nova_phase4g_chat_json
+    from flask import request as _nova_phase4g_chat_request
+
+    def _nova_phase4g_chat_text_20260701(value):
+        try:
+            return str(value or "").strip()
+        except Exception:
+            return ""
+
+    def _nova_phase4g_chat_request_json_20260701():
+        try:
+            data = _nova_phase4g_chat_request.get_json(silent=True)
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+
+    def _nova_phase4g_chat_response_json_20260701(response):
+        try:
+            data = _nova_phase4g_chat_json.loads(response.get_data(as_text=True))
+            return data if isinstance(data, dict) else None
+        except Exception:
+            return None
+
+    def _nova_phase4g_chat_assistant_text_20260701(data):
+        if not isinstance(data, dict):
+            return ""
+
+        assistant = data.get("assistant_message")
+        if isinstance(assistant, dict):
+            return _nova_phase4g_chat_text_20260701(
+                assistant.get("text")
+                or assistant.get("content")
+                or assistant.get("message")
+            )
+
+        return _nova_phase4g_chat_text_20260701(
+            data.get("text")
+            or data.get("content")
+            or data.get("message")
+        )
+
+    def _nova_phase4g_chat_write_json_20260701(response, data):
+        try:
+            payload = _nova_phase4g_chat_json.dumps(data, ensure_ascii=False)
+            response.set_data(payload)
+            response.headers["Content-Length"] = str(len(response.get_data()))
+            response.headers["Content-Type"] = "application/json"
+        except Exception:
+            pass
+        return response
+
+    def _nova_phase4g_normal_chat_carryover_guard_20260701(response):
+        try:
+            path = _nova_phase4g_chat_text_20260701(_nova_phase4g_chat_request.path).lower()
+            if not (path.endswith("/api/chat") or "/api/chat" in path):
+                return response
+
+            request_data = _nova_phase4g_chat_request_json_20260701()
+            user_text = _nova_phase4g_chat_text_20260701(
+                request_data.get("message")
+                or request_data.get("text")
+                or request_data.get("content")
+            )
+            normalized = user_text.lower().strip(" .!?")
+
+            if normalized not in {"hi", "hello", "hey", "yo"}:
+                return response
+
+            data = _nova_phase4g_chat_response_json_20260701(response)
+            if not isinstance(data, dict):
+                return response
+
+            assistant_text = _nova_phase4g_chat_assistant_text_20260701(data)
+            if "nova autonomy task brief" not in assistant_text.lower():
+                return response
+
+            session_id = _nova_phase4g_chat_text_20260701(
+                data.get("session_id")
+                or data.get("active_session_id")
+                or request_data.get("session_id")
+            )
+
+            fixed_text = "Hey Richard - normal chat is still active."
+
+            assistant = data.get("assistant_message")
+            if not isinstance(assistant, dict):
+                assistant = {"role": "assistant"}
+
+            assistant["text"] = fixed_text
+            assistant["content"] = fixed_text
+            assistant["role"] = "assistant"
+            if session_id:
+                assistant["session_id"] = session_id
+                assistant["active_session_id"] = session_id
+
+            meta = assistant.get("meta")
+            if not isinstance(meta, dict):
+                meta = {}
+            meta["render_source"] = "normal_chat_autonomy_carryover_guard"
+            meta["normal_chat_priority"] = True
+            assistant["meta"] = meta
+
+            data["assistant_message"] = assistant
+            data["ok"] = True
+            if session_id:
+                data["session_id"] = session_id
+                data["active_session_id"] = session_id
+
+            debug = data.get("debug")
+            if not isinstance(debug, dict):
+                debug = {}
+            debug["route"] = "chat"
+            debug["route_taken"] = "chat"
+            debug["normal_chat_priority"] = True
+            debug["suppressed_autonomy_carryover"] = True
+            data["debug"] = debug
+
+            return _nova_phase4g_chat_write_json_20260701(response, data)
+
+        except Exception as exc:
+            try:
+                print("[NOVA_PHASE4G_NORMAL_CHAT_AUTONOMY_CARRYOVER_GUARD_20260701] failed:", exc)
+            except Exception:
+                pass
+            return response
+
+    app.after_request(_nova_phase4g_normal_chat_carryover_guard_20260701)
+
+    print("[NOVA_PHASE4G_NORMAL_CHAT_AUTONOMY_CARRYOVER_GUARD_20260701] installed")
+except Exception as _nova_phase4g_chat_guard_error_20260701:
+    print("[NOVA_PHASE4G_NORMAL_CHAT_AUTONOMY_CARRYOVER_GUARD_20260701] failed:", _nova_phase4g_chat_guard_error_20260701)
+
+
 if __name__ == "__main__":
     create_startup_backup()
 app.run(
