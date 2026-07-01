@@ -16128,6 +16128,251 @@ except Exception as _nova_natural_project_install_error_20260701:
     except Exception:
         pass
 
+# NOVA_API_CHAT_COMPACT_PROJECT_CONTEXT_20260701
+# Route-level compact project-state context for broader Nova/project status prompts.
+# Uses project_state_service.compact_project_state_context() but does not modify the service.
+try:
+    import json as _nova_compact_project_json_20260701
+    import re as _nova_compact_project_re_20260701
+    import importlib.util as _nova_compact_project_importlib_util_20260701
+    from pathlib import Path as _NovaCompactProjectPath20260701
+    from flask import request as _nova_compact_project_request_20260701
+    from flask import Response as _NovaCompactProjectResponse20260701
+
+    def _nova_compact_project_normalize_20260701(value):
+        text = str(value or "").strip().lower()
+        text = text.replace("’", "'")
+        text = _nova_compact_project_re_20260701.sub(r"\s+", " ", text)
+        return text
+
+    def _nova_compact_project_should_answer_20260701(user_text):
+        text = _nova_compact_project_normalize_20260701(user_text)
+
+        if not text or len(text) > 240:
+            return False
+
+        # Leave exact direct commands to the already-locked project-state/natural-recall wrappers.
+        exact_owned_elsewhere = {
+            "what are we working on",
+            "what are we working on?",
+            "what did we just fix",
+            "what did we just fix?",
+            "what is left",
+            "what is left?",
+            "next",
+            "k",
+            "are we good",
+            "are we good?",
+            "what is locked",
+            "what is locked?",
+            "how far are we now",
+            "how far are we now?",
+            "what should we do now",
+            "what should we do now?",
+            "can we move on",
+            "can we move on?",
+        }
+
+        if text in exact_owned_elsewhere:
+            return False
+
+        project_terms = [
+            "nova",
+            "project",
+            "checkpoint",
+            "current work",
+            "our work",
+            "what we're doing",
+            "what we are doing",
+        ]
+
+        status_terms = [
+            "status",
+            "summary",
+            "context",
+            "checkpoint",
+            "progress",
+            "where",
+            "current",
+            "working on",
+            "next",
+            "left",
+            "locked",
+            "phase",
+        ]
+
+        has_project_term = any(term in text for term in project_terms)
+        has_status_term = any(term in text for term in status_terms)
+
+        blocked_terms = [
+            "bitcoin",
+            "price",
+            "weather",
+            "image",
+            "generate image",
+            "draw",
+            "attachment",
+            "upload",
+            "file",
+            "soccer",
+            "news",
+        ]
+
+        if any(term in text for term in blocked_terms):
+            return False
+
+        return has_project_term and has_status_term
+
+    def _nova_compact_project_request_json_20260701():
+        try:
+            data = _nova_compact_project_request_20260701.get_json(silent=True) or {}
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+
+    def _nova_compact_project_request_text_20260701(data):
+        for key in ("message", "user_text", "text", "prompt"):
+            value = data.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return ""
+
+    def _nova_compact_project_load_context_20260701():
+        service_path = (
+            _NovaCompactProjectPath20260701(__file__)
+            .resolve()
+            .parent
+            / "nova_backend"
+            / "services"
+            / "project_state_service.py"
+        )
+
+        spec = _nova_compact_project_importlib_util_20260701.spec_from_file_location(
+            "_nova_compact_project_state_service_direct_20260701",
+            str(service_path),
+        )
+
+        if not spec or not spec.loader:
+            return ""
+
+        module = _nova_compact_project_importlib_util_20260701.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        compact_fn = getattr(module, "compact_project_state_context", None)
+        if not callable(compact_fn):
+            return ""
+
+        return str(compact_fn(max_locked=8) or "").strip()
+
+    def _nova_compact_project_payload_20260701(reply, data):
+        session_id = ""
+        if isinstance(data, dict):
+            session_id = str(data.get("session_id") or data.get("active_session_id") or "").strip()
+
+        return {
+            "ok": True,
+            "success": True,
+            "content": reply,
+            "message": reply,
+            "response": reply,
+            "session_id": session_id,
+            "active_session_id": session_id,
+            "assistant_message": {
+                "role": "assistant",
+                "content": reply,
+                "attachments": [],
+            },
+            "route": "project_state_context",
+            "route_taken": "project_state_context",
+            "debug": {
+                "route": "project_state_context",
+                "route_taken": "project_state_context",
+                "compact_project_context": True,
+            },
+            "meta": {
+                "route": "project_state_context",
+                "strategy": "compact_project_context",
+            },
+        }
+
+    def _nova_compact_project_wrap_endpoint_20260701(endpoint_name):
+        view = app.view_functions.get(endpoint_name)
+        if not callable(view):
+            return False
+
+        if getattr(view, "_NOVA_API_CHAT_COMPACT_PROJECT_CONTEXT_20260701", False):
+            return True
+
+        def _nova_compact_project_wrapped_view_20260701(*args, **kwargs):
+            try:
+                data = _nova_compact_project_request_json_20260701()
+                user_text = _nova_compact_project_request_text_20260701(data)
+
+                if _nova_compact_project_should_answer_20260701(user_text):
+                    context = _nova_compact_project_load_context_20260701()
+
+                    if context:
+                        reply = (
+                            "Current Nova project context:\n"
+                            f"{context}\n\n"
+                            "This is the compact checkpoint view for the current Nova work."
+                        )
+                        payload = _nova_compact_project_payload_20260701(reply, data)
+                        encoded = _nova_compact_project_json_20260701.dumps(payload, ensure_ascii=False)
+                        return _NovaCompactProjectResponse20260701(
+                            encoded,
+                            status=200,
+                            mimetype="application/json",
+                        )
+            except Exception as _nova_compact_project_route_error_20260701:
+                try:
+                    print(
+                        "[NOVA_API_CHAT_COMPACT_PROJECT_CONTEXT_20260701] bypass:",
+                        _nova_compact_project_route_error_20260701,
+                    )
+                except Exception:
+                    pass
+
+            return view(*args, **kwargs)
+
+        _nova_compact_project_wrapped_view_20260701.__name__ = getattr(
+            view,
+            "__name__",
+            "_nova_compact_project_wrapped_view_20260701",
+        )
+        _nova_compact_project_wrapped_view_20260701._NOVA_API_CHAT_COMPACT_PROJECT_CONTEXT_20260701 = True
+
+        app.view_functions[endpoint_name] = _nova_compact_project_wrapped_view_20260701
+        return True
+
+    _nova_compact_project_wrapped_count_20260701 = 0
+    for _endpoint_name_20260701, _view_20260701 in list(app.view_functions.items()):
+        try:
+            rule_matches = [
+                rule.rule
+                for rule in app.url_map.iter_rules()
+                if rule.endpoint == _endpoint_name_20260701
+            ]
+
+            if "/api/chat" in rule_matches:
+                if _nova_compact_project_wrap_endpoint_20260701(_endpoint_name_20260701):
+                    _nova_compact_project_wrapped_count_20260701 += 1
+        except Exception:
+            pass
+
+    print(
+        "[NOVA_API_CHAT_COMPACT_PROJECT_CONTEXT_20260701] wrapped endpoints:",
+        _nova_compact_project_wrapped_count_20260701,
+    )
+except Exception as _nova_compact_project_install_error_20260701:
+    try:
+        print(
+            "[NOVA_API_CHAT_COMPACT_PROJECT_CONTEXT_20260701] failed:",
+            _nova_compact_project_install_error_20260701,
+        )
+    except Exception:
+        pass
+
 if __name__ == "__main__":
     create_startup_backup()
 app.run(
@@ -16138,5 +16383,6 @@ app.run(
 
 
 # NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611
+
 
 
