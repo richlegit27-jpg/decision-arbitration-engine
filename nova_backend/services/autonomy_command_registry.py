@@ -95,6 +95,19 @@ COMMAND_REGISTRY: List[Dict[str, object]] = [
         "purpose": "Return the locked autonomy command map through chat.",
         "safety": "Index only; no file edits, no command execution.",
     },
+    {
+        "command": "command-registry:",
+        "aliases": ["command-registry:", "command registry:", "registry:", "autonomy-registry:", "autonomy registry:"],
+        "route": "command_registry_command",
+        "mode": "read_only_command_registry",
+        "service": "nova_backend.services.autonomy_command_registry_adapter",
+        "formatter": "build_command_registry_response",
+        "api_smoke": "python .\\tools\\nova_command_registry_command_api_smoke.py",
+        "service_smoke": "python .\\tools\\nova_command_registry_adapter_smoke.py",
+        "status": "locked",
+        "purpose": "Return the read-only autonomy command registry through chat.",
+        "safety": "Registry only; no file edits, no command execution.",
+    },
 ]
 
 
