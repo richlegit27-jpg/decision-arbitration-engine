@@ -11,6 +11,17 @@ from typing import Any, Dict, List
 ROOT = Path(__file__).resolve().parents[1]
 STATE_PATH = ROOT / "data" / "nova_project_state.json"
 
+PLACEHOLDER_VALUES = {
+    "",
+    "next task here",
+    "todo",
+    "tbd",
+    "fix later",
+    "placeholder",
+    "replace me",
+    "next",
+}
+
 
 def run_git(args: List[str]) -> str:
     try:
@@ -84,19 +95,40 @@ def merge_unique(existing: List[str], new_items: List[str]) -> List[str]:
     return merged
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Sync Nova project-state JSON from git/checkpoint info.")
-    parser.add_argument("--current-focus", default="")
-    parser.add_argument("--next-move", default="")
-    parser.add_argument("--locked", action="append", default=[])
-    parser.add_argument("--completed", action="append", default=[])
-    parser.add_argument("--remaining", action="append", default=[])
-    parser.add_argument("--replace-remaining", action="store_true")
-    parser.add_argument("--regression-pass", action="store_true")
-    parser.add_argument("--project-state-pass", action="store_true")
+def is_placeholder(value: str) -> bool:
+    normalized = " ".join(str(value or "").strip().lower().split())
+    return normalized in PLACEHOLDER_VALUES
 
-    args = parser.parse_args()
 
+def validate_args(args: argparse.Namespace) -> None:
+    if args.next_move and is_placeholder(args.next_move):
+        raise ValueError(
+            f"Refusing placeholder --next-move value: {args.next_move!r}. "
+            "Use a real next move or omit --next-move."
+        )
+
+    if args.current_focus and is_placeholder(args.current_focus):
+        raise ValueError(
+            f"Refusing placeholder --current-focus value: {args.current_focus!r}. "
+            "Use a real current focus or omit --current-focus."
+        )
+
+    for item in args.remaining:
+        if is_placeholder(item):
+            raise ValueError(
+                f"Refusing placeholder --remaining value: {item!r}. "
+                "Use a real remaining item."
+            )
+
+    for item in args.completed:
+        if is_placeholder(item):
+            raise ValueError(
+                f"Refusing placeholder --completed value: {item!r}. "
+                "Use a real completed item."
+            )
+
+
+def build_state(args: argparse.Namespace) -> Dict[str, Any]:
     state = load_state()
     git = git_snapshot()
 
@@ -134,18 +166,60 @@ def main() -> int:
     state["git"] = git
     state["updated_at_utc"] = datetime.now(timezone.utc).isoformat()
 
+    return state
+
+
+def render_state(state: Dict[str, Any]) -> str:
+    return json.dumps(state, indent=2, ensure_ascii=False) + "\n"
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Sync Nova project-state JSON from git/checkpoint info.")
+    parser.add_argument("--current-focus", default="")
+    parser.add_argument("--next-move", default="")
+    parser.add_argument("--locked", action="append", default=[])
+    parser.add_argument("--completed", action="append", default=[])
+    parser.add_argument("--remaining", action="append", default=[])
+    parser.add_argument("--replace-remaining", action="store_true")
+    parser.add_argument("--regression-pass", action="store_true")
+    parser.add_argument("--project-state-pass", action="store_true")
+    parser.add_argument("--dry-run", action="store_true")
+
+    args = parser.parse_args()
+    validate_args(args)
+
+    state = build_state(args)
+    rendered = render_state(state)
+
+    if args.dry_run:
+        print("Project state dry run:")
+        print(rendered)
+        return 0
+
+    old_raw = ""
+    if STATE_PATH.exists():
+        old_raw = STATE_PATH.read_text(encoding="utf-8-sig")
+
+    if old_raw == rendered:
+        print("Project state unchanged.")
+        print(f"- checkpoint: {state['checkpoint']}")
+        print(f"- clean: {state.get('git', {}).get('clean')}")
+        print(f"- file: {STATE_PATH}")
+        return 0
+
     STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    STATE_PATH.write_text(
-        json.dumps(state, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
+    STATE_PATH.write_text(rendered, encoding="utf-8")
 
     print("Project state synced:")
     print(f"- checkpoint: {state['checkpoint']}")
-    print(f"- clean: {git.get('clean')}")
+    print(f"- clean: {state.get('git', {}).get('clean')}")
     print(f"- file: {STATE_PATH}")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except Exception as exc:
+        print(f"FAILED: {exc}")
+        raise SystemExit(1)
