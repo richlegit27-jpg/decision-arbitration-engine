@@ -17230,6 +17230,136 @@ def nova_workflow_catalog_command_guard_20260701():
         }), 500
 
 
+
+
+# NOVA_AUTONOMY_INDEX_COMMAND_GUARD_20260701
+# Autonomy ladder index command guard for:
+# autonomy-index:
+# This does not edit files, execute commands, or apply repairs.
+def _nova_is_autonomy_index_command_20260701(user_text):
+    raw = str(user_text or "").strip().lower()
+
+    triggers = (
+        "autonomy-index",
+        "autonomy index",
+        "ladder-index",
+        "ladder index",
+        "autonomy ladder",
+    )
+
+    return any(raw == trigger or raw.startswith(trigger + ":") for trigger in triggers)
+
+
+@app.before_request
+def nova_autonomy_index_command_guard_20260701():
+    try:
+        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
+            return None
+
+        payload = request.get_json(silent=True) or {}
+
+        user_text = str(
+            payload.get("user_text")
+            or payload.get("text")
+            or payload.get("message")
+            or ""
+        ).strip()
+
+        if not _nova_is_autonomy_index_command_20260701(user_text):
+            return None
+
+        from datetime import datetime, timezone
+        from nova_backend.services.autonomy_ladder_index import format_autonomy_ladder_index
+
+        assistant_text = format_autonomy_ladder_index()
+
+        session_id = str(
+            payload.get("session_id")
+            or payload.get("active_session_id")
+            or payload.get("requested_session_id")
+            or ""
+        ).strip()
+
+        if not session_id:
+            try:
+                session_id = str(getattr(session_service, "active_session_id", "") or "").strip()
+            except Exception:
+                session_id = ""
+
+        if not session_id:
+            session_id = "autonomy_index"
+
+        now = datetime.now(timezone.utc).isoformat()
+
+        user_msg = {
+            "role": "user",
+            "text": user_text,
+            "content": user_text,
+            "attachments": [],
+            "created_at": now,
+            "meta": {
+                "route": "autonomy_index_command",
+            },
+        }
+
+        assistant_msg = {
+            "role": "assistant",
+            "text": assistant_text,
+            "content": assistant_text,
+            "attachments": [],
+            "created_at": now,
+            "meta": {
+                "route": "autonomy_index_command",
+                "mode": "autonomy_ladder_index_only",
+            },
+        }
+
+        try:
+            session_service.add_message(session_id, user_msg)
+            session_service.add_message(session_id, assistant_msg)
+        except Exception:
+            pass
+
+        try:
+            session = session_service.get_session(session_id)
+        except Exception:
+            session = None
+
+        if not isinstance(session, dict):
+            session = {
+                "id": session_id,
+                "messages": [user_msg, assistant_msg],
+            }
+
+        return jsonify({
+            "ok": True,
+            "session_id": session_id,
+            "active_session_id": session_id,
+            "assistant_message": assistant_msg,
+            "session": session,
+            "runtime": {},
+            "debug": {
+                "route": "autonomy_index_command",
+                "mode": "autonomy_ladder_index_only",
+            },
+        })
+
+    except Exception as error:
+        try:
+            app.logger.exception("[NOVA_AUTONOMY_INDEX_COMMAND_GUARD_20260701] failed")
+        except Exception:
+            pass
+
+        return jsonify({
+            "ok": False,
+            "error": str(error),
+            "debug": {
+                "route": "autonomy_index_command",
+                "failed": True,
+            },
+        }), 500
+
+
 if __name__ == "__main__":
     create_startup_backup()
 app.run(
