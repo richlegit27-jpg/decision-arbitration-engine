@@ -16819,6 +16819,143 @@ def nova_patch_build_command_guard_20260630():
         }), 500
 
 
+
+
+# NOVA_REPAIR_PLAN_COMMAND_GUARD_20260630
+# Proposal-only command guard for:
+# repair-plan: <failed smoke output>
+# This does not edit files, execute commands, or apply repairs.
+def _nova_extract_repair_plan_input_20260630(user_text):
+    raw = str(user_text or "").strip()
+    lowered = raw.lower()
+
+    prefixes = (
+        "repair-plan:",
+        "repair plan:",
+        "repair:",
+        "fix-plan:",
+        "fix plan:",
+    )
+
+    for prefix in prefixes:
+        if lowered.startswith(prefix):
+            return raw[len(prefix):].strip()
+
+    return ""
+
+
+@app.before_request
+def nova_repair_plan_command_guard_20260630():
+    try:
+        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
+            return None
+
+        payload = request.get_json(silent=True) or {}
+
+        user_text = str(
+            payload.get("user_text")
+            or payload.get("text")
+            or payload.get("message")
+            or ""
+        ).strip()
+
+        failed_output = _nova_extract_repair_plan_input_20260630(user_text)
+
+        if not failed_output:
+            return None
+
+        from datetime import datetime, timezone
+        from nova_backend.services.autonomy_repair_planner import format_autonomy_repair_plan
+
+        assistant_text = format_autonomy_repair_plan(failed_output)
+
+        session_id = str(
+            payload.get("session_id")
+            or payload.get("active_session_id")
+            or payload.get("requested_session_id")
+            or ""
+        ).strip()
+
+        if not session_id:
+            try:
+                session_id = str(getattr(session_service, "active_session_id", "") or "").strip()
+            except Exception:
+                session_id = ""
+
+        if not session_id:
+            session_id = "repair_plan"
+
+        now = datetime.now(timezone.utc).isoformat()
+
+        user_msg = {
+            "role": "user",
+            "text": user_text,
+            "content": user_text,
+            "attachments": [],
+            "created_at": now,
+            "meta": {
+                "route": "repair_plan_command",
+            },
+        }
+
+        assistant_msg = {
+            "role": "assistant",
+            "text": assistant_text,
+            "content": assistant_text,
+            "attachments": [],
+            "created_at": now,
+            "meta": {
+                "route": "repair_plan_command",
+                "mode": "repair_proposal_only",
+            },
+        }
+
+        try:
+            session_service.add_message(session_id, user_msg)
+            session_service.add_message(session_id, assistant_msg)
+        except Exception:
+            pass
+
+        try:
+            session = session_service.get_session(session_id)
+        except Exception:
+            session = None
+
+        if not isinstance(session, dict):
+            session = {
+                "id": session_id,
+                "messages": [user_msg, assistant_msg],
+            }
+
+        return jsonify({
+            "ok": True,
+            "session_id": session_id,
+            "active_session_id": session_id,
+            "assistant_message": assistant_msg,
+            "session": session,
+            "runtime": {},
+            "debug": {
+                "route": "repair_plan_command",
+                "mode": "repair_proposal_only",
+            },
+        })
+
+    except Exception as error:
+        try:
+            app.logger.exception("[NOVA_REPAIR_PLAN_COMMAND_GUARD_20260630] failed")
+        except Exception:
+            pass
+
+        return jsonify({
+            "ok": False,
+            "error": str(error),
+            "debug": {
+                "route": "repair_plan_command",
+                "failed": True,
+            },
+        }), 500
+
+
 if __name__ == "__main__":
     create_startup_backup()
 app.run(
