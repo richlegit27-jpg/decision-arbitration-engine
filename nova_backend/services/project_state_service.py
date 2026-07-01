@@ -469,3 +469,54 @@ def _has_active_execution(runtime_execution_state: Optional[Any] = None) -> bool
 
     return _is_active_execution_state(_read_execution_state())
 
+
+# NOVA_PROJECT_STATE_COMPACT_CONTEXT_20260701
+# Compact formatter for safe project-state injection.
+# This does not change routing. It only exposes a short, bounded context line.
+def compact_project_state_context(max_locked: int = 6) -> str:
+    state = get_project_state()
+
+    checkpoint = str(state.get("checkpoint") or "").strip()
+    current_focus = str(state.get("current_focus") or "").strip()
+    next_move = str(state.get("next_move") or "").strip()
+    locked = _as_list(state.get("locked"))[:max_locked]
+
+    parts = []
+
+    if checkpoint:
+        parts.append(f"Nova checkpoint: {checkpoint}")
+
+    if current_focus:
+        parts.append(f"Focus: {current_focus}")
+
+    if next_move:
+        parts.append(f"Next: {next_move}")
+
+    if locked:
+        parts.append(f"Locked: {', '.join(locked)}")
+
+    text = ". ".join(parts).strip()
+
+    if text and not text.endswith("."):
+        text += "."
+
+    return text
+
+
+def compact_project_state_context_block(max_locked: int = 6) -> str:
+    text = compact_project_state_context(max_locked=max_locked)
+
+    if not text:
+        return ""
+
+    return (
+        "Current Nova project state:\n"
+        f"{text}\n"
+        "Use this only when the user asks about Nova/project status, progress, next steps, or current work."
+    )
+
+try:
+    print("[NOVA_PROJECT_STATE_COMPACT_CONTEXT_20260701] installed")
+except Exception:
+    pass
+
