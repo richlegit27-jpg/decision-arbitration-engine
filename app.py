@@ -18908,60 +18908,17 @@ try:
 except Exception as _nova_aq95_error_20260701:
     print("[NOVA_ANSWER_QUALITY_95_DIRECT_POLICY_20260701] failed:", _nova_aq95_error_20260701)
 
+
 # NOVA_PROJECT_BRAIN_DECISION_LOG_API_ROUTE_CONTRACT_20260701
-# Narrow route contract for Project Brain Decision Log questions.
+# Thin Flask wrapper for the service-owned Decision Log route contract.
 # Keeps current-state/project-state recall separate.
 try:
     from flask import request, jsonify
-    from nova_backend.services.project_brain_decision_log import answer_recent_changes as _nova_decision_log_answer_20260701
-
-    _NOVA_DECISION_LOG_ROUTE_KEYWORDS_20260701 = (
-        "what changed recently",
-        "what changed lately",
-        "recent changes",
-        "recent decisions",
-        "decision log",
-        "recent commits",
-        "last commits",
-        "latest commits",
-        "what did we commit",
-        "what did we lock recently",
-        "what got locked recently",
-        "locked upgrades",
-        "operator timeline",
+    from nova_backend.services.project_brain_decision_log_route_contract import (
+        build_decision_log_api_payload as _nova_build_decision_log_api_payload_20260701,
+        extract_user_text as _nova_decision_log_extract_user_text_20260701,
+        is_decision_log_question as _nova_is_decision_log_api_question_20260701,
     )
-
-    def _nova_decision_log_api_text_20260701():
-        try:
-            data = request.get_json(silent=True) or {}
-        except Exception:
-            data = {}
-
-        for key in ("message", "question", "user_text", "text", "prompt"):
-            value = data.get(key)
-            if isinstance(value, str):
-                return value
-
-        return ""
-
-    def _nova_is_decision_log_api_question_20260701(user_text):
-        text = str(user_text or "").strip().lower()
-        if not text:
-            return False
-
-        # Preserve direct project-state recall/current blocker routes.
-        protected_direct_recall = (
-            "what are we working on",
-            "what are we doing now",
-            "current project state",
-            "current blocker",
-            "what is the blocker",
-            "what should we do next",
-        )
-        if any(needle in text for needle in protected_direct_recall):
-            return False
-
-        return any(needle in text for needle in _NOVA_DECISION_LOG_ROUTE_KEYWORDS_20260701)
 
     @app.before_request
     def _nova_project_brain_decision_log_api_route_contract_20260701():
@@ -18969,28 +18926,16 @@ try:
             if request.path != "/api/chat" or request.method != "POST":
                 return None
 
-            user_text = _nova_decision_log_api_text_20260701()
+            try:
+                payload = request.get_json(silent=True) or {}
+            except Exception:
+                payload = {}
+
+            user_text = _nova_decision_log_extract_user_text_20260701(payload)
             if not _nova_is_decision_log_api_question_20260701(user_text):
                 return None
 
-            answer = _nova_decision_log_answer_20260701(limit=8)
-
-            return jsonify({
-                "ok": True,
-                "text": answer,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": answer,
-                    "content": answer,
-                    "attachments": [],
-                },
-                "debug": {
-                    "route": "project_brain_general_intelligence",
-                    "route_taken": "project_brain_general_intelligence",
-                    "intent": "decision_log",
-                    "decision_log_route_contract": True,
-                },
-            })
+            return jsonify(_nova_build_decision_log_api_payload_20260701(limit=8))
         except Exception as exc:
             try:
                 print("[NOVA_PROJECT_BRAIN_DECISION_LOG_API_ROUTE_CONTRACT_20260701] failed:", exc)
@@ -18998,7 +18943,7 @@ try:
                 pass
             return None
 
-    print("[NOVA_PROJECT_BRAIN_DECISION_LOG_API_ROUTE_CONTRACT_20260701] installed")
+    print("[NOVA_PROJECT_BRAIN_DECISION_LOG_API_ROUTE_CONTRACT_20260701] installed service wrapper")
 except Exception as _nova_decision_log_api_route_error_20260701:
     print("[NOVA_PROJECT_BRAIN_DECISION_LOG_API_ROUTE_CONTRACT_20260701] failed:", _nova_decision_log_api_route_error_20260701)
 
