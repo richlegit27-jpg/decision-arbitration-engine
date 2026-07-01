@@ -34,6 +34,7 @@ def main():
 
     run_smoke("nova_phase_4b_live_autonomy_lifecycle_smoke.py")
     run_smoke("nova_phase_4e_live_completion_cleanup_smoke.py")
+        "nova_phase_4f_normal_chat_isolation_smoke.py",
     print("NOVA MEMORY QUALITY SMOKE PASSED")
     return 0
 
