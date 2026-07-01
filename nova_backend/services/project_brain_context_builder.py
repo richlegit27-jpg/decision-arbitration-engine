@@ -141,3 +141,43 @@ def build_practical_project_answer() -> str:
         "route-contract smoke, classifier-broadening smoke, answer-quality smoke, and guard-stack audit. "
         "Then check `git status --short` and commit only after the board is green."
     )
+
+# NOVA_PROJECT_BRAIN_DECISION_CONTEXT_BUILDER_20260702
+# Service-only bridge from Project Brain context builder to Decision Engine.
+# No Flask wiring, no app.py dependency, no runtime mutation.
+def build_project_brain_decision_context_answer(user_text="", pasted_output=""):
+    """Build a compact Project Brain decision answer from the Decision Engine."""
+
+    try:
+        from nova_backend.services.project_brain_decision_engine import (
+            decide_project_brain_next_move,
+        )
+
+        decision = decide_project_brain_next_move(
+            user_text=user_text,
+            pasted_output=pasted_output,
+        )
+
+        validation = "; ".join(decision.validation)
+        avoid = "; ".join(decision.avoid)
+        target_layers = ", ".join(decision.target_layers)
+        target_files = ", ".join(decision.target_files)
+
+        return (
+            "Project Brain decision context:\n"
+            f"Intent: {decision.intent}\n"
+            f"Risk: {decision.risk}\n"
+            f"Confidence: {decision.confidence:.2f}\n"
+            f"Recommended next move: {decision.recommended_next_move}\n"
+            f"Target layers: {target_layers}\n"
+            f"Target files: {target_files}\n"
+            f"Validation: {validation}\n"
+            f"Avoid: {avoid}\n"
+            f"Rationale: {decision.rationale}"
+        )
+
+    except Exception as exc:
+        return (
+            "Project Brain decision context unavailable. "
+            f"Reason: {type(exc).__name__}: {exc}"
+        )
