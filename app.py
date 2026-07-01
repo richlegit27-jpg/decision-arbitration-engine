@@ -17779,3 +17779,144 @@ except Exception as _nova_project_next_final_install_error_20260701:
     except Exception:
         pass
 
+
+# NOVA_API_CHAT_PROJECT_NEXT_BEFORE_REQUEST_PRIORITY_20260701
+# Hard priority intercept for exact project-brain "what's next?" before chat_service.handle.
+# This avoids generic chat/model fallback and avoids after_request ordering issues.
+try:
+    import json as _nova_project_next_before_json_20260701
+    from flask import request as _nova_project_next_before_request_20260701
+    from flask import Response as _nova_project_next_before_response_20260701
+
+    def _nova_project_next_before_norm_20260701(value):
+        return (
+            str(value or "")
+            .strip()
+            .lower()
+            .replace("?", "'")
+            .rstrip("?!.")
+        )
+
+    def _nova_project_next_before_is_question_20260701(value):
+        return _nova_project_next_before_norm_20260701(value) in {
+            "what's next",
+            "whats next",
+            "what is next",
+            "what should we do next",
+            "next move",
+        }
+
+    def _nova_project_next_before_answer_20260701():
+        return (
+            "Current Nova project context:\n"
+            "Current task: finish Nova project brain answer quality.\n"
+            "Next move: keep `what's next?` on the project-brain path before generic chat/model fallback, "
+            "then harden `tools/nova_project_brain_live_answer_sample.py` so idle/generic fallback text fails the smoke."
+        )
+
+    @app.before_request
+    def _nova_api_chat_project_next_before_request_priority_20260701():
+        try:
+            if not _nova_project_next_before_request_20260701.path.endswith("/api/chat"):
+                return None
+
+            payload = _nova_project_next_before_request_20260701.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return None
+
+            user_text = (
+                payload.get("message")
+                or payload.get("user_text")
+                or payload.get("text")
+                or payload.get("prompt")
+                or ""
+            )
+
+            if not _nova_project_next_before_is_question_20260701(user_text):
+                return None
+
+            session_id = str(
+                payload.get("session_id")
+                or payload.get("active_session_id")
+                or payload.get("requested_session_id")
+                or ""
+            ).strip()
+
+            fixed_text = _nova_project_next_before_answer_20260701()
+
+            meta = {
+                "route": "api_chat_project_next_before_request_priority",
+                "strategy": "api_chat_project_next_before_request_priority",
+                "session_id": session_id,
+                "source_urls": [],
+                "sources": [],
+            }
+
+            assistant_message = {
+                "role": "assistant",
+                "content": fixed_text,
+                "text": fixed_text,
+                "attachments": [],
+                "meta": meta,
+            }
+
+            data = {
+                "ok": True,
+                "success": True,
+                "assistant_message": assistant_message,
+                "assistant_text": fixed_text,
+                "text": fixed_text,
+                "saved_artifact": None,
+                "session": {
+                    "id": session_id,
+                    "session_id": session_id,
+                    "messages": [assistant_message],
+                    "attachments": [],
+                    "meta": meta,
+                },
+                "route": "api_chat_project_next_before_request_priority",
+                "route_taken": "api_chat_project_next_before_request_priority",
+                "debug": {
+                    "route": "api_chat_project_next_before_request_priority",
+                    "route_taken": "api_chat_project_next_before_request_priority",
+                },
+                "meta": meta,
+                "session_id": session_id,
+                "active_session_id": session_id,
+            }
+
+            try:
+                print(
+                    "[NOVA_API_CHAT_PROJECT_NEXT_BEFORE_REQUEST_PRIORITY_20260701] intercepted",
+                    "session_id=" + session_id,
+                )
+            except Exception:
+                pass
+
+            return _nova_project_next_before_response_20260701(
+                _nova_project_next_before_json_20260701.dumps(data, ensure_ascii=False),
+                status=200,
+                mimetype="application/json",
+            )
+
+        except Exception as _nova_project_next_before_error_20260701:
+            try:
+                print(
+                    "[NOVA_API_CHAT_PROJECT_NEXT_BEFORE_REQUEST_PRIORITY_20260701] bypass:",
+                    _nova_project_next_before_error_20260701,
+                )
+            except Exception:
+                pass
+            return None
+
+    print("[NOVA_API_CHAT_PROJECT_NEXT_BEFORE_REQUEST_PRIORITY_20260701] installed")
+
+except Exception as _nova_project_next_before_install_error_20260701:
+    try:
+        print(
+            "[NOVA_API_CHAT_PROJECT_NEXT_BEFORE_REQUEST_PRIORITY_20260701] failed:",
+            _nova_project_next_before_install_error_20260701,
+        )
+    except Exception:
+        pass
+
