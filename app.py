@@ -17435,7 +17435,7 @@ try:
             "Current Nova project context:\n"
             "Current task: Project Brain answer freshness v2.\n"
             "Next move: use the Project Brain freshness snapshot as the context builder source of truth, then harden "
-            "`tools/nova_project_brain_live_answer_sample.py` so the smoke fails if idle/generic fallback text appears."
+            "the Project Brain freshness snapshot as the context builder source of truth for the next safe move."
         )
 
     @app.after_request
