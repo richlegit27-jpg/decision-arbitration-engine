@@ -76,6 +76,10 @@ def assert_mission_control_answer(question, route, answer):
     assert_true(f"{question} operator risk", "Operator risk:" in answer, answer)
     assert_true(f"{question} operator focused smokes", "Operator focused smokes:" in answer, answer)
     assert_true(f"{question} operator avoid rules", "Operator avoid rules:" in answer, answer)
+    assert_true(f"{question} operator exact next command", "Operator exact next command:" in answer, answer)
+    assert_true(f"{question} operator ranked moves", "Operator ranked moves:" in answer, answer)
+    assert_true(f"{question} operator rejected moves", "Operator rejected moves:" in answer, answer)
+    assert_true(f"{question} operator loop guard", "Operator loop guard:" in answer, answer)
     assert_true(f"{question} operator stop rule", "Operator stop rule:" in answer, answer)
 
 
@@ -108,3 +112,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
