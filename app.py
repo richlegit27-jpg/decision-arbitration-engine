@@ -16631,7 +16631,7 @@ def nova_autonomy_plan_command_guard_20260630():
             "created_at": now,
             "meta": {
                 "route": "autonomy_plan_command",
-                "mode": "proposal_only",
+                "mode": "patch_proposal_only",
             },
         }
 
@@ -16661,7 +16661,7 @@ def nova_autonomy_plan_command_guard_20260630():
             "runtime": {},
             "debug": {
                 "route": "autonomy_plan_command",
-                "mode": "proposal_only",
+                "mode": "patch_proposal_only",
                 "goal": goal,
             },
         })
