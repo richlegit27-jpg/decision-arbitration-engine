@@ -1,7 +1,7 @@
 {
   "project": "Nova",
-  "checkpoint": "007ec41 Add Nova autonomy plan adapter",
-  "current_focus": "Nova autonomy Phase 3F locked: autonomy-plan now uses a one-command adapter, preserves the old proposal_only debug mode, and keeps patch_proposal_only assistant metadata.",
+  "checkpoint": "Patch-build adapter locked",
+  "current_focus": "Nova autonomy Phase 3G locked: patch-build now uses a one-command adapter, and the one-command adapter migration set is complete.",
   "last_completed": [
     "Router cleanup locked",
     "Web/live price routing locked",
@@ -41,7 +41,8 @@
     "Added repair-build adapter at 46fbf24 and repaired tools/nova_repair_build_adapter_smoke.py at 378b621 so repair-build adapter smoke, API smoke, guard review, and memory quality can stay green.",
     "Repair-plan adapter locked",
     "Command-registry adapter verified locked",
-    "Autonomy-plan adapter locked"
+    "Autonomy-plan adapter locked",
+    "Patch-build adapter locked"
   ],
   "locked": [
     "Memory quality smoke",
@@ -83,8 +84,8 @@
     "Autonomy Phase 1C autonomy-plan command",
     "Autonomy Phase 1D Patch Builder service"
   ],
-  "remaining": "Only patch-build is still missing from the one-command adapter migration. Do not rebuild locked adapters.",
-  "next_move": "Create the patch-build one-command adapter next while preserving project-state recall, existing locked guards, command modes, route debug fields, and memory quality smoke.",
+  "remaining": "Run final adapter inventory and full locked smoke set. Do not rebuild locked adapters.",
+  "next_move": "Run final adapter inventory and locked smokes, then plan cleanup review for old duplicate guards only after all adapter routes are verified.",
   "git": {
     "branch": "post-frontend-polish-phase",
     "head": "e84977f",
