@@ -16959,27 +16959,8 @@ def nova_repair_plan_command_guard_20260630():
 
 
 # NOVA_REPAIR_BUILD_COMMAND_GUARD_20260701
-# Instructions-only command guard for:
-# repair-build: <failed smoke output>
-# This does not edit files, execute commands, or apply repairs.
-def _nova_extract_repair_build_input_20260701(user_text):
-    raw = str(user_text or "").strip()
-    lowered = raw.lower()
-
-    prefixes = (
-        "repair-build:",
-        "repair build:",
-        "build-repair:",
-        "build repair:",
-    )
-
-    for prefix in prefixes:
-        if lowered.startswith(prefix):
-            return raw[len(prefix):].strip()
-
-    return ""
-
-
+# Instructions-only repair-build guard.
+# Adapter-owned; behavior must remain repair_build_command + repair_instructions_only.
 @app.before_request
 def nova_repair_build_command_guard_20260701():
     try:
@@ -16988,93 +16969,16 @@ def nova_repair_build_command_guard_20260701():
 
         payload = request.get_json(silent=True) or {}
 
-        user_text = str(
-            payload.get("user_text")
-            or payload.get("text")
-            or payload.get("message")
-            or ""
-        ).strip()
+        from nova_backend.services.repair_build_adapter import (
+            build_repair_build_response,
+        )
 
-        failed_output = _nova_extract_repair_build_input_20260701(user_text)
+        response_payload = build_repair_build_response(payload, session_service)
 
-        if not failed_output:
+        if response_payload is None:
             return None
 
-        from datetime import datetime, timezone
-        from nova_backend.services.autonomy_repair_builder import format_autonomy_repair_build
-
-        assistant_text = format_autonomy_repair_build(failed_output)
-
-        session_id = str(
-            payload.get("session_id")
-            or payload.get("active_session_id")
-            or payload.get("requested_session_id")
-            or ""
-        ).strip()
-
-        if not session_id:
-            try:
-                session_id = str(getattr(session_service, "active_session_id", "") or "").strip()
-            except Exception:
-                session_id = ""
-
-        if not session_id:
-            session_id = "repair_build"
-
-        now = datetime.now(timezone.utc).isoformat()
-
-        user_msg = {
-            "role": "user",
-            "text": user_text,
-            "content": user_text,
-            "attachments": [],
-            "created_at": now,
-            "meta": {
-                "route": "repair_build_command",
-            },
-        }
-
-        assistant_msg = {
-            "role": "assistant",
-            "text": assistant_text,
-            "content": assistant_text,
-            "attachments": [],
-            "created_at": now,
-            "meta": {
-                "route": "repair_build_command",
-                "mode": "repair_instructions_only",
-            },
-        }
-
-        try:
-            session_service.add_message(session_id, user_msg)
-            session_service.add_message(session_id, assistant_msg)
-        except Exception:
-            pass
-
-        try:
-            session = session_service.get_session(session_id)
-        except Exception:
-            session = None
-
-        if not isinstance(session, dict):
-            session = {
-                "id": session_id,
-                "messages": [user_msg, assistant_msg],
-            }
-
-        return jsonify({
-            "ok": True,
-            "session_id": session_id,
-            "active_session_id": session_id,
-            "assistant_message": assistant_msg,
-            "session": session,
-            "runtime": {},
-            "debug": {
-                "route": "repair_build_command",
-                "mode": "repair_instructions_only",
-            },
-        })
+        return jsonify(response_payload)
 
     except Exception as error:
         try:
@@ -17090,8 +16994,6 @@ def nova_repair_build_command_guard_20260701():
                 "failed": True,
             },
         }), 500
-
-
 
 
 # NOVA_WORKFLOW_CATALOG_COMMAND_GUARD_20260701
