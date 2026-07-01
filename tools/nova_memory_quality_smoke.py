@@ -1,13 +1,10 @@
-﻿from pathlib import Path
 import subprocess
 import sys
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-TOOLS = ROOT / "tools"
 
-
-REQUIRED_SMOKES = [
+SMOKES = [
     "nova_project_state_smoke.py",
     "nova_project_context_smoke.py",
     "nova_project_compact_context_api_smoke.py",
@@ -16,25 +13,22 @@ REQUIRED_SMOKES = [
     "nova_phase_3i_static_backup_review_smoke.py",
     "nova_phase_3j_backup_guard_smoke.py",
     "nova_phase_3k_frontend_stability_smoke.py",
+    "nova_phase_4b_live_autonomy_lifecycle_smoke.py",
+    "nova_phase_4e_live_completion_cleanup_smoke.py",
+    "nova_phase_4f_normal_chat_isolation_smoke.py",
 ]
 
 
 def run_smoke(filename):
-    path = TOOLS / filename
-    if not path.exists():
-        raise FileNotFoundError(f"Missing required smoke: {path}")
-
+    path = ROOT / "tools" / filename
     subprocess.run([sys.executable, str(path)], cwd=ROOT, check=True)
     print(f"PASS {path.stem}")
 
 
 def main():
-    for filename in REQUIRED_SMOKES:
+    for filename in SMOKES:
         run_smoke(filename)
 
-    run_smoke("nova_phase_4b_live_autonomy_lifecycle_smoke.py")
-    run_smoke("nova_phase_4e_live_completion_cleanup_smoke.py")
-        "nova_phase_4f_normal_chat_isolation_smoke.py",
     print("NOVA MEMORY QUALITY SMOKE PASSED")
     return 0
 
