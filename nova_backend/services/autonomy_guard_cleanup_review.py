@@ -120,7 +120,7 @@ def create_autonomy_guard_cleanup_review(app_path: str = "app.py") -> Dict[str, 
             "app.py contains multiple locked command guards that now have registry metadata.",
             "This review is read-only and must not modify app.py.",
             "The one-command adapter migration is complete; the safest next step is cleanup review only.",
-            "The adapter services and command registry are the read-only source of truth before any fallback guard cleanup.",
+            "The adapter services and command-registry are the read-only source of truth before any fallback guard cleanup.",
         ],
         "safe_migration_plan": [
             "Keep every existing app.py guard in place for now.",
