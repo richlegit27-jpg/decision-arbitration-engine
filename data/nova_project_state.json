@@ -1,6 +1,6 @@
 {
   "project": "Nova",
-  "checkpoint": "c4740c6 Add Nova repair plan adapter",
+  "checkpoint": "4aacd7d Update Nova project state after repair plan adapter",
   "current_focus": "Nova autonomy Phase 3E adapter locked: repair-plan now uses a one-command adapter and its adapter smoke matches the supervised repair proposal response.",
   "last_completed": [
     "Router cleanup locked",
@@ -38,7 +38,8 @@
     "Added nova_backend/services/autonomy_command_registry_adapter.py and tools/nova_command_registry_adapter_smoke.py, then repaired the registry by listing command-registry itself so adapter smoke passes.",
     "Added autonomy-index adapter at f999681 and repaired nova_backend/services/autonomy_ladder_index.py at 91cd974 so adapter smoke can verify autonomy-index is visible in the ladder output.",
     "Added nova_backend/services/workflow_catalog_adapter.py and tools/nova_workflow_catalog_adapter_smoke.py. Workflow-catalog adapter smoke, workflow-catalog API smoke, guard cleanup review, and memory quality smoke all passed.",
-    "Added repair-build adapter at 46fbf24 and repaired tools/nova_repair_build_adapter_smoke.py at 378b621 so repair-build adapter smoke, API smoke, guard review, and memory quality can stay green."
+    "Added repair-build adapter at 46fbf24 and repaired tools/nova_repair_build_adapter_smoke.py at 378b621 so repair-build adapter smoke, API smoke, guard review, and memory quality can stay green.",
+    "Repair-plan adapter locked"
   ],
   "locked": [
     "Memory quality smoke",
@@ -80,8 +81,8 @@
     "Autonomy Phase 1C autonomy-plan command",
     "Autonomy Phase 1D Patch Builder service"
   ],
-  "remaining": "Continue one-command adapter migration only after clean smokes and clean git status. Next safest candidate is repair-plan because it is proposal-only.",
-  "next_move": "Create the command-registry one-command adapter next while preserving all locked guards, command modes, route debug fields, and memory quality smoke.",
+  "remaining": "Continue one-command adapter migration only after clean smokes and clean git status. Next safest candidate is command-registry because it is read-only, registry-backed, and preserves project-state recall.",
+  "next_move": "Create the command-registry one-command adapter next while preserving project-state recall, all locked guards, command modes, route debug fields, and memory quality smoke.",
   "git": {
     "branch": "post-frontend-polish-phase",
     "head": "e84977f",
