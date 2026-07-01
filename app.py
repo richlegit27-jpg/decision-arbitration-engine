@@ -16547,6 +16547,42 @@ except Exception as _nova_autonomy_install_error_20260701:
 
 
 
+
+# NOVA_AUTONOMY_PLAN_ADAPTER_GUARD_20260701
+# One-command adapter migration for autonomy-plan.
+# Keeps old guard below as fallback while adapter owns matching command requests.
+try:
+    @app.before_request
+    def nova_autonomy_plan_adapter_guard_20260701():
+        try:
+            if request.method != "POST":
+                return None
+
+            if request.path not in ("/api/chat", "/api/chat/stream"):
+                return None
+
+            try:
+                payload = request.get_json(silent=True) or {}
+            except Exception:
+                payload = {}
+
+            from nova_backend.services.autonomy_plan_adapter import build_autonomy_plan_response
+
+            response_json = build_autonomy_plan_response(payload, session_service)
+
+            if not response_json:
+                return None
+
+            return jsonify(response_json)
+        except Exception as _nova_autonomy_plan_adapter_error_20260701:
+            print("[NOVA_AUTONOMY_PLAN_ADAPTER_GUARD_20260701] failed:", _nova_autonomy_plan_adapter_error_20260701)
+            return None
+
+    print("[NOVA_AUTONOMY_PLAN_ADAPTER_GUARD_20260701] installed")
+except Exception as _nova_autonomy_plan_adapter_install_error_20260701:
+    print("[NOVA_AUTONOMY_PLAN_ADAPTER_GUARD_20260701] install failed:", _nova_autonomy_plan_adapter_install_error_20260701)
+
+
 # NOVA_AUTONOMY_PLAN_COMMAND_GUARD_20260630
 # Proposal-only command guard for:
 # autonomy-plan: <goal>
