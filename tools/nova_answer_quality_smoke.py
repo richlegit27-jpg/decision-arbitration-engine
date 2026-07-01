@@ -100,10 +100,11 @@ CASES = [
         "question": "what should we do next",
         "required": [
             "Project Brain",
-            "freshness snapshot",
-            "context builder",
-            "source of truth",
-            "safe move",
+            "Decision Engine v1",
+            "Project Brain cleanup/consolidation",
+            "direct recall",
+            "broad Project Brain routing",
+            "avoiding another app.py guard",
         ],
         "stale": [
             "finish Nova project brain answer quality",
@@ -118,10 +119,10 @@ CASES = [
         "question": "what is the current blocker",
         "required": [
             "Project Brain",
-            "answer freshness",
-            "fallback",
-            "context-builder",
-            "freshness snapshot",
+            "Decision Engine v1",
+            "No active Decision Engine blocker",
+            "cleanup/consolidation",
+            "move intelligence into services",
         ],
         "stale": [
             "larger Nova answer-quality 95 smoke now passes 20/20",

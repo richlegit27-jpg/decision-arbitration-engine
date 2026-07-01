@@ -123,20 +123,21 @@ def build_project_brain_freshness_snapshot() -> ProjectBrainFreshnessSnapshot:
     available_smokes = _available_smoke_files()
 
     checkpoint = (
-        "Project Brain routing, classifier broadening, context-builder answers, and freshness v2 "
-        "wording are protected by dedicated smokes."
+        "Decision Engine v1 and broad Project Brain routing are locked: exact project-state recall stays "
+        "on direct recall, broad Nova project paraphrases route through Project Brain general intelligence, "
+        "answer quality is 100%, and regression now protects both route contracts."
     )
 
     blocker = (
-        "The current blocker is Project Brain answer freshness v2: fallback-route priority and the "
-        "context-builder path are protected, but checkpoint, blocker, next move, recent commits, and "
-        "validation state should now come from this structured freshness snapshot instead of another "
-        "wording patch."
+        "No active Decision Engine blocker is open. The remaining risk is cleanup/consolidation: app.py still "
+        "has many historical guards and wrappers, so future work should avoid new route-layer patches and move "
+        "intelligence into services."
     )
 
     next_move = (
-        "Use the Project Brain freshness snapshot as the context builder source of truth for current "
-        "checkpoint, blocker, next concrete move / safe move, latest commits, and available smoke files."
+        "Start Project Brain cleanup/consolidation: keep the locked Decision Engine v1 behavior, preserve "
+        "direct recall and broad Project Brain routing, and consolidate stale route/context wording without "
+        "adding another app.py guard."
     )
 
     from nova_backend.services.project_brain_current_state_adapter import (
@@ -175,20 +176,21 @@ try:
     _NOVA_PRE_SANITIZED_BUILD_PROJECT_BRAIN_FRESHNESS_SNAPSHOT_20260702 = build_project_brain_freshness_snapshot
 
     _NOVA_CLEAN_CHECKPOINT_20260702 = (
-        "Project Brain routing, classifier broadening, context-builder answers, "
-        "direct freshness, and freshness snapshot validation are protected by dedicated smokes."
+        "Decision Engine v1 and broad Project Brain routing are locked: exact project-state recall stays "
+        "on direct recall, broad Nova project paraphrases route through Project Brain general intelligence, "
+        "answer quality is 100%, and regression now protects both route contracts."
     )
 
     _NOVA_CLEAN_BLOCKER_20260702 = (
-        "Project Brain answer freshness v2: fallback-route priority and the context-builder path "
-        "are protected, but checkpoint, blocker, next move, recent commits, and validation state "
-        "should come from this structured freshness snapshot instead of another wording patch."
+        "No active Decision Engine blocker is open. The remaining risk is cleanup/consolidation: app.py still "
+        "has many historical guards and wrappers, so future work should avoid new route-layer patches and move "
+        "intelligence into services."
     )
 
     _NOVA_CLEAN_NEXT_MOVE_20260702 = (
-        "Use the Project Brain freshness snapshot as the "
-        "context builder source of truth for checkpoint, blocker, next move, fallback priority, "
-        "recent commits, validation state, and available smoke files as the next safe move."
+        "Start Project Brain cleanup/consolidation: keep the locked Decision Engine v1 behavior, preserve "
+        "direct recall and broad Project Brain routing, and consolidate stale route/context wording without "
+        "adding another app.py guard."
     )
 
     def _nova_project_brain_snapshot_bad_field_20260702(value, required_terms=None):
@@ -203,9 +205,13 @@ try:
             return True
 
         bad_terms = [
+            "project brain answer freshness v2",
+            "use the project brain freshness snapshot",
+            "fallback-route priority",
+            "instead of another wording patch",
             "text: current nova project state",
             "current nova project state: richard is working",
-                        "and fres current blocker",
+            "and fres current blocker",
             "next concrete move / safe move: next concrete move / safe move",
             "current safe direction: next concrete move",
             "next move: harden",
@@ -227,19 +233,19 @@ try:
 
         if _nova_project_brain_snapshot_bad_field_20260702(
             checkpoint,
-            ["Project Brain", "freshness snapshot"],
+            ["Decision Engine v1", "Project Brain routing"],
         ):
             updates["checkpoint"] = _NOVA_CLEAN_CHECKPOINT_20260702
 
         if _nova_project_brain_snapshot_bad_field_20260702(
             blocker,
-            ["answer freshness", "fallback"],
+            ["No active Decision Engine blocker", "cleanup/consolidation"],
         ):
             updates["blocker"] = _NOVA_CLEAN_BLOCKER_20260702
 
         if _nova_project_brain_snapshot_bad_field_20260702(
             next_move,
-            ["safe move", "freshness snapshot", "context builder"],
+            ["Project Brain cleanup/consolidation", "without adding another app.py guard"],
         ):
             updates["next_move"] = _NOVA_CLEAN_NEXT_MOVE_20260702
 

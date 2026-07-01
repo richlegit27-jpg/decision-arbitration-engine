@@ -17513,9 +17513,9 @@ try:
     def _nova_project_next_answer_20260701():
         return (
             "Current Nova project context:\n"
-            "Current task: Project Brain answer freshness v2.\n"
-            "Next move: use the Project Brain freshness snapshot as the context builder source of truth, then harden "
-            "the Project Brain freshness snapshot as the context builder source of truth for the next safe move."
+            "Current task: Decision Engine v1 and broad Project Brain routing are locked.\n"
+            "Next move: start Project Brain cleanup/consolidation while preserving direct recall, "
+            "broad Project Brain routing, and avoiding another app.py guard."
         )
 
     @app.after_request
@@ -17652,9 +17652,9 @@ try:
     def _nova_project_next_before_answer_20260701():
         return (
             "Current Nova project context:\n"
-            "Current task: Project Brain answer freshness v2.\n"
-            "Next move: keep `what's next?` on the project-brain path before generic chat/model fallback, "
-            "then harden `tools/nova_project_brain_live_answer_sample.py` so idle/generic fallback text fails the smoke."
+            "Current task: Decision Engine v1 and broad Project Brain routing are locked.\n"
+            "Next move: start Project Brain cleanup/consolidation while preserving direct recall, "
+            "broad Project Brain routing, and avoiding another app.py guard."
         )
 
     @app.before_request
@@ -18299,9 +18299,9 @@ try:
     def _nova_project_next_wrap_answer_20260701():
         return (
             "Current Nova project context:\n"
-            "Current task: Project Brain answer freshness v2.\n"
-            "Next move: keep `what's next?` on the project-brain path before generic chat/model fallback, "
-            "then harden `tools/nova_project_brain_live_answer_sample.py` so idle/generic fallback text fails the smoke."
+            "Current task: Decision Engine v1 and broad Project Brain routing are locked.\n"
+            "Next move: start Project Brain cleanup/consolidation while preserving direct recall, "
+            "broad Project Brain routing, and avoiding another app.py guard."
         )
 
     def _nova_project_next_wrap_response_20260701(session_id):
@@ -18484,9 +18484,9 @@ try:
     def _nova_next_fixed_answer_20260701():
         return (
             "Current Nova project context:\n"
-            "Current task: Project Brain answer freshness v2.\n"
-            "Next move: harden `tools/nova_project_brain_live_answer_sample.py` so idle/generic fallback text fails the smoke, "
-            "then clean out the dead project-next hooks that were added while chasing this route."
+            "Current task: Decision Engine v1 and broad Project Brain routing are locked.\n"
+            "Next move: start Project Brain cleanup/consolidation while preserving direct recall, "
+            "broad Project Brain routing, and avoiding another app.py guard."
         )
 
     def _nova_next_fixed_make_response_20260701(session_id):

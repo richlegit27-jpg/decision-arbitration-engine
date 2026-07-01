@@ -11585,9 +11585,9 @@ if (not attachments) and (__name__ == "__main__"):
                 ):
                     _nova_pn_answer_20260701 = (
                         "Current Nova project context:\n"
-                        "Current task: Project Brain answer freshness v2.\n"
-                        "Next move: fix the `what's next?` route so it uses project context instead of generic chat fallback, "
-                        "then keep next move, blocker, fallback priority, and safe move answers fresh through the context-builder path."
+                        "Current task: Decision Engine v1 and broad Project Brain routing are locked.\n"
+                        "Next move: start Project Brain cleanup/consolidation while preserving direct recall, "
+                        "broad Project Brain routing, and avoiding another app.py guard."
                     )
 
                 _nova_pn_meta_20260701 = {
@@ -17675,9 +17675,9 @@ Next action:
         if normalized_text in {"what's next", "whats next", "what is next", "next move", "what now"}:
             assistant_text = (
                 "Current Nova project context:\n"
-                "Current task: Project Brain answer freshness v2.\n"
-                "Next move: fix the `what's next?` route so it uses project context instead of generic chat fallback, "
-                "then keep next move, blocker, fallback priority, and safe move answers fresh through the context-builder path."
+                "Current task: Decision Engine v1 and broad Project Brain routing are locked.\n"
+                "Next move: start Project Brain cleanup/consolidation while preserving direct recall, "
+                "broad Project Brain routing, and avoiding another app.py guard."
             )
 
             assistant_message = self._build_assistant_message(

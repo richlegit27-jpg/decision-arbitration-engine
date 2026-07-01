@@ -66,7 +66,8 @@ def _extract_route(data):
     debug = data.get("debug")
     if isinstance(debug, dict):
         return str(debug.get("route_taken") or debug.get("route") or "")
-    return ""
+
+    return str(data.get("route_taken") or data.get("route") or "")
 
 
 def ask(question):
@@ -97,10 +98,12 @@ def main():
 
     assert_true("snapshot version", snapshot.version == SNAPSHOT_VERSION, snapshot.version)
     assert_true("checkpoint exists", bool(snapshot.checkpoint), snapshot)
-    assert_true("blocker exists", "answer freshness" in snapshot.blocker.lower(), snapshot.blocker)
-    assert_true("fallback noted", "fallback" in snapshot.blocker.lower(), snapshot.blocker)
-    assert_true("next move exists", "freshness snapshot" in snapshot.next_move.lower(), snapshot.next_move)
-    assert_true("safe move term", "safe move" in snapshot.next_move.lower(), snapshot.next_move)
+    assert_true("checkpoint locked", "decision engine v1" in snapshot.checkpoint.lower(), snapshot.checkpoint)
+    assert_true("routing locked", "project brain routing" in snapshot.checkpoint.lower(), snapshot.checkpoint)
+    assert_true("blocker closed", "no active decision engine blocker" in snapshot.blocker.lower(), snapshot.blocker)
+    assert_true("cleanup risk noted", "cleanup/consolidation" in snapshot.blocker.lower(), snapshot.blocker)
+    assert_true("next move cleanup", "project brain cleanup/consolidation" in snapshot.next_move.lower(), snapshot.next_move)
+    assert_true("no new app guard", "without adding another app.py guard" in snapshot.next_move.lower(), snapshot.next_move)
     assert_true("validation includes py_compile", any("py_compile" in command for command in snapshot.validation), snapshot.validation)
     assert_true("validation includes git status", any("git status --short" in command for command in snapshot.validation), snapshot.validation)
     assert_true("available smokes found", len(snapshot.available_smoke_files) >= 5, snapshot.available_smoke_files)
@@ -108,19 +111,20 @@ def main():
     direct_answer = build_practical_project_answer()
     direct_lower = direct_answer.lower()
 
-    assert_true("direct answer uses snapshot", "freshness snapshot" in direct_lower, direct_answer)
-    assert_true("direct answer has safe move", "safe move" in direct_lower, direct_answer)
-    assert_true("direct answer has validation", "safe validation" in direct_lower, direct_answer)
+    assert_true("direct answer has Decision Engine", "decision engine v1" in direct_lower, direct_answer)
+    assert_true("direct answer has Project Brain", "project brain" in direct_lower, direct_answer)
+    assert_true("direct answer has cleanup", "cleanup/consolidation" in direct_lower, direct_answer)
+    assert_true("direct answer has no new guard", "without adding another app.py guard" in direct_lower, direct_answer)
 
     api_answer, route = ask("give me the Nova status without hype")
     api_lower = api_answer.lower()
 
     assert_true("api route", route == "project_brain_general_intelligence", route)
-    assert_true("api answer uses snapshot", "freshness snapshot" in api_lower, api_answer)
+    assert_true("api answer has Decision Engine", "decision engine v1" in api_lower, api_answer)
     assert_true("api answer has Project Brain", "project brain" in api_lower, api_answer)
-    assert_true("api answer has answer freshness", "answer freshness" in api_lower, api_answer)
-    assert_true("api answer has fallback", "fallback" in api_lower, api_answer)
-    assert_true("api answer has safe move", "safe move" in api_lower, api_answer)
+    assert_true("api answer has routing locked", "project brain routing" in api_lower, api_answer)
+    assert_true("api answer has cleanup", "cleanup/consolidation" in api_lower, api_answer)
+    assert_true("api answer has no new guard", "without adding another app.py guard" in api_lower, api_answer)
 
     print("")
     print("NOVA PROJECT BRAIN FRESHNESS SNAPSHOT SMOKE PASSED")
