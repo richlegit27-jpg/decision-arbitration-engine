@@ -101,10 +101,11 @@ CASES = [
         "required": [
             "Project Brain",
             "Decision Engine v1",
-            "Mission Control v1.1",
+            "Mission Control v1.2 / Failure Interpreter API",
             "Project Brain cleanup/consolidation",
             "direct recall",
             "broad Project Brain routing",
+            "pasted failure interpretation",
             "avoiding another app.py guard",
         ],
         "stale": [
@@ -123,6 +124,7 @@ CASES = [
             "Decision Engine v1",
             "No active Decision Engine blocker",
             "Mission Control blocker",
+            "Failure Interpreter blocker",
             "cleanup/consolidation",
             "move intelligence into services",
         ],

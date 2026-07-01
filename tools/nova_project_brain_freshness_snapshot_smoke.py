@@ -1,4 +1,4 @@
-﻿import json
+import json
 import os
 import time
 
@@ -104,6 +104,7 @@ def main():
     assert_true("operator prompts locked", "operator prompts" in snapshot.checkpoint.lower(), snapshot.checkpoint)
     assert_true("blocker closed", "no active decision engine blocker" in snapshot.blocker.lower(), snapshot.blocker)
     assert_true("mission blocker closed", "mission control blocker" in snapshot.blocker.lower(), snapshot.blocker)
+    assert_true("failure interpreter blocker closed", "failure interpreter blocker" in snapshot.blocker.lower(), snapshot.blocker)
     assert_true("cleanup risk noted", "cleanup/consolidation" in snapshot.blocker.lower(), snapshot.blocker)
     assert_true("next move cleanup", "project brain cleanup/consolidation" in snapshot.next_move.lower(), snapshot.next_move)
     assert_true("next move preserves Mission Control", "mission control v1.1" in snapshot.next_move.lower(), snapshot.next_move)
