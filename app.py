@@ -15677,6 +15677,203 @@ try:
 except Exception as _nova_img_cache_install_error_20260630:
     print("[NOVA_FINAL_IMAGE_RESPONSE_CACHE_TEXT_GUARD_20260630] failed:", _nova_img_cache_install_error_20260630)
 
+# NOVA_API_CHAT_PROJECT_STATE_IDLE_NEXT_FINAL_20260630
+# Final /api/chat response repair for idle next/k project-state recall.
+# This runs at the Flask route layer because the idle execution fallback is produced
+# outside ChatService.handle in some paths.
+try:
+    import json as _nova_api_project_state_json_20260630
+    import importlib.util as _nova_api_project_state_importlib_util_20260630
+    from pathlib import Path as _NovaApiProjectStatePath20260630
+    from flask import request as _nova_api_project_state_request_20260630
+
+    def _nova_api_project_state_load_answer_20260630(user_text):
+        service_path = (
+            _NovaApiProjectStatePath20260630(__file__)
+            .resolve()
+            .parent
+            / "nova_backend"
+            / "services"
+            / "project_state_service.py"
+        )
+
+        spec = _nova_api_project_state_importlib_util_20260630.spec_from_file_location(
+            "_nova_api_project_state_service_direct_20260630",
+            str(service_path),
+        )
+
+        if not spec or not spec.loader:
+            return None
+
+        module = _nova_api_project_state_importlib_util_20260630.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        answer_fn = getattr(module, "answer_project_state_question", None)
+        if not callable(answer_fn):
+            return None
+
+        return answer_fn(user_text, runtime_execution_state=None)
+
+    def _nova_api_project_state_patch_payload_20260630(payload, reply):
+        if not isinstance(payload, dict):
+            payload = {}
+
+        payload["ok"] = True
+        payload["success"] = True
+        payload["content"] = reply
+        payload["message"] = reply
+        payload["response"] = reply
+        payload["route"] = "project_state_recall"
+        payload["route_taken"] = "project_state_recall"
+
+        assistant = payload.get("assistant_message")
+        if not isinstance(assistant, dict):
+            assistant = {
+                "role": "assistant",
+                "attachments": [],
+            }
+
+        assistant["content"] = reply
+        assistant.setdefault("role", "assistant")
+        assistant.setdefault("attachments", [])
+        payload["assistant_message"] = assistant
+
+        debug = payload.get("debug")
+        if not isinstance(debug, dict):
+            debug = {}
+        debug["route"] = "project_state_recall"
+        debug["route_taken"] = "project_state_recall"
+        payload["debug"] = debug
+
+        meta = payload.get("meta")
+        if not isinstance(meta, dict):
+            meta = {}
+        meta["route"] = "project_state_recall"
+        meta["strategy"] = "project_state_recall"
+        payload["meta"] = meta
+
+        return payload
+
+    def _nova_api_project_state_content_20260630(payload):
+        if not isinstance(payload, dict):
+            return ""
+
+        assistant = payload.get("assistant_message")
+        if isinstance(assistant, dict):
+            content = assistant.get("content")
+            if isinstance(content, str):
+                return content
+
+        for key in ("content", "response", "message", "text", "answer"):
+            value = payload.get(key)
+            if isinstance(value, str):
+                return value
+
+        return ""
+
+    def _nova_api_project_state_request_text_20260630():
+        try:
+            data = _nova_api_project_state_request_20260630.get_json(silent=True) or {}
+            if isinstance(data, dict):
+                for key in ("message", "user_text", "text", "prompt"):
+                    value = data.get(key)
+                    if isinstance(value, str) and value.strip():
+                        return value.strip()
+        except Exception:
+            pass
+
+        return ""
+
+    def _nova_api_project_state_wrap_endpoint_20260630(endpoint_name):
+        view = app.view_functions.get(endpoint_name)
+        if not callable(view):
+            return False
+
+        if getattr(view, "_NOVA_API_CHAT_PROJECT_STATE_IDLE_NEXT_FINAL_20260630", False):
+            return True
+
+        def _nova_api_project_state_wrapped_view_20260630(*args, **kwargs):
+            result = view(*args, **kwargs)
+
+            try:
+                user_text = _nova_api_project_state_request_text_20260630().lower()
+                if user_text not in {"next", "k", "ok", "okay", "continue"}:
+                    return result
+
+                if not hasattr(result, "get_data") or not hasattr(result, "set_data"):
+                    return result
+
+                raw = result.get_data(as_text=True)
+                payload = _nova_api_project_state_json_20260630.loads(raw)
+
+                content = _nova_api_project_state_content_20260630(payload)
+                if "no active execution mission" not in str(content or "").lower():
+                    return result
+
+                reply = _nova_api_project_state_load_answer_20260630(user_text)
+                if not reply:
+                    return result
+
+                payload = _nova_api_project_state_patch_payload_20260630(payload, reply)
+                encoded = _nova_api_project_state_json_20260630.dumps(payload, ensure_ascii=False)
+
+                result.set_data(encoded)
+                try:
+                    result.headers["Content-Length"] = str(len(result.get_data()))
+                    result.headers["Content-Type"] = "application/json"
+                except Exception:
+                    pass
+
+                return result
+            except Exception as _nova_api_project_state_route_error_20260630:
+                try:
+                    print(
+                        "[NOVA_API_CHAT_PROJECT_STATE_IDLE_NEXT_FINAL_20260630] bypass:",
+                        _nova_api_project_state_route_error_20260630,
+                    )
+                except Exception:
+                    pass
+
+            return result
+
+        _nova_api_project_state_wrapped_view_20260630.__name__ = getattr(
+            view,
+            "__name__",
+            "_nova_api_project_state_wrapped_view_20260630",
+        )
+        _nova_api_project_state_wrapped_view_20260630._NOVA_API_CHAT_PROJECT_STATE_IDLE_NEXT_FINAL_20260630 = True
+
+        app.view_functions[endpoint_name] = _nova_api_project_state_wrapped_view_20260630
+        return True
+
+    _nova_api_project_state_wrapped_count_20260630 = 0
+    for _endpoint_name_20260630, _view_20260630 in list(app.view_functions.items()):
+        try:
+            rule_matches = [
+                rule.rule
+                for rule in app.url_map.iter_rules()
+                if rule.endpoint == _endpoint_name_20260630
+            ]
+
+            if "/api/chat" in rule_matches:
+                if _nova_api_project_state_wrap_endpoint_20260630(_endpoint_name_20260630):
+                    _nova_api_project_state_wrapped_count_20260630 += 1
+        except Exception:
+            pass
+
+    print(
+        "[NOVA_API_CHAT_PROJECT_STATE_IDLE_NEXT_FINAL_20260630] wrapped endpoints:",
+        _nova_api_project_state_wrapped_count_20260630,
+    )
+except Exception as _nova_api_project_state_install_error_20260630:
+    try:
+        print(
+            "[NOVA_API_CHAT_PROJECT_STATE_IDLE_NEXT_FINAL_20260630] failed:",
+            _nova_api_project_state_install_error_20260630,
+        )
+    except Exception:
+        pass
+
 if __name__ == "__main__":
     create_startup_backup()
 app.run(
@@ -15687,3 +15884,4 @@ app.run(
 
 
 # NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611
+

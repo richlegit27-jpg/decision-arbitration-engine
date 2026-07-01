@@ -1,0 +1,28 @@
+﻿{
+  "project": "Nova",
+  "checkpoint": "510eb27 Add Nova project state recall",
+  "current_focus": "Nova brain / memory quality upgrade: memory + project-state recall",
+  "last_completed": [
+    "Router cleanup locked",
+    "Web/live price routing locked",
+    "Image text polish locked",
+    "Attachment cleanup locked",
+    "Execution safety locked",
+    "Regression runner locked",
+    "Project-state recall service loads and answers current/fixed/remaining"
+  ],
+  "locked": [
+    "Router cleanup",
+    "Web/live price",
+    "Image text polish",
+    "Attachment cleanup",
+    "Execution safety",
+    "Regression runner"
+  ],
+  "remaining": [
+    "Fix next/k idle fallback so project-state recall owns idle next/k",
+    "Smoke test project-state answers",
+    "Amend the project-state recall commit"
+  ],
+  "next_move": "Fix idle next/k fallback in chat_service, then rerun both smoke tests."
+}
