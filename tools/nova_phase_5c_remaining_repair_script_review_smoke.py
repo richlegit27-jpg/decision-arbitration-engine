@@ -12,6 +12,8 @@ TARGETS = [
     "nova_phase_4z_master_gate_command_repair.py",
 ]
 
+SELF = "nova_phase_5c_remaining_repair_script_review_smoke.py"
+
 
 def assert_true(name: str, condition: bool, detail: str = "") -> None:
     if not condition:
@@ -22,9 +24,16 @@ def assert_true(name: str, condition: bool, detail: str = "") -> None:
 
 def references_to(filename: str) -> list[str]:
     refs = []
+    target_set = set(TARGETS)
 
     for path in TOOLS.glob("*.py"):
         if path.name == filename:
+            continue
+
+        if path.name == SELF:
+            continue
+
+        if path.name in target_set:
             continue
 
         text = path.read_text(encoding="utf-8", errors="replace")
@@ -55,12 +64,12 @@ def main() -> int:
         found += 1
         refs = references_to(name)
 
-        print(f"  refs={refs}")
+        print(f"  external_refs={refs}")
 
         assert_true(
-            f"remaining repair script unreferenced {name}",
+            f"remaining repair script externally unreferenced {name}",
             not refs,
-            f"refs={refs}",
+            f"external_refs={refs}",
         )
 
     assert_true(
