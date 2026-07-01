@@ -15874,6 +15874,260 @@ except Exception as _nova_api_project_state_install_error_20260630:
     except Exception:
         pass
 
+# NOVA_API_CHAT_NATURAL_PROJECT_RECALL_20260701
+# Route-level natural project-state recall.
+# This intentionally does not modify project_state_service.py.
+# It maps short natural project prompts to the already-green project-state answers.
+try:
+    import json as _nova_natural_project_json_20260701
+    import re as _nova_natural_project_re_20260701
+    import importlib.util as _nova_natural_project_importlib_util_20260701
+    from pathlib import Path as _NovaNaturalProjectPath20260701
+    from flask import request as _nova_natural_project_request_20260701
+    from flask import Response as _NovaNaturalProjectResponse20260701
+
+    def _nova_natural_project_normalize_20260701(value):
+        text = str(value or "").strip().lower()
+        text = text.replace("’", "'")
+        text = _nova_natural_project_re_20260701.sub(r"\s+", " ", text)
+        return text
+
+    def _nova_natural_project_prompt_map_20260701(user_text):
+        text = _nova_natural_project_normalize_20260701(user_text)
+
+        if not text or len(text) > 140:
+            return ""
+
+        current_exact = {
+            "are we good",
+            "are we good?",
+            "are we locked",
+            "are we locked?",
+            "is it locked",
+            "is it locked?",
+            "are we clean",
+            "are we clean?",
+            "how far are we",
+            "how far are we?",
+            "how far are we now",
+            "how far are we now?",
+            "where are we at",
+            "where are we at?",
+            "where are we now",
+            "where are we now?",
+            "how close are we",
+            "how close are we?",
+            "status now",
+            "progress now",
+        }
+
+        fixed_exact = {
+            "what is locked",
+            "what is locked?",
+            "what's locked",
+            "what's locked?",
+            "what got locked",
+            "what got locked?",
+            "what did we lock",
+            "what did we lock?",
+            "what passed",
+            "what passed?",
+            "what is green",
+            "what is green?",
+            "what's green",
+            "what's green?",
+        }
+
+        remaining_exact = {
+            "anything left",
+            "anything left?",
+            "anything else",
+            "anything else?",
+            "what else",
+            "what else?",
+            "what still needs doing",
+            "what still needs doing?",
+            "what needs doing",
+            "what needs doing?",
+            "how much is left",
+            "how much is left?",
+        }
+
+        next_exact = {
+            "what should we do now",
+            "what should we do now?",
+            "what do we do now",
+            "what do we do now?",
+            "what now",
+            "what now?",
+            "can we move on",
+            "can we move on?",
+            "should we move on",
+            "should we move on?",
+            "move on?",
+        }
+
+        if text in current_exact:
+            return "what are we working on?"
+
+        if text in fixed_exact:
+            return "what did we just fix?"
+
+        if text in remaining_exact:
+            return "what is left?"
+
+        if text in next_exact:
+            return "next"
+
+        return ""
+
+    def _nova_natural_project_request_json_20260701():
+        try:
+            data = _nova_natural_project_request_20260701.get_json(silent=True) or {}
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+
+    def _nova_natural_project_request_text_20260701(data):
+        for key in ("message", "user_text", "text", "prompt"):
+            value = data.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return ""
+
+    def _nova_natural_project_load_answer_20260701(mapped_prompt):
+        service_path = (
+            _NovaNaturalProjectPath20260701(__file__)
+            .resolve()
+            .parent
+            / "nova_backend"
+            / "services"
+            / "project_state_service.py"
+        )
+
+        spec = _nova_natural_project_importlib_util_20260701.spec_from_file_location(
+            "_nova_natural_project_state_service_direct_20260701",
+            str(service_path),
+        )
+
+        if not spec or not spec.loader:
+            return None
+
+        module = _nova_natural_project_importlib_util_20260701.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        answer_fn = getattr(module, "answer_project_state_question", None)
+        if not callable(answer_fn):
+            return None
+
+        return answer_fn(mapped_prompt, runtime_execution_state=None)
+
+    def _nova_natural_project_payload_20260701(reply, data):
+        session_id = ""
+        if isinstance(data, dict):
+            session_id = str(data.get("session_id") or data.get("active_session_id") or "").strip()
+
+        payload = {
+            "ok": True,
+            "success": True,
+            "content": reply,
+            "message": reply,
+            "response": reply,
+            "session_id": session_id,
+            "active_session_id": session_id,
+            "assistant_message": {
+                "role": "assistant",
+                "content": reply,
+                "attachments": [],
+            },
+            "route": "project_state_recall",
+            "route_taken": "project_state_recall",
+            "debug": {
+                "route": "project_state_recall",
+                "route_taken": "project_state_recall",
+                "natural_project_recall": True,
+            },
+            "meta": {
+                "route": "project_state_recall",
+                "strategy": "natural_project_recall",
+            },
+        }
+
+        return payload
+
+    def _nova_natural_project_wrap_endpoint_20260701(endpoint_name):
+        view = app.view_functions.get(endpoint_name)
+        if not callable(view):
+            return False
+
+        if getattr(view, "_NOVA_API_CHAT_NATURAL_PROJECT_RECALL_20260701", False):
+            return True
+
+        def _nova_natural_project_wrapped_view_20260701(*args, **kwargs):
+            try:
+                data = _nova_natural_project_request_json_20260701()
+                user_text = _nova_natural_project_request_text_20260701(data)
+                mapped_prompt = _nova_natural_project_prompt_map_20260701(user_text)
+
+                if mapped_prompt:
+                    reply = _nova_natural_project_load_answer_20260701(mapped_prompt)
+                    if reply:
+                        payload = _nova_natural_project_payload_20260701(reply, data)
+                        encoded = _nova_natural_project_json_20260701.dumps(payload, ensure_ascii=False)
+                        return _NovaNaturalProjectResponse20260701(
+                            encoded,
+                            status=200,
+                            mimetype="application/json",
+                        )
+            except Exception as _nova_natural_project_route_error_20260701:
+                try:
+                    print(
+                        "[NOVA_API_CHAT_NATURAL_PROJECT_RECALL_20260701] bypass:",
+                        _nova_natural_project_route_error_20260701,
+                    )
+                except Exception:
+                    pass
+
+            return view(*args, **kwargs)
+
+        _nova_natural_project_wrapped_view_20260701.__name__ = getattr(
+            view,
+            "__name__",
+            "_nova_natural_project_wrapped_view_20260701",
+        )
+        _nova_natural_project_wrapped_view_20260701._NOVA_API_CHAT_NATURAL_PROJECT_RECALL_20260701 = True
+
+        app.view_functions[endpoint_name] = _nova_natural_project_wrapped_view_20260701
+        return True
+
+    _nova_natural_project_wrapped_count_20260701 = 0
+    for _endpoint_name_20260701, _view_20260701 in list(app.view_functions.items()):
+        try:
+            rule_matches = [
+                rule.rule
+                for rule in app.url_map.iter_rules()
+                if rule.endpoint == _endpoint_name_20260701
+            ]
+
+            if "/api/chat" in rule_matches:
+                if _nova_natural_project_wrap_endpoint_20260701(_endpoint_name_20260701):
+                    _nova_natural_project_wrapped_count_20260701 += 1
+        except Exception:
+            pass
+
+    print(
+        "[NOVA_API_CHAT_NATURAL_PROJECT_RECALL_20260701] wrapped endpoints:",
+        _nova_natural_project_wrapped_count_20260701,
+    )
+except Exception as _nova_natural_project_install_error_20260701:
+    try:
+        print(
+            "[NOVA_API_CHAT_NATURAL_PROJECT_RECALL_20260701] failed:",
+            _nova_natural_project_install_error_20260701,
+        )
+    except Exception:
+        pass
+
 if __name__ == "__main__":
     create_startup_backup()
 app.run(
@@ -15884,4 +16138,5 @@ app.run(
 
 
 # NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611
+
 
