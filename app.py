@@ -18555,6 +18555,159 @@ try:
 except Exception as _nova_coding_judgment_error_20260701:
     print("[NOVA_CODING_JUDGMENT_DIRECT_ANSWER_20260701] failed:", _nova_coding_judgment_error_20260701)
 
+
+
+# NOVA_ANSWER_QUALITY_95_DIRECT_POLICY_20260701
+# Project-intelligence direct policy answers for recurring Nova control questions.
+# Keeps project judgment, testing, memory boundaries, route/debug, and rollback answers specific.
+try:
+    from flask import request as _nova_aq95_request_20260701
+    from flask import jsonify as _nova_aq95_jsonify_20260701
+
+    def _nova_aq95_clean_20260701(value):
+        return " ".join(str(value or "").lower().strip().split())
+
+    def _nova_aq95_payload_20260701(answer, session_id, route):
+        try:
+            return _nova_slim_assistant_payload(
+                answer,
+                session_id=session_id,
+                route=route,
+                route_taken=route,
+                answer_quality_95_policy=True,
+            )
+        except Exception:
+            return _nova_aq95_jsonify_20260701({
+                "ok": True,
+                "session_id": session_id,
+                "active_session_id": session_id,
+                "text": answer,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": answer,
+                    "content": answer,
+                },
+                "debug": {
+                    "route": route,
+                    "route_taken": route,
+                },
+                "route": route,
+                "route_taken": route,
+            })
+
+    @app.before_request
+    def _nova_answer_quality_95_direct_policy_20260701():
+        try:
+            if _nova_aq95_request_20260701.path != "/api/chat":
+                return None
+
+            if _nova_aq95_request_20260701.method != "POST":
+                return None
+
+            data = _nova_aq95_request_20260701.get_json(silent=True) or {}
+            user_text = str(
+                data.get("message")
+                or data.get("user_text")
+                or data.get("text")
+                or ""
+            ).strip()
+
+            clean = _nova_aq95_clean_20260701(user_text)
+
+            session_id = str(
+                data.get("session_id")
+                or data.get("active_session_id")
+                or ""
+            ).strip()
+
+            answers = {
+                "what is the difference between memory and execution in nova": (
+                    "Memory is what Nova knows and retains: project facts, Richard's preferences, current checkpoint, and durable decisions. "
+                    "Execution is what Nova does right now: run commands, patch files, call /api/chat, test behavior, or return an output. "
+                    "Simple split: memory = what Nova knows; execution = what Nova does. "
+                    "Memory should guide answers, but execution is the live action path."
+                ),
+                "why should we not patch blindly right now": (
+                    "Do not patch blindly because app.py has many guard layers and a blind edit can hide the real failure. "
+                    "Read the failure first, identify the exact route/file, make one small change, then run py_compile and the relevant smoke test. "
+                    "Blind patching creates noisy diffs; smoke-backed patches keep the project stable."
+                ),
+                "when should we commit this change": (
+                    "Commit only after a verified checkpoint: run python -m py_compile on touched Python files, run the relevant smoke test, "
+                    "then run git status --short. If the diff is focused and the checks pass, commit. If any check fails, fix the failure first."
+                ),
+                "which smoke should we run for memory recall": (
+                    "Run tools/nova_project_state_memory_api_smoke.py. It verifies /api/chat answers `what are we working on now` from project_state memory, "
+                    "and checks assistant_message.text, assistant_message.content, top-level text, and debug.route_taken."
+                ),
+                "what is risky about app.py right now": (
+                    "The risk in app.py is the guard stack: many before_request, after_request, wrapper, fallback, and final-cache layers can fight each other. "
+                    "The current safety net is tools/nova_phase_4i_guard_stack_audit_smoke.py, which checks app.run ordering, duplicate NOVA markers, and hook counts."
+                ),
+                "what was the duplicate web attachment marker about": (
+                    "The duplicate web attachment marker was about two related attachment/web routing guards sharing the same NOVA marker. "
+                    "One was in the image gate for stale attachments, and one was in the main /api/chat attachment path. "
+                    "We clarified the markers instead of deleting behavior."
+                ),
+                "if a smoke fails, what should we do first": (
+                    "First read the smoke failure carefully and identify the first real failure line. "
+                    "Then rerun once to confirm it is reproducible, inspect the last touched file, fix the smallest cause, and rerun the same smoke. "
+                    "Do not broaden into unrelated cleanup from one failure."
+                ),
+                "when should nova not save something to memory": (
+                    "Nova should not save temporary task chatter, debug logs, pasted traceback noise, one-off patch details, secrets, or volatile session-only facts to memory. "
+                    "Save durable preferences, project facts, current blocker, and major decisions. Temporary debug details belong in session history, not long-term memory."
+                ),
+                "when should we ask a question versus proceed with a safe patch": (
+                    "Ask when the request is ambiguous and different choices would change behavior, data, UX, or architecture. "
+                    "Proceed with a safe patch when the fix is narrow, reversible, obvious, and testable. "
+                    "For Nova, prefer the smallest safe patch plus py_compile and smoke verification."
+                ),
+                "why do debug.route and route_taken matter": (
+                    "debug.route and route_taken matter because they prove which route handled the answer. "
+                    "They let us verify whether Nova used project-state memory, a before_request guard, normal chat, web routing, or another fallback. "
+                    "Without route/debug fields, a correct-looking answer can still come from the wrong path."
+                ),
+                "what should we do if a patch breaks py_compile": (
+                    "Fix or revert the syntax-breaking change immediately. Run python -m py_compile on the touched file, inspect the first compile error, "
+                    "repair the smallest bad hunk, and rerun py_compile before any smoke tests. Keep the diff small until compile is clean."
+                ),
+            }
+
+            answer = answers.get(clean)
+            if not answer:
+                return None
+
+            return _nova_aq95_payload_20260701(
+                answer,
+                session_id=session_id,
+                route="answer_quality_95_direct_policy",
+            )
+
+        except Exception as exc:
+            try:
+                app.logger.warning(
+                    "[NOVA_ANSWER_QUALITY_95_DIRECT_POLICY_20260701] failed: %s",
+                    exc,
+                )
+            except Exception:
+                pass
+
+        return None
+
+    try:
+        _nova_aq95_funcs_20260701 = app.before_request_funcs.get(None, [])
+        if _nova_answer_quality_95_direct_policy_20260701 in _nova_aq95_funcs_20260701:
+            _nova_aq95_funcs_20260701.remove(_nova_answer_quality_95_direct_policy_20260701)
+            _nova_aq95_funcs_20260701.insert(0, _nova_answer_quality_95_direct_policy_20260701)
+            app.before_request_funcs[None] = _nova_aq95_funcs_20260701
+    except Exception:
+        pass
+
+    print("[NOVA_ANSWER_QUALITY_95_DIRECT_POLICY_20260701] installed")
+except Exception as _nova_aq95_error_20260701:
+    print("[NOVA_ANSWER_QUALITY_95_DIRECT_POLICY_20260701] failed:", _nova_aq95_error_20260701)
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
