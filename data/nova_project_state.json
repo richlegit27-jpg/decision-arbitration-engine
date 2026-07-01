@@ -1,7 +1,7 @@
 {
   "project": "Nova",
-  "checkpoint": "378b621 Repair Nova repair build adapter smoke",
-  "current_focus": "Nova autonomy Phase 3D adapter locked: repair-build now uses a one-command adapter and its adapter smoke matches the structured repair-build response.",
+  "checkpoint": "c4740c6 Add Nova repair plan adapter",
+  "current_focus": "Nova autonomy Phase 3E adapter locked: repair-plan now uses a one-command adapter and its adapter smoke matches the supervised repair proposal response.",
   "last_completed": [
     "Router cleanup locked",
     "Web/live price routing locked",
@@ -81,7 +81,7 @@
     "Autonomy Phase 1D Patch Builder service"
   ],
   "remaining": "Continue one-command adapter migration only after clean smokes and clean git status. Next safest candidate is repair-plan because it is proposal-only.",
-  "next_move": "Plan repair-plan one-command adapter migration while preserving project-state recall, guard review cleanliness, memory quality smoke, and all locked command behavior.",
+  "next_move": "Create the command-registry one-command adapter next while preserving all locked guards, command modes, route debug fields, and memory quality smoke.",
   "git": {
     "branch": "post-frontend-polish-phase",
     "head": "e84977f",
@@ -90,8 +90,8 @@
     "dirty_files": []
   },
   "updated_at_utc": "2026-07-01T03:18:03.782614+00:00",
-  "just_fixed": "Added repair-build adapter at 46fbf24 and repaired tools/nova_repair_build_adapter_smoke.py at 378b621 so repair-build adapter smoke, API smoke, guard review, and memory quality can stay green.",
-  "remaining_work": "Continue one-command adapter migration only after clean smokes and clean git status. Next safest candidate is repair-plan because it is proposal-only.",
+  "just_fixed": "Repair-plan adapter migration is committed and locked at c4740c6.",
+  "remaining_work": "Create the command-registry one-command adapter next while preserving all locked guards, command modes, route debug fields, and memory quality smoke.",
   "next_command": "Plan repair-plan one-command adapter migration while preserving project-state recall, guard review cleanliness, memory quality smoke, and all locked command behavior.",
   "k_command": "Plan repair-plan one-command adapter migration while preserving project-state recall, guard review cleanliness, memory quality smoke, and all locked command behavior.",
   "focus": "Nova autonomy phase 1D service locked: supervised Patch Builder creates instructions-only PowerShell patch plans without editing or executing.",
