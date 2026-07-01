@@ -3538,7 +3538,7 @@ def api_chat():
                 ):
                     _nova_image = _nova_item
                     break
-        # NOVA_WEB_INTENT_STRIPS_CURRENT_ATTACHMENTS_20260609
+        # NOVA_IMAGE_GATE_WEB_INTENT_STRIPS_STALE_ATTACHMENTS_20260609
         # Web/news prompts must ignore stale mobile attachment payload before the image gate scans it.
         _nova_image_gate_clean = " ".join(str(_nova_user_text or "").lower().split())
         _nova_image_gate_web_terms = (
@@ -4500,7 +4500,7 @@ def api_chat():
 
     attachments = normalize_attachments(request.json.get("attachments", []))
 
-    # NOVA_WEB_INTENT_STRIPS_CURRENT_ATTACHMENTS_20260609
+    # NOVA_API_CHAT_WEB_INTENT_STRIPS_CURRENT_ATTACHMENTS_20260609
     # If this is a fresh web/news request, do not let stale mobile attachment state hijack routing.
     _nova_main_clean_for_web = " ".join(str(user_text or "").lower().split())
     _nova_main_web_terms = (
