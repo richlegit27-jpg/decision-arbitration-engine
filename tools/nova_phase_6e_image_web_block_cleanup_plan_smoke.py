@@ -14,7 +14,7 @@ def assert_true(name, condition, detail=""):
 
 
 def main():
-    print("NOVA PHASE 6E IMAGE WEB BLOCK CLEANUP PLAN")
+    print("NOVA PHASE 6E IMAGE WEB BLOCK CLEANUP VALIDATION")
     print("")
 
     assert_true("chat_service exists", TARGET.exists(), str(TARGET))
@@ -32,47 +32,32 @@ def main():
         print(f"- owner at line {line_no}")
 
     assert_true(
-        "duplicate image web block owners visible",
-        len(starts) >= 2,
+        "single image web block owner remains",
+        len(starts) == 1,
         f"owners={starts}",
     )
 
-    keep = starts[-1]
-    remove = starts[:-1]
-
-    print("")
-    print(f"Keep final owner: line {keep}")
-    print("Remove earlier duplicate owners:")
-    for line_no in remove:
-        print(f"- line {line_no}")
+    keep = starts[0]
+    final_window = "\n".join(lines[max(0, keep - 1): min(len(lines), keep + 140)])
 
     assert_true(
-        "final owner is latest block",
-        keep == max(starts),
-        f"keep={keep} starts={starts}",
-    )
-
-    final_window = "\n".join(lines[max(0, keep - 1): min(len(lines), keep + 120)])
-
-    assert_true(
-        "final owner has image attachment route lock",
+        "remaining owner has image attachment route lock",
         "image_attachment_web_block" in final_window,
     )
 
     assert_true(
-        "final owner clears web sources",
+        "remaining owner clears web sources",
         'decision["source_urls"] = []' in final_window
         and 'decision["sources"] = []' in final_window,
     )
 
+    assert_true(
+        "remaining owner preserves image analysis mode",
+        'decision["mode"] = "image_analysis"' in final_window,
+    )
+
     print("")
-    print("Plan:")
-    print("- Keep the final image/web block owner only.")
-    print("- Remove earlier duplicate owner blocks.")
-    print("- Do not change image route behavior.")
-    print("- Verify command smokes and master gate after cleanup.")
-    print("")
-    print("NOVA PHASE 6E IMAGE WEB BLOCK CLEANUP PLAN PASSED")
+    print("NOVA PHASE 6E IMAGE WEB BLOCK CLEANUP VALIDATION PASSED")
     return 0
 
 
