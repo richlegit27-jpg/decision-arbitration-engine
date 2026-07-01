@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import re
 from dataclasses import dataclass, asdict
@@ -106,7 +106,11 @@ def interpret_project_brain_failure(
             ),
         )
 
-    if "missing=[" in lower and "includes expected signals failed" in lower:
+    if (
+        ("missing=[" in lower and "includes expected signals failed" in lower)
+        or ("answer quality smoke failed" in lower and "missing expected signals" in lower)
+        or ("includes expected signals" in lower and "failed" in lower)
+    ):
         case_name = _first_match(r"^(.+?) includes expected signals FAILED", combined)
         missing = _first_match(r"missing=\[([^\]]+)\]", combined)
 
@@ -120,7 +124,7 @@ def interpret_project_brain_failure(
                 "do not patch app.py unless the route is wrong",
             ],
             next_command="python .\\tools\\nova_answer_quality_smoke.py",
-            evidence=_evidence_lines(combined, ["includes expected signals FAILED", "missing=[", "CASE:", "ANSWER:"]),
+            evidence=_evidence_lines(combined, ["includes expected signals FAILED", "missing expected signals", "missing=[", "CASE:", "ANSWER:"]),
             rationale=(
                 f"The failing case {case_name or 'unknown'} is missing {missing or 'expected terms'}. "
                 "Decide whether the product answer or the smoke contract is the stale side, then patch only that layer."
