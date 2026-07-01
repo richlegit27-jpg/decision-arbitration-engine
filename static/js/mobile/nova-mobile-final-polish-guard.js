@@ -8,6 +8,49 @@ Final guard:
 */
 
 (function () {
+
+    // NOVA_MOBILE_ARIA_HIDDEN_SETATTRIBUTE_FOCUS_GUARD_20260701
+    // Blur focused descendants before a panel is hidden with aria-hidden=true.
+    // This prevents Chrome warning:
+    // "Blocked aria-hidden on an element because its descendant retained focus."
+    function installAriaHiddenFocusGuard() {
+        if (window.__NOVA_MOBILE_ARIA_HIDDEN_FOCUS_GUARD_20260701__) {
+            return;
+        }
+
+        window.__NOVA_MOBILE_ARIA_HIDDEN_FOCUS_GUARD_20260701__ = true;
+
+        const originalSetAttribute = Element.prototype.setAttribute;
+
+        Element.prototype.setAttribute = function patchedSetAttribute(name, value) {
+            try {
+                const attrName = String(name || "").toLowerCase();
+                const attrValue = String(value || "").toLowerCase();
+
+                if (attrName === "aria-hidden" && attrValue === "true") {
+                    const active = document.activeElement;
+
+                    if (
+                        active &&
+                        active !== document.body &&
+                        active !== document.documentElement &&
+                        typeof this.contains === "function" &&
+                        this.contains(active) &&
+                        typeof active.blur === "function"
+                    ) {
+                        active.blur();
+                    }
+                }
+            } catch (_) {
+                // Do not let accessibility polish break normal DOM behavior.
+            }
+
+            return originalSetAttribute.call(this, name, value);
+        };
+    }
+
+    installAriaHiddenFocusGuard();
+
     "use strict";
 
     const FIX_ID = "NOVA_MOBILE_FINAL_POLISH_GUARD_20260623";
