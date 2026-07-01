@@ -1,4 +1,4 @@
-﻿import time
+import time
 import requests
 
 
@@ -69,7 +69,7 @@ def main():
 
     assert_true("mission control route preserved", "project_brain_general_intelligence" in blob, blob)
     assert_true("mission control includes decision log", "decision log" in blob, answer)
-    assert_true("mission control includes recent-change route", "recent-change prompts route to decision log" in blob, answer)
+    assert_true("mission control includes decision log api route", "decision log api route" in blob, answer)
 
     route, answer = ask("what changed recently")
     blob = (route + "\n" + answer).lower()
