@@ -186,9 +186,9 @@ try:
     )
 
     _NOVA_CLEAN_NEXT_MOVE_20260702 = (
-        "Next concrete move / safe move: use the Project Brain freshness snapshot as the "
+        "Use the Project Brain freshness snapshot as the "
         "context builder source of truth for checkpoint, blocker, next move, fallback priority, "
-        "recent commits, validation state, and available smoke files."
+        "recent commits, validation state, and available smoke files as the next safe move."
     )
 
     def _nova_project_brain_snapshot_bad_field_20260702(value, required_terms=None):
@@ -205,7 +205,9 @@ try:
         bad_terms = [
             "text: current nova project state",
             "current nova project state: richard is working",
-            "and fres current blocker",
+                        "and fres current blocker",
+            "next concrete move / safe move: next concrete move / safe move",
+            "current safe direction: next concrete move",
             "next move: harden",
             "live_answer_sample.py",
             "idle/generic fallback",
@@ -225,7 +227,7 @@ try:
 
         if _nova_project_brain_snapshot_bad_field_20260702(
             checkpoint,
-            ["Project Brain", "freshness"],
+            ["Project Brain", "freshness snapshot"],
         ):
             updates["checkpoint"] = _NOVA_CLEAN_CHECKPOINT_20260702
 
