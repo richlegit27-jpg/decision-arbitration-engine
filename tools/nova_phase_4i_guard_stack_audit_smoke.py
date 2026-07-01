@@ -76,6 +76,27 @@ def main():
         for name, count in sorted(duplicates, key=lambda item: (-item[1], item[0])):
             print(f"{count}x {name}")
 
+    assert_true(
+        "no duplicate NOVA markers",
+        not duplicates,
+        f"duplicates={duplicates}",
+    )
+
+
+    assert_true(
+        "no duplicate NOVA markers",
+        not duplicates,
+        f"duplicates={duplicates}",
+    )
+
+
+    assert_true(
+        "no duplicate NOVA markers",
+        not duplicates,
+        f"duplicates={duplicates}",
+    )
+
+
     hooks = {
         "@app.after_request": [],
         "@app.before_request": [],
