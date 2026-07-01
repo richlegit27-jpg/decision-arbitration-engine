@@ -1,7 +1,7 @@
 {
   "project": "Nova",
-  "checkpoint": "3551b83 Wire Nova autonomy plan command",
-  "current_focus": "Nova autonomy phase 1C fully locked: task brain, autonomy command, supervised patch planner, and autonomy-plan chat command are committed with smoke coverage.",
+  "checkpoint": "c94672d Add Nova supervised patch builder",
+  "current_focus": "Nova autonomy phase 1D service locked: supervised Patch Builder creates instructions-only PowerShell patch plans without editing or executing.",
   "last_completed": [
     "Router cleanup locked",
     "Web/live price routing locked",
@@ -42,10 +42,11 @@
     "Release checkpoint",
     "Autonomy task brain",
     "Autonomy command smoke",
-    "Autonomy Phase 1C autonomy-plan command"
+    "Autonomy Phase 1C autonomy-plan command",
+    "Autonomy Phase 1D Patch Builder service"
   ],
-  "remaining": "Begin Phase 1D Patch Builder: generate exact supervised patch commands/files while still requiring Richard to run them manually.",
-  "next_move": "Create Nova Patch Builder service for exact PowerShell patch instructions without local execution.",
+  "remaining": "Wire patch-build: chat command into /api/chat so Richard can request supervised patch instructions from chat.",
+  "next_move": "Wire patch-build: command as proposal/instructions-only route with smoke coverage.",
   "git": {
     "branch": "post-frontend-polish-phase",
     "head": "e84977f",
@@ -54,8 +55,8 @@
     "dirty_files": []
   },
   "updated_at_utc": "2026-07-01T03:18:03.782614+00:00",
-  "just_fixed": "Wired autonomy-plan: chat command into /api/chat as proposal-only guarded route. It returns a supervised patch proposal and does not edit files, execute commands, or apply patches.",
-  "remaining_work": "Begin Phase 1D Patch Builder: generate exact supervised patch commands/files while still requiring Richard to run them manually.",
-  "next_command": "Begin Phase 1D Patch Builder.",
-  "k_command": "Start Patch Builder service."
+  "just_fixed": "Added nova_backend/services/autonomy_patch_builder.py and tools/nova_autonomy_patch_builder_smoke.py. Builder outputs files to change, PowerShell patch steps, compile checks, smokes, commit commands, rollback commands, and safety rules.",
+  "remaining_work": "Wire patch-build: chat command into /api/chat so Richard can request supervised patch instructions from chat.",
+  "next_command": "patch-build: make image descriptions better",
+  "k_command": "Wire patch-build command."
 }
