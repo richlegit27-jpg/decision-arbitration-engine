@@ -111,26 +111,28 @@ def should_refresh_project_state_answer(payload: dict) -> bool:
         or ""
     )
 
-    if route == PROJECT_STATE_ROUTE:
-        return True
+    intent = _clean(
+        payload.get("intent")
+        or debug.get("intent")
+        or debug.get("command_intent")
+    )
 
-    assistant_message = payload.get("assistant_message")
-    assistant_text = ""
-    if isinstance(assistant_message, dict):
-        assistant_text = _clean(
-            assistant_message.get("text")
-            or assistant_message.get("content")
-            or assistant_message.get("message")
-        )
+    delegated = bool(
+        payload.get("compact_project_context_delegated")
+        or debug.get("compact_project_context_delegated")
+    )
 
-    combined = "\n".join([
-        _clean(payload.get("text")),
-        _clean(payload.get("answer")),
-        _clean(payload.get("message")),
-        assistant_text,
-    ])
+    # Critical route contract:
+    # State Recall Refresh may only repair true direct project-state recall.
+    # Broad Project Brain paraphrases must stay on project_brain_general_intelligence,
+    # even if their answer text mentions stale cleanup risk.
+    if route != PROJECT_STATE_ROUTE:
+        return False
 
-    return answer_has_stale_cleanup(combined)
+    if delegated or intent == "general_project_answer":
+        return False
+
+    return True
 
 
 def refresh_project_state_payload(
