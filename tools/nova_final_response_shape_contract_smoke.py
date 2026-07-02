@@ -1,4 +1,4 @@
-﻿import json
+import json
 import time
 import requests
 
@@ -27,11 +27,19 @@ def post_chat(message, session_id):
 
 def get_route(data):
     debug = data.get("debug") if isinstance(data.get("debug"), dict) else {}
+    meta = data.get("meta") if isinstance(data.get("meta"), dict) else {}
+    assistant = data.get("assistant_message") if isinstance(data.get("assistant_message"), dict) else {}
+    assistant_meta = assistant.get("meta") if isinstance(assistant.get("meta"), dict) else {}
+
     return (
         data.get("route")
         or data.get("route_taken")
         or debug.get("route_taken")
         or debug.get("route")
+        or meta.get("route")
+        or meta.get("strategy")
+        or assistant_meta.get("route")
+        or assistant_meta.get("strategy")
         or ""
     )
 
