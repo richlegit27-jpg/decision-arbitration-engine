@@ -39,7 +39,16 @@ def main():
         classify_work_type("which smoke should we run") == "smoke_selection",
     )
 
+    from nova_backend.services.project_brain_smoke_selector import (
+        select_focused_smokes as selector_select_focused_smokes,
+    )
+
     app_smokes = select_smokes("route_cleanup", ["app.py"])
+    assert_true(
+        "planner delegates to smoke selector",
+        app_smokes == selector_select_focused_smokes("route_cleanup", ["app.py"]),
+        app_smokes,
+    )
     assert_true(
         "route cleanup uses audit",
         "python .\\tools\\nova_project_brain_route_patch_audit_smoke.py" in app_smokes,
@@ -107,3 +116,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
