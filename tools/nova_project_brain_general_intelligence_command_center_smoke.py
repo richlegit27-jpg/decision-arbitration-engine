@@ -1,5 +1,6 @@
 ﻿from nova_backend.services.project_brain_general_intelligence import (
     build_project_brain_general_answer,
+    should_handle_project_brain_general_question,
 )
 
 
@@ -18,6 +19,12 @@ def answer_text(question):
 def main():
     print("NOVA PROJECT BRAIN GENERAL INTELLIGENCE COMMAND CENTER SMOKE")
     print("============================================================")
+
+    assert_true("route gate handles command center", should_handle_project_brain_general_question("command center"))
+    assert_true("route gate handles smoke question", should_handle_project_brain_general_question("what smoke should we run"))
+    assert_true("route gate handles next upgrade", should_handle_project_brain_general_question("next upgrade"))
+    assert_true("route gate handles recent changes", should_handle_project_brain_general_question("what changed recently"))
+    assert_true("route gate preserves direct recall bypass", not should_handle_project_brain_general_question("what are we working on now"))
 
     intent, text = answer_text("command center")
     assert_true("command center intent", intent == "command_center", intent)
@@ -48,3 +55,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
