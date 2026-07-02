@@ -1,11 +1,10 @@
-﻿from nova_backend.services.project_brain_smoke_selector import (
-    build_smoke_selection,
-    build_smoke_selection_dict,
-    classify_smoke_work_type,
-    format_smoke_selection,
-    normalize_files,
-    select_focused_smokes,
+
+from nova_backend.services.project_brain_smoke_selector import (
+    build_smoke_selector_answer,
+    select_smokes,
 )
+from nova_backend.services.project_brain_upgrade_radar import select_best_upgrade
+from nova_backend.services.project_brain_operator_planner import choose_recommended_move, rank_moves
 
 
 def assert_true(name, condition, detail=""):
@@ -14,87 +13,75 @@ def assert_true(name, condition, detail=""):
     print(f"PASS {name}")
 
 
+def move_value(move, key, default=None):
+    if isinstance(move, dict):
+        return move.get(key, default)
+    return getattr(move, key, default)
+
+
 def main():
-    print("NOVA PROJECT BRAIN SMOKE SELECTOR SMOKE")
-    print("=======================================")
+    print("NOVA PROJECT BRAIN SELF-TEST SELECTOR SMOKE")
+    print("===========================================")
 
-    assert_true(
-        "normalizes files",
-        normalize_files(["app.py", "app.py", "tools/test.py"]) == ["app.py", "tools\\test.py"],
+    service_selection = select_smokes(
+        changed_files=[
+            "nova_backend/services/project_brain_operator_planner.py",
+            "tools/nova_project_brain_operator_planner_smoke.py",
+        ],
+        failure_type="signature_mismatch",
+        failing_layer="operator_planner",
+        user_intent="command center",
+        route_risk="low",
     )
 
-    assert_true(
-        "classifies failure",
-        classify_smoke_work_type("traceback failed") == "failure_repair",
+    assert_true("py compile included", any("py_compile" in item for item in service_selection.focused_smokes), service_selection.focused_smokes)
+    assert_true("service smoke included", any("general_intelligence_command_center_smoke" in item for item in service_selection.focused_smokes), service_selection.focused_smokes)
+    assert_true("service reason", "Project Brain service-layer" in service_selection.reason or "Changed Python files" in service_selection.reason, service_selection.reason)
+
+    route_selection = select_smokes(
+        changed_files=["app.py"],
+        failure_type="route_contract_failure",
+        failing_layer="api_route_gate",
+        user_intent="command_center_api",
+        route_risk="medium",
     )
 
-    assert_true(
-        "classifies route cleanup by file",
-        classify_smoke_work_type("", ["app.py"]) == "route_cleanup",
-    )
+    assert_true("api smoke included", any("command_center_api_smoke" in item for item in route_selection.focused_smokes), route_selection.focused_smokes)
+    assert_true("regression included for medium risk", any("nova_regression_smoke" in item for item in route_selection.focused_smokes), route_selection.focused_smokes)
+    assert_true("medium risk preserved", route_selection.risk == "medium", route_selection.risk)
 
-    assert_true(
-        "classifies mission control",
-        classify_smoke_work_type("", ["nova_backend/services/project_brain_mission_control.py"]) == "mission_control_api",
-    )
-
-    assert_true(
-        "classifies decision engine",
-        classify_smoke_work_type("", ["nova_backend/services/project_brain_decision_engine.py"]) == "decision_engine",
-    )
-
-    assert_true(
-        "classifies operator planner",
-        classify_smoke_work_type("", ["nova_backend/services/project_brain_operator_planner.py"]) == "operator_planner",
-    )
-
-    assert_true(
-        "classifies smoke selector",
-        classify_smoke_work_type("", ["nova_backend/services/project_brain_smoke_selector.py"]) == "smoke_selector",
-    )
-
-    route_smokes = select_focused_smokes("route_cleanup", ["app.py"])
-    assert_true("route uses audit", "python .\\tools\\nova_project_brain_route_patch_audit_smoke.py" in route_smokes, route_smokes)
-    assert_true("route uses api", "python .\\tools\\nova_project_brain_mission_control_api_smoke.py" in route_smokes, route_smokes)
-    assert_true("route uses regression", "python .\\tools\\nova_regression_smoke.py" in route_smokes, route_smokes)
-
-    mission_smokes = select_focused_smokes("mission_control_api", ["nova_backend/services/project_brain_mission_control.py"])
-    assert_true("mission uses operator plan smoke", "python .\\tools\\nova_project_brain_mission_control_operator_plan_smoke.py" in mission_smokes, mission_smokes)
-    assert_true("mission uses api smoke", "python .\\tools\\nova_project_brain_mission_control_api_smoke.py" in mission_smokes, mission_smokes)
-
-    decision_smokes = select_focused_smokes("decision_engine", ["nova_backend/services/project_brain_decision_engine.py"])
-    assert_true("decision uses operator planner decision smoke", "python .\\tools\\nova_project_brain_decision_engine_operator_planner_smoke.py" in decision_smokes, decision_smokes)
-    assert_true("decision uses decision engine smoke", "python .\\tools\\nova_project_brain_decision_engine_smoke.py" in decision_smokes, decision_smokes)
-
-    planner_smokes = select_focused_smokes("operator_planner", ["nova_backend/services/project_brain_operator_planner.py"])
-    assert_true("planner uses planner smoke only", planner_smokes == ["python .\\tools\\nova_project_brain_operator_planner_smoke.py"], planner_smokes)
-
-    selector = build_smoke_selection(
-        user_text="upgrade smoke selector",
+    selector_selection = select_smokes(
         changed_files=["nova_backend/services/project_brain_smoke_selector.py"],
+        failing_layer="smoke_selector",
+        user_intent="self-test",
+        route_risk="low",
     )
-    assert_true("selector work type", selector.work_type == "smoke_selector", selector)
-    assert_true("selector focused smoke", selector.focused_smokes == ["python .\\tools\\nova_project_brain_smoke_selector_smoke.py"], selector)
-    assert_true("selector no regression", selector.run_regression is False, selector)
-    assert_true("selector no api", selector.run_api_smoke is False, selector)
-    assert_true("selector reason", "Smoke Selector changed" in selector.reason, selector.reason)
 
-    route_selection = build_smoke_selection(changed_files=["app.py"])
-    assert_true("route selection regression", route_selection.run_regression is True, route_selection)
-    assert_true("route selection api", route_selection.run_api_smoke is True, route_selection)
+    assert_true("selector smoke included", any("smoke_selector_smoke" in item for item in selector_selection.focused_smokes), selector_selection.focused_smokes)
 
-    data = build_smoke_selection_dict(changed_files=["nova_backend/services/project_brain_operator_planner.py"])
-    assert_true("dict work type", data.get("work_type") == "operator_planner", data)
-    assert_true("dict focused smoke", data.get("focused_smokes") == ["python .\\tools\\nova_project_brain_operator_planner_smoke.py"], data)
+    answer = build_smoke_selector_answer(
+        changed_files=["nova_backend/services/project_brain_smoke_selector.py"],
+        failing_layer="smoke_selector",
+        user_intent="self-test",
+    )
 
-    formatted = format_smoke_selection(selector)
-    assert_true("formatted title", "Project Brain Smoke Selection:" in formatted, formatted)
-    assert_true("formatted work type", "Work type: smoke_selector" in formatted, formatted)
-    assert_true("formatted smoke", "nova_project_brain_smoke_selector_smoke.py" in formatted, formatted)
-    assert_true("formatted stop rule", "Stop rule:" in formatted, formatted)
+    assert_true("answer title", "Project Brain Self-Test Selector" in answer)
+    assert_true("answer focused smokes", "Focused Smokes" in answer)
+
+    best = select_best_upgrade()
+    assert_true("radar best self-test selector", best.name == "Self-Test Selector v1", best.name)
+
+    moves = rank_moves("next_move")
+    assert_true("operator planner first self-test", move_value(moves[0], "name") == "Self-Test Selector v1", move_value(moves[0], "name"))
+
+    recommended_move, why, risk, target_files = choose_recommended_move("next_move")
+    assert_true("recommended self-test", recommended_move == "Self-Test Selector v1", recommended_move)
+    assert_true("recommended why smoke set", "smoke set" in why, why)
+    assert_true("recommended risk low", risk == "low", risk)
+    assert_true("recommended target file", "nova_backend/services/project_brain_smoke_selector.py" in target_files, target_files)
 
     print("")
-    print("NOVA PROJECT BRAIN SMOKE SELECTOR SMOKE PASSED")
+    print("NOVA PROJECT BRAIN SELF-TEST SELECTOR SMOKE PASSED")
 
 
 if __name__ == "__main__":

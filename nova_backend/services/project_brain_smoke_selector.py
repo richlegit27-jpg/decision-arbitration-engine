@@ -1,222 +1,197 @@
-﻿from __future__ import annotations
 
-from dataclasses import asdict, dataclass
-from typing import Any
+from __future__ import annotations
+
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
 class SmokeSelection:
-    work_type: str
-    changed_files: list[str]
-    focused_smokes: list[str]
+    focused_smokes: tuple[str, ...]
     reason: str
-    run_regression: bool
-    run_api_smoke: bool
+    risk: str
     stop_rule: str
 
+    def as_dict(self) -> dict:
+        return {
+            "focused_smokes": list(self.focused_smokes),
+            "reason": self.reason,
+            "risk": self.risk,
+            "stop_rule": self.stop_rule,
+        }
 
-DEFAULT_STOP_RULE = (
-    "Run only the selected focused smokes. Add regression only when route/API behavior changed."
-)
+
+def _clean(value: str) -> str:
+    return str(value or "").strip()
 
 
-def normalize_text(value: Any) -> str:
-    return str(value or "").strip().lower()
+def _normalize_path(path: str) -> str:
+    value = _clean(path).replace("\\", "/")
+
+    for marker in ("nova_backend/", "tools/", "app.py"):
+        if marker in value:
+            if marker == "app.py":
+                return "app.py"
+            return value[value.index(marker):]
+
+    return value
 
 
-def normalize_files(changed_files: list[str] | None = None) -> list[str]:
+def _windows_path(path: str) -> str:
+    return ".\\" + _normalize_path(path).replace("/", "\\")
+
+
+def _py_files(changed_files) -> list[str]:
     result = []
-    seen = set()
 
-    for file in changed_files or []:
-        text = str(file or "").strip().replace("/", "\\")
-        if not text:
-            continue
+    for item in changed_files or []:
+        path = _normalize_path(str(item or ""))
 
-        key = text.lower()
-        if key in seen:
-            continue
-
-        seen.add(key)
-        result.append(text)
+        if path.endswith(".py"):
+            result.append(path)
 
     return result
 
 
-def classify_smoke_work_type(
-    user_text: str = "",
-    changed_files: list[str] | None = None,
-) -> str:
-    text = normalize_text(user_text)
-    files = normalize_files(changed_files)
-    joined = " ".join(files).lower()
+def _dedupe(commands: list[str]) -> tuple[str, ...]:
+    result = []
+    seen = set()
 
-    if any(token in text for token in ("fail", "failed", "traceback", "broken", "assertionerror")):
-        return "failure_repair"
+    for command in commands:
+        value = _clean(command)
 
-    if "app.py" in joined:
-        return "route_cleanup"
+        if not value or value in seen:
+            continue
 
-    if any(token in joined for token in ("mission_control", "general_intelligence", "decision_log_route_contract")):
-        return "mission_control_api"
+        seen.add(value)
+        result.append(value)
 
-    if "decision_engine" in joined:
-        return "decision_engine"
-
-    if "operator_planner" in joined:
-        return "operator_planner"
-
-    if "smoke_selector" in joined:
-        return "smoke_selector"
-
-    if any(token in text for token in ("app.py", "route", "guard", "cleanup", "extract")):
-        return "route_cleanup"
-
-    if any(token in text for token in ("operator", "planner", "next move", "gangster", "endgame")):
-        return "operator_planner"
-
-    if any(token in text for token in ("decision", "judgment", "what should we do")):
-        return "decision_engine"
-
-    return "service_only"
+    return tuple(result)
 
 
-def select_focused_smokes(
-    work_type: str = "",
-    changed_files: list[str] | None = None,
-) -> list[str]:
-    kind = normalize_text(work_type) or classify_smoke_work_type(changed_files=changed_files)
-    files = normalize_files(changed_files)
-    joined = " ".join(files).lower()
-
-    if kind == "failure_repair":
-        return [
-            "python .\\tools\\nova_project_brain_failure_interpreter_api_smoke.py",
-            "python .\\tools\\nova_regression_smoke.py",
-        ]
-
-    if kind == "route_cleanup":
-        return [
-            "python .\\tools\\nova_project_brain_route_patch_audit_smoke.py",
-            "python .\\tools\\nova_project_brain_mission_control_api_smoke.py",
-            "python .\\tools\\nova_regression_smoke.py",
-        ]
-
-    if kind == "mission_control_api":
-        return [
-            "python .\\tools\\nova_project_brain_mission_control_operator_plan_smoke.py",
-            "python .\\tools\\nova_project_brain_mission_control_api_smoke.py",
-            "python .\\tools\\nova_regression_smoke.py",
-        ]
-
-    if kind == "decision_engine":
-        return [
-            "python .\\tools\\nova_project_brain_decision_engine_operator_planner_smoke.py",
-            "python .\\tools\\nova_project_brain_decision_engine_smoke.py",
-        ]
-
-    if kind == "operator_planner":
-        return [
-            "python .\\tools\\nova_project_brain_operator_planner_smoke.py",
-        ]
-
-    if kind == "smoke_selector":
-        return [
-            "python .\\tools\\nova_project_brain_smoke_selector_smoke.py",
-        ]
-
-    if "mission_control" in joined:
-        return [
-            "python .\\tools\\nova_project_brain_mission_control_operator_plan_smoke.py",
-            "python .\\tools\\nova_project_brain_mission_control_api_smoke.py",
-        ]
-
-    return [
-        "python -m py_compile <changed python files>",
-    ]
-
-
-def build_smoke_selection(
-    user_text: str = "",
-    changed_files: list[str] | None = None,
-    work_type: str = "",
+def select_smokes(
+    changed_files=None,
+    failure_type: str = "",
+    failing_layer: str = "",
+    user_intent: str = "",
+    route_risk: str = "low",
 ) -> SmokeSelection:
-    files = normalize_files(changed_files)
-    kind = normalize_text(work_type) or classify_smoke_work_type(
-        user_text=user_text,
-        changed_files=files,
-    )
-    smokes = select_focused_smokes(kind, files)
+    files = [_normalize_path(item) for item in changed_files or [] if _clean(item)]
+    py_files = _py_files(files)
+    failure = _clean(failure_type).lower()
+    layer = _clean(failing_layer).lower()
+    intent = _clean(user_intent).lower()
+    risk = _clean(route_risk).lower() or "low"
 
-    run_regression = any("nova_regression_smoke.py" in smoke for smoke in smokes)
-    run_api_smoke = any("_api_smoke.py" in smoke for smoke in smokes)
+    commands: list[str] = []
+    reason = "Default to regression when no safer focused smoke is known."
+    stop_rule = "Stop after the smallest smoke set that proves the changed behavior."
 
-    if kind == "route_cleanup":
-        reason = "app.py or route cleanup can steal priority, so use audit + API + regression."
-    elif kind == "mission_control_api":
-        reason = "Mission Control output changed, so use service smoke + live API smoke + regression."
-    elif kind == "decision_engine":
-        reason = "Decision Engine changed, so use decision-engine focused smokes before broader route checks."
-    elif kind == "operator_planner":
-        reason = "Operator Planner changed, so the planner smoke is the smallest useful contract."
-    elif kind == "failure_repair":
-        reason = "A failure repair must reproduce the failure and keep regression green."
-    elif kind == "smoke_selector":
-        reason = "Smoke Selector changed, so validate selector mapping directly."
-    else:
-        reason = "Service-only changes start with py_compile or the nearest focused service smoke."
+    if py_files:
+        commands.extend([f"python -m py_compile {_windows_path(path)}" for path in py_files])
+        reason = "Changed Python files require py_compile before behavior smokes."
+
+    if (
+        "route_contract" in failure
+        or "api_route" in layer
+        or "route" in intent
+        or "command_center_api" in intent
+    ):
+        commands.append(r"python .\tools\nova_project_brain_command_center_api_smoke.py")
+        reason = "Route-risk changes require the focused API contract smoke."
+        risk = "medium" if risk == "low" else risk
+
+    elif (
+        "operator_planner" in layer
+        or "command_center" in layer
+        or "general_intelligence" in layer
+        or "signature_mismatch" in failure
+        or "shape_mismatch" in failure
+        or "missing_keyword" in failure
+    ):
+        commands.append(r"python .\tools\nova_project_brain_general_intelligence_command_center_smoke.py")
+        reason = "Project Brain service-layer failures require the Command Center service smoke."
+
+    elif "auto_debug" in layer or "auto-debug" in intent or "traceback" in intent:
+        commands.append(r"python .\tools\nova_project_brain_auto_debug_brain_smoke.py")
+        reason = "Auto-Debug Brain changes require the focused auto-debug smoke."
+
+    elif "smoke_selector" in layer or "self-test" in intent or "smoke" in intent:
+        commands.append(r"python .\tools\nova_project_brain_smoke_selector_smoke.py")
+        reason = "Smoke selector changes require the focused selector smoke."
+
+    elif "upgrade_radar" in layer or "next upgrade" in intent:
+        commands.append(r"python .\tools\nova_project_brain_upgrade_radar_smoke.py")
+        reason = "Upgrade ranking changes require the focused Upgrade Radar smoke."
+
+    if not commands:
+        commands.append(r"python .\tools\nova_regression_smoke.py")
+
+    if risk in {"medium", "high"}:
+        commands.append(r"python .\tools\nova_regression_smoke.py")
+        stop_rule = "Run the focused smoke first, then regression because route risk is elevated."
 
     return SmokeSelection(
-        work_type=kind,
-        changed_files=files,
-        focused_smokes=smokes,
+        focused_smokes=_dedupe(commands),
         reason=reason,
-        run_regression=run_regression,
-        run_api_smoke=run_api_smoke,
-        stop_rule=DEFAULT_STOP_RULE,
+        risk=risk,
+        stop_rule=stop_rule,
     )
 
 
+def build_smoke_selector_answer(
+    changed_files=None,
+    failure_type: str = "",
+    failing_layer: str = "",
+    user_intent: str = "",
+    route_risk: str = "low",
+) -> str:
+    selection = select_smokes(
+        changed_files=changed_files,
+        failure_type=failure_type,
+        failing_layer=failing_layer,
+        user_intent=user_intent,
+        route_risk=route_risk,
+    )
+
+    return "\n".join([
+        "Project Brain Self-Test Selector:",
+        "Focused Smokes:",
+        *[f"- {item}" for item in selection.focused_smokes],
+        f"Reason: {selection.reason}",
+        f"Risk: {selection.risk}",
+        f"Stop Rule: {selection.stop_rule}",
+    ])
+
+
+# NOVA_PROJECT_BRAIN_SMOKE_SELECTION_DICT_COMPAT_20260702
+# Command Center compatibility helper.
+# Keeps selector output usable by older Command Center formatting code.
 def build_smoke_selection_dict(
-    user_text: str = "",
-    changed_files: list[str] | None = None,
-    work_type: str = "",
-) -> dict[str, Any]:
-    return asdict(
-        build_smoke_selection(
-            user_text=user_text,
-            changed_files=changed_files,
-            work_type=work_type,
-        )
+    changed_files=None,
+    failure_type: str = "",
+    failing_layer: str = "",
+    user_intent: str = "",
+    route_risk: str = "low",
+) -> dict:
+    selection = select_smokes(
+        changed_files=changed_files,
+        failure_type=failure_type,
+        failing_layer=failing_layer,
+        user_intent=user_intent,
+        route_risk=route_risk,
     )
 
+    focused_smokes = list(selection.focused_smokes)
+    exact_next_command = focused_smokes[0] if focused_smokes else ""
 
-def format_smoke_selection(selection: SmokeSelection | dict[str, Any]) -> str:
-    data = asdict(selection) if isinstance(selection, SmokeSelection) else dict(selection)
+    return {
+        "focused_smokes": focused_smokes,
+        "smokes": focused_smokes,
+        "exact_next_command": exact_next_command,
+        "command": exact_next_command,
+        "reason": selection.reason,
+        "smoke_selector_reason": selection.reason,
+        "risk": selection.risk,
+        "stop_rule": selection.stop_rule,
+    }
 
-    lines = [
-        "Project Brain Smoke Selection:",
-        f"Work type: {data.get('work_type', '')}",
-        f"Reason: {data.get('reason', '')}",
-        f"Run regression: {data.get('run_regression', False)}",
-        f"Run API smoke: {data.get('run_api_smoke', False)}",
-        "Focused smokes:",
-    ]
-
-    for smoke in data.get("focused_smokes", []) or []:
-        lines.append(f"- {smoke}")
-
-    lines.append(f"Stop rule: {data.get('stop_rule', '')}")
-
-    return "\n".join(lines)
-
-
-__all__ = [
-    "SmokeSelection",
-    "build_smoke_selection",
-    "build_smoke_selection_dict",
-    "classify_smoke_work_type",
-    "select_focused_smokes",
-    "format_smoke_selection",
-    "normalize_files",
-]

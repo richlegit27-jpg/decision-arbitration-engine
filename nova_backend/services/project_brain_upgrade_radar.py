@@ -178,3 +178,96 @@ def build_upgrade_radar_summary() -> str:
         lines.append(f"{index}. {candidate.name} — {candidate.why}")
     return "\n".join(lines)
 
+
+# NOVA_PROJECT_BRAIN_SELF_TEST_SELECTOR_NEXT_V1_20260702
+# After Auto-Debug Brain is locked, rank Self-Test Selector as the next gangster upgrade.
+def get_upgrade_candidates() -> list[UpgradeCandidate]:
+    return [
+        UpgradeCandidate(
+            name="Self-Test Selector v1",
+            why=(
+                "Choose the smallest correct smoke set from changed files, failure layer, "
+                "intent, and route risk so Nova proves upgrades without wasting cycles."
+            ),
+            risk="low",
+            score=120,
+            target_files=(
+                "nova_backend/services/project_brain_smoke_selector.py",
+                "nova_backend/services/project_brain_upgrade_radar.py",
+                "tools/nova_project_brain_smoke_selector_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_smoke_selector_smoke.py",
+            ),
+        ),
+        UpgradeCandidate(
+            name="Patch Planner v1",
+            why="Turn failures into bounded file-level patch plans without adding new app.py route guards.",
+            risk="medium",
+            score=110,
+            target_files=(
+                "nova_backend/services/project_brain_patch_planner.py",
+                "tools/nova_project_brain_patch_planner_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_patch_planner_smoke.py",
+            ),
+            loses_to_best_because="Self-Test Selector should land first so Patch Planner can attach correct smokes to patches.",
+        ),
+        UpgradeCandidate(
+            name="Operator Command Launcher v1",
+            why="Convert Command Center recommendations into exact operator command blocks.",
+            risk="medium",
+            score=100,
+            target_files=(
+                "nova_backend/services/project_brain_operator_command_launcher.py",
+                "tools/nova_project_brain_operator_command_launcher_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_operator_command_launcher_smoke.py",
+            ),
+            loses_to_best_because="Launcher is stronger after Self-Test Selector decides the command list.",
+        ),
+        UpgradeCandidate(
+            name="Auto-Debug Brain v1",
+            why="Auto-Debug Brain is locked; keep it available as the traceback classifier.",
+            risk="low",
+            score=80,
+            target_files=(
+                "nova_backend/services/project_brain_auto_debug_brain.py",
+                "tools/nova_project_brain_auto_debug_brain_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_auto_debug_brain_smoke.py",
+            ),
+            loses_to_best_because="Already locked; next gangster upgrade is Self-Test Selector v1.",
+        ),
+        UpgradeCandidate(
+            name="Project Brain Upgrade Radar v1",
+            why="Upgrade Radar is locked; keep it as the ranking layer.",
+            risk="low",
+            score=70,
+            target_files=(
+                "nova_backend/services/project_brain_upgrade_radar.py",
+                "tools/nova_project_brain_upgrade_radar_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_upgrade_radar_smoke.py",
+            ),
+            loses_to_best_because="Already locked.",
+        ),
+    ]
+
+
+def select_best_upgrade() -> UpgradeCandidate:
+    candidates = get_upgrade_candidates()
+    return sorted(candidates, key=lambda item: item.score, reverse=True)[0]
+
+
+def build_upgrade_radar_summary() -> str:
+    candidates = get_upgrade_candidates()
+    lines = ["Project Brain Upgrade Radar:"]
+    for index, candidate in enumerate(sorted(candidates, key=lambda item: item.score, reverse=True), start=1):
+        lines.append(f"{index}. {candidate.name} — {candidate.why}")
+    return "\n".join(lines)
+
