@@ -31,24 +31,24 @@ def main():
     summary = build_upgrade_radar_summary()
 
     assert_true("candidates exist", len(candidates) >= 3)
-    assert_true("best upgrade radar", best.name == "Patch Planner v1", best.name)
+    assert_true("best upgrade radar", best.name == "Operator Command Launcher v1", best.name)
     assert_true("best risk valid", best.risk in {"low", "medium", "high"}, best.risk)
-    assert_true("summary includes auto debug", "Patch Planner v1" in summary)
-    assert_true("summary includes self-test selector", "Patch Planner v1" in summary)
+    assert_true("summary includes auto debug", "Operator Command Launcher v1" in summary)
+    assert_true("summary includes self-test selector", "Operator Command Launcher v1" in summary)
 
     moves = rank_moves("next_move")
     first = moves[0]
 
     assert_true("rank moves exists", len(moves) >= 1)
-    assert_true("rank first upgrade radar", move_value(first, "name") == "Patch Planner v1", move_value(first, "name"))
+    assert_true("rank first upgrade radar", move_value(first, "name") == "Operator Command Launcher v1", move_value(first, "name"))
     assert_true("cleanup skipped from top", move_value(first, "name") != "Cleanup Strategy Engine v1")
 
     recommended_move, why, risk, target_files = choose_recommended_move("next_move")
 
-    assert_true("recommended upgrade radar", recommended_move == "Patch Planner v1", recommended_move)
-    assert_true("recommended why gangster upgrades", "gangster upgrades" in why or "Turn failures into bounded file-level patch plans" in why, why)
+    assert_true("recommended upgrade radar", recommended_move == "Operator Command Launcher v1", recommended_move)
+    assert_true("recommended why gangster upgrades", "gangster upgrades" in why or "Convert best moves, target files, focused smokes, and route risk into exact PowerShell command blocks" in why, why)
     assert_true("recommended risk valid", risk in {"low", "medium", "high"}, risk)
-    assert_true("recommended target file", "nova_backend/services/project_brain_patch_planner.py" in target_files, target_files)
+    assert_true("recommended target file", "nova_backend/services/project_brain_operator_command_launcher.py" in target_files, target_files)
 
     print("")
     print("NOVA PROJECT BRAIN UPGRADE RADAR SMOKE PASSED")
