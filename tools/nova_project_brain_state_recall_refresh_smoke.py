@@ -76,6 +76,25 @@ def main():
         assert_true("stale cleanup removed", "Start Project Brain cleanup/consolidation" not in refreshed["text"], refreshed["text"])
         assert_true("next move refreshed", "Next move: Project Brain State Recall Refresh v1" in refreshed["text"], refreshed["text"])
 
+        general_payload = {
+            "debug": {
+                "route_taken": "project_brain_general_intelligence",
+                "compact_project_context_delegated": True,
+            },
+            "route": "project_brain_general_intelligence",
+            "intent": "general_project_answer",
+            "compact_project_context_delegated": True,
+            "assistant_message": {
+                "text": "Remaining risk: Start Project Brain cleanup/consolidation",
+                "content": "Remaining risk: Start Project Brain cleanup/consolidation",
+            },
+            "text": "Remaining risk: Start Project Brain cleanup/consolidation",
+        }
+
+        general_refreshed = refresh_project_state_payload(general_payload, memory_path=memory_path)
+        assert_true("general intelligence route untouched", general_refreshed == general_payload, general_refreshed)
+
+
         normal_payload = {
             "debug": {"route_taken": "chat"},
             "assistant_message": {"text": "normal chat"},
