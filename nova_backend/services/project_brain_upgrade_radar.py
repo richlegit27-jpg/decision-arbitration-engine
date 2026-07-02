@@ -764,3 +764,96 @@ def build_upgrade_radar_summary() -> str:
         lines.append(f"{index}. {candidate.name} — {candidate.why}")
     return "\n".join(lines)
 
+
+# NOVA_PROJECT_BRAIN_OPERATOR_MEMORY_WRITER_NEXT_V1_20260702
+# After Runtime Coach is locked, rank Operator Memory Writer as the next gangster upgrade.
+def get_upgrade_candidates() -> list[UpgradeCandidate]:
+    return [
+        UpgradeCandidate(
+            name="Project Brain Operator Memory Writer v1",
+            why=(
+                "Write locked operator milestones and state-update wording after green commits, "
+                "so direct project-state recall can stop lagging behind Command Center."
+            ),
+            risk="medium",
+            score=180,
+            target_files=(
+                "nova_backend/services/project_brain_operator_memory_writer.py",
+                "nova_backend/services/project_brain_upgrade_radar.py",
+                "tools/nova_project_brain_operator_memory_writer_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_operator_memory_writer_smoke.py",
+            ),
+        ),
+        UpgradeCandidate(
+            name="Project Brain State Bridge v1",
+            why="Bridge operator milestone records into direct project-state recall without app.py route guards.",
+            risk="medium",
+            score=170,
+            target_files=(
+                "nova_backend/services/project_brain_state_bridge.py",
+                "tools/nova_project_brain_state_bridge_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_state_bridge_smoke.py",
+            ),
+            loses_to_best_because="State Bridge should land after Operator Memory Writer creates the source-of-truth milestone record.",
+        ),
+        UpgradeCandidate(
+            name="Project Brain Runtime Coach v1",
+            why="Runtime Coach is locked; keep it as the smoke/git-status interpreter.",
+            risk="low",
+            score=90,
+            target_files=(
+                "nova_backend/services/project_brain_runtime_coach.py",
+                "tools/nova_project_brain_runtime_coach_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_runtime_coach_smoke.py",
+            ),
+            loses_to_best_because="Already locked; next gangster upgrade is Operator Memory Writer v1.",
+        ),
+        UpgradeCandidate(
+            name="Project Brain Mission Autopilot v1",
+            why="Mission Autopilot is locked; keep it as the safe mission planner.",
+            risk="low",
+            score=80,
+            target_files=(
+                "nova_backend/services/project_brain_mission_autopilot.py",
+                "tools/nova_project_brain_mission_autopilot_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_mission_autopilot_smoke.py",
+            ),
+            loses_to_best_because="Already locked.",
+        ),
+        UpgradeCandidate(
+            name="Project Brain Action Card v1",
+            why="Action Card is locked; keep it as the unified operator card.",
+            risk="low",
+            score=70,
+            target_files=(
+                "nova_backend/services/project_brain_action_card.py",
+                "tools/nova_project_brain_action_card_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_action_card_smoke.py",
+            ),
+            loses_to_best_because="Already locked.",
+        ),
+    ]
+
+
+def select_best_upgrade() -> UpgradeCandidate:
+    candidates = get_upgrade_candidates()
+    return sorted(candidates, key=lambda item: item.score, reverse=True)[0]
+
+
+def build_upgrade_radar_summary() -> str:
+    candidates = get_upgrade_candidates()
+    lines = ["Project Brain Upgrade Radar:"]
+    for index, candidate in enumerate(sorted(candidates, key=lambda item: item.score, reverse=True), start=1):
+        lines.append(f"{index}. {candidate.name} — {candidate.why}")
+    return "\n".join(lines)
+
