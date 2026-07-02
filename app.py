@@ -1,6 +1,6 @@
 ﻿import json
-import json
 from __future__ import annotations
+import json
 
 
 def _nova_boot_log_20260701(*args, **kwargs):
@@ -2189,7 +2189,6 @@ def _nova_read_project_state_store():
         if not PROJECT_STATE_FILE.exists():
             return {"sessions": {}}
 
-        import json
         # PROJECT_STATE_UTF8_SIG_LOCK
         payload = json.loads(PROJECT_STATE_FILE.read_text(encoding="utf-8-sig"))
 
@@ -2210,7 +2209,6 @@ def _nova_read_project_state_store():
 
 def _nova_write_project_state_store(payload):
     try:
-        import json
 
         if not isinstance(payload, dict):
             payload = {"sessions": {}}
@@ -6921,7 +6919,6 @@ def api_session_by_id(session_id: str):
     # after-request filter does not strip it.
     try:
         from pathlib import Path
-        import json
 
         sid = str(session_id or "").strip()
         root = Path(__file__).resolve().parent
@@ -7791,7 +7788,6 @@ def execution_stream():
             action = "run_step"
 
     def send_event(name, payload):
-        import json
         return f"event: {name}\ndata: {json.dumps(payload)}\n\n"
 
 def save_execution(execution):
@@ -9321,7 +9317,6 @@ def _nova_clean_attachment_analysis_response(response):
     """Final cleanup for canned attachment-analysis replies before mobile sees them."""
     try:
         from flask import request
-        import json
         import re
 
         if request.path != "/api/chat":
@@ -9482,7 +9477,6 @@ def _nova_final_attachment_output_noise_cleanup(response):
     """Final cosmetic cleanup for attachment-analysis text."""
     try:
         from flask import request
-        import json
         import re
 
         if request.path != "/api/chat":
@@ -9628,7 +9622,6 @@ def _nova_attachment_double_summary_cleanup(response):
     """Remove repeated attachment-analysis template lines from final output."""
     try:
         from flask import request
-        import json
         import re
 
         if request.path != "/api/chat":
@@ -9773,7 +9766,6 @@ def _nova_attachment_double_summary_cleanup(response):
 def _nova_attachment_followup_recall_gate():
     try:
         from flask import request, jsonify
-        import json
         from pathlib import Path
 
         if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
@@ -9824,7 +9816,6 @@ def _nova_session_attachment_memory_path_20260611():
 
 def _nova_load_session_attachment_memory_20260611():
     try:
-        import json
         path = _nova_session_attachment_memory_path_20260611()
         if not path.exists():
             return {}
@@ -9836,7 +9827,6 @@ def _nova_load_session_attachment_memory_20260611():
 
 def _nova_save_session_attachment_memory_20260611(data):
     try:
-        import json
         path = _nova_session_attachment_memory_path_20260611()
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(data if isinstance(data, dict) else {}, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -10226,7 +10216,6 @@ def nova_mobile_direct_session_persist_20260609():
     try:
         from pathlib import Path
         from datetime import datetime, timezone
-        import json
         import uuid
 
         payload = request.get_json(silent=True) or {}
@@ -10376,7 +10365,6 @@ def nova_desktop_app_fixed_20260610():
 # Local dev auth API: /api/auth/status, /api/auth/register, /api/auth/login, /api/auth/logout
 def _nova_install_local_auth_routes_20260610():
     import os
-    import json
     import secrets
     import hashlib
     from pathlib import Path
@@ -10932,7 +10920,6 @@ def nova_before_request_slim_api_sessions_20260611():
 # App-level session ownership bridge.
 # Keeps legacy unowned sessions safe, then claims them for the logged-in local user.
 def _nova_install_session_auth_scope_20260610():
-    import json
     from pathlib import Path
     from flask import request, session, g, Response
 
@@ -11156,7 +11143,6 @@ _nova_install_session_auth_scope_20260610()
 # NOVA_PRUNE_EMPTY_SESSION_SPAM_20260610
 # Prevents frontend/route bugs from filling nova_sessions.json with duplicate empty "New Chat" records.
 def _nova_install_empty_session_spam_pruner_20260610():
-    import json
     from pathlib import Path
     from flask import request
 
@@ -11315,7 +11301,6 @@ _nova_install_empty_session_spam_pruner_20260610()
 # NOVA_ATTACHMENT_SHAPE_NORMALIZER_20260610
 # Keeps saved session message attachments as JSON-safe lists of objects.
 def _nova_install_attachment_shape_normalizer_20260610():
-    import json
     import re
     from pathlib import Path
     from flask import request
@@ -11950,7 +11935,6 @@ def stream_events():
 @app.route("/api/chat/stream", methods=["POST"])
 def nova_chat_stream():
 
-    import json
     from flask import Response
 
     def generate():
@@ -13762,7 +13746,6 @@ except Exception:
 
 # NOVA_HISTORY_LIST_AND_DETAIL_20260621
 def nova_history_load_sessions_20260621():
-    import json
     from pathlib import Path
 
     base = Path(__file__).resolve().parent
@@ -13825,7 +13808,6 @@ def nova_history_messages_20260621(session):
 
 
 def nova_history_msg_text_20260621(message):
-    import json
 
     if isinstance(message, str):
         return message
@@ -14224,7 +14206,6 @@ def nova_history_detail_page_20260621(session_id):
 
 @app.route("/new-session")
 def nova_history_new_session_20260621():
-    import json
     import uuid
     from pathlib import Path
     from datetime import datetime, timezone
@@ -14306,7 +14287,6 @@ New session created.
 # NOVA_OPEN_SESSION_BRIDGE_20260622
 @app.route("/open-session/<session_id>")
 def nova_open_session_bridge_20260622(session_id):
-    import json
     import html
     from pathlib import Path
 
@@ -14413,7 +14393,6 @@ def nova_open_session_bridge_20260622(session_id):
 # NOVA_HISTORY_DIRECT_SEND_20260622
 @app.route("/history/<session_id>/send", methods=["POST"])
 def nova_history_direct_send_20260622(session_id):
-    import json
     from pathlib import Path
     from datetime import datetime, timezone
     from flask import request, redirect
