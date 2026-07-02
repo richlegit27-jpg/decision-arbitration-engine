@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from typing import Any
@@ -87,38 +87,27 @@ def classify_work_type(user_text: str = "", changed_files: list[str] | None = No
     return "operator_planning"
 
 
+def _operator_planner_smoke_work_type(work_type: str) -> str:
+    text = normalize_text(work_type)
+
+    if text == "operator_planning":
+        return "operator_planner"
+
+    if text == "smoke_selection":
+        return "smoke_selector"
+
+    return text
+
+
 def select_smokes(work_type: str, changed_files: list[str] | None = None) -> list[str]:
-    files = changed_files or []
-    joined = " ".join(files).lower()
+    from nova_backend.services.project_brain_smoke_selector import (
+        select_focused_smokes,
+    )
 
-    if work_type == "failure_repair":
-        return [
-            "python .\\tools\\nova_project_brain_failure_interpreter_api_smoke.py",
-            "python .\\tools\\nova_regression_smoke.py",
-        ]
-
-    if work_type == "smoke_selection":
-        return [
-            "python .\\tools\\nova_project_brain_operator_planner_smoke.py",
-        ]
-
-    if work_type in ("cleanup_strategy", "route_cleanup", "app_cleanup") or "app.py" in joined:
-        return [
-            "python .\\tools\\nova_project_brain_route_patch_audit_smoke.py",
-            "python .\\tools\\nova_project_brain_mission_control_api_smoke.py",
-            "python .\\tools\\nova_regression_smoke.py",
-        ]
-
-    if "mission_control" in joined:
-        return [
-            "python .\\tools\\nova_project_brain_operator_planner_smoke.py",
-            "python .\\tools\\nova_project_brain_mission_control_api_smoke.py",
-            "python .\\tools\\nova_regression_smoke.py",
-        ]
-
-    return [
-        "python .\\tools\\nova_project_brain_operator_planner_smoke.py",
-    ]
+    return select_focused_smokes(
+        work_type=_operator_planner_smoke_work_type(work_type),
+        changed_files=changed_files,
+    )
 
 
 def choose_recommended_move(work_type: str) -> tuple[str, str, str, list[str]]:
