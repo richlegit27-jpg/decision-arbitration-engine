@@ -62,7 +62,7 @@ def main():
     )
 
     plan = build_operator_plan("what is the next gangster upgrade")
-    assert_true("planner recommends quality v2", plan.recommended_move == "Operator Plan Quality v2", plan)
+    assert_true("planner recommends cleanup after completed filter", plan.recommended_move == "Cleanup Strategy Engine v1", plan)
     assert_true("planner risk low", plan.risk == "low", plan)
     assert_true("planner has target files", "nova_backend/services/project_brain_operator_planner.py" in plan.target_files, plan)
     assert_true("planner has focused smoke", "python .\\tools\\nova_project_brain_operator_planner_smoke.py" in plan.focused_smokes, plan)
@@ -70,7 +70,7 @@ def main():
     assert_true("planner exact next command", plan.exact_next_command == "python .\\tools\\nova_project_brain_operator_planner_smoke.py", plan)
     assert_true("planner loop guard", "already-passing lock" in plan.loop_guard, plan)
     assert_true("planner has ranked moves", len(plan.ranked_moves) == 3, plan)
-    assert_true("planner rank one is quality v2", plan.ranked_moves[0]["name"] == "Operator Plan Quality v2", plan.ranked_moves)
+    assert_true("planner rank one skips completed moves", plan.ranked_moves[0]["name"] == "Operator Plan Quality v2", plan.ranked_moves)
     assert_true("planner has rejected moves", len(plan.rejected_moves) == 2, plan.rejected_moves)
     assert_true("planner rejected moves explain loss", all(move.get("loses_to_best_because") for move in plan.rejected_moves), plan.rejected_moves)
 
@@ -116,4 +116,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
