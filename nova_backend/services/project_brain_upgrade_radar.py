@@ -937,3 +937,71 @@ def build_upgrade_radar_summary() -> str:
         lines.append(f"{index}. {candidate.name} — {candidate.why}")
     return "\n".join(lines)
 
+
+# NOVA_CONVERSATION_QUALITY_FIELD_TEST_NEXT_20260702
+# After backend stable tag, next best move is lived conversation quality testing.
+def get_upgrade_candidates() -> list[UpgradeCandidate]:
+    return [
+        UpgradeCandidate(
+            name="Nova Conversation Quality Field Test v1",
+            why=(
+                "Backend is stable enough to stop blind surgery and collect real conversation examples "
+                "where Nova feels shallow, confused, too bot-like, or loses continuation."
+            ),
+            risk="low",
+            score=220,
+            target_files=(
+                "tools/nova_conversation_quality_field_test_smoke.py",
+                "nova_backend/services/project_brain_upgrade_radar.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_conversation_quality_field_test_smoke.py",
+                r"python .\tools\nova_final_response_shape_contract_smoke.py",
+                r"python .\tools\nova_regression_smoke.py",
+            ),
+        ),
+        UpgradeCandidate(
+            name="App.py Guard Cleanup Pass 2",
+            why="Continue removing one small redundant final JSON mutator at a time.",
+            risk="medium",
+            score=170,
+            target_files=(
+                "app.py",
+                "tools/nova_finalizer_pipeline_audit.py",
+                "tools/nova_regression_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_finalizer_pipeline_audit.py",
+                r"python .\tools\nova_regression_smoke.py",
+            ),
+            loses_to_best_because="Conversation quality should be field-tested now that backend is tagged stable.",
+        ),
+        UpgradeCandidate(
+            name="Project Brain State Bridge v1",
+            why="Already locked; keep it visible only as completed infrastructure.",
+            risk="low",
+            score=80,
+            target_files=(
+                "nova_backend/services/project_brain_state_bridge.py",
+                "tools/nova_project_brain_state_bridge_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_state_bridge_smoke.py",
+            ),
+            loses_to_best_because="Already completed and stable-tagged.",
+        ),
+    ]
+
+
+def select_best_upgrade() -> UpgradeCandidate:
+    candidates = get_upgrade_candidates()
+    return sorted(candidates, key=lambda item: item.score, reverse=True)[0]
+
+
+def build_upgrade_radar_summary() -> str:
+    candidates = get_upgrade_candidates()
+    lines = ["Project Brain Upgrade Radar:"]
+    for index, candidate in enumerate(sorted(candidates, key=lambda item: item.score, reverse=True), start=1):
+        lines.append(f"{index}. {candidate.name} — {candidate.why}")
+    return "\n".join(lines)
+
