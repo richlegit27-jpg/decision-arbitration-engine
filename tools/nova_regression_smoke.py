@@ -1,4 +1,5 @@
 ﻿import json
+import os
 import sys
 import time
 from urllib import request, error
@@ -143,10 +144,14 @@ def run():
     )
 
     # 8. Live market price should route web.
-    btc = post_chat(
-        "bitcoin price right now",
-        f"regression_btc_web_{stamp}",
-    )
+    if os.environ.get("NOVA_SKIP_LIVE_WEB_SMOKE") == "1":
+        print("SKIP live_market_price_web because NOVA_SKIP_LIVE_WEB_SMOKE=1")
+        btc = None
+    else:
+        btc = post_chat(
+            "bitcoin price right now",
+            f"regression_btc_web_{stamp}",
+        )
     assert_true(
         "live_market_price_web",
         route_of(btc) in {"web_fetch", "web"} or "web" in route_of(btc),
