@@ -471,3 +471,110 @@ def build_upgrade_radar_summary() -> str:
         lines.append(f"{index}. {candidate.name} — {candidate.why}")
     return "\n".join(lines)
 
+
+# NOVA_PROJECT_BRAIN_ACTION_CARD_NEXT_V1_20260702
+# After Operator Command Launcher is locked, rank Action Card as the next gangster upgrade.
+def get_upgrade_candidates() -> list[UpgradeCandidate]:
+    return [
+        UpgradeCandidate(
+            name="Project Brain Action Card v1",
+            why=(
+                "Merge Upgrade Radar, Auto-Debug Brain, Patch Planner, Self-Test Selector, "
+                "and Operator Command Launcher into one operator card with exact commands."
+            ),
+            risk="medium",
+            score=150,
+            target_files=(
+                "nova_backend/services/project_brain_action_card.py",
+                "nova_backend/services/project_brain_upgrade_radar.py",
+                "tools/nova_project_brain_action_card_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_action_card_smoke.py",
+            ),
+        ),
+        UpgradeCandidate(
+            name="Project Brain Mission Autopilot v1",
+            why="Use the Action Card to choose, patch, smoke, and stop at one bounded service-level move.",
+            risk="high",
+            score=140,
+            target_files=(
+                "nova_backend/services/project_brain_mission_autopilot.py",
+                "tools/nova_project_brain_mission_autopilot_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_mission_autopilot_smoke.py",
+            ),
+            loses_to_best_because="Autopilot should land after Action Card produces the full operator command contract.",
+        ),
+        UpgradeCandidate(
+            name="Operator Command Launcher v1",
+            why="Operator Command Launcher is locked; keep it as the command-block generator.",
+            risk="low",
+            score=90,
+            target_files=(
+                "nova_backend/services/project_brain_operator_command_launcher.py",
+                "tools/nova_project_brain_operator_command_launcher_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_operator_command_launcher_smoke.py",
+            ),
+            loses_to_best_because="Already locked; next gangster upgrade is Project Brain Action Card v1.",
+        ),
+        UpgradeCandidate(
+            name="Patch Planner v1",
+            why="Patch Planner is locked; keep it as the bounded patch-plan layer.",
+            risk="low",
+            score=80,
+            target_files=(
+                "nova_backend/services/project_brain_patch_planner.py",
+                "tools/nova_project_brain_patch_planner_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_patch_planner_smoke.py",
+            ),
+            loses_to_best_because="Already locked.",
+        ),
+        UpgradeCandidate(
+            name="Self-Test Selector v1",
+            why="Self-Test Selector is locked; keep it as the smoke decision layer.",
+            risk="low",
+            score=70,
+            target_files=(
+                "nova_backend/services/project_brain_smoke_selector.py",
+                "tools/nova_project_brain_smoke_selector_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_smoke_selector_smoke.py",
+            ),
+            loses_to_best_because="Already locked.",
+        ),
+        UpgradeCandidate(
+            name="Auto-Debug Brain v1",
+            why="Auto-Debug Brain is locked; keep it as the traceback classifier.",
+            risk="low",
+            score=60,
+            target_files=(
+                "nova_backend/services/project_brain_auto_debug_brain.py",
+                "tools/nova_project_brain_auto_debug_brain_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_auto_debug_brain_smoke.py",
+            ),
+            loses_to_best_because="Already locked.",
+        ),
+    ]
+
+
+def select_best_upgrade() -> UpgradeCandidate:
+    candidates = get_upgrade_candidates()
+    return sorted(candidates, key=lambda item: item.score, reverse=True)[0]
+
+
+def build_upgrade_radar_summary() -> str:
+    candidates = get_upgrade_candidates()
+    lines = ["Project Brain Upgrade Radar:"]
+    for index, candidate in enumerate(sorted(candidates, key=lambda item: item.score, reverse=True), start=1):
+        lines.append(f"{index}. {candidate.name} — {candidate.why}")
+    return "\n".join(lines)
+

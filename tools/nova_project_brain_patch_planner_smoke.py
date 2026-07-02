@@ -47,7 +47,7 @@ TypeError: rank_moves() got an unexpected keyword argument 'changed_files'
         route_risk="low",
     )
 
-    assert_true("plan title", plan.title == "Project Brain Operator Command Launcher v1", plan.title)
+    assert_true("plan title", plan.title == "Project Brain Project Brain Action Card v1", plan.title)
     assert_true("signature failure carried", plan.failure_type == "signature_mismatch", plan.failure_type)
     assert_true("target file carried", plan.target_file == "nova_backend/services/project_brain_operator_planner.py", plan.target_file)
     assert_true("patch move signature", "signature" in plan.patch_move or "keyword" in plan.patch_move, plan.patch_move)
@@ -72,16 +72,16 @@ TypeError: rank_moves() got an unexpected keyword argument 'changed_files'
     assert_true("route risk medium", route_plan.risk == "medium", route_plan.risk)
 
     best = select_best_upgrade()
-    assert_true("radar best patch planner", best.name == "Operator Command Launcher v1", best.name)
+    assert_true("radar best patch planner", best.name == "Project Brain Action Card v1", best.name)
 
     moves = rank_moves("next_move")
-    assert_true("operator planner first patch planner", move_value(moves[0], "name") == "Operator Command Launcher v1", move_value(moves[0], "name"))
+    assert_true("operator planner first patch planner", move_value(moves[0], "name") == "Project Brain Action Card v1", move_value(moves[0], "name"))
 
     recommended_move, why, risk, target_files = choose_recommended_move("next_move")
-    assert_true("recommended patch planner", recommended_move == "Operator Command Launcher v1", recommended_move)
+    assert_true("recommended patch planner", recommended_move == "Project Brain Action Card v1", recommended_move)
     assert_true("recommended why patch plans", "patch plans" in why, why)
     assert_true("recommended risk medium", risk == "medium", risk)
-    assert_true("recommended target file", "nova_backend/services/project_brain_operator_command_launcher.py" in target_files, target_files)
+    assert_true("recommended target file", "nova_backend/services/project_brain_action_card.py" in target_files, target_files)
 
     print("")
     print("NOVA PROJECT BRAIN PATCH PLANNER SMOKE PASSED")

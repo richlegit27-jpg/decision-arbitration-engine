@@ -51,7 +51,7 @@ def main():
     assert_true("medium risk preserved", route_selection.risk == "medium", route_selection.risk)
 
     selector_selection = select_smokes(
-        changed_files=["nova_backend/services/project_brain_operator_command_launcher.py"],
+        changed_files=["nova_backend/services/project_brain_action_card.py"],
         failing_layer="smoke_selector",
         user_intent="self-test",
         route_risk="low",
@@ -60,7 +60,7 @@ def main():
     assert_true("selector smoke included", any("smoke_selector_smoke" in item for item in selector_selection.focused_smokes), selector_selection.focused_smokes)
 
     answer = build_smoke_selector_answer(
-        changed_files=["nova_backend/services/project_brain_operator_command_launcher.py"],
+        changed_files=["nova_backend/services/project_brain_action_card.py"],
         failing_layer="smoke_selector",
         user_intent="self-test",
     )
@@ -69,16 +69,16 @@ def main():
     assert_true("answer focused smokes", "Focused Smokes" in answer)
 
     best = select_best_upgrade()
-    assert_true("radar best self-test selector", best.name == "Operator Command Launcher v1", best.name)
+    assert_true("radar best self-test selector", best.name == "Project Brain Action Card v1", best.name)
 
     moves = rank_moves("next_move")
-    assert_true("operator planner first self-test", move_value(moves[0], "name") == "Operator Command Launcher v1", move_value(moves[0], "name"))
+    assert_true("operator planner first self-test", move_value(moves[0], "name") == "Project Brain Action Card v1", move_value(moves[0], "name"))
 
     recommended_move, why, risk, target_files = choose_recommended_move("next_move")
-    assert_true("recommended self-test", recommended_move == "Operator Command Launcher v1", recommended_move)
+    assert_true("recommended self-test", recommended_move == "Project Brain Action Card v1", recommended_move)
     assert_true("recommended why smoke set", "smoke set" in why, why)
     assert_true("recommended risk low", risk == "low", risk)
-    assert_true("recommended target file", "nova_backend/services/project_brain_operator_command_launcher.py" in target_files, target_files)
+    assert_true("recommended target file", "nova_backend/services/project_brain_action_card.py" in target_files, target_files)
 
     print("")
     print("NOVA PROJECT BRAIN SELF-TEST SELECTOR SMOKE PASSED")

@@ -72,16 +72,16 @@ AssertionError: command center route FAILED chat
     assert_true("route api smoke", "command_center_api_smoke" in route_report.focused_smoke, route_report.focused_smoke)
 
     best = select_best_upgrade()
-    assert_true("radar best auto debug", best.name == "Operator Command Launcher v1", best.name)
+    assert_true("radar best auto debug", best.name == "Project Brain Action Card v1", best.name)
 
     moves = rank_moves("next_move")
-    assert_true("operator planner first auto debug", move_value(moves[0], "name") == "Operator Command Launcher v1", move_value(moves[0], "name"))
+    assert_true("operator planner first auto debug", move_value(moves[0], "name") == "Project Brain Action Card v1", move_value(moves[0], "name"))
 
     recommended_move, why, risk, target_files = choose_recommended_move("next_move")
-    assert_true("recommended auto debug", recommended_move == "Operator Command Launcher v1", recommended_move)
-    assert_true("recommended why classify tracebacks", "Convert best moves, target files, focused smokes, and route risk into exact PowerShell command blocks" in why, why)
+    assert_true("recommended auto debug", recommended_move == "Project Brain Action Card v1", recommended_move)
+    assert_true("recommended why classify tracebacks", "Merge Upgrade Radar, Auto-Debug Brain, Patch Planner, Self-Test Selector, and Operator Command Launcher into one operator card with exact commands" in why, why)
     assert_true("recommended risk valid", risk in {"low", "medium", "high"}, risk)
-    assert_true("recommended target file", "nova_backend/services/project_brain_operator_command_launcher.py" in target_files, target_files)
+    assert_true("recommended target file", "nova_backend/services/project_brain_action_card.py" in target_files, target_files)
 
     print("")
     print("NOVA PROJECT BRAIN AUTO-DEBUG BRAIN SMOKE PASSED")
