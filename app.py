@@ -12337,51 +12337,6 @@ def _nova_direct_clean_attachment_text_response_20260611(text_value):
     except Exception:
         return text_value
 
-
-
-# NOVA_ATTACHMENT_FINAL_JSON_RESPONSE_SYNC_20260611
-@app.after_request
-def nova_attachment_final_json_response_sync_20260611(response):
-    try:
-        if request.path != "/api/chat":
-            return response
-
-        if not response.is_json:
-            return response
-
-        data = response.get_json(silent=True)
-        if not isinstance(data, dict):
-            return response
-
-        assistant_message = data.get("assistant_message")
-        if not isinstance(assistant_message, dict):
-            return response
-
-        content = str(assistant_message.get("content") or "").strip()
-        text_value = str(assistant_message.get("text") or "").strip()
-
-        if (
-            content.startswith("Attachment analysis:")
-            and "Attachment " in content
-            and " content:" in content
-            and (
-                "This uploaded attachment contains readable text about:" in text_value
-                or "Key points:" in text_value
-                or "Preview:" in text_value
-            )
-        ):
-            assistant_message["text"] = content
-            assistant_message["content"] = content
-            data["assistant_message"] = assistant_message
-
-            import json
-            response.set_data(json.dumps(data, ensure_ascii=False))
-            response.headers["Content-Type"] = "application/json; charset=utf-8"
-
-        return response
-    except Exception:
-        return response
-
 # NOVA_WEB_FETCH_REQUESTED_SESSION_BRIDGE_SAFE_20260612
 # Registers before the existing target-session bridge.
 # Rewrites successful web_fetch /api/chat responses to the requested session id
