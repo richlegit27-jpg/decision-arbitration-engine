@@ -32,6 +32,12 @@ def main():
     answer = build_project_brain_mission_control_answer("operator mode")
 
     assert_true("answer has mission title", "Project Brain Mission Control:" in answer, answer)
+    assert_true("answer has v14 console", "Mission Control v1.4 Operator Console" in answer, answer)
+    assert_true("answer has best move", "Best Move:" in answer, answer)
+    assert_true("answer has exact next command top", "Exact Next Command:" in answer, answer)
+    assert_true("answer has stop rule top", "Stop Rule:" in answer, answer)
+    assert_true("answer has loop guard top", "Loop Guard:" in answer, answer)
+    assert_true("answer has legacy contract", "Legacy Contract:" in answer, answer)
     assert_true("answer has operator section", "Operator Plan:" in answer, answer)
     assert_true("answer has operator recommended move", "Operator recommended move:" in answer, answer)
     assert_true("answer has operator focused smokes", "Operator focused smokes:" in answer, answer)
@@ -52,3 +58,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

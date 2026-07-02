@@ -60,6 +60,11 @@ def post_chat(question, session_id):
 def assert_mission_control_answer(question, route, answer):
     assert_true(f"{question} route", route == "project_brain_general_intelligence", route)
     assert_true(f"{question} title", "Project Brain Mission Control:" in answer, answer)
+    assert_true(f"{question} v14 operator console", "Mission Control v1.4 Operator Console" in answer, answer)
+    assert_true(f"{question} best move", "Best Move:" in answer, answer)
+    assert_true(f"{question} exact next command top", "Exact Next Command:" in answer, answer)
+    assert_true(f"{question} loop guard top", "Loop Guard:" in answer, answer)
+    assert_true(f"{question} legacy contract", "Legacy Contract:" in answer, answer)
     assert_true(f"{question} current state", "Current state:" in answer, answer)
     assert_true(f"{question} intent", "Intent:" in answer, answer)
     assert_true(f"{question} mission control intent", "mission_control" in answer, answer)
@@ -112,4 +117,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 

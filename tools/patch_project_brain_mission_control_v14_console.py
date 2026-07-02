@@ -1,104 +1,30 @@
-from __future__ import annotations
-
-from dataclasses import dataclass, asdict
-from typing import Any
+﻿from pathlib import Path
+import re
 
 
-@dataclass(frozen=True)
-class ProjectBrainMissionCard:
-    current_state: str
-    current_blocker: str
-    intent: str
-    confidence: float
-    risk: str
-    recommended_move: str
-    target_layers: list[str]
-    target_files: list[str]
-    focused_smoke: str
-    validation: list[str]
-    avoid: list[str]
-    commit_rule: str
-    rationale: str
-    failure_type: str
-    failure_severity: str
-    failure_patch_target: str
-    failure_next_command: str
-    failure_evidence: list[str]
-    operator_plan: dict[str, Any]
+TARGET = Path("nova_backend/services/project_brain_mission_control.py")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+if not TARGET.exists():
+    raise SystemExit("missing mission control service")
 
+text = TARGET.read_text(encoding="utf-8-sig")
 
-def _first_focused_smoke(validation: list[str]) -> str:
-    for command in validation:
-        text = str(command or "").strip()
-        lower = text.lower()
-        if text.startswith("python .\\tools\\") and "smoke" in lower:
-            return text
+if "Mission Control v1.4 Operator Console" in text:
+    print("Mission Control already has v1.4 console formatter")
+    raise SystemExit(0)
 
-    for command in validation:
-        text = str(command or "").strip()
-        if "focused smoke" in text.lower():
-            return text
+pattern = re.compile(
+    r"\n\ndef format_project_brain_mission_card\(card: ProjectBrainMissionCard\) -> str:"
+    r".*?"
+    r"\n\ndef build_project_brain_mission_control_answer\(",
+    re.DOTALL,
+)
 
-    return "run the smallest focused smoke first"
+match = pattern.search(text)
+if not match:
+    raise SystemExit("could not isolate format_project_brain_mission_card function")
 
-
-def build_project_brain_mission_card(
-    user_text: str = "",
-    pasted_output: str = "",
-) -> ProjectBrainMissionCard:
-    from nova_backend.services.project_brain_decision_engine import (
-        decide_project_brain_next_move,
-    )
-    from nova_backend.services.project_brain_freshness_snapshot import (
-        build_project_brain_freshness_snapshot,
-    )
-    from nova_backend.services.project_brain_failure_interpreter import (
-        interpret_project_brain_failure,
-    )
-    from nova_backend.services.project_brain_operator_planner import (
-        build_operator_plan_dict,
-    )
-
-    snapshot = build_project_brain_freshness_snapshot()
-    decision = decide_project_brain_next_move(
-        user_text=user_text,
-        pasted_output=pasted_output,
-    )
-    failure = interpret_project_brain_failure(
-        user_text=user_text,
-        pasted_output=pasted_output,
-    )
-    operator_plan = build_operator_plan_dict(
-        user_text=user_text,
-        changed_files=list(decision.target_files),
-        project_state=str(snapshot.checkpoint or ""),
-    )
-
-    return ProjectBrainMissionCard(
-        current_state=str(snapshot.checkpoint or "").strip(),
-        current_blocker=str(snapshot.blocker or "").strip(),
-        intent=decision.intent,
-        confidence=decision.confidence,
-        risk=decision.risk,
-        recommended_move=decision.recommended_next_move,
-        target_layers=list(decision.target_layers),
-        target_files=list(decision.target_files),
-        focused_smoke=_first_focused_smoke(list(decision.validation)),
-        validation=list(decision.validation),
-        avoid=list(decision.avoid),
-        commit_rule="Do not commit until py_compile and the focused smoke pass; then check git status --short.",
-        rationale=decision.rationale,
-        failure_type=failure.failure_type,
-        failure_severity=failure.severity,
-        failure_patch_target=failure.patch_target,
-        failure_next_command=failure.next_command,
-        failure_evidence=list(failure.evidence),
-        operator_plan=operator_plan,
-    )
-
+replacement = r'''
 
 def _join_nonempty(values: list[str] | tuple[str, ...] | None, separator: str = ", ") -> str:
     result = []
@@ -203,12 +129,9 @@ def format_project_brain_mission_card(card: ProjectBrainMissionCard) -> str:
     )
 
 
-def build_project_brain_mission_control_answer(
-    user_text: str = "",
-    pasted_output: str = "",
-) -> str:
-    card = build_project_brain_mission_card(
-        user_text=user_text,
-        pasted_output=pasted_output,
-    )
-    return format_project_brain_mission_card(card)
+def build_project_brain_mission_control_answer('''
+
+new_text = text[:match.start()] + replacement + text[match.end():]
+TARGET.write_text(new_text, encoding="utf-8")
+
+print("patched Mission Control v1.4 Operator Console formatter")
