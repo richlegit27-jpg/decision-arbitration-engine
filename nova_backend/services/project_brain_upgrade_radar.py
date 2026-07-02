@@ -857,3 +857,83 @@ def build_upgrade_radar_summary() -> str:
         lines.append(f"{index}. {candidate.name} — {candidate.why}")
     return "\n".join(lines)
 
+
+# NOVA_PROJECT_BRAIN_STATE_BRIDGE_NEXT_V1_20260702
+# After Operator Memory Writer is locked, rank State Bridge as the next gangster upgrade.
+def get_upgrade_candidates() -> list[UpgradeCandidate]:
+    return [
+        UpgradeCandidate(
+            name="Project Brain State Bridge v1",
+            why=(
+                "Bridge operator milestone records into direct project-state recall so stale cleanup wording "
+                "stops overriding the locked gangster upgrade stack."
+            ),
+            risk="medium",
+            score=190,
+            target_files=(
+                "nova_backend/services/project_brain_state_bridge.py",
+                "nova_backend/services/project_brain_upgrade_radar.py",
+                "tools/nova_project_brain_state_bridge_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_state_bridge_smoke.py",
+            ),
+        ),
+        UpgradeCandidate(
+            name="Project Brain State Recall Refresh v1",
+            why="Teach direct project-state recall to prefer the State Bridge record over stale cleanup memory.",
+            risk="medium",
+            score=180,
+            target_files=(
+                "nova_backend/services/project_brain_state_bridge.py",
+                "nova_backend/services/project_brain_freshness_snapshot.py",
+                "tools/nova_project_brain_state_recall_refresh_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_state_recall_refresh_smoke.py",
+            ),
+            loses_to_best_because="State Bridge should land first so recall refresh has a clean source record.",
+        ),
+        UpgradeCandidate(
+            name="Project Brain Operator Memory Writer v1",
+            why="Operator Memory Writer is locked; keep it as the milestone writer.",
+            risk="low",
+            score=90,
+            target_files=(
+                "nova_backend/services/project_brain_operator_memory_writer.py",
+                "tools/nova_project_brain_operator_memory_writer_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_operator_memory_writer_smoke.py",
+            ),
+            loses_to_best_because="Already locked; next gangster upgrade is State Bridge v1.",
+        ),
+        UpgradeCandidate(
+            name="Project Brain Runtime Coach v1",
+            why="Runtime Coach is locked; keep it as the smoke/git-status interpreter.",
+            risk="low",
+            score=80,
+            target_files=(
+                "nova_backend/services/project_brain_runtime_coach.py",
+                "tools/nova_project_brain_runtime_coach_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_runtime_coach_smoke.py",
+            ),
+            loses_to_best_because="Already locked.",
+        ),
+    ]
+
+
+def select_best_upgrade() -> UpgradeCandidate:
+    candidates = get_upgrade_candidates()
+    return sorted(candidates, key=lambda item: item.score, reverse=True)[0]
+
+
+def build_upgrade_radar_summary() -> str:
+    candidates = get_upgrade_candidates()
+    lines = ["Project Brain Upgrade Radar:"]
+    for index, candidate in enumerate(sorted(candidates, key=lambda item: item.score, reverse=True), start=1):
+        lines.append(f"{index}. {candidate.name} — {candidate.why}")
+    return "\n".join(lines)
+

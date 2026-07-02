@@ -43,7 +43,7 @@ PS C:\\Users\\Owner\\nova>
 
     milestone = build_operator_milestone_from_runtime_output(runtime_output)
 
-    assert_true("milestone title", milestone.title == "Project Brain Operator Memory Writer v1", milestone.title)
+    assert_true("milestone title", milestone.title == "Project Brain State Bridge v1", milestone.title)
     assert_true("commit hash parsed", milestone.commit_hash == "63c159f", milestone.commit_hash)
     assert_true("commit message parsed", milestone.commit_message == "Add Project Brain runtime coach", milestone.commit_message)
     assert_true("working tree clean parsed", milestone.working_tree_clean is True, milestone.working_tree_clean)
@@ -83,16 +83,16 @@ PS C:\\Users\\Owner\\nova>
     assert_true("answer state update", "State Update" in answer)
 
     best = select_best_upgrade()
-    assert_true("radar best memory writer", best.name == "Project Brain Operator Memory Writer v1", best.name)
+    assert_true("radar best memory writer", best.name == "Project Brain State Bridge v1", best.name)
 
     moves = rank_moves("next_move")
-    assert_true("operator planner first memory writer", move_value(moves[0], "name") == "Project Brain Operator Memory Writer v1", move_value(moves[0], "name"))
+    assert_true("operator planner first memory writer", move_value(moves[0], "name") == "Project Brain State Bridge v1", move_value(moves[0], "name"))
 
     recommended_move, why, risk, target_files = choose_recommended_move("next_move")
-    assert_true("recommended memory writer", recommended_move == "Project Brain Operator Memory Writer v1", recommended_move)
+    assert_true("recommended memory writer", recommended_move == "Project Brain State Bridge v1", recommended_move)
     assert_true("recommended why milestones", "milestones" in why or "state-update" in why, why)
     assert_true("recommended risk medium", risk == "medium", risk)
-    assert_true("recommended target file", "nova_backend/services/project_brain_operator_memory_writer.py" in target_files, target_files)
+    assert_true("recommended target file", "nova_backend/services/project_brain_state_bridge.py" in target_files, target_files)
 
     print("")
     print("NOVA PROJECT BRAIN OPERATOR MEMORY WRITER SMOKE PASSED")
