@@ -61,3 +61,23 @@ Category:
 - natural summary
 - no over-project-routing
 
+
+### Positive Case 3
+Prompt set:
+Field Test Round 2:
+- session memory check
+- attachment summary/follow-up check
+- casual chat vs project routing check
+
+Result:
+Nova did good across the second field test. No major weak behavior showed up.
+
+What worked:
+Nova kept the conversation usable, avoided obvious routing mistakes, and handled the tested context/follow-up behavior well enough for normal use.
+
+Category:
+- session/context pass
+- attachment follow-up pass
+- routing sanity pass
+- general usability pass
+
