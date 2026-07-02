@@ -1071,6 +1071,23 @@ observer.observe(document.documentElement, {
 <body>
   <div class="shell">
     <aside class="panel sidebar">
+<!-- NOVA_DESKTOP_EXECUTION_NATIVE_TOOLS_PANEL_20260702 -->
+<section id="nova-desktop-execution-native" class="panel-section nova-desktop-execution-native" aria-label="Execution Panel">
+    <div class="panel-section-title">Execution</div>
+
+    <div data-execution-panel>
+        <div class="nova-panel-muted">
+            No steps yet. Start with <strong>auto-plan &lt;goal&gt;</strong>, then use Run Step.
+        </div>
+    </div>
+
+    <div class="nova-desktop-execution-native-actions">
+        <button type="button" data-exec-fill="run step">Run Step</button>
+        <button type="button" data-exec-fill="run all">Run All</button>
+        <button type="button" data-exec-fill="stop">Stop</button>
+    </div>
+</section>
+
       <div class="brand">
         <div class="brand-row">
           <h1 class="brand-title">Nova</h1>
@@ -1141,26 +1158,7 @@ observer.observe(document.documentElement, {
     </main>
 
     <aside class="panel tools">
-
-<!-- NOVA_DESKTOP_EXECUTION_NATIVE_TOOLS_PANEL_20260702 -->
-<section id="nova-desktop-execution-native" class="panel-section nova-desktop-execution-native" aria-label="Execution Panel">
-    <div class="panel-section-title">Execution</div>
-
-    <div data-execution-panel>
-        <div class="nova-panel-muted">
-            No steps yet. Start with <strong>auto-plan &lt;goal&gt;</strong>, then use Run Step.
-        </div>
-    </div>
-
-    <div class="nova-desktop-execution-native-actions">
-        <button type="button" data-exec-fill="run step">Run Step</button>
-        <button type="button" data-exec-fill="run all">Run All</button>
-        <button type="button" data-exec-fill="stop">Stop</button>
-    </div>
-</section>
-
-
-      <section class="tools-section execution-section">
+<section class="tools-section execution-section">
         <h3>Execution</h3>
         <div class="execution-card">
           <div class="metric">
@@ -11838,6 +11836,98 @@ aside.panel.tools > #nova-desktop-execution-native,
 #nova-desktop-execution-native button {
     width: 100% !important;
     min-width: 0 !important;
+    box-sizing: border-box !important;
+}
+</style>
+
+
+
+<style id="nova-desktop-execution-move-to-left-panel-20260702">
+/* NOVA_DESKTOP_EXECUTION_MOVE_TO_LEFT_PANEL_20260702
+   Execution belongs in the left desktop panel, not the right tools rail.
+*/
+#nova-desktop-execution-native {
+    position: static !important;
+    inset: auto !important;
+    transform: none !important;
+    float: none !important;
+    clear: both !important;
+
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 150px !important;
+    box-sizing: border-box !important;
+
+    margin: 0 0 12px 0 !important;
+    padding: 12px !important;
+
+    border: 1px solid rgba(168, 85, 247, 0.34) !important;
+    border-radius: 16px !important;
+    background: rgba(15, 23, 42, 0.88) !important;
+    box-shadow: none !important;
+    outline: none !important;
+
+    color: #e5e7eb !important;
+    overflow: hidden !important;
+    z-index: auto !important;
+}
+
+#nova-desktop-execution-native .panel-section-title {
+    color: #facc15 !important;
+    font-weight: 900 !important;
+    margin-bottom: 10px !important;
+}
+
+#nova-desktop-execution-native [data-execution-panel] {
+    display: block !important;
+    width: 100% !important;
+    min-height: 60px !important;
+    box-sizing: border-box !important;
+    padding: 10px !important;
+    border-radius: 12px !important;
+    background: rgba(255,255,255,0.055) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+}
+
+#nova-desktop-execution-native .nova-desktop-execution-native-actions {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    margin-top: 10px !important;
+}
+
+#nova-desktop-execution-native button {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+}
+</style>
+
+
+
+<style id="nova-desktop-execution-native-bottom-tools-20260702">
+/* NOVA_DESKTOP_EXECUTION_NATIVE_BOTTOM_TOOLS_20260702
+   Keep Execution native inside the tools rail, but place it at the bottom.
+*/
+aside.panel.tools {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+}
+
+aside.panel.tools > #nova-desktop-execution-native,
+#nova-desktop-execution-native {
+    order: 9999 !important;
+    margin-top: auto !important;
+    margin-bottom: 0 !important;
+    flex: 0 0 auto !important;
+    align-self: stretch !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
     box-sizing: border-box !important;
 }
 </style>
