@@ -18948,51 +18948,20 @@ except Exception as _nova_decision_log_api_route_error_20260701:
     print("[NOVA_PROJECT_BRAIN_DECISION_LOG_API_ROUTE_CONTRACT_20260701] failed:", _nova_decision_log_api_route_error_20260701)
 
 # NOVA_PROJECT_BRAIN_STATE_RECALL_REFRESH_API_20260702
-# Thin compatibility hook: direct project-state recall must prefer the State Bridge memory record.
+# Service-owned finalizer install: direct project-state recall must prefer State Bridge memory.
 try:
-    import json as _nova_project_brain_state_recall_refresh_json_20260702
-    from nova_backend.services.project_brain_state_recall_refresh import refresh_project_state_payload as _nova_project_brain_refresh_project_state_payload_20260702
+    from nova_backend.services.project_brain_api_finalizer import (
+        install_project_brain_state_recall_refresh_finalizer as _nova_install_project_brain_state_recall_refresh_finalizer_20260702,
+    )
 
-    @app.after_request
-    def _nova_project_brain_state_recall_refresh_api_20260702(response):
-        try:
-            content_type = str(response.headers.get("Content-Type") or "")
-            if "application/json" not in content_type.lower():
-                return response
+    _nova_project_brain_state_recall_refresh_finalizer_result_20260702 = (
+        _nova_install_project_brain_state_recall_refresh_finalizer_20260702(app)
+    )
 
-            raw = response.get_data(as_text=True)
-            if not raw:
-                return response
-
-            data = _nova_project_brain_state_recall_refresh_json_20260702.loads(raw)
-            refreshed = _nova_project_brain_refresh_project_state_payload_20260702(data)
-
-            if refreshed is data or refreshed == data:
-                return response
-
-            response.set_data(_nova_project_brain_state_recall_refresh_json_20260702.dumps(refreshed, ensure_ascii=False))
-            response.headers["Content-Type"] = "application/json"
-            response.headers["Content-Length"] = str(len(response.get_data()))
-            return response
-        except Exception as exc:
-            try:
-                print("[NOVA_PROJECT_BRAIN_STATE_RECALL_REFRESH_API_20260702] failed:", exc)
-            except Exception:
-                pass
-            return response
-
-    try:
-        funcs = app.after_request_funcs.setdefault(None, [])
-        funcs[:] = [
-            func for func in funcs
-            if getattr(func, "__name__", "") != "_nova_project_brain_state_recall_refresh_api_20260702"
-        ]
-        funcs.insert(0, _nova_project_brain_state_recall_refresh_api_20260702)
-        print("[NOVA_PROJECT_BRAIN_STATE_RECALL_REFRESH_API_20260702] forced final after_request order before app.run")
-    except Exception as _nova_project_brain_state_recall_refresh_order_error_20260702:
-        print("[NOVA_PROJECT_BRAIN_STATE_RECALL_REFRESH_API_20260702] order failed:", _nova_project_brain_state_recall_refresh_order_error_20260702)
-
-    print("[NOVA_PROJECT_BRAIN_STATE_RECALL_REFRESH_API_20260702] installed before app.run")
+    print(
+        "[NOVA_PROJECT_BRAIN_STATE_RECALL_REFRESH_API_20260702] service finalizer installed",
+        _nova_project_brain_state_recall_refresh_finalizer_result_20260702,
+    )
 except Exception as _nova_project_brain_state_recall_refresh_api_error_20260702:
     print("[NOVA_PROJECT_BRAIN_STATE_RECALL_REFRESH_API_20260702] install failed:", _nova_project_brain_state_recall_refresh_api_error_20260702)
 
