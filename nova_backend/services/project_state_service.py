@@ -393,7 +393,7 @@ def _format_next(state: Dict[str, Any]) -> str:
 def answer_project_state_question(
     user_text: Any,
     runtime_execution_state: Optional[Any] = None,
-    ) -> Optional[str]:
+) -> Optional[str]:
     kind = _question_kind(user_text)
 
     if not kind:
@@ -419,9 +419,9 @@ def answer_project_state_question(
     return None
 
 
-    # NOVA_PROJECT_STATE_ACTIVE_EXECUTION_GUARD_FINAL_20260630
-    # Tightens "next/k" protection so stale runtime execution state does not block project-state recall.
-    # A mission only counts as active when it has both a live status and a real goal/step marker.
+# NOVA_PROJECT_STATE_ACTIVE_EXECUTION_GUARD_FINAL_20260630
+# Tightens "next/k" protection so stale runtime execution state does not block project-state recall.
+# A mission only counts as active when it has both a live status and a real goal/step marker.
 def _nova_project_state_has_execution_marker_final_20260630(state: Any) -> bool:
     if not state:
         return False
@@ -754,19 +754,6 @@ try:
 
 
     def answer_project_state_question(user_text=None, session_id="", *args, **kwargs):
-    # NOVA_JUST_FIXED_PROJECT_STATE_LOCK_20260702
-    # Keep the smoke-tested direct "what did we just fix" recall deterministic.
-    _nova_project_state_q_20260702 = str(user_text or "").strip().lower().rstrip(" ?!.")
-    if _nova_project_state_q_20260702 in {
-        "just fixed",
-        "what did we just fix",
-        "what did we fix",
-        "what was just fixed",
-        "what was fixed",
-        "last fix",
-        "recent fix",
-    }:
-        return 'We just fixed and locked the Project Brain regression path: project-state direct recall stays deterministic, broad Nova project paraphrases route through Project Brain general intelligence, and the regression smoke now protects those route contracts.'
         sid = _nova_ps_fresh_session_id_20260701(session_id, *args, **kwargs)
         text_value = str(user_text or "").strip()
 
