@@ -24,8 +24,10 @@ def _identity_payload(payload: dict) -> dict:
 def _build_state_recall_refresh_hook(
     refresh_project_state_payload: Callable[[dict], dict],
     finalize_session_response_payload: Callable[[dict], dict] | None = None,
+    finalize_attachment_response_payload: Callable[[dict], dict] | None = None,
 ):
     session_finalizer = finalize_session_response_payload or _identity_payload
+    attachment_finalizer = finalize_attachment_response_payload or _identity_payload
 
     def _nova_project_brain_state_recall_refresh_api_20260702(response):
         try:
@@ -38,7 +40,8 @@ def _build_state_recall_refresh_hook(
 
             data = json.loads(raw)
             refreshed = refresh_project_state_payload(data)
-            finalized = session_finalizer(refreshed)
+            session_finalized = session_finalizer(refreshed)
+            finalized = attachment_finalizer(session_finalized)
 
             if finalized is data or finalized == data:
                 return response
@@ -62,6 +65,7 @@ def install_project_brain_state_recall_refresh_finalizer(
     app: Any,
     refresh_project_state_payload: Callable[[dict], dict] | None = None,
     finalize_session_response_payload: Callable[[dict], dict] | None = None,
+    finalize_attachment_response_payload: Callable[[dict], dict] | None = None,
 ) -> dict:
     if refresh_project_state_payload is None:
         from nova_backend.services.project_brain_state_recall_refresh import (
@@ -73,9 +77,15 @@ def install_project_brain_state_recall_refresh_finalizer(
             finalize_session_response_payload as finalize_session_response_payload,
         )
 
+    if finalize_attachment_response_payload is None:
+        from nova_backend.services.attachment_response_finalizer import (
+            finalize_attachment_response_payload as finalize_attachment_response_payload,
+        )
+
     hook = _build_state_recall_refresh_hook(
         refresh_project_state_payload,
         finalize_session_response_payload=finalize_session_response_payload,
+        finalize_attachment_response_payload=finalize_attachment_response_payload,
     )
 
     funcs = app.after_request_funcs.setdefault(None, [])
@@ -98,4 +108,5 @@ def install_project_brain_state_recall_refresh_finalizer(
         "position": 0,
         "runs_last": True,
         "session_response_finalizer": True,
+        "attachment_response_finalizer": True,
     }

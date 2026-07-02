@@ -85,6 +85,33 @@ def finalize_session_payload(payload):
     return updated
 
 
+def finalize_attachment_payload(payload):
+    if not isinstance(payload, dict):
+        return payload
+
+    assistant_message = payload.get("assistant_message")
+    attachments = payload.get("attachments")
+
+    if not attachments and isinstance(assistant_message, dict):
+        attachments = assistant_message.get("attachments")
+
+    if not isinstance(attachments, list):
+        return payload
+
+    updated = dict(payload)
+    updated["attachments"] = attachments
+    updated["session_attachments"] = updated.get("session_attachments") or attachments
+
+    debug = updated.get("debug")
+    if not isinstance(debug, dict):
+        debug = {}
+
+    debug["attachment_response_finalizer"] = True
+    debug["attachment_count"] = len(attachments)
+    updated["debug"] = debug
+    return updated
+
+
 def main():
     print("NOVA PROJECT BRAIN API FINALIZER SMOKE")
     print("======================================")
@@ -101,6 +128,7 @@ def main():
         app,
         refresh_project_state_payload=refresh_payload,
         finalize_session_response_payload=finalize_session_payload,
+        finalize_attachment_response_payload=finalize_attachment_payload,
     )
 
     assert_true("installer result", result["installed"] is True, result)
@@ -111,6 +139,7 @@ def main():
         app,
         refresh_project_state_payload=refresh_payload,
         finalize_session_response_payload=finalize_session_payload,
+        finalize_attachment_response_payload=finalize_attachment_payload,
     )
 
     names = [func.__name__ for func in app.after_request_funcs[None]]
@@ -154,6 +183,29 @@ def main():
     assert_true("active session finalized", session_payload["active_session_id"] == "session_abc", session_payload)
     assert_true("session route preserved", session_payload["route"] == "chat", session_payload)
     assert_true("session finalizer marker", session_payload["debug"]["session_response_finalizer"] is True, session_payload)
+
+    attachment_response = FakeResponse(json.dumps({
+        "route": "chat",
+        "text": "uploaded",
+        "assistant_message": {
+            "text": "I see the file.",
+            "attachments": [
+                {
+                    "filename": "test.png",
+                    "url": "/api/uploads/test.png",
+                    "mime_type": "image/png",
+                }
+            ],
+        },
+    }))
+
+    attachment_after = hook(attachment_response)
+    attachment_payload = json.loads(attachment_after.get_data(as_text=True))
+
+    assert_true("attachment id finalized", attachment_payload["attachments"][0]["filename"] == "test.png", attachment_payload)
+    assert_true("session attachments finalized", attachment_payload["session_attachments"][0]["filename"] == "test.png", attachment_payload)
+    assert_true("attachment route preserved", attachment_payload["route"] == "chat", attachment_payload)
+    assert_true("attachment finalizer marker", attachment_payload["debug"]["attachment_response_finalizer"] is True, attachment_payload)
 
     general_response = FakeResponse(json.dumps({
         "route": "project_brain_general_intelligence",
