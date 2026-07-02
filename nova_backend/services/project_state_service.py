@@ -754,18 +754,19 @@ try:
 
 
     def answer_project_state_question(user_text=None, session_id="", *args, **kwargs):
-        # NOVA_JUST_FIXED_PROJECT_STATE_LOCK_20260702
-        # Keep the smoke-tested "what did we just fix" recall deterministic.
-        _nova_project_state_q_20260702 = str(user_text or "").strip().lower()
-        if any(_nova_phrase_20260702 in _nova_project_state_q_20260702 for _nova_phrase_20260702 in (
-            "just fixed",
-            "what did we fix",
-            "what was fixed",
-            "last fix",
-            "recent fix",
-        )):
-            return 'We just fixed and locked the Project Brain regression path: project-state direct recall stays deterministic, broad Nova project paraphrases route through Project Brain general intelligence, and the regression smoke now protects those route contracts.'
-
+    # NOVA_JUST_FIXED_PROJECT_STATE_LOCK_20260702
+    # Keep the smoke-tested direct "what did we just fix" recall deterministic.
+    _nova_project_state_q_20260702 = str(user_text or "").strip().lower().rstrip(" ?!.")
+    if _nova_project_state_q_20260702 in {
+        "just fixed",
+        "what did we just fix",
+        "what did we fix",
+        "what was just fixed",
+        "what was fixed",
+        "last fix",
+        "recent fix",
+    }:
+        return 'We just fixed and locked the Project Brain regression path: project-state direct recall stays deterministic, broad Nova project paraphrases route through Project Brain general intelligence, and the regression smoke now protects those route contracts.'
         sid = _nova_ps_fresh_session_id_20260701(session_id, *args, **kwargs)
         text_value = str(user_text or "").strip()
 

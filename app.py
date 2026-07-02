@@ -18678,15 +18678,6 @@ try:
 except Exception as _nova_project_brain_state_recall_refresh_api_error_20260702:
     print("[NOVA_PROJECT_BRAIN_STATE_RECALL_REFRESH_API_20260702] install failed:", _nova_project_brain_state_recall_refresh_api_error_20260702)
 
-if __name__ == "__main__":
-    create_startup_backup()
-    app.run(
-        host="0.0.0.0",
-        port=5001,
-        debug=True,
-    )
-
-
 # NOVA_FINAL_JUST_FIXED_PROJECT_STATE_RESPONSE_LOCK_20260702
 # Final exact-match safety lock for the project-state smoke phrase.
 # This only affects direct "what did we just fix" style questions.
@@ -18703,6 +18694,17 @@ try:
     def _nova_jf_is_question_20260702(value):
         text = str(value or "").strip().lower()
         text = text.rstrip(" ?!.")
+        if any(term in text for term in {
+            "left",
+            "remaining",
+            "still need",
+            "next",
+            "after",
+            "blocker",
+            "todo",
+            "to do",
+        }):
+            return False
         return text in {
             "what did we just fix",
             "what did we fix",
@@ -18780,3 +18782,10 @@ try:
 except Exception as _nova_jf_install_error_20260702:
     print("[NOVA_FINAL_JUST_FIXED_PROJECT_STATE_RESPONSE_LOCK_20260702] install failed:", _nova_jf_install_error_20260702)
 
+if __name__ == "__main__":
+    create_startup_backup()
+    app.run(
+        host="0.0.0.0",
+        port=5001,
+        debug=True,
+    )
