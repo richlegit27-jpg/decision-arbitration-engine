@@ -393,7 +393,7 @@ def _format_next(state: Dict[str, Any]) -> str:
 def answer_project_state_question(
     user_text: Any,
     runtime_execution_state: Optional[Any] = None,
-) -> Optional[str]:
+    ) -> Optional[str]:
     kind = _question_kind(user_text)
 
     if not kind:
@@ -419,9 +419,9 @@ def answer_project_state_question(
     return None
 
 
-# NOVA_PROJECT_STATE_ACTIVE_EXECUTION_GUARD_FINAL_20260630
-# Tightens "next/k" protection so stale runtime execution state does not block project-state recall.
-# A mission only counts as active when it has both a live status and a real goal/step marker.
+    # NOVA_PROJECT_STATE_ACTIVE_EXECUTION_GUARD_FINAL_20260630
+    # Tightens "next/k" protection so stale runtime execution state does not block project-state recall.
+    # A mission only counts as active when it has both a live status and a real goal/step marker.
 def _nova_project_state_has_execution_marker_final_20260630(state: Any) -> bool:
     if not state:
         return False
