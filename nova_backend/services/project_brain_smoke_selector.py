@@ -195,3 +195,28 @@ def build_smoke_selection_dict(
         "stop_rule": selection.stop_rule,
     }
 
+
+# NOVA_PROJECT_BRAIN_SELECT_FOCUSED_SMOKES_COMPAT_20260702
+# Compatibility helper for project_brain_operator_planner.select_smokes().
+# Returns only the focused smoke command list, while select_smokes() keeps the richer object.
+def select_focused_smokes(
+    work_type: str = "",
+    changed_files=None,
+    failure_type: str = "",
+    failing_layer: str = "",
+    user_intent: str = "",
+    route_risk: str = "low",
+    **kwargs,
+):
+    intent = str(user_intent or work_type or "").strip()
+
+    selection = select_smokes(
+        changed_files=changed_files,
+        failure_type=failure_type,
+        failing_layer=failing_layer,
+        user_intent=intent,
+        route_risk=route_risk,
+    )
+
+    return list(selection.focused_smokes)
+
