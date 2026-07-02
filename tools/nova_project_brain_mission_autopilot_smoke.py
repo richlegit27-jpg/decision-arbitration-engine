@@ -28,11 +28,11 @@ def main():
     plan_dict = build_mission_autopilot_dict()
     answer = build_mission_autopilot_answer()
 
-    assert_true("plan title", plan.title == "Project Brain Mission Autopilot v1", plan.title)
+    assert_true("plan title", plan.title == "Project Brain Runtime Coach v1", plan.title)
     assert_true("safe mode", plan.mode == "safe_mode", plan.mode)
     assert_true("allowed", plan.allowed is True, plan.allowed)
-    assert_true("selected autopilot", plan.selected_move == "Project Brain Mission Autopilot v1", plan.selected_move)
-    assert_true("target file", "nova_backend/services/project_brain_mission_autopilot.py" in plan.target_files, plan.target_files)
+    assert_true("selected autopilot", plan.selected_move == "Project Brain Runtime Coach v1", plan.selected_move)
+    assert_true("target file", "nova_backend/services/project_brain_runtime_coach.py" in plan.target_files, plan.target_files)
     assert_true("autopilot smoke command", any("mission_autopilot_smoke" in item for item in plan.commands), plan.commands)
     assert_true("git status command", plan.commands[-1] == "git status --short", plan.commands)
     assert_true("stop on failure", "Stop on the first failing command" in plan.stop_rule, plan.stop_rule)
@@ -60,16 +60,16 @@ def main():
     assert_true("explicit route regression", any("nova_regression_smoke" in item for item in explicit_route.commands), explicit_route.commands)
 
     best = select_best_upgrade()
-    assert_true("radar best autopilot", best.name == "Project Brain Mission Autopilot v1", best.name)
+    assert_true("radar best autopilot", best.name == "Project Brain Runtime Coach v1", best.name)
 
     moves = rank_moves("next_move")
-    assert_true("operator planner first autopilot", move_value(moves[0], "name") == "Project Brain Mission Autopilot v1", move_value(moves[0], "name"))
+    assert_true("operator planner first autopilot", move_value(moves[0], "name") == "Project Brain Runtime Coach v1", move_value(moves[0], "name"))
 
     recommended_move, why, risk, target_files = choose_recommended_move("next_move")
-    assert_true("recommended autopilot", recommended_move == "Project Brain Mission Autopilot v1", recommended_move)
+    assert_true("recommended autopilot", recommended_move == "Project Brain Runtime Coach v1", recommended_move)
     assert_true("recommended why stop failure", "stop-on-failure" in why or "bounded service-level move" in why, why)
     assert_true("recommended risk medium", risk == "medium", risk)
-    assert_true("recommended target file", "nova_backend/services/project_brain_mission_autopilot.py" in target_files, target_files)
+    assert_true("recommended target file", "nova_backend/services/project_brain_runtime_coach.py" in target_files, target_files)
 
     print("")
     print("NOVA PROJECT BRAIN MISSION AUTOPILOT SMOKE PASSED")
