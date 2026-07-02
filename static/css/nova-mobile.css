@@ -1,4 +1,4 @@
-﻿/* =========================================================
+/* =========================================================
    Nova Mobile CSS - Premium Final Polish
    Path: C:\Users\Owner\nova\static\css\nova-mobile.css
    Purpose: Mobile-only premium Nova chat UI.
@@ -15443,3 +15443,13 @@ body.nova-mobile-lightbox-open {
     transform: scale(0.97);
     opacity: 1;
 }
+
+
+/* NOVA_MOBILE_PHANTOM_ACTION_BUBBLE_HIDE_20260702
+   Hide empty assistant image/action shells that only show Copy/Regen.
+   This does not hide real assistant text or real image messages.
+*/
+#mobileChatMessages .mobile-chat-message.assistant.mobile-chat-image-message:not(:has(img, picture, video, canvas, svg, .nova-mobile-image, .mobile-image-preview, .attachment-preview, [data-attachment], a[href*="/api/uploads/"])) {
+    display: none !important;
+}
+
