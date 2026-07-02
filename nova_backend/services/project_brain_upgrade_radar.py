@@ -578,3 +578,96 @@ def build_upgrade_radar_summary() -> str:
         lines.append(f"{index}. {candidate.name} — {candidate.why}")
     return "\n".join(lines)
 
+
+# NOVA_PROJECT_BRAIN_MISSION_AUTOPILOT_NEXT_V1_20260702
+# After Action Card is locked, rank Mission Autopilot safe mode as the next gangster upgrade.
+def get_upgrade_candidates() -> list[UpgradeCandidate]:
+    return [
+        UpgradeCandidate(
+            name="Project Brain Mission Autopilot v1",
+            why=(
+                "Use the Action Card to choose one bounded service-level move, output exact commands, "
+                "enforce stop-on-failure, and refuse risky app.py route work unless route risk is explicit."
+            ),
+            risk="medium",
+            score=160,
+            target_files=(
+                "nova_backend/services/project_brain_mission_autopilot.py",
+                "nova_backend/services/project_brain_upgrade_radar.py",
+                "tools/nova_project_brain_mission_autopilot_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_mission_autopilot_smoke.py",
+            ),
+        ),
+        UpgradeCandidate(
+            name="Project Brain Runtime Coach v1",
+            why="Turn Mission Autopilot output into short operator coaching after each smoke result.",
+            risk="medium",
+            score=150,
+            target_files=(
+                "nova_backend/services/project_brain_runtime_coach.py",
+                "tools/nova_project_brain_runtime_coach_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_runtime_coach_smoke.py",
+            ),
+            loses_to_best_because="Runtime Coach should land after Mission Autopilot produces the safe mission contract.",
+        ),
+        UpgradeCandidate(
+            name="Project Brain Action Card v1",
+            why="Action Card is locked; keep it as the unified operator card.",
+            risk="low",
+            score=90,
+            target_files=(
+                "nova_backend/services/project_brain_action_card.py",
+                "tools/nova_project_brain_action_card_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_action_card_smoke.py",
+            ),
+            loses_to_best_because="Already locked; next gangster upgrade is Mission Autopilot v1 safe mode.",
+        ),
+        UpgradeCandidate(
+            name="Operator Command Launcher v1",
+            why="Operator Command Launcher is locked; keep it as the command-block generator.",
+            risk="low",
+            score=80,
+            target_files=(
+                "nova_backend/services/project_brain_operator_command_launcher.py",
+                "tools/nova_project_brain_operator_command_launcher_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_operator_command_launcher_smoke.py",
+            ),
+            loses_to_best_because="Already locked.",
+        ),
+        UpgradeCandidate(
+            name="Patch Planner v1",
+            why="Patch Planner is locked; keep it as the bounded patch-plan layer.",
+            risk="low",
+            score=70,
+            target_files=(
+                "nova_backend/services/project_brain_patch_planner.py",
+                "tools/nova_project_brain_patch_planner_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_patch_planner_smoke.py",
+            ),
+            loses_to_best_because="Already locked.",
+        ),
+    ]
+
+
+def select_best_upgrade() -> UpgradeCandidate:
+    candidates = get_upgrade_candidates()
+    return sorted(candidates, key=lambda item: item.score, reverse=True)[0]
+
+
+def build_upgrade_radar_summary() -> str:
+    candidates = get_upgrade_candidates()
+    lines = ["Project Brain Upgrade Radar:"]
+    for index, candidate in enumerate(sorted(candidates, key=lambda item: item.score, reverse=True), start=1):
+        lines.append(f"{index}. {candidate.name} — {candidate.why}")
+    return "\n".join(lines)
+
