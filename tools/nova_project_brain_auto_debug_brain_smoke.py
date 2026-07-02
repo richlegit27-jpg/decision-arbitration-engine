@@ -72,16 +72,16 @@ AssertionError: command center route FAILED chat
     assert_true("route api smoke", "command_center_api_smoke" in route_report.focused_smoke, route_report.focused_smoke)
 
     best = select_best_upgrade()
-    assert_true("radar best auto debug", best.name == "Self-Test Selector v1", best.name)
+    assert_true("radar best auto debug", best.name == "Patch Planner v1", best.name)
 
     moves = rank_moves("next_move")
-    assert_true("operator planner first auto debug", move_value(moves[0], "name") == "Self-Test Selector v1", move_value(moves[0], "name"))
+    assert_true("operator planner first auto debug", move_value(moves[0], "name") == "Patch Planner v1", move_value(moves[0], "name"))
 
     recommended_move, why, risk, target_files = choose_recommended_move("next_move")
-    assert_true("recommended auto debug", recommended_move == "Self-Test Selector v1", recommended_move)
-    assert_true("recommended why classify tracebacks", "Choose the smallest correct smoke set" in why, why)
+    assert_true("recommended auto debug", recommended_move == "Patch Planner v1", recommended_move)
+    assert_true("recommended why classify tracebacks", "Turn failures into bounded file-level patch plans" in why, why)
     assert_true("recommended risk valid", risk in {"low", "medium", "high"}, risk)
-    assert_true("recommended target file", "nova_backend/services/project_brain_smoke_selector.py" in target_files, target_files)
+    assert_true("recommended target file", "nova_backend/services/project_brain_patch_planner.py" in target_files, target_files)
 
     print("")
     print("NOVA PROJECT BRAIN AUTO-DEBUG BRAIN SMOKE PASSED")

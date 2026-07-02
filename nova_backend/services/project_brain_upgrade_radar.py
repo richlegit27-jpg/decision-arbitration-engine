@@ -271,3 +271,96 @@ def build_upgrade_radar_summary() -> str:
         lines.append(f"{index}. {candidate.name} — {candidate.why}")
     return "\n".join(lines)
 
+
+# NOVA_PROJECT_BRAIN_PATCH_PLANNER_NEXT_V1_20260702
+# After Self-Test Selector is locked, rank Patch Planner as the next gangster upgrade.
+def get_upgrade_candidates() -> list[UpgradeCandidate]:
+    return [
+        UpgradeCandidate(
+            name="Patch Planner v1",
+            why=(
+                "Turn failures into bounded file-level patch plans with target file, likely cause, "
+                "guardrails, focused smokes, and stop rule without adding new app.py route guards."
+            ),
+            risk="medium",
+            score=130,
+            target_files=(
+                "nova_backend/services/project_brain_patch_planner.py",
+                "nova_backend/services/project_brain_upgrade_radar.py",
+                "tools/nova_project_brain_patch_planner_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_patch_planner_smoke.py",
+            ),
+        ),
+        UpgradeCandidate(
+            name="Operator Command Launcher v1",
+            why="Convert Command Center recommendations into exact operator command blocks.",
+            risk="medium",
+            score=120,
+            target_files=(
+                "nova_backend/services/project_brain_operator_command_launcher.py",
+                "tools/nova_project_brain_operator_command_launcher_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_operator_command_launcher_smoke.py",
+            ),
+            loses_to_best_because="Patch Planner should land first so launched commands are based on bounded patch plans.",
+        ),
+        UpgradeCandidate(
+            name="Self-Test Selector v1",
+            why="Self-Test Selector is locked; keep it as the smoke decision layer.",
+            risk="low",
+            score=90,
+            target_files=(
+                "nova_backend/services/project_brain_smoke_selector.py",
+                "tools/nova_project_brain_smoke_selector_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_smoke_selector_smoke.py",
+            ),
+            loses_to_best_because="Already locked; next gangster upgrade is Patch Planner v1.",
+        ),
+        UpgradeCandidate(
+            name="Auto-Debug Brain v1",
+            why="Auto-Debug Brain is locked; keep it as the traceback classifier.",
+            risk="low",
+            score=80,
+            target_files=(
+                "nova_backend/services/project_brain_auto_debug_brain.py",
+                "tools/nova_project_brain_auto_debug_brain_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_auto_debug_brain_smoke.py",
+            ),
+            loses_to_best_because="Already locked.",
+        ),
+        UpgradeCandidate(
+            name="Project Brain Upgrade Radar v1",
+            why="Upgrade Radar is locked; keep it as the ranking layer.",
+            risk="low",
+            score=70,
+            target_files=(
+                "nova_backend/services/project_brain_upgrade_radar.py",
+                "tools/nova_project_brain_upgrade_radar_smoke.py",
+            ),
+            focused_smokes=(
+                r"python .\tools\nova_project_brain_upgrade_radar_smoke.py",
+            ),
+            loses_to_best_because="Already locked.",
+        ),
+    ]
+
+
+def select_best_upgrade() -> UpgradeCandidate:
+    candidates = get_upgrade_candidates()
+    return sorted(candidates, key=lambda item: item.score, reverse=True)[0]
+
+
+def build_upgrade_radar_summary() -> str:
+    candidates = get_upgrade_candidates()
+    lines = ["Project Brain Upgrade Radar:"]
+    for index, candidate in enumerate(sorted(candidates, key=lambda item: item.score, reverse=True), start=1):
+        lines.append(f"{index}. {candidate.name} — {candidate.why}")
+    return "\n".join(lines)
+
