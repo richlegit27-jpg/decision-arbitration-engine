@@ -43,6 +43,7 @@ def main():
     assert_true("decision rationale has ranked moves", "Ranked moves:" in decision.rationale, decision.rationale)
     assert_true("decision rationale has rejected moves", "Rejected moves:" in decision.rationale, decision.rationale)
     assert_true("decision rationale has exact next command", "Exact next command:" in decision.rationale, decision.rationale)
+    assert_true("decision rationale has smoke selector reason", "Smoke Selector reason:" in decision.rationale, decision.rationale)
 
     rendered = format_project_brain_decision(decision)
 
@@ -65,3 +66,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

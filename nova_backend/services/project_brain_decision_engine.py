@@ -445,6 +445,24 @@ def _unique_text(values):
     return result
 
 
+def _build_decision_smoke_selection(
+    decision: ProjectBrainDecision,
+    user_text: str = "",
+) -> dict:
+    try:
+        from nova_backend.services.project_brain_smoke_selector import (
+            build_smoke_selection_dict,
+        )
+
+        return build_smoke_selection_dict(
+            user_text=user_text,
+            changed_files=list(decision.target_files),
+            work_type=decision.intent,
+        )
+    except Exception:
+        return {}
+
+
 def _apply_operator_plan_to_decision(
     decision: ProjectBrainDecision,
     user_text: str = "",
@@ -462,10 +480,16 @@ def _apply_operator_plan_to_decision(
     except Exception:
         return decision
 
+    smoke_selection = _build_decision_smoke_selection(
+        decision=decision,
+        user_text=user_text,
+    )
+
     recommended_move = str(operator_plan.get("recommended_move") or "").strip()
     operator_why = str(operator_plan.get("why") or "").strip()
     exact_next_command = str(operator_plan.get("exact_next_command") or "").strip()
     loop_guard = str(operator_plan.get("loop_guard") or "").strip()
+    smoke_reason = str(smoke_selection.get("reason") or "").strip()
 
     ranked_moves = operator_plan.get("ranked_moves", []) or []
     rejected_moves = operator_plan.get("rejected_moves", []) or []
@@ -491,6 +515,7 @@ def _apply_operator_plan_to_decision(
 
     validation = _unique_text(
         list(decision.validation)
+        + list(smoke_selection.get("focused_smokes", []) or [])
         + list(operator_plan.get("focused_smokes", []) or [])
         + ([exact_next_command] if exact_next_command else [])
     )
@@ -519,6 +544,7 @@ def _apply_operator_plan_to_decision(
         decision.rationale,
         f"Operator Planner v2 selected {recommended_move}." if recommended_move else "",
         f"Exact next command: {exact_next_command}" if exact_next_command else "",
+        f"Smoke Selector reason: {smoke_reason}" if smoke_reason else "",
         f"Ranked moves: {ranked_summary}" if ranked_summary else "",
         f"Rejected moves: {rejected_summary}" if rejected_summary else "",
         f"Loop guard: {loop_guard}" if loop_guard else "",
