@@ -42,3 +42,22 @@ Category:
 - tone correction worked
 - no over-project-routing
 
+
+### Positive Case 2
+Prompt:
+what were we talking about again?
+
+Nova answer:
+You were asking whether your project is actually getting good now.
+
+My read was: the biggest change is that it started feeling more intentional and coherent, and the thing to avoid next is messing with it too much just because you're getting restless. Basically: don't panic-rewrite the parts that are finally starting to click.
+
+What worked:
+Nova remembered the active thread, summarized the prior advice accurately, and kept the tone natural.
+
+Category:
+- good thread recall
+- good continuation
+- natural summary
+- no over-project-routing
+
