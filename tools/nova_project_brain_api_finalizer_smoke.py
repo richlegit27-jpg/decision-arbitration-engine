@@ -46,6 +46,45 @@ def refresh_payload(payload):
     return updated
 
 
+def finalize_session_payload(payload):
+    if not isinstance(payload, dict):
+        return payload
+
+    session_id = str(
+        payload.get("session_id")
+        or payload.get("active_session_id")
+        or payload.get("requested_session_id")
+        or ""
+    ).strip()
+
+    if not session_id:
+        debug = payload.get("debug")
+        if isinstance(debug, dict):
+            session_id = str(
+                debug.get("requested_session_id")
+                or debug.get("session_id")
+                or debug.get("active_session_id")
+                or ""
+            ).strip()
+
+    if not session_id:
+        return payload
+
+    updated = dict(payload)
+    updated["session_id"] = updated.get("session_id") or session_id
+    updated["active_session_id"] = updated.get("active_session_id") or session_id
+
+    debug = updated.get("debug")
+    if not isinstance(debug, dict):
+        debug = {}
+
+    debug["session_response_finalizer"] = True
+    debug["requested_session_id"] = debug.get("requested_session_id") or session_id
+    debug["active_session_id"] = debug.get("active_session_id") or session_id
+    updated["debug"] = debug
+    return updated
+
+
 def main():
     print("NOVA PROJECT BRAIN API FINALIZER SMOKE")
     print("======================================")
@@ -61,6 +100,7 @@ def main():
     result = install_project_brain_state_recall_refresh_finalizer(
         app,
         refresh_project_state_payload=refresh_payload,
+        finalize_session_response_payload=finalize_session_payload,
     )
 
     assert_true("installer result", result["installed"] is True, result)
@@ -70,6 +110,7 @@ def main():
     second = install_project_brain_state_recall_refresh_finalizer(
         app,
         refresh_project_state_payload=refresh_payload,
+        finalize_session_response_payload=finalize_session_payload,
     )
 
     names = [func.__name__ for func in app.after_request_funcs[None]]
@@ -97,6 +138,40 @@ def main():
     normal_raw_before = normal_response.get_data(as_text=True)
     normal_after = hook(normal_response)
     assert_true("normal response untouched", normal_after.get_data(as_text=True) == normal_raw_before, normal_after.get_data(as_text=True))
+
+    session_response = FakeResponse(json.dumps({
+        "route": "chat",
+        "text": "normal chat with session",
+        "debug": {
+            "requested_session_id": "session_abc",
+        },
+    }))
+
+    session_after = hook(session_response)
+    session_payload = json.loads(session_after.get_data(as_text=True))
+
+    assert_true("session id finalized", session_payload["session_id"] == "session_abc", session_payload)
+    assert_true("active session finalized", session_payload["active_session_id"] == "session_abc", session_payload)
+    assert_true("session route preserved", session_payload["route"] == "chat", session_payload)
+    assert_true("session finalizer marker", session_payload["debug"]["session_response_finalizer"] is True, session_payload)
+
+    general_response = FakeResponse(json.dumps({
+        "route": "project_brain_general_intelligence",
+        "intent": "general_project_answer",
+        "compact_project_context_delegated": True,
+        "text": "Remaining risk: Start Project Brain cleanup/consolidation",
+        "debug": {
+            "requested_session_id": "general_123",
+        },
+    }))
+
+    general_after = hook(general_response)
+    general_payload = json.loads(general_after.get_data(as_text=True))
+
+    assert_true("general route preserved", general_payload["route"] == "project_brain_general_intelligence", general_payload)
+    assert_true("general text not state refreshed", "Project Brain State Recall Refresh v1" not in general_payload["text"], general_payload)
+    assert_true("general session finalized", general_payload["session_id"] == "general_123", general_payload)
+
 
     html_response = FakeResponse("<html></html>", content_type="text/html")
     html_after = hook(html_response)
