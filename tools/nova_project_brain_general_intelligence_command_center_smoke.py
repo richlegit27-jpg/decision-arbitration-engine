@@ -1,4 +1,4 @@
-﻿from nova_backend.services.project_brain_general_intelligence import (
+from nova_backend.services.project_brain_general_intelligence import (
     build_project_brain_general_answer,
     should_handle_project_brain_general_question,
 )

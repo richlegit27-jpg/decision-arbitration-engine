@@ -1168,3 +1168,117 @@ _NOVA_PRE_RANK_MOVES_CHANGED_FILES_SAFE_20260702 = rank_moves
 def rank_moves(work_type: str, changed_files=None, **kwargs):
     return _NOVA_PRE_RANK_MOVES_CHANGED_FILES_SAFE_20260702(work_type)
 
+
+# NOVA_PROJECT_BRAIN_UPGRADE_RADAR_V1_20260702
+# Service-only upgrade ranking. No app.py route guard.
+_NOVA_PRE_UPGRADE_RADAR_RANK_MOVES_20260702 = rank_moves
+
+def _nova_upgrade_radar_value_20260702(move, key, default=None):
+    if isinstance(move, dict):
+        return move.get(key, default)
+    return getattr(move, key, default)
+
+
+def _nova_upgrade_radar_list_20260702(value):
+    if value is None:
+        return []
+
+    if isinstance(value, str):
+        return [value] if value.strip() else []
+
+    try:
+        return [str(item) for item in value if str(item or "").strip()]
+    except Exception:
+        return []
+
+
+def _nova_upgrade_radar_name_20260702(move):
+    return str(_nova_upgrade_radar_value_20260702(move, "name", "") or "").strip()
+
+
+def _nova_upgrade_radar_risk_20260702(move, default="low"):
+    return str(_nova_upgrade_radar_value_20260702(move, "risk", default) or default).strip() or default
+
+
+def _nova_upgrade_radar_move_20260702(rank=1):
+    from nova_backend.services.project_brain_upgrade_radar import select_best_upgrade
+
+    best = select_best_upgrade()
+
+    return _move(
+        rank=rank,
+        name=best.name,
+        why=best.why,
+        risk=best.risk,
+        target_files=list(best.target_files),
+        focused_smokes=list(best.focused_smokes),
+        loses_to_best_because=best.loses_to_best_because,
+    )
+
+
+def _nova_upgrade_radar_normalize_move_20260702(move, rank):
+    return _move(
+        rank=rank,
+        name=_nova_upgrade_radar_name_20260702(move),
+        why=str(_nova_upgrade_radar_value_20260702(move, "why", "") or "").strip(),
+        risk=_nova_upgrade_radar_risk_20260702(move),
+        target_files=_nova_upgrade_radar_list_20260702(
+            _nova_upgrade_radar_value_20260702(move, "target_files", [])
+        ),
+        focused_smokes=_nova_upgrade_radar_list_20260702(
+            _nova_upgrade_radar_value_20260702(move, "focused_smokes", [])
+        ),
+        loses_to_best_because=str(
+            _nova_upgrade_radar_value_20260702(move, "loses_to_best_because", "") or ""
+        ).strip(),
+    )
+
+
+def rank_moves(work_type: str, changed_files=None, **kwargs):
+    try:
+        base_moves = _NOVA_PRE_UPGRADE_RADAR_RANK_MOVES_20260702(
+            work_type,
+            changed_files=changed_files,
+            **kwargs,
+        )
+    except TypeError:
+        base_moves = _NOVA_PRE_UPGRADE_RADAR_RANK_MOVES_20260702(work_type)
+    except Exception:
+        base_moves = []
+
+    radar = _nova_upgrade_radar_move_20260702(rank=1)
+
+    combined = [radar]
+    seen = {_nova_upgrade_radar_name_20260702(radar)}
+
+    for move in base_moves or []:
+        name = _nova_upgrade_radar_name_20260702(move)
+
+        if not name or name in seen:
+            continue
+
+        if name == "Cleanup Strategy Engine v1":
+            continue
+
+        seen.add(name)
+        combined.append(move)
+
+    return [
+        _nova_upgrade_radar_normalize_move_20260702(move, index)
+        for index, move in enumerate(combined, start=1)
+    ]
+
+
+def choose_recommended_move(work_type: str):
+    ranked = rank_moves(work_type)
+    best = ranked[0] if ranked else _nova_upgrade_radar_move_20260702(rank=1)
+
+    return (
+        _nova_upgrade_radar_name_20260702(best),
+        str(_nova_upgrade_radar_value_20260702(best, "why", "") or "").strip(),
+        _nova_upgrade_radar_risk_20260702(best),
+        _nova_upgrade_radar_list_20260702(
+            _nova_upgrade_radar_value_20260702(best, "target_files", [])
+        ),
+    )
+
