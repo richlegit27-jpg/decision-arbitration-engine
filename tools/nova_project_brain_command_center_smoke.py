@@ -47,6 +47,9 @@ def main():
 
     formatted = format_project_brain_command_center(card)
     assert_true("formatted title", "Project Brain Command Center:" in formatted, formatted)
+    assert_true("formatted v2 intent console", "Command Center v2 Intent Console" in formatted, formatted)
+    assert_true("formatted primary answer", "Primary Answer:" in formatted, formatted)
+    assert_true("formatted contract", "Command Center Contract:" in formatted, formatted)
     assert_true("formatted command intent", "Command intent:" in formatted, formatted)
     assert_true("formatted status", "Status:" in formatted, formatted)
     assert_true("formatted best move", "Best Move:" in formatted, formatted)
@@ -60,7 +63,17 @@ def main():
     answer = build_project_brain_command_center_answer("next gangster upgrade")
     assert_true("answer title", "Project Brain Command Center:" in answer, answer)
     assert_true("answer intent next", "Command intent: next_move" in answer, answer)
+    assert_true("answer v2 console", "Command Center v2 Intent Console" in answer, answer)
+    assert_true("answer primary next move", "Primary Answer: next best Project Brain move." in answer, answer)
     assert_true("answer has exact command", "Exact Next Command:" in answer, answer)
+
+    smoke_answer = build_project_brain_command_center_answer("what smoke should we run")
+    assert_true("smoke answer primary", "Primary Answer: run the focused smoke set first." in smoke_answer, smoke_answer)
+    assert_true("smoke answer focused smokes", "Focused Smokes:" in smoke_answer, smoke_answer)
+
+    changes_answer = build_project_brain_command_center_answer("what changed recently")
+    assert_true("recent answer primary", "Primary Answer: recent Project Brain changes." in changes_answer, changes_answer)
+    assert_true("recent answer log", "Recent Decision Log:" in changes_answer, changes_answer)
 
     print("")
     print("NOVA PROJECT BRAIN COMMAND CENTER SMOKE PASSED")
@@ -68,3 +81,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
