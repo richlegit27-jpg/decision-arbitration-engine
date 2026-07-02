@@ -109,4 +109,5 @@ def install_project_brain_state_recall_refresh_finalizer(
         "runs_last": True,
         "session_response_finalizer": True,
         "attachment_response_finalizer": True,
+        "attachment_response_finalizer": True,
     }
