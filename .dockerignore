@@ -1,0 +1,12 @@
+﻿# Nova production files
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+nova_backups/
+uploads/*
+!uploads/.gitkeep
+data/*.bak
+data/*backup*

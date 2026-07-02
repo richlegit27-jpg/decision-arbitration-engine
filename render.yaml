@@ -3,11 +3,13 @@
     name: nova
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn nova_app:app
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 180
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.13
+      - key: FLASK_ENV
+        value: production
+      - key: NOVA_ENV
+        value: production
       - key: OPENAI_API_KEY
         sync: false
-      - key: OPENAI_MODEL
-        value: gpt-4.1-mini
-      - key: DEBUG
-        value: false
