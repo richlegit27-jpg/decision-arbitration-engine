@@ -89,7 +89,31 @@
                 }
             }
 
-            console.log("[Nova Mobile Close Layout Reset V1] reset", reason);
+            document.documentElement.style.width = "100%";
+            document.documentElement.style.maxWidth = "100%";
+            document.documentElement.style.overflowX = "hidden";
+
+            document.body.style.width = "100%";
+            document.body.style.maxWidth = "100%";
+            document.body.style.overflowX = "hidden";
+            document.body.style.position = "relative";
+            document.body.style.left = "0";
+            document.body.style.transform = "none";
+
+            for (const el of document.querySelectorAll("*")) {
+                const r = el.getBoundingClientRect();
+
+                if (r.left < -5 || r.width > window.innerWidth + 20) {
+                    el.style.left = "0";
+                    el.style.right = "";
+                    el.style.transform = "none";
+                    el.style.translate = "";
+                    el.style.maxWidth = "100vw";
+                    el.style.overflowX = "hidden";
+                }
+            }
+
+            console.log("[Nova Mobile Close Layout Reset V1] reset", reason, window.innerWidth);
         } catch (exc) {
             console.warn("[Nova Mobile Close Layout Reset V1] failed", exc);
         }
@@ -127,3 +151,4 @@
 
     console.log("[Nova Mobile Close Layout Reset V1] installed");
 })();
+
