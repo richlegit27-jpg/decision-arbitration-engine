@@ -1,3 +1,10 @@
+﻿from pathlib import Path
+import re
+
+js_path = Path("static/js/mobile/nova-mobile-session-drawer-v2.js")
+app_path = Path("app.py")
+
+js = r'''
 (function () {
     "use strict";
 
@@ -514,3 +521,20 @@
         boot();
     }
 })();
+'''
+
+js_path.write_text(js.strip() + "\n", encoding="utf-8")
+
+app = app_path.read_text(encoding="utf-8")
+app2 = re.sub(
+    r"nova-mobile-session-drawer-v2\.js\?v=[^\"']+",
+    "nova-mobile-session-drawer-v2.js?v=20260703-clean-replace-1",
+    app,
+)
+
+if app2 == app:
+    raise SystemExit("drawer script cache string not found in app.py")
+
+app_path.write_text(app2, encoding="utf-8")
+
+print("replaced drawer js cleanly")
