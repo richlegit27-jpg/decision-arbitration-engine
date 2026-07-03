@@ -1,243 +1,11 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
-
-# NOVA_DURABLE_DATA_BOOTSTRAP_20260703
-def _nova_durable_data_bootstrap_20260703():
-    try:
-        import os
-        import shutil
-        import time
-        from pathlib import Path
-
-        base_dir = Path(__file__).resolve().parent
-        app_data = base_dir / "data"
-
-        candidates = []
-
-        explicit = os.environ.get("NOVA_DATA_DIR", "").strip()
-        if explicit:
-            candidates.append(Path(explicit))
-
-        # Only use /data when it already exists, which indicates a real mounted
-        # Railway volume. Do not create fake /data on local Windows or ephemeral
-        # containers, because that can move repo-local data unexpectedly.
-        volume_data = Path("/data")
-        if os.name != "nt" and volume_data.exists():
-            candidates.append(volume_data)
-
-        candidates.append(app_data)
-
-        chosen = None
-
-        for candidate in candidates:
-            try:
-                candidate.mkdir(parents=True, exist_ok=True)
-                probe = candidate / ".nova_write_probe"
-                probe.write_text("ok", encoding="utf-8")
-                probe.unlink(missing_ok=True)
-                chosen = candidate
-                break
-            except Exception:
-                continue
-
-        if chosen is None:
-            chosen = app_data
-            chosen.mkdir(parents=True, exist_ok=True)
-
-        os.environ["NOVA_DATA_DIR"] = str(chosen)
-
-        should_bridge_app_data = False
-        try:
-            should_bridge_app_data = chosen.resolve() != app_data.resolve()
-        except Exception:
-            should_bridge_app_data = str(chosen) != str(app_data)
-
-        if should_bridge_app_data:
-            chosen.mkdir(parents=True, exist_ok=True)
-
-            if app_data.exists() and not app_data.is_symlink():
-                for item in app_data.iterdir():
-                    target = chosen / item.name
-                    if target.exists():
-                        continue
-                    try:
-                        if item.is_dir():
-                            shutil.copytree(item, target)
-                        else:
-                            shutil.copy2(item, target)
-                    except Exception:
-                        pass
-
-                try:
-                    app_data.rename(base_dir / ("data_ephemeral_backup_" + time.strftime("%Y%m%d_%H%M%S")))
-                except Exception:
-                    pass
-
-            if not app_data.exists():
-                try:
-                    app_data.symlink_to(chosen, target_is_directory=True)
-                except Exception:
-                    pass
-
-        print("[NOVA_DURABLE_DATA_BOOTSTRAP_20260703] NOVA_DATA_DIR=", os.environ.get("NOVA_DATA_DIR"))
-        print("[NOVA_DURABLE_DATA_BOOTSTRAP_20260703] app_data=", str(app_data), "real=", str(app_data.resolve()))
-
-    except Exception as exc:
-        try:
-            print("[NOVA_DURABLE_DATA_BOOTSTRAP_20260703] failed:", exc)
-        except Exception:
-            pass
-
-
-_nova_durable_data_bootstrap_20260703()
-# /NOVA_DURABLE_DATA_BOOTSTRAP_20260703
-
-
-# ============================================================
-# NOVA_RAILWAY_PERSISTENT_DATA_BOOTSTRAP_20260702
-# Railway persistence fix:
-# If NOVA_DATA_DIR is set, bind app runtime data/uploads to it.
-# Expected Railway env:
-#   NOVA_DATA_DIR=/data
-# Expected Railway volume mount:
-#   /data
-# This preserves sessions, memory, artifacts, and generated uploads
-# across Railway deploys/restarts.
-# ============================================================
-try:
-    import os as _nova_persist_os
-    import shutil as _nova_persist_shutil
-    from pathlib import Path as _NovaPersistPath
-
-    def _nova_copy_tree_contents_20260702(source, target):
-        try:
-            source = _NovaPersistPath(source)
-            target = _NovaPersistPath(target)
-            if not source.exists() or not source.is_dir():
-                return
-
-            target.mkdir(parents=True, exist_ok=True)
-
-            for child in source.iterdir():
-                dest = target / child.name
-
-                if child.is_dir():
-                    if not dest.exists():
-                        _nova_persist_shutil.copytree(child, dest)
-                    else:
-                        _nova_copy_tree_contents_20260702(child, dest)
-                else:
-                    if not dest.exists():
-                        _nova_persist_shutil.copy2(child, dest)
-        except Exception as exc:
-            try:
-                print("[NOVA_RAILWAY_PERSISTENT_DATA_BOOTSTRAP_20260702] copy failed:", exc)
-            except Exception:
-                pass
-
-    def _nova_bind_path_to_persistent_target_20260702(app_path, persistent_path):
-        try:
-            app_path = _NovaPersistPath(app_path)
-            persistent_path = _NovaPersistPath(persistent_path)
-
-            persistent_path.mkdir(parents=True, exist_ok=True)
-
-            if app_path.exists() and not app_path.is_symlink():
-                _nova_copy_tree_contents_20260702(app_path, persistent_path)
-
-                backup_path = app_path.with_name(app_path.name + "_container_backup")
-                if backup_path.exists() and backup_path.is_dir():
-                    _nova_persist_shutil.rmtree(backup_path, ignore_errors=True)
-
-                try:
-                    app_path.rename(backup_path)
-                except Exception:
-                    _nova_persist_shutil.rmtree(app_path, ignore_errors=True)
-
-            if app_path.is_symlink():
-                try:
-                    current_target = _nova_persist_os.readlink(str(app_path))
-                except Exception:
-                    current_target = ""
-
-                if str(persistent_path) != str(current_target):
-                    try:
-                        app_path.unlink()
-                    except Exception:
-                        pass
-
-            if not app_path.exists():
-                try:
-                    app_path.symlink_to(persistent_path, target_is_directory=True)
-                except Exception:
-                    # Symlink fallback: keep directory and copy data.
-                    app_path.mkdir(parents=True, exist_ok=True)
-                    _nova_copy_tree_contents_20260702(persistent_path, app_path)
-
-            return True
-        except Exception as exc:
-            try:
-                print("[NOVA_RAILWAY_PERSISTENT_DATA_BOOTSTRAP_20260702] bind failed:", app_path, persistent_path, exc)
-            except Exception:
-                pass
-            return False
-
-    _nova_persistent_root_20260702 = str(_nova_persist_os.environ.get("NOVA_DATA_DIR") or "").strip()
-
-    if _nova_persistent_root_20260702:
-        _nova_root_20260702 = _NovaPersistPath.cwd()
-        _nova_persistent_root_path_20260702 = _NovaPersistPath(_nova_persistent_root_20260702)
-        _nova_persistent_root_path_20260702.mkdir(parents=True, exist_ok=True)
-
-        _nova_bind_path_to_persistent_target_20260702(
-            _nova_root_20260702 / "data",
-            _nova_persistent_root_path_20260702,
-        )
-
-        _nova_bind_path_to_persistent_target_20260702(
-            _nova_root_20260702 / "uploads",
-            _nova_persistent_root_path_20260702 / "uploads",
-        )
-
-        try:
-            _nova_persist_os.environ["NOVA_SESSIONS_FILE"] = str(_nova_persistent_root_path_20260702 / "nova_sessions.json")
-            _nova_persist_os.environ["NOVA_MEMORY_FILE"] = str(_nova_persistent_root_path_20260702 / "nova_memory.json")
-            _nova_persist_os.environ["NOVA_ARTIFACTS_FILE"] = str(_nova_persistent_root_path_20260702 / "nova_artifacts.json")
-            _nova_persist_os.environ["NOVA_UPLOADS_DIR"] = str(_nova_persistent_root_path_20260702 / "uploads")
-        except Exception:
-            pass
-
-        try:
-            print(
-                "[NOVA_RAILWAY_PERSISTENT_DATA_BOOTSTRAP_20260702] active",
-                "root=", str(_nova_persistent_root_path_20260702),
-                "data=", str(_nova_root_20260702 / "data"),
-                "uploads=", str(_nova_root_20260702 / "uploads"),
-            )
-        except Exception:
-            pass
-    else:
-        try:
-            print("[NOVA_RAILWAY_PERSISTENT_DATA_BOOTSTRAP_20260702] skipped; NOVA_DATA_DIR not set")
-        except Exception:
-            pass
-
-except Exception as _nova_persistent_data_bootstrap_error_20260702:
-    try:
-        print("[NOVA_RAILWAY_PERSISTENT_DATA_BOOTSTRAP_20260702] outer failed:", _nova_persistent_data_bootstrap_error_20260702)
-    except Exception:
-        pass
-
-
-import json
 
 def _nova_boot_log_20260701(*args, **kwargs):
     import os as _nova_boot_log_os_20260701
 
     if str(_nova_boot_log_os_20260701.getenv("NOVA_VERBOSE_BOOT_LOGS", "")).strip().lower() in {"1", "true", "yes", "on"}:
         print(*args, **kwargs)
-
-
 
 import os
 import re
@@ -1135,7 +903,7 @@ def _nova_replace_weak_backend_reply(user_text, result):
     from being returned as the final assistant response.
 
     Also catches mojibake variants like:
-    "IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢m ready. What are we working on?"
+    "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢m ready. What are we working on?"
     """
     try:
         if not isinstance(result, dict):
@@ -1154,13 +922,13 @@ def _nova_replace_weak_backend_reply(user_text, result):
         normalized = (
             text
             .lower()
-            .replace("Ã¢â‚¬â„¢", "'")
+            .replace("â€™", "'")
             .replace("`", "'")
-            .replace("Ã‚Â´", "'")
-            .replace("ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢", "'")
-            .replace("ÃƒÂ£Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢", "'")
-            .replace("iÃƒÂ£Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢m", "i'm")
-            .replace("iÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢m", "i'm")
+            .replace("Â´", "'")
+            .replace("Ã¢â‚¬â„¢", "'")
+            .replace("Ã£Â¢Ã¢â€šÂ¬Ã¢â€žÂ¢", "'")
+            .replace("iÃ£Â¢Ã¢â€šÂ¬Ã¢â€žÂ¢m", "i'm")
+            .replace("iÃ¢â‚¬â„¢m", "i'm")
         )
 
         compact = " ".join(normalized.split())
@@ -1274,12 +1042,12 @@ def _nova_safe_clean_attachment_text(raw_text, max_chars=6000):
         "url removed from extracted attachment text",
         "wayfair.ca",
         "sponsored",
-        "ad Ã‚Â·",
-        "ads Ã‚Â·",
-        "shop Ã¢â‚¬Âº",
-        "wall art Ã¢â‚¬Âº",
+        "ad Â·",
+        "ads Â·",
+        "shop â€º",
+        "wall art â€º",
         "free_shipping",
-        "furniture & dÃƒÂ©cor",
+        "furniture & dÃ©cor",
         "kitchen appliances",
         "prices you'll love",
         "eye-catching prints",
@@ -1296,7 +1064,7 @@ def _nova_safe_clean_attachment_text(raw_text, max_chars=6000):
         if not line:
             continue
 
-        low = line.lower().strip(" :;-Ã¢â‚¬Â¢*|")
+        low = line.lower().strip(" :;-â€¢*|")
         low_compact = re.sub(r"[^a-z0-9]+", " ", low).strip()
 
         if low_compact in noisy_exact:
@@ -2417,6 +2185,7 @@ def _nova_read_project_state_store():
         if not PROJECT_STATE_FILE.exists():
             return {"sessions": {}}
 
+        import json
         # PROJECT_STATE_UTF8_SIG_LOCK
         payload = json.loads(PROJECT_STATE_FILE.read_text(encoding="utf-8-sig"))
 
@@ -2437,6 +2206,7 @@ def _nova_read_project_state_store():
 
 def _nova_write_project_state_store(payload):
     try:
+        import json
 
         if not isinstance(payload, dict):
             payload = {"sessions": {}}
@@ -3847,7 +3617,7 @@ def api_chat():
 
         _nova_attachments = _nova_payload.get("attachments") or []
 
-        # ðŸš¨ IMAGE FASTPATH SAFETY GUARD
+        # 🚨 IMAGE FASTPATH SAFETY GUARD
         if str(_nova_user_text or "").strip().lower().startswith("/image"):
             _nova_attachments = []
 
@@ -5002,11 +4772,11 @@ def api_chat():
             current_compact = " ".join(
                 current_text
                 .lower()
+                .replace("â€™", "'")
                 .replace("Ã¢â‚¬â„¢", "'")
-                .replace("ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢", "'")
-                .replace("ÃƒÂ£Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢", "'")
-                .replace("iÃƒÂ£Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢m", "i'm")
-                .replace("iÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢m", "i'm")
+                .replace("Ã£Â¢Ã¢â€šÂ¬Ã¢â€žÂ¢", "'")
+                .replace("iÃ£Â¢Ã¢â€šÂ¬Ã¢â€žÂ¢m", "i'm")
+                .replace("iÃ¢â‚¬â„¢m", "i'm")
                 .split()
             )
             if (
@@ -5117,7 +4887,7 @@ def api_chat():
             for index, item in enumerate(image_attachments[:5], start=1):
                 line = f"{index}. {item.get('name') or 'image attachment'} ({item.get('mime') or 'image/*'})"
                 if item.get("url"):
-                    line += f" Ã¢â‚¬â€ {item.get('url')}"
+                    line += f" â€” {item.get('url')}"
                 lines.append(line)
 
             lines.append("")
@@ -5778,7 +5548,7 @@ def api_chat():
                     "eye-catching prints",
                     "url removed from extracted attachment text",
                     "free_shipping",
-                    "furniture & dÃƒÂ©cor",
+                    "furniture & dÃ©cor",
                     "kitchen appliances",
                     "love, horror and more themes",
                     "plain field in front of mountain peak",
@@ -5799,7 +5569,7 @@ def api_chat():
                     if not _nova_line:
                         continue
 
-                    _nova_low = _nova_line.lower().strip(" :;-Ã¢â‚¬Â¢*|")
+                    _nova_low = _nova_line.lower().strip(" :;-â€¢*|")
                     _nova_low_compact = _nova_prehandle_re.sub(r"[^a-z0-9]+", " ", _nova_low).strip()
 
                     if _nova_low_compact in _nova_noise_exact:
@@ -5984,7 +5754,7 @@ def api_chat():
                     "eye-catching prints",
                     "url removed from extracted attachment text",
                     "free_shipping",
-                    "furniture & dÃƒÂ©cor",
+                    "furniture & dÃ©cor",
                     "kitchen appliances",
                     "love, horror and more themes",
                     "plain field in front of mountain peak",
@@ -6015,7 +5785,7 @@ def api_chat():
                     if not _line:
                         continue
 
-                    _low = _line.lower().strip(" :;-Ã¢â‚¬Â¢*|")
+                    _low = _line.lower().strip(" :;-â€¢*|")
                     _compact = _nova_attach_re.sub(r"[^a-z0-9]+", " ", _low).strip()
 
                     if _compact in _noise_exact:
@@ -6251,7 +6021,7 @@ def api_chat():
 
                     line = f"{index}. {label} ({mime})"
                     if url:
-                        line += f" Ã¢â‚¬â€ {url}"
+                        line += f" â€” {url}"
                     lines.append(line)
 
                 lines.append("")
@@ -6689,7 +6459,7 @@ def api_chat():
                             def _nova_weak_guard_clean_line(value):
                                 line = str(value or "").strip()
                                 line = _nova_weak_guard_re.sub(r"^\\s*\\d+\\.\\s*", "", line).strip()
-                                line = line.replace("Ã®ÂºÂ", "").strip()
+                                line = line.replace("îº", "").strip()
                                 line = line.replace("Attachment <unknown>", "uploaded attachment")
                                 line = _nova_weak_guard_re.sub(r"\\s+", " ", line).strip()
                                 return line
@@ -6731,7 +6501,7 @@ def api_chat():
                                 if not line:
                                     return ""
 
-                                low = line.lower().strip(" :;-Ã¢â‚¬Â¢*|")
+                                low = line.lower().strip(" :;-â€¢*|")
                                 compact = _nova_weak_guard_re.sub(r"[^a-z0-9]+", " ", low).strip()
 
                                 if low in _nova_weak_bad_exact or compact in _nova_weak_bad_exact:
@@ -7147,6 +6917,7 @@ def api_session_by_id(session_id: str):
     # after-request filter does not strip it.
     try:
         from pathlib import Path
+        import json
 
         sid = str(session_id or "").strip()
         root = Path(__file__).resolve().parent
@@ -8016,6 +7787,7 @@ def execution_stream():
             action = "run_step"
 
     def send_event(name, payload):
+        import json
         return f"event: {name}\ndata: {json.dumps(payload)}\n\n"
 
 def save_execution(execution):
@@ -9197,14 +8969,14 @@ def api_attachment_summarize():
 
         def _nova_endpoint_keep_attachment_line(value):
             line = str(value or "").strip()
-            line = line.replace("Ã®ÂºÂ", "").strip()
+            line = line.replace("îº", "").strip()
             line = _nova_endpoint_re.sub(r"^\\s*\\d+\\.\\s*", "", line).strip()
             line = _nova_endpoint_re.sub(r"\\s+", " ", line).strip()
 
             if not line:
                 return ""
 
-            low = line.lower().strip(" :;-Ã¢â‚¬Â¢*|")
+            low = line.lower().strip(" :;-â€¢*|")
             compact = _nova_endpoint_re.sub(r"[^a-z0-9]+", " ", low).strip()
 
             bad_exact = {
@@ -9235,7 +9007,7 @@ def api_attachment_summarize():
                 "bath",
                 "amazon",
                 "related content",
-                "furniture dÃƒÂ©cor",
+                "furniture dÃ©cor",
                 "kitchen appliances",
             }
 
@@ -9251,8 +9023,8 @@ def api_attachment_summarize():
                 "free stock photo",
                 "https://www.amazon.",
                 "https://www.wayfair.",
-                "Ã¢â‚¬Âº shop Ã¢â‚¬Âº",
-                "Ã¢â‚¬Âº wall art Ã¢â‚¬Âº",
+                "â€º shop â€º",
+                "â€º wall art â€º",
             )
 
             if low in bad_exact or compact in bad_exact:
@@ -9545,6 +9317,7 @@ def _nova_clean_attachment_analysis_response(response):
     """Final cleanup for canned attachment-analysis replies before mobile sees them."""
     try:
         from flask import request
+        import json
         import re
 
         if request.path != "/api/chat":
@@ -9596,12 +9369,12 @@ def _nova_clean_attachment_analysis_response(response):
             "eye-catching prints",
             "url removed from extracted attachment text",
             "free_shipping",
-            "furniture & dÃƒÂ©cor",
+            "furniture & dÃ©cor",
             "kitchen appliances",
             "love, horror and more themes",
             "plain field in front of mountain peak",
             "free stock photo",
-            "6000 Ãƒâ€”",
+            "6000 Ã—",
             "jpeg",
         )
 
@@ -9618,7 +9391,7 @@ def _nova_clean_attachment_analysis_response(response):
             if not cleaned:
                 continue
 
-            low = cleaned.lower().strip(" :;-Ã¢â‚¬Â¢*|")
+            low = cleaned.lower().strip(" :;-â€¢*|")
             low_compact = re.sub(r"[^a-z0-9]+", " ", low).strip()
 
             if low_compact in noisy_exact:
@@ -9705,6 +9478,7 @@ def _nova_final_attachment_output_noise_cleanup(response):
     """Final cosmetic cleanup for attachment-analysis text."""
     try:
         from flask import request
+        import json
         import re
 
         if request.path != "/api/chat":
@@ -9752,7 +9526,7 @@ def _nova_final_attachment_output_noise_cleanup(response):
             "eye-catching prints",
             "url removed from extracted attachment text",
             "free_shipping",
-            "furniture & dÃƒÂ©cor",
+            "furniture & dÃ©cor",
             "kitchen appliances",
             "related content",
         )
@@ -9762,14 +9536,14 @@ def _nova_final_attachment_output_noise_cleanup(response):
 
         for raw_line in text_value.splitlines():
             line = re.sub(r"^\s*\d+\.\s*", "", str(raw_line or "")).strip()
-            line = line.replace("Ã®ÂºÂ", "").strip()
+            line = line.replace("îº", "").strip()
             line = line.replace("Attachment <unknown>", "uploaded attachment")
             line = re.sub(r"\s+", " ", line).strip()
 
             if not line:
                 continue
 
-            low = line.lower().strip(" :;-Ã¢â‚¬Â¢*|")
+            low = line.lower().strip(" :;-â€¢*|")
             compact = re.sub(r"[^a-z0-9]+", " ", low).strip()
 
             if low.startswith("attachment analysis"):
@@ -9850,6 +9624,7 @@ def _nova_attachment_double_summary_cleanup(response):
     """Remove repeated attachment-analysis template lines from final output."""
     try:
         from flask import request
+        import json
         import re
 
         if request.path != "/api/chat":
@@ -9914,13 +9689,13 @@ def _nova_attachment_double_summary_cleanup(response):
         for raw_line in text_value.splitlines():
             line = str(raw_line or "").strip()
             line = re.sub(r"^\s*\d+\.\s*", "", line).strip()
-            line = line.replace("Ã®ÂºÂ", "").strip()
+            line = line.replace("îº", "").strip()
             line = re.sub(r"\s+", " ", line).strip()
 
             if not line:
                 continue
 
-            low = line.lower().strip(" :;-Ã¢â‚¬Â¢*|")
+            low = line.lower().strip(" :;-â€¢*|")
             compact = re.sub(r"[^a-z0-9]+", " ", low).strip()
 
             if low in bad_exact or compact in bad_exact:
@@ -9994,6 +9769,7 @@ def _nova_attachment_double_summary_cleanup(response):
 def _nova_attachment_followup_recall_gate():
     try:
         from flask import request, jsonify
+        import json
         from pathlib import Path
 
         if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
@@ -10044,6 +9820,7 @@ def _nova_session_attachment_memory_path_20260611():
 
 def _nova_load_session_attachment_memory_20260611():
     try:
+        import json
         path = _nova_session_attachment_memory_path_20260611()
         if not path.exists():
             return {}
@@ -10055,6 +9832,7 @@ def _nova_load_session_attachment_memory_20260611():
 
 def _nova_save_session_attachment_memory_20260611(data):
     try:
+        import json
         path = _nova_session_attachment_memory_path_20260611()
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(data if isinstance(data, dict) else {}, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -10444,6 +10222,7 @@ def nova_mobile_direct_session_persist_20260609():
     try:
         from pathlib import Path
         from datetime import datetime, timezone
+        import json
         import uuid
 
         payload = request.get_json(silent=True) or {}
@@ -10593,6 +10372,7 @@ def nova_desktop_app_fixed_20260610():
 # Local dev auth API: /api/auth/status, /api/auth/register, /api/auth/login, /api/auth/logout
 def _nova_install_local_auth_routes_20260610():
     import os
+    import json
     import secrets
     import hashlib
     from pathlib import Path
@@ -11027,160 +10807,6 @@ def nova_before_request_slim_api_sessions_20260611():
         if request.path != "/api/sessions" or request.method != "GET":
             return None
 
-        # NOVA_RICHARD_LEGACY_SESSION_OWNER_BRIDGE_20260703
-        # Production/local-auth migration bridge:
-        # richard is the current real owner, but older sessions were saved as joe
-        # or with no owner. Build /api/sessions from the raw store before the
-        # older slim route can collapse visibility to one empty auth session.
-        try:
-            import json as _nova_legacy_json
-            from pathlib import Path as _NovaLegacyPath
-            from flask import session as _nova_legacy_flask_session
-
-            base_dir = _NovaLegacyPath(__file__).resolve().parent
-            sessions_path = base_dir / "data" / "nova_sessions.json"
-            users_path = base_dir / "data" / "nova_auth_users.json"
-
-            current_uid = str(_nova_legacy_flask_session.get("nova_user_id") or "").strip()
-            current_username = ""
-
-            if current_uid and users_path.exists():
-                users_data = _nova_legacy_json.loads(users_path.read_text(encoding="utf-8"))
-                for user_item in users_data.get("users", []):
-                    if isinstance(user_item, dict) and str(user_item.get("id") or "") == current_uid:
-                        current_username = str(user_item.get("username") or "").strip().lower()
-                        break
-
-            if current_username == "richard" and sessions_path.exists():
-                store = _nova_legacy_json.loads(sessions_path.read_text(encoding="utf-8"))
-
-                if isinstance(store, dict):
-                    raw_store_sessions = store.get("sessions")
-                    if not isinstance(raw_store_sessions, list):
-                        raw_store_sessions = store.get("items")
-                    if not isinstance(raw_store_sessions, list):
-                        raw_store_sessions = []
-                elif isinstance(store, list):
-                    raw_store_sessions = store
-                    store = {"active_session_id": "", "sessions": raw_store_sessions}
-                else:
-                    raw_store_sessions = []
-                    store = {"active_session_id": "", "sessions": []}
-
-                changed = False
-                visible_sessions = []
-
-                for item in raw_store_sessions:
-                    if not isinstance(item, dict):
-                        continue
-
-                    item_user_id = str(item.get("user_id") or "").strip()
-                    item_username = str(item.get("username") or "").strip().lower()
-
-                    is_current = bool(current_uid and item_user_id == current_uid)
-                    is_same_name = bool(item_username and item_username == current_username)
-                    is_legacy_joe = item_username == "joe"
-                    is_unowned = not item_user_id and not item_username
-
-                    if not (is_current or is_same_name or is_legacy_joe or is_unowned):
-                        continue
-
-                    if is_legacy_joe or is_unowned:
-                        meta = item.get("meta")
-                        if not isinstance(meta, dict):
-                            meta = {}
-                            item["meta"] = meta
-
-                        if not meta.get("previous_owner_user_id") and item_user_id:
-                            meta["previous_owner_user_id"] = item_user_id
-                        if not meta.get("previous_owner_username") and item_username:
-                            meta["previous_owner_username"] = item_username
-
-                        if current_uid and item.get("user_id") != current_uid:
-                            item["user_id"] = current_uid
-                            changed = True
-
-                        if item.get("username") != current_username:
-                            item["username"] = current_username
-                            changed = True
-
-                        if meta.get("owner_source") != "local_auth_legacy_adoption_20260703":
-                            meta["owner_source"] = "local_auth_legacy_adoption_20260703"
-                            changed = True
-
-                    visible_sessions.append(item)
-
-                if changed:
-                    if isinstance(store, dict):
-                        store["sessions"] = raw_store_sessions
-                    sessions_path.write_text(
-                        _nova_legacy_json.dumps(store, ensure_ascii=False, indent=2),
-                        encoding="utf-8"
-                    )
-
-                def _message_count(item):
-                    messages = item.get("messages")
-                    return len(messages) if isinstance(messages, list) else int(item.get("message_count") or 0)
-
-                def _slim(item):
-                    return {
-                        "id": item.get("id") or item.get("session_id") or "",
-                        "title": item.get("title") or "New Chat",
-                        "created_at": item.get("created_at") or "",
-                        "updated_at": item.get("updated_at") or "",
-                        "pinned": bool(item.get("pinned")),
-                        "message_count": _message_count(item),
-                        "user_id": item.get("user_id") or "",
-                        "username": item.get("username") or "",
-                        "meta": item.get("meta") if isinstance(item.get("meta"), dict) else {},
-                        "working_state": item.get("working_state") if isinstance(item.get("working_state"), dict) else {},
-                        "active_execution": item.get("active_execution") if isinstance(item.get("active_execution"), dict) else {},
-                    }
-
-                visible_sessions.sort(
-                    key=lambda item: str(item.get("updated_at") or item.get("created_at") or ""),
-                    reverse=True
-                )
-
-                returned_sessions = [_slim(item) for item in visible_sessions]
-                active_session_id = str(store.get("active_session_id") or "").strip()
-                if not active_session_id and returned_sessions:
-                    active_session_id = returned_sessions[0].get("id") or ""
-
-                active_session = None
-                for item in visible_sessions:
-                    if str(item.get("id") or item.get("session_id") or "") == active_session_id:
-                        active_session = _slim(item)
-                        break
-
-                slim_response = jsonify({
-                    "ok": True,
-                    "active_session_id": active_session_id,
-                    "session": active_session,
-                    "sessions": returned_sessions,
-                    "items": returned_sessions,
-                    "artifacts": [],
-                    "slim_sessions_payload": True,
-                    "debug": {
-                        "route": "richard_legacy_session_owner_bridge",
-                        "route_taken": "legacy_owner_bridge_slim_sessions_payload",
-                        "raw_session_count": len(raw_store_sessions),
-                        "returned_session_count": len(returned_sessions),
-                        "legacy_owner_bridge": True,
-                        "current_user_id": current_uid,
-                        "current_username": current_username,
-                        "adopted_legacy_sessions": changed,
-                    },
-                })
-                slim_response.headers["X-Nova-Slim-Sessions"] = "1"
-                return slim_response
-
-        except Exception as legacy_exc:
-            try:
-                app.logger.warning("[Nova Legacy Session Owner Bridge] failed: %s", legacy_exc)
-            except Exception:
-                pass
-
         raw_sessions = []
 
         for method_name in (
@@ -11302,6 +10928,7 @@ def nova_before_request_slim_api_sessions_20260611():
 # App-level session ownership bridge.
 # Keeps legacy unowned sessions safe, then claims them for the logged-in local user.
 def _nova_install_session_auth_scope_20260610():
+    import json
     from pathlib import Path
     from flask import request, session, g, Response
 
@@ -11525,6 +11152,7 @@ _nova_install_session_auth_scope_20260610()
 # NOVA_PRUNE_EMPTY_SESSION_SPAM_20260610
 # Prevents frontend/route bugs from filling nova_sessions.json with duplicate empty "New Chat" records.
 def _nova_install_empty_session_spam_pruner_20260610():
+    import json
     from pathlib import Path
     from flask import request
 
@@ -11683,6 +11311,7 @@ _nova_install_empty_session_spam_pruner_20260610()
 # NOVA_ATTACHMENT_SHAPE_NORMALIZER_20260610
 # Keeps saved session message attachments as JSON-safe lists of objects.
 def _nova_install_attachment_shape_normalizer_20260610():
+    import json
     import re
     from pathlib import Path
     from flask import request
@@ -12317,6 +11946,7 @@ def stream_events():
 @app.route("/api/chat/stream", methods=["POST"])
 def nova_chat_stream():
 
+    import json
     from flask import Response
 
     def generate():
@@ -12608,7 +12238,7 @@ def nova_focus_recall_before_web_20260611():
 
             assistant_text = "Your current Nova focus is: " + focus
 
-        # ðŸ”’ IMPORTANT: DO NOT RETURN RESPONSE
+        # 🔒 IMPORTANT: DO NOT RETURN RESPONSE
         # Only attach data to request for downstream handler
         request.nova_focus_recall = {
             "session_id": session_id,
@@ -12704,6 +12334,178 @@ def _nova_direct_clean_attachment_text_response_20260611(text_value):
         return final.strip()
     except Exception:
         return text_value
+
+
+
+# NOVA_ATTACHMENT_FINAL_JSON_RESPONSE_SYNC_20260611
+@app.after_request
+def nova_attachment_final_json_response_sync_20260611(response):
+    try:
+        if request.path != "/api/chat":
+            return response
+
+        if not response.is_json:
+            return response
+
+        data = response.get_json(silent=True)
+        if not isinstance(data, dict):
+            return response
+
+        assistant_message = data.get("assistant_message")
+        if not isinstance(assistant_message, dict):
+            return response
+
+        content = str(assistant_message.get("content") or "").strip()
+        text_value = str(assistant_message.get("text") or "").strip()
+
+        if (
+            content.startswith("Attachment analysis:")
+            and "Attachment " in content
+            and " content:" in content
+            and (
+                "This uploaded attachment contains readable text about:" in text_value
+                or "Key points:" in text_value
+                or "Preview:" in text_value
+            )
+        ):
+            assistant_message["text"] = content
+            assistant_message["content"] = content
+            data["assistant_message"] = assistant_message
+
+            import json
+            response.set_data(json.dumps(data, ensure_ascii=False))
+            response.headers["Content-Type"] = "application/json; charset=utf-8"
+
+        return response
+    except Exception:
+        return response
+
+
+
+
+# NOVA_ATTACHMENT_FINAL_RAW_JSON_RESPONSE_SYNC_20260611
+@app.after_request
+def nova_attachment_final_raw_json_response_sync_20260611(response):
+    try:
+        if request.path != "/api/chat":
+            return response
+
+        raw_body = response.get_data(as_text=True)
+        if not raw_body or "assistant_message" not in raw_body or "Attachment analysis:" not in raw_body:
+            return response
+
+        import json
+        data = json.loads(raw_body)
+        if not isinstance(data, dict):
+            return response
+
+        assistant_message = data.get("assistant_message")
+        if not isinstance(assistant_message, dict):
+            return response
+
+        content = str(assistant_message.get("content") or "").strip()
+        text_value = str(assistant_message.get("text") or "").strip()
+
+        if (
+            content.startswith("Attachment analysis:")
+            and "Attachment " in content
+            and " content:" in content
+            and content != text_value
+        ):
+            assistant_message["text"] = content
+            assistant_message["content"] = content
+            data["assistant_message"] = assistant_message
+
+            response.set_data(json.dumps(data, ensure_ascii=False))
+            response.headers["Content-Type"] = "application/json; charset=utf-8"
+            response.headers["X-Nova-Attachment-Sync"] = "raw-json-fixed"
+
+        return response
+    except Exception:
+        return response
+
+
+
+
+# NOVA_ATTACHMENT_API_CHAT_VIEW_WRAPPER_SYNC_20260611
+def _nova_sync_attachment_text_response_20260611(response):
+    try:
+        flask_response = app.make_response(response)
+        raw_body = flask_response.get_data(as_text=True)
+
+        if not raw_body or "assistant_message" not in raw_body or "Attachment analysis:" not in raw_body:
+            return flask_response
+
+        import json
+        data = json.loads(raw_body)
+        if not isinstance(data, dict):
+            return flask_response
+
+        assistant_message = data.get("assistant_message")
+        if not isinstance(assistant_message, dict):
+            return flask_response
+
+        content = str(assistant_message.get("content") or "").strip()
+        text_value = str(assistant_message.get("text") or "").strip()
+
+        if (
+            content.startswith("Attachment analysis:")
+            and "Attachment " in content
+            and " content:" in content
+            and content != text_value
+        ):
+            assistant_message["text"] = content
+            assistant_message["content"] = content
+            data["assistant_message"] = assistant_message
+
+            flask_response.set_data(json.dumps(data, ensure_ascii=False))
+            flask_response.headers["Content-Type"] = "application/json; charset=utf-8"
+            flask_response.headers["X-Nova-Attachment-Sync"] = "view-wrapper-fixed"
+
+        return flask_response
+    except Exception:
+        return response
+
+
+def _nova_install_api_chat_attachment_view_wrapper_20260611():
+    try:
+        wrapped = 0
+
+        for rule in list(app.url_map.iter_rules()):
+            if getattr(rule, "rule", "") != "/api/chat":
+                continue
+
+            endpoint = getattr(rule, "endpoint", "")
+            original_view = app.view_functions.get(endpoint)
+
+            if not callable(original_view):
+                continue
+
+            if getattr(original_view, "_nova_attachment_view_wrapper_20260611", False):
+                continue
+
+            def _wrapped_api_chat_view(*args, __original_view=original_view, **kwargs):
+                response = __original_view(*args, **kwargs)
+                return _nova_sync_attachment_text_response_20260611(response)
+
+            _wrapped_api_chat_view.__name__ = getattr(original_view, "__name__", "nova_wrapped_api_chat")
+            _wrapped_api_chat_view.__doc__ = getattr(original_view, "__doc__", None)
+            _wrapped_api_chat_view._nova_attachment_view_wrapper_20260611 = True
+
+            app.view_functions[endpoint] = _wrapped_api_chat_view
+            wrapped += 1
+
+        _nova_boot_log_20260701("[NOVA ATTACHMENT SYNC] wrapped /api/chat endpoints:", wrapped)
+    except Exception as exc:
+        print("[NOVA ATTACHMENT SYNC] wrapper install failed:", exc)
+
+
+_nova_install_api_chat_attachment_view_wrapper_20260611()
+
+
+# NOVA_WEB_FETCH_BRIDGE_JSON_IMPORT_FIX_20260612
+# Ensure this late bridge can rewrite Flask response JSON even if json was not imported globally.
+import json as json
 
 # NOVA_WEB_FETCH_REQUESTED_SESSION_BRIDGE_SAFE_20260612
 # Registers before the existing target-session bridge.
@@ -14128,6 +13930,7 @@ except Exception:
 
 # NOVA_HISTORY_LIST_AND_DETAIL_20260621
 def nova_history_load_sessions_20260621():
+    import json
     from pathlib import Path
 
     base = Path(__file__).resolve().parent
@@ -14190,6 +13993,7 @@ def nova_history_messages_20260621(session):
 
 
 def nova_history_msg_text_20260621(message):
+    import json
 
     if isinstance(message, str):
         return message
@@ -14588,6 +14392,7 @@ def nova_history_detail_page_20260621(session_id):
 
 @app.route("/new-session")
 def nova_history_new_session_20260621():
+    import json
     import uuid
     from pathlib import Path
     from datetime import datetime, timezone
@@ -14669,6 +14474,7 @@ New session created.
 # NOVA_OPEN_SESSION_BRIDGE_20260622
 @app.route("/open-session/<session_id>")
 def nova_open_session_bridge_20260622(session_id):
+    import json
     import html
     from pathlib import Path
 
@@ -14775,6 +14581,7 @@ def nova_open_session_bridge_20260622(session_id):
 # NOVA_HISTORY_DIRECT_SEND_20260622
 @app.route("/history/<session_id>/send", methods=["POST"])
 def nova_history_direct_send_20260622(session_id):
+    import json
     from pathlib import Path
     from datetime import datetime, timezone
     from flask import request, redirect
@@ -15550,7 +15357,7 @@ try:
 
     def _nova_natural_project_normalize_20260701(value):
         text = str(value or "").strip().lower()
-        text = text.replace("â€™", "'")
+        text = text.replace("’", "'")
         text = _nova_natural_project_re_20260701.sub(r"\s+", " ", text)
         return text
 
@@ -15803,7 +15610,7 @@ try:
 
     def _nova_compact_project_normalize_20260701(value):
         text = str(value or "").strip().lower()
-        text = text.replace("â€™", "'")
+        text = text.replace("’", "'")
         text = _nova_compact_project_re_20260701.sub(r"\s+", " ", text)
         return text
 
@@ -17561,6 +17368,100 @@ except Exception as _nova_phase4g_chat_guard_error_20260701:
 # NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701
 # Must be above
 
+# NOVA_FINAL_RESPONSE_SHAPE_CONTENT_DEBUG_20260701
+# Final payload polish: preserve assistant_message.content and debug fields
+# even when later response-cache wrappers rebuild JSON from assistant_message.text.
+try:
+    import json as _nova_final_shape_json_20260701
+
+    @app.after_request
+    def _nova_final_response_shape_content_debug_20260701(response):
+        try:
+            content_type = str(response.headers.get("Content-Type") or "").lower()
+            if "application/json" not in content_type:
+                return response
+
+            raw = response.get_data(as_text=True)
+            if not raw:
+                return response
+
+            data = _nova_final_shape_json_20260701.loads(raw)
+            if not isinstance(data, dict):
+                return response
+
+            changed = False
+
+            assistant = data.get("assistant_message")
+            if isinstance(assistant, dict):
+                text_value = str(
+                    assistant.get("text")
+                    or assistant.get("content")
+                    or data.get("text")
+                    or ""
+                )
+
+                if text_value:
+                    if not assistant.get("text"):
+                        assistant["text"] = text_value
+                        changed = True
+
+                    if not assistant.get("content"):
+                        assistant["content"] = text_value
+                        changed = True
+
+                    data["assistant_message"] = assistant
+
+                    if not data.get("text"):
+                        data["text"] = text_value
+                        changed = True
+
+            route_value = str(data.get("route") or "").strip()
+            route_taken_value = str(data.get("route_taken") or route_value or "").strip()
+
+            if route_value or route_taken_value:
+                debug = data.get("debug")
+                if not isinstance(debug, dict):
+                    debug = {}
+                    changed = True
+
+                if route_value and not debug.get("route"):
+                    debug["route"] = route_value
+                    changed = True
+
+                if route_taken_value and not debug.get("route_taken"):
+                    debug["route_taken"] = route_taken_value
+                    changed = True
+
+                data["debug"] = debug
+
+            if changed:
+                response.set_data(
+                    _nova_final_shape_json_20260701.dumps(
+                        data,
+                        ensure_ascii=False,
+                    )
+                )
+                response.headers["Content-Type"] = "application/json"
+                response.headers["Content-Length"] = str(len(response.get_data()))
+
+        except Exception as exc:
+            try:
+                app.logger.warning(
+                    "[NOVA_FINAL_RESPONSE_SHAPE_CONTENT_DEBUG_20260701] failed: %s",
+                    exc,
+                )
+            except Exception:
+                pass
+
+        return response
+
+    print("[NOVA_FINAL_RESPONSE_SHAPE_CONTENT_DEBUG_20260701] installed")
+except Exception as _nova_final_shape_error_20260701:
+    print("[NOVA_FINAL_RESPONSE_SHAPE_CONTENT_DEBUG_20260701] failed:", _nova_final_shape_error_20260701)
+
+# NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611
+
+
 # NOVA_API_CHAT_PROJECT_NEXT_FINAL_OVERRIDE_20260701
 # Final API response override for exact project-brain "what's next?" questions.
 # This catches generic chat fallback after chat_service.handle and before UI/PowerShell see it.
@@ -19044,1690 +18945,162 @@ try:
 except Exception as _nova_decision_log_api_route_error_20260701:
     print("[NOVA_PROJECT_BRAIN_DECISION_LOG_API_ROUTE_CONTRACT_20260701] failed:", _nova_decision_log_api_route_error_20260701)
 
-# NOVA_PROJECT_BRAIN_STATE_RECALL_REFRESH_API_20260702
-# Service-owned finalizer install: direct project-state recall must prefer State Bridge memory.
+# --- NOVA_PROTECTED_SESSION_RESTORE_20260703 ---
 try:
-    from nova_backend.services.project_brain_api_finalizer import (
-        install_project_brain_state_recall_refresh_finalizer as _nova_install_project_brain_state_recall_refresh_finalizer_20260702,
-    )
+    import os as _npsr_os
+    import json as _npsr_json
+    import shutil as _npsr_shutil
+    from pathlib import Path as _NpsrPath
+    from flask import request as _npsr_request
+    from flask import jsonify as _npsr_jsonify
 
-    _nova_project_brain_state_recall_refresh_finalizer_result_20260702 = (
-        _nova_install_project_brain_state_recall_refresh_finalizer_20260702(app)
-    )
+    def _npsr_paths_20260703():
+        base = _NpsrPath(__file__).resolve().parent
+        data = _NpsrPath(_npsr_os.environ.get("NOVA_DATA_DIR", str(base / "data")))
+        data.mkdir(parents=True, exist_ok=True)
+        sessions = _NpsrPath(_npsr_os.environ.get("NOVA_SESSIONS_FILE", str(data / "nova_sessions.json")))
+        vault = data / "nova_sessions.richard_restore_vault_20260703.json"
+        return sessions, vault
 
-    print(
-        "[NOVA_PROJECT_BRAIN_STATE_RECALL_REFRESH_API_20260702] service finalizer installed",
-        _nova_project_brain_state_recall_refresh_finalizer_result_20260702,
-    )
-except Exception as _nova_project_brain_state_recall_refresh_api_error_20260702:
-    print("[NOVA_PROJECT_BRAIN_STATE_RECALL_REFRESH_API_20260702] install failed:", _nova_project_brain_state_recall_refresh_api_error_20260702)
+    def _npsr_count_20260703(value):
+        if isinstance(value, list):
+            return len(value)
 
-# NOVA_FINAL_JUST_FIXED_PROJECT_STATE_RESPONSE_LOCK_20260702
-# Final exact-match safety lock for the project-state smoke phrase.
-# This only affects direct "what did we just fix" style questions.
-try:
-    from flask import request as _nova_jf_request_20260702
+        if isinstance(value, dict):
+            sessions = value.get("sessions")
+            if isinstance(sessions, list):
+                return len(sessions)
+            if isinstance(sessions, dict):
+                return len(sessions)
 
-    _NOVA_JF_LOCKED_ANSWER_20260702 = (
-        "We just fixed and locked the Project Brain regression path: "
-        "project-state direct recall stays deterministic, broad Nova project paraphrases "
-        "route through Project Brain general intelligence, and the regression smoke now "
-        "protects those route contracts."
-    )
-
-    def _nova_jf_is_question_20260702(value):
-        text = str(value or "").strip().lower()
-        text = text.rstrip(" ?!.")
-        if any(term in text for term in {
-            "left",
-            "remaining",
-            "still need",
-            "next",
-            "after",
-            "blocker",
-            "todo",
-            "to do",
-        }):
-            return False
-        return text in {
-            "what did we just fix",
-            "what did we fix",
-            "what was just fixed",
-            "what was fixed",
-            "just fixed",
-            "last fix",
-            "recent fix",
-        }
-
-    def _nova_jf_patch_payload_20260702(payload):
-        if not isinstance(payload, dict):
-            return payload
-
-        payload["text"] = _NOVA_JF_LOCKED_ANSWER_20260702
-        payload["response"] = _NOVA_JF_LOCKED_ANSWER_20260702
-        payload["answer"] = _NOVA_JF_LOCKED_ANSWER_20260702
-
-        assistant_message = payload.get("assistant_message")
-        if isinstance(assistant_message, dict):
-            assistant_message["text"] = _NOVA_JF_LOCKED_ANSWER_20260702
-            assistant_message["content"] = _NOVA_JF_LOCKED_ANSWER_20260702
-            payload["assistant_message"] = assistant_message
-
-        message = payload.get("message")
-        if isinstance(message, dict):
-            message["text"] = _NOVA_JF_LOCKED_ANSWER_20260702
-            message["content"] = _NOVA_JF_LOCKED_ANSWER_20260702
-            payload["message"] = message
-
-        debug = payload.get("debug")
-        if not isinstance(debug, dict):
-            debug = {}
-        debug["route"] = "project_state_direct_recall"
-        debug["route_taken"] = "project_state_direct_recall"
-        debug["just_fixed_project_state_lock"] = True
-        payload["debug"] = debug
-
-        return payload
-
-    @app.after_request
-    def _nova_final_just_fixed_project_state_response_lock_20260702(response):
-        try:
-            if not _nova_jf_request_20260702.path.endswith("/api/chat"):
-                return response
-
-            req_json = _nova_jf_request_20260702.get_json(silent=True) or {}
-            user_text = (
-                req_json.get("message")
-                or req_json.get("text")
-                or req_json.get("user_text")
-                or req_json.get("prompt")
-                or ""
-            )
-
-            if not _nova_jf_is_question_20260702(user_text):
-                return response
-
-            payload = response.get_json(silent=True)
-            if not isinstance(payload, dict):
-                return response
-
-            patched = _nova_jf_patch_payload_20260702(payload)
-            response.set_data(json.dumps(patched))
-            response.mimetype = "application/json"
-            return response
-        except Exception as exc:
-            try:
-                print("[NOVA_FINAL_JUST_FIXED_PROJECT_STATE_RESPONSE_LOCK_20260702] failed:", exc)
-            except Exception:
-                pass
-            return response
-
-    print("[NOVA_FINAL_JUST_FIXED_PROJECT_STATE_RESPONSE_LOCK_20260702] installed")
-except Exception as _nova_jf_install_error_20260702:
-    print("[NOVA_FINAL_JUST_FIXED_PROJECT_STATE_RESPONSE_LOCK_20260702] install failed:", _nova_jf_install_error_20260702)
-
-
-
-# NOVA_SESSION_IMAGE_MESSAGE_HYDRATOR_20260702
-# Hydrate generated-image session messages for mobile/session restore.
-# Some image-generation assistant messages are saved with meta.image_url but empty attachments.
-try:
-    from flask import request as _nova_img_hydrate_request_20260702
-
-    def _nova_img_hydrate_filename_20260702(url):
-        value = str(url or "").strip()
-        if not value:
-            return ""
-        return value.split("?", 1)[0].rstrip("/").rsplit("/", 1)[-1]
-
-    def _nova_img_hydrate_message_20260702(message):
-        if not isinstance(message, dict):
-            return message
-
-        role = str(message.get("role") or "").lower()
-        if role != "assistant":
-            return message
-
-        meta = message.get("meta")
-        if not isinstance(meta, dict):
-            meta = {}
-
-        image_url = (
-            message.get("image_url")
-            or meta.get("image_url")
-            or meta.get("last_image_url")
-            or ""
-        )
-        image_url = str(image_url or "").strip()
-
-        if not image_url:
-            return message
-
-        message["image_url"] = image_url
-
-        attachments = message.get("attachments")
-        if not isinstance(attachments, list):
-            attachments = []
-
-        has_image_attachment = False
-        for item in attachments:
-            if isinstance(item, dict):
-                item_url = str(item.get("url") or item.get("file_url") or "").strip()
-                item_type = str(item.get("mime_type") or item.get("type") or "").lower()
-                if item_url == image_url or item_type.startswith("image/"):
-                    has_image_attachment = True
-                    break
-
-        if not has_image_attachment:
-            filename = _nova_img_hydrate_filename_20260702(image_url)
-            attachments.append({
-                "id": filename,
-                "filename": filename,
-                "stored_name": filename,
-                "url": image_url,
-                "file_url": image_url,
-                "mime_type": "image/png",
-                "type": "image/png",
-            })
-
-        message["attachments"] = attachments
-        return message
-
-    def _nova_img_hydrate_session_20260702(session):
-        if not isinstance(session, dict):
-            return session
-
-        messages = session.get("messages")
-        if isinstance(messages, list):
-            session["messages"] = [
-                _nova_img_hydrate_message_20260702(item)
-                for item in messages
+            found = [
+                item for item in value.values()
+                if isinstance(item, dict) and (
+                    "messages" in item or "id" in item or "session_id" in item
+                )
             ]
-
-        return session
-
-    def _nova_img_hydrate_payload_20260702(payload):
-        if isinstance(payload, dict):
-            if isinstance(payload.get("session"), dict):
-                payload["session"] = _nova_img_hydrate_session_20260702(payload["session"])
-
-            if isinstance(payload.get("messages"), list):
-                payload["messages"] = [
-                    _nova_img_hydrate_message_20260702(item)
-                    for item in payload["messages"]
-                ]
-
-            if isinstance(payload.get("sessions"), list):
-                payload["sessions"] = [
-                    _nova_img_hydrate_session_20260702(item)
-                    for item in payload["sessions"]
-                ]
-
-            # Some endpoints return a session object directly.
-            if isinstance(payload.get("id"), str) and isinstance(payload.get("messages"), list):
-                payload = _nova_img_hydrate_session_20260702(payload)
-
-        return payload
-
-    @app.after_request
-    def _nova_session_image_message_hydrator_20260702(response):
-        try:
-            path = str(getattr(_nova_img_hydrate_request_20260702, "path", "") or "")
-            if not (
-                path.startswith("/api/sessions")
-                or path.startswith("/api/chat/")
-                or path.endswith("/api/chat")
-            ):
-                return response
-
-            payload = response.get_json(silent=True)
-            if payload is None:
-                return response
-
-            patched = _nova_img_hydrate_payload_20260702(payload)
-            response.set_data(json.dumps(patched))
-            response.mimetype = "application/json"
-            return response
-        except Exception as exc:
-            try:
-                print("[NOVA_SESSION_IMAGE_MESSAGE_HYDRATOR_20260702] failed:", exc)
-            except Exception:
-                pass
-            return response
-
-    print("[NOVA_SESSION_IMAGE_MESSAGE_HYDRATOR_20260702] installed")
-except Exception as _nova_img_hydrate_install_error_20260702:
-    print("[NOVA_SESSION_IMAGE_MESSAGE_HYDRATOR_20260702] install failed:", _nova_img_hydrate_install_error_20260702)
-
-
-
-# NOVA_GENERATED_IMAGE_SESSION_PERSISTENCE_20260702
-# Persist generated-image URL/attachment fields into saved session messages.
-# Fixes mobile/session restore where generated image exists but restored assistant message has attachments=[].
-try:
-    from pathlib import Path as _nova_img_persist_Path_20260702
-    from flask import request as _nova_img_persist_request_20260702
-
-    def _nova_img_persist_filename_20260702(url):
-        value = str(url or "").strip()
-        return value.split("?", 1)[0].rstrip("/").rsplit("/", 1)[-1] if value else ""
-
-    def _nova_img_persist_attachment_20260702(image_url):
-        filename = _nova_img_persist_filename_20260702(image_url)
-        return {
-            "id": filename,
-            "filename": filename,
-            "stored_name": filename,
-            "url": image_url,
-            "file_url": image_url,
-            "mime_type": "image/png",
-            "type": "image/png",
-        }
-
-    def _nova_img_persist_patch_message_20260702(message, image_url):
-        if not isinstance(message, dict) or not image_url:
-            return message
-
-        if str(message.get("role") or "").lower() != "assistant":
-            return message
-
-        message["image_url"] = image_url
-
-        meta = message.get("meta")
-        if not isinstance(meta, dict):
-            meta = {}
-        meta["image_url"] = image_url
-        meta["source"] = "image_generation"
-        message["meta"] = meta
-
-        attachments = message.get("attachments")
-        if not isinstance(attachments, list):
-            attachments = []
-
-        exists = False
-        for item in attachments:
-            if not isinstance(item, dict):
-                continue
-            item_url = str(item.get("url") or item.get("file_url") or "").strip()
-            item_type = str(item.get("mime_type") or item.get("type") or "").lower()
-            if item_url == image_url or item_type.startswith("image/"):
-                item["url"] = item_url or image_url
-                item["file_url"] = item.get("file_url") or image_url
-                item["mime_type"] = item.get("mime_type") or "image/png"
-                item["type"] = item.get("type") or "image/png"
-                exists = True
-
-        if not exists:
-            attachments.append(_nova_img_persist_attachment_20260702(image_url))
-
-        message["attachments"] = attachments
-        return message
-
-    def _nova_img_persist_find_sessions_20260702(data):
-        found = []
-
-        if isinstance(data, list):
-            for item in data:
-                if isinstance(item, dict) and item.get("messages") is not None:
-                    found.append(item)
-            return found
-
-        if not isinstance(data, dict):
-            return found
-
-        if data.get("messages") is not None:
-            found.append(data)
-
-        sessions = data.get("sessions")
-        if isinstance(sessions, list):
-            for item in sessions:
-                if isinstance(item, dict):
-                    found.append(item)
-        elif isinstance(sessions, dict):
-            for item in sessions.values():
-                if isinstance(item, dict):
-                    found.append(item)
-
-        for item in data.values():
-            if isinstance(item, dict) and item.get("messages") is not None and item not in found:
-                found.append(item)
-
-        return found
-
-    def _nova_img_persist_to_session_file_20260702(session_id, image_url, assistant_text):
-        if not session_id or not image_url:
-            return False
-
-        sessions_path = _nova_img_persist_Path_20260702("data/nova_sessions.json")
-        if not sessions_path.exists():
-            return False
-
-        data = json.loads(sessions_path.read_text(encoding="utf-8") or "{}")
-        changed = False
-
-        for session in _nova_img_persist_find_sessions_20260702(data):
-            if str(session.get("id") or session.get("session_id") or "") != str(session_id):
-                continue
-
-            meta = session.get("meta")
-            if not isinstance(meta, dict):
-                meta = {}
-            meta["last_image_url"] = image_url
-            session["meta"] = meta
-
-            messages = session.get("messages")
-            if not isinstance(messages, list):
-                continue
-
-            target = None
-            for message in reversed(messages):
-                if not isinstance(message, dict):
-                    continue
-                if str(message.get("role") or "").lower() != "assistant":
-                    continue
-                msg_text = str(message.get("text") or message.get("content") or "")
-                msg_meta = message.get("meta") if isinstance(message.get("meta"), dict) else {}
-                if (
-                    msg_meta.get("source") == "image_generation"
-                    or "generated image" in msg_text.lower()
-                    or (assistant_text and msg_text.strip() == str(assistant_text).strip())
-                ):
-                    target = message
-                    break
-
-            if target is None:
-                target = {
-                    "role": "assistant",
-                    "text": assistant_text or "Generated image",
-                    "content": assistant_text or "Generated image",
-                    "attachments": [],
-                    "meta": {"source": "image_generation"},
-                }
-                messages.append(target)
-
-            _nova_img_persist_patch_message_20260702(target, image_url)
-            changed = True
-
-        if changed:
-            sessions_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-
-        return changed
-
-    def _nova_img_persist_patch_payload_20260702(payload):
-        if not isinstance(payload, dict):
-            return payload
-
-        assistant_message = payload.get("assistant_message") if isinstance(payload.get("assistant_message"), dict) else {}
-        saved_artifact = payload.get("saved_artifact") if isinstance(payload.get("saved_artifact"), dict) else {}
-        viewer = saved_artifact.get("viewer") if isinstance(saved_artifact.get("viewer"), dict) else {}
-
-        image_url = (
-            payload.get("image_url")
-            or assistant_message.get("image_url")
-            or saved_artifact.get("image_url")
-            or saved_artifact.get("preview")
-            or viewer.get("image_url")
-            or ""
-        )
-        image_url = str(image_url or "").strip()
-
-        if not image_url:
-            return payload
-
-        session_id = (
-            payload.get("session_id")
-            or payload.get("active_session_id")
-            or assistant_message.get("session_id")
-            or saved_artifact.get("session_id")
-            or ""
-        )
-
-        assistant_text = (
-            assistant_message.get("text")
-            or assistant_message.get("content")
-            or payload.get("text")
-            or saved_artifact.get("summary")
-            or "Generated image"
-        )
-
-        if isinstance(assistant_message, dict):
-            payload["assistant_message"] = _nova_img_persist_patch_message_20260702(assistant_message, image_url)
-
-        if isinstance(payload.get("session"), dict):
-            messages = payload["session"].get("messages")
-            if isinstance(messages, list):
-                for message in reversed(messages):
-                    if isinstance(message, dict) and str(message.get("role") or "").lower() == "assistant":
-                        msg_text = str(message.get("text") or message.get("content") or "")
-                        msg_meta = message.get("meta") if isinstance(message.get("meta"), dict) else {}
-                        if msg_meta.get("source") == "image_generation" or "generated image" in msg_text.lower():
-                            _nova_img_persist_patch_message_20260702(message, image_url)
-                            break
-
-        _nova_img_persist_to_session_file_20260702(session_id, image_url, assistant_text)
-        return payload
-
-    @app.after_request
-    def _nova_generated_image_session_persistence_20260702(response):
-        try:
-            path = str(getattr(_nova_img_persist_request_20260702, "path", "") or "")
-            if not path.endswith("/api/chat"):
-                return response
-
-            payload = response.get_json(silent=True)
-            if not isinstance(payload, dict):
-                return response
-
-            patched = _nova_img_persist_patch_payload_20260702(payload)
-            response.set_data(json.dumps(patched))
-            response.mimetype = "application/json"
-            return response
-        except Exception as exc:
-            try:
-                print("[NOVA_GENERATED_IMAGE_SESSION_PERSISTENCE_20260702] failed:", exc)
-            except Exception:
-                pass
-            return response
-
-    print("[NOVA_GENERATED_IMAGE_SESSION_PERSISTENCE_20260702] installed")
-except Exception as _nova_img_persist_install_error_20260702:
-    print("[NOVA_GENERATED_IMAGE_SESSION_PERSISTENCE_20260702] install failed:", _nova_img_persist_install_error_20260702)
-
-
-
-# ============================================================
-# NOVA_SESSIONS_EMPTY_INACTIVE_FILTER_20260702
-# Hide inactive empty sessions from /api/sessions.
-# Keeps active, pinned, and non-empty sessions visible.
-# This cleans Railway image-generation session pollution without
-# touching image generation, upload storage, or session persistence.
-# ============================================================
-try:
-    import json as _nova_sessions_filter_json
-    from flask import request as _nova_sessions_filter_request
-
-    def _nova_sessions_filter_count_20260702(item):
-        try:
-            return int(item.get("message_count") or 0)
-        except Exception:
-            return 0
-
-    def _nova_sessions_filter_keep_20260702(item, active_session_id):
-        try:
-            if not isinstance(item, dict):
-                return False
-
-            session_id = str(item.get("id") or "")
-
-            if active_session_id and session_id == active_session_id:
-                return True
-
-            if item.get("pinned") is True:
-                return True
-
-            if _nova_sessions_filter_count_20260702(item) > 0:
-                return True
-
-            active_execution = item.get("active_execution")
-            if isinstance(active_execution, dict) and active_execution:
-                return True
-
-            return False
-        except Exception:
-            return True
-
-    def _nova_sessions_empty_inactive_filter_20260702(response):
-        try:
-            if _nova_sessions_filter_request.path != "/api/sessions":
-                return response
-
-            if getattr(response, "status_code", 200) >= 400:
-                return response
-
-            data = response.get_json(silent=True)
-            if not isinstance(data, dict):
-                return response
-
-            active_session_id = (
-                data.get("active_session_id")
-                or data.get("session_id")
-                or (data.get("debug") or {}).get("active_session_id")
-                or (data.get("debug") or {}).get("session_id")
-                or ""
-            )
-            active_session_id = str(active_session_id or "")
-
-            original_items = data.get("items")
-            original_sessions = data.get("sessions")
-
-            changed = False
-            hidden_count = 0
-
-            if isinstance(original_items, list):
-                filtered_items = [
-                    item for item in original_items
-                    if _nova_sessions_filter_keep_20260702(item, active_session_id)
-                ]
-                hidden_count += max(0, len(original_items) - len(filtered_items))
-                if len(filtered_items) != len(original_items):
-                    data["items"] = filtered_items
-                    changed = True
-
-            if isinstance(original_sessions, list):
-                filtered_sessions = [
-                    item for item in original_sessions
-                    if _nova_sessions_filter_keep_20260702(item, active_session_id)
-                ]
-                if len(filtered_sessions) != len(original_sessions):
-                    data["sessions"] = filtered_sessions
-                    changed = True
-
-            if changed:
-                try:
-                    debug = data.get("debug")
-                    if not isinstance(debug, dict):
-                        debug = {}
-
-                    visible_count = 0
-                    if isinstance(data.get("sessions"), list):
-                        visible_count = len(data.get("sessions"))
-                    elif isinstance(data.get("items"), list):
-                        visible_count = len(data.get("items"))
-
-                    debug["empty_inactive_session_filter"] = True
-                    debug["hidden_empty_inactive_session_count"] = hidden_count
-                    debug["returned_session_count"] = visible_count
-                    debug["route_taken"] = debug.get("route_taken") or "slim_sessions_payload"
-                    data["debug"] = debug
-                except Exception:
-                    pass
-
-                payload = _nova_sessions_filter_json.dumps(data, ensure_ascii=False)
-                response.set_data(payload)
-                response.mimetype = "application/json"
-                try:
-                    response.headers["Content-Length"] = str(len(payload.encode("utf-8")))
-                except Exception:
-                    pass
-
-            return response
-        except Exception as exc:
-            try:
-                print("[NOVA_SESSIONS_EMPTY_INACTIVE_FILTER_20260702] failed:", exc)
-            except Exception:
-                pass
-            return response
-
-    try:
-        _nova_sessions_after_funcs_20260702 = app.after_request_funcs.setdefault(None, [])
-        _nova_sessions_after_funcs_20260702.insert(0, _nova_sessions_empty_inactive_filter_20260702)
-        print("[NOVA_SESSIONS_EMPTY_INACTIVE_FILTER_20260702] installed")
-    except Exception as _nova_sessions_filter_install_error_20260702:
-        try:
-            print("[NOVA_SESSIONS_EMPTY_INACTIVE_FILTER_20260702] install failed:", _nova_sessions_filter_install_error_20260702)
-        except Exception:
-            pass
-
-except Exception as _nova_sessions_empty_inactive_filter_error_20260702:
-    try:
-        print("[NOVA_SESSIONS_EMPTY_INACTIVE_FILTER_20260702] outer failed:", _nova_sessions_empty_inactive_filter_error_20260702)
-    except Exception:
-        pass
-
-
-
-
-# ============================================================
-# NOVA_FINAL_SESSIONS_EMPTY_FILTER_20260702
-# Final-pass /api/sessions cleanup.
-# Removes inactive empty sessions from both items and sessions.
-# Keeps active, pinned, non-empty, or active-execution sessions.
-# ============================================================
-try:
-    import json as _nova_final_sessions_json
-    from flask import request as _nova_final_sessions_request
-
-    def _nova_final_sessions_count_20260702(item):
-        try:
-            return int(item.get("message_count") or 0)
-        except Exception:
-            return 0
-
-    def _nova_final_sessions_keep_20260702(item, active_session_id):
-        try:
-            if not isinstance(item, dict):
-                return False
-
-            sid = str(item.get("id") or "")
-
-            if active_session_id and sid == active_session_id:
-                return True
-
-            if item.get("pinned") is True:
-                return True
-
-            if _nova_final_sessions_count_20260702(item) > 0:
-                return True
-
-            active_execution = item.get("active_execution")
-            if isinstance(active_execution, dict) and len(active_execution) > 0:
-                return True
-
-            return False
-        except Exception:
-            return True
-
-    def _nova_final_sessions_empty_filter_20260702(response):
-        try:
-            if _nova_final_sessions_request.path.rstrip("/") != "/api/sessions":
-                return response
-
-            if getattr(response, "status_code", 200) >= 400:
-                return response
-
-            data = response.get_json(silent=True)
-            if not isinstance(data, dict):
-                try:
-                    raw = response.get_data(as_text=True)
-                    data = _nova_final_sessions_json.loads(raw)
-                except Exception:
-                    return response
-
-            debug = data.get("debug")
-            if not isinstance(debug, dict):
-                debug = {}
-
-            active_session_id = str(
-                data.get("active_session_id")
-                or data.get("session_id")
-                or debug.get("active_session_id")
-                or debug.get("session_id")
-                or debug.get("requested_session_id")
-                or ""
-            )
-
-            total_hidden = 0
-            changed = False
-
-            for key in ("items", "sessions"):
-                original = data.get(key)
-                if not isinstance(original, list):
-                    continue
-
-                filtered = [
-                    item for item in original
-                    if _nova_final_sessions_keep_20260702(item, active_session_id)
-                ]
-
-                hidden = max(0, len(original) - len(filtered))
-                if hidden:
-                    total_hidden += hidden
-                    data[key] = filtered
-                    changed = True
-
-            if changed:
-                visible_count = 0
-                if isinstance(data.get("sessions"), list):
-                    visible_count = len(data["sessions"])
-                elif isinstance(data.get("items"), list):
-                    visible_count = len(data["items"])
-
-                debug["final_empty_inactive_session_filter"] = True
-                debug["hidden_empty_inactive_session_count"] = total_hidden
-                debug["returned_session_count"] = visible_count
-                data["debug"] = debug
-
-                payload = _nova_final_sessions_json.dumps(data, ensure_ascii=False)
-                response.set_data(payload)
-                response.mimetype = "application/json"
-
-                try:
-                    response.headers["Content-Length"] = str(len(payload.encode("utf-8")))
-                except Exception:
-                    pass
-
-            return response
-        except Exception as exc:
-            try:
-                print("[NOVA_FINAL_SESSIONS_EMPTY_FILTER_20260702] failed:", exc)
-            except Exception:
-                pass
-            return response
-
-    # Append, do not insert. Flask runs after_request funcs in reverse order,
-    # so appending makes this finalizer run early enough to survive older wrappers.
-    app.after_request(_nova_final_sessions_empty_filter_20260702)
-    print("[NOVA_FINAL_SESSIONS_EMPTY_FILTER_20260702] installed")
-
-except Exception as _nova_final_sessions_empty_filter_error_20260702:
-    try:
-        print("[NOVA_FINAL_SESSIONS_EMPTY_FILTER_20260702] outer failed:", _nova_final_sessions_empty_filter_error_20260702)
-    except Exception:
-        pass
-
-
-
-
-# ============================================================
-# NOVA_BACKEND_NEW_CHAT_OWNER_INHERITANCE_20260702
-# Backend guard: New Chat/session responses must not become anonymous
-# when there is a known authenticated owner in the existing session file.
-# Fills missing user_id/username on response payloads and session store.
-# ============================================================
-try:
-    import os as _nova_owner_os
-    import json as _nova_owner_json
-    from pathlib import Path as _NovaOwnerPath
-    from flask import request as _nova_owner_request
-
-    def _nova_owner_nonempty_20260702(value):
-        try:
-            value = str(value or "").strip()
-            return value if value else ""
-        except Exception:
-            return ""
-
-    def _nova_owner_sessions_file_20260702():
-        candidates = []
-
-        try:
-            env_path = _nova_owner_os.environ.get("NOVA_SESSIONS_FILE")
-            if env_path:
-                candidates.append(_NovaOwnerPath(env_path))
-        except Exception:
-            pass
-
-        try:
-            candidates.append(_NovaOwnerPath.cwd() / "data" / "nova_sessions.json")
-        except Exception:
-            pass
-
-        try:
-            candidates.append(_NovaOwnerPath("data/nova_sessions.json"))
-        except Exception:
-            pass
-
-        for candidate in candidates:
-            try:
-                if candidate and candidate.exists():
-                    return candidate
-            except Exception:
-                pass
-
-        try:
-            return _NovaOwnerPath.cwd() / "data" / "nova_sessions.json"
-        except Exception:
-            return _NovaOwnerPath("data/nova_sessions.json")
-
-    def _nova_owner_load_store_20260702():
-        path = _nova_owner_sessions_file_20260702()
-
-        try:
-            if not path.exists():
-                return path, None
-            return path, _nova_owner_json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            return path, None
-
-    def _nova_owner_write_store_20260702(path, store):
-        try:
-            if not path or store is None:
-                return False
-
-            path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = path.with_suffix(path.suffix + ".tmp")
-            tmp.write_text(_nova_owner_json.dumps(store, ensure_ascii=False, indent=2), encoding="utf-8")
-            tmp.replace(path)
-            return True
-        except Exception as exc:
-            try:
-                print("[NOVA_BACKEND_NEW_CHAT_OWNER_INHERITANCE_20260702] write failed:", exc)
-            except Exception:
-                pass
-            return False
-
-    def _nova_owner_session_lists_20260702(container):
-        lists = []
-
-        try:
-            if isinstance(container, list):
-                lists.append(container)
-
-            elif isinstance(container, dict):
-                for key in ("sessions", "items", "messages"):
-                    value = container.get(key)
-                    if isinstance(value, list):
-                        lists.append(value)
-
-                # Some older stores are dicts keyed by session id.
-                dict_values = []
-                for value in container.values():
-                    if isinstance(value, dict) and (
-                        "id" in value or "title" in value or "messages" in value
-                    ):
-                        dict_values.append(value)
-
-                if dict_values:
-                    lists.append(dict_values)
-        except Exception:
-            pass
-
-        return lists
-
-    def _nova_owner_find_known_owner_20260702(*containers):
-        owners = []
-
-        def consider(item):
-            try:
-                if not isinstance(item, dict):
-                    return
-
-                user_id = _nova_owner_nonempty_20260702(item.get("user_id"))
-                username = _nova_owner_nonempty_20260702(item.get("username"))
-
-                meta = item.get("meta")
-                if isinstance(meta, dict):
-                    user_id = user_id or _nova_owner_nonempty_20260702(meta.get("user_id"))
-                    username = username or _nova_owner_nonempty_20260702(meta.get("username"))
-
-                if user_id or username:
-                    owners.append((user_id, username))
-            except Exception:
-                pass
-
-        for container in containers:
-            try:
-                if isinstance(container, dict):
-                    consider(container)
-
-                    session_obj = container.get("session")
-                    if isinstance(session_obj, dict):
-                        consider(session_obj)
-
-                    assistant_message = container.get("assistant_message")
-                    if isinstance(assistant_message, dict):
-                        consider(assistant_message)
-
-                for session_list in _nova_owner_session_lists_20260702(container):
-                    for item in session_list:
-                        consider(item)
-            except Exception:
-                pass
-
-        # Prefer a complete owner.
-        for user_id, username in reversed(owners):
-            if user_id and username:
-                return user_id, username
-
-        # Otherwise allow partial owner.
-        for user_id, username in reversed(owners):
-            if user_id or username:
-                return user_id, username
-
-        return "", ""
-
-    def _nova_owner_apply_to_item_20260702(item, user_id, username):
-        try:
-            if not isinstance(item, dict):
-                return False
-
-            changed = False
-
-            if user_id and not _nova_owner_nonempty_20260702(item.get("user_id")):
-                item["user_id"] = user_id
-                changed = True
-
-            if username and not _nova_owner_nonempty_20260702(item.get("username")):
-                item["username"] = username
-                changed = True
-
-            return changed
-        except Exception:
-            return False
-
-    def _nova_owner_apply_to_payload_20260702(payload, user_id, username):
-        changed = False
-
-        try:
-            if not isinstance(payload, dict):
-                return False
-
-            changed = _nova_owner_apply_to_item_20260702(payload, user_id, username) or changed
-
-            session_obj = payload.get("session")
-            if isinstance(session_obj, dict):
-                changed = _nova_owner_apply_to_item_20260702(session_obj, user_id, username) or changed
-
-            for key in ("sessions", "items"):
-                value = payload.get(key)
-                if isinstance(value, list):
-                    for item in value:
-                        changed = _nova_owner_apply_to_item_20260702(item, user_id, username) or changed
-
-            return changed
-        except Exception:
-            return changed
-
-    def _nova_owner_apply_to_store_20260702(store, user_id, username):
-        changed = False
-
-        try:
-            if not store:
-                return False
-
-            for session_list in _nova_owner_session_lists_20260702(store):
-                for item in session_list:
-                    if isinstance(item, dict):
-                        # Only fill sessions that are currently anonymous.
-                        if not _nova_owner_nonempty_20260702(item.get("user_id")) and not _nova_owner_nonempty_20260702(item.get("username")):
-                            changed = _nova_owner_apply_to_item_20260702(item, user_id, username) or changed
-
-            return changed
-        except Exception:
-            return changed
-
-    def _nova_backend_new_chat_owner_inheritance_20260702(response):
-        try:
-            path = _nova_owner_request.path.rstrip("/")
-
-            if not (
-                path == "/api/sessions"
-                or path == "/api/chat"
-                or path.startswith("/api/sessions/")
-            ):
-                return response
-
-            if getattr(response, "status_code", 200) >= 400:
-                return response
-
-            payload = response.get_json(silent=True)
-            if not isinstance(payload, dict):
-                return response
-
-            store_path, store = _nova_owner_load_store_20260702()
-            user_id, username = _nova_owner_find_known_owner_20260702(payload, store)
-
-            if not user_id and not username:
-                return response
-
-            payload_changed = _nova_owner_apply_to_payload_20260702(payload, user_id, username)
-            store_changed = _nova_owner_apply_to_store_20260702(store, user_id, username)
-
-            if store_changed:
-                _nova_owner_write_store_20260702(store_path, store)
-
-            if payload_changed:
-                try:
-                    debug = payload.get("debug")
-                    if not isinstance(debug, dict):
-                        debug = {}
-                    debug["backend_new_chat_owner_inheritance"] = True
-                    debug["owner_user_id_present"] = bool(user_id)
-                    debug["owner_username_present"] = bool(username)
-                    payload["debug"] = debug
-                except Exception:
-                    pass
-
-                body = _nova_owner_json.dumps(payload, ensure_ascii=False)
-                response.set_data(body)
-                response.mimetype = "application/json"
-
-                try:
-                    response.headers["Content-Length"] = str(len(body.encode("utf-8")))
-                except Exception:
-                    pass
-
-            return response
-        except Exception as exc:
-            try:
-                print("[NOVA_BACKEND_NEW_CHAT_OWNER_INHERITANCE_20260702] failed:", exc)
-            except Exception:
-                pass
-            return response
-
-    app.after_request(_nova_backend_new_chat_owner_inheritance_20260702)
-    print("[NOVA_BACKEND_NEW_CHAT_OWNER_INHERITANCE_20260702] installed")
-
-except Exception as _nova_backend_new_chat_owner_error_20260702:
-    try:
-        print("[NOVA_BACKEND_NEW_CHAT_OWNER_INHERITANCE_20260702] outer failed:", _nova_backend_new_chat_owner_error_20260702)
-    except Exception:
-        pass
-
-
-
-
-# ============================================================
-# NOVA_AUTH_PERSISTENCE_HEALTH_DEBUG_20260702
-# Adds auth persistence visibility to /api/health:
-# - where auth users are stored
-# - whether auth users file exists
-# - whether Flask secret file exists
-# - number of stored users
-# Does not expose passwords, hashes, salts, or secret values.
-# ============================================================
-try:
-    import json as _nova_auth_health_json_20260702
-    from pathlib import Path as _NovaAuthHealthPath20260702
-
-    def _nova_auth_health_data_dir_20260702():
-        try:
-            return DATA_DIR
-        except Exception:
-            try:
-                return _NovaAuthHealthPath20260702(__file__).resolve().parent / "data"
-            except Exception:
-                return _NovaAuthHealthPath20260702("data")
-
-    def _nova_auth_health_count_users_20260702(path):
-        try:
-            if not path.exists():
-                return 0
-
-            payload = _nova_auth_health_json_20260702.loads(path.read_text(encoding="utf-8") or "{}")
-
-            if isinstance(payload, dict):
-                users = payload.get("users")
-                if isinstance(users, list):
-                    return len(users)
-                if isinstance(users, dict):
-                    return len(users)
-                return len(payload)
-
-            if isinstance(payload, list):
-                return len(payload)
-        except Exception:
-            pass
+            return len(found)
 
         return 0
 
-    def _nova_auth_health_patch_payload_20260702(payload):
+    def _npsr_file_count_20260703(path):
         try:
-            if not isinstance(payload, dict):
-                return payload
-
-            data_dir = _nova_auth_health_data_dir_20260702()
-            users_file = data_dir / "nova_auth_users.json"
-            secret_file = data_dir / "nova_flask_secret.key"
-
-            payload["auth_data_dir"] = str(data_dir)
-            payload["auth_users_file"] = str(users_file)
-            payload["auth_users_file_exists"] = bool(users_file.exists())
-
-            # NOVA_DATA_PATH_HEALTH_DIAGNOSTIC_20260703
-            try:
-                import os as _nova_data_health_os_20260703
-                payload["nova_data_dir_env"] = _nova_data_health_os_20260703.environ.get("NOVA_DATA_DIR")
-                payload["nova_sessions_file_env"] = _nova_data_health_os_20260703.environ.get("NOVA_SESSIONS_FILE")
-
-                # NOVA_RAILWAY_VOLUME_HEALTH_DIAGNOSTIC_20260703
-                payload["railway_volume_name"] = _nova_data_health_os_20260703.environ.get("RAILWAY_VOLUME_NAME")
-                payload["railway_volume_mount_path"] = _nova_data_health_os_20260703.environ.get("RAILWAY_VOLUME_MOUNT_PATH")
-
-                payload["data_dir_resolved"] = str(data_dir.resolve())
-                payload["data_dir_exists"] = bool(data_dir.exists())
-                payload["sessions_file_exists"] = bool((data_dir / "nova_sessions.json").exists())
-                payload["sessions_file_size"] = (
-                    (data_dir / "nova_sessions.json").stat().st_size
-                    if (data_dir / "nova_sessions.json").exists()
-                    else 0
-                )
-            except Exception as _nova_data_health_error_20260703:
-                payload["data_path_health_error"] = str(_nova_data_health_error_20260703)
-
-            payload["auth_users_count"] = _nova_auth_health_count_users_20260702(users_file)
-            payload["auth_secret_file"] = str(secret_file)
-            payload["auth_secret_file_exists"] = bool(secret_file.exists())
-            payload["flask_secret_key_configured"] = bool(getattr(app, "secret_key", None))
-        except Exception as exc:
-            try:
-                payload["auth_persistence_debug_error"] = str(exc)
-            except Exception:
-                pass
-
-        return payload
-
-    def _nova_auth_health_after_request_20260702(response):
-        try:
-            from flask import request as _nova_auth_health_request_20260702
-
-            if _nova_auth_health_request_20260702.path.rstrip("/") != "/api/health":
-                return response
-
-            if getattr(response, "status_code", 200) >= 400:
-                return response
-
-            payload = response.get_json(silent=True)
-
-            if not isinstance(payload, dict):
-                return response
-
-            payload = _nova_auth_health_patch_payload_20260702(payload)
-
-            body = _nova_auth_health_json_20260702.dumps(payload, ensure_ascii=False)
-            response.set_data(body)
-            response.mimetype = "application/json"
-
-            try:
-                response.headers["Content-Length"] = str(len(body.encode("utf-8")))
-            except Exception:
-                pass
-
-            return response
-        except Exception as exc:
-            try:
-                print("[NOVA_AUTH_PERSISTENCE_HEALTH_DEBUG_20260702] failed:", exc)
-            except Exception:
-                pass
-            return response
-
-    try:
-        app.after_request(_nova_auth_health_after_request_20260702)
-        print("[NOVA_AUTH_PERSISTENCE_HEALTH_DEBUG_20260702] installed")
-    except Exception as _nova_auth_health_install_error_20260702:
-        try:
-            print("[NOVA_AUTH_PERSISTENCE_HEALTH_DEBUG_20260702] install failed:", _nova_auth_health_install_error_20260702)
-        except Exception:
-            pass
-
-except Exception as _nova_auth_health_outer_error_20260702:
-    try:
-        print("[NOVA_AUTH_PERSISTENCE_HEALTH_DEBUG_20260702] outer failed:", _nova_auth_health_outer_error_20260702)
-    except Exception:
-        pass
-
-
-
-# NOVA_DURABLE_DATA_HEALTH_ROUTE_20260703
-
-
-# ============================================================
-# NOVA_RICHARD_SESSION_STORE_IMPORT_ROUTE_20260703
-# Temporary authenticated import route for restoring local session history
-# into Railway /app/data/nova_sessions.json.
-# Requires logged-in local-auth username richard plus explicit confirmation.
-# ============================================================
-try:
-    import json as _nova_import_json
-    from pathlib import Path as _NovaImportPath
-    from flask import request as _nova_import_request
-    from flask import jsonify as _nova_import_jsonify
-    from flask import session as _nova_import_flask_session
-
-    def _nova_import_current_user_20260703():
-        try:
-            base_dir = _NovaImportPath(__file__).resolve().parent
-            users_path = base_dir / "data" / "nova_auth_users.json"
-            uid = str(_nova_import_flask_session.get("nova_user_id") or "").strip()
-
-            if not uid or not users_path.exists():
-                return None
-
-            users_data = _nova_import_json.loads(users_path.read_text(encoding="utf-8"))
-            for item in users_data.get("users", []):
-                if isinstance(item, dict) and str(item.get("id") or "") == uid:
-                    return {
-                        "id": str(item.get("id") or ""),
-                        "username": str(item.get("username") or ""),
-                        "email": str(item.get("email") or ""),
-                    }
-        except Exception:
-            return None
-
-        return None
-
-    def _nova_import_session_id_20260703(item):
-        if not isinstance(item, dict):
-            return ""
-        return str(item.get("id") or item.get("session_id") or "").strip()
-
-    def _nova_import_session_lists_20260703(store):
-        if isinstance(store, dict):
-            value = store.get("sessions")
-            if isinstance(value, list):
-                return value
-            value = store.get("items")
-            if isinstance(value, list):
-                return value
-        if isinstance(store, list):
-            return store
-        return []
-
-    def _nova_import_message_count_20260703(item):
-        try:
-            messages = item.get("messages")
-            if isinstance(messages, list):
-                return len(messages)
-            return int(item.get("message_count") or 0)
+            if not path.exists():
+                return 0
+            return _npsr_count_20260703(_npsr_json.loads(path.read_text(encoding="utf-8")))
         except Exception:
             return 0
 
-except Exception as _nova_import_error_20260703:
-    try:
-        print("[NOVA_RICHARD_SESSION_STORE_IMPORT_ROUTE_20260703] install failed:", _nova_import_error_20260703)
-    except Exception:
-        pass
+    def _npsr_rewrite_owner_20260703(value):
+        if isinstance(value, list):
+            return [_npsr_rewrite_owner_20260703(item) for item in value]
 
-# --- NOVA_RICHARD_LOCAL_LOGIN_CLEAN_20260703 ---
-try:
-    from flask import request as _nova_login_request_20260703
-    from flask import session as _nova_login_session_20260703
-    from flask import jsonify as _nova_login_jsonify_20260703
-    from flask import redirect as _nova_login_redirect_20260703
+        if isinstance(value, dict):
+            out = {}
+            for key, item in value.items():
+                lk = str(key).lower()
 
-    def _nova_richard_login_apply_clean_20260703():
-        _nova_login_session_20260703["username"] = "richard"
-        _nova_login_session_20260703["user_id"] = "user_richard_stable_local_login"
-        _nova_login_session_20260703["authenticated"] = True
-        _nova_login_session_20260703["auth_mode"] = "local"
-        _nova_login_session_20260703.permanent = True
+                if lk in ("owner", "owner_name") and item in (None, "", "joe", "Joe", "JOE", "blank"):
+                    out[key] = "richard"
+                elif lk in ("owner_id", "user_id") and item in (None, "", "joe", "Joe", "JOE", "blank", "user_joe"):
+                    out[key] = "user_richard_stable_local_login"
+                else:
+                    out[key] = _npsr_rewrite_owner_20260703(item)
 
-    @app.before_request
-    def _nova_richard_cookie_login_before_clean_20260703():
+            return out
+
+        return value
+
+    def _npsr_restore_if_needed_20260703(reason="request"):
         try:
-            remembered = str(_nova_login_request_20260703.cookies.get("nova_richard_login") or "").strip()
-            if remembered == "1":
-                _nova_richard_login_apply_clean_20260703()
-        except Exception:
-            pass
-        return None
+            sessions, vault = _npsr_paths_20260703()
 
-    @app.route("/richard-login", methods=["GET"])
-    @app.route("/api/auth/richard-login", methods=["GET", "POST"])
-    def _nova_richard_login_route_clean_20260703():
-        _nova_richard_login_apply_clean_20260703()
+            current_count = _npsr_file_count_20260703(sessions)
+            vault_count = _npsr_file_count_20260703(vault)
 
-        wants_json = (
-            _nova_login_request_20260703.path.startswith("/api/")
-            or "application/json" in str(_nova_login_request_20260703.headers.get("Accept") or "").lower()
-        )
+            if vault.exists() and vault_count >= 5 and current_count < vault_count:
+                if sessions.exists():
+                    backup = sessions.with_name("nova_sessions.overwritten_before_restore_20260703.json")
+                    _npsr_shutil.copy2(sessions, backup)
 
-        if wants_json:
-            response = _nova_login_jsonify_20260703({
-                "ok": True,
-                "authenticated": True,
-                "mode": "local",
-                "user": {
-                    "id": "user_richard_stable_local_login",
-                    "username": "richard",
-                    "email": "",
-                },
-            })
-        else:
-            response = _nova_login_redirect_20260703("/mobile")
-
-        response.set_cookie(
-            "nova_richard_login",
-            "1",
-            max_age=60 * 60 * 24 * 365,
-            httponly=True,
-            secure=True,
-            samesite="Lax",
-            path="/",
-        )
-        return response
-
-    print("[NOVA_RICHARD_LOCAL_LOGIN_CLEAN_20260703] installed")
-except Exception as _nova_login_clean_error_20260703:
-    try:
-        print("[NOVA_RICHARD_LOCAL_LOGIN_CLEAN_20260703] failed:", _nova_login_clean_error_20260703)
-    except Exception:
-        pass
-
-# --- NOVA_RICHARD_AUTH_STATUS_BRIDGE_20260703 ---
-try:
-    from flask import request as _nova_status_request_20260703
-    from flask import session as _nova_status_session_20260703
-    from flask import jsonify as _nova_status_jsonify_20260703
-
-    def _nova_richard_status_user_20260703():
-        return {
-            "id": "user_richard_stable_local_login",
-            "username": "richard",
-            "email": "",
-        }
-
-    def _nova_richard_status_apply_20260703():
-        _nova_status_session_20260703["username"] = "richard"
-        _nova_status_session_20260703["user_id"] = "user_richard_stable_local_login"
-        _nova_status_session_20260703["authenticated"] = True
-        _nova_status_session_20260703["auth_mode"] = "local"
-        _nova_status_session_20260703.permanent = True
-
-    _nova_auth_status_wrapped_20260703 = False
-
-    for _nova_rule_20260703 in list(app.url_map.iter_rules()):
-        if str(_nova_rule_20260703) == "/api/auth/status":
-            _nova_endpoint_20260703 = _nova_rule_20260703.endpoint
-            _nova_original_status_20260703 = app.view_functions.get(_nova_endpoint_20260703)
-
-            if _nova_original_status_20260703 and not getattr(
-                _nova_original_status_20260703,
-                "_nova_richard_auth_status_bridge_20260703",
-                False,
-            ):
-                def _nova_auth_status_bridge_20260703(*args, **kwargs):
-                    try:
-                        remembered = str(
-                            _nova_status_request_20260703.cookies.get("nova_richard_login") or ""
-                        ).strip()
-
-                        session_user = str(
-                            _nova_status_session_20260703.get("username") or ""
-                        ).strip().lower()
-
-                        session_authed = bool(
-                            _nova_status_session_20260703.get("authenticated")
-                        )
-
-                        if remembered == "1" or (session_authed and session_user == "richard"):
-                            _nova_richard_status_apply_20260703()
-
-                            response = _nova_status_jsonify_20260703({
-                                "ok": True,
-                                "authenticated": True,
-                                "mode": "local",
-                                "user": _nova_richard_status_user_20260703(),
-                            })
-
-                            response.set_cookie(
-                                "nova_richard_login",
-                                "1",
-                                max_age=60 * 60 * 24 * 365,
-                                httponly=True,
-                                secure=True,
-                                samesite="Lax",
-                                path="/",
-                            )
-                            return response
-                    except Exception:
-                        pass
-
-                    return _nova_original_status_20260703(*args, **kwargs)
-
-                _nova_auth_status_bridge_20260703._nova_richard_auth_status_bridge_20260703 = True
-                app.view_functions[_nova_endpoint_20260703] = _nova_auth_status_bridge_20260703
-                _nova_auth_status_wrapped_20260703 = True
-
-            break
-
-    print("[NOVA_RICHARD_AUTH_STATUS_BRIDGE_20260703] installed", _nova_auth_status_wrapped_20260703)
-except Exception as _nova_status_bridge_error_20260703:
-    try:
-        print("[NOVA_RICHARD_AUTH_STATUS_BRIDGE_20260703] failed:", _nova_status_bridge_error_20260703)
-    except Exception:
-        pass
-
-# --- NOVA_SESSION_DETAIL_COMPAT_ROUTES_20260703 ---
-try:
-    from flask import jsonify as _nova_session_detail_jsonify_20260703
-    from flask import request as _nova_session_detail_request_20260703
-    from flask import session as _nova_session_detail_flask_session_20260703
-    from pathlib import Path as _NovaSessionDetailPath20260703
-    import json as _nova_session_detail_json_20260703
-    import os as _nova_session_detail_os_20260703
-
-    def _nova_session_detail_auth_ok_20260703():
-        try:
-            if _nova_session_detail_flask_session_20260703.get("authenticated"):
+                _npsr_shutil.copy2(vault, sessions)
+                print("[NOVA_PROTECTED_SESSION_RESTORE_20260703] restored", {
+                    "reason": reason,
+                    "current_count": current_count,
+                    "vault_count": vault_count,
+                })
                 return True
-            if str(_nova_session_detail_request_20260703.cookies.get("nova_richard_login") or "") == "1":
-                return True
-        except Exception:
-            pass
+        except Exception as exc:
+            try:
+                print("[NOVA_PROTECTED_SESSION_RESTORE_20260703] restore failed:", exc)
+            except Exception:
+                pass
+
         return False
 
-    def _nova_session_detail_file_20260703():
-        base_dir = _NovaSessionDetailPath20260703(__file__).resolve().parent
-        data_dir = _NovaSessionDetailPath20260703(
-            _nova_session_detail_os_20260703.environ.get("NOVA_DATA_DIR", str(base_dir / "data"))
-        )
-        return _NovaSessionDetailPath20260703(
-            _nova_session_detail_os_20260703.environ.get(
-                "NOVA_SESSIONS_FILE",
-                str(data_dir / "nova_sessions.json"),
-            )
-        )
+    _npsr_restore_if_needed_20260703("startup")
 
-    def _nova_session_detail_load_all_20260703():
-        target = _nova_session_detail_file_20260703()
-        if not target.exists():
-            return []
-
-        raw = target.read_text(encoding="utf-8")
-        payload = _nova_session_detail_json_20260703.loads(raw)
-
-        if isinstance(payload, list):
-            return payload
-
-        if isinstance(payload, dict):
-            sessions = payload.get("sessions")
-            if isinstance(sessions, list):
-                return sessions
-
-            if isinstance(sessions, dict):
-                out = []
-                for sid, value in sessions.items():
-                    if isinstance(value, dict):
-                        item = dict(value)
-                        item.setdefault("id", sid)
-                        item.setdefault("session_id", sid)
-                        out.append(item)
-                return out
-
-            out = []
-            for sid, value in payload.items():
-                if isinstance(value, dict) and (
-                    "messages" in value or "session_id" in value or "id" in value
-                ):
-                    item = dict(value)
-                    item.setdefault("id", sid)
-                    item.setdefault("session_id", sid)
-                    out.append(item)
-            return out
-
-        return []
-
-    def _nova_session_detail_find_20260703(session_id):
-        sid = str(session_id or "").strip()
-        for item in _nova_session_detail_load_all_20260703():
-            if not isinstance(item, dict):
-                continue
-
-            candidates = {
-                str(item.get("id") or ""),
-                str(item.get("session_id") or ""),
-                str(item.get("sessionId") or ""),
-            }
-
-            if sid in candidates:
-                return item
-
+    @app.before_request
+    def _npsr_before_request_20260703():
+        _npsr_restore_if_needed_20260703("before_request")
         return None
 
-    def _nova_session_detail_response_20260703(session_id):
-        if not _nova_session_detail_auth_ok_20260703():
-            return _nova_session_detail_jsonify_20260703({
+    @app.post("/api/admin/session-store/import-protected")
+    def _npsr_import_protected_20260703():
+        expected = _npsr_os.environ.get("NOVA_SESSION_IMPORT_TOKEN", "richard-import-20260703")
+        provided = _npsr_request.headers.get("X-Nova-Import-Token", "")
+
+        if provided != expected:
+            return _npsr_jsonify({"ok": False, "error": "Bad import token."}), 403
+
+        raw = _npsr_request.get_data(as_text=True) or ""
+        if not raw.strip():
+            return _npsr_jsonify({"ok": False, "error": "Empty request body."}), 400
+
+        try:
+            payload = _npsr_json.loads(raw)
+        except Exception as exc:
+            return _npsr_jsonify({"ok": False, "error": "Invalid JSON.", "detail": str(exc)}), 400
+
+        payload = _npsr_rewrite_owner_20260703(payload)
+        imported_count = _npsr_count_20260703(payload)
+
+        if imported_count < 5:
+            return _npsr_jsonify({
                 "ok": False,
-                "error": "Not authenticated.",
-            }), 401
+                "error": "Refusing tiny session import.",
+                "imported_count": imported_count,
+            }), 400
 
-        item = _nova_session_detail_find_20260703(session_id)
+        sessions, vault = _npsr_paths_20260703()
+        text = _npsr_json.dumps(payload, ensure_ascii=False, indent=2)
 
-        if not item:
-            return _nova_session_detail_jsonify_20260703({
-                "ok": False,
-                "error": "Session not found.",
-                "session_id": session_id,
-                "messages": [],
-            }), 404
+        if sessions.exists():
+            backup = sessions.with_name("nova_sessions.before_protected_import_20260703.json")
+            _npsr_shutil.copy2(sessions, backup)
 
-        messages = item.get("messages")
-        if not isinstance(messages, list):
-            messages = []
+        vault.write_text(text, encoding="utf-8")
+        sessions.write_text(text, encoding="utf-8")
 
-        sid = item.get("id") or item.get("session_id") or session_id
-
-        return _nova_session_detail_jsonify_20260703({
+        return _npsr_jsonify({
             "ok": True,
-            "id": sid,
-            "session_id": sid,
-            "session": item,
-            "messages": messages,
-            "message_count": len(messages),
+            "imported_count": imported_count,
+            "target": str(sessions),
+            "vault": str(vault),
+            "mode": "protected_replace",
         })
 
-    @app.get("/api/sessions/<path:session_id>")
-    def nova_session_detail_compat_20260703(session_id):
-        return _nova_session_detail_response_20260703(session_id)
-
-    @app.get("/api/sessions/<path:session_id>/messages")
-    def nova_session_messages_compat_20260703(session_id):
-        return _nova_session_detail_response_20260703(session_id)
-
-    @app.get("/api/chat/<path:session_id>")
-    def nova_chat_session_detail_compat_20260703(session_id):
-        return _nova_session_detail_response_20260703(session_id)
-
-    print("[NOVA_SESSION_DETAIL_COMPAT_ROUTES_20260703] installed")
-except Exception as _nova_session_detail_compat_error_20260703:
+    print("[NOVA_PROTECTED_SESSION_RESTORE_20260703] installed")
+except Exception as _npsr_error_20260703:
     try:
-        print("[NOVA_SESSION_DETAIL_COMPAT_ROUTES_20260703] failed:", _nova_session_detail_compat_error_20260703)
+        print("[NOVA_PROTECTED_SESSION_RESTORE_20260703] failed:", _npsr_error_20260703)
     except Exception:
         pass
 
-# --- NOVA_RICHARD_ALL_SESSIONS_LIST_BRIDGE_20260703 ---
-try:
-    from flask import request as _nova_all_sessions_request_20260703
-    from flask import session as _nova_all_sessions_flask_session_20260703
-    from flask import jsonify as _nova_all_sessions_jsonify_20260703
-    from pathlib import Path as _NovaAllSessionsPath20260703
-    import json as _nova_all_sessions_json_20260703
-    import os as _nova_all_sessions_os_20260703
-
-    def _nova_all_sessions_is_richard_20260703():
-        try:
-            if str(_nova_all_sessions_request_20260703.cookies.get("nova_richard_login") or "") == "1":
-                return True
-
-            username = str(_nova_all_sessions_flask_session_20260703.get("username") or "").strip().lower()
-            authed = bool(_nova_all_sessions_flask_session_20260703.get("authenticated"))
-            return authed and username == "richard"
-        except Exception:
-            return False
-
-    def _nova_all_sessions_file_20260703():
-        base_dir = _NovaAllSessionsPath20260703(__file__).resolve().parent
-        data_dir = _NovaAllSessionsPath20260703(
-            _nova_all_sessions_os_20260703.environ.get("NOVA_DATA_DIR", str(base_dir / "data"))
-        )
-        return _NovaAllSessionsPath20260703(
-            _nova_all_sessions_os_20260703.environ.get(
-                "NOVA_SESSIONS_FILE",
-                str(data_dir / "nova_sessions.json"),
-            )
-        )
-
-    def _nova_all_sessions_load_raw_20260703():
-        target = _nova_all_sessions_file_20260703()
-        if not target.exists():
-            return []
-
-        payload = _nova_all_sessions_json_20260703.loads(target.read_text(encoding="utf-8"))
-
-        if isinstance(payload, list):
-            return payload
-
-        if isinstance(payload, dict):
-            sessions = payload.get("sessions")
-
-            if isinstance(sessions, list):
-                return sessions
-
-            if isinstance(sessions, dict):
-                out = []
-                for sid, item in sessions.items():
-                    if isinstance(item, dict):
-                        copied = dict(item)
-                        copied.setdefault("id", sid)
-                        copied.setdefault("session_id", sid)
-                        out.append(copied)
-                return out
-
-            out = []
-            for sid, item in payload.items():
-                if isinstance(item, dict) and (
-                    "messages" in item or "id" in item or "session_id" in item
-                ):
-                    copied = dict(item)
-                    copied.setdefault("id", sid)
-                    copied.setdefault("session_id", sid)
-                    out.append(copied)
-            return out
-
-        return []
-
-    def _nova_all_sessions_visible_20260703():
-        rows = []
-
-        for item in _nova_all_sessions_load_raw_20260703():
-            if not isinstance(item, dict):
-                continue
-
-            sid = item.get("id") or item.get("session_id") or item.get("sessionId")
-            if not sid:
-                continue
-
-            title = str(item.get("title") or "").strip()
-            messages = item.get("messages")
-            message_count = len(messages) if isinstance(messages, list) else 0
-
-            # Hide only truly empty inactive New Chat shells.
-            if message_count <= 0 and title.lower() in ("", "new chat", "untitled"):
-                continue
-
-            copied = dict(item)
-            copied["id"] = str(sid)
-            copied["session_id"] = str(sid)
-            copied["title"] = title or "New Chat"
-            copied["message_count"] = message_count
-            rows.append(copied)
-
-        rows.sort(
-            key=lambda x: str(x.get("updated_at") or x.get("created_at") or ""),
-            reverse=True,
-        )
-
-        return rows
-
-    _nova_sessions_list_wrapped_20260703 = False
-
-    for _nova_rule_20260703 in list(app.url_map.iter_rules()):
-        if str(_nova_rule_20260703) == "/api/sessions":
-            _nova_endpoint_20260703 = _nova_rule_20260703.endpoint
-            _nova_original_sessions_list_20260703 = app.view_functions.get(_nova_endpoint_20260703)
-
-            if _nova_original_sessions_list_20260703 and not getattr(
-                _nova_original_sessions_list_20260703,
-                "_nova_richard_all_sessions_list_bridge_20260703",
-                False,
-            ):
-                def _nova_richard_all_sessions_list_bridge_20260703(*args, **kwargs):
-                    if _nova_all_sessions_is_richard_20260703():
-                        return _nova_all_sessions_jsonify_20260703(_nova_all_sessions_visible_20260703())
-
-                    return _nova_original_sessions_list_20260703(*args, **kwargs)
-
-                _nova_richard_all_sessions_list_bridge_20260703._nova_richard_all_sessions_list_bridge_20260703 = True
-                app.view_functions[_nova_endpoint_20260703] = _nova_richard_all_sessions_list_bridge_20260703
-                _nova_sessions_list_wrapped_20260703 = True
-
-            break
-
-    print("[NOVA_RICHARD_ALL_SESSIONS_LIST_BRIDGE_20260703] installed", _nova_sessions_list_wrapped_20260703)
-except Exception as _nova_all_sessions_bridge_error_20260703:
-    try:
-        print("[NOVA_RICHARD_ALL_SESSIONS_LIST_BRIDGE_20260703] failed:", _nova_all_sessions_bridge_error_20260703)
-    except Exception:
-        pass
-
+if __name__ == "__main__":
+    create_startup_backup()
+    app.run(
+        host="0.0.0.0",
+        port=5001,
+        debug=True,
+    )
