@@ -283,7 +283,7 @@
         }
 
         const script = document.createElement("script");
-        script.src = "/static/js/mobile/nova-mobile-session-panel-v6.js?v=new-chat-session-v9";
+        script.src = "/static/js/mobile/nova-mobile-session-panel-v9.js?v=v9-new-file";
         script.async = false;
         script.setAttribute("data-nova-session-panel-v6-loader", "true");
 
@@ -306,5 +306,6 @@
 
     log("active", VERSION);
 })();
+
 
 
