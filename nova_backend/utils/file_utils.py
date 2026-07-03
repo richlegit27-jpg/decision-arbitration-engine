@@ -31,10 +31,51 @@ def _get_file_lock(path: str | Path) -> threading.RLock:
         return lock
 
 
-def ensure_dir(path: str | Path) -> Path:
+def ensure_dir(path):
+    """
+    Ensure a path is a usable directory.
+
+    If Railway presents an existing file or broken symlink at a directory path,
+    repair it instead of crashing app boot with FileExistsError.
+    """
+    from pathlib import Path
+    import time
+
     p = Path(path)
-    p.mkdir(parents=True, exist_ok=True)
-    return p
+
+    try:
+        if p.is_dir():
+            return p
+
+        if p.exists() or p.is_symlink():
+            backup = p.with_name(f"{p.name}.file_blocker_{int(time.time())}")
+            try:
+                p.rename(backup)
+            except Exception:
+                try:
+                    p.unlink()
+                except FileNotFoundError:
+                    pass
+
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+
+    except FileExistsError:
+        if p.is_dir():
+            return p
+
+        if p.exists() or p.is_symlink():
+            backup = p.with_name(f"{p.name}.file_blocker_{int(time.time())}")
+            try:
+                p.rename(backup)
+            except Exception:
+                try:
+                    p.unlink()
+                except FileNotFoundError:
+                    pass
+
+        p.mkdir(parents=True, exist_ok=True)
+        return p
 
 
 def ensure_parent_dir(path: str | Path) -> Path:
