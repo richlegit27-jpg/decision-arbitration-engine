@@ -1,3 +1,13 @@
+﻿from pathlib import Path
+import re
+
+js_path = Path("static/js/mobile/nova-mobile-new-chat-backend-create-v1.js")
+app_path = Path("app.py")
+
+if not js_path.exists():
+    raise SystemExit("missing " + str(js_path))
+
+js = r'''
 (function () {
     "use strict";
 
@@ -197,3 +207,20 @@
 
     log("ready", VERSION);
 })();
+'''
+
+js_path.write_text(js.strip() + "\n", encoding="utf-8")
+
+app = app_path.read_text(encoding="utf-8")
+app2 = re.sub(
+    r"nova-mobile-new-chat-backend-create-v1\.js\?v=[^\"']+",
+    "nova-mobile-new-chat-backend-create-v1.js?v=backend-create-v2-no-auto-run-20260703",
+    app,
+)
+
+if app2 == app:
+    print("warning: app.py script cache string not found; file replaced anyway")
+else:
+    app_path.write_text(app2, encoding="utf-8")
+
+print("replaced new chat backend create with no-auto-run v2")
