@@ -90,6 +90,85 @@
         return [];
     }
 
+
+    // NOVA_SESSION_DRAWER_V2_REAL_SESSION_FILTER_20260703
+    function showDebugSessions() {
+        try {
+            var params = new URLSearchParams(window.location.search);
+            if (
+                params.get("debug_sessions") === "1" ||
+                params.get("show_debug_sessions") === "1" ||
+                params.get("dev_sessions") === "1"
+            ) {
+                return true;
+            }
+
+            return localStorage.getItem("nova_show_debug_sessions") === "1";
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function isDebugSession(item) {
+        var id = sessionId(item).toLowerCase();
+        var title = String((item && item.title) || "").toLowerCase();
+        var combined = id + " " + title;
+
+        return (
+            id.indexOf("regression_") === 0 ||
+            id.indexOf("test_") === 0 ||
+            id.indexOf("smoke_") === 0 ||
+            combined.indexOf("regression") >= 0 ||
+            combined.indexOf("smoke") >= 0
+        );
+    }
+
+    function shouldShowSessionInDrawer(item) {
+        if (!item) return false;
+
+        var id = sessionId(item);
+        if (!id) return false;
+
+        if (isDebugSession(item) && !showDebugSessions()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function sessionKind(item) {
+        var id = sessionId(item).toLowerCase();
+
+        if (id.indexOf("mobile_") === 0) return "Mobile";
+        if (id.indexOf("session_") === 0) return "Legacy";
+        if (id.indexOf("regression_") === 0) return "Regression";
+        if (id.indexOf("test_") === 0) return "Test";
+        if (id.indexOf("smoke_") === 0) return "Smoke";
+
+        return "Session";
+    }
+
+    function sessionSortRank(item) {
+        var kind = sessionKind(item);
+
+        if (kind === "Mobile") return 0;
+        if (kind === "Legacy") return 1;
+        if (kind === "Session") return 2;
+        return 9;
+    }
+
+    function compareDrawerSessions(a, b) {
+        var ar = sessionSortRank(a);
+        var br = sessionSortRank(b);
+
+        if (ar !== br) return ar - br;
+
+        var at = String((a && (a.updated_at || a.created_at || a.last_updated)) || "");
+        var bt = String((b && (b.updated_at || b.created_at || b.last_updated)) || "");
+
+        return bt.localeCompare(at);
+    }
+
     function messagesFrom(payload) {
         if (Array.isArray(payload)) return payload;
         if (payload && Array.isArray(payload.messages)) return payload.messages;
@@ -292,13 +371,15 @@
         ownDrawer();
 
         fetchJson("/api/sessions").then(function (payload) {
-            var sessions = sessionsFrom(payload);
+            var allSessions = sessionsFrom(payload);
+            var sessions = allSessions.filter(shouldShowSessionInDrawer).sort(compareDrawerSessions);
+            var hiddenDebugCount = allSessions.length - sessions.length;
             button.textContent = "Sessions (" + sessions.length + ")";
             panel.innerHTML = "";
 
             var head = document.createElement("div");
             head.className = "nova-session-drawer-v2-empty";
-            head.textContent = "Sessions: " + sessions.length;
+            head.textContent = "Sessions: " + sessions.length + (hiddenDebugCount ? " · hidden tests: " + hiddenDebugCount : "");
             panel.appendChild(head);
 
             sessions.forEach(function (item) {
@@ -316,7 +397,7 @@
 
                 var meta = document.createElement("div");
                 meta.className = "nova-session-drawer-v2-meta";
-                meta.textContent = (count === undefined || count === null ? "?" : count) + " messages · " + id;
+                meta.textContent = sessionKind(item) + " · " + (count === undefined || count === null ? "?" : count) + " messages · " + id;
 
                 row.appendChild(titleEl);
                 row.appendChild(meta);
