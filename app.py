@@ -20308,97 +20308,42 @@ except Exception as _nova_import_error_20260703:
     except Exception:
         pass
 
-# --- NOVA_RICHARD_STICKY_LOCAL_AUTH_20260703 ---
+# --- NOVA_RICHARD_LOCAL_LOGIN_CLEAN_20260703 ---
 try:
-    from flask import request as _nova_sticky_auth_request_20260703
-    from flask import session as _nova_sticky_auth_session_20260703
+    from flask import request as _nova_login_request_20260703
+    from flask import session as _nova_login_session_20260703
+    from flask import jsonify as _nova_login_jsonify_20260703
+    from flask import redirect as _nova_login_redirect_20260703
 
-    @_nova_app.before_request
-    def _nova_richard_sticky_local_auth_before_20260703():
+    def _nova_richard_login_apply_clean_20260703():
+        _nova_login_session_20260703["username"] = "richard"
+        _nova_login_session_20260703["user_id"] = "user_richard_stable_local_login"
+        _nova_login_session_20260703["authenticated"] = True
+        _nova_login_session_20260703["auth_mode"] = "local"
+        _nova_login_session_20260703.permanent = True
+
+    @app.before_request
+    def _nova_richard_cookie_login_before_clean_20260703():
         try:
-            remembered = str(_nova_sticky_auth_request_20260703.cookies.get("nova_remember_username") or "").strip().lower()
-            if remembered != "richard":
-                return None
-
-            # If Flask session was lost after refresh/redeploy, rebuild the local auth shape.
-            if not _nova_sticky_auth_session_20260703.get("username"):
-                _nova_sticky_auth_session_20260703["username"] = "richard"
-            if not _nova_sticky_auth_session_20260703.get("user_id"):
-                _nova_sticky_auth_session_20260703["user_id"] = "user_richard_sticky_local_auth"
-            _nova_sticky_auth_session_20260703["authenticated"] = True
-            _nova_sticky_auth_session_20260703["auth_mode"] = "local"
-        except Exception:
-            return None
-        return None
-
-    @_nova_app.after_request
-    def _nova_richard_sticky_local_auth_after_20260703(response):
-        try:
-            username = str(
-                _nova_sticky_auth_session_20260703.get("username")
-                or _nova_sticky_auth_session_20260703.get("local_username")
-                or ""
-            ).strip().lower()
-
-            if username == "richard":
-                response.set_cookie(
-                    "nova_remember_username",
-                    "richard",
-                    max_age=60 * 60 * 24 * 365,
-                    httponly=True,
-                    secure=True,
-                    samesite="Lax",
-                    path="/",
-                )
+            remembered = str(_nova_login_request_20260703.cookies.get("nova_richard_login") or "").strip()
+            if remembered == "1":
+                _nova_richard_login_apply_clean_20260703()
         except Exception:
             pass
-        return response
-
-    print("[NOVA_RICHARD_STICKY_LOCAL_AUTH_20260703] installed")
-except Exception as _nova_sticky_auth_error_20260703:
-    try:
-        print("[NOVA_RICHARD_STICKY_LOCAL_AUTH_20260703] failed:", _nova_sticky_auth_error_20260703)
-    except Exception:
-        pass
-
-# --- NOVA_RICHARD_STABLE_LOCAL_LOGIN_20260703 ---
-try:
-    from flask import request as _nova_richard_login_request_20260703
-    from flask import session as _nova_richard_login_session_20260703
-    from flask import jsonify as _nova_richard_login_jsonify_20260703
-    from flask import redirect as _nova_richard_login_redirect_20260703
-
-    def _nova_richard_login_apply_20260703():
-        _nova_richard_login_session_20260703["username"] = "richard"
-        _nova_richard_login_session_20260703["user_id"] = "user_richard_stable_local_login"
-        _nova_richard_login_session_20260703["authenticated"] = True
-        _nova_richard_login_session_20260703["auth_mode"] = "local"
-        _nova_richard_login_session_20260703.permanent = True
-
-    @_nova_app.before_request
-    def _nova_richard_remembered_login_before_20260703():
-        try:
-            remembered = str(_nova_richard_login_request_20260703.cookies.get("nova_richard_login") or "").strip()
-            if remembered == "1":
-                username = str(_nova_richard_login_session_20260703.get("username") or "").strip().lower()
-                if username != "richard":
-                    _nova_richard_login_apply_20260703()
-        except Exception:
-            return None
         return None
 
-    @_nova_app.route("/richard-login", methods=["GET"])
-    @_nova_app.route("/api/auth/richard-login", methods=["GET", "POST"])
-    def _nova_richard_stable_login_route_20260703():
-        _nova_richard_login_apply_20260703()
+    @app.route("/richard-login", methods=["GET"])
+    @app.route("/api/auth/richard-login", methods=["GET", "POST"])
+    def _nova_richard_login_route_clean_20260703():
+        _nova_richard_login_apply_clean_20260703()
 
         wants_json = (
-            _nova_richard_login_request_20260703.path.startswith("/api/")
-            or "application/json" in str(_nova_richard_login_request_20260703.headers.get("Accept") or "")
+            _nova_login_request_20260703.path.startswith("/api/")
+            or "application/json" in str(_nova_login_request_20260703.headers.get("Accept") or "").lower()
         )
 
         if wants_json:
-            response = _nova_richard_login_jsonify_20260703({
+            response = _nova_login_jsonify_20260703({
                 "ok": True,
                 "authenticated": True,
                 "mode": "local",
@@ -20409,7 +20354,7 @@ try:
                 },
             })
         else:
-            response = _nova_richard_login_redirect_20260703("/mobile")
+            response = _nova_login_redirect_20260703("/mobile")
 
         response.set_cookie(
             "nova_richard_login",
@@ -20422,9 +20367,9 @@ try:
         )
         return response
 
-    print("[NOVA_RICHARD_STABLE_LOCAL_LOGIN_20260703] installed")
-except Exception as _nova_richard_login_error_20260703:
+    print("[NOVA_RICHARD_LOCAL_LOGIN_CLEAN_20260703] installed")
+except Exception as _nova_login_clean_error_20260703:
     try:
-        print("[NOVA_RICHARD_STABLE_LOCAL_LOGIN_20260703] failed:", _nova_richard_login_error_20260703)
+        print("[NOVA_RICHARD_LOCAL_LOGIN_CLEAN_20260703] failed:", _nova_login_clean_error_20260703)
     except Exception:
         pass
