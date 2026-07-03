@@ -1,3 +1,10 @@
+﻿from pathlib import Path
+import re
+
+js_path = Path("static/js/mobile/nova-mobile-session-drawer-v2.js")
+app_path = Path("app.py")
+
+js = r"""
 (function () {
     "use strict";
 
@@ -366,3 +373,24 @@
         boot();
     }
 })();
+"""
+
+js_path.write_text(js.strip() + "\n", encoding="utf-8")
+
+app = app_path.read_text(encoding="utf-8")
+
+# Replace every possible drawer script cache version in app.py.
+app2 = re.sub(
+    r"nova-mobile-session-drawer-v2\.js\?v=[^\"']+",
+    "nova-mobile-session-drawer-v2.js?v=20260703-hard-clean-no-async",
+    app,
+)
+
+if "20260703-hard-clean-no-async" not in app2:
+    raise SystemExit("failed to install hard clean cache version in app.py")
+
+app_path.write_text(app2, encoding="utf-8")
+
+print("wrote hard clean no-async drawer")
+print("drawer refs in app.py:", app2.count("nova-mobile-session-drawer-v2.js"))
+print("hard clean cache refs:", app2.count("20260703-hard-clean-no-async"))
