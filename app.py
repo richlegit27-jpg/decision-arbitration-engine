@@ -19097,6 +19097,94 @@ except Exception as _npsr_error_20260703:
     except Exception:
         pass
 
+# --- NOVA_RICHARD_LOGIN_AND_STATUS_RESTORE_20260703 ---
+try:
+    from flask import session as _nrla_session
+    from flask import request as _nrla_request
+    from flask import jsonify as _nrla_jsonify
+    from flask import redirect as _nrla_redirect
+    from flask import make_response as _nrla_make_response
+
+    def _nrla_set_richard_auth_20260703(response):
+        try:
+            _nrla_session.permanent = True
+            _nrla_session["authenticated"] = True
+            _nrla_session["auth_mode"] = "local"
+            _nrla_session["username"] = "richard"
+            _nrla_session["user_id"] = "user_richard_stable_local_login"
+        except Exception:
+            pass
+
+        try:
+            response.set_cookie(
+                "nova_richard_login",
+                "1",
+                max_age=60 * 60 * 24 * 365,
+                httponly=True,
+                secure=True,
+                samesite="Lax",
+                path="/",
+            )
+        except Exception:
+            pass
+
+        return response
+
+    def _nrla_richard_payload_20260703():
+        return {
+            "ok": True,
+            "authenticated": True,
+            "mode": "local",
+            "user": {
+                "id": "user_richard_stable_local_login",
+                "username": "richard",
+                "email": "",
+            },
+        }
+
+    @app.get("/richard-login")
+    def nova_richard_login_restore_page_20260703():
+        response = _nrla_make_response(_nrla_redirect("/mobile"))
+        return _nrla_set_richard_auth_20260703(response)
+
+    @app.get("/api/auth/richard-login")
+    @app.post("/api/auth/richard-login")
+    def nova_richard_login_restore_api_20260703():
+        response = _nrla_jsonify(_nrla_richard_payload_20260703())
+        return _nrla_set_richard_auth_20260703(response)
+
+    for _nrla_rule_20260703 in list(app.url_map.iter_rules()):
+        if str(_nrla_rule_20260703) == "/api/auth/status":
+            _nrla_endpoint_20260703 = _nrla_rule_20260703.endpoint
+            _nrla_original_status_20260703 = app.view_functions.get(_nrla_endpoint_20260703)
+
+            def _nrla_status_bridge_20260703(*args, **kwargs):
+                try:
+                    if str(_nrla_request.cookies.get("nova_richard_login") or "") == "1":
+                        response = _nrla_jsonify(_nrla_richard_payload_20260703())
+                        return _nrla_set_richard_auth_20260703(response)
+
+                    if (
+                        _nrla_session.get("authenticated")
+                        and str(_nrla_session.get("username") or "").lower() == "richard"
+                    ):
+                        response = _nrla_jsonify(_nrla_richard_payload_20260703())
+                        return _nrla_set_richard_auth_20260703(response)
+                except Exception:
+                    pass
+
+                return _nrla_original_status_20260703(*args, **kwargs)
+
+            app.view_functions[_nrla_endpoint_20260703] = _nrla_status_bridge_20260703
+            break
+
+    print("[NOVA_RICHARD_LOGIN_AND_STATUS_RESTORE_20260703] installed")
+except Exception as _nrla_error_20260703:
+    try:
+        print("[NOVA_RICHARD_LOGIN_AND_STATUS_RESTORE_20260703] failed:", _nrla_error_20260703)
+    except Exception:
+        pass
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
