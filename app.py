@@ -19488,50 +19488,13 @@ except Exception as _nasf_error_20260703:
 
 
 # --- NOVA_MOBILE_SESSION_DRAWER_V2_INJECT_20260703 ---
+# NOVA_DISABLE_DRAWER_V2_INJECT_20260703_FINAL_PURGE
+# Disabled. The only allowed mobile sessions owner is:
+# static/js/mobile/nova-mobile-sessions.js
 try:
-    from flask import request as _nmsdv2_request
-
-    @app.after_request
-    def _nmsdv2_inject_after_request_20260703(response):
-        try:
-            if _nmsdv2_request.path not in ("/mobile", "/mobile/"):
-                return response
-
-            content_type = str(response.headers.get("Content-Type") or "")
-            if "text/html" not in content_type:
-                return response
-
-            html = response.get_data(as_text=True)
-
-            if "nova-mobile-session-drawer-v2.js" in html:
-                return response
-
-            script = '<script src="/static/js/mobile/nova-mobile-session-drawer-v2.js?v=20260703-stable-no-jitter-6-force-close-after-restore"></script>'
-
-            lower = html.lower()
-            idx = lower.rfind("</body>")
-
-            if idx >= 0:
-                html = html[:idx] + "\n" + script + "\n" + html[idx:]
-            else:
-                html = html + "\n" + script + "\n"
-
-            response.set_data(html)
-            response.headers["Content-Length"] = str(len(response.get_data()))
-        except Exception as exc:
-            try:
-                print("[NOVA_MOBILE_SESSION_DRAWER_V2_INJECT_20260703] failed:", exc)
-            except Exception:
-                pass
-
-        return response
-
-    print("[NOVA_MOBILE_SESSION_DRAWER_V2_INJECT_20260703] installed")
-except Exception as _nmsdv2_error_20260703:
-    try:
-        print("[NOVA_MOBILE_SESSION_DRAWER_V2_INJECT_20260703] failed:", _nmsdv2_error_20260703)
-    except Exception:
-        pass
+    print("[NOVA_MOBILE_SESSION_DRAWER_V2_INJECT_20260703] disabled final purge")
+except Exception:
+    pass
 
 
 
