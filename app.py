@@ -6910,86 +6910,82 @@ def _nova_find_uploaded_file_path_20260607(attachment):
 
 @app.get("/api/sessions/<session_id>")
 def api_session_by_id(session_id: str):
-    # NOVA_CLEAN_SESSION_DETAIL_ENDPOINT_20260611
-    # NOVA_SESSION_JSON_UTF8_SIG_READ_FIX_20260611
-    # Clean desktop session detail endpoint. Returns one full session from
-    # the canonical session store and marks the response so the auth-scope
-    # after-request filter does not strip it.
-    try:
-        from pathlib import Path
-        import json
+    # NOVA_SESSION_DETAIL_SERVICE_FIRST_20260703
+    # Detail must read through the same service path used by list/delete.
+    # The old manual candidate-file scanner could 404 even when /api/sessions
+    # listed the session and /api/sessions/delete could remove it.
+    sid = str(session_id or "").strip()
 
-        sid = str(session_id or "").strip()
-        root = Path(__file__).resolve().parent
-
-        candidates = []
-
-        def add_candidate(value):
-            try:
-                if value:
-                    p = Path(value).resolve()
-                    if p not in candidates:
-                        candidates.append(p)
-            except Exception:
-                pass
-
-        add_candidate(globals().get("SESSIONS_FILE"))
-        add_candidate(root / "data" / "nova_sessions.json")
-        add_candidate(Path.cwd() / "data" / "nova_sessions.json")
-        add_candidate(Path("C:/Users/Owner/nova/data/nova_sessions.json"))
-
-        found = None
-        active_session_id = ""
-
-        for sessions_path in candidates:
-            if not sessions_path.exists():
-                continue
-
-            try:
-                store = json.loads(sessions_path.read_text(encoding="utf-8-sig") or "{}")
-            except Exception:
-                continue
-
-            if not isinstance(store, dict):
-                continue
-
-            active_session_id = str(store.get("active_session_id") or "").strip()
-            items = store.get("sessions")
-            if not isinstance(items, list):
-                continue
-
-            for item in items:
-                if isinstance(item, dict) and str(item.get("id") or "").strip() == sid:
-                    found = item
-                    active_session_id = sid
-                    break
-
-            if found is not None:
-                break
-
-        if found is None:
-            return jsonify({
-                "ok": False,
-                "error": "Session not found",
-                "session": None,
-                "active_session_id": active_session_id,
-                "skip_session_auth_scope_filter": True,
-            }), 404
-
-        return jsonify({
-            "ok": True,
-            "session": found,
-            "active_session_id": active_session_id,
-            "skip_session_auth_scope_filter": True,
-        })
-    except Exception as e:
+    if not sid:
         return jsonify({
             "ok": False,
-            "error": str(e),
+            "error": "Session not found",
             "session": None,
-            "active_session_id": str(session_id or "").strip(),
+            "active_session_id": "",
+            "session_id": sid,
             "skip_session_auth_scope_filter": True,
-        }), 500
+        }), 404
+
+    found = None
+    active_session_id = ""
+
+    try:
+        active_session_id = str(getattr(session_service, "active_session_id", "") or "").strip()
+    except Exception:
+        active_session_id = ""
+
+    try:
+        candidate = session_service.get_session(sid)
+        if isinstance(candidate, dict):
+            found = candidate
+    except Exception:
+        found = None
+
+    if found is None:
+        try:
+            sessions = session_service.get_all()
+            if isinstance(sessions, list):
+                for item in sessions:
+                    if isinstance(item, dict) and str(item.get("id") or "").strip() == sid:
+                        found = item
+                        break
+        except Exception:
+            found = None
+
+    # Last-resort raw store fallback, still using the service's configured file.
+    if found is None:
+        try:
+            store = session_service._read_store()
+            items = store.get("sessions") if isinstance(store, dict) else []
+            if isinstance(items, list):
+                for item in items:
+                    if isinstance(item, dict) and str(item.get("id") or "").strip() == sid:
+                        found = item
+                        break
+
+            if isinstance(store, dict):
+                active_session_id = str(store.get("active_session_id") or active_session_id or "").strip()
+        except Exception:
+            found = None
+
+    if found is None:
+        return jsonify({
+            "ok": False,
+            "error": "Session not found",
+            "session": None,
+            "active_session_id": active_session_id,
+            "session_id": sid,
+            "skip_session_auth_scope_filter": True,
+        }), 404
+
+    return jsonify({
+        "ok": True,
+        "session": found,
+        "active_session_id": active_session_id or sid,
+        "session_id": sid,
+        "skip_session_auth_scope_filter": True,
+        "detail_service_first": True,
+    })
 
 
 @app.post("/api/sessions/new")
