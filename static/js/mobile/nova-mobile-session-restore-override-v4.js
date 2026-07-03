@@ -272,5 +272,38 @@
         render: render
     };
 
+
+    function loadSessionPanelV6FromV4() {
+        if (window.__NOVA_MOBILE_SESSION_PANEL_V6__) {
+            return;
+        }
+
+        if (document.querySelector("script[data-nova-session-panel-v6-loader='true']")) {
+            return;
+        }
+
+        const script = document.createElement("script");
+        script.src = "/static/js/mobile/nova-mobile-session-panel-v6.js?v=loaded-by-v4";
+        script.async = false;
+        script.setAttribute("data-nova-session-panel-v6-loader", "true");
+
+        script.onload = function () {
+            try {
+                console.log("[NOVA MOBILE RESTORE OVERRIDE V4] loaded session panel v6");
+            } catch (_) {}
+        };
+
+        script.onerror = function () {
+            try {
+                console.warn("[NOVA MOBILE RESTORE OVERRIDE V4] failed to load session panel v6");
+            } catch (_) {}
+        };
+
+        document.head.appendChild(script);
+    }
+
+    loadSessionPanelV6FromV4();
+
     log("active", VERSION);
 })();
+
