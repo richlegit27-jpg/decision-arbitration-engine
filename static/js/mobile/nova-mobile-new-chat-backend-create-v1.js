@@ -1,16 +1,11 @@
 (function () {
     "use strict";
 
-    const VERSION = "backend-create-v2-no-auto-run-20260703";
-
-    if (window.__NOVA_MOBILE_NEW_CHAT_BACKEND_CREATE_V2_NO_AUTO_RUN_20260703__) {
-        return;
-    }
-
+    var VERSION = "backend-create-v2-no-auto-run-20260703b";
     window.__NOVA_MOBILE_NEW_CHAT_BACKEND_CREATE_V2_NO_AUTO_RUN_20260703__ = VERSION;
 
-    let inFlight = false;
-    let lastRunAt = 0;
+    var inFlight = false;
+    var lastRunAt = 0;
 
     function log() {
         try {
@@ -50,22 +45,19 @@
             }
             return response.json();
         }).then(function (payload) {
-            const id = extractSessionId(payload);
+            var id = extractSessionId(payload);
 
             if (!id) {
                 throw new Error("Session create returned no usable id: " + JSON.stringify(payload).slice(0, 600));
             }
 
-            return {
-                id: id,
-                payload: payload
-            };
+            return { id: id, payload: payload };
         });
     }
 
     function clearVisibleChat() {
         try {
-            const candidates = [
+            [
                 "#messages",
                 "#chat-messages",
                 "#nova-chat-messages",
@@ -73,9 +65,7 @@
                 ".messages",
                 ".chat-messages",
                 ".nova-mobile-messages"
-            ];
-
-            candidates.forEach(function (selector) {
+            ].forEach(function (selector) {
                 document.querySelectorAll(selector).forEach(function (el) {
                     if (el && el.id !== "nova-session-drawer-v2-panel") {
                         el.innerHTML = "";
@@ -94,7 +84,7 @@
         clearVisibleChat();
 
         try {
-            const url = new URL(window.location.href);
+            var url = new URL(window.location.href);
             url.pathname = "/mobile";
             url.searchParams.set("session_id", id);
             url.searchParams.set("v", "new-chat-backend-create-v2-" + Date.now());
@@ -113,7 +103,7 @@
             }
         } catch (_) {}
 
-        const now = Date.now();
+        var now = Date.now();
 
         if (inFlight || now - lastRunAt < 1500) {
             log("ignored duplicate new-chat request");
@@ -138,13 +128,13 @@
     function looksLikeNewChatButton(el) {
         if (!el) return false;
 
-        const text = String(el.textContent || "").trim().toLowerCase();
-        const aria = String(el.getAttribute("aria-label") || "").trim().toLowerCase();
-        const title = String(el.getAttribute("title") || "").trim().toLowerCase();
-        const id = String(el.id || "").toLowerCase();
-        const klass = String(el.className || "").toLowerCase();
+        var text = String(el.textContent || "").trim().toLowerCase();
+        var aria = String(el.getAttribute("aria-label") || "").trim().toLowerCase();
+        var title = String(el.getAttribute("title") || "").trim().toLowerCase();
+        var id = String(el.id || "").toLowerCase();
+        var klass = String(el.className || "").toLowerCase();
 
-        const haystack = [text, aria, title, id, klass].join(" ");
+        var haystack = [text, aria, title, id, klass].join(" ");
 
         if (haystack.indexOf("session") >= 0 && haystack.indexOf("new") < 0) {
             return false;
@@ -168,8 +158,8 @@
 
         document.addEventListener("click", function (event) {
             try {
-                const target = event.target;
-                const button = target && target.closest && target.closest("button, a, [role='button']");
+                var target = event.target;
+                var button = target && target.closest && target.closest("button, a, [role='button']");
                 if (!button) return;
 
                 if (button.closest && button.closest("#nova-session-drawer-v2-panel")) {
@@ -187,13 +177,16 @@
         }, true);
     }
 
-    // Important: no automatic create on page load.
-    // New Chat now only runs from a real New Chat click.
     installClickCapture();
 
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", installClickCapture);
     }
+
+    window.NovaMobileNewChatBackendCreateV2 = {
+        version: VERSION,
+        run: runNewChatFlow
+    };
 
     log("ready", VERSION);
 })();
