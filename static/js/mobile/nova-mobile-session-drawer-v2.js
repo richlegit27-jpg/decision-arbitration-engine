@@ -529,4 +529,3 @@
     setTimeout(forceDrawerTopLeft, 1500);
     setInterval(forceDrawerTopLeft, 1000);
 })();
-
