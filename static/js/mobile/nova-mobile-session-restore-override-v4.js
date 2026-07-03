@@ -283,7 +283,7 @@
         }
 
         const script = document.createElement("script");
-        script.src = "/static/js/mobile/nova-mobile-session-panel-v6.js?v=loaded-by-v4";
+        script.src = "/static/js/mobile/nova-mobile-session-panel-v6.js?v=panel-v7-loaded-by-v4";
         script.async = false;
         script.setAttribute("data-nova-session-panel-v6-loader", "true");
 
@@ -306,4 +306,5 @@
 
     log("active", VERSION);
 })();
+
 
