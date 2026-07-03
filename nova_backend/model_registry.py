@@ -92,6 +92,20 @@ def get_allowed_provider_models() -> set[str]:
     return {item for item in allowed if item}
 
 
+def _default_model_direct() -> str:
+    aliases = _aliases()
+    raw = _clean(os.getenv("OPENAI_MODEL"))
+
+    if raw in aliases:
+        return aliases[raw]["model"]
+
+    if raw and raw in get_allowed_provider_models():
+        return raw
+
+    default_alias = get_default_model_alias()
+    return aliases[default_alias]["model"]
+
+
 def resolve_model(requested_model: Any = None, fallback: str | None = None) -> str:
     requested = _clean(requested_model)
     aliases = _aliases()
@@ -103,23 +117,18 @@ def resolve_model(requested_model: Any = None, fallback: str | None = None) -> s
         return requested
 
     fallback_text = _clean(fallback)
+
     if fallback_text in aliases:
         return aliases[fallback_text]["model"]
 
     if fallback_text in get_allowed_provider_models():
         return fallback_text
 
-    default_alias = get_default_model_alias()
-    return aliases[default_alias]["model"]
+    return _default_model_direct()
 
 
 def get_default_model() -> str:
-    raw = _clean(os.getenv("OPENAI_MODEL"))
-
-    if raw:
-        return resolve_model(raw)
-
-    return resolve_model(get_default_model_alias())
+    return _default_model_direct()
 
 
 def get_model_billing_tier(requested_model: Any = None) -> str:
