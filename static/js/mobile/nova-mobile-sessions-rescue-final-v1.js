@@ -109,6 +109,39 @@
         document.head.appendChild(style);
     }
 
+
+    function restoreBodyVisibility(reason) {
+        /* NOVA_MOBILE_SESSIONS_RESCUE_FINAL_V3_BODY_UNHIDE_20260703 */
+        var body = document.body;
+        if (!body) return;
+
+        body.removeAttribute("hidden");
+
+        if (body.getAttribute("aria-hidden") === "true") {
+            body.removeAttribute("aria-hidden");
+        }
+
+        body.style.removeProperty("display");
+        body.style.removeProperty("visibility");
+        body.style.removeProperty("opacity");
+        body.style.removeProperty("pointer-events");
+
+        if (getComputedStyle(body).display === "none") {
+            body.style.setProperty("display", "block", "important");
+        }
+
+        if (getComputedStyle(body).visibility === "hidden") {
+            body.style.setProperty("visibility", "visible", "important");
+        }
+
+        if (getComputedStyle(body).opacity === "0") {
+            body.style.setProperty("opacity", "1", "important");
+        }
+
+        body.style.setProperty("pointer-events", "auto", "important");
+        body.dataset.novaSessionsBodyRestored = reason || "unknown";
+    }
+
     function showMainLayout() {
         var shell = document.querySelector(".mobile-shell");
         var messages = $("mobileChatMessages");
@@ -190,6 +223,15 @@
     function closePanel() {
         var panel = getPanel();
 
+        restoreBodyVisibility("close-before");
+
+        if (document.activeElement && panel.contains(document.activeElement)) {
+            try {
+                document.activeElement.blur();
+            } catch (e) {}
+        }
+
+        panel.removeAttribute("hidden");
         panel.classList.add("hidden");
         panel.setAttribute("aria-hidden", "true");
         panel.setAttribute("data-nova-sessions-open", "false");
@@ -289,9 +331,12 @@
 
     function openPanel() {
         addStyle();
+        restoreBodyVisibility("open-before");
 
         var panel = getPanel();
+        ensurePanelMarkup(panel);
 
+        panel.removeAttribute("hidden");
         panel.classList.remove("hidden");
         panel.setAttribute("aria-hidden", "false");
         panel.setAttribute("data-nova-sessions-open", "true");
@@ -306,6 +351,7 @@
             document.body.classList.add("nova-mobile-sessions-open");
         }
 
+        restoreBodyVisibility("open-after");
         loadSessions();
     }
 
@@ -321,6 +367,7 @@
 
     function ensureButton() {
         addStyle();
+        restoreBodyVisibility("ensure-button");
 
         var button = findExistingButton();
 
@@ -388,8 +435,10 @@
     };
 
     function boot() {
+        restoreBodyVisibility("boot-start");
         ensureButton();
         closePanel();
+        restoreBodyVisibility("boot-end");
     }
 
     if (document.readyState === "loading") {
@@ -398,7 +447,10 @@
         boot();
     }
 
-    setInterval(ensureButton, 1500);
+    setInterval(function () {
+        restoreBodyVisibility("interval");
+        ensureButton();
+    }, 1500);
 
     console.log("[NOVA_MOBILE_SESSIONS_RESCUE_FINAL_V1_20260703] ready");
 })();
