@@ -451,9 +451,14 @@
         }
     }
 
-    window.NovaMobileOpenSessions = openPanel;
-    window.NovaMobileCloseSessions = closePanel;
-    window.NovaMobileReloadSessions = loadSessions;
+    // NOVA_MOBILE_SESSIONS_FINAL_GLOBAL_LOCK_20260703
+    function installFinalSessionGlobals() {
+        window.NovaMobileOpenSessions = openPanel;
+        window.NovaMobileCloseSessions = closePanel;
+        window.NovaMobileReloadSessions = loadSessions;
+    }
+
+    installFinalSessionGlobals();
 
     function boot() {
         removeOldSessionUi();
@@ -471,3 +476,4 @@
     setTimeout(boot, 500);
     setTimeout(boot, 1500);
 })();
+
