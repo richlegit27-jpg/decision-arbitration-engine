@@ -346,11 +346,21 @@
             } catch (_) {}
         }, true);
 
-        setInterval(function () {
-            installStyles();
-            ownDrawerVisibility();
-            hideOldSessionButtons();
-        }, 500);
+        function stabilitySweep() {
+            try {
+                installStyles();
+                ownDrawerVisibility();
+                hideOldSessionButtons();
+            } catch (_) {}
+        }
+
+        stabilitySweep();
+        setTimeout(stabilitySweep, 100);
+        setTimeout(stabilitySweep, 500);
+        setTimeout(stabilitySweep, 1500);
+
+        window.addEventListener("resize", stabilitySweep);
+        document.addEventListener("visibilitychange", stabilitySweep);
 
         try {
             await loadSessions();
@@ -388,9 +398,10 @@
 })();
 
 // NOVA_SESSION_DRAWER_V2_BOOT_RACE_FIX_20260703
+// Reduced to a passive marker. The old emergency click timer forced panel visibility
+// after every click and could cause page jitter/reflow.
 (function () {
     "use strict";
-
     window.__NOVA_SESSION_DRAWER_V2_BOOT_RACE_FIX_20260703__ = true;
 
     document.addEventListener("click", function (event) {
@@ -402,17 +413,6 @@
                 target.closest("#nova-session-drawer-v2-button, #nova-session-drawer-v2-panel")
             ) {
                 window.__NOVA_SESSION_DRAWER_V2_USER_TOUCHED_20260703__ = true;
-
-                setTimeout(function () {
-                    const panel = document.getElementById("nova-session-drawer-v2-panel");
-                    if (panel && window.__NOVA_SESSION_DRAWER_V2_USER_TOUCHED_20260703__) {
-                        panel.setAttribute("data-open", "true");
-                        panel.style.setProperty("display", "block", "important");
-                        panel.style.setProperty("visibility", "visible", "important");
-                        panel.style.setProperty("opacity", "1", "important");
-                        panel.style.setProperty("pointer-events", "auto", "important");
-                    }
-                }, 650);
             }
         } catch (_) {}
     }, true);
