@@ -19390,6 +19390,54 @@ except Exception as _nmsdv2_error_20260703:
     except Exception:
         pass
 
+
+
+# --- NOVA_MOBILE_SEND_STABLE_V1_INJECT_20260703 ---
+try:
+    from flask import request as _nmssv1_request
+
+    @app.after_request
+    def _nmssv1_inject_after_request_20260703(response):
+        try:
+            if _nmssv1_request.path not in ("/mobile", "/mobile/"):
+                return response
+
+            content_type = str(response.headers.get("Content-Type") or "")
+            if "text/html" not in content_type:
+                return response
+
+            html = response.get_data(as_text=True)
+
+            if "nova-mobile-send-stable-v1.js" in html:
+                return response
+
+            script = '<script src="/static/js/mobile/nova-mobile-send-stable-v1.js?v=mobile-send-stable-v1-20260703"></script>'
+
+            lower = html.lower()
+            idx = lower.rfind("</body>")
+
+            if idx >= 0:
+                html = html[:idx] + "\n" + script + "\n" + html[idx:]
+            else:
+                html = html + "\n" + script + "\n"
+
+            response.set_data(html)
+            response.headers["Content-Length"] = str(len(response.get_data()))
+        except Exception as exc:
+            try:
+                print("[NOVA_MOBILE_SEND_STABLE_V1_INJECT_20260703] failed:", exc)
+            except Exception:
+                pass
+
+        return response
+
+    print("[NOVA_MOBILE_SEND_STABLE_V1_INJECT_20260703] installed")
+except Exception as _nmssv1_error_20260703:
+    try:
+        print("[NOVA_MOBILE_SEND_STABLE_V1_INJECT_20260703] failed:", _nmssv1_error_20260703)
+    except Exception:
+        pass
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
