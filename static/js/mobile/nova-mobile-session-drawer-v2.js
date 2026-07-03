@@ -299,21 +299,39 @@
     }
 
     function renderMessages(id, title, messages) {
-        const container = messageContainer();
-        container.innerHTML = "";
+        const ui = ensureUi();
+        const panel = ui.panel;
+
+        panel.setAttribute("data-open", "true");
+        panel.innerHTML = "";
+
+        const wrap = document.createElement("div");
+        wrap.className = "nova-session-drawer-v2-detail";
+
+        const back = document.createElement("button");
+        back.type = "button";
+        back.className = "nova-session-drawer-v2-row";
+        back.textContent = "← Back to sessions";
+        back.onclick = function (event) {
+            try {
+                event.preventDefault();
+                event.stopPropagation();
+            } catch (_) {}
+            loadSessions();
+        };
+        wrap.appendChild(back);
 
         const header = document.createElement("div");
-        header.className = "nova-session-drawer-v2-message";
-        header.setAttribute("data-role", "system");
+        header.className = "nova-session-drawer-v2-empty";
         header.textContent = "Session: " + (title || id) + " · " + messages.length + " messages";
-        container.appendChild(header);
+        wrap.appendChild(header);
 
         if (!messages.length) {
             const empty = document.createElement("div");
             empty.className = "nova-session-drawer-v2-message";
             empty.setAttribute("data-role", "system");
             empty.textContent = "No messages in this session.";
-            container.appendChild(empty);
+            wrap.appendChild(empty);
         }
 
         messages.forEach(function (message) {
@@ -321,17 +339,17 @@
             row.className = "nova-session-drawer-v2-message";
             row.setAttribute("data-role", messageRole(message));
             row.textContent = messageText(message) || "[empty message]";
-            container.appendChild(row);
+            wrap.appendChild(row);
         });
 
+        panel.appendChild(wrap);
+
         try {
-            window.scrollTo({ top: 0, behavior: "smooth" });
-        } catch (_) {
-            window.scrollTo(0, 0);
-        }
+            panel.scrollTop = 0;
+        } catch (_) {}
     }
 
-    async function openSession(item) {
+    async async function openSession(item) {
         const id = sessionId(item);
         if (!id) return;
 
@@ -345,21 +363,24 @@
         try {
             const url = new URL(window.location.href);
             url.searchParams.set("session_id", id);
-            url.searchParams.set("v", "session-drawer-v2-" + Date.now());
+            url.searchParams.set("v", "session-open-" + Date.now());
             history.replaceState(null, "", url.toString());
         } catch (_) {}
 
-        const panel = document.getElementById("nova-session-drawer-v2-panel");
-        if (panel) panel.setAttribute("data-open", "false");
-
-        renderMessages(id, title, []);
+        const ui = ensureUi();
+        const panel = ui.panel;
+        panel.setAttribute("data-open", "true");
+        panel.innerHTML = "<div class='nova-session-drawer-v2-empty'>Opening session...</div>";
 
         try {
             const detail = await fetchJson("/api/sessions/" + encodeURIComponent(id));
+            const session = detail.session || detail;
             const messages = normalizeMessages(detail);
-            renderMessages(id, title, messages);
+            renderMessages(id, session.title || title, messages);
             log("opened", id, messages.length);
         } catch (err) {
+            panel.setAttribute("data-open", "true");
+            panel.innerHTML = "<div class='nova-session-drawer-v2-empty'>Session open failed. See console.</div>";
             log("open failed", err);
         }
     }
@@ -793,4 +814,59 @@
     }, true);
 
     setInterval(tick, 250);
+})();
+
+
+// NOVA_SESSION_DRAWER_V2_OPEN_IN_PANEL_STYLE_20260703
+(function () {
+    "use strict";
+
+    function installOpenInPanelStyle() {
+        try {
+            let style = document.getElementById("nova-session-drawer-v2-open-in-panel-style");
+            if (!style) {
+                style = document.createElement("style");
+                style.id = "nova-session-drawer-v2-open-in-panel-style";
+                document.head.appendChild(style);
+            }
+
+            style.textContent = `
+#nova-session-drawer-v2-panel .nova-session-drawer-v2-detail {
+    display: block !important;
+    padding: 8px !important;
+}
+
+#nova-session-drawer-v2-panel .nova-session-drawer-v2-message {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    border-radius: 10px !important;
+    padding: 10px !important;
+    margin: 8px 0 !important;
+    font-size: 13px !important;
+    line-height: 1.35 !important;
+}
+
+#nova-session-drawer-v2-panel .nova-session-drawer-v2-message[data-role="user"] {
+    background: rgba(139, 92, 246, 0.22) !important;
+}
+
+#nova-session-drawer-v2-panel .nova-session-drawer-v2-message[data-role="assistant"] {
+    background: rgba(255, 255, 255, 0.10) !important;
+}
+
+#nova-session-drawer-v2-panel .nova-session-drawer-v2-message[data-role="system"] {
+    background: rgba(255, 255, 255, 0.06) !important;
+}
+`;
+        } catch (_) {}
+    }
+
+    installOpenInPanelStyle();
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", installOpenInPanelStyle);
+    }
 })();
