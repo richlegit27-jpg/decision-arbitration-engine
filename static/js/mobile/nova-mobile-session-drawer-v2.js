@@ -870,3 +870,67 @@
         document.addEventListener("DOMContentLoaded", installOpenInPanelStyle);
     }
 })();
+
+
+// NOVA_SESSION_DRAWER_V2_OPEN_IN_PANEL_FINAL_20260703
+(function () {
+    "use strict";
+
+    window.__NOVA_SESSION_DRAWER_V2_OPEN_IN_PANEL_FINAL_20260703__ = true;
+
+    function installOpenInPanelFinalStyle() {
+        try {
+            let style = document.getElementById("nova-session-drawer-v2-open-in-panel-final-style");
+            if (!style) {
+                style = document.createElement("style");
+                style.id = "nova-session-drawer-v2-open-in-panel-final-style";
+                document.head.appendChild(style);
+            }
+
+            style.textContent = `
+#nova-session-drawer-v2-panel[data-open="true"] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+#nova-session-drawer-v2-panel .nova-session-drawer-v2-detail {
+    display: block !important;
+    padding: 8px !important;
+}
+
+#nova-session-drawer-v2-panel .nova-session-drawer-v2-message {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    border-radius: 10px !important;
+    padding: 10px !important;
+    margin: 8px 0 !important;
+    font-size: 13px !important;
+    line-height: 1.35 !important;
+}
+
+#nova-session-drawer-v2-panel .nova-session-drawer-v2-message[data-role="user"] {
+    background: rgba(139, 92, 246, 0.22) !important;
+}
+
+#nova-session-drawer-v2-panel .nova-session-drawer-v2-message[data-role="assistant"] {
+    background: rgba(255, 255, 255, 0.10) !important;
+}
+
+#nova-session-drawer-v2-panel .nova-session-drawer-v2-message[data-role="system"] {
+    background: rgba(255, 255, 255, 0.06) !important;
+}
+`;
+        } catch (_) {}
+    }
+
+    installOpenInPanelFinalStyle();
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", installOpenInPanelFinalStyle);
+    }
+})();
