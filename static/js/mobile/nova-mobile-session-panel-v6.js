@@ -336,3 +336,160 @@
 
     log("active", VERSION);
 })();
+
+/* NOVA_MOBILE_NEW_CHAT_SESSION_V8_20260703 */
+(function () {
+    "use strict";
+
+    if (window.__NOVA_MOBILE_NEW_CHAT_SESSION_V8_20260703__) {
+        return;
+    }
+
+    window.__NOVA_MOBILE_NEW_CHAT_SESSION_V8_20260703__ = true;
+
+    const KEYS = [
+        "nova_mobile_active_session_id",
+        "nova_active_session_id",
+        "active_session_id",
+        "session_id"
+    ];
+
+    let lastNewChatAt = 0;
+
+    function log() {
+        try { console.log("[NOVA MOBILE NEW CHAT SESSION V8]", ...arguments); } catch (_) {}
+    }
+
+    function makeSessionId() {
+        return "mobile_session_" + Date.now() + "_" + Math.random().toString(16).slice(2, 8);
+    }
+
+    function setActiveSessionId(id) {
+        const sessionId = String(id || "").trim();
+        if (!sessionId) return "";
+
+        for (const key of KEYS) {
+            try { localStorage.setItem(key, sessionId); } catch (_) {}
+        }
+
+        window.novaMobileActiveSessionId = sessionId;
+        window.activeSessionId = sessionId;
+        window.currentSessionId = sessionId;
+        window.NOVA_ACTIVE_SESSION_ID = sessionId;
+
+        if (
+            window.NovaMobileSessionPanelV6 &&
+            typeof window.NovaMobileSessionPanelV6.setActiveSessionId === "function"
+        ) {
+            try { window.NovaMobileSessionPanelV6.setActiveSessionId(sessionId); } catch (_) {}
+        }
+
+        return sessionId;
+    }
+
+    function clearVisibleChat() {
+        const roots = [
+            document.getElementById("mobileChatMessages"),
+            document.querySelector("[data-nova-chat-messages='true']"),
+            document.querySelector(".mobile-chat-container"),
+            document.querySelector(".chat-messages"),
+            document.querySelector("#chatMessages")
+        ].filter(Boolean);
+
+        const seen = new Set();
+
+        for (const root of roots) {
+            if (seen.has(root)) continue;
+            seen.add(root);
+
+            if (
+                root.id === "nova-mobile-session-panel-v6" ||
+                root.closest("#nova-mobile-session-panel-v6")
+            ) {
+                continue;
+            }
+
+            root.innerHTML = "";
+            root.setAttribute("data-nova-session-cleared", "true");
+        }
+
+        try { window.messages = []; } catch (_) {}
+        try { window.currentMessages = []; } catch (_) {}
+    }
+
+    function isNewChatNode(node) {
+        if (!node) return false;
+
+        const raw = (
+            String(node.id || "") + " " +
+            String(node.className || "") + " " +
+            String(node.getAttribute && node.getAttribute("data-action") || "") + " " +
+            String(node.getAttribute && node.getAttribute("aria-label") || "") + " " +
+            String(node.title || "") + " " +
+            String(node.textContent || "")
+        ).toLowerCase();
+
+        return (
+            raw.includes("new chat") ||
+            raw.includes("new conversation") ||
+            raw.includes("start new") ||
+            raw.includes("new session") ||
+            (
+                raw.includes("new") &&
+                (
+                    raw.includes("chat") ||
+                    raw.includes("session") ||
+                    raw.includes("conversation")
+                )
+            )
+        );
+    }
+
+    function beginNewChat(event) {
+        const node = event.target && event.target.closest
+            ? event.target.closest("button, a, [role='button'], div, span")
+            : null;
+
+        if (!isNewChatNode(node)) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        const now = Date.now();
+
+        if (now - lastNewChatAt < 700) {
+            return;
+        }
+
+        lastNewChatAt = now;
+
+        const sessionId = makeSessionId();
+        setActiveSessionId(sessionId);
+        clearVisibleChat();
+
+        try {
+            if (window.NovaMobileSessionPanelV6 && typeof window.NovaMobileSessionPanelV6.close === "function") {
+                window.NovaMobileSessionPanelV6.close();
+            }
+        } catch (_) {}
+
+        log("new chat active session", sessionId);
+    }
+
+    window.addEventListener("click", beginNewChat, true);
+    window.addEventListener("touchend", beginNewChat, true);
+
+    window.NovaMobileNewChatSessionV8 = {
+        makeSessionId,
+        setActiveSessionId,
+        clearVisibleChat,
+        beginNewChat
+    };
+
+    log("active");
+})();
+/* /NOVA_MOBILE_NEW_CHAT_SESSION_V8_20260703 */
+
