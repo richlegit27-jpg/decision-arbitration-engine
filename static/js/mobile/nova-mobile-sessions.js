@@ -2022,3 +2022,67 @@ if (window.__NOVA_MOBILE_SESSION_FINAL_OWNER_SHIELD_20260630__) return;
     } catch (e) {}
 })();
 
+
+/* ============================================================
+ * NOVA_MOBILE_SESSION_DRAWER_V2_ROUTE_TO_REAL_OWNER_20260703
+ * Keep the one visible drawer-v2 button, but route it to the
+ * real /api/sessions owner that already has Open/Rename/Pin/Delete.
+ * ============================================================ */
+(function () {
+    "use strict";
+
+    var MARKER = "__NOVA_MOBILE_SESSION_DRAWER_V2_ROUTE_TO_REAL_OWNER_20260703__";
+
+    if (window[MARKER]) {
+        return;
+    }
+
+    window[MARKER] = true;
+
+    function isDrawerV2Trigger(target) {
+        var node = target;
+
+        while (node && node !== document.documentElement) {
+            try {
+                if (
+                    node.id === "nova-session-drawer-v2-button" ||
+                    node.getAttribute("data-nova-session-drawer-v2") === "true"
+                ) {
+                    return true;
+                }
+            } catch (error) {}
+
+            node = node.parentElement;
+        }
+
+        return false;
+    }
+
+    function openRealSessionsDrawer() {
+        if (typeof window.NovaMobileOpenSessions === "function") {
+            window.NovaMobileOpenSessions();
+            return true;
+        }
+
+        return false;
+    }
+
+    document.addEventListener("click", function (event) {
+        if (!isDrawerV2Trigger(event.target)) {
+            return;
+        }
+
+        var opened = openRealSessionsDrawer();
+
+        if (!opened) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+    }, true);
+
+    console.log("[NOVA_MOBILE_SESSION_DRAWER_V2_ROUTE_TO_REAL_OWNER_20260703] active");
+})();
+
