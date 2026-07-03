@@ -1,7 +1,6 @@
 ﻿from __future__ import annotations
 
 from typing import Any
-from nova_backend.services.model_registry import resolve_model
 
 
 def _clean_text(value: Any) -> str:
@@ -25,7 +24,7 @@ def call_model(
 
     try:
         response = openai_client.chat.completions.create(
-            model=resolve_model(default_model),
+            model=default_model or "gpt-4.1-mini",
             messages=[
                 {"role": "system", "content": system_context or "You are Nova."},
                 {"role": "user", "content": prompt},
@@ -83,3 +82,4 @@ Draft answer:
 
     improved = _clean_text(call_model_func(refine_prompt, context))
     return improved or base_answer
+

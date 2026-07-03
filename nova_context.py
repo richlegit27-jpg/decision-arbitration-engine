@@ -36,7 +36,6 @@ from services_web import (
     wants_web_search,
 )
 from storage import (
-from nova_backend.services.model_registry import get_default_model
     load_memory,
     load_sessions,
     load_users,
@@ -45,7 +44,7 @@ from nova_backend.services.model_registry import get_default_model
     save_users as storage_save_users,
 )
 
-DEFAULT_MODEL = get_default_model()
+DEFAULT_MODEL = (os.getenv("OPENAI_MODEL", "gpt-4.1-mini") or "gpt-4.1-mini").strip()
 OPENAI_API_KEY = (os.getenv("OPENAI_API_KEY", "") or "").strip()
 TAVILY_API_KEY = (os.getenv("TAVILY_API_KEY") or "").strip()
 
@@ -258,3 +257,4 @@ def ensure_agent_thread() -> None:
         agent_state=AGENT_STATE,
         worker_target=background_agent_worker,
     )
+

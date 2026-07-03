@@ -134,7 +134,6 @@ from nova_backend.services.runtime_cognitive_injection_service import (
 )
 
 from nova_backend.services.runtime_cognitive_firewall import (
-from nova_backend.services.model_registry import get_default_model, get_image_model, get_vision_model, resolve_model
     RuntimeCognitiveFirewall,
 )
 
@@ -3659,14 +3658,20 @@ if (not attachments) and (__name__ == "__main__"):
         # CONFIG
         # =========================
 
-        self.image_model = get_image_model()
+        self.image_model = os.getenv(
+            "NOVA_IMAGE_MODEL",
+            "gpt-image-1",
+        )
 
         self.image_size = os.getenv(
             "NOVA_IMAGE_SIZE",
             "1024x1024",
         )
 
-        self.chat_model = get_default_model()
+        self.chat_model = os.getenv(
+            "OPENAI_MODEL",
+            "gpt-5.4",
+        )
 
         self.model = self.chat_model
 
@@ -4928,7 +4933,7 @@ if (not attachments) and (__name__ == "__main__"):
 
         try:
             model_response = self.client.responses.create(
-                model=resolve_model(self.model),
+                model=self.model,
                 input=[
                     {
                         "role": "system",
@@ -6826,7 +6831,7 @@ if (not attachments) and (__name__ == "__main__"):
             return clean
         try:
             response = self.client.responses.create(
-                model=resolve_model(self.chat_model),
+                model=self.chat_model,
                 input=model_messages,
             )
 
@@ -9549,7 +9554,7 @@ if (not attachments) and (__name__ == "__main__"):
                         )
 
                         response = self.client.chat.completions.create(
-                            model=resolve_model(getattr(self, "model", None)),
+                            model=getattr(self, "model", "gpt-4o-mini"),
                             messages=[
                                 {
                                     "role": "system",
@@ -10275,7 +10280,7 @@ if (not attachments) and (__name__ == "__main__"):
                 )
 
                 response = self.client.chat.completions.create(
-                    model=resolve_model(getattr(self, "model", None)),
+                    model=getattr(self, "model", "gpt-4o-mini"),
                     messages=[
                         {
                             "role": "system",
@@ -14396,7 +14401,7 @@ Auto-fix result:
         try:
 
             response = self.client.responses.create(
-                model=resolve_model(self.model),
+                model=self.model,
                 input=[
                     {
                         "role": "system",
@@ -20186,7 +20191,7 @@ def _save_artifact_fallback(self, artifact: dict):
             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
             response = client.chat.completions.create(
-                model=get_vision_model(),
+                model=os.getenv("NOVA_VISION_MODEL", "gpt-4o-mini"),
                 messages=[
                     {
                         "role": "system",
@@ -21021,7 +21026,7 @@ def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict
                         _nova_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
                         _nova_response = _nova_client.chat.completions.create(
-                            model=get_vision_model(),
+                            model=os.getenv("NOVA_VISION_MODEL", "gpt-4o-mini"),
                             messages=[
                                 {
                                     "role": "system",
@@ -21380,7 +21385,7 @@ def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict
         try:
 
             response = self.client.responses.create(
-                model=resolve_model(self.chat_model),
+                model=self.chat_model,
                 input=[
                     {
                         "role": "system",
@@ -25471,3 +25476,4 @@ except Exception as _nova_railway_image_patch_error_20260702:
         print("[NOVA_RAILWAY_UPLOADS_DIR_RUNTIME_NORMALIZER_20260702] image patch failed", _nova_railway_image_patch_error_20260702)
     except Exception:
         pass
+

@@ -4,7 +4,6 @@ from flask import Blueprint, jsonify, render_template
 
 from auth_utils import DEV_BYPASS_AUTH, current_user
 from nova_context import AGENT_STATE, DEFAULT_MODEL, get_user_sessions
-from nova_backend.services.model_registry import get_model_details, get_public_models
 
 core_bp = Blueprint("core", __name__)
 
@@ -51,7 +50,7 @@ def api_models():
         {
             "ok": True,
             "default": DEFAULT_MODEL,
-            "models": get_public_models(),
-                "model_details": get_model_details(),
+            "models": [DEFAULT_MODEL, "gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini"],
         }
     )
+
