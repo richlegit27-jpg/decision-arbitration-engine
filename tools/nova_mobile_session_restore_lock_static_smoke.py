@@ -18,6 +18,9 @@ def main():
     assert_true("messages rendered from session detail", "normalizeMessages" in js and "clearAndRenderMessages" in js)
     assert_true("active session state updated", "nova_mobile_active_session_id" in js)
     assert_true("new chat debounce present", "blocked duplicate New Chat click" in js)
+    assert_true("DOM root v2 present", "__NOVA_MOBILE_SESSION_RESTORE_DOM_ROOT_V2__" in js)
+    assert_true("fallback chat root present", "createFallbackChatRoot" in js)
+    assert_true("DOM scoring chat root present", "scoreChatRootCandidate" in js)
 
     wired = False
     for rel in ("templates/mobile.html", "templates/index-mobile.html"):

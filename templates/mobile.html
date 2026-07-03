@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 
@@ -462,7 +462,7 @@
     type="button"
     title="Send"
 >
-    <span class="mobile-action-icon">ÃƒÂ¢Ã…Â¾Ã‚Â¤</span>
+    <span class="mobile-action-icon">ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¾Ãƒâ€šÃ‚Â¤</span>
 </button>
 
 <button
@@ -472,7 +472,7 @@
     title="Stop generation"
     data-active="false"
 >
-    <span class="mobile-action-icon">ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â </span>
+    <span class="mobile-action-icon">ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“Ãƒâ€šÃ‚Â </span>
 </button>
 
 <button
@@ -481,7 +481,7 @@
     type="button"
     title="Voice input"
 >
-    <span class="mobile-action-icon">ÃƒÂ°Ã…Â¸Ã…Â½Ã¢â€žÂ¢</span>
+    <span class="mobile-action-icon">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢</span>
 </button>
 
 <button
@@ -491,7 +491,7 @@
     title="Stop speech"
     data-active="false"
 >
-    <span class="mobile-action-icon">ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â‚¬Â¡</span>
+    <span class="mobile-action-icon">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡</span>
 </button>
 
 <button
@@ -500,7 +500,7 @@
     type="button"
     title="Read aloud"
 >
-    <span class="mobile-action-icon">ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ…Â </span>
+    <span class="mobile-action-icon">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã‚Â </span>
 </button>
 
 <button
@@ -509,7 +509,7 @@
     type="button"
     title="Attach file"
 >
-    <span class="mobile-action-icon">ÃƒÂ¯Ã‚Â¼Ã¢â‚¬Â¹</span>
+    <span class="mobile-action-icon">ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¼ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹</span>
 </button>
 
 <button
@@ -525,7 +525,7 @@
         }
     "
 >
-    <span class="mobile-action-icon">ÃƒÂ¢Ã¢â‚¬Â¹Ã‚Â¯</span>
+    <span class="mobile-action-icon">ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹Ãƒâ€šÃ‚Â¯</span>
 </button>
 
 <input
@@ -5613,7 +5613,7 @@ composer.style.setProperty("overflow", "visible", "important");
 async function openUniqueFinalSessionsPanel(reason) {
     hideOldPanels();
 
-    // ðŸ”¥ ALWAYS CREATE OR RECOVER PANEL (CRITICAL FIX)
+    // Ã°Å¸â€Â¥ ALWAYS CREATE OR RECOVER PANEL (CRITICAL FIX)
     let panel = document.getElementById("nova-mobile-sessions-panel");
 
     if (!panel) {
@@ -5622,7 +5622,7 @@ async function openUniqueFinalSessionsPanel(reason) {
         document.body.appendChild(panel);
     }
 
-    // ðŸ”¥ HARD VISIBILITY OVERRIDE (IMPORTANT FOR YOUR UI BUGS)
+    // Ã°Å¸â€Â¥ HARD VISIBILITY OVERRIDE (IMPORTANT FOR YOUR UI BUGS)
     panel.style.setProperty("position", "fixed", "important");
     panel.style.setProperty("top", "60px", "important");
     panel.style.setProperty("left", "10px", "important");
@@ -5714,7 +5714,7 @@ async function openUniqueFinalSessionsPanel(reason) {
         row.style.setProperty("pointer-events", "auto", "important");
 
         const open = makeButton(
-            (session.pinned ? "ðŸ“Œ " : "") + (session.title || session.id)
+            (session.pinned ? "Ã°Å¸â€œÅ’ " : "") + (session.title || session.id)
         );
 
         open.style.setProperty("text-align", "left", "important");
@@ -5817,7 +5817,8 @@ async function openUniqueFinalSessionsPanel(reason) {
 <!-- /NOVA_MOBILE_UNIQUE_FINAL_SESSIONS_PANEL_OWNER_20260625 -->
 
     <script src="{{ url_for('static', filename='js/mobile/nova-mobile-copy-action-fix.js') }}?v=20260702"></script>
-<script src="{{ url_for('static', filename='js/mobile/nova-mobile-session-restore-lock.js') }}?v=session-restore-lock-20260702"></script>
+<script src="{{ url_for('static', filename='js/mobile/nova-mobile-session-restore-lock.js') }}?v=session-restore-dom-root-v3"></script>
+<script src="/static/js/mobile/nova-mobile-session-restore-override-v4.js?v=mobile-session-restore-override-v4"></script>
 </body>
 </html>
 
@@ -6429,6 +6430,3 @@ body:not(.nova-ready) #nova-composer {
 </script>
 
 <!-- /NOVA_MOBILE_MENU_HELP_BLOG_ORDER_FINAL_20260624 -->
-
-
-
