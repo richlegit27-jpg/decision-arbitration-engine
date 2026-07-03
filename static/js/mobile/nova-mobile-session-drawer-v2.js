@@ -477,6 +477,12 @@
             var restoredMessages = messagesFrom(detail);
             renderMessages(id, session.title || title, restoredMessages);
             renderSessionToMainChat(id, session.title || title, restoredMessages);
+
+            try {
+                var uiAfterRestore = getUi();
+                uiAfterRestore.panel.setAttribute("data-open", "false");
+                ownDrawer();
+            } catch (_) {}
             log("opened", id);
         }).catch(function (err) {
             panel.setAttribute("data-open", "true");
