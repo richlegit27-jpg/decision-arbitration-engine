@@ -11,56 +11,50 @@ Temporary guards kept for now:
 
 SCRIPT TAGS IN templates/mobile.html
 ----------------------------------------
-936: other: /static/js/mobile/nova-mobile-core.js?v=scroll-authority-20260626-002
-938: other: /static/js/mobile/nova-mobile-state.js?v=mobile-state-002
-940: other: /static/js/mobile/nova-mobile-ui-utils.js?v=git-restored-valid-20260623
-947: other: /static/js/mobile/nova-mobile-chat-ui.js?v=mobile-modular-001
-949: other: /static/js/mobile/nova-mobile-message-actions.js?v=mobile-actions-fix-007
-951: other: /static/js/mobile/nova-mobile-stream.js?v=mobile-stream-full-clean-20260604-001
-958: other: /static/js/mobile/nova-mobile-images.js?v=scroll-authority-20260626-002
-960: other: /static/js/mobile/nova-mobile-webcards.js?v=source-card-kill-20260624-999
-962: other: /static/js/mobile/nova-mobile-upload.js?v=hard-attach-final-20260607210437
-964: other: /static/js/mobile/nova-mobile-voice.js?v=mobile-voice-endgame-002
-971: CANONICAL_KEEP: /static/js/mobile/nova-mobile-sessions.js
-978: other: /static/js/mobile/nova-mobile-listeners.js?v=mobile-modular-001
-980: other: /static/js/mobile/nova-mobile-events.js?v=compact-quick-prompts-20260610-001
-982: other: /static/js/mobile/nova-mobile-storage.js?v=mobile-storage-003
-984: other: /static/js/mobile/nova-mobile-bridge.js?v=scroll-authority-20260626-004
-987: other: /static/js/nova-mobile-app.js?v=code-color-20260630-001
-994: other: /static/js/mobile/nova-mobile-attachment-payload.js?v=attachment-revert-clean-20260609-001
-998: other: /static/js/mobile/nova-mobile-attachment-preview.js?v=legacy-preview-disabled-20260630-001
-1001: other: /static/js/mobile/nova-mobile-execution-panel.js?v=execution-panel-cache-state-20260623
-1004: other: /static/js/mobile/nova-mobile-assistant-actions.js?v=assistant-actions-retry-20260623
-1007: other: /static/js/mobile/nova-mobile-render-guard.js?v=render-guard-20260630-0010
-1009: other: /static/js/mobile/nova-mobile-artifacts-panel.js
-1238: other: {{ url_for(
-4777: other: {{ url_for(
-4778: other: {{ url_for(
-4779: REVIEW_COMPETING_OWNER: /static/js/mobile/nova-mobile-session-restore-override-v4.js?v=mobile-session-restore-override-v4
-4780: REVIEW_COMPETING_OWNER: /static/js/mobile/nova-mobile-session-drawer-restore-v5.js?v=mobile-session-drawer-restore-v5
-4781: REVIEW_COMPETING_OWNER: /static/js/mobile/nova-mobile-session-panel-v6.js?v=mobile-session-panel-v6
-4782: other: /static/js/mobile/nova-mobile-new-chat-backend-create-v1.js?v=backend-create-v1-20260703
-4783: other: /static/js/mobile/nova-mobile-send-dedupe-guard-v1.js?v=send-dedupe-v1-20260703
-4784: REVIEW_COMPETING_OWNER: /static/js/mobile/nova-mobile-url-session-authority-v1.js?v=url-session-authority-v1-20260703
-4785: GUARD_KEEP_FOR_NOW: /static/js/mobile/nova-mobile-close-layout-reset-v1.js?v=close-layout-reset-v1-20260703
-4786: GUARD_KEEP_FOR_NOW: /static/js/mobile/nova-mobile-sessions-close-final-v1.js?v=sessions-close-final-v1-20260703
-4787: CANONICAL_KEEP: /static/js/mobile/nova-mobile-sessions-rescue-final-v1.js?v=sessions-rescue-final-v3-body-unhide-20260703
+745: other: /static/js/mobile/nova-mobile-core.js?v=scroll-authority-20260626-002
+747: other: /static/js/mobile/nova-mobile-state.js?v=mobile-state-002
+749: other: /static/js/mobile/nova-mobile-ui-utils.js?v=git-restored-valid-20260623
+756: other: /static/js/mobile/nova-mobile-chat-ui.js?v=mobile-modular-001
+758: other: /static/js/mobile/nova-mobile-message-actions.js?v=mobile-actions-fix-007
+760: other: /static/js/mobile/nova-mobile-stream.js?v=mobile-stream-full-clean-20260604-001
+767: other: /static/js/mobile/nova-mobile-images.js?v=scroll-authority-20260626-002
+769: other: /static/js/mobile/nova-mobile-webcards.js?v=source-card-kill-20260624-999
+771: other: /static/js/mobile/nova-mobile-upload.js?v=hard-attach-final-20260607210437
+773: other: /static/js/mobile/nova-mobile-voice.js?v=mobile-voice-endgame-002
+780: CANONICAL_KEEP: /static/js/mobile/nova-mobile-sessions.js
+787: other: /static/js/mobile/nova-mobile-listeners.js?v=mobile-modular-001
+789: other: /static/js/mobile/nova-mobile-events.js?v=compact-quick-prompts-20260610-001
+791: other: /static/js/mobile/nova-mobile-storage.js?v=mobile-storage-003
+793: other: /static/js/mobile/nova-mobile-bridge.js?v=scroll-authority-20260626-004
+796: other: /static/js/nova-mobile-app.js?v=code-color-20260630-001
+803: other: /static/js/mobile/nova-mobile-attachment-payload.js?v=attachment-revert-clean-20260609-001
+807: other: /static/js/mobile/nova-mobile-attachment-preview.js?v=legacy-preview-disabled-20260630-001
+810: other: /static/js/mobile/nova-mobile-execution-panel.js?v=execution-panel-cache-state-20260623
+813: other: /static/js/mobile/nova-mobile-assistant-actions.js?v=assistant-actions-retry-20260623
+816: other: /static/js/mobile/nova-mobile-render-guard.js?v=render-guard-20260630-0010
+818: other: /static/js/mobile/nova-mobile-artifacts-panel.js
+1047: other: {{ url_for(
+4586: other: {{ url_for(
+4587: other: {{ url_for(
+4591: other: /static/js/mobile/nova-mobile-new-chat-backend-create-v1.js?v=backend-create-v1-20260703
+4592: other: /static/js/mobile/nova-mobile-send-dedupe-guard-v1.js?v=send-dedupe-v1-20260703
+4593: REVIEW_COMPETING_OWNER: /static/js/mobile/nova-mobile-url-session-authority-v1.js?v=url-session-authority-v1-20260703
+4594: GUARD_KEEP_FOR_NOW: /static/js/mobile/nova-mobile-close-layout-reset-v1.js?v=close-layout-reset-v1-20260703
+4595: GUARD_KEEP_FOR_NOW: /static/js/mobile/nova-mobile-sessions-close-final-v1.js?v=sessions-close-final-v1-20260703
+4596: CANONICAL_KEEP: /static/js/mobile/nova-mobile-sessions-rescue-final-v1.js?v=sessions-rescue-final-v3-body-unhide-20260703
 
 INLINE SCRIPT BLOCKS TOUCHING SESSIONS/BODY
 ----------------------------------------
-line 590: hits=['nova-mobile-sessions-panel', 'aria-hidden', 'setAttribute("aria-hidden"', 'setProperty("display", "none"']
-preview=\n(function () {\n    "use strict";\n\n    function $(id) {\n        return document.getElementById(id);\n    }\n\n    function forceHide(panel) {\n        if (!panel) return;\n\n        panel.classList.add("hidden");\n        panel.setAttribute("aria-hidden", "true");\n        panel.style.setProperty("display", "none", "important");\n    }\n\n    function forceShow(panel, topOrBottom) {\n        if (!panel) return;\n\n        panel.classList.remove("hidden");\n        panel.setAttribute("aria-hidden", "false");\n\n 
-
-line 2423: hits=['aria-hidden', 'removeAttribute("aria-hidden"']
+line 2232: hits=['aria-hidden', 'removeAttribute("aria-hidden"']
 preview=\n(function () {\n    "use strict";\n\n    const FIX_ID = "NOVA_MOBILE_TOP_COPY_EXPORT_SESSION_20260623";\n\n    function $(id) {\n        return document.getElementById(id);\n    }\n\n    function clean(value) {\n        return String(value || "")\n            .replace(/\r/g, "")\n            .replace(/[ \t]+\n/g, "\n")\n            .replace(/\n[ \t]+/g, "\n")\n            .replace(/\n{3,}/g, "\n\n")\n            .trim();\n    }\n\n    function toast(message) {\n        if (typeof window.showToast === "function") 
 
-line 2790: hits=['setProperty("display", "none"']
+line 2599: hits=['setProperty("display", "none"']
 preview=\n(function () {\n    "use strict";\n\n    const BAD = [\n        ".nova-mobile-summary-horsemen",\n        "#nova-mobile-summary-horsemen",\n        ".nova-mobile-summary-body",\n        "#nova-mobile-summary-body",\n        ".nova-mobile-backend-dock",\n        "#nova-mobile-backend-dock",\n        "#nova-backend-readiness-button",\n        ".nova-backend-readiness-button",\n        ".nova-mobile-backend-button"\n    ];\n\n    function kill() {\n        for (const sel of BAD) {\n            document.querySelect
 
-line 3304: hits=['setProperty("display", "none"']
+line 3113: hits=['setProperty("display", "none"']
 preview=\n(function () {\n    const MARK = "NOVA_MOBILE_STABLE_TOOLS_PANEL_NO_SHAKE_20260624";\n\n    function panel() {\n        return document.getElementById("nova-mobile-tools-panel");\n    }\n\n    function hideTopCopyExport() {\n        ["nova-mobile-copy-chat", "nova-mobile-export-chat"].forEach(id => {\n            const el = document.getElementById(id);\n            if (!el) return;\n\n            el.style.setProperty("display", "none", "important");\n            el.style.setProperty("visibility", "hidden", 
 
-line 3622: hits=['aria-hidden', 'setAttribute("aria-hidden"']
+line 3431: hits=['aria-hidden', 'setAttribute("aria-hidden"']
 preview=\n\n\n(() => {\n    const TAG = "[NOVA_MOBILE_ONE_ROW_NEW_SESSIONS_COPY_REGEN_V10_CONSOLIDATED_20260625]";\n\n    if (window.__novaMobileTopRowV10Consolidated20260625) return;\n    window.__novaMobileTopRowV10Consolidated20260625 = true;\n\n    const PARK_IDS = [\n        "mobileMenuButton",\n        "mobileMemoryButton",\n        "nova-mobile-new-chat",\n        "nova-mobile-sessions-toggle",\n        "nova-mobile-copy-chat",\n        "nova-mobile-rail-copy",\n        "nova-mobile-rail-regen",\n        "nova-mo
 
 
@@ -165,5 +159,5 @@ static/js/mobile/nova-mobile-upload.js
 
 SUMMARY
 ----------------------------------------
-review_competing_script_tags: 4
-inline_blocks_touching_sessions_or_body: 5
+review_competing_script_tags: 1
+inline_blocks_touching_sessions_or_body: 4
