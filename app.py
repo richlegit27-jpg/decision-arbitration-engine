@@ -18,7 +18,13 @@ def _nova_durable_data_bootstrap_20260703():
         if explicit:
             candidates.append(Path(explicit))
 
-        candidates.append(Path("/data"))
+        # Only use /data when it already exists, which indicates a real mounted
+        # Railway volume. Do not create fake /data on local Windows or ephemeral
+        # containers, because that can move repo-local data unexpectedly.
+        volume_data = Path("/data")
+        if os.name != "nt" and volume_data.exists():
+            candidates.append(volume_data)
+
         candidates.append(app_data)
 
         chosen = None
@@ -40,7 +46,13 @@ def _nova_durable_data_bootstrap_20260703():
 
         os.environ["NOVA_DATA_DIR"] = str(chosen)
 
-        if chosen.resolve() != app_data.resolve():
+        should_bridge_app_data = False
+        try:
+            should_bridge_app_data = chosen.resolve() != app_data.resolve()
+        except Exception:
+            should_bridge_app_data = str(chosen) != str(app_data)
+
+        if should_bridge_app_data:
             chosen.mkdir(parents=True, exist_ok=True)
 
             if app_data.exists() and not app_data.is_symlink():
