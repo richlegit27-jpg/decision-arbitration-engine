@@ -8,6 +8,7 @@ import os
 import re
 import time
 import uuid
+from nova_backend.services.model_registry import get_default_model, get_model_details, get_public_models, resolve_model
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -22,7 +23,7 @@ SESSIONS_FILE = DATA_DIR / "nova_sessions.json"
 MEMORY_FILE = DATA_DIR / "nova_memory.json"
 
 OPENAI_API_KEY = (os.getenv("OPENAI_API_KEY") or "").strip()
-DEFAULT_MODEL = (os.getenv("OPENAI_MODEL") or "gpt-4.1-mini").strip() or "gpt-4.1-mini"
+DEFAULT_MODEL = get_default_model()
 
 MAX_UPLOAD_FILES = 10
 MAX_UPLOAD_SIZE_BYTES = 20 * 1024 * 1024  # 20 MB per file
@@ -583,12 +584,8 @@ def uploaded_file(filename):
 @app.route("/api/models", methods=["GET"])
 def api_models():
     return jsonify({
-        "models": [
-            DEFAULT_MODEL,
-            "gpt-4.1-mini",
-            "gpt-4.1",
-            "gpt-4o-mini",
-        ],
+        "models": get_public_models(),
+        "model_details": get_model_details(),
         "default": DEFAULT_MODEL,
     })
 
@@ -765,7 +762,7 @@ def api_chat():
     data = request.get_json(silent=True) or {}
     session_id = normalize_text(data.get("session_id"))
     content = normalize_text(data.get("content"))
-    model = normalize_text(data.get("model")) or DEFAULT_MODEL
+    model = resolve_model(normalize_text(data.get("model")) or DEFAULT_MODEL)
     uploaded_files = data.get("uploaded_files") if isinstance(data.get("uploaded_files"), list) else []
 
     if not content:
@@ -828,7 +825,7 @@ def api_chat_stream():
     data = request.get_json(silent=True) or {}
     session_id = normalize_text(data.get("session_id"))
     content = normalize_text(data.get("content"))
-    model = normalize_text(data.get("model")) or DEFAULT_MODEL
+    model = resolve_model(normalize_text(data.get("model")) or DEFAULT_MODEL)
     uploaded_files = data.get("uploaded_files") if isinstance(data.get("uploaded_files"), list) else []
 
     if not content:
@@ -942,4 +939,3 @@ if __name__ == "__main__":
     port = int((os.getenv("PORT") or os.getenv("APP_PORT") or "8743").strip())
     debug = (os.getenv("DEBUG") or "true").strip().lower() == "true"
     app.run(host=host, port=port, debug=debug)
-
