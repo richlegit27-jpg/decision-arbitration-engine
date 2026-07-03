@@ -478,11 +478,10 @@
             renderMessages(id, session.title || title, restoredMessages);
             renderSessionToMainChat(id, session.title || title, restoredMessages);
 
-            try {
-                var uiAfterRestore = getUi();
-                uiAfterRestore.panel.setAttribute("data-open", "false");
-                ownDrawer();
-            } catch (_) {}
+            closeDrawerAfterRestore();
+            setTimeout(closeDrawerAfterRestore, 50);
+            setTimeout(closeDrawerAfterRestore, 250);
+            setTimeout(closeDrawerAfterRestore, 750);
             log("opened", id);
         }).catch(function (err) {
             panel.setAttribute("data-open", "true");
@@ -576,6 +575,21 @@
         }
 
         log("ready", VERSION);
+    }
+
+
+    // NOVA_SESSION_DRAWER_V2_FORCE_CLOSE_AFTER_RESTORE_20260703
+    function closeDrawerAfterRestore() {
+        try {
+            var panel = document.getElementById("nova-session-drawer-v2-panel");
+            if (!panel) return;
+
+            panel.setAttribute("data-open", "false");
+            panel.style.setProperty("display", "none", "important");
+            panel.style.setProperty("visibility", "hidden", "important");
+            panel.style.setProperty("opacity", "0", "important");
+            panel.style.setProperty("pointer-events", "none", "important");
+        } catch (_) {}
     }
 
     window.NovaSessionDrawerV2Stable = {
