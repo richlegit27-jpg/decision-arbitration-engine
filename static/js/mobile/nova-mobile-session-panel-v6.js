@@ -493,3 +493,133 @@
 })();
 /* /NOVA_MOBILE_NEW_CHAT_SESSION_V8_20260703 */
 
+/* NOVA_MOBILE_NEW_CHAT_URL_BOOT_V9_20260703 */
+(function () {
+    "use strict";
+
+    if (window.__NOVA_MOBILE_NEW_CHAT_URL_BOOT_V9_20260703__) {
+        return;
+    }
+
+    window.__NOVA_MOBILE_NEW_CHAT_URL_BOOT_V9_20260703__ = true;
+
+    const KEYS = [
+        "nova_mobile_active_session_id",
+        "nova_active_session_id",
+        "active_session_id",
+        "session_id"
+    ];
+
+    function log() {
+        try { console.log("[NOVA MOBILE NEW CHAT URL BOOT V9]", ...arguments); } catch (_) {}
+    }
+
+    function makeSessionId() {
+        return "mobile_session_" + Date.now() + "_" + Math.random().toString(16).slice(2, 8);
+    }
+
+    function setActiveSessionId(id) {
+        const sessionId = String(id || "").trim();
+        if (!sessionId) return "";
+
+        for (const key of KEYS) {
+            try { localStorage.setItem(key, sessionId); } catch (_) {}
+        }
+
+        window.novaMobileActiveSessionId = sessionId;
+        window.activeSessionId = sessionId;
+        window.currentSessionId = sessionId;
+        window.NOVA_ACTIVE_SESSION_ID = sessionId;
+
+        try {
+            if (
+                window.NovaMobileSessionPanelV6 &&
+                typeof window.NovaMobileSessionPanelV6.setActiveSessionId === "function"
+            ) {
+                window.NovaMobileSessionPanelV6.setActiveSessionId(sessionId);
+            }
+        } catch (_) {}
+
+        return sessionId;
+    }
+
+    function clearVisibleChatSoon() {
+        setTimeout(function () {
+            const roots = [
+                document.getElementById("mobileChatMessages"),
+                document.querySelector("[data-nova-chat-messages='true']"),
+                document.querySelector(".mobile-chat-container"),
+                document.querySelector(".chat-messages"),
+                document.querySelector("#chatMessages")
+            ].filter(Boolean);
+
+            const seen = new Set();
+
+            for (const root of roots) {
+                if (seen.has(root)) continue;
+                seen.add(root);
+
+                if (
+                    root.id === "nova-mobile-session-panel-v6" ||
+                    root.closest("#nova-mobile-session-panel-v6")
+                ) {
+                    continue;
+                }
+
+                root.innerHTML = "";
+                root.setAttribute("data-nova-new-chat-url-cleared", "true");
+            }
+
+            try { window.messages = []; } catch (_) {}
+            try { window.currentMessages = []; } catch (_) {}
+        }, 0);
+    }
+
+    function rotateSessionFromNewUrl() {
+        let url;
+
+        try {
+            url = new URL(window.location.href);
+        } catch (_) {
+            return;
+        }
+
+        if (!url.searchParams.has("new")) {
+            return;
+        }
+
+        const newToken = String(url.searchParams.get("new") || Date.now());
+        const seenKey = "nova_mobile_new_chat_url_seen_" + newToken;
+
+        try {
+            if (sessionStorage.getItem(seenKey)) {
+                return;
+            }
+
+            sessionStorage.setItem(seenKey, "1");
+        } catch (_) {}
+
+        const sessionId = makeSessionId();
+        setActiveSessionId(sessionId);
+        clearVisibleChatSoon();
+
+        try {
+            url.searchParams.delete("new");
+            const cleanUrl = url.pathname + (url.search ? url.search : "") + (url.hash || "");
+            window.history.replaceState(null, "", cleanUrl);
+        } catch (_) {}
+
+        log("rotated session from ?new=", sessionId);
+    }
+
+    rotateSessionFromNewUrl();
+
+    window.NovaMobileNewChatUrlBootV9 = {
+        makeSessionId,
+        setActiveSessionId,
+        rotateSessionFromNewUrl
+    };
+
+    log("active");
+})();
+/* /NOVA_MOBILE_NEW_CHAT_URL_BOOT_V9_20260703 */
