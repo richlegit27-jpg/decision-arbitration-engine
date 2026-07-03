@@ -777,7 +777,7 @@ body {
      SESSIONS (SINGLE SOURCE OF TRUTH)
 ========================= -->
 
-<script src="/static/js/mobile/nova-mobile-sessions.js"></script>
+<script src="/static/js/mobile/nova-mobile-sessions.js?v=sessions-final-hard-lock-20260703"></script>
 
 
 <!-- =========================
@@ -1048,84 +1048,7 @@ body {
 
 <!-- NOVA_MOBILE_REMOVE_RAW_TAIL_GARBAGE_20260703
      Removed malformed legacy mobile tail blocks that leaked raw JS/CSS into the page.
-     Sessions panel remains owned by static/js/mobile/nova-mobile-sessions.js.
--->
-<!-- NOVA_MOBILE_MENU_PANEL_SCROLL_FIX_20260623 -->
-<style>
-/* Mobile menu panel: keep Memory/Upload/Open/Execution/Artifacts visible */
-.nova-mobile-tools-menu-fixed,
-.nova-mobile-menu-panel-fixed {
-    max-height: min(62vh, calc(100vh - 150px)) !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    overscroll-behavior: contain !important;
-    -webkit-overflow-scrolling: touch !important;
-    padding: 8px !important;
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px) !important;
-    box-sizing: border-box !important;
-    display: grid !important;
-    grid-template-columns: minmax(0, 1fr) !important;
-    gap: 7px !important;
-    align-content: start !important;
-}
-
-.nova-mobile-tools-menu-fixed > *,
-.nova-mobile-menu-panel-fixed > * {
-    min-width: 0 !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-}
-
-.nova-mobile-tools-menu-fixed button,
-.nova-mobile-tools-menu-fixed a,
-.nova-mobile-menu-panel-fixed button,
-.nova-mobile-menu-panel-fixed a {
-    width: 100% !important;
-    min-height: 34px !important;
-    height: 34px !important;
-    max-height: 34px !important;
-    padding: 0 10px !important;
-    border-radius: 13px !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    font-size: 12px !important;
-    line-height: 1 !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-}
-
-/* If the menu is fixed/absolute near the top-right, keep it inside the screen */
-.nova-mobile-tools-menu-fixed,
-.nova-mobile-menu-panel-fixed {
-    right: 8px !important;
-    left: auto !important;
-    max-width: min(260px, calc(100vw - 18px)) !important;
-}
-
-/* Small phones need a little more vertical room */
-@media (max-height: 700px) {
-    .nova-mobile-tools-menu-fixed,
-    .nova-mobile-menu-panel-fixed {
-        max-height: min(70vh, calc(100vh - 118px)) !important;
-    }
-
-    .nova-mobile-tools-menu-fixed button,
-    .nova-mobile-tools-menu-fixed a,
-    .nova-mobile-menu-panel-fixed button,
-    .nova-mobile-menu-panel-fixed a {
-        min-height: 31px !important;
-        height: 31px !important;
-        max-height: 31px !important;
-        font-size: 11.5px !important;
-    }
-}
-</style>
-
-<script>
-(function () {
-    "use strict";
+     Sessions panel remains owned by static/js/mobile/nova-mobile-sessions.js?v=sessions-final-hard-lock-20260703"use strict";
 
     const FIX_ID = "NOVA_MOBILE_MENU_PANEL_SCROLL_FIX_20260623";
 
@@ -5212,3 +5135,5 @@ body:not(.nova-ready) #nova-composer {
 </script>
 
 <!-- /NOVA_MOBILE_MENU_HELP_BLOG_ORDER_FINAL_20260624 -->
+
+

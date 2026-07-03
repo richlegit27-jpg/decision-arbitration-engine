@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
     "use strict";
 
     if (window.__NOVA_MOBILE_SESSIONS_FINAL_OWNER_V1_20260703__) {
@@ -452,10 +452,26 @@
     }
 
     // NOVA_MOBILE_SESSIONS_FINAL_GLOBAL_LOCK_20260703
+    // NOVA_MOBILE_SESSIONS_FINAL_GLOBAL_HARD_LOCK_20260703
+    function lockFinalGlobal(name, value) {
+        try {
+            Object.defineProperty(window, name, {
+                value: value,
+                writable: false,
+                configurable: false,
+                enumerable: true
+            });
+        } catch (error) {
+            try {
+                window[name] = value;
+            } catch (_) {}
+        }
+    }
+
     function installFinalSessionGlobals() {
-        window.NovaMobileOpenSessions = openPanel;
-        window.NovaMobileCloseSessions = closePanel;
-        window.NovaMobileReloadSessions = loadSessions;
+        lockFinalGlobal("NovaMobileOpenSessions", openPanel);
+        lockFinalGlobal("NovaMobileCloseSessions", closePanel);
+        lockFinalGlobal("NovaMobileReloadSessions", loadSessions);
     }
 
     installFinalSessionGlobals();
@@ -475,5 +491,19 @@
 
     setTimeout(boot, 500);
     setTimeout(boot, 1500);
+    setTimeout(boot, 3000);
+    setTimeout(boot, 6000);
+
+    let finalLockCount = 0;
+    const finalLockTimer = setInterval(function () {
+        finalLockCount += 1;
+        installFinalSessionGlobals();
+        removeOldSessionUi();
+        ensureButton();
+
+        if (finalLockCount >= 20) {
+            clearInterval(finalLockTimer);
+        }
+    }, 750);
 })();
 
