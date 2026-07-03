@@ -6994,18 +6994,33 @@ def api_session_by_id(session_id: str):
 
 @app.post("/api/sessions/new")
 def api_sessions_new():
-
+    # NOVA_SESSION_NEW_PRUNER_GHOST_ACTIVE_FIX_20260703
+    # Create one session and return the actual created object.
+    # Older response filters/pruners could leave active_session_id pointing
+    # at a session not present in the response list.
     data = request_json()
     title = str(data.get("title") or "New Chat").strip() or "New Chat"
 
     session = session_service.create_session(title)
-    if not session:
-        return json_error("Failed to create session", 500)
+    session_id = ""
+
+    if isinstance(session, dict):
+        session_id = str(session.get("id") or "").strip()
+
+    if not session_id:
+        session_id = str(getattr(session_service, "active_session_id", "") or "").strip()
+
+    if session_id:
+        fresh_session = session_service.get_session(session_id)
+        if isinstance(fresh_session, dict):
+            session = fresh_session
+
+    sessions = session_service.get_all()
 
     return json_ok(
-        session=session_service.get_session(session["id"]),
-        sessions=session_service.get_all(),
-        active_session_id=session_service.active_session_id,
+        session=session if isinstance(session, dict) else None,
+        sessions=sessions,
+        active_session_id=session_id or getattr(session_service, "active_session_id", ""),
     )
 
 
@@ -11275,10 +11290,23 @@ def _nova_install_empty_session_spam_pruner_20260610():
                 if old_id and old_id != str(newest.get("id") or ""):
                     remove_ids.add(old_id)
 
+        # NOVA_SESSION_NEW_PRUNER_GHOST_ACTIVE_FIX_20260703
+        # Always repair a ghost active_session_id, even when nothing was pruned.
+        valid_ids = [
+            str(item.get("id") or "")
+            for item in sessions
+            if isinstance(item, dict) and str(item.get("id") or "")
+        ]
+        old_active = str(store.get("active_session_id") or "")
+
+        if old_active and old_active not in set(valid_ids):
+            store["active_session_id"] = valid_ids[0] if valid_ids else ""
+            save_store(store)
+            return 0
+
         if not remove_ids:
             return 0
 
-        old_active = str(store.get("active_session_id") or "")
         new_sessions = [
             item for item in sessions
             if not (isinstance(item, dict) and str(item.get("id") or "") in remove_ids)
@@ -11301,6 +11329,19 @@ def _nova_install_empty_session_spam_pruner_20260610():
     @app.after_request
     def nova_prune_empty_session_spam_after_request_20260610(response):
         path = str(request.path or "")
+
+        # NOVA_SESSION_NEW_PRUNER_GHOST_ACTIVE_FIX_20260703
+        # Do not prune immediately after session mutation routes.
+        # These routes already changed the store; pruning after them can make
+        # new/rename/delete/pin look flaky or leave active_session_id as a ghost.
+        if request.method != "GET" and path in (
+            "/api/sessions/new",
+            "/api/sessions/switch",
+            "/api/sessions/rename",
+            "/api/sessions/pin",
+            "/api/sessions/delete",
+        ):
+            return response
 
         if (
             path.startswith("/api/sessions")
