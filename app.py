@@ -20005,6 +20005,11 @@ try:
                 import os as _nova_data_health_os_20260703
                 payload["nova_data_dir_env"] = _nova_data_health_os_20260703.environ.get("NOVA_DATA_DIR")
                 payload["nova_sessions_file_env"] = _nova_data_health_os_20260703.environ.get("NOVA_SESSIONS_FILE")
+
+                # NOVA_RAILWAY_VOLUME_HEALTH_DIAGNOSTIC_20260703
+                payload["railway_volume_name"] = _nova_data_health_os_20260703.environ.get("RAILWAY_VOLUME_NAME")
+                payload["railway_volume_mount_path"] = _nova_data_health_os_20260703.environ.get("RAILWAY_VOLUME_MOUNT_PATH")
+
                 payload["data_dir_resolved"] = str(data_dir.resolve())
                 payload["data_dir_exists"] = bool(data_dir.exists())
                 payload["sessions_file_exists"] = bool((data_dir / "nova_sessions.json").exists())
