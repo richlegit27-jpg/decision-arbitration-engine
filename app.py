@@ -19185,6 +19185,76 @@ except Exception as _nrla_error_20260703:
     except Exception:
         pass
 
+# --- NOVA_MOBILE_OWNER_AUTO_AUTH_20260703 ---
+try:
+    from flask import request as _nmoa_request
+    from flask import session as _nmoa_session
+
+    def _nmoa_should_auto_auth_20260703():
+        try:
+            path = str(_nmoa_request.path or "")
+
+            if path in ("/mobile", "/mobile/"):
+                return True
+
+            if path.startswith("/api/auth/status"):
+                return True
+
+            if path.startswith("/api/sessions"):
+                return True
+
+            return False
+        except Exception:
+            return False
+
+    def _nmoa_set_richard_session_20260703():
+        try:
+            _nmoa_session.permanent = True
+            _nmoa_session["authenticated"] = True
+            _nmoa_session["auth_mode"] = "local"
+            _nmoa_session["username"] = "richard"
+            _nmoa_session["user_id"] = "user_richard_stable_local_login"
+        except Exception:
+            pass
+
+    @app.before_request
+    def _nmoa_before_request_20260703():
+        try:
+            if _nmoa_should_auto_auth_20260703():
+                _nmoa_set_richard_session_20260703()
+        except Exception:
+            pass
+
+        return None
+
+    @app.after_request
+    def _nmoa_after_request_20260703(response):
+        try:
+            if (
+                _nmoa_session.get("authenticated")
+                and str(_nmoa_session.get("username") or "").lower() == "richard"
+            ):
+                response.set_cookie(
+                    "nova_richard_login",
+                    "1",
+                    max_age=60 * 60 * 24 * 365,
+                    httponly=True,
+                    secure=True,
+                    samesite="Lax",
+                    path="/",
+                )
+        except Exception:
+            pass
+
+        return response
+
+    print("[NOVA_MOBILE_OWNER_AUTO_AUTH_20260703] installed")
+except Exception as _nmoa_error_20260703:
+    try:
+        print("[NOVA_MOBILE_OWNER_AUTO_AUTH_20260703] failed:", _nmoa_error_20260703)
+    except Exception:
+        pass
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
