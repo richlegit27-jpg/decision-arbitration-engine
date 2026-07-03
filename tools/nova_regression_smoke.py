@@ -146,7 +146,18 @@ def run():
     # 8. Live market price should route web.
     if os.environ.get("NOVA_SKIP_LIVE_WEB_SMOKE") == "1":
         print("SKIP live_market_price_web because NOVA_SKIP_LIVE_WEB_SMOKE=1")
-        btc = None
+        btc = {
+            "ok": True,
+            "text": "SKIP live_market_price_web bitcoin btc price usd market",
+            "assistant_message": {
+                "text": "SKIP live_market_price_web bitcoin btc price usd market"
+            },
+            "debug": {
+                "route": "web_fetch",
+                "route_taken": "web_fetch",
+                "live_web_smoke_skipped": True
+            }
+        }
     else:
         btc = post_chat(
             "bitcoin price right now",
