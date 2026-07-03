@@ -3486,7 +3486,7 @@ console.log("[" + MARK + "] ready");
 
         row.innerHTML = `
             <button id="nova-mobile-row-new" type="button">New</button>
-            <button id="nova-mobile-row-sessions" type="button">Sessions</button>
+            <!-- NOVA_MOBILE_DISABLE_V10_GARBAGE_SESSIONS_BUTTON_20260703: disabled garbage V10 Sessions button -->
             <button id="nova-mobile-row-copy" type="button">Copy</button>
             <button id="nova-mobile-row-regen" type="button">Regen</button>
         `;
@@ -3879,7 +3879,12 @@ console.log("[" + MARK + "] ready");
         ensureRow();
 
         bindButton("nova-mobile-row-new", openNew);
-        bindButton("nova-mobile-row-sessions", openSessions);
+        // NOVA_MOBILE_DISABLE_V10_GARBAGE_SESSIONS_BUTTON_20260703: V10 Sessions button disabled; original owner remains window.NovaMobileOpenSessions().
+setTimeout(() => {
+    const staleV10 = document.getElementById("nova-mobile-v10-sessions-panel");
+    if (staleV10) staleV10.remove();
+}, 0);
+
         bindButton("nova-mobile-row-copy", runCopy);
         bindButton("nova-mobile-row-regen", runRegen);
 
