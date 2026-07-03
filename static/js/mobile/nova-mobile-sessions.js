@@ -2024,14 +2024,15 @@ if (window.__NOVA_MOBILE_SESSION_FINAL_OWNER_SHIELD_20260630__) return;
 
 
 /* ============================================================
- * NOVA_MOBILE_SESSION_DRAWER_V2_ROUTE_TO_REAL_OWNER_20260703
- * Keep the one visible drawer-v2 button, but route it to the
- * real /api/sessions owner that already has Open/Rename/Pin/Delete.
+ * NOVA_MOBILE_KILL_DRAWER_V2_SHOW_ORIGINAL_SESSIONS_20260703
+ * Remove the garbage drawer-v2 Sessions button/panel and make the
+ * original sessions toggle visible. Original owner:
+ * window.NovaMobileOpenSessions().
  * ============================================================ */
 (function () {
     "use strict";
 
-    var MARKER = "__NOVA_MOBILE_SESSION_DRAWER_V2_ROUTE_TO_REAL_OWNER_20260703__";
+    var MARKER = "__NOVA_MOBILE_KILL_DRAWER_V2_SHOW_ORIGINAL_SESSIONS_20260703__";
 
     if (window[MARKER]) {
         return;
@@ -2039,50 +2040,84 @@ if (window.__NOVA_MOBILE_SESSION_FINAL_OWNER_SHIELD_20260630__) return;
 
     window[MARKER] = true;
 
-    function isDrawerV2Trigger(target) {
-        var node = target;
-
-        while (node && node !== document.documentElement) {
+    function removeDrawerV2() {
+        [
+            "#nova-session-drawer-v2-button",
+            "#nova-session-drawer-v2-panel",
+            "#nova-session-drawer-v2-stable-style",
+            "#nova-session-drawer-v2-main-chat-restore-style",
+            "[data-nova-session-drawer-v2='true']"
+        ].forEach(function (selector) {
             try {
-                if (
-                    node.id === "nova-session-drawer-v2-button" ||
-                    node.getAttribute("data-nova-session-drawer-v2") === "true"
-                ) {
-                    return true;
-                }
+                document.querySelectorAll(selector).forEach(function (el) {
+                    if (el) el.remove();
+                });
             } catch (error) {}
-
-            node = node.parentElement;
-        }
-
-        return false;
+        });
     }
 
-    function openRealSessionsDrawer() {
-        if (typeof window.NovaMobileOpenSessions === "function") {
-            window.NovaMobileOpenSessions();
-            return true;
-        }
+    function showOriginalToggle() {
+        var btn = document.getElementById("nova-mobile-sessions-toggle");
 
-        return false;
-    }
-
-    document.addEventListener("click", function (event) {
-        if (!isDrawerV2Trigger(event.target)) {
+        if (!btn) {
             return;
         }
 
-        var opened = openRealSessionsDrawer();
+        btn.style.setProperty("display", "block", "important");
+        btn.style.setProperty("visibility", "visible", "important");
+        btn.style.setProperty("opacity", "1", "important");
+        btn.style.setProperty("pointer-events", "auto", "important");
+        btn.style.setProperty("position", "fixed", "important");
+        btn.style.setProperty("left", "12px", "important");
+        btn.style.setProperty("top", "10px", "important");
+        btn.style.setProperty("right", "auto", "important");
+        btn.style.setProperty("bottom", "auto", "important");
+        btn.style.setProperty("z-index", "2147483647", "important");
 
-        if (!opened) {
-            return;
+        if (!btn.dataset.novaOriginalSessionsKillV2Wired) {
+            btn.dataset.novaOriginalSessionsKillV2Wired = "1";
+
+            btn.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
+
+                removeDrawerV2();
+
+                if (typeof window.NovaMobileOpenSessions === "function") {
+                    window.NovaMobileOpenSessions();
+                }
+            }, true);
         }
+    }
 
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
-    }, true);
+    function apply() {
+        removeDrawerV2();
+        showOriginalToggle();
+    }
 
-    console.log("[NOVA_MOBILE_SESSION_DRAWER_V2_ROUTE_TO_REAL_OWNER_20260703] active");
+    apply();
+    setTimeout(apply, 50);
+    setTimeout(apply, 250);
+    setTimeout(apply, 1000);
+
+    try {
+        var observer = new MutationObserver(function () {
+            apply();
+        });
+
+        observer.observe(document.documentElement, {
+            childList: true,
+            subtree: true
+        });
+
+        setTimeout(function () {
+            try {
+                observer.disconnect();
+            } catch (error) {}
+        }, 10000);
+    } catch (error) {}
+
+    console.log("[NOVA_MOBILE_KILL_DRAWER_V2_SHOW_ORIGINAL_SESSIONS_20260703] active");
 })();
 
