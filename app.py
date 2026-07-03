@@ -11108,6 +11108,20 @@ def _nova_install_session_auth_scope_20260610():
         if response.headers.get("X-Nova-Slim-Sessions") == "1":
             return response
 
+        # NOVA_SKIP_SESSION_AUTH_SCOPE_FOR_MUTATIONS_20260703
+        # Do not rewrite successful session mutation responses.
+        # The filter below can collapse POST /api/sessions/new/rename/pin/delete
+        # into session=null, sessions=[], active_session_id="", which breaks
+        # mobile refresh and makes rename/delete look like they reverted.
+        if request.method != "GET" and path in (
+            "/api/sessions/new",
+            "/api/sessions/switch",
+            "/api/sessions/rename",
+            "/api/sessions/pin",
+            "/api/sessions/delete",
+        ):
+            return response
+
         user = getattr(g, "nova_auth_user", None) or current_auth_user()
         store, visible = normalize_store_for_user(user)
 
