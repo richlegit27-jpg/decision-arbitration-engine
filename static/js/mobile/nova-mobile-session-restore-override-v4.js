@@ -307,5 +307,3 @@
     log("active", VERSION);
 })();
 
-
-
