@@ -118,8 +118,13 @@
             id.indexOf("regression_") === 0 ||
             id.indexOf("test_") === 0 ||
             id.indexOf("smoke_") === 0 ||
+            id.indexOf("duplicate_") === 0 ||
+            id.indexOf("debug_") === 0 ||
+            id.indexOf("api_check_") === 0 ||
             combined.indexOf("regression") >= 0 ||
-            combined.indexOf("smoke") >= 0
+            combined.indexOf("smoke") >= 0 ||
+            combined.indexOf("duplicate_api_check") >= 0 ||
+            combined.indexOf("api check") >= 0
         );
     }
 
