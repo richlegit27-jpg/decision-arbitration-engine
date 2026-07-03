@@ -19363,7 +19363,7 @@ try:
             if "nova-mobile-session-drawer-v2.js" in html:
                 return response
 
-            script = '<script src="/static/js/mobile/nova-mobile-session-drawer-v2.js?v=20260703-hard-clean-no-async"></script>'
+            script = '<script src="/static/js/mobile/nova-mobile-session-drawer-v2.js?v=20260703-clean-replace-2-racefix"></script>'
 
             lower = html.lower()
             idx = lower.rfind("</body>")

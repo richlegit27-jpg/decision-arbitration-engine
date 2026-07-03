@@ -327,35 +327,55 @@
         });
     }
 
-    function boot() {
-        ui();
+    async function boot() {
+        ensureUi();
+
+        let drawerTouchedByUser = false;
+
+        document.addEventListener("click", function (event) {
+            try {
+                const target = event.target;
+                if (
+                    target &&
+                    target.closest &&
+                    target.closest("#nova-session-drawer-v2-button, #nova-session-drawer-v2-panel")
+                ) {
+                    drawerTouchedByUser = true;
+                    window.__NOVA_SESSION_DRAWER_V2_USER_TOUCHED_20260703__ = true;
+                }
+            } catch (_) {}
+        }, true);
 
         setInterval(function () {
-            own();
-            hideOldRightButtons();
+            installStyles();
+            ownDrawerVisibility();
+            hideOldSessionButtons();
         }, 500);
 
-        loadSessions();
+        try {
+            await loadSessions();
+            const ui = ensureUi();
+            const params = new URLSearchParams(window.location.search);
+            const id = params.get("session_id");
 
-        setTimeout(function () {
-            var parts = ui();
-            var params = new URLSearchParams(window.location.search);
-            var id = params.get("session_id");
-
-            if (id) {
-                fetchJson("/api/sessions/" + encodeURIComponent(id)).then(function (detail) {
-                    var session = detail.session || detail;
-                    renderMessages(id, session.title || id, messagesFrom(detail));
-                }).catch(function (err) {
-                    log("url session failed", err);
-                    parts.panel.setAttribute("data-open", "false");
-                    own();
-                });
-            } else {
-                parts.panel.setAttribute("data-open", "false");
-                own();
+            if (!id && !drawerTouchedByUser && !window.__NOVA_SESSION_DRAWER_V2_USER_TOUCHED_20260703__) {
+                ui.panel.setAttribute("data-open", "false");
+                ownDrawerVisibility();
             }
-        }, 250);
+        } catch (_) {}
+
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get("session_id");
+
+        if (id) {
+            try {
+                const detail = await fetchJson("/api/sessions/" + encodeURIComponent(id));
+                const session = detail.session || detail;
+                renderMessages(id, session.title || id, normalizeMessages(detail));
+            } catch (err) {
+                log("url session failed", err);
+            }
+        }
 
         log("ready", VERSION);
     }
@@ -365,4 +385,35 @@
     } else {
         boot();
     }
+})();
+
+// NOVA_SESSION_DRAWER_V2_BOOT_RACE_FIX_20260703
+(function () {
+    "use strict";
+
+    window.__NOVA_SESSION_DRAWER_V2_BOOT_RACE_FIX_20260703__ = true;
+
+    document.addEventListener("click", function (event) {
+        try {
+            const target = event.target;
+            if (
+                target &&
+                target.closest &&
+                target.closest("#nova-session-drawer-v2-button, #nova-session-drawer-v2-panel")
+            ) {
+                window.__NOVA_SESSION_DRAWER_V2_USER_TOUCHED_20260703__ = true;
+
+                setTimeout(function () {
+                    const panel = document.getElementById("nova-session-drawer-v2-panel");
+                    if (panel && window.__NOVA_SESSION_DRAWER_V2_USER_TOUCHED_20260703__) {
+                        panel.setAttribute("data-open", "true");
+                        panel.style.setProperty("display", "block", "important");
+                        panel.style.setProperty("visibility", "visible", "important");
+                        panel.style.setProperty("opacity", "1", "important");
+                        panel.style.setProperty("pointer-events", "auto", "important");
+                    }
+                }, 650);
+            }
+        } catch (_) {}
+    }, true);
 })();
