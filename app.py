@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 
 # NOVA_DURABLE_DATA_BOOTSTRAP_20260703
@@ -1135,7 +1135,7 @@ def _nova_replace_weak_backend_reply(user_text, result):
     from being returned as the final assistant response.
 
     Also catches mojibake variants like:
-    "IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢m ready. What are we working on?"
+    "IÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢m ready. What are we working on?"
     """
     try:
         if not isinstance(result, dict):
@@ -1154,13 +1154,13 @@ def _nova_replace_weak_backend_reply(user_text, result):
         normalized = (
             text
             .lower()
-            .replace("Ã¢â‚¬â„¢", "'")
-            .replace("`", "'")
-            .replace("Ã‚Â´", "'")
             .replace("ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢", "'")
-            .replace("ÃƒÂ£Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢", "'")
-            .replace("iÃƒÂ£Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢m", "i'm")
-            .replace("iÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢m", "i'm")
+            .replace("`", "'")
+            .replace("Ãƒâ€šÃ‚Â´", "'")
+            .replace("ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢", "'")
+            .replace("ÃƒÆ’Ã‚Â£Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢", "'")
+            .replace("iÃƒÆ’Ã‚Â£Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢m", "i'm")
+            .replace("iÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢m", "i'm")
         )
 
         compact = " ".join(normalized.split())
@@ -1274,12 +1274,12 @@ def _nova_safe_clean_attachment_text(raw_text, max_chars=6000):
         "url removed from extracted attachment text",
         "wayfair.ca",
         "sponsored",
-        "ad Ã‚Â·",
-        "ads Ã‚Â·",
-        "shop Ã¢â‚¬Âº",
-        "wall art Ã¢â‚¬Âº",
+        "ad Ãƒâ€šÃ‚Â·",
+        "ads Ãƒâ€šÃ‚Â·",
+        "shop ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº",
+        "wall art ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº",
         "free_shipping",
-        "furniture & dÃƒÂ©cor",
+        "furniture & dÃƒÆ’Ã‚Â©cor",
         "kitchen appliances",
         "prices you'll love",
         "eye-catching prints",
@@ -1296,7 +1296,7 @@ def _nova_safe_clean_attachment_text(raw_text, max_chars=6000):
         if not line:
             continue
 
-        low = line.lower().strip(" :;-Ã¢â‚¬Â¢*|")
+        low = line.lower().strip(" :;-ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢*|")
         low_compact = re.sub(r"[^a-z0-9]+", " ", low).strip()
 
         if low_compact in noisy_exact:
@@ -3847,7 +3847,7 @@ def api_chat():
 
         _nova_attachments = _nova_payload.get("attachments") or []
 
-        # ðŸš¨ IMAGE FASTPATH SAFETY GUARD
+        # Ã°Å¸Å¡Â¨ IMAGE FASTPATH SAFETY GUARD
         if str(_nova_user_text or "").strip().lower().startswith("/image"):
             _nova_attachments = []
 
@@ -5002,11 +5002,11 @@ def api_chat():
             current_compact = " ".join(
                 current_text
                 .lower()
-                .replace("Ã¢â‚¬â„¢", "'")
                 .replace("ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢", "'")
-                .replace("ÃƒÂ£Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢", "'")
-                .replace("iÃƒÂ£Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢m", "i'm")
-                .replace("iÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢m", "i'm")
+                .replace("ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢", "'")
+                .replace("ÃƒÆ’Ã‚Â£Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢", "'")
+                .replace("iÃƒÆ’Ã‚Â£Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢m", "i'm")
+                .replace("iÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢m", "i'm")
                 .split()
             )
             if (
@@ -5117,7 +5117,7 @@ def api_chat():
             for index, item in enumerate(image_attachments[:5], start=1):
                 line = f"{index}. {item.get('name') or 'image attachment'} ({item.get('mime') or 'image/*'})"
                 if item.get("url"):
-                    line += f" Ã¢â‚¬â€ {item.get('url')}"
+                    line += f" ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â {item.get('url')}"
                 lines.append(line)
 
             lines.append("")
@@ -5778,7 +5778,7 @@ def api_chat():
                     "eye-catching prints",
                     "url removed from extracted attachment text",
                     "free_shipping",
-                    "furniture & dÃƒÂ©cor",
+                    "furniture & dÃƒÆ’Ã‚Â©cor",
                     "kitchen appliances",
                     "love, horror and more themes",
                     "plain field in front of mountain peak",
@@ -5799,7 +5799,7 @@ def api_chat():
                     if not _nova_line:
                         continue
 
-                    _nova_low = _nova_line.lower().strip(" :;-Ã¢â‚¬Â¢*|")
+                    _nova_low = _nova_line.lower().strip(" :;-ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢*|")
                     _nova_low_compact = _nova_prehandle_re.sub(r"[^a-z0-9]+", " ", _nova_low).strip()
 
                     if _nova_low_compact in _nova_noise_exact:
@@ -5984,7 +5984,7 @@ def api_chat():
                     "eye-catching prints",
                     "url removed from extracted attachment text",
                     "free_shipping",
-                    "furniture & dÃƒÂ©cor",
+                    "furniture & dÃƒÆ’Ã‚Â©cor",
                     "kitchen appliances",
                     "love, horror and more themes",
                     "plain field in front of mountain peak",
@@ -6015,7 +6015,7 @@ def api_chat():
                     if not _line:
                         continue
 
-                    _low = _line.lower().strip(" :;-Ã¢â‚¬Â¢*|")
+                    _low = _line.lower().strip(" :;-ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢*|")
                     _compact = _nova_attach_re.sub(r"[^a-z0-9]+", " ", _low).strip()
 
                     if _compact in _noise_exact:
@@ -6251,7 +6251,7 @@ def api_chat():
 
                     line = f"{index}. {label} ({mime})"
                     if url:
-                        line += f" Ã¢â‚¬â€ {url}"
+                        line += f" ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â {url}"
                     lines.append(line)
 
                 lines.append("")
@@ -6689,7 +6689,7 @@ def api_chat():
                             def _nova_weak_guard_clean_line(value):
                                 line = str(value or "").strip()
                                 line = _nova_weak_guard_re.sub(r"^\\s*\\d+\\.\\s*", "", line).strip()
-                                line = line.replace("Ã®ÂºÂ", "").strip()
+                                line = line.replace("ÃƒÂ®Ã‚ÂºÃ‚Â", "").strip()
                                 line = line.replace("Attachment <unknown>", "uploaded attachment")
                                 line = _nova_weak_guard_re.sub(r"\\s+", " ", line).strip()
                                 return line
@@ -6731,7 +6731,7 @@ def api_chat():
                                 if not line:
                                     return ""
 
-                                low = line.lower().strip(" :;-Ã¢â‚¬Â¢*|")
+                                low = line.lower().strip(" :;-ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢*|")
                                 compact = _nova_weak_guard_re.sub(r"[^a-z0-9]+", " ", low).strip()
 
                                 if low in _nova_weak_bad_exact or compact in _nova_weak_bad_exact:
@@ -9197,14 +9197,14 @@ def api_attachment_summarize():
 
         def _nova_endpoint_keep_attachment_line(value):
             line = str(value or "").strip()
-            line = line.replace("Ã®ÂºÂ", "").strip()
+            line = line.replace("ÃƒÂ®Ã‚ÂºÃ‚Â", "").strip()
             line = _nova_endpoint_re.sub(r"^\\s*\\d+\\.\\s*", "", line).strip()
             line = _nova_endpoint_re.sub(r"\\s+", " ", line).strip()
 
             if not line:
                 return ""
 
-            low = line.lower().strip(" :;-Ã¢â‚¬Â¢*|")
+            low = line.lower().strip(" :;-ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢*|")
             compact = _nova_endpoint_re.sub(r"[^a-z0-9]+", " ", low).strip()
 
             bad_exact = {
@@ -9235,7 +9235,7 @@ def api_attachment_summarize():
                 "bath",
                 "amazon",
                 "related content",
-                "furniture dÃƒÂ©cor",
+                "furniture dÃƒÆ’Ã‚Â©cor",
                 "kitchen appliances",
             }
 
@@ -9251,8 +9251,8 @@ def api_attachment_summarize():
                 "free stock photo",
                 "https://www.amazon.",
                 "https://www.wayfair.",
-                "Ã¢â‚¬Âº shop Ã¢â‚¬Âº",
-                "Ã¢â‚¬Âº wall art Ã¢â‚¬Âº",
+                "ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº shop ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº",
+                "ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº wall art ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº",
             )
 
             if low in bad_exact or compact in bad_exact:
@@ -9596,12 +9596,12 @@ def _nova_clean_attachment_analysis_response(response):
             "eye-catching prints",
             "url removed from extracted attachment text",
             "free_shipping",
-            "furniture & dÃƒÂ©cor",
+            "furniture & dÃƒÆ’Ã‚Â©cor",
             "kitchen appliances",
             "love, horror and more themes",
             "plain field in front of mountain peak",
             "free stock photo",
-            "6000 Ãƒâ€”",
+            "6000 ÃƒÆ’Ã¢â‚¬â€",
             "jpeg",
         )
 
@@ -9618,7 +9618,7 @@ def _nova_clean_attachment_analysis_response(response):
             if not cleaned:
                 continue
 
-            low = cleaned.lower().strip(" :;-Ã¢â‚¬Â¢*|")
+            low = cleaned.lower().strip(" :;-ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢*|")
             low_compact = re.sub(r"[^a-z0-9]+", " ", low).strip()
 
             if low_compact in noisy_exact:
@@ -9752,7 +9752,7 @@ def _nova_final_attachment_output_noise_cleanup(response):
             "eye-catching prints",
             "url removed from extracted attachment text",
             "free_shipping",
-            "furniture & dÃƒÂ©cor",
+            "furniture & dÃƒÆ’Ã‚Â©cor",
             "kitchen appliances",
             "related content",
         )
@@ -9762,14 +9762,14 @@ def _nova_final_attachment_output_noise_cleanup(response):
 
         for raw_line in text_value.splitlines():
             line = re.sub(r"^\s*\d+\.\s*", "", str(raw_line or "")).strip()
-            line = line.replace("Ã®ÂºÂ", "").strip()
+            line = line.replace("ÃƒÂ®Ã‚ÂºÃ‚Â", "").strip()
             line = line.replace("Attachment <unknown>", "uploaded attachment")
             line = re.sub(r"\s+", " ", line).strip()
 
             if not line:
                 continue
 
-            low = line.lower().strip(" :;-Ã¢â‚¬Â¢*|")
+            low = line.lower().strip(" :;-ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢*|")
             compact = re.sub(r"[^a-z0-9]+", " ", low).strip()
 
             if low.startswith("attachment analysis"):
@@ -9914,13 +9914,13 @@ def _nova_attachment_double_summary_cleanup(response):
         for raw_line in text_value.splitlines():
             line = str(raw_line or "").strip()
             line = re.sub(r"^\s*\d+\.\s*", "", line).strip()
-            line = line.replace("Ã®ÂºÂ", "").strip()
+            line = line.replace("ÃƒÂ®Ã‚ÂºÃ‚Â", "").strip()
             line = re.sub(r"\s+", " ", line).strip()
 
             if not line:
                 continue
 
-            low = line.lower().strip(" :;-Ã¢â‚¬Â¢*|")
+            low = line.lower().strip(" :;-ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢*|")
             compact = re.sub(r"[^a-z0-9]+", " ", low).strip()
 
             if low in bad_exact or compact in bad_exact:
@@ -12454,7 +12454,7 @@ def nova_focus_recall_before_web_20260611():
 
             assistant_text = "Your current Nova focus is: " + focus
 
-        # ðŸ”’ IMPORTANT: DO NOT RETURN RESPONSE
+        # Ã°Å¸â€â€™ IMPORTANT: DO NOT RETURN RESPONSE
         # Only attach data to request for downstream handler
         request.nova_focus_recall = {
             "session_id": session_id,
@@ -15396,7 +15396,7 @@ try:
 
     def _nova_natural_project_normalize_20260701(value):
         text = str(value or "").strip().lower()
-        text = text.replace("â€™", "'")
+        text = text.replace("Ã¢â‚¬â„¢", "'")
         text = _nova_natural_project_re_20260701.sub(r"\s+", " ", text)
         return text
 
@@ -15649,7 +15649,7 @@ try:
 
     def _nova_compact_project_normalize_20260701(value):
         text = str(value or "").strip().lower()
-        text = text.replace("â€™", "'")
+        text = text.replace("Ã¢â‚¬â„¢", "'")
         text = _nova_compact_project_re_20260701.sub(r"\s+", " ", text)
         return text
 
@@ -20118,6 +20118,61 @@ except Exception as exc:
 # /NOVA_DURABLE_DATA_HEALTH_ROUTE_20260703
 
 
+
+# NOVA_DEPLOY_FINGERPRINT_20260703
+try:
+    @app.get("/api/debug/deploy-fingerprint")
+    def _nova_debug_deploy_fingerprint_20260703():
+        from pathlib import Path
+        import os
+        from flask import jsonify
+
+        root = Path(__file__).resolve().parent
+
+        def probe(rel_path):
+            path = root / rel_path
+            exists = path.exists()
+            text = ""
+            if exists and path.is_file():
+                try:
+                    text = path.read_text(encoding="utf-8", errors="replace")
+                except Exception as exc:
+                    text = "READ_FAILED: " + str(exc)
+
+            return {
+                "rel_path": rel_path,
+                "abs_path": str(path),
+                "exists": exists,
+                "size": path.stat().st_size if exists and path.is_file() else None,
+                "has_v8_marker": "NOVA_MOBILE_NEW_CHAT_SESSION_V8_20260703" in text,
+                "has_v9_url_boot_marker": "NOVA_MOBILE_NEW_CHAT_URL_BOOT_V9_20260703" in text,
+                "has_get_active_session_id": "getActiveSessionId" in text,
+                "loads_panel_v9": "nova-mobile-session-panel-v9.js" in text,
+                "loads_panel_v6": "nova-mobile-session-panel-v6.js" in text,
+            }
+
+        return jsonify({
+            "ok": True,
+            "marker": "NOVA_DEPLOY_FINGERPRINT_20260703",
+            "cwd": os.getcwd(),
+            "app_file": __file__,
+            "root": str(root),
+            "railway_git_commit_sha": os.environ.get("RAILWAY_GIT_COMMIT_SHA"),
+            "railway_git_branch": os.environ.get("RAILWAY_GIT_BRANCH"),
+            "railway_service_name": os.environ.get("RAILWAY_SERVICE_NAME"),
+            "files": {
+                "panel_v9": probe("static/js/mobile/nova-mobile-session-panel-v9.js"),
+                "panel_v6": probe("static/js/mobile/nova-mobile-session-panel-v6.js"),
+                "restore_v4": probe("static/js/mobile/nova-mobile-session-restore-override-v4.js"),
+                "mobile_template": probe("templates/mobile.html"),
+            },
+        })
+except Exception as _nova_deploy_fingerprint_error_20260703:
+    try:
+        print("[NOVA_DEPLOY_FINGERPRINT_20260703] failed:", _nova_deploy_fingerprint_error_20260703)
+    except Exception:
+        pass
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
@@ -20125,3 +20180,4 @@ if __name__ == "__main__":
         port=5001,
         debug=True,
     )
+
