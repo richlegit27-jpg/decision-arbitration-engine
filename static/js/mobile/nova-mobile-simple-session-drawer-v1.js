@@ -1,11 +1,14 @@
 ﻿(function () {
     "use strict";
 
-    const MARK = "NOVA_MOBILE_SIMPLE_SESSION_DRAWER_ISOLATED_V2_20260704";
+    const MARK = "NOVA_MOBILE_CLEAN_SESSION_DRAWER_V3_20260704";
     const OLD_MARK = "NOVA_MOBILE_SIMPLE_SESSION_DRAWER_V1_20260704";
+    const OLD_ISOLATED_MARK = "NOVA_MOBILE_SIMPLE_SESSION_DRAWER_ISOLATED_V2_20260704";
+
     const BUTTON_ID = "nova-clean-session-launcher-v2";
     const PANEL_ID = "nova-clean-session-panel-v2";
-    const ROW_ATTR = "data-nova-clean-session-row-v2";
+    const ROW_ATTR = "data-nova-clean-session-row-v3";
+    const ACTION_ATTR = "data-nova-clean-session-action-v3";
 
     if (window[MARK]) {
         return;
@@ -13,8 +16,10 @@
 
     window[MARK] = true;
     window[OLD_MARK] = true;
+    window[OLD_ISOLATED_MARK] = true;
 
     let panelOpen = false;
+    let cachedSessions = [];
 
     function escapeHtml(value) {
         return String(value == null ? "" : value)
@@ -60,20 +65,88 @@
         location.href = "/mobile?session_id=" + encodeURIComponent(sessionId) + "&v=clean-session-open-" + Date.now();
     }
 
-    async function fetchJson(url) {
-        const res = await fetch(url, {
+    async function fetchJson(url, options) {
+        const res = await fetch(url, Object.assign({
             credentials: "include",
             cache: "no-store",
             headers: {
                 "Accept": "application/json"
             }
-        });
+        }, options || {}));
 
         if (!res.ok) {
             throw new Error("HTTP " + res.status + " for " + url);
         }
 
-        return await res.json();
+        const text = await res.text();
+
+        if (!text) {
+            return {};
+        }
+
+        try {
+            return JSON.parse(text);
+        } catch (_) {
+            return { ok: true, text: text };
+        }
+    }
+
+    async function postJson(url, body) {
+        return await fetchJson(url, {
+            method: "POST",
+            headers: {
+                "Accept": "application/json",
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(body || {})
+        });
+    }
+
+    async function postSessionAction(action, sessionId, payload) {
+        const safeId = encodeURIComponent(sessionId);
+        const body = Object.assign({
+            id: sessionId,
+            session_id: sessionId,
+            sessionId: sessionId
+        }, payload || {});
+
+        const candidates = [
+            {
+                url: "/api/sessions/" + safeId + "/" + action,
+                body: payload || {}
+            },
+            {
+                url: "/api/sessions/" + action,
+                body: body
+            },
+            {
+                url: "/api/sessions/" + safeId,
+                body: Object.assign({ action: action }, body)
+            }
+        ];
+
+        let lastError = null;
+
+        for (const candidate of candidates) {
+            try {
+                const result = await postJson(candidate.url, candidate.body);
+                console.error("[Nova Clean Sessions] action ok", {
+                    action: action,
+                    url: candidate.url,
+                    result: result
+                });
+                return result;
+            } catch (err) {
+                lastError = err;
+                console.error("[Nova Clean Sessions] action failed candidate", {
+                    action: action,
+                    url: candidate.url,
+                    error: String(err && err.message || err)
+                });
+            }
+        }
+
+        throw lastError || new Error("Session action failed: " + action);
     }
 
     async function fetchSessionById(sessionId) {
@@ -156,6 +229,8 @@
             return bTime - aTime;
         });
 
+        cachedSessions = merged;
+
         return {
             currentId: currentId,
             activeSessionId: data.active_session_id || "",
@@ -163,18 +238,40 @@
         };
     }
 
+    function getSessionTitle(session) {
+        return session.title || "New Chat";
+    }
+
+    function getSessionCount(session) {
+        return session.message_count == null ? 0 : session.message_count;
+    }
+
+    function actionControl(label, action) {
+        return (
+            "<span " + ACTION_ATTR + "='" + escapeHtml(action) + "' " +
+            "style='display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.18);background:#24242b;color:white;border-radius:999px;padding:7px 9px;font-size:12px;font-weight:750;margin-right:6px;margin-top:10px;'>" +
+            escapeHtml(label) +
+            "</span>"
+        );
+    }
+
     function rowHtml(session, currentId) {
         const sessionId = getSessionId(session);
-        const title = session.title || "New Chat";
-        const count = session.message_count == null ? 0 : session.message_count;
+        const title = getSessionTitle(session);
+        const count = getSessionCount(session);
         const isActive = sessionId === currentId;
         const pin = session.pinned ? " · pinned" : "";
         const active = isActive ? " · active" : "";
 
         return (
-            "<div style='font-weight:800;margin-bottom:4px;'>" + escapeHtml(title) + "</div>" +
+            "<div style='font-weight:850;margin-bottom:4px;'>" + escapeHtml(title) + "</div>" +
             "<div style='opacity:.78;font-size:12px;overflow-wrap:anywhere;'>" + escapeHtml(sessionId) + "</div>" +
-            "<div style='opacity:.78;font-size:12px;margin-top:4px;'>" + escapeHtml(count) + " messages" + pin + active + "</div>"
+            "<div style='opacity:.78;font-size:12px;margin-top:4px;'>" + escapeHtml(count) + " messages" + pin + active + "</div>" +
+            "<div style='display:flex;flex-wrap:wrap;gap:0;margin-top:2px;'>" +
+                actionControl("Rename", "rename") +
+                actionControl(session.pinned ? "Unpin" : "Pin", "pin") +
+                actionControl("Delete", "delete") +
+            "</div>"
         );
     }
 
@@ -321,14 +418,13 @@
             row.style.setProperty("opacity", "1", "important");
             row.style.setProperty("position", "relative", "important");
             row.style.setProperty("z-index", "2147483647", "important");
+        });
 
-            if (!row.innerText.trim()) {
-                row.innerHTML = (
-                    "<div style='font-weight:800;margin-bottom:4px;'>" + escapeHtml(row.dataset.title || "New Chat") + "</div>" +
-                    "<div style='opacity:.78;font-size:12px;overflow-wrap:anywhere;'>" + escapeHtml(row.dataset.sessionId || "") + "</div>" +
-                    "<div style='opacity:.78;font-size:12px;margin-top:4px;'>" + escapeHtml(row.dataset.meta || "") + "</div>"
-                );
-            }
+        panel.querySelectorAll("[" + ACTION_ATTR + "]").forEach(function (action) {
+            action.style.setProperty("display", "inline-flex", "important");
+            action.style.setProperty("pointer-events", "auto", "important");
+            action.style.setProperty("visibility", "visible", "important");
+            action.style.setProperty("opacity", "1", "important");
         });
     }
 
@@ -345,6 +441,107 @@
         setTimeout(run, 300);
         setTimeout(run, 700);
         setTimeout(run, 1200);
+    }
+
+    async function handleAction(event, session) {
+        const actionEl = event.target && event.target.closest && event.target.closest("[" + ACTION_ATTR + "]");
+
+        if (!actionEl) {
+            return false;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const action = actionEl.getAttribute(ACTION_ATTR);
+        const sessionId = getSessionId(session);
+
+        if (!sessionId) {
+            return true;
+        }
+
+        try {
+            if (action === "rename") {
+                const oldTitle = getSessionTitle(session);
+                const title = prompt("Rename session:", oldTitle);
+
+                if (!title || !title.trim()) {
+                    return true;
+                }
+
+                await postSessionAction("rename", sessionId, {
+                    title: title.trim(),
+                    name: title.trim()
+                });
+
+                await renderDrawer();
+                return true;
+            }
+
+            if (action === "pin") {
+                await postSessionAction("pin", sessionId, {
+                    pinned: !session.pinned,
+                    value: !session.pinned
+                });
+
+                await renderDrawer();
+                return true;
+            }
+
+            if (action === "delete") {
+                const title = getSessionTitle(session);
+
+                if (!confirm("Delete session \"" + title + "\"?")) {
+                    return true;
+                }
+
+                await postSessionAction("delete", sessionId, {});
+
+                const currentId = getCurrentSessionId();
+
+                if (sessionId === currentId) {
+                    const next = cachedSessions.find(function (item) {
+                        return getSessionId(item) && getSessionId(item) !== sessionId;
+                    });
+
+                    if (next) {
+                        openSession(getSessionId(next));
+                    } else {
+                        location.href = "/mobile?v=clean-session-delete-" + Date.now();
+                    }
+
+                    return true;
+                }
+
+                await renderDrawer();
+                return true;
+            }
+        } catch (err) {
+            console.error("[Nova Clean Sessions] action failed final", err);
+            alert("Session action failed. Check console for endpoint details.");
+        }
+
+        return true;
+    }
+
+    function currentSummaryHtml(data) {
+        const currentId = data.currentId;
+        const current = data.sessions.find(function (session) {
+            return getSessionId(session) === currentId;
+        });
+
+        if (!current) {
+            return "";
+        }
+
+        return (
+            "<div style='border:1px solid rgba(140,120,255,.45);background:#19152b;border-radius:14px;padding:10px;margin-bottom:10px;'>" +
+                "<div style='font-size:11px;opacity:.7;font-weight:800;text-transform:uppercase;letter-spacing:.04em;'>Current</div>" +
+                "<div style='font-weight:900;margin-top:3px;'>" + escapeHtml(getSessionTitle(current)) + "</div>" +
+                "<div style='opacity:.76;font-size:12px;overflow-wrap:anywhere;margin-top:3px;'>" + escapeHtml(currentId) + "</div>" +
+                "<div style='opacity:.76;font-size:12px;margin-top:3px;'>" + escapeHtml(getSessionCount(current)) + " messages</div>" +
+            "</div>"
+        );
     }
 
     async function renderDrawer() {
@@ -380,6 +577,9 @@
             header.appendChild(title);
             header.appendChild(close);
 
+            const summary = document.createElement("div");
+            summary.innerHTML = currentSummaryHtml(data);
+
             const list = document.createElement("div");
             list.style.cssText = "display:flex;flex-direction:column;gap:8px;";
 
@@ -391,8 +591,8 @@
                 row.setAttribute(ROW_ATTR, "true");
                 row.tabIndex = 0;
                 row.dataset.sessionId = sessionId;
-                row.dataset.title = session.title || "New Chat";
-                row.dataset.meta = (session.message_count == null ? 0 : session.message_count) + " messages" + (session.pinned ? " · pinned" : "") + (isActive ? " · active" : "");
+                row.dataset.title = getSessionTitle(session);
+                row.dataset.meta = getSessionCount(session) + " messages" + (session.pinned ? " · pinned" : "") + (isActive ? " · active" : "");
 
                 row.style.cssText = [
                     "width:100%",
@@ -410,9 +610,13 @@
 
                 row.innerHTML = rowHtml(session, currentId);
 
-                row.addEventListener("click", function (event) {
-                    event.preventDefault();
-                    event.stopPropagation();
+                row.addEventListener("click", async function (event) {
+                    const handled = await handleAction(event, session);
+
+                    if (handled) {
+                        return;
+                    }
+
                     openSession(sessionId);
                 });
 
@@ -428,6 +632,7 @@
 
             panel.innerHTML = "";
             panel.appendChild(header);
+            panel.appendChild(summary);
 
             if (!data.sessions.length) {
                 const empty = document.createElement("div");
@@ -440,14 +645,14 @@
 
             rescueOpenPanelSoon();
 
-            console.error("[Nova Clean Sessions] rendered", {
+            console.error("[Nova Clean Sessions V3] rendered", {
                 count: data.sessions.length,
                 currentId: currentId,
                 activeSessionId: data.activeSessionId
             });
         } catch (err) {
             panel.innerHTML = "<div style='padding:10px;color:#ffb4b4;'>Failed to load sessions.</div>";
-            console.error("[Nova Clean Sessions] failed", err);
+            console.error("[Nova Clean Sessions V3] failed", err);
         }
     }
 
@@ -477,7 +682,7 @@
     }
 
     window.NovaMobileSimpleSessionDrawerV1 = {
-        version: "isolated-v2",
+        version: "clean-v3-actions",
         renderDrawer: renderDrawer,
         openSession: openSession
     };
@@ -485,7 +690,7 @@
     function boot() {
         makeButton();
         installRescue();
-        console.error("[Nova Clean Sessions] installed");
+        console.error("[Nova Clean Sessions V3] installed");
     }
 
     if (document.readyState === "loading") {
