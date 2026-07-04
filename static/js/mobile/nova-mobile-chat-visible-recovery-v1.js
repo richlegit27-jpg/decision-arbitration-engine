@@ -160,6 +160,12 @@
             return true;
         }
 
+        // If session.messages already rendered from this payload, do not also render
+        // assistant_message / text from the same response.
+        if (rendered) {
+            return true;
+        }
+
         const assistant =
             payload.assistant_message ||
             payload.assistant ||
@@ -257,4 +263,5 @@
 
     console.log("[" + MARK + "] ready");
 })();
+
 
