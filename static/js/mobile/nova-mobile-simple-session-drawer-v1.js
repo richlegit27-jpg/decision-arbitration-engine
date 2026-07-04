@@ -1,7 +1,7 @@
 ﻿(function () {
     "use strict";
 
-    const MARK = "NOVA_MOBILE_CLEAN_SESSION_DRAWER_V3_FAST_ENDPOINTS_20260704";
+    const MARK = "NOVA_MOBILE_CLEAN_SESSION_DRAWER_V3_CLOSE_TOGGLE_20260704";
     const OLD_MARK = "NOVA_MOBILE_SIMPLE_SESSION_DRAWER_V1_20260704";
     const OLD_ISOLATED_MARK = "NOVA_MOBILE_SIMPLE_SESSION_DRAWER_ISOLATED_V2_20260704";
 
@@ -303,6 +303,12 @@
         btn.addEventListener("click", function (event) {
             event.preventDefault();
             event.stopPropagation();
+
+            if (isPanelOpenVisible()) {
+                closePanel();
+                return;
+            }
+
             renderDrawer();
         });
 
@@ -351,7 +357,26 @@
 
         if (panel) {
             panel.style.setProperty("display", "none", "important");
+            panel.style.setProperty("pointer-events", "none", "important");
+            panel.style.setProperty("visibility", "hidden", "important");
+            panel.style.setProperty("opacity", "0", "important");
         }
+    }
+
+    function isPanelOpenVisible() {
+        const panel = document.getElementById(PANEL_ID);
+
+        if (!panel || !panelOpen) {
+            return false;
+        }
+
+        const style = getComputedStyle(panel);
+
+        return (
+            style.display !== "none" &&
+            style.visibility !== "hidden" &&
+            style.opacity !== "0"
+        );
     }
 
     function forceVisibleButton() {
@@ -682,7 +707,7 @@
     }
 
     window.NovaMobileSimpleSessionDrawerV1 = {
-        version: "clean-v3-fast-endpoints",
+        version: "clean-v3-close-toggle",
         renderDrawer: renderDrawer,
         openSession: openSession
     };
@@ -690,7 +715,7 @@
     function boot() {
         makeButton();
         installRescue();
-        console.error("[Nova Clean Sessions V3 Fast Endpoints] installed");
+        console.error("[Nova Clean Sessions V3 Close Toggle] installed");
     }
 
     if (document.readyState === "loading") {
