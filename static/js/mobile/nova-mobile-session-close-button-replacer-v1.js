@@ -1,7 +1,7 @@
 ﻿(function () {
     "use strict";
 
-    const MARK = "__NOVA_MOBILE_SESSION_CLOSE_BUTTON_CAPTURE_V3_20260704__";
+    const MARK = "__NOVA_MOBILE_SESSION_CLOSE_ANY_DRAWER_V4_20260704__";
 
     if (window[MARK]) {
         return;
@@ -9,85 +9,137 @@
 
     window[MARK] = true;
 
-    const PANEL_ID = "nova-clean-session-panel-v2";
-    const BUTTON_ID = "nova-clean-session-launcher-v2";
-
-    function getPanel() {
-        return document.getElementById(PANEL_ID);
+    function textOf(el) {
+        return String(
+            (el && (
+                el.getAttribute("aria-label") ||
+                el.getAttribute("title") ||
+                el.textContent ||
+                ""
+            )) ||
+            ""
+        ).trim().toLowerCase();
     }
 
-    function getLauncher() {
-        return document.getElementById(BUTTON_ID);
-    }
-
-    function isCloseButton(node) {
-        if (!node || !node.closest) {
+    function isVisible(el) {
+        if (!el) {
             return false;
         }
 
-        const button = node.closest("button, [role='button']");
+        const style = getComputedStyle(el);
+        const rect = el.getBoundingClientRect();
+
+        return (
+            style.display !== "none" &&
+            style.visibility !== "hidden" &&
+            style.opacity !== "0" &&
+            rect.width > 0 &&
+            rect.height > 0
+        );
+    }
+
+    function looksSessionRelated(el) {
+        if (!el) {
+            return false;
+        }
+
+        const haystack = String(
+            (el.id || "") + " " +
+            (el.className || "") + " " +
+            (el.getAttribute("role") || "") + " " +
+            (el.getAttribute("aria-label") || "") + " " +
+            (el.getAttribute("data-nova-session-panel") || "") + " " +
+            (el.getAttribute("data-nova-clean-session-panel") || "") + " " +
+            (el.textContent || "").slice(0, 500)
+        ).toLowerCase();
+
+        return (
+            haystack.includes("session") ||
+            haystack.includes("sessions") ||
+            haystack.includes("drawer")
+        );
+    }
+
+    function findCandidatePanels() {
+        const all = Array.from(document.querySelectorAll("aside, dialog, section, nav, div, [role='dialog'], [role='complementary']"));
+
+        return all
+            .filter(isVisible)
+            .filter(looksSessionRelated)
+            .filter(function (el) {
+                const style = getComputedStyle(el);
+                const rect = el.getBoundingClientRect();
+
+                return (
+                    style.position === "fixed" ||
+                    style.position === "absolute" ||
+                    Number(style.zIndex) >= 10 ||
+                    rect.width >= 200
+                );
+            })
+            .sort(function (a, b) {
+                const az = Number(getComputedStyle(a).zIndex) || 0;
+                const bz = Number(getComputedStyle(b).zIndex) || 0;
+
+                return bz - az;
+            });
+    }
+
+    function isCloseButtonTarget(target) {
+        if (!target || !target.closest) {
+            return false;
+        }
+
+        const button = target.closest("button, [role='button'], a");
 
         if (!button) {
             return false;
         }
 
-        const panel = getPanel();
+        const label = textOf(button);
 
-        if (!panel || !panel.contains(button)) {
+        if (!(label === "close" || label.includes("close") || label === "×" || label === "x")) {
             return false;
         }
 
-        const label = String(
-            button.getAttribute("aria-label") ||
-            button.getAttribute("title") ||
-            button.textContent ||
-            ""
-        ).trim().toLowerCase();
-
-        return label === "close" || label.includes("close");
+        return findCandidatePanels().some(function (panel) {
+            return panel.contains(button);
+        });
     }
 
     function hardClosePanel() {
-        const panel = getPanel();
-        const launcher = getLauncher();
+        const panels = findCandidatePanels();
 
-        if (!panel) {
+        if (!panels.length) {
+            console.error("[Nova Session Close Any Drawer V4] no visible session panel found");
             return false;
         }
 
-        const active = document.activeElement;
+        panels.forEach(function (panel) {
+            const active = document.activeElement;
 
-        if (active && panel.contains(active)) {
-            try {
-                active.blur();
-            } catch (err) {}
-        }
-
-        panel.style.setProperty("display", "none", "important");
-        panel.style.setProperty("pointer-events", "none", "important");
-        panel.style.setProperty("visibility", "hidden", "important");
-        panel.style.setProperty("opacity", "0", "important");
-        panel.style.setProperty("transform", "translateX(-120%)", "important");
-        panel.setAttribute("aria-hidden", "true");
-        panel.dataset.novaForceClosed = "true";
-
-        if (launcher && typeof launcher.focus === "function") {
-            try {
-                launcher.focus({ preventScroll: true });
-            } catch (err) {
+            if (active && panel.contains(active)) {
                 try {
-                    launcher.focus();
-                } catch (err2) {}
+                    active.blur();
+                } catch (err) {}
             }
-        }
 
-        console.error("[Nova Session Close Capture V3] hard closed panel");
+            panel.style.setProperty("display", "none", "important");
+            panel.style.setProperty("pointer-events", "none", "important");
+            panel.style.setProperty("visibility", "hidden", "important");
+            panel.style.setProperty("opacity", "0", "important");
+            panel.style.setProperty("transform", "translateX(-120%)", "important");
+            panel.setAttribute("aria-hidden", "true");
+            panel.dataset.novaForceClosed = "true";
+        });
+
+        console.error("[Nova Session Close Any Drawer V4] hard closed panels", panels.length);
 
         return true;
     }
 
-    function interceptClose(event) {
-        if (!isCloseButton(event.target)) {
+    function intercept(event) {
+        if (!isCloseButtonTarget(event.target)) {
             return;
         }
 
@@ -100,69 +152,61 @@
         return false;
     }
 
-    function findCloseButton() {
-        const panel = getPanel();
+    function replaceCloseButtons() {
+        const panels = findCandidatePanels();
+        let replaced = 0;
 
-        if (!panel) {
-            return null;
-        }
+        panels.forEach(function (panel) {
+            const buttons = Array.from(panel.querySelectorAll("button, [role='button'], a"));
 
-        return Array.from(panel.querySelectorAll("button, [role='button']")).find(function (button) {
-            const label = String(
-                button.getAttribute("aria-label") ||
-                button.getAttribute("title") ||
-                button.textContent ||
-                ""
-            ).trim().toLowerCase();
+            buttons.forEach(function (button) {
+                const label = textOf(button);
 
-            return label === "close" || label.includes("close");
-        }) || null;
-    }
+                if (!(label === "close" || label.includes("close") || label === "×" || label === "x")) {
+                    return;
+                }
 
-    function replaceCloseButton() {
-        const oldButton = findCloseButton();
+                if (button.dataset.novaCloseAnyDrawerV4 === "true") {
+                    return;
+                }
 
-        if (!oldButton) {
-            return false;
-        }
+                const fresh = button.cloneNode(true);
 
-        if (oldButton.dataset.novaCloseCaptureV3 === "true") {
-            return true;
-        }
+                fresh.dataset.novaCloseAnyDrawerV4 = "true";
 
-        const fresh = oldButton.cloneNode(true);
+                fresh.onclick = function (event) {
+                    if (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
 
-        fresh.dataset.novaCloseCaptureV3 = "true";
-        fresh.setAttribute("data-nova-session-close-capture-v3", "true");
+                    hardClosePanel();
 
-        fresh.onclick = function (event) {
-            if (event) {
-                event.preventDefault();
-                event.stopPropagation();
-            }
+                    return false;
+                };
 
-            hardClosePanel();
+                ["pointerdown", "pointerup", "touchstart", "touchend", "mousedown", "mouseup", "click"].forEach(function (eventName) {
+                    fresh.addEventListener(eventName, function (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        event.stopImmediatePropagation();
 
-            return false;
-        };
+                        hardClosePanel();
 
-        ["pointerdown", "pointerup", "touchstart", "touchend", "mousedown", "mouseup", "click"].forEach(function (eventName) {
-            fresh.addEventListener(eventName, function (event) {
-                event.preventDefault();
-                event.stopPropagation();
-                event.stopImmediatePropagation();
+                        return false;
+                    }, true);
+                });
 
-                hardClosePanel();
-
-                return false;
-            }, true);
+                button.replaceWith(fresh);
+                replaced += 1;
+            });
         });
 
-        oldButton.replaceWith(fresh);
+        if (replaced) {
+            console.error("[Nova Session Close Any Drawer V4] replaced close buttons", replaced);
+        }
 
-        console.error("[Nova Session Close Capture V3] replaced Close button");
-
-        return true;
+        return replaced;
     }
 
     function patchRenderDrawer() {
@@ -172,7 +216,7 @@
             return false;
         }
 
-        if (api.__novaCloseCaptureV3Patched) {
+        if (api.__novaCloseAnyDrawerV4Patched) {
             return true;
         }
 
@@ -181,53 +225,56 @@
         api.renderDrawer = async function () {
             const result = await originalRenderDrawer.apply(api, arguments);
 
-            setTimeout(replaceCloseButton, 0);
-            setTimeout(replaceCloseButton, 25);
-            setTimeout(replaceCloseButton, 100);
-            setTimeout(replaceCloseButton, 300);
-            setTimeout(replaceCloseButton, 800);
+            setTimeout(replaceCloseButtons, 0);
+            setTimeout(replaceCloseButtons, 25);
+            setTimeout(replaceCloseButtons, 100);
+            setTimeout(replaceCloseButtons, 300);
+            setTimeout(replaceCloseButtons, 800);
 
             return result;
         };
 
-        api.__novaCloseCaptureV3Patched = true;
+        api.__novaCloseAnyDrawerV4Patched = true;
 
-        console.error("[Nova Session Close Capture V3] patched renderDrawer");
+        console.error("[Nova Session Close Any Drawer V4] patched renderDrawer");
 
         return true;
     }
 
     function boot() {
         ["pointerdown", "pointerup", "touchstart", "touchend", "mousedown", "mouseup", "click"].forEach(function (eventName) {
-            document.addEventListener(eventName, interceptClose, true);
-            window.addEventListener(eventName, interceptClose, true);
+            document.addEventListener(eventName, intercept, true);
+            window.addEventListener(eventName, intercept, true);
         });
 
         const observer = new MutationObserver(function () {
             patchRenderDrawer();
-            replaceCloseButton();
+            replaceCloseButtons();
         });
 
         observer.observe(document.documentElement, {
             childList: true,
-            subtree: true
+            subtree: true,
+            attributes: true,
+            attributeFilter: ["style", "class", "aria-hidden"]
         });
 
         patchRenderDrawer();
-        replaceCloseButton();
+        replaceCloseButtons();
 
         setInterval(function () {
             patchRenderDrawer();
-            replaceCloseButton();
+            replaceCloseButtons();
         }, 250);
 
-        console.error("[Nova Session Close Capture V3] installed");
+        console.error("[Nova Session Close Any Drawer V4] installed");
     }
 
-    window.NovaMobileSessionCloseButtonCaptureV3 = {
-        version: "session-close-button-capture-v3",
+    window.NovaMobileSessionCloseAnyDrawerV4 = {
+        version: "session-close-any-drawer-v4",
+        findCandidatePanels: findCandidatePanels,
         hardClosePanel: hardClosePanel,
-        replaceCloseButton: replaceCloseButton,
+        replaceCloseButtons: replaceCloseButtons,
         patchRenderDrawer: patchRenderDrawer
     };
 
