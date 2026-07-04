@@ -324,6 +324,53 @@
         }
     }
 
+
+    function installDirectHeaderButton() {
+        var old = byId(HEADER_BUTTON_ID);
+
+        if (!old) {
+            return false;
+        }
+
+        if (old.dataset.novaMobileSessionsFinalV2Direct === "1") {
+            return true;
+        }
+
+        var fresh = old.cloneNode(true);
+
+        fresh.id = HEADER_BUTTON_ID;
+        fresh.textContent = "Sessions";
+        fresh.setAttribute("aria-label", "Sessions");
+        fresh.dataset.novaMobileSessionsFinalV2Direct = "1";
+        fresh.dataset.novaMobileSessionsFinalV2Bound = "1";
+
+        fresh.style.pointerEvents = "auto";
+        fresh.style.position = fresh.style.position || "relative";
+        fresh.style.zIndex = "2147483645";
+
+        fresh.onclick = function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            openSessions("direct-cloned-header-button");
+
+            return false;
+        };
+
+        fresh.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            openSessions("direct-cloned-header-button-capture");
+        }, true);
+
+        old.replaceWith(fresh);
+
+        console.log("[Nova Mobile Sessions Final V2] direct cloned header button installed");
+
+        return true;
+    }
+
     function bindHeader() {
         var header = byId(HEADER_BUTTON_ID);
 
@@ -396,14 +443,18 @@
     removeKnownOldPanels();
     bindHeader();
     installDelegatedHeaderClick();
+    installDirectHeaderButton();
 
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", bindHeader, { once: true });
     }
 
     setTimeout(bindHeader, 250);
+    setTimeout(installDirectHeaderButton, 250);
     setTimeout(bindHeader, 1000);
+    setTimeout(installDirectHeaderButton, 1000);
     setTimeout(bindHeader, 2500);
+    setTimeout(installDirectHeaderButton, 2500);
 
     window.NovaMobileSessionsFinalV2 = {
         open: openSessions,
