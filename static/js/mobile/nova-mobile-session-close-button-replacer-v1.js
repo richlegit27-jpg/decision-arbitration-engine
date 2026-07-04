@@ -52,23 +52,27 @@
             return null;
         }
 
-        return [...panel.querySelectorAll("button, [role='button']"]
-            .find((button) => {
-                const label = String(
-                    button.getAttribute("aria-label") ||
-                    button.textContent ||
-                    ""
-                ).trim().toLowerCase();
+        return Array.from(panel.querySelectorAll("button, [role='button']")).find(function (button) {
+            const label = String(
+                button.getAttribute("aria-label") ||
+                button.textContent ||
+                ""
+            ).trim().toLowerCase();
 
-                return label === "close" || label.includes("close");
-            });
+            return label === "close" || label.includes("close");
+        }) || null;
     }
 
     function replaceCloseButton() {
         const panel = document.getElementById(PANEL_ID);
+
+        if (!panel) {
+            return false;
+        }
+
         const oldButton = findCloseButton(panel);
 
-        if (!panel || !oldButton) {
+        if (!oldButton) {
             return false;
         }
 
@@ -92,7 +96,7 @@
             return false;
         };
 
-        ["pointerdown", "touchstart", "mousedown", "click"].forEach((eventName) => {
+        ["pointerdown", "touchstart", "mousedown", "click"].forEach(function (eventName) {
             fresh.addEventListener(eventName, function (event) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -154,8 +158,8 @@
 
     window.NovaMobileSessionCloseButtonReplacerV1 = {
         version: "session-close-button-replacer-v1",
-        hardClosePanel,
-        replaceCloseButton
+        hardClosePanel: hardClosePanel,
+        replaceCloseButton: replaceCloseButton
     };
 
     boot();

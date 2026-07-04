@@ -1,4 +1,4 @@
-<!-- NOVA_DESKTOP_APP_UI_V1_20260610 -->
+﻿<!-- NOVA_DESKTOP_APP_UI_V1_20260610 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -3350,7 +3350,7 @@ fetch("/api/memory", { cache: "no-store" })
         '<br>',
         '<span>Overall backend readiness: ' + String(overall ?? 0) + '%</span>',
         '<br>',
-        '<span>Planner: ' + String(payload.planner_percent ?? 0) + '% · Memory: ' + String(payload.memory_percent ?? 0) + '% · Sessions: ' + String(payload.session_percent ?? 0) + '%</span>'
+        '<span>Planner: ' + String(payload.planner_percent ?? 0) + '% Â· Memory: ' + String(payload.memory_percent ?? 0) + '% Â· Sessions: ' + String(payload.session_percent ?? 0) + '%</span>'
       ].join("");
     }
   }
@@ -4485,7 +4485,7 @@ messages.forEach(function (message) {
 
   const header = document.createElement("div");
   header.style.cssText = "opacity:.65;font-size:12px;margin-bottom:6px;";
-  header.textContent = role + (id ? " · " + id : "");
+  header.textContent = role + (id ? " Â· " + id : "");
 
   const textDiv = document.createElement("div");
   textDiv.style.whiteSpace = "pre-wrap";
@@ -4893,7 +4893,7 @@ window.NovaDesktopFetchSession = fetchSession;
 
       card.innerHTML =
         '<div style="font-size:12px;opacity:.72;margin-bottom:3px;">Source' +
-        (host ? " · " + escapeText(host) : "") +
+        (host ? " Â· " + escapeText(host) : "") +
         '</div>' +
         '<div style="font-size:14px;font-weight:650;line-height:1.25;">' +
         escapeText(title) +
@@ -7112,7 +7112,7 @@ main {
     function short(value, limit) {
         const text = clean(value);
         if (text.length <= limit) return text;
-        return text.slice(0, limit - 1).trim() + "…";
+        return text.slice(0, limit - 1).trim() + "â€¦";
     }
 
     function buildSummary() {
@@ -7132,7 +7132,7 @@ main {
             "Recent focus: " + latest.map(function (row) {
                 return short(row.replace(/^(user|assistant):\s*/i, ""), 70);
             }).join(" / ") + ".",
-            "Latest ask: “" + short(latestUser.replace(/^user:\s*/i, ""), 120) + "”."
+            "Latest ask: â€œ" + short(latestUser.replace(/^user:\s*/i, ""), 120) + "â€."
         ].join(" ");
     }
 
@@ -11934,3 +11934,4 @@ aside.panel.tools > #nova-desktop-execution-native,
 
 </body>
 </html>
+
