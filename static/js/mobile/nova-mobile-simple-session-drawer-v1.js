@@ -1,18 +1,32 @@
 ﻿(function () {
     "use strict";
 
-    const MARK = "NOVA_MOBILE_SIMPLE_SESSION_DRAWER_V1_20260704";
+    const MARK = "NOVA_MOBILE_SIMPLE_SESSION_DRAWER_ISOLATED_V2_20260704";
+    const OLD_MARK = "NOVA_MOBILE_SIMPLE_SESSION_DRAWER_V1_20260704";
+    const BUTTON_ID = "nova-clean-session-launcher-v2";
+    const PANEL_ID = "nova-clean-session-panel-v2";
+    const ROW_ATTR = "data-nova-clean-session-row-v2";
 
     if (window[MARK]) {
         return;
     }
 
     window[MARK] = true;
+    window[OLD_MARK] = true;
 
-    let simpleSessionPanelOpen = false;
+    let panelOpen = false;
+
+    function escapeHtml(value) {
+        return String(value == null ? "" : value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
 
     function getSessionId(item) {
-        return item && (item.id || item.session_id || item.sessionId || "");
+        return item && String(item.id || item.session_id || item.sessionId || "");
     }
 
     function getCurrentSessionId() {
@@ -43,18 +57,136 @@
         }
 
         setCurrentSessionId(sessionId);
-        location.href = "/mobile?session_id=" + encodeURIComponent(sessionId) + "&v=simple-session-open-" + Date.now();
+        location.href = "/mobile?session_id=" + encodeURIComponent(sessionId) + "&v=clean-session-open-" + Date.now();
+    }
+
+    async function fetchJson(url) {
+        const res = await fetch(url, {
+            credentials: "include",
+            cache: "no-store",
+            headers: {
+                "Accept": "application/json"
+            }
+        });
+
+        if (!res.ok) {
+            throw new Error("HTTP " + res.status + " for " + url);
+        }
+
+        return await res.json();
+    }
+
+    async function fetchSessionById(sessionId) {
+        if (!sessionId) {
+            return null;
+        }
+
+        try {
+            const data = await fetchJson("/api/sessions/" + encodeURIComponent(sessionId) + "?clean_drawer_session=" + Date.now());
+            const session = data.session || data.item || data;
+
+            if (session && !getSessionId(session)) {
+                session.id = sessionId;
+            }
+
+            return session;
+        } catch (err) {
+            console.error("[Nova Clean Sessions] current session fetch failed", err);
+            return {
+                id: sessionId,
+                title: "Current Session",
+                message_count: "?"
+            };
+        }
+    }
+
+    async function fetchSessions() {
+        const currentId = getCurrentSessionId();
+        const data = await fetchJson("/api/sessions?clean_drawer=" + Date.now());
+        const sessions = data.sessions || data.items || [];
+        const map = new Map();
+
+        function addSession(session) {
+            const sessionId = getSessionId(session);
+
+            if (!sessionId) {
+                return;
+            }
+
+            map.set(sessionId, Object.assign({}, session, { id: sessionId }));
+        }
+
+        const currentSession = await fetchSessionById(currentId);
+
+        if (currentSession) {
+            addSession(currentSession);
+        }
+
+        sessions.forEach(addSession);
+
+        if (currentId && !map.has(currentId)) {
+            addSession({
+                id: currentId,
+                title: "Current Session",
+                message_count: "?"
+            });
+        }
+
+        const merged = Array.from(map.values());
+
+        merged.sort(function (a, b) {
+            const aId = getSessionId(a);
+            const bId = getSessionId(b);
+
+            if (aId === currentId) {
+                return -1;
+            }
+
+            if (bId === currentId) {
+                return 1;
+            }
+
+            if (!!b.pinned !== !!a.pinned) {
+                return b.pinned ? 1 : -1;
+            }
+
+            const aTime = Date.parse(a.updated_at || a.updatedAt || "") || 0;
+            const bTime = Date.parse(b.updated_at || b.updatedAt || "") || 0;
+
+            return bTime - aTime;
+        });
+
+        return {
+            currentId: currentId,
+            activeSessionId: data.active_session_id || "",
+            sessions: merged
+        };
+    }
+
+    function rowHtml(session, currentId) {
+        const sessionId = getSessionId(session);
+        const title = session.title || "New Chat";
+        const count = session.message_count == null ? 0 : session.message_count;
+        const isActive = sessionId === currentId;
+        const pin = session.pinned ? " · pinned" : "";
+        const active = isActive ? " · active" : "";
+
+        return (
+            "<div style='font-weight:800;margin-bottom:4px;'>" + escapeHtml(title) + "</div>" +
+            "<div style='opacity:.78;font-size:12px;overflow-wrap:anywhere;'>" + escapeHtml(sessionId) + "</div>" +
+            "<div style='opacity:.78;font-size:12px;margin-top:4px;'>" + escapeHtml(count) + " messages" + pin + active + "</div>"
+        );
     }
 
     function makeButton() {
-        let btn = document.getElementById("nova-simple-sessions-button-v1");
+        let btn = document.getElementById(BUTTON_ID);
 
         if (btn) {
             return btn;
         }
 
         btn = document.createElement("button");
-        btn.id = "nova-simple-sessions-button-v1";
+        btn.id = BUTTON_ID;
         btn.type = "button";
         btn.textContent = "Sessions";
         btn.style.cssText = [
@@ -71,30 +203,33 @@
             "box-shadow:0 8px 24px rgba(0,0,0,.35)"
         ].join(";");
 
-        btn.addEventListener("click", function () {
+        btn.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
             renderDrawer();
         });
 
         document.body.appendChild(btn);
         forceVisibleButton();
+
         return btn;
     }
 
     function makePanel() {
-        let panel = document.getElementById("nova-simple-sessions-panel-v1");
+        let panel = document.getElementById(PANEL_ID);
 
         if (panel) {
             return panel;
         }
 
         panel = document.createElement("div");
-        panel.id = "nova-simple-sessions-panel-v1";
+        panel.id = PANEL_ID;
         panel.style.cssText = [
             "position:fixed",
             "left:10px",
             "right:10px",
             "top:56px",
-            "max-height:70vh",
+            "max-height:72vh",
             "overflow:auto",
             "z-index:2147483647",
             "background:#101014",
@@ -108,28 +243,30 @@
         ].join(";");
 
         document.body.appendChild(panel);
+
         return panel;
     }
 
     function closePanel() {
-        simpleSessionPanelOpen = false;
+        panelOpen = false;
 
-        const panel = document.getElementById("nova-simple-sessions-panel-v1");
+        const panel = document.getElementById(PANEL_ID);
+
         if (panel) {
             panel.style.setProperty("display", "none", "important");
         }
     }
 
     function forceVisibleButton() {
-        const btn = document.getElementById("nova-simple-sessions-button-v1");
+        const btn = document.getElementById(BUTTON_ID);
 
         if (!btn) {
             return;
         }
 
+        btn.removeAttribute("hidden");
         btn.removeAttribute("data-nova-hidden-by-session-owner");
         btn.removeAttribute("data-nova-hidden-by-sessions-final");
-        btn.removeAttribute("hidden");
         btn.disabled = false;
 
         btn.style.setProperty("display", "inline-flex", "important");
@@ -145,9 +282,9 @@
     }
 
     function forceVisiblePanel() {
-        const panel = document.getElementById("nova-simple-sessions-panel-v1");
+        const panel = document.getElementById(PANEL_ID);
 
-        if (!panel || !simpleSessionPanelOpen) {
+        if (!panel || !panelOpen) {
             return;
         }
 
@@ -167,17 +304,16 @@
     }
 
     function forceVisibleRows() {
-        const panel = document.getElementById("nova-simple-sessions-panel-v1");
+        const panel = document.getElementById(PANEL_ID);
 
         if (!panel) {
             return;
         }
 
-        panel.querySelectorAll("[role='button']").forEach(function (row) {
+        panel.querySelectorAll("[" + ROW_ATTR + "]").forEach(function (row) {
             row.removeAttribute("hidden");
             row.removeAttribute("data-nova-hidden-by-session-owner");
             row.removeAttribute("data-nova-hidden-by-sessions-final");
-            row.disabled = false;
 
             row.style.setProperty("display", "block", "important");
             row.style.setProperty("pointer-events", "auto", "important");
@@ -185,86 +321,61 @@
             row.style.setProperty("opacity", "1", "important");
             row.style.setProperty("position", "relative", "important");
             row.style.setProperty("z-index", "2147483647", "important");
+
+            if (!row.innerText.trim()) {
+                row.innerHTML = (
+                    "<div style='font-weight:800;margin-bottom:4px;'>" + escapeHtml(row.dataset.title || "New Chat") + "</div>" +
+                    "<div style='opacity:.78;font-size:12px;overflow-wrap:anywhere;'>" + escapeHtml(row.dataset.sessionId || "") + "</div>" +
+                    "<div style='opacity:.78;font-size:12px;margin-top:4px;'>" + escapeHtml(row.dataset.meta || "") + "</div>"
+                );
+            }
         });
     }
 
     function rescueOpenPanelSoon() {
-        forceVisiblePanel();
-        forceVisibleRows();
-        setTimeout(function () { forceVisiblePanel(); forceVisibleRows(); }, 25);
-        setTimeout(function () { forceVisiblePanel(); forceVisibleRows(); }, 100);
-        setTimeout(function () { forceVisiblePanel(); forceVisibleRows(); }, 300);
-        setTimeout(function () { forceVisiblePanel(); forceVisibleRows(); }, 700);
-        setTimeout(function () { forceVisiblePanel(); forceVisibleRows(); }, 1200);
-    }
-
-    function installVisibilityRescue() {
-        forceVisibleButton();
-
-        setTimeout(forceVisibleButton, 50);
-        setTimeout(forceVisibleButton, 250);
-        setTimeout(forceVisibleButton, 750);
-        setTimeout(forceVisibleButton, 1500);
-
-        window.setInterval(function () {
+        function run() {
             forceVisibleButton();
             forceVisiblePanel();
             forceVisibleRows();
-        }, 1000);
+        }
 
-        try {
-            const observer = new MutationObserver(function () {
-                forceVisibleButton();
-                forceVisiblePanel();
-            });
-
-            observer.observe(document.documentElement, {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                attributeFilter: ["style", "hidden", "data-nova-hidden-by-session-owner", "data-nova-hidden-by-sessions-final"]
-            });
-        } catch (_) {}
-    }
-
-    async function fetchSessions() {
-        const res = await fetch("/api/sessions?simple_drawer=" + Date.now(), {
-            credentials: "include",
-            cache: "no-store"
-        });
-
-        const data = await res.json();
-
-        return {
-            activeSessionId: data.active_session_id || "",
-            sessions: data.sessions || data.items || []
-        };
+        run();
+        setTimeout(run, 25);
+        setTimeout(run, 100);
+        setTimeout(run, 300);
+        setTimeout(run, 700);
+        setTimeout(run, 1200);
     }
 
     async function renderDrawer() {
         const panel = makePanel();
 
-        simpleSessionPanelOpen = true;
+        panelOpen = true;
         panel.style.setProperty("display", "block", "important");
         panel.innerHTML = "<div style='padding:10px;'>Loading sessions...</div>";
+
         rescueOpenPanelSoon();
 
         try {
             const data = await fetchSessions();
-            const currentId = getCurrentSessionId() || data.activeSessionId;
+            const currentId = data.currentId;
 
             const header = document.createElement("div");
             header.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;";
 
             const title = document.createElement("div");
             title.textContent = "Sessions";
-            title.style.cssText = "font-weight:800;font-size:16px;";
+            title.style.cssText = "font-weight:900;font-size:16px;";
 
             const close = document.createElement("button");
             close.type = "button";
             close.textContent = "Close";
             close.style.cssText = "background:#24242b;color:white;border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:8px 10px;";
-            close.addEventListener("click", closePanel);
+            close.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                closePanel();
+            });
 
             header.appendChild(title);
             header.appendChild(close);
@@ -277,30 +388,31 @@
                 const isActive = sessionId === currentId;
                 const row = document.createElement("div");
 
-                row.setAttribute("role", "button");
+                row.setAttribute(ROW_ATTR, "true");
                 row.tabIndex = 0;
+                row.dataset.sessionId = sessionId;
+                row.dataset.title = session.title || "New Chat";
+                row.dataset.meta = (session.message_count == null ? 0 : session.message_count) + " messages" + (session.pinned ? " · pinned" : "") + (isActive ? " · active" : "");
+
                 row.style.cssText = [
                     "width:100%",
+                    "box-sizing:border-box",
                     "text-align:left",
                     "border-radius:14px",
                     "border:1px solid " + (isActive ? "rgba(140,120,255,.85)" : "rgba(255,255,255,.14)"),
                     "background:" + (isActive ? "#27213f" : "#18181f"),
                     "color:white",
                     "padding:12px",
-                    "display:block"
+                    "display:block",
+                    "cursor:pointer",
+                    "user-select:none"
                 ].join(";");
 
-                const name = session.title || "New Chat";
-                const count = session.message_count || 0;
-                const pin = session.pinned ? " · pinned" : "";
-                const active = isActive ? " · active" : "";
+                row.innerHTML = rowHtml(session, currentId);
 
-                row.innerHTML =
-                    "<div style='font-weight:750;margin-bottom:4px;'>" + escapeHtml(name) + "</div>" +
-                    "<div style='opacity:.75;font-size:12px;'>" + escapeHtml(sessionId) + "</div>" +
-                    "<div style='opacity:.75;font-size:12px;margin-top:4px;'>" + count + " messages" + pin + active + "</div>";
-
-                row.addEventListener("click", function () {
+                row.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
                     openSession(sessionId);
                 });
 
@@ -324,40 +436,56 @@
                 panel.appendChild(empty);
             } else {
                 panel.appendChild(list);
-            forceVisibleRows();
             }
 
             rescueOpenPanelSoon();
 
-            console.error("[Nova Simple Sessions] rendered", {
+            console.error("[Nova Clean Sessions] rendered", {
                 count: data.sessions.length,
-                activeSessionId: data.activeSessionId,
-                currentId: currentId
+                currentId: currentId,
+                activeSessionId: data.activeSessionId
             });
         } catch (err) {
             panel.innerHTML = "<div style='padding:10px;color:#ffb4b4;'>Failed to load sessions.</div>";
-            console.error("[Nova Simple Sessions] failed", err);
+            console.error("[Nova Clean Sessions] failed", err);
         }
     }
 
-    function escapeHtml(value) {
-        return String(value || "")
-            .replaceAll("&", "&amp;")
-            .replaceAll("<", "&lt;")
-            .replaceAll(">", "&gt;")
-            .replaceAll('"', "&quot;")
-            .replaceAll("'", "&#039;");
+    function installRescue() {
+        forceVisibleButton();
+
+        window.setInterval(function () {
+            forceVisibleButton();
+            forceVisiblePanel();
+            forceVisibleRows();
+        }, 1000);
+
+        try {
+            const observer = new MutationObserver(function () {
+                forceVisibleButton();
+                forceVisiblePanel();
+                forceVisibleRows();
+            });
+
+            observer.observe(document.documentElement, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ["style", "hidden", "data-nova-hidden-by-session-owner", "data-nova-hidden-by-sessions-final"]
+            });
+        } catch (_) {}
     }
 
     window.NovaMobileSimpleSessionDrawerV1 = {
+        version: "isolated-v2",
         renderDrawer: renderDrawer,
         openSession: openSession
     };
 
     function boot() {
         makeButton();
-        installVisibilityRescue();
-        console.error("[Nova Simple Sessions] installed");
+        installRescue();
+        console.error("[Nova Clean Sessions] installed");
     }
 
     if (document.readyState === "loading") {
