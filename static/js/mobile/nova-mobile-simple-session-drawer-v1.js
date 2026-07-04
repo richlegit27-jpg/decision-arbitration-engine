@@ -9,6 +9,8 @@
 
     window[MARK] = true;
 
+    let simpleSessionPanelOpen = false;
+
     function getSessionId(item) {
         return item && (item.id || item.session_id || item.sessionId || "");
     }
@@ -110,9 +112,11 @@
     }
 
     function closePanel() {
+        simpleSessionPanelOpen = false;
+
         const panel = document.getElementById("nova-simple-sessions-panel-v1");
         if (panel) {
-            panel.style.display = "none";
+            panel.style.setProperty("display", "none", "important");
         }
     }
 
@@ -140,6 +144,37 @@
         btn.style.setProperty("z-index", "2147483647", "important");
     }
 
+    function forceVisiblePanel() {
+        const panel = document.getElementById("nova-simple-sessions-panel-v1");
+
+        if (!panel || !simpleSessionPanelOpen) {
+            return;
+        }
+
+        panel.removeAttribute("hidden");
+        panel.removeAttribute("data-nova-hidden-by-session-owner");
+        panel.removeAttribute("data-nova-hidden-by-sessions-final");
+
+        panel.style.setProperty("display", "block", "important");
+        panel.style.setProperty("pointer-events", "auto", "important");
+        panel.style.setProperty("visibility", "visible", "important");
+        panel.style.setProperty("opacity", "1", "important");
+        panel.style.setProperty("position", "fixed", "important");
+        panel.style.setProperty("left", "10px", "important");
+        panel.style.setProperty("right", "10px", "important");
+        panel.style.setProperty("top", "56px", "important");
+        panel.style.setProperty("z-index", "2147483647", "important");
+    }
+
+    function rescueOpenPanelSoon() {
+        forceVisiblePanel();
+        setTimeout(forceVisiblePanel, 25);
+        setTimeout(forceVisiblePanel, 100);
+        setTimeout(forceVisiblePanel, 300);
+        setTimeout(forceVisiblePanel, 700);
+        setTimeout(forceVisiblePanel, 1200);
+    }
+
     function installVisibilityRescue() {
         forceVisibleButton();
 
@@ -148,11 +183,15 @@
         setTimeout(forceVisibleButton, 750);
         setTimeout(forceVisibleButton, 1500);
 
-        window.setInterval(forceVisibleButton, 1000);
+        window.setInterval(function () {
+            forceVisibleButton();
+            forceVisiblePanel();
+        }, 1000);
 
         try {
             const observer = new MutationObserver(function () {
                 forceVisibleButton();
+                forceVisiblePanel();
             });
 
             observer.observe(document.documentElement, {
@@ -181,8 +220,10 @@
     async function renderDrawer() {
         const panel = makePanel();
 
-        panel.style.display = "block";
+        simpleSessionPanelOpen = true;
+        panel.style.setProperty("display", "block", "important");
         panel.innerHTML = "<div style='padding:10px;'>Loading sessions...</div>";
+        rescueOpenPanelSoon();
 
         try {
             const data = await fetchSessions();
@@ -252,6 +293,8 @@
             } else {
                 panel.appendChild(list);
             }
+
+            rescueOpenPanelSoon();
 
             console.error("[Nova Simple Sessions] rendered", {
                 count: data.sessions.length,
