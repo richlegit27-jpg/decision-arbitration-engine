@@ -70,7 +70,7 @@
             logout.style.zIndex = "2147483647";
         }
 
-        // Keep Sessions alone on the right.
+        // Keep Sessions alone on the right and bind it directly.
         if (sessions) {
             pill(sessions);
             sessions.style.right = "8px";
@@ -78,6 +78,22 @@
             sessions.style.width = "82px";
             sessions.style.maxWidth = "82px";
             sessions.style.zIndex = "2147483647";
+            sessions.style.pointerEvents = "auto";
+            sessions.dataset.novaTopLayoutSessionsDirect = "1";
+
+            sessions.onclick = function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (window.NovaMobileSessionsFinalV2 && typeof window.NovaMobileSessionsFinalV2.open === "function") {
+                    window.NovaMobileSessionsFinalV2.open("top-layout-direct-sessions-click");
+                    return false;
+                }
+
+                console.warn("[Nova Mobile Top Button Layout V1] Sessions API missing");
+
+                return false;
+            };
         }
 
         // Hide extra floating Sessions if it exists.
@@ -105,3 +121,4 @@
 
     console.log("[Nova Mobile Top Button Layout V1] installed left logout right sessions");
 })();
+
