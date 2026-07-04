@@ -362,6 +362,8 @@
         }
     }, true);
 
+    closeSessions("boot-cleanup");
+    removeKnownOldPanels();
     bindHeader();
 
     if (document.readyState === "loading") {
@@ -382,3 +384,4 @@
 
     console.log("[Nova Mobile Sessions Final V2] installed");
 })();
+
