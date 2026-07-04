@@ -1,7 +1,7 @@
 ﻿(function () {
     "use strict";
 
-    const MARK = "__NOVA_MOBILE_SESSION_CLOSE_ANY_DRAWER_V4_20260704__";
+    const MARK = "__NOVA_MOBILE_SESSION_CLOSE_REMOVE_DRAWER_V5_20260704__";
 
     if (window[MARK]) {
         return;
@@ -9,7 +9,7 @@
 
     window[MARK] = true;
 
-    function textOf(el) {
+    function labelOf(el) {
         return String(
             (el && (
                 el.getAttribute("aria-label") ||
@@ -21,125 +21,137 @@
         ).trim().toLowerCase();
     }
 
-    function isVisible(el) {
-        if (!el) {
+    function metaOf(el) {
+        return String(
+            (el && (
+                (el.id || "") + " " +
+                (el.className || "") + " " +
+                (el.getAttribute("role") || "") + " " +
+                (el.getAttribute("aria-label") || "") + " " +
+                (el.getAttribute("data-nova-session-panel") || "") + " " +
+                (el.getAttribute("data-nova-clean-session-panel") || "")
+            )) ||
+            ""
+        ).toLowerCase();
+    }
+
+    function isCloseLike(button) {
+        const label = labelOf(button);
+        return label === "close" || label.includes("close") || label === "×" || label === "x";
+    }
+
+    function isSessionPanelLike(el) {
+        if (!el || el === document.body || el === document.documentElement) {
             return false;
         }
 
+        const meta = metaOf(el);
+        const text = String(el.textContent || "").toLowerCase().slice(0, 1000);
         const style = getComputedStyle(el);
         const rect = el.getBoundingClientRect();
 
+        const namedLikePanel =
+            meta.includes("session") ||
+            meta.includes("drawer") ||
+            meta.includes("panel");
+
+        const contentLikePanel =
+            text.includes("session") &&
+            (
+                text.includes("new chat") ||
+                text.includes("rename") ||
+                text.includes("pin") ||
+                text.includes("delete") ||
+                text.includes("close")
+            );
+
+        const positionedLikeDrawer =
+            style.position === "fixed" ||
+            style.position === "absolute" ||
+            style.position === "sticky" ||
+            Number(style.zIndex) >= 10 ||
+            el.getAttribute("role") === "dialog";
+
         return (
-            style.display !== "none" &&
-            style.visibility !== "hidden" &&
-            style.opacity !== "0" &&
             rect.width > 0 &&
-            rect.height > 0
+            rect.height > 0 &&
+            positionedLikeDrawer &&
+            (namedLikePanel || contentLikePanel)
         );
     }
 
-    function looksSessionRelated(el) {
-        if (!el) {
-            return false;
+    function findPanelForButton(button) {
+        let el = button;
+
+        while (el && el !== document.body && el !== document.documentElement) {
+            if (isSessionPanelLike(el)) {
+                return el;
+            }
+
+            el = el.parentElement;
         }
 
-        const haystack = String(
-            (el.id || "") + " " +
-            (el.className || "") + " " +
-            (el.getAttribute("role") || "") + " " +
-            (el.getAttribute("aria-label") || "") + " " +
-            (el.getAttribute("data-nova-session-panel") || "") + " " +
-            (el.getAttribute("data-nova-clean-session-panel") || "") + " " +
-            (el.textContent || "").slice(0, 500)
-        ).toLowerCase();
-
-        return (
-            haystack.includes("session") ||
-            haystack.includes("sessions") ||
-            haystack.includes("drawer")
-        );
+        return null;
     }
 
-    function findCandidatePanels() {
-        const all = Array.from(document.querySelectorAll("aside, dialog, section, nav, div, [role='dialog'], [role='complementary']"));
+    function findCloseButtons() {
+        return Array.from(document.querySelectorAll("button, [role='button'], a")).filter(function (button) {
+            if (!isCloseLike(button)) {
+                return false;
+            }
 
-        return all
-            .filter(isVisible)
-            .filter(looksSessionRelated)
-            .filter(function (el) {
-                const style = getComputedStyle(el);
-                const rect = el.getBoundingClientRect();
-
-                return (
-                    style.position === "fixed" ||
-                    style.position === "absolute" ||
-                    Number(style.zIndex) >= 10 ||
-                    rect.width >= 200
-                );
-            })
-            .sort(function (a, b) {
-                const az = Number(getComputedStyle(a).zIndex) || 0;
-                const bz = Number(getComputedStyle(b).zIndex) || 0;
-
-                return bz - az;
-            });
-    }
-
-    function isCloseButtonTarget(target) {
-        if (!target || !target.closest) {
-            return false;
-        }
-
-        const button = target.closest("button, [role='button'], a");
-
-        if (!button) {
-            return false;
-        }
-
-        const label = textOf(button);
-
-        if (!(label === "close" || label.includes("close") || label === "×" || label === "x")) {
-            return false;
-        }
-
-        return findCandidatePanels().some(function (panel) {
-            return panel.contains(button);
+            return !!findPanelForButton(button);
         });
     }
 
-    function hardClosePanel() {
-        const panels = findCandidatePanels();
-
-        if (!panels.length) {
-            console.error("[Nova Session Close Any Drawer V4] no visible session panel found");
+    function removePanel(panel) {
+        if (!panel || !panel.parentNode) {
             return false;
         }
 
-        panels.forEach(function (panel) {
+        try {
             const active = document.activeElement;
 
             if (active && panel.contains(active)) {
-                try {
-                    active.blur();
-                } catch (err) {}
+                active.blur();
             }
+        } catch (err) {}
 
-            panel.style.setProperty("display", "none", "important");
-            panel.style.setProperty("pointer-events", "none", "important");
-            panel.style.setProperty("visibility", "hidden", "important");
-            panel.style.setProperty("opacity", "0", "important");
-            panel.style.setProperty("transform", "translateX(-120%)", "important");
-            panel.setAttribute("aria-hidden", "true");
-            panel.dataset.novaForceClosed = "true";
-        });
+        panel.remove();
 
-        console.error("[Nova Session Close Any Drawer V4] hard closed panels", panels.length);
+        console.error("[Nova Session Close Remove V5] removed drawer panel");
 
         return true;
     }
 
+    function hardClosePanelFromTarget(target) {
+        const button = target && target.closest
+            ? target.closest("button, [role='button'], a")
+            : null;
+
+        const panel = button ? findPanelForButton(button) : null;
+
+        if (panel) {
+            return removePanel(panel);
+        }
+
+        const buttons = findCloseButtons();
+
+        if (buttons.length) {
+            const fallbackPanel = findPanelForButton(buttons[0]);
+            return removePanel(fallbackPanel);
+        }
+
+        console.error("[Nova Session Close Remove V5] no close panel found");
+        return false;
+    }
+
     function intercept(event) {
-        if (!isCloseButtonTarget(event.target)) {
+        const button = event.target && event.target.closest
+            ? event.target.closest("button, [role='button'], a")
+            : null;
+
+        if (!button || !isCloseLike(button) || !findPanelForButton(button)) {
             return;
         }
 
@@ -147,63 +159,52 @@
         event.stopPropagation();
         event.stopImmediatePropagation();
 
-        hardClosePanel();
+        hardClosePanelFromTarget(button);
 
         return false;
     }
 
     function replaceCloseButtons() {
-        const panels = findCandidatePanels();
         let replaced = 0;
 
-        panels.forEach(function (panel) {
-            const buttons = Array.from(panel.querySelectorAll("button, [role='button'], a"));
+        findCloseButtons().forEach(function (button) {
+            if (button.dataset.novaCloseRemoveV5 === "true") {
+                return;
+            }
 
-            buttons.forEach(function (button) {
-                const label = textOf(button);
+            const fresh = button.cloneNode(true);
 
-                if (!(label === "close" || label.includes("close") || label === "×" || label === "x")) {
-                    return;
+            fresh.dataset.novaCloseRemoveV5 = "true";
+
+            fresh.onclick = function (event) {
+                if (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
                 }
 
-                if (button.dataset.novaCloseAnyDrawerV4 === "true") {
-                    return;
-                }
+                hardClosePanelFromTarget(fresh);
 
-                const fresh = button.cloneNode(true);
+                return false;
+            };
 
-                fresh.dataset.novaCloseAnyDrawerV4 = "true";
+            ["pointerdown", "pointerup", "touchstart", "touchend", "mousedown", "mouseup", "click"].forEach(function (eventName) {
+                fresh.addEventListener(eventName, function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    event.stopImmediatePropagation();
 
-                fresh.onclick = function (event) {
-                    if (event) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                    }
-
-                    hardClosePanel();
+                    hardClosePanelFromTarget(fresh);
 
                     return false;
-                };
-
-                ["pointerdown", "pointerup", "touchstart", "touchend", "mousedown", "mouseup", "click"].forEach(function (eventName) {
-                    fresh.addEventListener(eventName, function (event) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        event.stopImmediatePropagation();
-
-                        hardClosePanel();
-
-                        return false;
-                    }, true);
-                });
-
-                button.replaceWith(fresh);
-                replaced += 1;
+                }, true);
             });
+
+            button.replaceWith(fresh);
+            replaced += 1;
         });
 
         if (replaced) {
-            console.error("[Nova Session Close Any Drawer V4] replaced close buttons", replaced);
+            console.error("[Nova Session Close Remove V5] replaced close buttons", replaced);
         }
 
         return replaced;
@@ -216,7 +217,7 @@
             return false;
         }
 
-        if (api.__novaCloseAnyDrawerV4Patched) {
+        if (api.__novaCloseRemoveV5Patched) {
             return true;
         }
 
@@ -234,9 +235,9 @@
             return result;
         };
 
-        api.__novaCloseAnyDrawerV4Patched = true;
+        api.__novaCloseRemoveV5Patched = true;
 
-        console.error("[Nova Session Close Any Drawer V4] patched renderDrawer");
+        console.error("[Nova Session Close Remove V5] patched renderDrawer");
 
         return true;
     }
@@ -254,9 +255,7 @@
 
         observer.observe(document.documentElement, {
             childList: true,
-            subtree: true,
-            attributes: true,
-            attributeFilter: ["style", "class", "aria-hidden"]
+            subtree: true
         });
 
         patchRenderDrawer();
@@ -267,13 +266,11 @@
             replaceCloseButtons();
         }, 250);
 
-        console.error("[Nova Session Close Any Drawer V4] installed");
+        console.error("[Nova Session Close Remove V5] installed");
     }
 
-    window.NovaMobileSessionCloseAnyDrawerV4 = {
-        version: "session-close-any-drawer-v4",
-        findCandidatePanels: findCandidatePanels,
-        hardClosePanel: hardClosePanel,
+    window.NovaMobileSessionCloseRemoveV5 = {
+        version: "session-close-remove-v5",
         replaceCloseButtons: replaceCloseButtons,
         patchRenderDrawer: patchRenderDrawer
     };
