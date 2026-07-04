@@ -31,7 +31,7 @@
         }
     }
 
-    function isChatRequest(input) {
+    function isChatUrl(input) {
         try {
             const raw = typeof input === "string" ? input : input && input.url;
             if (!raw) {
@@ -39,103 +39,54 @@
             }
 
             const url = new URL(raw, location.origin);
-
-            return (
-                url.pathname === "/api/chat" ||
-                url.pathname === "/api/chat/stream"
-            );
+            return url.pathname === "/api/chat" || url.pathname === "/api/chat/stream";
         } catch (_) {
             return false;
         }
     }
 
-    function forceHeaders(headers, sessionId) {
-        const next = new Headers(headers || {});
-        next.set("X-Nova-Session-Id", sessionId);
-        next.set("X-Nova-Active-Session-Id", sessionId);
-        return next;
-    }
-
-    function forceJsonBody(body, sessionId) {
-        if (typeof body !== "string") {
-            return {
-                changed: false,
-                body: body
-            };
-        }
-
-        try {
-            const payload = JSON.parse(body);
-
-            if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-                return {
-                    changed: false,
-                    body: body
-                };
-            }
-
-            payload.session_id = sessionId;
-            payload.active_session_id = sessionId;
-            payload.sessionId = sessionId;
-
-            return {
-                changed: true,
-                body: JSON.stringify(payload)
-            };
-        } catch (_) {
-            return {
-                changed: false,
-                body: body
-            };
-        }
-    }
-
-    function forceFormBody(body, sessionId) {
-        if (!(body instanceof FormData)) {
-            return false;
-        }
-
-        try {
+    function forceBody(body, sessionId) {
+        if (body instanceof FormData) {
             body.set("session_id", sessionId);
             body.set("active_session_id", sessionId);
             body.set("sessionId", sessionId);
-            return true;
-        } catch (_) {
-            return false;
+            return body;
         }
+
+        if (typeof body === "string") {
+            try {
+                const payload = JSON.parse(body);
+                if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+                    payload.session_id = sessionId;
+                    payload.active_session_id = sessionId;
+                    payload.sessionId = sessionId;
+                    return JSON.stringify(payload);
+                }
+            } catch (_) {}
+        }
+
+        return body;
     }
 
     window.fetch = function novaMobileSendSessionAuthorityFetch(input, init) {
         const sessionId = getSessionId();
 
-        if (!sessionId || !isChatRequest(input)) {
+        if (!sessionId || !isChatUrl(input)) {
             return originalFetch(input, init);
         }
 
         const nextInit = Object.assign({}, init || {});
+        const headers = new Headers(nextInit.headers || {});
 
-        if (!nextInit.method) {
-            nextInit.method = "POST";
-        }
+        headers.set("X-Nova-Session-Id", sessionId);
+        headers.set("X-Nova-Active-Session-Id", sessionId);
 
-        nextInit.headers = forceHeaders(nextInit.headers, sessionId);
-
-        if (nextInit.body instanceof FormData) {
-            forceFormBody(nextInit.body, sessionId);
-        } else {
-            const forced = forceJsonBody(nextInit.body, sessionId);
-
-            if (forced.changed) {
-                nextInit.body = forced.body;
-                nextInit.headers.set("Content-Type", "application/json");
-            }
-        }
+        nextInit.headers = headers;
+        nextInit.body = forceBody(nextInit.body, sessionId);
 
         console.error("[Nova Send Session Authority] forced chat session", {
             sessionId: sessionId,
-            url: typeof input === "string" ? input : input && input.url,
-            method: nextInit.method,
-            hasBody: !!nextInit.body
+            url: typeof input === "string" ? input : input && input.url
         });
 
         return originalFetch(input, nextInit);
