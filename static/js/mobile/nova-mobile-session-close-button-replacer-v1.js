@@ -1,7 +1,7 @@
 ﻿(function () {
     "use strict";
 
-    const MARK = "__NOVA_MOBILE_SESSION_CLOSE_REMOVE_DRAWER_V5_20260704__";
+    const MARK = "__NOVA_MOBILE_SESSION_CLOSE_REMOVE_DRAWER_V6_20260704__";
 
     if (window[MARK]) {
         return;
@@ -9,7 +9,7 @@
 
     window[MARK] = true;
 
-    function labelOf(el) {
+    function textOf(el) {
         return String(
             (el && (
                 el.getAttribute("aria-label") ||
@@ -21,70 +21,70 @@
         ).trim().toLowerCase();
     }
 
-    function metaOf(el) {
-        return String(
-            (el && (
-                (el.id || "") + " " +
-                (el.className || "") + " " +
-                (el.getAttribute("role") || "") + " " +
-                (el.getAttribute("aria-label") || "") + " " +
-                (el.getAttribute("data-nova-session-panel") || "") + " " +
-                (el.getAttribute("data-nova-clean-session-panel") || "")
-            )) ||
-            ""
-        ).toLowerCase();
+    function isVisible(el) {
+        if (!el) {
+            return false;
+        }
+
+        const style = getComputedStyle(el);
+        const rect = el.getBoundingClientRect();
+
+        return (
+            style.display !== "none" &&
+            style.visibility !== "hidden" &&
+            style.opacity !== "0" &&
+            rect.width > 0 &&
+            rect.height > 0
+        );
     }
 
-    function isCloseLike(button) {
-        const label = labelOf(button);
-        return label === "close" || label.includes("close") || label === "×" || label === "x";
+    function isExactCloseButton(el) {
+        const label = textOf(el);
+
+        return (
+            label === "close" ||
+            label === "×" ||
+            label === "x"
+        );
     }
 
-    function isSessionPanelLike(el) {
+    function looksLikeSessionDrawer(el) {
         if (!el || el === document.body || el === document.documentElement) {
             return false;
         }
 
-        const meta = metaOf(el);
-        const text = String(el.textContent || "").toLowerCase().slice(0, 1000);
-        const style = getComputedStyle(el);
-        const rect = el.getBoundingClientRect();
+        const meta = String(
+            (el.id || "") + " " +
+            (el.className || "") + " " +
+            (el.getAttribute("role") || "") + " " +
+            (el.getAttribute("aria-label") || "")
+        ).toLowerCase();
 
-        const namedLikePanel =
+        const text = String(el.textContent || "").toLowerCase();
+
+        const hasSessionMeta =
             meta.includes("session") ||
             meta.includes("drawer") ||
-            meta.includes("panel");
+            meta.includes("nova-clean");
 
-        const contentLikePanel =
-            text.includes("session") &&
-            (
-                text.includes("new chat") ||
-                text.includes("rename") ||
-                text.includes("pin") ||
-                text.includes("delete") ||
-                text.includes("close")
-            );
+        const hasSessionActions =
+            text.includes("new chat") ||
+            text.includes("rename") ||
+            text.includes("pin") ||
+            text.includes("delete") ||
+            text.includes("clean start");
 
-        const positionedLikeDrawer =
-            style.position === "fixed" ||
-            style.position === "absolute" ||
-            style.position === "sticky" ||
-            Number(style.zIndex) >= 10 ||
-            el.getAttribute("role") === "dialog";
+        const hasClose =
+            text.includes("close");
 
-        return (
-            rect.width > 0 &&
-            rect.height > 0 &&
-            positionedLikeDrawer &&
-            (namedLikePanel || contentLikePanel)
-        );
+        return hasClose && (hasSessionMeta || hasSessionActions);
     }
 
-    function findPanelForButton(button) {
+    function findDrawerForCloseButton(button) {
         let el = button;
 
         while (el && el !== document.body && el !== document.documentElement) {
-            if (isSessionPanelLike(el)) {
+            if (looksLikeSessionDrawer(el)) {
                 return el;
             }
 
@@ -96,54 +96,39 @@
 
     function findCloseButtons() {
         return Array.from(document.querySelectorAll("button, [role='button'], a")).filter(function (button) {
-            if (!isCloseLike(button)) {
-                return false;
-            }
-
-            return !!findPanelForButton(button);
+            return isVisible(button) && isExactCloseButton(button) && !!findDrawerForCloseButton(button);
         });
     }
 
-    function removePanel(panel) {
-        if (!panel || !panel.parentNode) {
+    function removeDrawer(drawer) {
+        if (!drawer || !drawer.parentNode) {
             return false;
         }
 
         try {
             const active = document.activeElement;
 
-            if (active && panel.contains(active)) {
+            if (active && drawer.contains(active)) {
                 active.blur();
             }
         } catch (err) {}
 
-        panel.remove();
+        drawer.remove();
 
-        console.error("[Nova Session Close Remove V5] removed drawer panel");
+        console.error("[Nova Session Close Remove V6] removed drawer");
 
         return true;
     }
 
-    function hardClosePanelFromTarget(target) {
-        const button = target && target.closest
-            ? target.closest("button, [role='button'], a")
-            : null;
+    function closeFromButton(button) {
+        const drawer = findDrawerForCloseButton(button);
 
-        const panel = button ? findPanelForButton(button) : null;
-
-        if (panel) {
-            return removePanel(panel);
+        if (!drawer) {
+            console.error("[Nova Session Close Remove V6] no drawer found for close button", button);
+            return false;
         }
 
-        const buttons = findCloseButtons();
-
-        if (buttons.length) {
-            const fallbackPanel = findPanelForButton(buttons[0]);
-            return removePanel(fallbackPanel);
-        }
-
-        console.error("[Nova Session Close Remove V5] no close panel found");
-        return false;
+        return removeDrawer(drawer);
     }
 
     function intercept(event) {
@@ -151,7 +136,11 @@
             ? event.target.closest("button, [role='button'], a")
             : null;
 
-        if (!button || !isCloseLike(button) || !findPanelForButton(button)) {
+        if (!button || !isVisible(button) || !isExactCloseButton(button)) {
+            return;
+        }
+
+        if (!findDrawerForCloseButton(button)) {
             return;
         }
 
@@ -159,7 +148,7 @@
         event.stopPropagation();
         event.stopImmediatePropagation();
 
-        hardClosePanelFromTarget(button);
+        closeFromButton(button);
 
         return false;
     }
@@ -168,13 +157,14 @@
         let replaced = 0;
 
         findCloseButtons().forEach(function (button) {
-            if (button.dataset.novaCloseRemoveV5 === "true") {
+            if (button.dataset.novaCloseRemoveV6 === "true") {
                 return;
             }
 
             const fresh = button.cloneNode(true);
 
-            fresh.dataset.novaCloseRemoveV5 = "true";
+            fresh.dataset.novaCloseRemoveV6 = "true";
+            fresh.removeAttribute("onclick");
 
             fresh.onclick = function (event) {
                 if (event) {
@@ -182,7 +172,7 @@
                     event.stopPropagation();
                 }
 
-                hardClosePanelFromTarget(fresh);
+                closeFromButton(fresh);
 
                 return false;
             };
@@ -193,7 +183,7 @@
                     event.stopPropagation();
                     event.stopImmediatePropagation();
 
-                    hardClosePanelFromTarget(fresh);
+                    closeFromButton(fresh);
 
                     return false;
                 }, true);
@@ -204,7 +194,7 @@
         });
 
         if (replaced) {
-            console.error("[Nova Session Close Remove V5] replaced close buttons", replaced);
+            console.error("[Nova Session Close Remove V6] replaced close buttons", replaced);
         }
 
         return replaced;
@@ -217,7 +207,7 @@
             return false;
         }
 
-        if (api.__novaCloseRemoveV5Patched) {
+        if (api.__novaCloseRemoveV6Patched) {
             return true;
         }
 
@@ -235,9 +225,9 @@
             return result;
         };
 
-        api.__novaCloseRemoveV5Patched = true;
+        api.__novaCloseRemoveV6Patched = true;
 
-        console.error("[Nova Session Close Remove V5] patched renderDrawer");
+        console.error("[Nova Session Close Remove V6] patched renderDrawer");
 
         return true;
     }
@@ -255,7 +245,9 @@
 
         observer.observe(document.documentElement, {
             childList: true,
-            subtree: true
+            subtree: true,
+            attributes: true,
+            attributeFilter: ["style", "class"]
         });
 
         patchRenderDrawer();
@@ -266,13 +258,13 @@
             replaceCloseButtons();
         }, 250);
 
-        console.error("[Nova Session Close Remove V5] installed");
+        console.error("[Nova Session Close Remove V6] installed");
     }
 
-    window.NovaMobileSessionCloseRemoveV5 = {
-        version: "session-close-remove-v5",
+    window.NovaMobileSessionCloseRemoveV6 = {
+        version: "session-close-remove-v6",
         replaceCloseButtons: replaceCloseButtons,
-        patchRenderDrawer: patchRenderDrawer
+        findCloseButtons: findCloseButtons
     };
 
     boot();
