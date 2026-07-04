@@ -251,9 +251,10 @@
             data.sessions.forEach(function (session) {
                 const sessionId = getSessionId(session);
                 const isActive = sessionId === currentId;
-                const row = document.createElement("button");
+                const row = document.createElement("div");
 
-                row.type = "button";
+                row.setAttribute("role", "button");
+                row.tabIndex = 0;
                 row.style.cssText = [
                     "width:100%",
                     "text-align:left",
@@ -277,6 +278,13 @@
 
                 row.addEventListener("click", function () {
                     openSession(sessionId);
+                });
+
+                row.addEventListener("keydown", function (event) {
+                    if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openSession(sessionId);
+                    }
                 });
 
                 list.appendChild(row);
