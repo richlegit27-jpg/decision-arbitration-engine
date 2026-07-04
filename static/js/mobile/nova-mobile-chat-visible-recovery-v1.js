@@ -139,6 +139,16 @@
     function renderPayload(payload) {
         if (!payload || typeof payload !== "object") return false;
 
+        // backup renderer: normal renderer already has visible content, so do nothing.
+        const existingRoot = chatRoot();
+        if (
+            existingRoot &&
+            existingRoot.children.length > 0 &&
+            String(existingRoot.innerText || existingRoot.textContent || "").trim()
+        ) {
+            return true;
+        }
+
         let rendered = false;
 
         const sessionMessages =
@@ -263,5 +273,6 @@
 
     console.log("[" + MARK + "] ready");
 })();
+
 
 
