@@ -356,6 +356,36 @@
         return true;
     }
 
+
+    function installDelegatedHeaderClick() {
+        if (window.__NOVA_MOBILE_SESSIONS_FINAL_V2_DELEGATED_CLICK__) {
+            return;
+        }
+
+        window.__NOVA_MOBILE_SESSIONS_FINAL_V2_DELEGATED_CLICK__ = true;
+
+        document.addEventListener("click", function (event) {
+            var target = event.target;
+
+            if (!target || !target.closest) {
+                return;
+            }
+
+            var header = target.closest("#" + HEADER_BUTTON_ID);
+
+            if (!header) {
+                return;
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+
+            openSessions("delegated-header-click");
+        }, true);
+
+        console.log("[Nova Mobile Sessions Final V2] delegated header click installed");
+    }
     document.addEventListener("keydown", function (event) {
         if (event.key === "Escape") {
             closeSessions("escape");
@@ -365,6 +395,7 @@
     closeSessions("boot-cleanup");
     removeKnownOldPanels();
     bindHeader();
+    installDelegatedHeaderClick();
 
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", bindHeader, { once: true });
@@ -384,4 +415,5 @@
 
     console.log("[Nova Mobile Sessions Final V2] installed");
 })();
+
 
