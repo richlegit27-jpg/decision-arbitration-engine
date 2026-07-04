@@ -1,7 +1,7 @@
 ﻿(function () {
     "use strict";
 
-    const MARK = "NOVA_MOBILE_CLEAN_SESSION_DRAWER_V3_20260704";
+    const MARK = "NOVA_MOBILE_CLEAN_SESSION_DRAWER_V3_FAST_ENDPOINTS_20260704";
     const OLD_MARK = "NOVA_MOBILE_SIMPLE_SESSION_DRAWER_V1_20260704";
     const OLD_ISOLATED_MARK = "NOVA_MOBILE_SIMPLE_SESSION_DRAWER_ISOLATED_V2_20260704";
 
@@ -112,12 +112,12 @@
 
         const candidates = [
             {
-                url: "/api/sessions/" + safeId + "/" + action,
-                body: payload || {}
-            },
-            {
                 url: "/api/sessions/" + action,
                 body: body
+            },
+            {
+                url: "/api/sessions/" + safeId + "/" + action,
+                body: payload || {}
             },
             {
                 url: "/api/sessions/" + safeId,
@@ -682,7 +682,7 @@
     }
 
     window.NovaMobileSimpleSessionDrawerV1 = {
-        version: "clean-v3-actions",
+        version: "clean-v3-fast-endpoints",
         renderDrawer: renderDrawer,
         openSession: openSession
     };
@@ -690,7 +690,7 @@
     function boot() {
         makeButton();
         installRescue();
-        console.error("[Nova Clean Sessions V3] installed");
+        console.error("[Nova Clean Sessions V3 Fast Endpoints] installed");
     }
 
     if (document.readyState === "loading") {
