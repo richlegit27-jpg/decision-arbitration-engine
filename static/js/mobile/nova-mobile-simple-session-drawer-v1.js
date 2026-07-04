@@ -166,13 +166,36 @@
         panel.style.setProperty("z-index", "2147483647", "important");
     }
 
+    function forceVisibleRows() {
+        const panel = document.getElementById("nova-simple-sessions-panel-v1");
+
+        if (!panel) {
+            return;
+        }
+
+        panel.querySelectorAll("[role='button']").forEach(function (row) {
+            row.removeAttribute("hidden");
+            row.removeAttribute("data-nova-hidden-by-session-owner");
+            row.removeAttribute("data-nova-hidden-by-sessions-final");
+            row.disabled = false;
+
+            row.style.setProperty("display", "block", "important");
+            row.style.setProperty("pointer-events", "auto", "important");
+            row.style.setProperty("visibility", "visible", "important");
+            row.style.setProperty("opacity", "1", "important");
+            row.style.setProperty("position", "relative", "important");
+            row.style.setProperty("z-index", "2147483647", "important");
+        });
+    }
+
     function rescueOpenPanelSoon() {
         forceVisiblePanel();
-        setTimeout(forceVisiblePanel, 25);
-        setTimeout(forceVisiblePanel, 100);
-        setTimeout(forceVisiblePanel, 300);
-        setTimeout(forceVisiblePanel, 700);
-        setTimeout(forceVisiblePanel, 1200);
+        forceVisibleRows();
+        setTimeout(function () { forceVisiblePanel(); forceVisibleRows(); }, 25);
+        setTimeout(function () { forceVisiblePanel(); forceVisibleRows(); }, 100);
+        setTimeout(function () { forceVisiblePanel(); forceVisibleRows(); }, 300);
+        setTimeout(function () { forceVisiblePanel(); forceVisibleRows(); }, 700);
+        setTimeout(function () { forceVisiblePanel(); forceVisibleRows(); }, 1200);
     }
 
     function installVisibilityRescue() {
@@ -186,6 +209,7 @@
         window.setInterval(function () {
             forceVisibleButton();
             forceVisiblePanel();
+            forceVisibleRows();
         }, 1000);
 
         try {
@@ -300,6 +324,7 @@
                 panel.appendChild(empty);
             } else {
                 panel.appendChild(list);
+            forceVisibleRows();
             }
 
             rescueOpenPanelSoon();
