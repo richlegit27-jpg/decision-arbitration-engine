@@ -9,7 +9,7 @@
 
     window[MARKER] = true;
 
-    function pill(button, rightPx, widthPx) {
+    function pill(button) {
         if (!button) {
             return;
         }
@@ -20,10 +20,6 @@
         button.style.justifyContent = "center";
         button.style.position = "fixed";
         button.style.top = "calc(8px + env(safe-area-inset-top))";
-        button.style.right = rightPx + "px";
-        button.style.left = "auto";
-        button.style.width = widthPx + "px";
-        button.style.maxWidth = widthPx + "px";
         button.style.height = "34px";
         button.style.margin = "0";
         button.style.padding = "0 8px";
@@ -43,6 +39,7 @@
 
     function applyLayout() {
         var header = document.querySelector(".mobile-header");
+        var account = document.getElementById("nova-mobile-account-top");
         var logout = document.getElementById("nova-mobile-auth-logout");
         var sessions = document.getElementById("nova-mobile-sessions-toggle");
         var floatingSessions = document.getElementById("nova-mobile-sessions-floating-v2");
@@ -58,10 +55,32 @@
             header.style.boxSizing = "border-box";
         }
 
-        pill(logout, 8, 64);
-        pill(sessions, 78, 78);
+        if (account) {
+            account.style.zIndex = "2147483647";
+            account.style.pointerEvents = "auto";
+        }
 
-        // Hide the extra floating Sessions button if it exists. One Sessions button only.
+        // Move Logout to the left side, beside Account.
+        if (logout) {
+            pill(logout);
+            logout.style.left = "86px";
+            logout.style.right = "auto";
+            logout.style.width = "68px";
+            logout.style.maxWidth = "68px";
+            logout.style.zIndex = "2147483647";
+        }
+
+        // Keep Sessions alone on the right.
+        if (sessions) {
+            pill(sessions);
+            sessions.style.right = "8px";
+            sessions.style.left = "auto";
+            sessions.style.width = "82px";
+            sessions.style.maxWidth = "82px";
+            sessions.style.zIndex = "2147483647";
+        }
+
+        // Hide extra floating Sessions if it exists.
         if (floatingSessions) {
             floatingSessions.style.display = "none";
             floatingSessions.hidden = true;
@@ -69,15 +88,7 @@
             floatingSessions.style.pointerEvents = "none";
         }
 
-        if (logout) {
-            logout.style.zIndex = "2147483647";
-        }
-
-        if (sessions) {
-            sessions.style.zIndex = "2147483646";
-        }
-
-        console.log("[Nova Mobile Top Button Layout V1] applied simple layout");
+        console.log("[Nova Mobile Top Button Layout V1] applied left logout right sessions");
     }
 
     applyLayout();
@@ -92,5 +103,5 @@
         apply: applyLayout
     };
 
-    console.log("[Nova Mobile Top Button Layout V1] installed simple layout");
+    console.log("[Nova Mobile Top Button Layout V1] installed left logout right sessions");
 })();
