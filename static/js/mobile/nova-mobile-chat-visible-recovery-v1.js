@@ -107,10 +107,41 @@
 
         const key = id || (role + ":" + text.slice(0, 120));
 
-        const existingSameText = Array.from(root.querySelectorAll(".nova-mobile-visible-message-v1"))
+        function normalizeForDedupe(value) {
+            return String(value || "")
+                .toLowerCase()
+                .replace(/[“”]/g, "\"")
+                .replace(/[‘’]/g, "'")
+                .replace(/[—–]/g, "-")
+                .replace(/\bcopy\b/g, "")
+                .replace(/\bregen\b/g, "")
+                .replace(/[^a-z0-9]+/g, " ")
+                .replace(/\s+/g, " ")
+                .trim();
+        }
+
+        const normalizedText = normalizeForDedupe(text);
+
+        const existingSameText = Array.from(root.children || [])
             .some(function (el) {
-                return el.dataset.role === (role || "assistant") &&
-                    String(el.textContent || "").trim() === text;
+                const existing = normalizeForDedupe(el.innerText || el.textContent || "");
+                if (!existing || !normalizedText) {
+                    return false;
+                }
+
+                if (existing === normalizedText) {
+                    return true;
+                }
+
+                if (normalizedText.length >= 30 && existing.includes(normalizedText)) {
+                    return true;
+                }
+
+                if (existing.length >= 30 && normalizedText.includes(existing)) {
+                    return true;
+                }
+
+                return false;
             });
 
         if (existingSameText) {
@@ -138,18 +169,7 @@
 
     function renderPayload(payload) {
         if (!payload || typeof payload !== "object") return false;
-
-        // backup renderer: normal renderer already has visible content, so do nothing.
-        const existingRoot = chatRoot();
-        if (
-            existingRoot &&
-            existingRoot.children.length > 0 &&
-            String(existingRoot.innerText || existingRoot.textContent || "").trim()
-        ) {
-            return true;
-        }
-
-        let rendered = false;
+let rendered = false;
 
         const sessionMessages =
             payload.session && Array.isArray(payload.session.messages)
@@ -316,6 +336,8 @@
 
     console.log("[" + MARK + "] ready");
 })();
+
+
 
 
 
