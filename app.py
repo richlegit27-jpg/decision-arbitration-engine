@@ -19551,3 +19551,50 @@ if __name__ == "__main__":
         port=5001,
         debug=True,
     )
+
+
+
+# --- NOVA_MOBILE_CHAT_VISIBLE_RECOVERY_INJECT_20260703 ---
+try:
+    from flask import request as _nvcvr_request
+
+    @app.after_request
+    def _nvcvr_inject_after_request_20260703(response):
+        try:
+            if _nvcvr_request.path not in ("/mobile", "/mobile/"):
+                return response
+
+            content_type = str(response.headers.get("Content-Type") or "")
+            if "text/html" not in content_type.lower():
+                return response
+
+            body = response.get_data(as_text=True)
+
+            if "nova-mobile-chat-visible-recovery-v1.js" in body:
+                return response
+
+            script = '<script src="/static/js/mobile/nova-mobile-chat-visible-recovery-v1.js?v=chat-visible-recovery-inject-20260703"></script>'
+
+            import re
+            if re.search(r"</body>", body, flags=re.I):
+                body = re.sub(r"</body>", script + "\n</body>", body, count=1, flags=re.I)
+            else:
+                body = body + "\n" + script + "\n"
+
+            response.set_data(body)
+            response.headers["Content-Length"] = str(len(body.encode("utf-8")))
+            return response
+        except Exception as error:
+            try:
+                print("[NOVA_MOBILE_CHAT_VISIBLE_RECOVERY_INJECT_20260703] bypass:", error)
+            except Exception:
+                pass
+            return response
+
+    print("[NOVA_MOBILE_CHAT_VISIBLE_RECOVERY_INJECT_20260703] installed")
+except Exception as _nvcvr_error:
+    try:
+        print("[NOVA_MOBILE_CHAT_VISIBLE_RECOVERY_INJECT_20260703] install failed:", _nvcvr_error)
+    except Exception:
+        pass
+
