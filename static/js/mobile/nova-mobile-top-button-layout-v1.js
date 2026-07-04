@@ -9,82 +9,75 @@
 
     window[MARKER] = true;
 
-    function stylePill(button) {
+    function pill(button, rightPx, widthPx) {
         if (!button) {
             return;
         }
 
+        button.hidden = false;
+        button.style.display = "inline-flex";
+        button.style.alignItems = "center";
+        button.style.justifyContent = "center";
         button.style.position = "fixed";
         button.style.top = "calc(8px + env(safe-area-inset-top))";
+        button.style.right = rightPx + "px";
+        button.style.left = "auto";
+        button.style.width = widthPx + "px";
+        button.style.maxWidth = widthPx + "px";
+        button.style.height = "34px";
+        button.style.margin = "0";
+        button.style.padding = "0 8px";
         button.style.border = "1px solid rgba(255,255,255,0.22)";
         button.style.borderRadius = "12px";
         button.style.background = "rgba(20,20,30,0.96)";
         button.style.color = "#fff";
-        button.style.padding = "8px 10px";
         button.style.fontWeight = "800";
-        button.style.fontSize = "13px";
+        button.style.fontSize = "12px";
         button.style.lineHeight = "1";
-        button.style.height = "34px";
-        button.style.minWidth = "auto";
-        button.style.pointerEvents = "auto";
         button.style.boxSizing = "border-box";
         button.style.whiteSpace = "nowrap";
-        button.style.display = "";
-        button.hidden = false;
-    }
-
-    function widthOf(el, fallback) {
-        if (!el) {
-            return fallback;
-        }
-
-        var rect = el.getBoundingClientRect();
-        return Math.ceil(rect.width || fallback);
+        button.style.overflow = "hidden";
+        button.style.textOverflow = "ellipsis";
+        button.style.pointerEvents = "auto";
     }
 
     function applyLayout() {
+        var header = document.querySelector(".mobile-header");
         var logout = document.getElementById("nova-mobile-auth-logout");
         var sessions = document.getElementById("nova-mobile-sessions-toggle");
         var floatingSessions = document.getElementById("nova-mobile-sessions-floating-v2");
-        var header = document.querySelector(".mobile-header");
-
-        if (logout) {
-            stylePill(logout);
-            logout.style.right = "8px";
-            logout.style.left = "auto";
-            logout.style.zIndex = "2147483647";
-        }
-
-        var logoutWidth = widthOf(logout, 72);
-        var sessionsRight = logoutWidth + 22;
-
-        if (sessions) {
-            stylePill(sessions);
-            sessions.style.right = sessionsRight + "px";
-            sessions.style.left = "auto";
-            sessions.style.marginRight = "0";
-            sessions.style.zIndex = "2147483646";
-        }
-
-        if (floatingSessions) {
-            stylePill(floatingSessions);
-            floatingSessions.style.right = sessionsRight + "px";
-            floatingSessions.style.left = "auto";
-            floatingSessions.style.zIndex = "2147483646";
-        }
-
-        var sessionsWidth = widthOf(sessions || floatingSessions, 82);
 
         if (header) {
-            header.style.paddingRight = (logoutWidth + sessionsWidth + 44) + "px";
+            header.style.paddingRight = "";
+            header.style.transform = "";
+            header.style.right = "";
+            header.style.left = "";
+            header.style.width = "";
+            header.style.maxWidth = "100vw";
+            header.style.overflow = "visible";
             header.style.boxSizing = "border-box";
         }
 
-        console.log("[Nova Mobile Top Button Layout V1] applied", {
-            logoutWidth: logoutWidth,
-            sessionsRight: sessionsRight,
-            sessionsWidth: sessionsWidth
-        });
+        pill(logout, 8, 64);
+        pill(sessions, 78, 78);
+
+        // Hide the extra floating Sessions button if it exists. One Sessions button only.
+        if (floatingSessions) {
+            floatingSessions.style.display = "none";
+            floatingSessions.hidden = true;
+            floatingSessions.setAttribute("aria-hidden", "true");
+            floatingSessions.style.pointerEvents = "none";
+        }
+
+        if (logout) {
+            logout.style.zIndex = "2147483647";
+        }
+
+        if (sessions) {
+            sessions.style.zIndex = "2147483646";
+        }
+
+        console.log("[Nova Mobile Top Button Layout V1] applied simple layout");
     }
 
     applyLayout();
@@ -99,5 +92,5 @@
         apply: applyLayout
     };
 
-    console.log("[Nova Mobile Top Button Layout V1] installed");
+    console.log("[Nova Mobile Top Button Layout V1] installed simple layout");
 })();
