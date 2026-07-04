@@ -231,7 +231,8 @@
         if (typeof originalFetch !== "function") return;
 
         window.fetch = async function novaVisibleFetch(input, init) {
-            const response = await originalFetch.apply(this, arguments);
+            let nextInput = input;
+            let nextInit = init;
 
             try {
                 const url = String(input && input.url ? input.url : input || "");
@@ -242,7 +243,49 @@
                 ).toUpperCase();
 
                 if (method === "POST" && url.includes("/api/chat")) {
+                    const sid =
+                        new URLSearchParams(window.location.search).get("session_id") ||
+                        localStorage.getItem("nova_mobile_active_session_id") ||
+                        localStorage.getItem("nova_active_session_id") ||
+                        "";
+
+                    if (sid) {
+                        nextInit = Object.assign({}, init || {});
+                        const headers = new Headers(nextInit.headers || {});
+                        const body = nextInit.body;
+
+                        if (typeof body === "string") {
+                            try {
+                                const payload = JSON.parse(body || "{}");
+                                payload.session_id = payload.session_id || sid;
+                                payload.client_session_id = payload.client_session_id || sid;
+                                payload.active_session_id = payload.active_session_id || sid;
+                                nextInit.body = JSON.stringify(payload);
+
+                                if (!headers.has("Content-Type")) {
+                                    headers.set("Content-Type", "application/json");
+                                }
+                                nextInit.headers = headers;
+                            } catch (_) {}
+                        }
+                    }
+                }
+            } catch (_) {}
+
+            const response = await originalFetch.call(this, nextInput, nextInit);
+
+            try {
+                const url = String(nextInput && nextInput.url ? nextInput.url : nextInput || "");
+                const method = String(
+                    (nextInit && nextInit.method) ||
+                    (nextInput && nextInput.method) ||
+                    "GET"
+                ).toUpperCase();
+
+                if (method === "POST" && url.includes("/api/chat")) {
                     response.clone().json().then(renderPayload).catch(function () {});
+                    setTimeout(loadCurrentSession, 600);
+                    setTimeout(loadCurrentSession, 1600);
                 }
             } catch (_) {}
 
@@ -273,6 +316,7 @@
 
     console.log("[" + MARK + "] ready");
 })();
+
 
 
 
