@@ -1,7 +1,7 @@
 ﻿(function () {
     "use strict";
 
-    const MARK = "__NOVA_MOBILE_SESSION_CLOSE_REMOVE_DRAWER_V6_20260704__";
+    const MARK = "__NOVA_MOBILE_SESSION_CLOSE_REMOVE_DRAWER_V7_20260704__";
 
     if (window[MARK]) {
         return;
@@ -115,7 +115,7 @@
 
         drawer.remove();
 
-        console.error("[Nova Session Close Remove V6] removed drawer");
+        console.error("[Nova Session Close Remove V7] removed drawer");
 
         return true;
     }
@@ -124,7 +124,7 @@
         const drawer = findDrawerForCloseButton(button);
 
         if (!drawer) {
-            console.error("[Nova Session Close Remove V6] no drawer found for close button", button);
+            console.error("[Nova Session Close Remove V7] no drawer found for close button", button);
             return false;
         }
 
@@ -157,13 +157,13 @@
         let replaced = 0;
 
         findCloseButtons().forEach(function (button) {
-            if (button.dataset.novaCloseRemoveV6 === "true") {
+            if (button.dataset.novaCloseRemoveV7 === "true") {
                 return;
             }
 
             const fresh = button.cloneNode(true);
 
-            fresh.dataset.novaCloseRemoveV6 = "true";
+            fresh.dataset.novaCloseRemoveV7 = "true";
             fresh.removeAttribute("onclick");
 
             fresh.onclick = function (event) {
@@ -194,7 +194,7 @@
         });
 
         if (replaced) {
-            console.error("[Nova Session Close Remove V6] replaced close buttons", replaced);
+            console.error("[Nova Session Close Remove V7] replaced close buttons", replaced);
         }
 
         return replaced;
@@ -207,7 +207,7 @@
             return false;
         }
 
-        if (api.__novaCloseRemoveV6Patched) {
+        if (api.__novaCloseRemoveV7Patched) {
             return true;
         }
 
@@ -225,14 +225,105 @@
             return result;
         };
 
-        api.__novaCloseRemoveV6Patched = true;
+        api.__novaCloseRemoveV7Patched = true;
 
-        console.error("[Nova Session Close Remove V6] patched renderDrawer");
+        console.error("[Nova Session Close Remove V7] patched renderDrawer");
+
+        return true;
+    }
+    const LAUNCHER_MARK = "__NOVA_MOBILE_SESSION_LAUNCHER_BIND_V7__";
+
+    function isSessionsLauncher(button) {
+        if (!button) {
+            return false;
+        }
+
+        const id = String(button.id || "").toLowerCase();
+        const text = String(button.textContent || "").trim().toLowerCase();
+        const aria = String(button.getAttribute("aria-label") || "").trim().toLowerCase();
+
+        return (
+            id === "nova-mobile-sessions-toggle" ||
+            id === "nova-clean-session-launcher-v2" ||
+            text === "sessions" ||
+            aria === "sessions"
+        );
+    }
+
+    async function openSessionsDrawer() {
+        const api = window.NovaMobileSimpleSessionDrawerV1;
+
+        if (!api || typeof api.renderDrawer !== "function") {
+            console.error("[Nova Session Launcher V7] renderDrawer missing", api);
+            return false;
+        }
+
+        console.error("[Nova Session Launcher V7] opening sessions drawer");
+
+        await api.renderDrawer();
+
+        setTimeout(replaceCloseButtons, 0);
+        setTimeout(replaceCloseButtons, 25);
+        setTimeout(replaceCloseButtons, 100);
+        setTimeout(replaceCloseButtons, 300);
 
         return true;
     }
 
+    function bindSessionLaunchers() {
+        if (window[LAUNCHER_MARK]) {
+            return true;
+        }
+
+        window[LAUNCHER_MARK] = true;
+
+        ["pointerdown", "touchstart", "mousedown", "click"].forEach(function (eventName) {
+            document.addEventListener(eventName, function (event) {
+                const button = event.target && event.target.closest
+                    ? event.target.closest("button, [role='button'], a")
+                    : null;
+
+                if (!isSessionsLauncher(button)) {
+                    return;
+                }
+
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
+
+                openSessionsDrawer();
+
+                return false;
+            }, true);
+
+            window.addEventListener(eventName, function (event) {
+                const button = event.target && event.target.closest
+                    ? event.target.closest("button, [role='button'], a")
+                    : null;
+
+                if (!isSessionsLauncher(button)) {
+                    return;
+                }
+
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
+
+                openSessionsDrawer();
+
+                return false;
+            }, true);
+        });
+
+        console.error("[Nova Session Launcher V7] installed");
+
+        return true;
+    }
+
+
+
     function boot() {
+        bindSessionLaunchers();
         ["pointerdown", "pointerup", "touchstart", "touchend", "mousedown", "mouseup", "click"].forEach(function (eventName) {
             document.addEventListener(eventName, intercept, true);
             window.addEventListener(eventName, intercept, true);
@@ -258,14 +349,15 @@
             replaceCloseButtons();
         }, 250);
 
-        console.error("[Nova Session Close Remove V6] installed");
+        console.error("[Nova Session Close Remove V7] installed");
     }
 
-    window.NovaMobileSessionCloseRemoveV6 = {
-        version: "session-close-remove-v6",
+    window.NovaMobileSessionCloseRemoveV7 = {
+        version: "session-close-remove-v7",
         replaceCloseButtons: replaceCloseButtons,
         findCloseButtons: findCloseButtons
     };
 
     boot();
 })();
+
