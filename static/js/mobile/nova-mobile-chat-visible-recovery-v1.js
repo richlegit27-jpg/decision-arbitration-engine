@@ -107,6 +107,16 @@
 
         const key = id || (role + ":" + text.slice(0, 120));
 
+        const existingSameText = Array.from(root.querySelectorAll(".nova-mobile-visible-message-v1"))
+            .some(function (el) {
+                return el.dataset.role === (role || "assistant") &&
+                    String(el.textContent || "").trim() === text;
+            });
+
+        if (existingSameText) {
+            return true;
+        }
+
         if (root.querySelector(`[data-nova-visible-key="${CSS.escape(key)}"]`)) {
             return true;
         }
@@ -144,6 +154,10 @@
                     message.id || ""
                 ) || rendered;
             });
+        }
+
+        if (rendered) {
+            return true;
         }
 
         const assistant =
@@ -243,3 +257,4 @@
 
     console.log("[" + MARK + "] ready");
 })();
+
