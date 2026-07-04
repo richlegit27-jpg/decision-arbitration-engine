@@ -9,7 +9,7 @@
 
     window[MARKER] = true;
 
-    function pill(button) {
+    function baseButton(button) {
         if (!button) {
             return;
         }
@@ -19,7 +19,6 @@
         button.style.alignItems = "center";
         button.style.justifyContent = "center";
         button.style.position = "fixed";
-        button.style.top = "calc(8px + env(safe-area-inset-top))";
         button.style.height = "34px";
         button.style.margin = "0";
         button.style.padding = "0 8px";
@@ -35,6 +34,28 @@
         button.style.overflow = "hidden";
         button.style.textOverflow = "ellipsis";
         button.style.pointerEvents = "auto";
+        button.style.transform = "none";
+    }
+
+    function bindSessionsButton(sessions) {
+        if (!sessions) {
+            return;
+        }
+
+        sessions.dataset.novaTopLayoutSessionsDirect = "1";
+
+        sessions.onclick = function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (window.NovaMobileSessionsFinalV2 && typeof window.NovaMobileSessionsFinalV2.open === "function") {
+                window.NovaMobileSessionsFinalV2.open("top-layout-direct-sessions-click");
+                return false;
+            }
+
+            console.warn("[Nova Mobile Top Button Layout V1] Sessions API missing");
+            return false;
+        };
     }
 
     function applyLayout() {
@@ -46,6 +67,7 @@
 
         if (header) {
             header.style.paddingRight = "";
+            header.style.paddingLeft = "";
             header.style.transform = "";
             header.style.right = "";
             header.style.left = "";
@@ -60,43 +82,30 @@
             account.style.pointerEvents = "auto";
         }
 
-        // Move Logout to the left side, beside Account.
-        if (logout) {
-            pill(logout);
-            logout.style.left = "86px";
-            logout.style.right = "auto";
-            logout.style.width = "68px";
-            logout.style.maxWidth = "68px";
-            logout.style.zIndex = "2147483647";
-        }
-
-        // Keep Sessions alone on the right and bind it directly.
+        // Sessions gets the top-right spot by itself.
         if (sessions) {
-            pill(sessions);
+            baseButton(sessions);
+            sessions.style.top = "calc(8px + env(safe-area-inset-top))";
             sessions.style.right = "8px";
             sessions.style.left = "auto";
-            sessions.style.width = "82px";
-            sessions.style.maxWidth = "82px";
+            sessions.style.width = "86px";
+            sessions.style.maxWidth = "86px";
             sessions.style.zIndex = "2147483647";
-            sessions.style.pointerEvents = "auto";
-            sessions.dataset.novaTopLayoutSessionsDirect = "1";
-
-            sessions.onclick = function (event) {
-                event.preventDefault();
-                event.stopPropagation();
-
-                if (window.NovaMobileSessionsFinalV2 && typeof window.NovaMobileSessionsFinalV2.open === "function") {
-                    window.NovaMobileSessionsFinalV2.open("top-layout-direct-sessions-click");
-                    return false;
-                }
-
-                console.warn("[Nova Mobile Top Button Layout V1] Sessions API missing");
-
-                return false;
-            };
+            bindSessionsButton(sessions);
         }
 
-        // Hide extra floating Sessions if it exists.
+        // Logout moves below the account/left area, not beside Sessions.
+        if (logout) {
+            baseButton(logout);
+            logout.style.top = "calc(48px + env(safe-area-inset-top))";
+            logout.style.left = "8px";
+            logout.style.right = "auto";
+            logout.style.width = "76px";
+            logout.style.maxWidth = "76px";
+            logout.style.zIndex = "2147483646";
+        }
+
+        // Kill the extra floating sessions duplicate.
         if (floatingSessions) {
             floatingSessions.style.display = "none";
             floatingSessions.hidden = true;
@@ -104,7 +113,7 @@
             floatingSessions.style.pointerEvents = "none";
         }
 
-        console.log("[Nova Mobile Top Button Layout V1] applied left logout right sessions");
+        console.log("[Nova Mobile Top Button Layout V1] installed separated top buttons");
     }
 
     applyLayout();
@@ -118,7 +127,4 @@
     window.NovaMobileTopButtonLayoutV1 = {
         apply: applyLayout
     };
-
-    console.log("[Nova Mobile Top Button Layout V1] installed left logout right sessions");
 })();
-
