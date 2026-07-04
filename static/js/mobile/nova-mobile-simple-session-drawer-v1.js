@@ -74,6 +74,7 @@
         });
 
         document.body.appendChild(btn);
+        forceVisibleButton();
         return btn;
     }
 
@@ -113,6 +114,54 @@
         if (panel) {
             panel.style.display = "none";
         }
+    }
+
+    function forceVisibleButton() {
+        const btn = document.getElementById("nova-simple-sessions-button-v1");
+
+        if (!btn) {
+            return;
+        }
+
+        btn.removeAttribute("data-nova-hidden-by-session-owner");
+        btn.removeAttribute("data-nova-hidden-by-sessions-final");
+        btn.removeAttribute("hidden");
+        btn.disabled = false;
+
+        btn.style.setProperty("display", "inline-flex", "important");
+        btn.style.setProperty("pointer-events", "auto", "important");
+        btn.style.setProperty("visibility", "visible", "important");
+        btn.style.setProperty("opacity", "1", "important");
+        btn.style.setProperty("align-items", "center", "important");
+        btn.style.setProperty("justify-content", "center", "important");
+        btn.style.setProperty("position", "fixed", "important");
+        btn.style.setProperty("left", "10px", "important");
+        btn.style.setProperty("top", "10px", "important");
+        btn.style.setProperty("z-index", "2147483647", "important");
+    }
+
+    function installVisibilityRescue() {
+        forceVisibleButton();
+
+        setTimeout(forceVisibleButton, 50);
+        setTimeout(forceVisibleButton, 250);
+        setTimeout(forceVisibleButton, 750);
+        setTimeout(forceVisibleButton, 1500);
+
+        window.setInterval(forceVisibleButton, 1000);
+
+        try {
+            const observer = new MutationObserver(function () {
+                forceVisibleButton();
+            });
+
+            observer.observe(document.documentElement, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ["style", "hidden", "data-nova-hidden-by-session-owner", "data-nova-hidden-by-sessions-final"]
+            });
+        } catch (_) {}
     }
 
     async function fetchSessions() {
@@ -231,6 +280,7 @@
 
     function boot() {
         makeButton();
+        installVisibilityRescue();
         console.error("[Nova Simple Sessions] installed");
     }
 
