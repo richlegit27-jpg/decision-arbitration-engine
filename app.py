@@ -19573,7 +19573,7 @@ try:
             if "nova-mobile-chat-visible-recovery-v1.js" in body:
                 return response
 
-            script = '<script src="/static/js/mobile/nova-mobile-chat-visible-recovery-v1.js?v=chat-visible-recovery-inject-20260703"></script>'
+            script = '<script src="/static/js/mobile/nova-mobile-chat-visible-recovery-v1.js?v=chat-visible-recovery-url-session-20260703b"></script>'
 
             import re
             if re.search(r"</body>", body, flags=re.I):
@@ -19597,4 +19597,5 @@ except Exception as _nvcvr_error:
         print("[NOVA_MOBILE_CHAT_VISIBLE_RECOVERY_INJECT_20260703] install failed:", _nvcvr_error)
     except Exception:
         pass
+
 
