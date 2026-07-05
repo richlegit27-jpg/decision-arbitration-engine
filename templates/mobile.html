@@ -1028,7 +1028,7 @@ body {
 
 <!-- NOVA_MOBILE_REMOVE_RAW_TAIL_GARBAGE_20260703
      Removed malformed legacy mobile tail blocks that leaked raw JS/CSS into the page.
-     Sessions panel remains owned by static/js/mobile/nova-mobile-sessions.js?v=sessions-direct-owner-final-20260705"use strict";
+     Sessions panel remains owned by static/js/mobile/nova-mobile-sessions.js?v=sessions-direct-owner-no-drawer-duplicate-20260705"use strict";
 
     const FIX_ID = "NOVA_MOBILE_MENU_PANEL_SCROLL_FIX_20260623";
 
@@ -4294,9 +4294,9 @@ composer.style.setProperty("overflow", "visible", "important");
 <!-- NOVA_SESSION_OWNER_CLEANUP_20260703: disabled duplicate sessions rescue-final loader -->
 <!-- NOVA_SESSION_OWNER_CLEANUP_20260703: disabled duplicate session fallback renderer loader -->
 
-<script src="/static/js/mobile/nova-mobile-sessions.js?v=sessions-direct-owner-final-20260705"></script>
+<script src="/static/js/mobile/nova-mobile-sessions.js?v=sessions-direct-owner-no-drawer-duplicate-20260705"></script>
 <script src="/static/js/mobile/nova-mobile-active-session-sanitizer-v1.js?v=active-session-sanitizer-v1-20260703"></script>
-<script src="/static/js/mobile/nova-mobile-session-drawer-owner-v1.js?v=session-drawer-single-owner-20260705"></script>
+<!-- DISABLED_DUPLICATE_SESSION_DRAWER_OWNER_V1_20260705 -->
 <script src="/static/js/mobile/nova-mobile-chat-restore-keeper-v1.js?v=chat-restore-keeper-v1-20260703"></script>
 <script src="/static/js/mobile/nova-mobile-session-flat-actions-v1.js?v=session-flat-actions-v1-20260703"></script>
 
@@ -4354,6 +4354,7 @@ composer.style.setProperty("overflow", "visible", "important");
 </html>
 
 <!-- DEPLOY_MARKER_UPLOAD_MENU_OWNER_EE1B706_20260705 -->
+
 
 
 
