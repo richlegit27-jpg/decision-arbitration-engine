@@ -16579,3 +16579,45 @@ a {
 }
 /* /NOVA_MOBILE_HEADER_LAYOUT_SINGLE_OWNER_20260705 */
 
+/* NOVA_MOBILE_DEAD_AUTH_HEADER_KILL_20260705 */
+#nova-mobile-account-top,
+#nova-auth-workmode-register-v2,
+#nova-mobile-auth-logout,
+#nova-mobile-sessions-final-button-v1 {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    left: -99999px !important;
+    top: -99999px !important;
+    width: 0 !important;
+    height: 0 !important;
+    max-width: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    z-index: -1 !important;
+}
+
+.mobile-header-actions {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 8px !important;
+    position: static !important;
+    margin-left: auto !important;
+}
+
+#nova-mobile-new-chat,
+#nova-mobile-sessions-toggle {
+    display: inline-flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    position: static !important;
+    transform: none !important;
+    inset: auto !important;
+    z-index: 41 !important;
+}
+/* /NOVA_MOBILE_DEAD_AUTH_HEADER_KILL_20260705 */
+
