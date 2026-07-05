@@ -20108,7 +20108,8 @@ def api_debug_chat_turn_dry_run():
 
 
 # NOVA_ATTACHMENT_CONTEXT_DEBUG_ROUTE_20260705
-@app.route("/api/debug/attachment-context-dry-run", methods=["POST"])
+@app.route("/api/debug/attachment-context-dry-run",
+                "/api/debug/attachment-web-guard-dry-run", methods=["POST"])
 def api_debug_attachment_context_dry_run():
     try:
         if not _nova_debug_routes_enabled():
@@ -20291,6 +20292,70 @@ def api_debug_attachment_readiness():
                 "attachment_context_marker_present": "NOVA_ATTACHMENT_CONTEXT_20260705" in context_text,
                 "attachment_context_preview": context_text[:1200],
                 "guard": guard,
+            }
+        )
+    except Exception as exc:
+        try:
+            from flask import jsonify
+
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": str(exc),
+                }
+            ), 500
+        except Exception:
+            return {
+                "ok": False,
+                "error": str(exc),
+            }, 500
+
+
+
+
+
+# NOVA_ATTACHMENT_WEB_GUARD_DEBUG_ROUTE_20260705
+@app.route("/api/debug/attachment-web-guard-dry-run", methods=["POST"])
+def api_debug_attachment_web_guard_dry_run():
+    try:
+        if not _nova_debug_routes_enabled():
+            return _nova_debug_routes_disabled_response()
+
+        from flask import jsonify, request, g
+        from nova_backend.services.chat_service import ChatService
+
+        payload = request.get_json(silent=True) or {}
+
+        user_text = (
+            payload.get("message")
+            or payload.get("text")
+            or payload.get("user_text")
+            or payload.get("prompt")
+            or "summarize this attached file"
+        )
+
+        service = ChatService()
+
+        if not hasattr(service, "_execute_web_fetch"):
+            return jsonify(
+                {
+                    "ok": True,
+                    "available": False,
+                    "message": "ChatService has no _execute_web_fetch method on this branch.",
+                    "boundary_attachment_count": len(getattr(g, "nova_api_chat_attachments", []) or []),
+                }
+            )
+
+        result = service._execute_web_fetch(user_text)
+
+        return jsonify(
+            {
+                "ok": True,
+                "available": True,
+                "boundary_attachment_count": len(getattr(g, "nova_api_chat_attachments", []) or []),
+                "result": result,
+                "suppressed": bool(isinstance(result, dict) and result.get("suppressed")),
+                "reason": result.get("reason") if isinstance(result, dict) else None,
             }
         )
     except Exception as exc:
