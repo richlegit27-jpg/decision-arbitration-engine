@@ -24,23 +24,34 @@
             .replace(/'/g, "&#039;");
     }
 
+    function blurIfFocused(el) {
+        try {
+            if (el && (document.activeElement === el || el.contains(document.activeElement))) {
+                document.activeElement.blur();
+            }
+        } catch (_) {}
+    }
+
     function hideOldLaunchers() {
         [
             "nova-standalone-sessions-button-v5",
             "nova-visible-sessions-launcher-final"
         ].forEach(function (id) {
             const el = document.getElementById(id);
-            if (el) {
-                try {
-                    if (document.activeElement === el || el.contains(document.activeElement)) {
-                        document.activeElement.blur();
-                    }
-                } catch (_) {}
-
-                el.style.setProperty("display", "none", "important");
-                el.style.setProperty("pointer-events", "none", "important");
-                el.setAttribute("aria-hidden", "true");
+            if (!el) {
+                return;
             }
+
+            blurIfFocused(el);
+
+            el.style.setProperty("display", "none", "important");
+            el.style.setProperty("pointer-events", "none", "important");
+            el.style.setProperty("visibility", "hidden", "important");
+            el.setAttribute("tabindex", "-1");
+
+            try {
+                el.inert = true;
+            } catch (_) {}
         });
     }
 
@@ -63,7 +74,7 @@
     display: none !important;
     flex-direction: column !important;
     box-sizing: border-box !important;
-    padding: 62px 14px 14px 14px !important;
+    padding: 68px 14px 14px 14px !important;
     background: rgba(15, 10, 28, 0.98) !important;
     color: #f7f2ff !important;
     border-left: 1px solid rgba(255,255,255,0.16) !important;
@@ -71,6 +82,7 @@
     overflow: hidden !important;
     opacity: 1 !important;
     transform: none !important;
+    visibility: visible !important;
 }
 #nova-mobile-sessions-panel.nova-session-drawer-bridge.is-open {
     display: flex !important;
@@ -90,7 +102,7 @@
     top: max(12px, env(safe-area-inset-top)) !important;
     right: 14px !important;
     z-index: 2147483647 !important;
-    min-width: 96px !important;
+    min-width: 100px !important;
     height: 48px !important;
     padding: 0 16px !important;
     border-radius: 999px !important;
@@ -158,18 +170,27 @@
             document.body.appendChild(drawer);
         }
 
+        blurIfFocused(drawer);
+
         drawer.className = "nova-session-drawer-bridge";
         drawer.removeAttribute("hidden");
+        drawer.removeAttribute("aria-hidden");
         drawer.style.removeProperty("opacity");
         drawer.style.removeProperty("transform");
+        drawer.style.setProperty("visibility", "visible", "important");
 
         return drawer;
     }
 
     function closeDrawer() {
         const drawer = ensureDrawer();
+
+        blurIfFocused(drawer);
+
         drawer.classList.remove("is-open");
         drawer.style.setProperty("display", "none", "important");
+
+        console.log(LOG, "closed");
     }
 
     function openDrawer() {
@@ -195,8 +216,13 @@
             close.addEventListener("click", function (event) {
                 event.preventDefault();
                 event.stopPropagation();
+                event.stopImmediatePropagation();
                 closeDrawer();
-            });
+            }, true);
+
+            try {
+                close.focus({ preventScroll: true });
+            } catch (_) {}
         }
 
         loadSessions(drawer);
@@ -268,6 +294,18 @@
     }
 
     document.addEventListener("click", function (event) {
+        const closeButton = event.target && event.target.closest
+            ? event.target.closest(".nova-session-bridge-close")
+            : null;
+
+        if (closeButton) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            closeDrawer();
+            return;
+        }
+
         const headerButton = event.target && event.target.closest
             ? event.target.closest("#nova-mobile-sessions-toggle")
             : null;
@@ -283,9 +321,98 @@
         openDrawer();
     }, true);
 
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+            const drawer = document.getElementById(DRAWER_ID);
+            if (drawer && drawer.classList.contains("is-open")) {
+                event.preventDefault();
+                closeDrawer();
+            }
+        }
+    }, true);
+
     hideOldLaunchers();
     setTimeout(hideOldLaunchers, 500);
     setTimeout(hideOldLaunchers, 1500);
+
+
+    function removeLegacySessionLaunchers() {
+        function removeOne(el) {
+            if (!el) {
+                return;
+            }
+
+            try {
+                if (document.activeElement === el || el.contains(document.activeElement)) {
+                    document.activeElement.blur();
+                }
+            } catch (_) {}
+
+            try {
+                el.inert = true;
+            } catch (_) {}
+
+            try {
+                el.remove();
+            } catch (_) {
+                el.style.setProperty("display", "none", "important");
+                el.style.setProperty("visibility", "hidden", "important");
+                el.style.setProperty("pointer-events", "none", "important");
+                el.setAttribute("tabindex", "-1");
+            }
+        }
+
+        [
+            "nova-visible-sessions-launcher-final",
+            "nova-standalone-sessions-button-v5",
+            "nova-standalone-sessions-drawer-v5"
+        ].forEach(function (id) {
+            removeOne(document.getElementById(id));
+        });
+
+        document.querySelectorAll("button, [role='button']").forEach(function (el) {
+            if (!el) {
+                return;
+            }
+
+            if (el.id === "nova-mobile-sessions-toggle") {
+                return;
+            }
+
+            if (el.closest && el.closest("#nova-mobile-sessions-panel")) {
+                return;
+            }
+
+            const text = String(el.textContent || "").replace(/\s+/g, " ").trim();
+
+            if (text !== "☰ Sessions" && text !== "Sessions") {
+                return;
+            }
+
+            let fixed = false;
+
+            try {
+                fixed = getComputedStyle(el).position === "fixed";
+            } catch (_) {}
+
+            if (fixed) {
+                removeOne(el);
+            }
+        });
+    }
+
+    removeLegacySessionLaunchers();
+    setTimeout(removeLegacySessionLaunchers, 50);
+    setTimeout(removeLegacySessionLaunchers, 250);
+    setTimeout(removeLegacySessionLaunchers, 750);
+    setInterval(removeLegacySessionLaunchers, 400);
+
+    try {
+        new MutationObserver(removeLegacySessionLaunchers).observe(document.documentElement, {
+            childList: true,
+            subtree: true
+        });
+    } catch (_) {}
 
     window.NovaMobileSessionDrawerBridgeV1 = {
         open: openDrawer,
@@ -294,5 +421,4 @@
 
     console.log(LOG, "installed");
 })();
-
 
