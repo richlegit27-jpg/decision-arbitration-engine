@@ -11640,10 +11640,19 @@ if (not attachments) and (__name__ == "__main__"):
 
         combined_text = "\n".join(found_text_parts)
 
+        combined_lower = combined_text.lower()
+
         bad_web_fallback = (
-            "No verified fresh web results were retrieved" in combined_text
-            or "Try a more specific query with a team, person, date, or source" in combined_text
-            or "Use the web route to verify" in combined_text
+            "no verified fresh web results were retrieved" in combined_lower
+            or "try a more specific query with a team, person, date, or source" in combined_lower
+            or "use the web route to verify" in combined_lower
+            or "can't directly browse from here" in combined_lower
+            or "cannot directly browse from here" in combined_lower
+            or "i can’t directly browse from here" in combined_lower
+            or "i can't directly browse from here" in combined_lower
+            or "fastest exact query is" in combined_lower
+            or "paste the listing here" in combined_lower
+            or "likely location:" in combined_lower
         )
 
         if not bad_web_fallback:
