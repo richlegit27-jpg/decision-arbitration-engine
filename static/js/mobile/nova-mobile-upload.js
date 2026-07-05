@@ -259,6 +259,10 @@
 (function () {
     "use strict";
 
+    console.log("[Nova Mobile Hard Attach Button Bridge] disabled - + button is menu-only");
+    window.NovaMobileHardAttachButtonBridgeInstalled = true;
+    return;
+
     if (window.NovaMobileHardAttachButtonBridgeInstalled) {
         return;
     }
