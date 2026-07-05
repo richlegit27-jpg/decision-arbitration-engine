@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     "use strict";
 
     if (window.__NOVA_MOBILE_SESSIONS_FINAL_OWNER_V1_20260703__) {
@@ -283,10 +283,10 @@
                         background:${active ? "rgba(255,255,255,.12)" : "rgba(255,255,255,.05)"};">
                 <button type="button" data-nova-action="open"
                         style="display:block;width:100%;text-align:left;background:transparent;color:#fff;border:0;padding:0;margin:0 0 8px;font-size:14px;font-weight:800;">
-                    ${pinned ? "📌 " : ""}${escapeHtml(title)}
+                    ${pinned ? "ðŸ“Œ " : ""}${escapeHtml(title)}
                 </button>
                 <div style="display:flex;align-items:center;gap:6px;">
-                    <span style="flex:1;color:rgba(255,255,255,.62);font-size:12px;">${escapeHtml(id.slice(-8))} · ${count} msgs</span>
+                    <span style="flex:1;color:rgba(255,255,255,.62);font-size:12px;">${escapeHtml(id.slice(-8))} Â· ${count} msgs</span>
                     <button type="button" data-nova-action="rename" style="border:0;border-radius:9px;padding:7px 9px;font-weight:700;">Rename</button>
                     <button type="button" data-nova-action="pin" data-pinned="${pinned ? "true" : "false"}" style="border:0;border-radius:9px;padding:7px 9px;font-weight:700;">${pinned ? "Unpin" : "Pin"}</button>
                     <button type="button" data-nova-action="delete" style="border:0;border-radius:9px;padding:7px 9px;font-weight:700;">Delete</button>
@@ -304,7 +304,7 @@
     }
 
     async function loadSessions() {
-        setStatus("Loading sessions…");
+        setStatus("Loading sessionsâ€¦");
         const data = await jsonFetch(API.list + "?ui_final=" + Date.now(), { method: "GET" });
         const sessions = getSessions(data);
         const activeId = data.active_session_id || activeIdFromStorage();
@@ -330,7 +330,7 @@
     }
 
     async function createNewSession() {
-        setStatus("Creating session…");
+        setStatus("Creating sessionâ€¦");
 
         const data = await jsonFetch(API.newSession + "?ui_final_new=" + Date.now(), {
             method: "POST",
@@ -349,7 +349,7 @@
     }
 
     async function openSession(id) {
-        setStatus("Opening session…");
+        setStatus("Opening sessionâ€¦");
         const data = await jsonFetch(API.detail(id) + "?ui_final_detail=" + Date.now(), { method: "GET" });
 
         setActiveId(id);
@@ -376,13 +376,13 @@
 
     async function renameSession(id, row) {
         const current = row ? (row.querySelector("[data-nova-action='open']")?.textContent || "") : "";
-        const title = prompt("Rename session", current.replace(/^📌\s*/, "").trim() || "New Chat");
+        const title = prompt("Rename session", current.replace(/^ðŸ“Œ\s*/, "").trim() || "New Chat");
 
         if (!title) {
             return;
         }
 
-        setStatus("Renaming…");
+        setStatus("Renamingâ€¦");
 
         await jsonFetch(API.rename, {
             method: "POST",
@@ -397,7 +397,7 @@
     }
 
     async function pinSession(id, pinned) {
-        setStatus(pinned ? "Pinning…" : "Unpinning…");
+        setStatus(pinned ? "Pinningâ€¦" : "Unpinningâ€¦");
 
         await jsonFetch(API.pin, {
             method: "POST",
@@ -418,7 +418,7 @@
             return;
         }
 
-        setStatus("Deleting…");
+        setStatus("Deletingâ€¦");
 
         await jsonFetch(API.delete, {
             method: "POST",
@@ -506,4 +506,5 @@
         }
     }, 750);
 })();
+
 
