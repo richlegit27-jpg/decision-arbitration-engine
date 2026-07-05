@@ -486,6 +486,7 @@
         input.onchange = handleChange;
 
         installStyles();
+        scheduleNativeAttachReclaim();
         installApi();
         renderPreview();
 
@@ -498,6 +499,7 @@
         install();
     }
 })();
+
 
 
 
