@@ -147,6 +147,31 @@ def exec_debug(*args):
 
 class ChatService:
 
+    def _nova_use_chat_turn_messages_enabled(self):
+        # NOVA_CHAT_TURN_FEATURE_FLAG_ADAPTER_20260705
+        value = str(os.getenv("NOVA_USE_CHAT_TURN_MESSAGES", "")).strip().lower()
+
+        return value in {
+            "1",
+            "true",
+            "yes",
+            "on",
+            "enabled",
+        }
+
+    def _nova_select_model_messages(self, fallback_messages):
+        # NOVA_CHAT_TURN_FEATURE_FLAG_ADAPTER_20260705
+        if not self._nova_use_chat_turn_messages_enabled():
+            return fallback_messages
+
+        shadow_messages = getattr(self, "_last_chat_turn_messages_shadow", None)
+
+        if not shadow_messages:
+            return fallback_messages
+
+        return shadow_messages
+
+
     @classmethod
     def get_global_chat_turn_shadow_snapshot(cls):
         # NOVA_CHAT_TURN_GLOBAL_DEBUG_SNAPSHOT_20260705
