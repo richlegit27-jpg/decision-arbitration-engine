@@ -469,3 +469,223 @@
 })();
 /* NOVA_SESSION_UI_AGGRESSIVE_CLOSE_V2_END */
 
+/* NOVA_SESSION_UI_FORCE_SESSIONS_OPENER_V3_START */
+(function () {
+    "use strict";
+
+    if (window.__NOVA_MOBILE_SESSION_UI_FORCE_SESSIONS_OPENER_V3_20260704__) {
+        return;
+    }
+
+    window.__NOVA_MOBILE_SESSION_UI_FORCE_SESSIONS_OPENER_V3_20260704__ = true;
+
+    const LOG = "[Nova Mobile Force Sessions Opener V3]";
+
+    function hardShow(el, display) {
+        if (!el) return false;
+
+        el.hidden = false;
+        el.removeAttribute("hidden");
+        el.removeAttribute("inert");
+        el.setAttribute("aria-hidden", "false");
+
+        el.style.setProperty("display", display || "block", "important");
+        el.style.setProperty("visibility", "visible", "important");
+        el.style.setProperty("opacity", "1", "important");
+        el.style.setProperty("pointer-events", "auto", "important");
+
+        return true;
+    }
+
+    function textOf(el) {
+        if (!el) return "";
+
+        return [
+            el.id || "",
+            el.className || "",
+            el.getAttribute && (el.getAttribute("aria-label") || ""),
+            el.getAttribute && (el.getAttribute("title") || ""),
+            el.textContent || ""
+        ].join(" ");
+    }
+
+    function findOriginalSessionsButton() {
+        return (
+            document.getElementById("nova-mobile-sessions-toggle") ||
+            [...document.querySelectorAll("button, a, [role='button']")]
+                .find(el => /sessions/i.test(textOf(el)))
+        );
+    }
+
+    function createBossSessionsButton() {
+        let btn = document.getElementById("nova-force-sessions-opener-v3");
+
+        if (btn) {
+            return btn;
+        }
+
+        btn = document.createElement("button");
+        btn.id = "nova-force-sessions-opener-v3";
+        btn.type = "button";
+        btn.textContent = "Sessions";
+        btn.setAttribute("aria-label", "Sessions");
+        btn.setAttribute("title", "Sessions");
+
+        btn.style.setProperty("position", "fixed", "important");
+        btn.style.setProperty("top", "12px", "important");
+        btn.style.setProperty("right", "12px", "important");
+        btn.style.setProperty("z-index", "2147483647", "important");
+        btn.style.setProperty("min-width", "92px", "important");
+        btn.style.setProperty("height", "42px", "important");
+        btn.style.setProperty("border-radius", "12px", "important");
+        btn.style.setProperty("border", "1px solid rgba(255,255,255,0.25)", "important");
+        btn.style.setProperty("background", "rgba(20,20,28,0.96)", "important");
+        btn.style.setProperty("color", "#fff", "important");
+        btn.style.setProperty("font-size", "14px", "important");
+        btn.style.setProperty("font-weight", "700", "important");
+        btn.style.setProperty("box-shadow", "0 8px 24px rgba(0,0,0,0.35)", "important");
+        btn.style.setProperty("display", "inline-flex", "important");
+        btn.style.setProperty("align-items", "center", "important");
+        btn.style.setProperty("justify-content", "center", "important");
+        btn.style.setProperty("pointer-events", "auto", "important");
+
+        btn.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            openSessions("boss-button");
+        }, true);
+
+        document.body.appendChild(btn);
+        return btn;
+    }
+
+    function findSessionPanel() {
+        const candidates = [...document.querySelectorAll("body *")]
+            .filter(el => {
+                if (!el || el === document.body || el === document.documentElement) return false;
+
+                const tag = (el.tagName || "").toLowerCase();
+                if (/^(script|style|link|meta|button|input|textarea|select|option|svg|path)$/.test(tag)) return false;
+
+                const idClass = [el.id || "", el.className || ""].join(" ");
+                if (/composer|mobilechatmessages|chatmessages|chat-message|input|textarea|header$/i.test(idClass)) return false;
+
+                const text = (el.textContent || "").trim();
+                return /current sessions|session_[a-f0-9]|rename|pin|delete|chat history|session list/i.test(text);
+            });
+
+        let best = null;
+        let bestScore = -999;
+
+        for (const el of candidates) {
+            const text = (el.textContent || "").trim();
+            const idClass = [el.id || "", el.className || ""].join(" ");
+
+            let score = 0;
+            if (/current sessions/i.test(text)) score += 40;
+            if (/session_[a-f0-9]/i.test(text)) score += 20;
+            if (/rename|pin|delete/i.test(text)) score += 12;
+            if (/session|drawer|panel|history|conversation/i.test(idClass)) score += 10;
+            if (el.children && el.children.length >= 2) score += 5;
+
+            if (score > bestScore) {
+                bestScore = score;
+                best = el;
+            }
+        }
+
+        return best;
+    }
+
+    function showSessionPanel(panel) {
+        if (!panel) return false;
+
+        hardShow(panel, "block");
+
+        panel.classList.add("open", "show", "visible", "active");
+
+        panel.style.setProperty("position", "fixed", "important");
+        panel.style.setProperty("top", "64px", "important");
+        panel.style.setProperty("right", "8px", "important");
+        panel.style.setProperty("bottom", "76px", "important");
+        panel.style.setProperty("left", "auto", "important");
+        panel.style.setProperty("width", "min(380px, calc(100vw - 16px))", "important");
+        panel.style.setProperty("max-width", "calc(100vw - 16px)", "important");
+        panel.style.setProperty("max-height", "calc(100vh - 140px)", "important");
+        panel.style.setProperty("overflow", "auto", "important");
+        panel.style.setProperty("z-index", "2147483646", "important");
+        panel.style.setProperty("transform", "translateX(0)", "important");
+
+        return true;
+    }
+
+    function openSessions(reason) {
+        const original = findOriginalSessionsButton();
+        const boss = createBossSessionsButton();
+
+        if (original) {
+            hardShow(original, "inline-flex");
+
+            let parent = original.parentElement;
+            for (let i = 0; parent && i < 4; i += 1) {
+                hardShow(parent, "flex");
+                parent = parent.parentElement;
+            }
+
+            try {
+                original.click();
+            } catch (_) {}
+        }
+
+        const panelNow = findSessionPanel();
+        const openedNow = showSessionPanel(panelNow);
+
+        setTimeout(function () {
+            const panelLate = findSessionPanel();
+            const openedLate = showSessionPanel(panelLate);
+
+            console.log(LOG, "openSessions", {
+                reason,
+                hasOriginal: !!original,
+                hasBoss: !!boss,
+                openedNow,
+                openedLate,
+                panel: panelLate || panelNow
+            });
+        }, 120);
+
+        return !!(original || boss);
+    }
+
+    function install() {
+        createBossSessionsButton();
+
+        const original = findOriginalSessionsButton();
+        if (original) {
+            hardShow(original, "inline-flex");
+        }
+
+        setTimeout(install, 1000);
+    }
+
+    const oldApi = window.NovaMobileSessionUiEndgameV1 || {};
+
+    window.NovaMobileSessionUiEndgameV1 = Object.assign(oldApi, {
+        openSessions,
+        forceSessionsButton: function () {
+            createBossSessionsButton();
+            const original = findOriginalSessionsButton();
+            if (original) hardShow(original, "inline-flex");
+            return true;
+        },
+        findSessionPanel,
+        findOriginalSessionsButton
+    });
+
+    install();
+
+    console.log(LOG, "installed");
+})();
+/* NOVA_SESSION_UI_FORCE_SESSIONS_OPENER_V3_END */
+
