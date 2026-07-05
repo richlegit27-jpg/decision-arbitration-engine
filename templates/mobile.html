@@ -136,7 +136,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nova Mobile</title>
 
-<link rel="stylesheet" href="/static/css/nova-mobile.css?v=plus-no-shake-css-full-20260705">
+<link rel="stylesheet" href="/static/css/nova-mobile.css?v=hidden-panel-hard-lock-20260630-001">
 
 <style>
     html,
@@ -319,7 +319,26 @@
             }
         "
     >Memory</button>
-<button
+
+    <button
+        type="button"
+        data-mobile-tool="upload"
+        onclick="
+            const toolsPanel = document.getElementById('nova-mobile-tools-panel');
+            const input = document.getElementById('nova-mobile-file-input');
+
+            if (toolsPanel) {
+                toolsPanel.classList.add('hidden');
+                toolsPanel.style.cssText = 'display:none !important;';
+            }
+
+            if (input) {
+                input.click();
+            }
+        "
+    >Upload</button>
+
+    <button
         type="button"
         data-mobile-tool="execution"
         onclick="
@@ -748,7 +767,7 @@ body {
 <script src="/static/js/mobile/nova-mobile-images.js?v=scroll-authority-20260626-002"></script>
 
 <script src="/static/js/mobile/nova-mobile-webcards.js?v=source-card-kill-20260624-999"></script>
-<script src="/static/js/mobile/nova-mobile-upload.js?v=upload-no-layout-send-bridge-20260705"></script>
+<script src="/static/js/mobile/nova-mobile-upload.js?v=upload-menu-owner-hard-bridge-disabled-20260705"></script>
 <script src="/static/js/mobile/nova-mobile-voice.js?v=mobile-voice-endgame-002"></script>
 
 
@@ -4494,19 +4513,18 @@ composer.style.setProperty("overflow", "visible", "important");
 
 <!-- NOVA_SESSION_OWNER_CLEANUP_20260703: disabled duplicate session fallback renderer loader -->
     <script src="/static/js/mobile/nova-mobile-sessions.js?v=sessions-chat-recovery-20260703"></script>
-    <script src="/static/js/mobile/nova-mobile-send-stable-v1.js?v=send-preview-rerender-stop-20260705"></script>
+    <script src="/static/js/mobile/nova-mobile-send-stable-v1.js?v=send-attachments-fixed-31784e9-20260704"></script>
     <script src="/static/js/mobile/nova-mobile-active-session-sanitizer-v1.js?v=active-session-sanitizer-v1-20260703"></script>
 <script src="/static/js/mobile/nova-mobile-session-drawer-owner-v1.js?v=session-drawer-owner-v1-20260703"></script>
 <script src="/static/js/mobile/nova-mobile-chat-restore-keeper-v1.js?v=chat-restore-keeper-v1-20260703"></script>
 <script src="/static/js/mobile/nova-mobile-session-flat-actions-v1.js?v=session-flat-actions-v1-20260703"></script>
 
 <script src="/static/js/mobile/nova-mobile-url-session-authority-v1.js?v=url-session-authority-v2-20260704"></script>
+<script src="/static/js/mobile/nova-mobile-attachment-boot-reset-v1.js?v=attachment-boot-reset-v1-20260705"></script>
+<script src="/static/js/mobile/nova-mobile-upload-change-authority-v1.js?v=upload-change-authority-v1-20260705"></script>
+<script src="/static/js/mobile/nova-mobile-plus-menu-reliability-v1.js?v=plus-menu-reliability-v1-20260705"></script>
+
 </body>
 </html>
 
-
-
-
-
-
-
+<!-- DEPLOY_MARKER_UPLOAD_MENU_OWNER_EE1B706_20260705 -->

@@ -130,54 +130,20 @@
         );
     }
 
-function normalizeAttachmentForSend(item) {
-    if (!item || typeof item !== "object") {
-        return null;
-    }
-
-    var filename =
-        item.filename ||
-        item.name ||
-        item.file_name ||
-        item.original_name ||
-        "";
-
-    var url =
-        item.url ||
-        item.file_url ||
-        item.fileUrl ||
-        item.path ||
-        item.upload_url ||
-        item.uploadUrl ||
-        "";
-
-    var mimeType =
-        item.mime_type ||
-        item.mimeType ||
-        item.type ||
-        item.content_type ||
-        "";
-
-    var size =
-        item.size ||
-        item.size_bytes ||
-        item.sizeBytes ||
-        null;
-
-    if (!filename && !url) {
-        return null;
-    }
-
-    return {
-        filename: filename,
-        name: filename,
-        url: url,
-        file_url: url,
-        mime_type: mimeType,
-        type: mimeType,
-        size: size
-    };
-}
+return {
+    id: item.id || item.attachment_id || item.file_id || "",
+    attachment_id: item.attachment_id || item.id || item.file_id || "",
+    filename: filename,
+    name: filename,
+    url: url,
+    file_url: url,
+    path: item.path || item.upload_path || item.saved_path || item.file_path || url,
+    mime_type: mimeType,
+    type: mimeType,
+    content_type: mimeType,
+    size: size,
+    size_bytes: size
+};
 
 function addAttachmentCandidates(out, value) {
     if (!value) {
@@ -234,38 +200,88 @@ function readJsonArray(key) {
 function collectPendingAttachments() {
     var found = [];
 
+    function safeAdd(value) {
+        try {
+            addAttachmentCandidates(found, value);
+        } catch (_) {}
+    }
+
+    function safeJson(raw) {
+        try {
+            if (!raw) return null;
+            return JSON.parse(raw);
+        } catch (_) {
+            return null;
+        }
+    }
+
     try {
-        addAttachmentCandidates(found, window.NovaMobileUpload?.getPendingAttachments?.());
+        safeAdd(window.NovaMobileUpload?.getPendingAttachments?.());
     } catch (_) {}
 
-    addAttachmentCandidates(found, window.NovaMobileSharedAttachments);
-    addAttachmentCandidates(found, window.__novaMobilePendingAttachments);
-    addAttachmentCandidates(found, window.NovaMobilePendingAttachments);
-    addAttachmentCandidates(found, window.__NOVA_MOBILE_PENDING_ATTACHMENTS__);
-    addAttachmentCandidates(found, window.NovaMobileUploadedAttachments);
-    addAttachmentCandidates(found, window.NovaMobileAttachmentQueue);
-    addAttachmentCandidates(found, window.NovaMobileUploadQueue);
-    addAttachmentCandidates(found, window.pendingAttachments);
+    safeAdd(window.NovaMobileUpload);
+    safeAdd(window.NovaMobileSharedAttachments);
+    safeAdd(window.__novaMobilePendingAttachments);
+    safeAdd(window.NovaMobilePendingAttachments);
+    safeAdd(window.__NOVA_MOBILE_PENDING_ATTACHMENTS__);
+    safeAdd(window.NovaMobileUploadedAttachments);
+    safeAdd(window.NovaMobileAttachmentQueue);
+    safeAdd(window.NovaMobileUploadQueue);
+    safeAdd(window.pendingAttachments);
 
-    addAttachmentCandidates(found, readJsonArray("nova_mobile_pending_attachments"));
-    addAttachmentCandidates(found, readJsonArray("nova_mobile_upload"));
-    addAttachmentCandidates(found, readJsonArray("nova_mobile_uploads"));
-    addAttachmentCandidates(found, readJsonArray("nova_pending_attachments"));
-    addAttachmentCandidates(found, readJsonArray("pending_attachments"));
+    [
+        "nova_mobile_pending_attachments",
+        "nova_mobile_upload",
+        "nova_mobile_uploads",
+        "nova_mobile_attachment_queue",
+        "nova_mobile_uploaded_attachments",
+        "nova_pending_attachments",
+        "pending_attachments",
+        "nova_mobile_last_uploaded_attachment",
+        "nova_mobile_pending_attachment",
+        "nova_mobile_attachment",
+        "nova_pending_attachment",
+        "pending_attachment"
+    ].forEach(function (key) {
+        try {
+            safeAdd(safeJson(localStorage.getItem(key)));
+            safeAdd(safeJson(sessionStorage.getItem(key)));
+        } catch (_) {}
+    });
+
+    try {
+        Object.keys(window).forEach(function (key) {
+            if (!/(upload|attach|attachment|file)/i.test(key)) {
+                return;
+            }
+
+            if (!/^Nova|^nova|pending|upload|attach|file/i.test(key)) {
+                return;
+            }
+
+            try {
+                safeAdd(window[key]);
+            } catch (_) {}
+        });
+    } catch (_) {}
 
     var seen = {};
     var unique = [];
 
     found.forEach(function (item) {
+        var clean = normalizeAttachmentForSend(item);
+        if (!clean) return;
+
         var key = [
-            item.filename || item.name || "",
-            item.url || item.file_url || item.path || "",
-            item.mime_type || item.type || ""
+            clean.filename || clean.name || "",
+            clean.url || clean.file_url || clean.path || "",
+            clean.mime_type || clean.type || "",
+            clean.size || ""
         ].join("|");
 
         if (!seen[key]) {
             seen[key] = true;
-            unique.push(item);
+            unique.push(clean);
         }
     });
 
@@ -461,14 +477,36 @@ console.log("[Nova Send Stable] BEFORE CHAT SEND", {
     attachments: pendingAttachments
 });
 
+console.log("[Nova Send Stable] FINAL PAYLOAD BEFORE CHAT", {
+    attachmentCount: Array.isArray(pendingAttachments) ? pendingAttachments.length : 0,
+    payload: payload
+});
+
+console.log("[Nova Send Stable] FINAL ATTACHMENT CHECK", {
+    attachmentCount: pendingAttachments.length,
+    attachments: pendingAttachments,
+    novaMobileUpload: window.NovaMobileUpload,
+    uploadGetter: (function () {
+        try {
+            return window.NovaMobileUpload?.getPendingAttachments?.();
+        } catch (_) {
+            return null;
+        }
+    })(),
+    localUpload: localStorage.getItem("nova_mobile_upload"),
+    localPending: localStorage.getItem("nova_mobile_pending_attachments")
+});
+
 if (pendingAttachments.length) {
     payload.attachments = pendingAttachments;
     payload.files = pendingAttachments;
+    payload.uploads = pendingAttachments;
+    payload.uploaded_files = pendingAttachments;
+    payload.attachment = pendingAttachments[0];
     log("sending with attachments", pendingAttachments);
 } else {
     log("sending without attachments");
 }
-
 fetch("/api/chat", {
     method: "POST",
     credentials: "include",
