@@ -147,6 +147,69 @@ def exec_debug(*args):
 
 class ChatService:
 
+    def get_chat_turn_shadow_snapshot(self):
+        # NOVA_CHAT_TURN_DEBUG_SNAPSHOT_20260705
+        turn = getattr(self, "_last_chat_turn_shadow", None)
+        messages = getattr(self, "_last_chat_turn_messages_shadow", []) or []
+
+        if turn is None:
+            return {
+                "ok": True,
+                "has_shadow_turn": False,
+                "turn": None,
+                "messages": {
+                    "count": 0,
+                    "roles": [],
+                },
+            }
+
+        attachments = []
+        for item in getattr(turn, "attachments", []) or []:
+            attachments.append(
+                {
+                    "id": getattr(item, "id", ""),
+                    "filename": getattr(item, "filename", ""),
+                    "mime_type": getattr(item, "mime_type", ""),
+                    "kind": getattr(item, "kind", ""),
+                    "has_url": bool(getattr(item, "url", "")),
+                }
+            )
+
+        user_text = getattr(turn, "user_text", "") or ""
+
+        return {
+            "ok": True,
+            "has_shadow_turn": True,
+            "turn": {
+                "request_id": getattr(turn, "request_id", ""),
+                "session_id": getattr(turn, "session_id", ""),
+                "intent": getattr(turn, "intent", ""),
+                "model": getattr(turn, "model", ""),
+                "created_at": getattr(turn, "created_at", ""),
+                "user_text_preview": user_text[:160],
+                "user_text_length": len(user_text),
+                "attachment_count": len(attachments),
+                "attachments": attachments,
+                "history_count": len(getattr(turn, "history", []) or []),
+                "memory_count": len(getattr(turn, "memory", []) or []),
+                "attachment_context_count": len(getattr(turn, "attachment_context", []) or []),
+                "tool_result_count": len(getattr(turn, "tool_results", []) or []),
+                "metadata": getattr(turn, "metadata", {}) or {},
+            },
+            "messages": {
+                "count": len(messages),
+                "roles": [
+                    (message.get("role") if isinstance(message, dict) else "")
+                    for message in messages
+                ],
+                "content_lengths": [
+                    len(message.get("content", "")) if isinstance(message, dict) else 0
+                    for message in messages
+                ],
+            },
+        }
+
+
     def _nova_build_chat_turn_shadow(
         self,
         payload=None,
