@@ -20414,6 +20414,48 @@ except Exception:
 
 
 
+
+
+# NOVA_UPLOAD_ATTACHMENT_SUMMARY_HOOK_20260705
+try:
+    @app.after_request
+    def _nova_upload_attachment_summary_hook(response):
+        try:
+            from flask import request
+            import json
+            from nova_backend.services.upload_attachment_response_normalizer import (
+                normalize_upload_response_payload,
+            )
+            from nova_backend.services.chat_turn_attachment_hydrator import (
+                hydrate_attachment_for_context,
+            )
+
+            if request.path != "/api/upload":
+                return response
+
+            if not getattr(response, "is_json", False):
+                return response
+
+            payload = response.get_json(silent=True)
+
+            if not isinstance(payload, dict):
+                return response
+
+            normalized = normalize_upload_response_payload(payload)
+            hydrated = hydrate_attachment_for_context(normalized)
+
+            if isinstance(hydrated, dict) and hydrated != payload:
+                response.set_data(json.dumps(hydrated, ensure_ascii=False))
+                response.content_type = "application/json"
+
+            return response
+        except Exception:
+            return response
+except Exception:
+    pass
+
+
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
