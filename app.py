@@ -20158,6 +20158,44 @@ def api_debug_attachment_context_dry_run():
 
 
 
+
+
+# NOVA_API_CHAT_ATTACHMENT_BOUNDARY_HOOK_20260705
+try:
+    @app.before_request
+    def _nova_api_chat_attachment_boundary_hook():
+        try:
+            from flask import g, request
+            from nova_backend.services.chat_attachment_payload_normalizer import (
+                normalize_api_chat_attachments,
+            )
+
+            if request.path not in {
+                "/api/chat",
+                "/api/chat/stream",
+                "/api/debug/chat-turn-dry-run",
+                "/api/debug/chat-turn",
+                "/api/debug/attachment-context-dry-run",
+            }:
+                return None
+
+            payload = request.get_json(silent=True) or {}
+            g.nova_api_chat_attachments = normalize_api_chat_attachments(payload)
+            return None
+        except Exception:
+            try:
+                from flask import g
+
+                g.nova_api_chat_attachments = []
+            except Exception:
+                pass
+
+            return None
+except Exception:
+    pass
+
+
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(

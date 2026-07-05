@@ -303,6 +303,16 @@ def nova_chat_turn_inject_attachment_context_from_locals(
 ) -> Any:
     attachments = collect_attachments_from_scope(scope)
 
+    # NOVA_API_CHAT_ATTACHMENT_BOUNDARY_G_CONTEXT_20260705
+    try:
+        from flask import g, has_request_context
+
+        if has_request_context():
+            boundary_attachments = getattr(g, "nova_api_chat_attachments", None) or []
+            attachments = list(attachments or []) + list(boundary_attachments or [])
+    except Exception:
+        pass
+
     try:
         from nova_backend.services.chat_turn_attachment_hydrator import (
             hydrate_attachments_for_context,
