@@ -4528,10 +4528,154 @@ composer.style.setProperty("overflow", "visible", "important");
 <script src="/static/js/mobile/nova-mobile-send-stable-v1.js?v=send-single-upload-owner-20260705"></script>
 <script src="/static/js/mobile/nova-mobile-chat-visible-recovery-v1.js?v=chat-visible-recovery-dedupe-final-20260703c"></script>
 
+<!-- NOVA_MOBILE_ACCOUNT_LOGOUT_PARKING_20260705 -->
+<style>
+    #nova-mobile-account-logout-parking-v1 {
+        position: fixed !important;
+        left: 8px !important;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 8px) !important;
+        z-index: 40 !important;
+        display: flex !important;
+        gap: 6px !important;
+        align-items: center !important;
+        max-width: 42vw !important;
+        opacity: 0.55 !important;
+        transform: scale(0.86) !important;
+        transform-origin: left bottom !important;
+        pointer-events: auto !important;
+    }
+
+    #nova-mobile-account-logout-parking-v1:hover,
+    #nova-mobile-account-logout-parking-v1:focus-within {
+        opacity: 1 !important;
+    }
+
+    #nova-mobile-account-logout-parking-v1 button,
+    #nova-mobile-account-logout-parking-v1 a,
+    #nova-mobile-account-logout-parking-v1 [role="button"] {
+        min-width: 0 !important;
+        max-width: 120px !important;
+        height: 30px !important;
+        padding: 4px 8px !important;
+        font-size: 11px !important;
+        line-height: 1 !important;
+        border-radius: 999px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+</style>
+<script>
+(function () {
+    "use strict";
+
+    var MARK = "NOVA_MOBILE_ACCOUNT_LOGOUT_PARKING_20260705";
+
+    if (window.__NOVA_MOBILE_ACCOUNT_LOGOUT_PARKING_20260705__) {
+        return;
+    }
+
+    window.__NOVA_MOBILE_ACCOUNT_LOGOUT_PARKING_20260705__ = true;
+
+    function getParking() {
+        var box = document.getElementById("nova-mobile-account-logout-parking-v1");
+
+        if (!box) {
+            box = document.createElement("div");
+            box.id = "nova-mobile-account-logout-parking-v1";
+            box.setAttribute("aria-label", "Account controls");
+            document.body.appendChild(box);
+        }
+
+        return box;
+    }
+
+    function isAccountOrLogoutControl(el) {
+        if (!el) return false;
+
+        var text = String(el.innerText || el.textContent || "").trim().toLowerCase();
+        var id = String(el.id || "").toLowerCase();
+        var klass = String(el.className || "").toLowerCase();
+        var aria = String(el.getAttribute("aria-label") || "").toLowerCase();
+        var title = String(el.getAttribute("title") || "").toLowerCase();
+        var href = String(el.getAttribute("href") || "").toLowerCase();
+
+        var haystack = [text, id, klass, aria, title, href].join(" ");
+
+        if (haystack.indexOf("new chat") >= 0) return false;
+        if (haystack.indexOf("sessions") >= 0) return false;
+        if (haystack.indexOf("session") >= 0) return false;
+        if (haystack.indexOf("send") >= 0) return false;
+        if (haystack.indexOf("attach") >= 0) return false;
+        if (haystack.indexOf("voice") >= 0) return false;
+        if (haystack.indexOf("stop") >= 0) return false;
+
+        return (
+            text === "account" ||
+            text === "logout" ||
+            text === "log out" ||
+            haystack.indexOf("logout") >= 0 ||
+            haystack.indexOf("log-out") >= 0 ||
+            haystack.indexOf("account") >= 0
+        );
+    }
+
+    function parkControls() {
+        var box = getParking();
+        var moved = 0;
+
+        Array.from(document.querySelectorAll("button, a, [role='button']")).forEach(function (el) {
+            if (!isAccountOrLogoutControl(el)) return;
+            if (el.closest && el.closest("#nova-mobile-account-logout-parking-v1")) return;
+
+            try {
+                el.dataset.novaAccountLogoutParked = "1";
+                box.appendChild(el);
+                moved += 1;
+            } catch (_) {}
+        });
+
+        if (moved) {
+            try {
+                console.log("[" + MARK + "] parked account/logout controls", moved);
+            } catch (_) {}
+        }
+
+        return moved;
+    }
+
+    function boot() {
+        parkControls();
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", boot, { once: true });
+    } else {
+        boot();
+    }
+
+    setTimeout(boot, 250);
+    setTimeout(boot, 900);
+    setTimeout(boot, 1800);
+
+    var observer = new MutationObserver(boot);
+    observer.observe(document.documentElement || document.body, {
+        childList: true,
+        subtree: true
+    });
+
+    window.NovaMobileAccountLogoutParkingV1 = {
+        version: MARK,
+        park: parkControls
+    };
+})();
+</script>
+<!-- /NOVA_MOBILE_ACCOUNT_LOGOUT_PARKING_20260705 -->
 </body>
 </html>
 
 <!-- DEPLOY_MARKER_UPLOAD_MENU_OWNER_EE1B706_20260705 -->
+
 
 
 
