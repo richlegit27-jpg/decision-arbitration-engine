@@ -280,16 +280,32 @@ function clearPendingAttachmentsAfterSend() {
     } catch (_) {}
 
     document.querySelectorAll(
-        [
-            "#nova-mobile-upload-preview-owner",
-            ".nova-mobile-upload-preview-owner",
-            ".nova-mobile-upload-preview-chip",
-            "[data-nova-role='attachment-preview-chip']",
-            "#nova-mobile-attachment-preview",
-            ".nova-mobile-attachment-preview",
-            "#mobileAttachmentPreview",
-            ".mobile-attachment-preview",
-            "[data-mobile-attachment-preview]"
+[
+    "#nova-mobile-upload-preview-owner",
+    ".nova-mobile-upload-preview-owner",
+    ".nova-mobile-upload-preview-chip",
+    "[data-nova-role='attachment-preview-chip']",
+
+    "#nova-mobile-attachment-preview",
+    ".nova-mobile-attachment-preview",
+    "#mobileAttachmentPreview",
+    ".mobile-attachment-preview",
+    "[data-mobile-attachment-preview]",
+
+    "#nova-mobile-preview-bar",
+    ".nova-mobile-preview-bar",
+    ".nova-mobile-preview-strip",
+    ".nova-mobile-upload-preview",
+    ".nova-mobile-attachment-chip",
+    ".nova-mobile-upload-chip",
+
+    "[data-nova-attachment-preview]",
+    "[data-nova-upload-preview]",
+    "[data-nova-attachment-chip]",
+    "[data-upload-preview]",
+    "[data-attachment-preview]"
+]
+
         ].join(",")
     ).forEach(function (node) {
         node.remove();
@@ -300,6 +316,27 @@ function clearPendingAttachmentsAfterSend() {
             input.value = "";
         } catch (_) {}
     });
+
+try {
+    if (window.NovaMobileUploadPreviewOwner && typeof window.NovaMobileUploadPreviewOwner.clear === "function") {
+        window.NovaMobileUploadPreviewOwner.clear();
+    }
+} catch (_) {}
+
+try {
+    if (window.NovaMobileUploadPreviewOwner && typeof window.NovaMobileUploadPreviewOwner.renderUploadPreview === "function") {
+        window.NovaMobileUploadPreviewOwner.renderUploadPreview();
+    }
+} catch (_) {}
+
+try {
+    document.body.classList.remove(
+        "nova-has-attachment",
+        "nova-mobile-has-attachment",
+        "nova-upload-active",
+        "nova-attachment-active"
+    );
+} catch (_) {}
 
     log("cleared attachments after send");
 }
