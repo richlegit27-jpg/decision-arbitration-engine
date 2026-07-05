@@ -77,3 +77,24 @@ def test_chat_turn_dry_run_route_coerces_alias_payload(monkeypatch):
     assert data["turn"]["user_text_preview"] == "analyze attached image"
     assert data["turn"]["attachment_count"] == 1
 
+def test_chat_turn_dry_run_route_disabled_without_env(monkeypatch):
+    import importlib
+
+    monkeypatch.delenv("NOVA_DEBUG_ROUTES", raising=False)
+
+    app_module = importlib.import_module("app")
+    flask_app = getattr(app_module, "app")
+    client = flask_app.test_client()
+
+    response = client.post(
+        "/api/debug/chat-turn-dry-run",
+        json={
+            "session_id": "session_debug_disabled_001",
+            "message": "hello",
+        },
+    )
+
+    assert response.status_code == 404
+    data = response.get_json()
+    assert data["ok"] is False
+    assert "disabled" in data["error"].lower()
