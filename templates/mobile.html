@@ -177,54 +177,6 @@
         display: inline-flex;
     }
 </style>
-<style id="nova-mobile-header-static-owner-style-20260705">
-/* NOVA_MOBILE_HEADER_STATIC_OWNER_20260705 */
-#nova-mobile-account-top,
-#nova-auth-workmode-register-v2,
-#nova-mobile-auth-logout,
-#nova-mobile-sessions-final-button-v1 {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-    position: absolute !important;
-    left: -99999px !important;
-    top: -99999px !important;
-    width: 0 !important;
-    height: 0 !important;
-    overflow: hidden !important;
-}
-
-.mobile-header {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    gap: 10px !important;
-}
-
-.mobile-header-actions {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: flex-end !important;
-    gap: 8px !important;
-    margin-left: auto !important;
-    position: static !important;
-    transform: none !important;
-    inset: auto !important;
-}
-
-#nova-mobile-new-chat,
-#nova-mobile-sessions-toggle {
-    display: inline-flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    position: static !important;
-    pointer-events: auto !important;
-    transform: none !important;
-    inset: auto !important;
-}
-/* /NOVA_MOBILE_HEADER_STATIC_OWNER_20260705 */
-</style>
 </head>
 
 <body>
@@ -304,9 +256,32 @@
         <div class="mobile-header-title">Nova Mobile</div>
 
         <div class="mobile-header-actions">
-            <button id="nova-mobile-new-chat" type="button" class="mobile-header-btn">New</button>
-            <button id="nova-mobile-sessions-toggle" type="button" class="mobile-header-btn">Sessions</button>
-        </div>
+            <button
+                id="nova-mobile-new-chat"
+                class="mobile-header-btn"
+                type="button"
+                onclick="window.location.href = '/mobile?new=' + Date.now();"
+            >New</button>
+
+            <button
+                id="nova-mobile-copy-chat"
+                class="mobile-header-btn"
+                type="button"
+            >Copy</button>
+
+            <button
+                id="nova-mobile-export-chat"
+                class="mobile-header-btn"
+                type="button"
+            >Export</button>
+
+            <button
+                id="nova-mobile-sessions-toggle"
+                class="mobile-header-btn"
+                type="button"
+            >Sessions</button>
+
+            <div class="mobile-status" aria-label="Nova online"></div>
         </div>
     </header>
 
@@ -4552,11 +4527,11 @@ composer.style.setProperty("overflow", "visible", "important");
 <script src="/static/js/mobile/nova-mobile-upload-change-authority-v1.js?v=upload-single-owner-20260705"></script>
 <script src="/static/js/mobile/nova-mobile-send-stable-v1.js?v=send-single-upload-owner-20260705"></script>
 <script src="/static/js/mobile/nova-mobile-chat-visible-recovery-v1.js?v=chat-visible-recovery-dedupe-final-20260703c"></script>
+    <script src="/static/js/mobile/nova-mobile-header-owner-v1.js?v=header-owner-live-002-20260705"></script>
 </body>
 </html>
 
 <!-- DEPLOY_MARKER_UPLOAD_MENU_OWNER_EE1B706_20260705 -->
-
 
 
 
