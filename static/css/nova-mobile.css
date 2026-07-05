@@ -1,4 +1,4 @@
-/* =========================================================
+﻿/* =========================================================
    Nova Mobile CSS - Premium Final Polish
    Path: C:\Users\Owner\nova\static\css\nova-mobile.css
    Purpose: Mobile-only premium Nova chat UI.
@@ -1627,7 +1627,7 @@ body {
    ========================================================= */
 
 .mobile-thinking-bubble::after {
-    content: " â—";
+    content: " Ã¢â€”Â";
     animation: novaTypingDots 1s infinite;
 }
 
@@ -1987,7 +1987,7 @@ body {
 }
 
 .mobile-chat-message.system .mobile-message-content::before {
-    content: "â€¢";
+    content: "Ã¢â‚¬Â¢";
     font-size: 18px;
     line-height: 1;
     animation: novaSystemPulse 1.1s infinite ease-in-out;
@@ -5964,7 +5964,7 @@ body::after {
 }
 
 .mobile-message-content pre::before {
-    content: "â—  â—  â—";
+    content: "Ã¢â€”Â  Ã¢â€”Â  Ã¢â€”Â";
 
     position: absolute;
     top: 10px;
@@ -11114,7 +11114,7 @@ input#nova-mobile-input,
     line-height: 1.4 !important;
 }
 
-/* Limit overflow / “spread” */
+/* Limit overflow / â€œspreadâ€ */
 .nova-web-card,
 .nova-webcard {
     word-break: break-word !important;
@@ -13117,7 +13117,7 @@ a[href*="logout"] {
 }
 
 /* ================================
-   NOVA ATTACHMENT SYSTEM — ENDGAME
+   NOVA ATTACHMENT SYSTEM â€” ENDGAME
 ================================== */
 
 #nova-mobile-attachment-preview {
@@ -16486,3 +16486,96 @@ a {
 }
 
 /* End full mobile CSS */
+
+/* NOVA_MOBILE_HEADER_LAYOUT_SINGLE_OWNER_20260705 */
+.mobile-header,
+#mobileHeader,
+.nova-mobile-header {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 40 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px !important;
+    overflow: visible !important;
+}
+
+.mobile-header-title,
+.mobile-header-main,
+#mobileSessionTitle,
+#nova-mobile-session-title {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+.mobile-header-actions {
+    flex: 0 0 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 8px !important;
+    min-width: max-content !important;
+    margin-left: auto !important;
+    position: static !important;
+    inset: auto !important;
+    transform: none !important;
+}
+
+.mobile-header-actions > *,
+.mobile-header-actions button,
+.mobile-header-actions a,
+.mobile-header-actions [role="button"],
+.mobile-header-btn {
+    position: static !important;
+    inset: auto !important;
+    transform: none !important;
+    float: none !important;
+    flex: 0 0 auto !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    max-height: 34px !important;
+    box-sizing: border-box !important;
+    white-space: nowrap !important;
+    pointer-events: auto !important;
+}
+
+.mobile-header-actions button,
+.mobile-header-actions a,
+.mobile-header-btn {
+    padding: 0 10px !important;
+    line-height: 1 !important;
+}
+
+@media (max-width: 420px) {
+    .mobile-header,
+    #mobileHeader,
+    .nova-mobile-header {
+        gap: 6px !important;
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+    }
+
+    .mobile-header-actions {
+        gap: 6px !important;
+    }
+
+    .mobile-header-actions button,
+    .mobile-header-actions a,
+    .mobile-header-btn {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+        font-size: 12px !important;
+    }
+}
+/* /NOVA_MOBILE_HEADER_LAYOUT_SINGLE_OWNER_20260705 */
+
