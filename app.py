@@ -676,6 +676,51 @@ def nova_api_usage_session_summary_active_20260705(session_id):
         usage=usage_compact
         )
 
+
+# ============================================================
+# NOVA_STATE_USAGE_AFTER_REQUEST_20260705
+# Inject token usage into /api/state responses.
+# ============================================================
+
+@app.after_request
+def nova_state_usage_after_request_20260705(response):
+    try:
+        from flask import jsonify, request
+
+        if request.path != "/api/state":
+            return response
+
+        if response.status_code != 200:
+            return response
+
+        payload = response.get_json(silent=True)
+
+        if not isinstance(payload, dict):
+            return response
+
+        if "usage" in payload:
+            return response
+
+        from nova_backend.services.usage_ledger_service import usage_summary
+
+        usage = usage_summary()
+
+        payload["usage"] = {
+            "totals": usage.get("totals", {}),
+            "by_model": usage.get("by_model", {}),
+            "updated_at": usage.get("updated_at"),
+        }
+
+        return jsonify(payload), response.status_code
+
+    except Exception as exc:
+        try:
+            print("[NOVA_STATE_USAGE_AFTER_REQUEST] failed:", exc)
+        except Exception:
+            pass
+
+        return response
+
 @app.get("/api/health")
 def api_health():
     return json_ok(
@@ -19743,5 +19788,6 @@ def _nova_wrap_api_state_with_usage_20260705():
 
 
 _nova_wrap_api_state_with_usage_20260705()
+
 
 
