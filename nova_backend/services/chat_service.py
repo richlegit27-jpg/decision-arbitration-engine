@@ -11588,7 +11588,10 @@ if (not attachments) and (__name__ == "__main__"):
 
     def _rewrite_live_store_hours_query(self, user_text: str, location=None) -> str:
         """
-        Rewrite the user's question into a web-search-friendly live hours query.
+        LIVE_STORE_HOURS_QUERY_V2
+
+        Keep live business-hours searches close to a normal Google-style query.
+        Detection/routing can use keywords, but the actual web query should stay simple.
         """
         query = (user_text or "").strip()
 
@@ -11599,13 +11602,25 @@ if (not attachments) and (__name__ == "__main__"):
             if extra and extra.lower() not in query.lower():
                 query = f"{query} {extra}".strip()
 
-        return (
-            "Current live store hours / open now status for this exact business: "
-            f"{query}. Prefer the official store locator or a current business listing. "
-            "Answer only if the exact location and today's hours/open status are found. "
-            "If not verified, say the live hours could not be verified. "
-            "Do not say 'I need live store-hours data for that' to the user."
+        lowered = query.lower()
+
+        has_hours_word = any(
+            term in lowered
+            for term in (
+                "hours",
+                "open",
+                "closed",
+                "closing",
+                "close",
+                "open now",
+                "right now",
+            )
         )
+
+        if not has_hours_word:
+            query = f"{query} hours"
+
+        return " ".join(query.split())
 
     def _normalize_live_store_hours_result(self, result):
         """
