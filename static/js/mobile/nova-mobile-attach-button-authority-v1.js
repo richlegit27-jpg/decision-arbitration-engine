@@ -1,13 +1,16 @@
-﻿/* NOVA_MOBILE_ATTACH_BUTTON_AUTHORITY_V3_CLEAN_CLONE_20260705 */
-(function installNovaMobileAttachButtonAuthorityV3CleanClone() {
+﻿/* NOVA_MOBILE_ATTACH_BUTTON_AUTHORITY_V4_SINGLE_CLICK_20260705 */
+(function installNovaMobileAttachButtonAuthorityV4SingleClick() {
     "use strict";
 
-    if (window.__NOVA_MOBILE_ATTACH_BUTTON_AUTHORITY_V3_CLEAN_CLONE_20260705__) {
+    if (window.__NOVA_MOBILE_ATTACH_BUTTON_AUTHORITY_V4_SINGLE_CLICK_20260705__) {
         return;
     }
 
+    window.__NOVA_MOBILE_ATTACH_BUTTON_AUTHORITY_V4_SINGLE_CLICK_20260705__ = true;
     window.__NOVA_MOBILE_ATTACH_BUTTON_AUTHORITY_V3_CLEAN_CLONE_20260705__ = true;
     window.__NOVA_MOBILE_ATTACH_BUTTON_AUTHORITY_V1_20260705__ = true;
+
+    let lastOpenAt = 0;
 
     function log() {
         try {
@@ -18,8 +21,8 @@
     function getAttachButton() {
         return (
             document.getElementById("nova-mobile-attach") ||
-            document.querySelector(".nova-mobile-attach") ||
-            document.querySelector(".nova-mobile-attach-action")
+            document.querySelector(".nova-mobile-attach-action") ||
+            document.querySelector(".nova-mobile-attach")
         );
     }
 
@@ -34,26 +37,32 @@
     function ensureInputReady(input) {
         if (!input) return;
 
-        try {
-            input.disabled = false;
-            input.removeAttribute("disabled");
-            input.setAttribute("type", "file");
-        } catch (_) {}
+        input.disabled = false;
+        input.removeAttribute("disabled");
 
-        try {
-            if (!input.accept) {
-                input.accept = "image/*,.txt,.md,.pdf,.doc,.docx";
-            }
-        } catch (_) {}
+        if (!input.accept) {
+            input.accept = "image/*,.txt,.md,.pdf,.doc,.docx";
+        }
     }
 
     function openPicker(event) {
-        const input = getFileInput();
+        const now = Date.now();
 
-        if (!input) {
-            log("[Nova Attach Button Authority V3] no file input found");
+        if (now - lastOpenAt < 900) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (typeof event.stopImmediatePropagation === "function") {
+                    event.stopImmediatePropagation();
+                }
+            }
+
+            log("[Nova Attach Button Authority V4] ignored duplicate tap");
             return;
         }
+
+        lastOpenAt = now;
 
         if (event) {
             event.preventDefault();
@@ -64,36 +73,44 @@
             }
         }
 
+        const input = getFileInput();
+
+        if (!input) {
+            log("[Nova Attach Button Authority V4] no file input found");
+            return;
+        }
+
         ensureInputReady(input);
 
-        log("[Nova Attach Button Authority V3] opening picker");
+        log("[Nova Attach Button Authority V4] opening picker once");
 
         try {
             input.click();
         } catch (error) {
-            console.error("[Nova Attach Button Authority V3] input click failed", error);
+            console.error("[Nova Attach Button Authority V4] input click failed", error);
         }
     }
 
-    function replaceWithCleanClone(button) {
+    function cleanButton(button) {
         if (!button) return null;
 
-        if (button.dataset.novaAttachAuthorityCleanClone === "1") {
+        if (button.dataset.novaAttachAuthorityV4Clean === "1") {
             return button;
         }
 
         const clone = button.cloneNode(true);
 
         clone.id = "nova-mobile-attach";
+        clone.dataset.novaAttachAuthorityV4Clean = "1";
         clone.dataset.novaAttachAuthorityCleanClone = "1";
         clone.dataset.novaAttachAuthorityBound = "0";
 
         try {
             button.replaceWith(clone);
-            log("[Nova Attach Button Authority V3] replaced old attach button with clean clone");
+            log("[Nova Attach Button Authority V4] replaced attach button with single-click clone");
             return clone;
         } catch (error) {
-            console.error("[Nova Attach Button Authority V3] clean clone replace failed", error);
+            console.error("[Nova Attach Button Authority V4] clone replace failed", error);
             return button;
         }
     }
@@ -108,34 +125,29 @@
 
         ensureInputReady(input);
 
-        button = replaceWithCleanClone(button);
+        button = cleanButton(button);
 
-        if (!button) {
-            return false;
-        }
-
-        if (button.dataset.novaAttachAuthorityBound === "1") {
+        if (!button || button.dataset.novaAttachAuthorityBound === "1") {
             return true;
         }
 
         button.dataset.novaAttachAuthorityBound = "1";
 
-        button.onclick = openPicker;
-        button.onpointerup = openPicker;
-        button.ontouchend = openPicker;
-
+        /*
+          IMPORTANT:
+          Bind only ONE picker event.
+          No pointerup.
+          No touchend.
+          No onclick property.
+          This prevents double file picker opens.
+        */
         button.addEventListener("click", openPicker, true);
-        button.addEventListener("pointerup", openPicker, true);
-        button.addEventListener("touchend", openPicker, true);
 
         input.addEventListener("change", function () {
-            log("[Nova Attach Button Authority V3] selected files", input.files && input.files.length, input.files && input.files[0]);
+            log("[Nova Attach Button Authority V4] selected files", input.files && input.files.length, input.files && input.files[0]);
         }, true);
 
-        log("[Nova Attach Button Authority V3] bound clean attach button", {
-            button: button.id || button.className,
-            input: input.id || input.className
-        });
+        log("[Nova Attach Button Authority V4] bound single-click attach button");
 
         return true;
     }
@@ -159,10 +171,10 @@
     bindLoop();
 
     window.NovaMobileAttachButtonAuthorityV1 = {
-        version: "NOVA_MOBILE_ATTACH_BUTTON_AUTHORITY_V3_CLEAN_CLONE_20260705",
-        bind,
-        openPicker
+        version: "NOVA_MOBILE_ATTACH_BUTTON_AUTHORITY_V4_SINGLE_CLICK_20260705",
+        bind: bind,
+        openPicker: openPicker
     };
 
-    log("[Nova Attach Button Authority V3] installed");
+    log("[Nova Attach Button Authority V4] installed");
 })();
