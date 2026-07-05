@@ -391,16 +391,22 @@
             return;
         }
 
+        /*
+         * FINAL MODEL:
+         * The paperclip is a real <label>.
+         * The file input is a real file input.
+         * The browser opens the picker natively through label activation.
+         * No input.click().
+         * No invisible overlay.
+         */
         attach.removeAttribute("type");
+        attach.setAttribute("for", INPUT_ID);
         attach.style.setProperty("position", "relative", "important");
         attach.style.setProperty("overflow", "visible", "important");
         attach.style.setProperty("pointer-events", "auto", "important");
         attach.style.setProperty("cursor", "pointer", "important");
         attach.style.setProperty("touch-action", "manipulation", "important");
-
-        if (attach.tagName === "LABEL") {
-            attach.setAttribute("for", INPUT_ID);
-        }
+        attach.dataset.novaAttachNativeLabelFinal = "true";
 
         if (input.parentElement !== attach) {
             attach.appendChild(input);
@@ -409,49 +415,35 @@
         input.disabled = false;
         input.removeAttribute("disabled");
         input.removeAttribute("hidden");
+        input.setAttribute("type", "file");
         input.setAttribute("aria-label", "Attach file");
 
         input.style.cssText = [
-            "display:block !important",
-            "visibility:visible !important",
-            "position:fixed !important",
-            "left:-9999px !important",
-            "top:-9999px !important",
+            "position:absolute !important",
+            "left:0 !important",
+            "top:0 !important",
             "width:1px !important",
             "height:1px !important",
             "opacity:0 !important",
-            "z-index:-1 !important",
+            "overflow:hidden !important",
             "pointer-events:none !important"
         ].join("; ");
     }
     function installNativeAttachClickFallback() {
         const attach = document.getElementById(ATTACH_ID);
 
-        if (!attach || attach.dataset.novaStaticAttachClickFallback === "button-trigger-v2") {
+        if (!attach || attach.dataset.novaStaticAttachClickFallback === "native-label-final") {
             return;
         }
 
-        attach.dataset.novaStaticAttachClickFallback = "button-trigger-v2";
-
-        function openNativePickerFromUserEvent(event) {
-            const input = document.getElementById(INPUT_ID);
-
-            if (!input) {
-                return;
-            }
-
-            forceNativeInputOverAttach();
-
-            if (event) {
-                event.stopPropagation();
-            }
-
-            input.click();
-        }
-
-        attach.addEventListener("pointerup", openNativePickerFromUserEvent, true);
-        attach.addEventListener("touchend", openNativePickerFromUserEvent, true);
-        attach.addEventListener("click", openNativePickerFromUserEvent, true);
+        /*
+         * Do not preventDefault.
+         * Do not stopPropagation.
+         * Do not call input.click().
+         * Let the native <label for="file-input"> behavior open the picker.
+         */
+        attach.dataset.novaStaticAttachClickFallback = "native-label-final";
+        forceNativeInputOverAttach();
     }
     function scheduleNativeAttachReclaim() {
         forceNativeInputOverAttach();
@@ -492,6 +484,7 @@
         install();
     }
 })();
+
 
 
 
