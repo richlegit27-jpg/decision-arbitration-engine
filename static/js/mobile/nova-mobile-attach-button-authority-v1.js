@@ -74,7 +74,7 @@
     }
 
     function bind() {
-        const button = getAttachButton();
+        let button = getAttachButton();
         const input = getFileInput();
 
         if (!button || !input) {
@@ -83,13 +83,50 @@
 
         ensureInputReady(input);
 
+        if (button.dataset.novaAttachAuthorityCleanClone !== "1") {
+            const clone = button.cloneNode(true);
+
+            clone.dataset.novaAttachAuthorityCleanClone = "1";
+            clone.dataset.novaAttachAuthorityBound = "0";
+            clone.id = "nova-mobile-attach";
+
+            try {
+                button.replaceWith(clone);
+                button = clone;
+                log("[Nova Attach Button Authority] replaced old attach button with clean clone");
+            } catch (error) {
+                log("[Nova Attach Button Authority] clone replace failed", error);
+            }
+        }
+
         if (button.dataset.novaAttachAuthorityBound === "1") {
             return true;
         }
 
         button.dataset.novaAttachAuthorityBound = "1";
 
+        button.onclick = openPicker;
+        button.onpointerup = openPicker;
+        button.ontouchend = openPicker;
+
         button.addEventListener("click", openPicker, true);
+        button.addEventListener("pointerup", openPicker, true);
+        button.addEventListener("touchend", openPicker, true);
+
+        input.addEventListener("change", function () {
+            log("[Nova Attach Button Authority] selected files", input.files && input.files.length, input.files && input.files[0]);
+        }, true);
+
+        log("[Nova Attach Button Authority] bound clean attach button", { button: button.id || button.className, input: input.id || input.className });
+
+        return true;
+    }
+
+        button.dataset.novaAttachAuthorityBound = "1";
+
+        button.addEventListener("click", openPicker, true);
+        button.addEventListener("pointerup", openPicker, true);
+        button.addEventListener("touchend", openPicker, true);
 
         input.addEventListener("change", function () {
             log("[Nova Attach Button Authority] selected files", input.files && input.files.length, input.files && input.files[0]);
@@ -126,3 +163,5 @@
 
     log("[Nova Attach Button Authority] installed");
 })();
+
+
