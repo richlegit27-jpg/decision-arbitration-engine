@@ -20456,6 +20456,112 @@ except Exception:
 
 
 
+
+
+# NOVA_ATTACHMENT_CAPABILITY_STATUS_ROUTE_20260705
+@app.route("/api/attachment/status", methods=["GET"])
+def api_attachment_status():
+    try:
+        from flask import jsonify
+
+        modules = {
+            "upload_response_normalizer": False,
+            "payload_normalizer": False,
+            "hydrator": False,
+            "context_builder": False,
+            "intent_guard": False,
+            "web_guard": False,
+        }
+
+        details = {}
+
+        try:
+            from nova_backend.services.upload_attachment_response_normalizer import (
+                normalize_upload_response_payload,
+            )
+
+            modules["upload_response_normalizer"] = callable(normalize_upload_response_payload)
+        except Exception as exc:
+            details["upload_response_normalizer_error"] = str(exc)
+
+        try:
+            from nova_backend.services.chat_attachment_payload_normalizer import (
+                normalize_api_chat_attachments,
+            )
+
+            modules["payload_normalizer"] = callable(normalize_api_chat_attachments)
+        except Exception as exc:
+            details["payload_normalizer_error"] = str(exc)
+
+        try:
+            from nova_backend.services.chat_turn_attachment_hydrator import (
+                hydrate_attachments_for_context,
+            )
+
+            modules["hydrator"] = callable(hydrate_attachments_for_context)
+        except Exception as exc:
+            details["hydrator_error"] = str(exc)
+
+        try:
+            from nova_backend.services.chat_turn_attachment_context import (
+                build_attachment_context_text,
+            )
+
+            modules["context_builder"] = callable(build_attachment_context_text)
+        except Exception as exc:
+            details["context_builder_error"] = str(exc)
+
+        try:
+            from nova_backend.services.chat_attachment_intent_guard import (
+                should_suppress_web_for_attachment,
+            )
+
+            modules["intent_guard"] = callable(should_suppress_web_for_attachment)
+        except Exception as exc:
+            details["intent_guard_error"] = str(exc)
+
+        try:
+            from nova_backend.services.chat_service import ChatService
+
+            modules["web_guard"] = bool(
+                getattr(ChatService, "_nova_attachment_guard_web_suppression_installed", False)
+                or getattr(ChatService, "_nova_attachment_guard_web_routing_suppression_installed", False)
+            )
+        except Exception as exc:
+            details["web_guard_error"] = str(exc)
+
+        ready = all(modules.values())
+
+        return jsonify(
+            {
+                "ok": True,
+                "ready": ready,
+                "attachment_pipeline": modules,
+                "debug_routes_require_env": True,
+                "debug_env": "NOVA_DEBUG_ROUTES=1",
+                "details": details,
+            }
+        )
+    except Exception as exc:
+        try:
+            from flask import jsonify
+
+            return jsonify(
+                {
+                    "ok": False,
+                    "ready": False,
+                    "error": str(exc),
+                }
+            ), 500
+        except Exception:
+            return {
+                "ok": False,
+                "ready": False,
+                "error": str(exc),
+            }, 500
+
+
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
