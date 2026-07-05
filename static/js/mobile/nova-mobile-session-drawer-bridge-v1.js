@@ -186,6 +186,13 @@
     const hiddenSessionOverlays = [];
 
     function isProbablyLogoutOverlay(el) {
+        if (el && (
+            el.id === "nova-mobile-auth-chip" ||
+            el.id === "nova-mobile-auth-logout" ||
+            el.id === "nova-auth-workmode-panel"
+        )) {
+            return true;
+        }
         if (!el || el.id === DRAWER_ID) {
             return false;
         }
@@ -245,6 +252,38 @@
             el.style.setProperty("pointer-events", "none", "important");
 
             hiddenSessionOverlays.push(el);
+        });
+    }
+
+
+    function hideKnownAuthChipIds() {
+        [
+            "nova-mobile-auth-chip",
+            "nova-mobile-auth-logout",
+            "nova-auth-workmode-panel"
+        ].forEach(function (id) {
+            const el = document.getElementById(id);
+            if (!el) {
+                return;
+            }
+
+            try {
+                if (document.activeElement === el || el.contains(document.activeElement)) {
+                    document.activeElement.blur();
+                }
+            } catch (_) {}
+
+            if (el.dataset.novaSessionOverlayHidden !== "1") {
+                el.dataset.novaSessionOverlayHidden = "1";
+                el.dataset.novaSessionOldDisplay = el.style.display || "";
+                el.dataset.novaSessionOldVisibility = el.style.visibility || "";
+                el.dataset.novaSessionOldPointerEvents = el.style.pointerEvents || "";
+                hiddenSessionOverlays.push(el);
+            }
+
+            el.style.setProperty("display", "none", "important");
+            el.style.setProperty("visibility", "hidden", "important");
+            el.style.setProperty("pointer-events", "none", "important");
         });
     }
 
@@ -322,6 +361,7 @@
     function openDrawer() {
         hideOldLaunchers();
         hideBlockingSessionOverlays();
+        hideKnownAuthChipIds();
 
         const drawer = ensureDrawer();
 
@@ -546,8 +586,9 @@
         close: closeDrawer
     };
 
-    console.log(LOG, "installed focus-safe close");
+    console.log(LOG, "installed auth-chip-hide");
 })();
+
 
 
 
