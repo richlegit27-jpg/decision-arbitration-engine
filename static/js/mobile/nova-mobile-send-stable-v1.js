@@ -1,7 +1,7 @@
 ﻿(function () {
     "use strict";
 
-    var VERSION = "send-stable-universal-attachment-collector-20260705-004";
+    var VERSION = "send-single-upload-owner-20260705";
     window.__NOVA_MOBILE_SEND_STABLE_V1_20260703__ = VERSION;
 
     var inFlight = false;
@@ -569,11 +569,19 @@ fetch("/api/chat", {
         var responsePayload = JSON.parse(raw);
         var reply = extractReply(responsePayload) || "[empty response]";
 
-        appendMessage("assistant", reply);
+appendMessage("assistant", reply);
 
-        clearPendingAttachmentsAfterSend();
+try {
+    window.NovaMobileUpload?.clearPendingAttachments?.();
+} catch (_) {}
 
-        log("sent", sid);
+try {
+    window.NovaMobileUpload?.clear?.();
+} catch (_) {}
+
+clearPendingAttachmentsAfterSend();
+
+log("sent", sid);
     });
 }).catch(function (err) {
     appendMessage("system", "Send failed: " + (err && err.message ? err.message : String(err)));
@@ -652,6 +660,7 @@ fetch("/api/chat", {
 
     log("ready", VERSION);
 })();
+
 
 
 
