@@ -134,18 +134,44 @@
                 button.getAttribute("title") || ""
             ].join(" ");
 
-${indent}if (button.id === "nova-mobile-sessions-toggle") {
-${indent}    button.removeAttribute("data-nova-hidden-by-sessions-final");
-${indent}    button.style.removeProperty("display");
-${indent}    button.style.setProperty("display", "inline-flex", "important");
-${indent}    button.style.setProperty("pointer-events", "auto", "important");
-${indent}    return;
-${indent}}
+            if (button.id === "nova-mobile-sessions-toggle") {
 
-${indent}if (/session/i.test(text)) {
-${indent}    button.style.display = "none";
-${indent}    button.dataset.novaHiddenBySessionsFinal = "1";
-${indent}}
+
+                button.removeAttribute("data-nova-hidden-by-sessions-final");
+
+
+                button.style.removeProperty("display");
+
+
+                button.style.setProperty("display", "inline-flex", "important");
+
+
+                button.style.setProperty("visibility", "visible", "important");
+
+
+                button.style.setProperty("opacity", "1", "important");
+
+
+                button.style.setProperty("pointer-events", "auto", "important");
+
+
+                return;
+
+
+            }
+
+
+
+            if (/session/i.test(text)) {
+
+
+                button.style.display = "none";
+
+
+                button.dataset.novaHiddenBySessionsFinal = "1";
+
+
+            }
         });
     }
 
