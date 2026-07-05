@@ -4350,10 +4350,51 @@ composer.style.setProperty("overflow", "visible", "important");
 })();
 </script>
 <!-- NOVA_MOBILE_SESSIONS_HEADER_VISIBLE_20260705 -->
+
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_MOBILE_SESSION_HEADER_TO_FINAL_OWNER_BRIDGE_20260705__) {
+        return;
+    }
+
+    window.__NOVA_MOBILE_SESSION_HEADER_TO_FINAL_OWNER_BRIDGE_20260705__ = true;
+
+    function openRealSessionsOwner(event) {
+        const headerButton = event.target && event.target.closest
+            ? event.target.closest("#nova-mobile-sessions-toggle")
+            : null;
+
+        if (!headerButton) {
+            return;
+        }
+
+        const ownerButton = document.getElementById("nova-mobile-sessions-final-button-v1");
+
+        if (!ownerButton || ownerButton === headerButton) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (typeof event.stopImmediatePropagation === "function") {
+            event.stopImmediatePropagation();
+        }
+
+        ownerButton.click();
+    }
+
+    document.addEventListener("click", openRealSessionsOwner, true);
+})();
+</script>
+<!-- NOVA_MOBILE_SESSION_HEADER_TO_FINAL_OWNER_BRIDGE_20260705 -->
 </body>
 </html>
 
 <!-- DEPLOY_MARKER_UPLOAD_MENU_OWNER_EE1B706_20260705 -->
+
 
 
 
