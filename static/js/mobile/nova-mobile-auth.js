@@ -1,4 +1,41 @@
-﻿/* NOVA_MOBILE_AUTH_GUARD_20260610 */
+﻿(function () {
+    "use strict";
+
+    window.NOVA_MOBILE_AUTH_HEADER_UI_DISABLED_20260705 = true;
+
+    function removeDeadAuthHeaderControls() {
+        [
+            "nova-mobile-account-top-disabled-20260705",
+            "nova-mobile-auth-logout-disabled-20260705",
+            "nova-auth-workmode-register-v2-disabled-20260705"
+        ].forEach(function (id) {
+            document.querySelectorAll("#" + id).forEach(function (el) {
+                el.remove();
+            });
+        });
+
+        document.querySelectorAll(".nova-mobile-auth-chip").forEach(function (el) {
+            el.remove();
+        });
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", removeDeadAuthHeaderControls);
+    } else {
+        removeDeadAuthHeaderControls();
+    }
+
+    window.addEventListener("load", removeDeadAuthHeaderControls);
+    window.addEventListener("pageshow", removeDeadAuthHeaderControls);
+
+    try {
+        new MutationObserver(removeDeadAuthHeaderControls).observe(document.documentElement, {
+            childList: true,
+            subtree: true
+        });
+    } catch (err) {}
+})();
+/* NOVA_MOBILE_AUTH_GUARD_20260610 */
 (function () {
     "use strict";
 
@@ -140,13 +177,13 @@
             chip.className = "nova-mobile-auth-chip";
             chip.innerHTML = `
                 <span id="nova-mobile-auth-name"></span>
-                <button id="nova-mobile-auth-logout" type="button">Logout</button>
+                <button id="nova-mobile-auth-logout-disabled-20260705" type="button">Logout</button>
             `;
             document.body.appendChild(chip);
         }
 
         const name = document.getElementById("nova-mobile-auth-name");
-        const logout = document.getElementById("nova-mobile-auth-logout");
+        const logout = document.getElementById("nova-mobile-auth-logout-disabled-20260705");
 
         if (name) {
             name.textContent = username ? `@${username}` : "Signed in";
@@ -220,6 +257,7 @@
         refreshMobileAuth();
     }
 })();
+
 
 
 
