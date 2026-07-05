@@ -5,6 +5,9 @@
 
     function removeDeadAuthHeaderControls() {
         [
+            "nova-mobile-account-top",
+            "nova-mobile-auth-logout",
+            "nova-auth-workmode-register-v2",
             "nova-mobile-account-top-disabled-20260705",
             "nova-mobile-auth-logout-disabled-20260705",
             "nova-auth-workmode-register-v2-disabled-20260705"
@@ -257,6 +260,7 @@
         refreshMobileAuth();
     }
 })();
+
 
 
 
