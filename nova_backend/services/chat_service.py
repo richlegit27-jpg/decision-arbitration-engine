@@ -11629,7 +11629,43 @@ if (not attachments) and (__name__ == "__main__"):
             )
             for attempt in attempts:
                 try:
-                    return attempt()
+                    result = attempt()
+
+                    text = ""
+                    if isinstance(result, dict):
+                        text = (
+                            result.get("text")
+                            or result.get("answer")
+                            or result.get("content")
+                            or ""
+                        )
+
+                    if "No verified fresh web results were retrieved" in text:
+                        fallback = (
+                            "I could not verify live hours for that exact location from the current web route. "
+                            "Check Google Maps or the official Tim Hortons store locator for the most current "
+                            "open/closed status. For a better check, include the exact address or nearby cross street."
+                        )
+
+                        if isinstance(result, dict):
+                            result["text"] = fallback
+                            result["answer"] = fallback
+                            result["content"] = fallback
+                            result["route"] = "live_store_hours"
+                            result["verified"] = False
+                            return result
+
+                        return {
+                            "ok": True,
+                            "text": fallback,
+                            "answer": fallback,
+                            "content": fallback,
+                            "route": "live_store_hours",
+                            "verified": False,
+                        }
+
+                    return result
+
                 except TypeError:
                     continue
 
