@@ -182,6 +182,109 @@
         return drawer;
     }
 
+
+    const hiddenSessionOverlays = [];
+
+    function isProbablyLogoutOverlay(el) {
+        if (!el || el.id === DRAWER_ID) {
+            return false;
+        }
+
+        if (el.closest && el.closest("#" + DRAWER_ID)) {
+            return false;
+        }
+
+        const text = String(el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+        const idClass = String((el.id || "") + " " + (el.className || "")).toLowerCase();
+
+        const looksAuth =
+            text === "logout" ||
+            text === "log out" ||
+            text.includes("logout") ||
+            text.includes("log out") ||
+            idClass.includes("logout") ||
+            idClass.includes("auth") ||
+            idClass.includes("account");
+
+        if (!looksAuth) {
+            return false;
+        }
+
+        try {
+            const cs = getComputedStyle(el);
+            const z = parseInt(cs.zIndex || "0", 10) || 0;
+            return (cs.position === "fixed" || cs.position === "absolute" || z > 1000);
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function hideBlockingSessionOverlays() {
+        document.querySelectorAll("button, a, div, nav, aside").forEach(function (el) {
+            if (!isProbablyLogoutOverlay(el)) {
+                return;
+            }
+
+            if (el.dataset.novaSessionOverlayHidden === "1") {
+                return;
+            }
+
+            try {
+                if (document.activeElement === el || el.contains(document.activeElement)) {
+                    document.activeElement.blur();
+                }
+            } catch (_) {}
+
+            el.dataset.novaSessionOverlayHidden = "1";
+            el.dataset.novaSessionOldDisplay = el.style.display || "";
+            el.dataset.novaSessionOldVisibility = el.style.visibility || "";
+            el.dataset.novaSessionOldPointerEvents = el.style.pointerEvents || "";
+
+            el.style.setProperty("display", "none", "important");
+            el.style.setProperty("visibility", "hidden", "important");
+            el.style.setProperty("pointer-events", "none", "important");
+
+            hiddenSessionOverlays.push(el);
+        });
+    }
+
+    function restoreBlockingSessionOverlays() {
+        while (hiddenSessionOverlays.length) {
+            const el = hiddenSessionOverlays.pop();
+
+            if (!el || el.dataset.novaSessionOverlayHidden !== "1") {
+                continue;
+            }
+
+            const oldDisplay = el.dataset.novaSessionOldDisplay || "";
+            const oldVisibility = el.dataset.novaSessionOldVisibility || "";
+            const oldPointerEvents = el.dataset.novaSessionOldPointerEvents || "";
+
+            if (oldDisplay) {
+                el.style.display = oldDisplay;
+            } else {
+                el.style.removeProperty("display");
+            }
+
+            if (oldVisibility) {
+                el.style.visibility = oldVisibility;
+            } else {
+                el.style.removeProperty("visibility");
+            }
+
+            if (oldPointerEvents) {
+                el.style.pointerEvents = oldPointerEvents;
+            } else {
+                el.style.removeProperty("pointer-events");
+            }
+
+            delete el.dataset.novaSessionOverlayHidden;
+            delete el.dataset.novaSessionOldDisplay;
+            delete el.dataset.novaSessionOldVisibility;
+            delete el.dataset.novaSessionOldPointerEvents;
+        }
+    }
+
     function closeDrawer() {
         const drawer = ensureDrawer();
 
@@ -190,11 +293,14 @@
         drawer.classList.remove("is-open");
         drawer.style.setProperty("display", "none", "important");
 
+        restoreBlockingSessionOverlays();
+
         console.log(LOG, "closed");
     }
 
     function openDrawer() {
         hideOldLaunchers();
+        hideBlockingSessionOverlays();
 
         const drawer = ensureDrawer();
 
@@ -421,4 +527,5 @@
 
     console.log(LOG, "installed");
 })();
+
 
