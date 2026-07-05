@@ -392,12 +392,15 @@
         }
 
         attach.removeAttribute("type");
-        attach.setAttribute("for", INPUT_ID);
-        attach.htmlFor = INPUT_ID;
         attach.style.setProperty("position", "relative", "important");
-        attach.style.setProperty("overflow", "hidden", "important");
+        attach.style.setProperty("overflow", "visible", "important");
         attach.style.setProperty("pointer-events", "auto", "important");
         attach.style.setProperty("cursor", "pointer", "important");
+        attach.style.setProperty("touch-action", "manipulation", "important");
+
+        if (attach.tagName === "LABEL") {
+            attach.setAttribute("for", INPUT_ID);
+        }
 
         if (input.parentElement !== attach) {
             attach.appendChild(input);
@@ -411,38 +414,24 @@
         input.style.cssText = [
             "display:block !important",
             "visibility:visible !important",
-            "position:absolute !important",
-            "left:0 !important",
-            "top:0 !important",
-            "right:auto !important",
-            "bottom:auto !important",
-            "inset:0 auto auto 0 !important",
-            "width:100% !important",
-            "height:100% !important",
-            "min-width:100% !important",
-            "min-height:100% !important",
-            "max-width:none !important",
-            "max-height:none !important",
-            "opacity:0.01 !important",
-            "z-index:2147483647 !important",
-            "pointer-events:auto !important",
-            "cursor:pointer !important",
-            "margin:0 !important",
-            "padding:0 !important",
-            "border:0 !important",
-            "appearance:none !important",
-            "-webkit-appearance:none !important"
+            "position:fixed !important",
+            "left:-9999px !important",
+            "top:-9999px !important",
+            "width:1px !important",
+            "height:1px !important",
+            "opacity:0 !important",
+            "z-index:-1 !important",
+            "pointer-events:none !important"
         ].join("; ");
     }
-
     function installNativeAttachClickFallback() {
         const attach = document.getElementById(ATTACH_ID);
 
-        if (!attach || attach.dataset.novaStaticAttachClickFallback === "1") {
+        if (!attach || attach.dataset.novaStaticAttachClickFallback === "button-trigger-v2") {
             return;
         }
 
-        attach.dataset.novaStaticAttachClickFallback = "1";
+        attach.dataset.novaStaticAttachClickFallback = "button-trigger-v2";
 
         function openNativePickerFromUserEvent(event) {
             const input = document.getElementById(INPUT_ID);
@@ -453,17 +442,17 @@
 
             forceNativeInputOverAttach();
 
-            event.preventDefault();
-            event.stopPropagation();
+            if (event) {
+                event.stopPropagation();
+            }
 
             input.click();
         }
 
-        attach.addEventListener("click", openNativePickerFromUserEvent, true);
         attach.addEventListener("pointerup", openNativePickerFromUserEvent, true);
         attach.addEventListener("touchend", openNativePickerFromUserEvent, true);
+        attach.addEventListener("click", openNativePickerFromUserEvent, true);
     }
-
     function scheduleNativeAttachReclaim() {
         forceNativeInputOverAttach();
         installNativeAttachClickFallback();
@@ -503,6 +492,7 @@
         install();
     }
 })();
+
 
 
 
