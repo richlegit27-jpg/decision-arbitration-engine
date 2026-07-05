@@ -416,7 +416,38 @@ function clearPendingAttachmentsAfterSend() {
             } catch (_) {}
         }
 
+var bridgeAttachments = [];
+
+try {
+    bridgeAttachments = window.NovaMobileUpload?.getPendingAttachments?.() || [];
+} catch (_) {
+    bridgeAttachments = [];
+}
+
 var pendingAttachments = collectPendingAttachments();
+
+console.log("[Nova Send Stable] ATTACHMENT SOURCES", {
+    bridgeCount: Array.isArray(bridgeAttachments) ? bridgeAttachments.length : -1,
+    collectCount: Array.isArray(pendingAttachments) ? pendingAttachments.length : -1,
+    bridgeAttachments: bridgeAttachments,
+    collectedAttachments: pendingAttachments,
+    novaMobileUpload: window.NovaMobileUpload,
+    pendingA: window.NovaMobilePendingAttachments,
+    pendingB: window.__novaMobilePendingAttachments,
+    pendingC: window.NovaMobileSharedAttachments,
+    localUpload: localStorage.getItem("nova_mobile_upload"),
+    localPending: localStorage.getItem("nova_mobile_pending_attachments")
+});
+
+if (
+    Array.isArray(bridgeAttachments) &&
+    bridgeAttachments.length &&
+    (!Array.isArray(pendingAttachments) || !pendingAttachments.length)
+) {
+    pendingAttachments = bridgeAttachments.map(function (item) {
+        return normalizeAttachmentForSend(item) || item;
+    }).filter(Boolean);
+}
 
 var payload = {
     message: text,
