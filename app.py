@@ -20077,32 +20077,14 @@ except Exception as _nvcvr_error:
         pass
 
 # NOVA_CHAT_TURN_DEBUG_ROUTE_20260705
+# NOVA_CHAT_TURN_DEBUG_ROUTE_GLOBAL_20260705
 @app.route("/api/debug/chat-turn-shadow", methods=["GET"])
 def api_debug_chat_turn_shadow():
     try:
         from flask import jsonify
         from nova_backend.services.chat_service import ChatService
 
-        target = None
-
-        for value in globals().values():
-            if isinstance(value, ChatService):
-                target = value
-                break
-
-            if hasattr(value, "get_chat_turn_shadow_snapshot"):
-                target = value
-                break
-
-        if target is None:
-            return jsonify(
-                {
-                    "ok": False,
-                    "error": "No ChatService instance with chat turn shadow snapshot was found.",
-                }
-            ), 404
-
-        return jsonify(target.get_chat_turn_shadow_snapshot())
+        return jsonify(ChatService.get_global_chat_turn_shadow_snapshot())
 
     except Exception as error:
         try:
@@ -20114,5 +20096,4 @@ def api_debug_chat_turn_shadow():
             ), 500
         except Exception:
             return {"ok": False, "error": str(error)}, 500
-
 

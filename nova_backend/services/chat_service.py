@@ -147,6 +147,15 @@ def exec_debug(*args):
 
 class ChatService:
 
+    @classmethod
+    def get_global_chat_turn_shadow_snapshot(cls):
+        # NOVA_CHAT_TURN_GLOBAL_DEBUG_SNAPSHOT_20260705
+        instance = cls.__new__(cls)
+        instance._last_chat_turn_shadow = getattr(cls, "_nova_last_chat_turn_shadow", None)
+        instance._last_chat_turn_messages_shadow = getattr(cls, "_nova_last_chat_turn_messages_shadow", [])
+        return instance.get_chat_turn_shadow_snapshot()
+
+
     def get_chat_turn_shadow_snapshot(self):
         # NOVA_CHAT_TURN_DEBUG_SNAPSHOT_20260705
         turn = getattr(self, "_last_chat_turn_shadow", None)
@@ -242,6 +251,13 @@ class ChatService:
 
         self._last_chat_turn_shadow = turn
         self._last_chat_turn_messages_shadow = messages
+
+        # NOVA_CHAT_TURN_GLOBAL_SNAPSHOT_SET_20260705
+        try:
+            self.__class__._nova_last_chat_turn_shadow = turn
+            self.__class__._nova_last_chat_turn_messages_shadow = messages
+        except Exception:
+            pass
 
         return turn, messages
 
