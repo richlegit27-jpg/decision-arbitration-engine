@@ -149,6 +149,42 @@ def exec_debug(*args):
 
 class ChatService:
 
+    def _nova_build_chat_turn_shadow(
+        self,
+        payload=None,
+        *,
+        history=None,
+        memory=None,
+        attachment_context=None,
+        tool_results=None,
+        metadata=None,
+    ):
+        # NOVA_CHAT_TURN_HELPER_20260705
+        if not isinstance(payload, dict):
+            payload = {}
+
+        turn = build_chat_turn_from_request(
+            payload,
+            history=history or [],
+            memory=memory or [],
+            attachment_context=attachment_context or [],
+            tool_results=tool_results or [],
+            model=str(
+                getattr(self, "chat_model", "")
+                or getattr(self, "model", "")
+                or ""
+            ),
+            metadata=metadata or {"source": "chat_service.shadow_helper"},
+        )
+
+        messages = build_model_messages(turn)
+
+        self._last_chat_turn_shadow = turn
+        self._last_chat_turn_messages_shadow = messages
+
+        return turn, messages
+
+
     # NOVA_WEB_NEWS_BLOCKS_IMAGE_GENERATION_BRANCHES_20260609
     def _nova_is_web_news_intent_20260609(self, value) -> bool:
         probe = " ".join(str(value or "").split("\n", 1)[0].lower().split())
