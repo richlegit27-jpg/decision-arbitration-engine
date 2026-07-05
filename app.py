@@ -20196,6 +20196,53 @@ except Exception:
 
 
 
+
+
+# NOVA_ATTACHMENT_INTENT_GUARD_DEBUG_ROUTE_20260705
+@app.route("/api/debug/attachment-intent-guard", methods=["POST"])
+def api_debug_attachment_intent_guard():
+    try:
+        if not _nova_debug_routes_enabled():
+            return _nova_debug_routes_disabled_response()
+
+        from flask import jsonify, request
+        from nova_backend.services.chat_attachment_intent_guard import (
+            attachment_guard_metadata,
+        )
+
+        payload = request.get_json(silent=True) or {}
+        user_text = (
+            payload.get("message")
+            or payload.get("text")
+            or payload.get("user_text")
+            or payload.get("prompt")
+            or ""
+        )
+
+        return jsonify(
+            {
+                "ok": True,
+                "guard": attachment_guard_metadata(user_text, payload),
+            }
+        )
+    except Exception as exc:
+        try:
+            from flask import jsonify
+
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": str(exc),
+                }
+            ), 500
+        except Exception:
+            return {
+                "ok": False,
+                "error": str(exc),
+            }, 500
+
+
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
