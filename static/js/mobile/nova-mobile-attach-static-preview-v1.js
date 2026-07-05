@@ -351,6 +351,37 @@
         };
     }
 
+    function hardBindNativeAttach(attach, input) {
+        attach.setAttribute("for", INPUT_ID);
+        attach.htmlFor = INPUT_ID;
+
+        if (input.parentElement !== attach) {
+            attach.appendChild(input);
+        }
+
+        input.id = INPUT_ID;
+        input.type = "file";
+        input.disabled = false;
+        input.removeAttribute("disabled");
+        input.setAttribute("aria-label", "Attach file");
+
+        attach.style.position = "relative";
+        attach.style.overflow = "hidden";
+        attach.style.pointerEvents = "auto";
+        attach.style.cursor = "pointer";
+
+        input.style.display = "block";
+        input.style.visibility = "visible";
+        input.style.position = "absolute";
+        input.style.left = "0";
+        input.style.top = "0";
+        input.style.width = "100%";
+        input.style.height = "100%";
+        input.style.opacity = "0.01";
+        input.style.zIndex = "2147483647";
+        input.style.pointerEvents = "auto";
+        input.style.cursor = "pointer";
+    }
     function install() {
         const attach = document.getElementById(ATTACH_ID);
         const input = document.getElementById(INPUT_ID);
@@ -379,3 +410,4 @@
         install();
     }
 })();
+
