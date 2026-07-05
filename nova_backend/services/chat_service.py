@@ -11607,9 +11607,70 @@ if (not attachments) and (__name__ == "__main__"):
             "Do not say 'I need live store-hours data for that' to the user."
         )
 
+    def _normalize_live_store_hours_result(self, result):
+        """
+        LIVE_STORE_HOURS_FALLBACK_V2
+
+        Cleans generic web-fetch failure text for any business/location hours request.
+        Applies to restaurants, stores, banks, clinics, gas stations, malls, etc.
+        """
+        fallback = (
+            "I could not verify live hours for that exact business or location from the current web route. "
+            "Check Google Maps, the business's official store locator, or the official website for the most "
+            "current open/closed status. For a better check, include the exact address, business name, "
+            "or nearby cross street."
+        )
+
+        if not isinstance(result, dict):
+            return result
+
+        found_text_parts = []
+
+        for key in ("text", "answer", "content"):
+            value = result.get(key)
+            if value:
+                found_text_parts.append(str(value))
+
+        assistant_message = result.get("assistant_message")
+        if isinstance(assistant_message, dict):
+            for key in ("text", "content", "answer"):
+                value = assistant_message.get(key)
+                if value:
+                    found_text_parts.append(str(value))
+
+        combined_text = "\n".join(found_text_parts)
+
+        bad_web_fallback = (
+            "No verified fresh web results were retrieved" in combined_text
+            or "Try a more specific query with a team, person, date, or source" in combined_text
+            or "Use the web route to verify" in combined_text
+        )
+
+        if not bad_web_fallback:
+            return result
+
+        result["text"] = fallback
+        result["answer"] = fallback
+        result["content"] = fallback
+        result["route"] = "live_store_hours"
+        result["verified"] = False
+
+        if isinstance(assistant_message, dict):
+            assistant_message["text"] = fallback
+            assistant_message["content"] = fallback
+            assistant_message["answer"] = fallback
+
+        session = result.get("session")
+        if isinstance(session, dict):
+            working_state = session.get("working_state")
+            if isinstance(working_state, dict):
+                working_state["last_assistant_message"] = fallback
+
+        return result
+
     def _handle_live_store_hours_request(self, user_text: str, session_id: str = "", attachments=None, location=None):
         """
-        Route live business-hours questions through Nova's existing web pipeline.
+        Route live business/location-hours questions through Nova's existing web pipeline.
         """
         web_query = self._rewrite_live_store_hours_query(user_text, location=location)
 
@@ -11627,66 +11688,11 @@ if (not attachments) and (__name__ == "__main__"):
                 lambda: handler(web_query, session_id),
                 lambda: handler(web_query),
             )
+
             for attempt in attempts:
                 try:
                     result = attempt()
-
-                    fallback = (
-                        "I could not verify live hours for that exact location from the current web route. "
-                        "Check Google Maps or the official Tim Hortons store locator for the most current "
-                        "open/closed status. For a better check, include the exact address or nearby cross street."
-                    )
-
-                    found_text_parts = []
-
-                    if isinstance(result, dict):
-                        for key in ("text", "answer", "content"):
-                            value = result.get(key)
-                            if value:
-                                found_text_parts.append(str(value))
-
-                        assistant_message = result.get("assistant_message")
-                        if isinstance(assistant_message, dict):
-                            for key in ("text", "content", "answer"):
-                                value = assistant_message.get(key)
-                                if value:
-                                    found_text_parts.append(str(value))
-
-                    combined_text = "\n".join(found_text_parts)
-
-                    if "No verified fresh web results were retrieved" in combined_text:
-                        if isinstance(result, dict):
-                            result["text"] = fallback
-                            result["answer"] = fallback
-                            result["content"] = fallback
-                            result["route"] = "live_store_hours"
-                            result["verified"] = False
-
-                            assistant_message = result.get("assistant_message")
-                            if isinstance(assistant_message, dict):
-                                assistant_message["text"] = fallback
-                                assistant_message["content"] = fallback
-                                assistant_message["answer"] = fallback
-
-                            session = result.get("session")
-                            if isinstance(session, dict):
-                                working_state = session.get("working_state")
-                                if isinstance(working_state, dict):
-                                    working_state["last_assistant_message"] = fallback
-
-                            return result
-
-                        return {
-                            "ok": True,
-                            "text": fallback,
-                            "answer": fallback,
-                            "content": fallback,
-                            "route": "live_store_hours",
-                            "verified": False,
-                        }
-
-                    return result
-
+                    return self._normalize_live_store_hours_result(result)
                 except TypeError:
                     continue
 
@@ -11698,21 +11704,22 @@ if (not attachments) and (__name__ == "__main__"):
                 lambda: fetcher(web_query, session_id),
                 lambda: fetcher(web_query),
             )
+
             for attempt in attempts:
                 try:
-                    return attempt()
+                    result = attempt()
+                    return self._normalize_live_store_hours_result(result)
                 except TypeError:
                     continue
 
-        return {
+        return self._normalize_live_store_hours_result({
             "ok": True,
-            "answer": (
-                "I could not verify live hours for that exact business from the current web route. "
-                "Please check Google Maps or the official store locator for the most current open/closed status."
-            ),
+            "text": "No verified fresh web results were retrieved.",
+            "answer": "No verified fresh web results were retrieved.",
+            "content": "No verified fresh web results were retrieved.",
             "route": "live_store_hours",
             "verified": False,
-        }
+        })
 
 
     def handle(self, user_text: str, session_id: str = "", attachments=None):
