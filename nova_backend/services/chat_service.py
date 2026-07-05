@@ -1,3 +1,4 @@
+from nova_backend.services.chat_turn_pipeline import build_chat_turn_from_request
 
 from __future__ import annotations
 
@@ -11747,6 +11748,30 @@ if (not attachments) and (__name__ == "__main__"):
 
 
     def handle(self, user_text: str, session_id: str = "", attachments=None):
+
+        # NOVA_CHAT_TURN_PIPELINE_SHADOW_20260705
+        try:
+            _nova_turn_payload = {
+                _key: _value
+                for _key, _value in locals().items()
+                if _key != "self"
+            }
+            self._last_chat_turn_shadow = build_chat_turn_from_request(
+                _nova_turn_payload,
+                model=str(
+                    getattr(self, "chat_model", "")
+                    or getattr(self, "model", "")
+                    or ""
+                ),
+                metadata={"source": "chat_service.handle.shadow"},
+            )
+        except Exception as _nova_turn_error:
+            self._last_chat_turn_shadow = None
+            try:
+                print("[Nova ChatTurn Shadow] failed:", _nova_turn_error)
+            except Exception:
+                pass
+
 
         # LIVE_STORE_HOURS_ROUTE_V1: force current business hours/open-now questions to web.
         if self._looks_like_live_store_hours_request(user_text):
