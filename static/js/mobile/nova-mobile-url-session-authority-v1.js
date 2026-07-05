@@ -170,3 +170,82 @@
     setTimeout(forceUrlSession, 800);
     setTimeout(forceUrlSession, 1800);
 })();
+
+/* NOVA_URL_AUTHORITY_TOP_LAYOUT_BRIDGE_V1_START */
+(function () {
+    "use strict";
+
+    if (window.__NOVA_URL_AUTHORITY_TOP_LAYOUT_BRIDGE_V1_20260704__) {
+        return;
+    }
+
+    window.__NOVA_URL_AUTHORITY_TOP_LAYOUT_BRIDGE_V1_20260704__ = true;
+
+    let scheduled = false;
+
+    function applyTopLayout(reason) {
+        if (scheduled) {
+            return;
+        }
+
+        scheduled = true;
+
+        requestAnimationFrame(function () {
+            scheduled = false;
+
+            try {
+                if (
+                    window.NovaMobileTopButtonLayoutV3 &&
+                    typeof window.NovaMobileTopButtonLayoutV3.apply === "function"
+                ) {
+                    window.NovaMobileTopButtonLayoutV3.apply();
+
+                    setTimeout(function () {
+                        try {
+                            window.NovaMobileTopButtonLayoutV3.apply();
+                        } catch (_) {}
+                    }, 80);
+
+                    console.log("[Nova URL Authority Top Layout Bridge V1] applied", reason);
+                }
+            } catch (err) {
+                console.warn("[Nova URL Authority Top Layout Bridge V1] failed", err);
+            }
+        });
+    }
+
+    window.NovaUrlAuthorityApplyTopLayoutV1 = applyTopLayout;
+
+    function startObserver() {
+        if (!document.body) {
+            setTimeout(startObserver, 50);
+            return;
+        }
+
+        const observer = new MutationObserver(function () {
+            applyTopLayout("mutation");
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+
+        applyTopLayout("boot");
+
+        setTimeout(function () { applyTopLayout("late-250"); }, 250);
+        setTimeout(function () { applyTopLayout("late-750"); }, 750);
+        setTimeout(function () { applyTopLayout("late-1500"); }, 1500);
+        setTimeout(function () { applyTopLayout("late-3000"); }, 3000);
+
+        console.log("[Nova URL Authority Top Layout Bridge V1] installed");
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", startObserver, { once: true });
+    } else {
+        startObserver();
+    }
+})();
+/* NOVA_URL_AUTHORITY_TOP_LAYOUT_BRIDGE_V1_END */
+
