@@ -11785,35 +11785,22 @@ if (not attachments) and (__name__ == "__main__"):
 
     def handle(self, user_text: str, session_id: str = "", attachments=None):
 
-        # NOVA_CHAT_TURN_PIPELINE_SHADOW_20260705
+        # NOVA_CHAT_TURN_HANDLE_HELPER_SHADOW_20260705
         try:
             _nova_turn_payload = {
                 _key: _value
                 for _key, _value in locals().items()
                 if _key != "self"
             }
-            self._last_chat_turn_shadow = build_chat_turn_from_request(
+            self._nova_build_chat_turn_shadow(
                 _nova_turn_payload,
-                model=str(
-                    getattr(self, "chat_model", "")
-                    or getattr(self, "model", "")
-                    or ""
-                )
-
-            # NOVA_CHAT_TURN_MESSAGES_SHADOW_20260705
-
-            self._last_chat_turn_messages_shadow = build_model_messages(
-
-                self._last_chat_turn_shadow
-
-            )
-,
                 metadata={"source": "chat_service.handle.shadow"},
             )
         except Exception as _nova_turn_error:
             self._last_chat_turn_shadow = None
+            self._last_chat_turn_messages_shadow = []
             try:
-                print("[Nova ChatTurn Shadow] failed:", _nova_turn_error)
+                print("[Nova ChatTurn Shadow Helper] failed:", _nova_turn_error)
             except Exception:
                 pass
 
