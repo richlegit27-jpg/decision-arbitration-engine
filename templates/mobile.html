@@ -4525,6 +4525,96 @@ composer.style.setProperty("overflow", "visible", "important");
 <script src="/static/js/mobile/nova-mobile-attachment-boot-reset-v1.js?v=attachment-boot-reset-v1-20260705"></script>
 <script src="/static/js/mobile/nova-mobile-upload-change-authority-v1.js?v=upload-change-authority-v1-20260705"></script>
 <script src="/static/js/mobile/nova-mobile-plus-menu-reliability-v1.js?v=plus-menu-reliability-v1-20260705"></script>
+
+<script>
+/* NOVA_MOBILE_ATTACH_MENU_OWNER_FINAL_20260705 */
+(function () {
+    "use strict";
+
+    if (window.NovaMobileAttachMenuOwnerFinal20260705) {
+        return;
+    }
+
+    window.NovaMobileAttachMenuOwnerFinal20260705 = true;
+
+    const TAG = "[Nova Attach Menu Owner Final]";
+
+    function findAttachButton() {
+        return (
+            document.getElementById("nova-mobile-attach") ||
+            document.querySelector("[data-mobile-attach]") ||
+            document.querySelector("[data-action='attach']")
+        );
+    }
+
+    function findAttachmentMenu() {
+        return (
+            document.getElementById("nova-mobile-attachment-menu") ||
+            document.getElementById("mobileAttachmentMenu") ||
+            document.querySelector("[data-mobile-attachment-menu]") ||
+            document.querySelector("[data-nova-attachment-menu]") ||
+            document.querySelector(".nova-mobile-attachment-menu") ||
+            document.querySelector(".mobile-attachment-menu")
+        );
+    }
+
+    function openMenu(event) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+        }
+
+        const button = findAttachButton();
+        const menu = findAttachmentMenu();
+
+        if (!button) {
+            console.warn(TAG, "missing attach button");
+            return false;
+        }
+
+        if (!menu) {
+            console.warn(TAG, "missing attachment menu");
+            return false;
+        }
+
+        menu.hidden = false;
+        menu.removeAttribute("hidden");
+        menu.setAttribute("aria-hidden", "false");
+        menu.classList.add("open", "is-open", "active", "visible", "show");
+
+        button.setAttribute("aria-expanded", "true");
+
+        console.log(TAG, "opened menu only");
+
+        return false;
+    }
+
+    function bind() {
+        const button = findAttachButton();
+
+        if (!button || button.dataset.novaAttachMenuOwnerFinal === "1") {
+            return;
+        }
+
+        button.dataset.novaAttachMenuOwnerFinal = "1";
+
+        button.onclick = openMenu;
+
+        button.addEventListener("pointerdown", openMenu, true);
+        button.addEventListener("click", openMenu, true);
+        button.addEventListener("touchend", openMenu, true);
+
+        console.log(TAG, "bound + as menu-only");
+    }
+
+    bind();
+    setTimeout(bind, 300);
+    setTimeout(bind, 1000);
+    document.addEventListener("DOMContentLoaded", bind);
+})();
+</script>
+
 </body>
 </html>
 
