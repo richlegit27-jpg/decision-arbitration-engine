@@ -1,20 +1,18 @@
 ﻿(function () {
     "use strict";
 
-    if (window.__NOVA_MOBILE_ATTACH_NATIVE_LABEL_V1__) {
+    if (window.__NOVA_MOBILE_ATTACH_NATIVE_LABEL_V2__) {
         return;
     }
 
-    window.__NOVA_MOBILE_ATTACH_NATIVE_LABEL_V1__ = true;
+    window.__NOVA_MOBILE_ATTACH_NATIVE_LABEL_V2__ = true;
 
-    const LOG = "[Nova Attach Native Label V1]";
+    const LOG = "[Nova Attach Native Label V2]";
     const BUTTON_ID = "nova-mobile-attach";
     const INPUT_ID = "nova-mobile-file-input";
-    const PREVIEW_ID = "nova-mobile-attach-preview-native-v1";
+    const PREVIEW_ID = "nova-mobile-attach-preview-native-v2";
     const STORE_KEY = "nova_mobile_upload";
     const ACCEPT = "image/*,.txt,.md,.json,.js,.py,.css,.html,.pdf,.docx";
-
-    let fileInput = null;
 
     function keyOf(item) {
         return [
@@ -26,47 +24,33 @@
 
     function dedupe(items) {
         const seen = new Set();
-        const output = [];
 
-        (items || []).forEach(function (item) {
+        return (items || []).filter(function (item) {
             const key = keyOf(item);
 
             if (!key || seen.has(key)) {
-                return;
+                return false;
             }
 
             seen.add(key);
-            output.push(item);
+            return true;
         });
-
-        return output;
     }
 
     function readQueue() {
-        let stored = [];
-
         try {
-            stored = JSON.parse(localStorage.getItem(STORE_KEY) || "[]");
-            if (!Array.isArray(stored)) {
-                stored = [];
-            }
+            const parsed = JSON.parse(localStorage.getItem(STORE_KEY) || "[]");
+            return dedupe(Array.isArray(parsed) ? parsed : []);
         } catch (error) {
-            stored = [];
+            return [];
         }
-
-        return dedupe(stored);
     }
 
     function saveQueue(queue) {
         const clean = dedupe(queue);
 
         window.NovaMobilePendingAttachments = clean;
-
-        try {
-            localStorage.setItem(STORE_KEY, JSON.stringify(clean));
-        } catch (error) {
-            console.warn(LOG, "queue save failed", error);
-        }
+        localStorage.setItem(STORE_KEY, JSON.stringify(clean));
 
         return clean;
     }
@@ -117,21 +101,24 @@
             "nova-mobile-attach-preview-owner-v3",
             "nova-mobile-attach-preview-owner-v4",
             "nova-mobile-attach-preview-safe-v5",
+            "nova-mobile-attach-preview-native-v1",
             "nova-mobile-upload-preview",
             "nova-mobile-preview-bar",
             "mobileAttachPreview",
             "mobile-attach-preview"
         ].forEach(function (id) {
             const el = document.getElementById(id);
+
             if (el && el.id !== PREVIEW_ID) {
                 el.remove();
             }
         });
     }
 
-    function ensurePreviewBar() {
+    function renderPreview() {
         removeOldPreviewBars();
 
+        const queue = saveQueue(readQueue());
         let bar = document.getElementById(PREVIEW_ID);
 
         if (!bar) {
@@ -140,33 +127,18 @@
             document.body.appendChild(bar);
         }
 
+        bar.innerHTML = "";
         bar.style.setProperty("position", "fixed", "important");
         bar.style.setProperty("left", "10px", "important");
         bar.style.setProperty("right", "10px", "important");
         bar.style.setProperty("bottom", "78px", "important");
         bar.style.setProperty("z-index", "999998", "important");
-        bar.style.setProperty("display", "none", "important");
+        bar.style.setProperty("display", queue.length ? "flex" : "none", "important");
         bar.style.setProperty("gap", "8px", "important");
         bar.style.setProperty("align-items", "center", "important");
         bar.style.setProperty("overflow-x", "auto", "important");
         bar.style.setProperty("padding", "6px 2px", "important");
         bar.style.setProperty("pointer-events", "auto", "important");
-
-        return bar;
-    }
-
-    function renderPreview() {
-        const queue = saveQueue(readQueue());
-        const bar = ensurePreviewBar();
-
-        bar.innerHTML = "";
-
-        if (!queue.length) {
-            bar.style.setProperty("display", "none", "important");
-            return;
-        }
-
-        bar.style.setProperty("display", "flex", "important");
 
         queue.forEach(function (item) {
             const chip = document.createElement("div");
@@ -272,8 +244,9 @@
         console.log(LOG, "uploaded", attachment);
     }
 
-    async function handleFiles() {
-        const files = Array.from(fileInput.files || []);
+    async function handleFiles(event) {
+        const input = event.currentTarget;
+        const files = Array.from(input.files || []);
 
         console.log(LOG, "selected files", files.map(function (file) {
             return file.name;
@@ -288,68 +261,91 @@
             }
         }
 
-        fileInput.value = "";
+        input.value = "";
     }
 
-    function replaceAttachButtonWithLabel() {
+    function disableExternalFileInputs(label) {
+        document.querySelectorAll("input[type='file']").forEach(function (old, index) {
+            if (label.contains(old)) {
+                return;
+            }
+
+            old.id = "nova-mobile-old-file-input-" + index;
+            old.disabled = true;
+            old.style.setProperty("display", "none", "important");
+            old.style.setProperty("pointer-events", "none", "important");
+        });
+    }
+
+    function ensureInputInLabel(label) {
+        let input = label.querySelector("input[type='file']");
+
+        if (!input) {
+            input = document.createElement("input");
+            label.appendChild(input);
+        }
+
+        input.type = "file";
+        input.id = INPUT_ID;
+        input.multiple = true;
+        input.accept = ACCEPT;
+        input.disabled = false;
+        input.dataset.novaAttachOwner = "native-label-v2";
+
+        input.removeAttribute("disabled");
+        input.removeAttribute("hidden");
+        input.removeAttribute("inert");
+
+        input.onchange = handleFiles;
+
+        input.style.setProperty("position", "absolute", "important");
+        input.style.setProperty("inset", "0", "important");
+        input.style.setProperty("width", "100%", "important");
+        input.style.setProperty("height", "100%", "important");
+        input.style.setProperty("opacity", "0.01", "important");
+        input.style.setProperty("z-index", "20", "important");
+        input.style.setProperty("pointer-events", "auto", "important");
+        input.style.setProperty("cursor", "pointer", "important");
+
+        return input;
+    }
+
+    function ensureNativeLabel() {
         const existing = document.getElementById(BUTTON_ID);
 
         if (!existing) {
             console.warn(LOG, "attach button missing");
-            return false;
+            return null;
         }
 
-        if (existing.tagName === "LABEL" && existing.dataset.novaAttachOwner === "native-label-v1") {
-            fileInput = document.getElementById(INPUT_ID);
-            return true;
+        let label = existing;
+
+        if (existing.tagName !== "LABEL") {
+            label = document.createElement("label");
+
+            label.id = BUTTON_ID;
+            label.className = existing.className;
+            label.innerHTML = existing.innerHTML || "＋";
+            label.title = existing.title || "Attach file";
+            existing.replaceWith(label);
         }
 
-        document.querySelectorAll("input[type='file']").forEach(function (old, index) {
-            old.id = "nova-mobile-old-file-input-" + index;
-            old.disabled = true;
-            old.style.setProperty("display", "none", "important");
-        });
-
-        const label = document.createElement("label");
-
-        label.id = BUTTON_ID;
-        label.className = existing.className;
-        label.innerHTML = existing.innerHTML || "＋";
-        label.title = existing.title || "Attach file";
         label.setAttribute("role", "button");
         label.setAttribute("aria-label", "Attach file");
-        label.dataset.novaAttachOwner = "native-label-v1";
+        label.dataset.novaAttachOwner = "native-label-v2";
 
-        label.style.cssText = existing.style.cssText || "";
         label.style.setProperty("position", "relative", "important");
         label.style.setProperty("overflow", "hidden", "important");
-        label.style.setProperty("display", getComputedStyle(existing).display === "none" ? "flex" : getComputedStyle(existing).display, "important");
+        label.style.setProperty("display", "flex", "important");
         label.style.setProperty("align-items", "center", "important");
         label.style.setProperty("justify-content", "center", "important");
         label.style.setProperty("pointer-events", "auto", "important");
         label.style.setProperty("cursor", "pointer", "important");
 
-        fileInput = document.createElement("input");
-        fileInput.type = "file";
-        fileInput.id = INPUT_ID;
-        fileInput.multiple = true;
-        fileInput.accept = ACCEPT;
-        fileInput.dataset.novaAttachOwner = "native-label-v1";
-        fileInput.addEventListener("change", handleFiles);
+        ensureInputInLabel(label);
+        disableExternalFileInputs(label);
 
-        fileInput.style.setProperty("position", "absolute", "important");
-        fileInput.style.setProperty("inset", "0", "important");
-        fileInput.style.setProperty("width", "100%", "important");
-        fileInput.style.setProperty("height", "100%", "important");
-        fileInput.style.setProperty("opacity", "0.01", "important");
-        fileInput.style.setProperty("z-index", "5", "important");
-        fileInput.style.setProperty("pointer-events", "auto", "important");
-        fileInput.style.setProperty("cursor", "pointer", "important");
-
-        label.appendChild(fileInput);
-        existing.replaceWith(label);
-
-        return true;
+        return label;
     }
 
     function installApi() {
@@ -363,6 +359,10 @@
             clearQueue: clearQueue,
             getQueue: readQueue,
             renderPreview: renderPreview,
+            repair: function () {
+                ensureNativeLabel();
+                renderPreview();
+            },
             debug: function () {
                 const attach = document.getElementById(BUTTON_ID);
                 const input = document.getElementById(INPUT_ID);
@@ -372,7 +372,7 @@
                     : null;
 
                 return {
-                    installed: "native-label-v1",
+                    installed: "native-label-v2",
                     attachTag: attach ? attach.tagName : "",
                     hasInput: !!input,
                     topId: top ? top.id : "",
@@ -397,11 +397,7 @@
 
     function install() {
         installApi();
-
-        if (!replaceAttachButtonWithLabel()) {
-            return;
-        }
-
+        ensureNativeLabel();
         renderPreview();
 
         console.log(LOG, "installed");
