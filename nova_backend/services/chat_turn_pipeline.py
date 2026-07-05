@@ -313,6 +313,134 @@ def _format_attachment_context(context: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+
+# NOVA_CHAT_PAYLOAD_COERCION_20260705
+NESTED_PAYLOAD_KEYS = (
+    "payload",
+    "data",
+    "request_json",
+    "request_data",
+    "json_data",
+    "body",
+    "kwargs",
+)
+
+
+def _is_session_like(value: Any) -> bool:
+    text = _as_text(value)
+
+    if not text:
+        return False
+
+    if text.startswith("session_"):
+        return True
+
+    if text.startswith("mobile_"):
+        return True
+
+    if " " not in text and len(text) >= 16 and not text.startswith("/"):
+        return True
+
+    return False
+
+
+def _looks_like_attachment_list(value: Any) -> bool:
+    if not isinstance(value, list):
+        return False
+
+    if not value:
+        return False
+
+    return any(
+        isinstance(item, dict) and (
+            item.get("filename")
+            or item.get("name")
+            or item.get("url")
+            or item.get("path")
+            or item.get("mime_type")
+            or item.get("mimeType")
+            or item.get("upload_id")
+            or item.get("id")
+        )
+        for item in value
+    )
+
+
+def _merge_payload_dict(target: dict[str, Any], source: dict[str, Any]) -> None:
+    for key, value in source.items():
+        if key == "self":
+            continue
+
+        if key in NESTED_PAYLOAD_KEYS and isinstance(value, dict):
+            _merge_payload_dict(target, value)
+            continue
+
+        if isinstance(key, str) and key.startswith("arg_"):
+            if isinstance(value, dict):
+                _merge_payload_dict(target, value)
+                continue
+
+            if _is_session_like(value) and not any(target.get(session_key) for session_key in SESSION_KEYS):
+                target["session_id"] = value
+                continue
+
+            if _as_text(value) and not any(target.get(text_key) for text_key in TEXT_KEYS):
+                target["message"] = value
+                continue
+
+        if _looks_like_attachment_list(value) and not any(target.get(attachment_key) for attachment_key in ATTACHMENT_KEYS):
+            target["attachments"] = value
+            continue
+
+        if key not in target or target.get(key) in (None, "", [], {}):
+            target[key] = value
+
+
+def coerce_chat_payload(payload: Any) -> dict[str, Any]:
+    """
+    Convert real ChatService.handle() locals/route payloads into the simple shape
+    the ChatTurn pipeline expects.
+
+    This intentionally accepts messy transitional shapes so /api/chat can move
+    toward one clean backend-owned request object without breaking old callers.
+    """
+    if not isinstance(payload, dict):
+        return {}
+
+    coerced: dict[str, Any] = {}
+
+    # Merge nested request payloads first.
+    for key in NESTED_PAYLOAD_KEYS:
+        value = payload.get(key)
+
+        if isinstance(value, dict):
+            _merge_payload_dict(coerced, value)
+
+    # Then merge top-level values so explicit locals can override empty nested data.
+    _merge_payload_dict(coerced, payload)
+
+    # Common aliases that show up in route/service code.
+    if not coerced.get("message"):
+        for alias in ("input", "question", "q", "content_text"):
+            if _as_text(coerced.get(alias)):
+                coerced["message"] = coerced.get(alias)
+                break
+
+    if not coerced.get("session_id"):
+        for alias in ("sid", "active_session_id", "current_session_id"):
+            if _as_text(coerced.get(alias)):
+                coerced["session_id"] = coerced.get(alias)
+                break
+
+    if not coerced.get("attachments"):
+        for alias in ("uploaded_files", "pending_files", "attachment_queue", "upload_queue"):
+            if coerced.get(alias):
+                coerced["attachments"] = coerced.get(alias)
+                break
+
+    return coerced
+
+
 def build_chat_turn_from_request(
     payload: dict[str, Any],
     *,
@@ -323,8 +451,7 @@ def build_chat_turn_from_request(
     model: str = "",
     metadata: dict[str, Any] | None = None,
 ) -> ChatTurn:
-    if not isinstance(payload, dict):
-        payload = {}
+    payload = coerce_chat_payload(payload)
 
     user_text = normalize_user_text(payload)
     attachments = normalize_attachments(payload)
@@ -421,6 +548,7 @@ __all__ = [
     "build_chat_turn_from_request",
     "build_model_messages",
     "classify_intent",
+    "coerce_chat_payload",
     "normalize_attachments",
     "normalize_session_id",
     "normalize_user_text",
