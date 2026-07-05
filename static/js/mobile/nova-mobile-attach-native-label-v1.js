@@ -303,7 +303,7 @@
         input.style.setProperty("width", "100%", "important");
         input.style.setProperty("height", "100%", "important");
         input.style.setProperty("opacity", "0.01", "important");
-        input.style.setProperty("z-index", "20", "important");
+        input.style.setProperty("z-index", "999999", "important");
         input.style.setProperty("pointer-events", "auto", "important");
         input.style.setProperty("cursor", "pointer", "important");
 
@@ -409,3 +409,4 @@
         install();
     }
 })();
+
