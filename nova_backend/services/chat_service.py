@@ -26187,4 +26187,197 @@ try:
 except Exception:
     pass
 
+# NOVA_ATTACHMENT_GUARD_WEB_ROUTING_SUPPRESSION_20260705
+def _nova_attachment_guard_should_suppress_current_web_call(args=None, kwargs=None):
+    args = args or ()
+    kwargs = kwargs or {}
+
+    try:
+        finder_text = globals().get("_nova_attachment_guard_find_user_text_from_args")
+        finder_payload = globals().get("_nova_attachment_guard_find_payload_from_args")
+
+        if callable(finder_text):
+            user_text = finder_text(args, kwargs)
+        else:
+            user_text = ""
+
+        if callable(finder_payload):
+            payload = finder_payload(args, kwargs)
+        else:
+            payload = None
+
+        if not user_text:
+            for value in args:
+                if isinstance(value, str) and value.strip():
+                    user_text = value
+                    break
+
+        if payload is None:
+            try:
+                from flask import g, has_request_context, request
+
+                if has_request_context():
+                    boundary_attachments = getattr(g, "nova_api_chat_attachments", None) or []
+                    payload_json = request.get_json(silent=True) or {}
+                    payload = boundary_attachments or payload_json
+                    if not user_text:
+                        user_text = (
+                            payload_json.get("message")
+                            or payload_json.get("text")
+                            or payload_json.get("user_text")
+                            or payload_json.get("prompt")
+                            or ""
+                        )
+            except Exception:
+                pass
+
+        from nova_backend.services.chat_attachment_intent_guard import (
+            should_suppress_web_for_attachment,
+        )
+
+        return should_suppress_web_for_attachment(user_text, payload)
+    except Exception:
+        return False
+
+
+def _nova_attachment_guard_install_web_routing_suppression():
+    try:
+        target_class = ChatService
+    except Exception:
+        return {
+            "installed": False,
+            "reason": "missing_chat_service",
+            "wrapped_result_methods": [],
+            "wrapped_bool_methods": [],
+        }
+
+    if getattr(target_class, "_nova_attachment_guard_web_routing_suppression_installed", False):
+        return {
+            "installed": True,
+            "reason": "already_installed",
+            "wrapped_result_methods": list(
+                getattr(target_class, "_nova_attachment_guard_wrapped_result_methods", [])
+            ),
+            "wrapped_bool_methods": list(
+                getattr(target_class, "_nova_attachment_guard_wrapped_bool_methods", [])
+            ),
+        }
+
+    result_methods = [
+        "_execute_web_fetch",
+        "_execute_web_search",
+        "_run_web_fetch",
+        "_run_web_search",
+        "_fetch_web_results",
+        "_search_web",
+        "_web_search",
+        "_perform_web_search",
+        "_maybe_web_fetch",
+        "_maybe_web_search",
+    ]
+
+    bool_methods = [
+        "_should_use_web",
+        "_should_fetch_web",
+        "_should_route_to_web",
+        "_should_use_web_search",
+        "_needs_web",
+        "_is_web_request",
+        "_is_web_search_request",
+        "_should_do_web_search",
+    ]
+
+    wrapped_result_methods = []
+    wrapped_bool_methods = []
+
+    def _make_result_wrapper(method_name, original_method):
+        def _nova_guarded_result_method(self, *args, **kwargs):
+            if _nova_attachment_guard_should_suppress_current_web_call(args, kwargs):
+                disabled_result = globals().get("_nova_attachment_guard_web_disabled_result")
+
+                if callable(disabled_result):
+                    user_text = ""
+                    finder_text = globals().get("_nova_attachment_guard_find_user_text_from_args")
+
+                    if callable(finder_text):
+                        user_text = finder_text(args, kwargs)
+
+                    return disabled_result(user_text)
+
+                return {
+                    "ok": True,
+                    "disabled": True,
+                    "suppressed": True,
+                    "reason": "attachment_focused_turn",
+                    "results": [],
+                    "cards": [],
+                    "items": [],
+                    "sources": [],
+                    "message": "Web/search suppressed because this turn is focused on attached file content.",
+                }
+
+            return original_method(self, *args, **kwargs)
+
+        _nova_guarded_result_method.__name__ = f"_nova_guarded_{method_name}"
+        return _nova_guarded_result_method
+
+    def _make_bool_wrapper(method_name, original_method):
+        def _nova_guarded_bool_method(self, *args, **kwargs):
+            if _nova_attachment_guard_should_suppress_current_web_call(args, kwargs):
+                return False
+
+            return original_method(self, *args, **kwargs)
+
+        _nova_guarded_bool_method.__name__ = f"_nova_guarded_{method_name}"
+        return _nova_guarded_bool_method
+
+    for method_name in result_methods:
+        original_method = getattr(target_class, method_name, None)
+
+        if not callable(original_method):
+            continue
+
+        if getattr(original_method, "_nova_attachment_guard_wrapped", False):
+            wrapped_result_methods.append(method_name)
+            continue
+
+        wrapper = _make_result_wrapper(method_name, original_method)
+        setattr(wrapper, "_nova_attachment_guard_wrapped", True)
+        setattr(target_class, f"_nova_original_{method_name}", original_method)
+        setattr(target_class, method_name, wrapper)
+        wrapped_result_methods.append(method_name)
+
+    for method_name in bool_methods:
+        original_method = getattr(target_class, method_name, None)
+
+        if not callable(original_method):
+            continue
+
+        if getattr(original_method, "_nova_attachment_guard_wrapped", False):
+            wrapped_bool_methods.append(method_name)
+            continue
+
+        wrapper = _make_bool_wrapper(method_name, original_method)
+        setattr(wrapper, "_nova_attachment_guard_wrapped", True)
+        setattr(target_class, f"_nova_original_{method_name}", original_method)
+        setattr(target_class, method_name, wrapper)
+        wrapped_bool_methods.append(method_name)
+
+    setattr(target_class, "_nova_attachment_guard_web_routing_suppression_installed", True)
+    setattr(target_class, "_nova_attachment_guard_wrapped_result_methods", wrapped_result_methods)
+    setattr(target_class, "_nova_attachment_guard_wrapped_bool_methods", wrapped_bool_methods)
+
+    return {
+        "installed": True,
+        "reason": "installed",
+        "wrapped_result_methods": wrapped_result_methods,
+        "wrapped_bool_methods": wrapped_bool_methods,
+    }
+
+
+try:
+    _nova_attachment_guard_install_web_routing_suppression()
+except Exception:
+    pass
+
 
