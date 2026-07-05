@@ -10,6 +10,7 @@
     var pendingAttachments = [];
     var fileInput = null;
     var previewHost = null;
+    var lastPickerOpenAt = 0;
     var boundButtons = new WeakSet();
 
     function log() {
@@ -273,6 +274,15 @@
     }
 
     function openUploadPicker() {
+        var now = Date.now();
+
+        if (now - lastPickerOpenAt < 1200) {
+            log("picker duplicate blocked");
+            return false;
+        }
+
+        lastPickerOpenAt = now;
+
         var input = ensureFileInput();
 
         try {
@@ -296,6 +306,9 @@
             button.addEventListener("click", function (event) {
                 event.preventDefault();
                 event.stopPropagation();
+                if (event.stopImmediatePropagation) {
+                    event.stopImmediatePropagation();
+                }
 
                 openUploadPicker();
                 return false;
@@ -378,3 +391,4 @@
 
     log("installed");
 })();
+
