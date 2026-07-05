@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     "use strict";
 
     var VERSION = "mobile-send-stable-v1-20260703";
@@ -368,17 +368,14 @@ fetch("/api/chat", {
         "Accept": "application/json"
     },
     body: JSON.stringify(payload)
-})
-
-
-  }).then(function (response) {
+}).then(function (response) {
     return response.text().then(function (raw) {
         if (!response.ok) {
             throw new Error("HTTP " + response.status + ": " + raw.slice(0, 500));
         }
 
-        var payload = JSON.parse(raw);
-        var reply = extractReply(payload) || "[empty response]";
+        var responsePayload = JSON.parse(raw);
+        var reply = extractReply(responsePayload) || "[empty response]";
 
         appendMessage("assistant", reply);
 
@@ -392,6 +389,7 @@ fetch("/api/chat", {
 }).finally(function () {
     inFlight = false;
 });
+    }
 
     function looksLikeSendButton(el) {
         if (!el) return false;
@@ -411,8 +409,8 @@ fetch("/api/chat", {
 
         return (
             text === "send" ||
-            text === "➤" ||
-            text === "↑" ||
+            text === "âž¤" ||
+            text === "â†‘" ||
             haystack.indexOf("send") >= 0
         );
     }
@@ -462,3 +460,4 @@ fetch("/api/chat", {
 
     log("ready", VERSION);
 })();
+
