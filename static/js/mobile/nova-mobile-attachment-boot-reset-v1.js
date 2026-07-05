@@ -8,34 +8,12 @@
 
     window.__NOVA_MOBILE_ATTACHMENT_BOOT_RESET_V1_20260705__ = true;
 
+    let userPickedFile = false;
+
     function log() {
         try {
             console.log.apply(console, arguments);
         } catch (_) {}
-    }
-
-    const KEY_RE = /(attach|attachment|attachments|upload|uploads|preview|pending.*file|pending.*image|pending.*attach)/i;
-    const VALUE_RE = /(\/api\/uploads\/|attachment|attachments|filename|preview|pending)/i;
-
-    function clearStorage() {
-        [window.localStorage, window.sessionStorage].forEach(function (store) {
-            if (!store) return;
-
-            Object.keys(store).forEach(function (key) {
-                let value = "";
-
-                try {
-                    value = String(store.getItem(key) || "");
-                } catch (_) {}
-
-                if (KEY_RE.test(key) || VALUE_RE.test(value)) {
-                    try {
-                        log("[Nova Attachment Boot Reset] removed stale storage", key);
-                        store.removeItem(key);
-                    } catch (_) {}
-                }
-            });
-        });
     }
 
     function clearQueues() {
@@ -76,21 +54,70 @@
         });
     }
 
-    function reset() {
+    function clearStorage() {
+        const keyRe = /(attach|attachment|attachments|upload|uploads|preview|pending.*file|pending.*image|pending.*attach)/i;
+        const valueRe = /(\/api\/uploads\/|attachment|attachments|filename|preview|pending)/i;
+
+        [window.localStorage, window.sessionStorage].forEach(function (store) {
+            if (!store) return;
+
+            Object.keys(store).forEach(function (key) {
+                let value = "";
+
+                try {
+                    value = String(store.getItem(key) || "");
+                } catch (_) {}
+
+                if (keyRe.test(key) || valueRe.test(value)) {
+                    try {
+                        log("[Nova Attachment Boot Reset] removed stale storage", key);
+                        store.removeItem(key);
+                    } catch (_) {}
+                }
+            });
+        });
+    }
+
+    function reset(reason) {
+        if (userPickedFile) {
+            log("[Nova Attachment Boot Reset] skipped after user file pick", reason);
+            return;
+        }
+
         clearStorage();
         clearQueues();
         clearFileInput();
         clearPreviewDom();
+
+        log("[Nova Attachment Boot Reset] cleared stale attachment state", reason);
     }
 
-    reset();
+    document.addEventListener("change", function (event) {
+        const target = event.target;
 
-    document.addEventListener("DOMContentLoaded", reset);
-    window.addEventListener("load", reset);
+        if (target && target.matches && target.matches("input[type='file']")) {
+            userPickedFile = true;
+            log("[Nova Attachment Boot Reset] user picked file, boot reset disabled");
+        }
+    }, true);
 
-    setTimeout(reset, 100);
-    setTimeout(reset, 500);
-    setTimeout(reset, 1500);
+    reset("install");
+
+    document.addEventListener("DOMContentLoaded", function () {
+        reset("dom-ready");
+    });
+
+    window.addEventListener("load", function () {
+        reset("load");
+    });
+
+    setTimeout(function () {
+        reset("late-250");
+    }, 250);
+
+    setTimeout(function () {
+        reset("late-1000");
+    }, 1000);
 
     window.NovaMobileAttachmentBootResetV1 = {
         version: "NOVA_MOBILE_ATTACHMENT_BOOT_RESET_V1_20260705",
