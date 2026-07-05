@@ -19544,54 +19544,6 @@ except Exception as _nmssv1_error_20260703:
     except Exception:
         pass
 
-# --- NOVA_MOBILE_HEADER_OWNER_ROUTE_INJECT_20260705 ---
-# Targeted /mobile HTML loader for the single-owner header cleanup script.
-# This is not the old send injector. It only ensures the header owner JS is present on /mobile.
-try:
-    @app.after_request
-    def nova_mobile_header_owner_route_inject_20260705(response):
-        try:
-            from flask import request
-
-            if not request.path.startswith("/mobile"):
-                return response
-
-            content_type = response.headers.get("Content-Type", "")
-
-            if "text/html" not in content_type:
-                return response
-
-            html = response.get_data(as_text=True)
-
-            if "nova-mobile-header-owner-v1.js" in html:
-                return response
-
-            tag = '<script src="/static/js/mobile/nova-mobile-header-owner-v1.js?v=header-owner-route-inject-20260705"></script>'
-
-            if "</body>" in html:
-                html = html.replace("</body>", "    " + tag + "\n</body>", 1)
-            else:
-                html = html + "\n" + tag + "\n"
-
-            response.set_data(html)
-            response.headers["Content-Length"] = str(len(response.get_data()))
-
-            return response
-        except Exception as exc:
-            try:
-                print("[NOVA_MOBILE_HEADER_OWNER_ROUTE_INJECT_20260705] failed", exc)
-            except Exception:
-                pass
-
-            return response
-
-    print("[NOVA_MOBILE_HEADER_OWNER_ROUTE_INJECT_20260705] installed")
-except Exception as exc:
-    try:
-        print("[NOVA_MOBILE_HEADER_OWNER_ROUTE_INJECT_20260705] install failed", exc)
-    except Exception:
-        pass
-
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
@@ -19645,7 +19597,6 @@ except Exception as _nvcvr_error:
         print("[NOVA_MOBILE_CHAT_VISIBLE_RECOVERY_INJECT_20260703] install failed:", _nvcvr_error)
     except Exception:
         pass
-
 
 
 
