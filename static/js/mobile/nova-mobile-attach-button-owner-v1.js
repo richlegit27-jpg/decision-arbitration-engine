@@ -51,13 +51,23 @@
             return false;
         }
 
-        const t = textOf(target);
-
-        if (isBadMatch(target)) {
-            return false;
+        /*
+         * Strict owner rule:
+         * only the real composer attach button may open the file picker.
+         * This prevents preview close/remove taps from bubbling into the attach picker.
+         */
+        if (target.id === "nova-mobile-attach") {
+            return true;
         }
 
-        return /attach|upload|file|image|photo|picture|paperclip|clip|📎/.test(t);
+        if (target.dataset && (
+            target.dataset.novaMainAttachCapture === "1" ||
+            target.dataset.novaHardAttachBridge === "1"
+        )) {
+            return true;
+        }
+
+        return false;
     }
 
     function ensureInput() {
@@ -277,5 +287,6 @@
         stabilize: stabilizeVisibleAttachButtons
     };
 
-    console.log(LOG, "installed");
+    console.log(LOG, "installed strict-owner");
 })();
+
