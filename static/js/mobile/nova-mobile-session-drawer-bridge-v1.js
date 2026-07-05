@@ -285,9 +285,30 @@
         }
     }
 
+
+    function escapeDrawerFocusBeforeHide(drawer) {
+        try {
+            const active = document.activeElement;
+
+            if (active && drawer && drawer.contains(active)) {
+                active.blur();
+            }
+
+            const headerButton = document.getElementById("nova-mobile-sessions-toggle");
+
+            if (headerButton && typeof headerButton.focus === "function") {
+                headerButton.focus({ preventScroll: true });
+            } else if (document.body && typeof document.body.focus === "function") {
+                document.body.setAttribute("tabindex", "-1");
+                document.body.focus({ preventScroll: true });
+            }
+        } catch (_) {}
+    }
+
     function closeDrawer() {
         const drawer = ensureDrawer();
 
+        escapeDrawerFocusBeforeHide(drawer);
         blurIfFocused(drawer);
 
         drawer.classList.remove("is-open");
@@ -525,7 +546,8 @@
         close: closeDrawer
     };
 
-    console.log(LOG, "installed");
+    console.log(LOG, "installed focus-safe close");
 })();
+
 
 
