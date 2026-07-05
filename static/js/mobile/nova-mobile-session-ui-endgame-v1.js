@@ -1,5 +1,27 @@
 ﻿(function () {
     "use strict";
+    window.__NOVA_FORCE_SESSIONS_OPENER_V3_DISABLED_20260704__ = true;
+
+    function novaRemoveForceSessionsOpenerV3() {
+        const bad = document.getElementById("nova-force-sessions-opener-v3");
+        if (bad && bad.parentNode) {
+            bad.parentNode.removeChild(bad);
+        }
+    }
+
+    novaRemoveForceSessionsOpenerV3();
+
+    const novaForceSessionsOpenerV3Observer = new MutationObserver(function () {
+        novaRemoveForceSessionsOpenerV3();
+    });
+
+    if (document.documentElement) {
+        novaForceSessionsOpenerV3Observer.observe(document.documentElement, {
+            childList: true,
+            subtree: true
+        });
+    }
+
 
     if (window.__NOVA_MOBILE_SESSION_UI_ENDGAME_V1_20260704__) {
         return;
@@ -1086,4 +1108,5 @@
     console.log(LOG, "installed");
 })();
 /* NOVA_STANDALONE_SESSIONS_DRAWER_V5_END */
+
 
