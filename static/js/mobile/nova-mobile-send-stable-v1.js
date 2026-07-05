@@ -234,6 +234,10 @@ function readJsonArray(key) {
 function collectPendingAttachments() {
     var found = [];
 
+    try {
+        addAttachmentCandidates(found, window.NovaMobileUpload?.getPendingAttachments?.());
+    } catch (_) {}
+
     addAttachmentCandidates(found, window.NovaMobileSharedAttachments);
     addAttachmentCandidates(found, window.__novaMobilePendingAttachments);
     addAttachmentCandidates(found, window.NovaMobilePendingAttachments);
@@ -244,15 +248,19 @@ function collectPendingAttachments() {
     addAttachmentCandidates(found, window.pendingAttachments);
 
     addAttachmentCandidates(found, readJsonArray("nova_mobile_pending_attachments"));
+    addAttachmentCandidates(found, readJsonArray("nova_mobile_upload"));
+    addAttachmentCandidates(found, readJsonArray("nova_mobile_uploads"));
+    addAttachmentCandidates(found, readJsonArray("nova_pending_attachments"));
+    addAttachmentCandidates(found, readJsonArray("pending_attachments"));
 
     var seen = {};
     var unique = [];
 
     found.forEach(function (item) {
         var key = [
-            item.filename || "",
-            item.url || "",
-            item.mime_type || ""
+            item.filename || item.name || "",
+            item.url || item.file_url || item.path || "",
+            item.mime_type || item.type || ""
         ].join("|");
 
         if (!seen[key]) {
@@ -367,6 +375,7 @@ function clearPendingAttachmentsAfterSend() {
 
     log("cleared attachments after send");
 }
+
     function sendNow(event) {
         try {
             if (event) {
@@ -413,6 +422,13 @@ var payload = {
     message: text,
     session_id: sid
 };
+
+console.log("[Nova Send Stable] BEFORE CHAT SEND", {
+    text: text,
+    session_id: sid,
+    attachmentCount: pendingAttachments.length,
+    attachments: pendingAttachments
+});
 
 if (pendingAttachments.length) {
     payload.attachments = pendingAttachments;
