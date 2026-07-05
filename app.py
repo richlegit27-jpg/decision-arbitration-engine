@@ -15171,6 +15171,34 @@ def _nova_phase4h_has_message_20260705(messages, role, text, msg_id=""):
     return False
 
 
+def _nova_phase4h_dedupe_messages_20260705(messages):
+    if not isinstance(messages, list):
+        return []
+
+    cleaned = []
+    seen = set()
+
+    for msg in messages:
+        if not isinstance(msg, dict):
+            continue
+
+        role = _nova_phase4h_text_20260705(msg.get("role"))
+        text = _nova_phase4h_msg_text_20260705(msg)
+
+        # Main duplicate rule: same role + same visible text.
+        key = (role, text)
+
+        if role and text and key in seen:
+            continue
+
+        if role and text:
+            seen.add(key)
+
+        cleaned.append(msg)
+
+    return cleaned
+
+
 def _nova_phase4h_load_store_20260705():
     try:
         return _nova_final_load_sessions_store_20260612()
@@ -15416,6 +15444,8 @@ def _nova_phase4h_merge_chat_response_20260705(response_json):
             "updated_at": now_value,
             "meta": assistant_meta,
         })
+
+    messages = _nova_phase4h_dedupe_messages_20260705(messages)
 
     session_obj["messages"] = messages
     session_obj["message_count"] = len(messages)
@@ -20045,6 +20075,7 @@ except Exception as _nvcvr_error:
         print("[NOVA_MOBILE_CHAT_VISIBLE_RECOVERY_INJECT_20260703] install failed:", _nvcvr_error)
     except Exception:
         pass
+
 
 
 
