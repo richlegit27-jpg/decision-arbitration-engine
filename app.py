@@ -672,54 +672,8 @@ def nova_api_usage_session_summary_active_20260705(session_id):
         return json_error(
             str(exc),
             route="nova_api_usage_session_summary_active_20260705",
-            session_id=session_id,,
-        usage=usage_compact
+            session_id=session_id,
         )
-
-
-# ============================================================
-# NOVA_STATE_USAGE_AFTER_REQUEST_20260705
-# Inject token usage into /api/state responses.
-# ============================================================
-
-@app.after_request
-def nova_state_usage_after_request_20260705(response):
-    try:
-        from flask import jsonify, request
-
-        if request.path != "/api/state":
-            return response
-
-        if response.status_code != 200:
-            return response
-
-        payload = response.get_json(silent=True)
-
-        if not isinstance(payload, dict):
-            return response
-
-        if "usage" in payload:
-            return response
-
-        from nova_backend.services.usage_ledger_service import usage_summary
-
-        usage = usage_summary()
-
-        payload["usage"] = {
-            "totals": usage.get("totals", {}),
-            "by_model": usage.get("by_model", {}),
-            "updated_at": usage.get("updated_at"),
-        }
-
-        return jsonify(payload), response.status_code
-
-    except Exception as exc:
-        try:
-            print("[NOVA_STATE_USAGE_AFTER_REQUEST] failed:", exc)
-        except Exception:
-            pass
-
-        return response
 
 @app.get("/api/health")
 def api_health():
@@ -732,8 +686,7 @@ def api_health():
         sessions_file=str(SESSIONS_FILE),
         artifacts_file=str(ARTIFACTS_FILE),
         memory_file=str(MEMORY_FILE),
-        route_build="backend-memory-recall-fix-phase-1-001",,
-        usage=usage_compact
+        route_build="backend-memory-recall-fix-phase-1-001",
     )
 
 
@@ -848,26 +801,6 @@ def api_state():
         "last_assistant_message": last_assistant_message,
         "working_state": normalized_working_state,
     }
-    # NOVA_API_STATE_USAGE_DIRECT_20260705
-    try:
-        from nova_backend.services.usage_ledger_service import usage_summary
-        usage = usage_summary()
-        usage_compact = {
-            "totals": usage.get("totals", {}),
-            "by_model": usage.get("by_model", {}),
-            "updated_at": usage.get("updated_at"),
-        }
-    except Exception as _nova_usage_state_error:
-        usage_compact = {
-            "error": str(_nova_usage_state_error),
-            "totals": {
-                "calls": 0,
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "total_tokens": 0,
-            },
-        }
-
 
     return json_ok(
         state=state,
@@ -880,8 +813,7 @@ def api_state():
         last_user_message=last_user_message,
         last_assistant_message=last_assistant_message,
         artifacts=artifact_service.build_list_payload(),
-        memory=memory_service.build_list_payload(),,
-        usage=usage_compact
+        memory=memory_service.build_list_payload(),
     )
 
 
@@ -1645,8 +1577,7 @@ def api_sessions():
         active_session_id=session_service.active_session_id,
         session=session_service.get_active(),
         artifacts=artifact_service.build_list_payload(),
-        memory=memory_service.build_list_payload(),,
-        usage=usage_compact
+        memory=memory_service.build_list_payload(),
     )
 
 
@@ -2313,8 +2244,7 @@ def _nova_write_project_state_store(payload):
         PROJECT_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
         PROJECT_STATE_FILE.write_text(
             json.dumps(payload, indent=2, ensure_ascii=False),
-            encoding="utf-8",,
-        usage=usage_compact
+            encoding="utf-8",
         )
 
         return True
@@ -6897,8 +6827,7 @@ def api_chat():
                 k: v
                 for k, v in payload.items()
                 if v is not None
-            },
-        usage=usage_compact
+            }
         )
 
     except Exception as exc:
@@ -6933,8 +6862,7 @@ def api_chat_session_compat(session_id: str):
             active_session_id=requested_session_id,
             messages=[],
             missing_session=True,
-            mobile_fallback=True,,
-        usage=usage_compact
+            mobile_fallback=True,
         )
 
     return json_ok(
@@ -6943,8 +6871,7 @@ def api_chat_session_compat(session_id: str):
         active_session_id=session_service.active_session_id,
         messages=session.get("messages") or [],
         missing_session=False,
-        mobile_fallback=False,,
-        usage=usage_compact
+        mobile_fallback=False,
     )
 
 
@@ -7208,8 +7135,7 @@ def api_sessions_new():
         active_session_id=session_id or getattr(session_service, "active_session_id", ""),
         session_id=session_id,
         skip_session_auth_scope_filter=True,
-        durable_session_write=True,,
-        usage=usage_compact
+        durable_session_write=True,
     )
 
 
@@ -7229,8 +7155,7 @@ def api_sessions_switch():
     return json_ok(
         session=session_service.get_session(session_id),
         sessions=session_service.get_all(),
-        active_session_id=session_service.active_session_id,,
-        usage=usage_compact
+        active_session_id=session_service.active_session_id,
     )
 
 
@@ -7251,8 +7176,7 @@ def api_sessions_rename():
     return json_ok(
         session=session_service.get_session(session_id),
         sessions=session_service.get_all(),
-        active_session_id=session_service.active_session_id,,
-        usage=usage_compact
+        active_session_id=session_service.active_session_id,
     )
 
 
@@ -7273,8 +7197,7 @@ def api_sessions_pin():
     return json_ok(
         session=session_service.get_session(session_id),
         sessions=session_service.get_all(),
-        active_session_id=session_service.active_session_id,,
-        usage=usage_compact
+        active_session_id=session_service.active_session_id,
     )
 
 
@@ -7296,8 +7219,7 @@ def api_sessions_delete():
     return json_ok(
         session=active_session,
         sessions=session_service.get_all(),
-        active_session_id=active_id,,
-        usage=usage_compact
+        active_session_id=active_id,
     )
 
 # -----------------------
@@ -7307,8 +7229,7 @@ def api_sessions_delete():
 @app.get("/api/artifacts")
 def api_artifacts():
     return json_ok(
-        artifacts=artifact_service.build_list_payload(),,
-        usage=usage_compact
+        artifacts=artifact_service.build_list_payload(),
     )
 
 
@@ -7319,8 +7240,7 @@ def api_artifact_view(artifact_id: str):
         return json_error("Artifact not found", 404)
 
     return json_ok(
-        artifact=payload,,
-        usage=usage_compact
+        artifact=payload,
     )
 
 @app.delete("/api/artifacts/<artifact_id>")
@@ -7331,8 +7251,7 @@ def api_delete_artifact(artifact_id: str):
         return json_ok(
             ok=bool(ok),
             deleted_artifact_id=artifact_id,
-            artifacts=artifact_service.build_list_payload(),,
-        usage=usage_compact
+            artifacts=artifact_service.build_list_payload(),
         )
 
     except Exception as e:
@@ -7623,8 +7542,7 @@ def api_recon_analyze():
 
     return json_ok(
         result=result,
-        artifact=recon_service.build_artifact_payload(result),,
-        usage=usage_compact
+        artifact=recon_service.build_artifact_payload(result),
     )
 
 @app.post("/api/upload")
@@ -19713,81 +19631,6 @@ except Exception as _nvcvr_error:
 
 
 
-
-
-
-
-
-# ============================================================
-# NOVA_STATE_USAGE_INJECTION_20260705
-# Adds token usage totals to /api/state without rewriting api_state.
-# ============================================================
-
-def _nova_wrap_api_state_with_usage_20260705():
-    try:
-        original = globals().get("api_state")
-        if not callable(original):
-            return
-
-        if getattr(original, "_nova_usage_wrapped_20260705", False):
-            return
-
-        def wrapped_api_state(*args, **kwargs):
-            response = original(*args, **kwargs)
-
-            try:
-                from flask import jsonify
-                from nova_backend.services.usage_ledger_service import usage_summary
-
-                usage = usage_summary()
-                usage_compact = {
-                    "totals": usage.get("totals", {}),
-                    "by_model": usage.get("by_model", {}),
-                    "updated_at": usage.get("updated_at"),
-                }
-
-                # json_ok usually returns a Flask Response.
-                if hasattr(response, "get_json"):
-                    payload = response.get_json(silent=True)
-                    if isinstance(payload, dict):
-                        payload["usage"] = usage_compact
-                        return jsonify(payload), getattr(response, "status_code", 200)
-
-                # If original returned (response, status), preserve status.
-                if isinstance(response, tuple) and response:
-                    raw = response[0]
-                    status = response[1] if len(response) > 1 else 200
-
-                    if hasattr(raw, "get_json"):
-                        payload = raw.get_json(silent=True)
-                        if isinstance(payload, dict):
-                            payload["usage"] = usage_compact
-                            return jsonify(payload), status
-
-                return response
-            except Exception as exc:
-                try:
-                    print("[NOVA_STATE_USAGE_INJECTION] failed:", exc)
-                except Exception:
-                    pass
-                return response
-
-        wrapped_api_state._nova_usage_wrapped_20260705 = True
-        globals()["api_state"] = wrapped_api_state
-
-        try:
-            app.view_functions["api_state"] = wrapped_api_state
-        except Exception:
-            pass
-
-    except Exception as exc:
-        try:
-            print("[NOVA_STATE_USAGE_INJECTION_SETUP] failed:", exc)
-        except Exception:
-            pass
-
-
-_nova_wrap_api_state_with_usage_20260705()
 
 
 
