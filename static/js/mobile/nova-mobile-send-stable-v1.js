@@ -130,6 +130,180 @@
         );
     }
 
+function normalizeAttachmentForSend(item) {
+    if (!item || typeof item !== "object") {
+        return null;
+    }
+
+    var filename =
+        item.filename ||
+        item.name ||
+        item.file_name ||
+        item.original_name ||
+        "";
+
+    var url =
+        item.url ||
+        item.file_url ||
+        item.fileUrl ||
+        item.path ||
+        item.upload_url ||
+        item.uploadUrl ||
+        "";
+
+    var mimeType =
+        item.mime_type ||
+        item.mimeType ||
+        item.type ||
+        item.content_type ||
+        "";
+
+    var size =
+        item.size ||
+        item.size_bytes ||
+        item.sizeBytes ||
+        null;
+
+    if (!filename && !url) {
+        return null;
+    }
+
+    return {
+        filename: filename,
+        name: filename,
+        url: url,
+        file_url: url,
+        mime_type: mimeType,
+        type: mimeType,
+        size: size
+    };
+}
+
+function addAttachmentCandidates(out, value) {
+    if (!value) {
+        return;
+    }
+
+    if (Array.isArray(value)) {
+        value.forEach(function (item) {
+            var clean = normalizeAttachmentForSend(item);
+            if (clean) {
+                out.push(clean);
+            }
+        });
+        return;
+    }
+
+    if (typeof value === "object") {
+        [
+            "attachments",
+            "files",
+            "queue",
+            "items",
+            "uploaded",
+            "uploadedFiles",
+            "pending",
+            "pendingAttachments"
+        ].forEach(function (key) {
+            if (Array.isArray(value[key])) {
+                addAttachmentCandidates(out, value[key]);
+            }
+        });
+
+        var cleanSingle = normalizeAttachmentForSend(value);
+        if (cleanSingle) {
+            out.push(cleanSingle);
+        }
+    }
+}
+
+function readJsonArray(key) {
+    try {
+        var raw = localStorage.getItem(key);
+        if (!raw) {
+            return [];
+        }
+
+        var parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+        return [];
+    }
+}
+
+function collectPendingAttachments() {
+    var found = [];
+
+    addAttachmentCandidates(found, window.NovaMobileSharedAttachments);
+    addAttachmentCandidates(found, window.__novaMobilePendingAttachments);
+    addAttachmentCandidates(found, window.NovaMobilePendingAttachments);
+    addAttachmentCandidates(found, window.__NOVA_MOBILE_PENDING_ATTACHMENTS__);
+    addAttachmentCandidates(found, window.NovaMobileUploadedAttachments);
+    addAttachmentCandidates(found, window.NovaMobileAttachmentQueue);
+    addAttachmentCandidates(found, window.NovaMobileUploadQueue);
+    addAttachmentCandidates(found, window.pendingAttachments);
+
+    addAttachmentCandidates(found, readJsonArray("nova_mobile_pending_attachments"));
+
+    var seen = {};
+    var unique = [];
+
+    found.forEach(function (item) {
+        var key = [
+            item.filename || "",
+            item.url || "",
+            item.mime_type || ""
+        ].join("|");
+
+        if (!seen[key]) {
+            seen[key] = true;
+            unique.push(item);
+        }
+    });
+
+    return unique;
+}
+
+function clearPendingAttachmentsAfterSend() {
+    window.NovaMobileSharedAttachments = [];
+    window.__novaMobilePendingAttachments = [];
+    window.NovaMobilePendingAttachments = [];
+    window.__NOVA_MOBILE_PENDING_ATTACHMENTS__ = [];
+    window.NovaMobileUploadedAttachments = [];
+    window.NovaMobileAttachmentQueue = [];
+    window.NovaMobileUploadQueue = [];
+    window.pendingAttachments = [];
+
+    try {
+        localStorage.removeItem("nova_mobile_pending_attachments");
+        localStorage.removeItem("nova_mobile_last_uploaded_attachment");
+    } catch (_) {}
+
+    document.querySelectorAll(
+        [
+            "#nova-mobile-upload-preview-owner",
+            ".nova-mobile-upload-preview-owner",
+            ".nova-mobile-upload-preview-chip",
+            "[data-nova-role='attachment-preview-chip']",
+            "#nova-mobile-attachment-preview",
+            ".nova-mobile-attachment-preview",
+            "#mobileAttachmentPreview",
+            ".mobile-attachment-preview",
+            "[data-mobile-attachment-preview]"
+        ].join(",")
+    ).forEach(function (node) {
+        node.remove();
+    });
+
+    document.querySelectorAll("input[type='file']").forEach(function (input) {
+        try {
+            input.value = "";
+        } catch (_) {}
+    });
+
+    log("cleared attachments after send");
+}
+
     function sendNow(event) {
         try {
             if (event) {
@@ -170,37 +344,54 @@
             } catch (_) {}
         }
 
-        fetch("/api/chat", {
-            method: "POST",
-            credentials: "include",
-            cache: "no-store",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            },
-            body: JSON.stringify({
-                message: text,
-                session_id: sid
-            })
-        }).then(function (response) {
-            return response.text().then(function (raw) {
-                if (!response.ok) {
-                    throw new Error("HTTP " + response.status + ": " + raw.slice(0, 500));
-                }
+var pendingAttachments = collectPendingAttachments();
 
-                var payload = JSON.parse(raw);
-                var reply = extractReply(payload) || "[empty response]";
+var payload = {
+    message: text,
+    session_id: sid
+};
 
-                appendMessage("assistant", reply);
-                log("sent", sid);
-            });
-        }).catch(function (err) {
-            appendMessage("system", "Send failed: " + (err && err.message ? err.message : String(err)));
-            log("failed", err);
-        }).finally(function () {
-            inFlight = false;
-        });
-    }
+if (pendingAttachments.length) {
+    payload.attachments = pendingAttachments;
+    payload.files = pendingAttachments;
+    log("sending with attachments", pendingAttachments);
+} else {
+    log("sending without attachments");
+}
+
+fetch("/api/chat", {
+    method: "POST",
+    credentials: "include",
+    cache: "no-store",
+    headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    },
+    body: JSON.stringify(payload)
+})
+
+
+  }).then(function (response) {
+    return response.text().then(function (raw) {
+        if (!response.ok) {
+            throw new Error("HTTP " + response.status + ": " + raw.slice(0, 500));
+        }
+
+        var payload = JSON.parse(raw);
+        var reply = extractReply(payload) || "[empty response]";
+
+        appendMessage("assistant", reply);
+
+        clearPendingAttachmentsAfterSend();
+
+        log("sent", sid);
+    });
+}).catch(function (err) {
+    appendMessage("system", "Send failed: " + (err && err.message ? err.message : String(err)));
+    log("failed", err);
+}).finally(function () {
+    inFlight = false;
+});
 
     function looksLikeSendButton(el) {
         if (!el) return false;
