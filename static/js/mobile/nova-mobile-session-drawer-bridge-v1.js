@@ -31,6 +31,12 @@
         ].forEach(function (id) {
             const el = document.getElementById(id);
             if (el) {
+                try {
+                    if (document.activeElement === el || el.contains(document.activeElement)) {
+                        document.activeElement.blur();
+                    }
+                } catch (_) {}
+
                 el.style.setProperty("display", "none", "important");
                 el.style.setProperty("pointer-events", "none", "important");
                 el.setAttribute("aria-hidden", "true");
@@ -57,7 +63,7 @@
     display: none !important;
     flex-direction: column !important;
     box-sizing: border-box !important;
-    padding: 14px !important;
+    padding: 62px 14px 14px 14px !important;
     background: rgba(15, 10, 28, 0.98) !important;
     color: #f7f2ff !important;
     border-left: 1px solid rgba(255,255,255,0.16) !important;
@@ -80,13 +86,26 @@
     font: 900 18px Arial, system-ui, sans-serif !important;
 }
 #nova-mobile-sessions-panel .nova-session-bridge-close {
-    width: 38px !important;
-    height: 38px !important;
+    position: fixed !important;
+    top: max(12px, env(safe-area-inset-top)) !important;
+    right: 14px !important;
+    z-index: 2147483647 !important;
+    min-width: 96px !important;
+    height: 48px !important;
+    padding: 0 16px !important;
     border-radius: 999px !important;
-    border: 1px solid rgba(255,255,255,0.18) !important;
-    background: rgba(255,255,255,0.10) !important;
-    color: #fff !important;
-    font: 900 22px Arial, system-ui, sans-serif !important;
+    border: 2px solid rgba(255,255,255,0.9) !important;
+    background: #ffffff !important;
+    color: #1f1235 !important;
+    font: 900 14px Arial, system-ui, sans-serif !important;
+    box-shadow: 0 10px 34px rgba(0,0,0,0.55) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    opacity: 1 !important;
+    visibility: visible !important;
 }
 #nova-mobile-sessions-panel .nova-session-bridge-body {
     overflow-y: auto !important;
@@ -161,7 +180,7 @@
         drawer.innerHTML = `
             <div class="nova-session-bridge-head">
                 <div class="nova-session-bridge-title">Sessions</div>
-                <button type="button" class="nova-session-bridge-close" aria-label="Close sessions">×</button>
+                <button type="button" class="nova-session-bridge-close" aria-label="Close sessions">× Close</button>
             </div>
             <div class="nova-session-bridge-body">
                 <div class="nova-session-bridge-loading">Loading sessions...</div>
@@ -275,3 +294,5 @@
 
     console.log(LOG, "installed");
 })();
+
+
