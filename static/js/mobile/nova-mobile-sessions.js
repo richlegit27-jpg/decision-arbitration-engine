@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
     "use strict";
 
     if (window.__NOVA_MOBILE_SESSIONS_FINAL_OWNER_V1_20260703__) {
@@ -515,6 +515,75 @@
             clearInterval(finalLockTimer);
         }
     }, 750);
+
+    /* NOVA_MOBILE_VISIBLE_HEADER_DIRECT_SESSION_OWNER_FINAL_20260705 */
+    function bindVisibleHeaderSessionsButtonFinal() {
+        const headerButton = document.getElementById("nova-mobile-sessions-toggle");
+
+        if (!headerButton) {
+            return;
+        }
+
+        headerButton.dataset.novaVisibleHeaderDirectSessionOwner = "1";
+    }
+
+    function openVisibleHeaderSessionsDirectFinal(event) {
+        const headerButton = event.target && event.target.closest
+            ? event.target.closest("#nova-mobile-sessions-toggle")
+            : null;
+
+        if (!headerButton) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (typeof event.stopImmediatePropagation === "function") {
+            event.stopImmediatePropagation();
+        }
+
+        bindVisibleHeaderSessionsButtonFinal();
+
+        try {
+            ensureButton();
+        } catch (_) {}
+
+        try {
+            ensurePanel();
+        } catch (_) {}
+
+        const panel = document.getElementById(IDS.panel);
+
+        if (panel) {
+            panel.removeAttribute("hidden");
+            panel.removeAttribute("data-nova-hidden-by-sessions-final");
+            panel.style.setProperty("display", "flex", "important");
+            panel.style.setProperty("visibility", "visible", "important");
+            panel.style.setProperty("opacity", "1", "important");
+            panel.style.setProperty("pointer-events", "auto", "important");
+        }
+
+        Promise.resolve()
+            .then(loadSessions)
+            .catch(function (error) {
+                console.error("[Nova Mobile Sessions] visible header direct owner failed", error);
+
+                try {
+                    setStatus("Sessions failed to load.");
+                } catch (_) {}
+            });
+    }
+
+    document.addEventListener("click", openVisibleHeaderSessionsDirectFinal, true);
+
+    bindVisibleHeaderSessionsButtonFinal();
+    document.addEventListener("DOMContentLoaded", bindVisibleHeaderSessionsButtonFinal);
+    window.addEventListener("load", bindVisibleHeaderSessionsButtonFinal);
+    setTimeout(bindVisibleHeaderSessionsButtonFinal, 100);
+    setTimeout(bindVisibleHeaderSessionsButtonFinal, 500);
+    setTimeout(bindVisibleHeaderSessionsButtonFinal, 1200);
+
 })();
 
 
