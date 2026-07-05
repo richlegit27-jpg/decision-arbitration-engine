@@ -19545,40 +19545,6 @@ except Exception as _nmssv1_error_20260703:
         pass
 
 
-# ============================================================
-# NOVA_USAGE_API_ROUTES_20260705
-# Token / usage tracking endpoints.
-# ============================================================
-
-@app.route("/api/usage", methods=["GET"])
-def nova_api_usage_summary_20260705():
-    try:
-        from flask import jsonify
-        from nova_backend.services.usage_ledger_service import usage_summary
-
-        return jsonify(usage_summary())
-    except Exception as exc:
-        return jsonify({
-            "ok": False,
-            "error": str(exc),
-            "route": "nova_api_usage_summary_20260705"
-        }), 500
-
-
-@app.route("/api/usage/session/<session_id>", methods=["GET"])
-def nova_api_usage_session_summary_20260705(session_id):
-    try:
-        from flask import jsonify
-        from nova_backend.services.usage_ledger_service import usage_summary
-
-        return jsonify(usage_summary(session_id=session_id))
-    except Exception as exc:
-        return jsonify({
-            "ok": False,
-            "error": str(exc),
-            "route": "nova_api_usage_session_summary_20260705",
-            "session_id": session_id
-        }), 500
 
 if __name__ == "__main__":
     create_startup_backup()
@@ -19633,6 +19599,7 @@ except Exception as _nvcvr_error:
         print("[NOVA_MOBILE_CHAT_VISIBLE_RECOVERY_INJECT_20260703] install failed:", _nvcvr_error)
     except Exception:
         pass
+
 
 
 
