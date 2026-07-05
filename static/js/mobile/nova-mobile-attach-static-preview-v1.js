@@ -444,10 +444,10 @@
 
         attach.dataset.novaStaticAttachClickFallback = "1";
 
-        attach.addEventListener("click", function (event) {
+        function openNativePickerFromUserEvent(event) {
             const input = document.getElementById(INPUT_ID);
 
-            if (!input || event.target === input) {
+            if (!input) {
                 return;
             }
 
@@ -457,7 +457,11 @@
             event.stopPropagation();
 
             input.click();
-        }, true);
+        }
+
+        attach.addEventListener("click", openNativePickerFromUserEvent, true);
+        attach.addEventListener("pointerup", openNativePickerFromUserEvent, true);
+        attach.addEventListener("touchend", openNativePickerFromUserEvent, true);
     }
 
     function scheduleNativeAttachReclaim() {
@@ -499,6 +503,7 @@
         install();
     }
 })();
+
 
 
 
