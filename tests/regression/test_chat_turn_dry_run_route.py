@@ -1,7 +1,8 @@
 ﻿import importlib
 
 
-def test_chat_turn_dry_run_route_accepts_attachment_payload():
+def test_chat_turn_dry_run_route_accepts_attachment_payload(monkeypatch):
+    monkeypatch.setenv("NOVA_DEBUG_ROUTES", "1")
     app_module = importlib.import_module("app")
     flask_app = getattr(app_module, "app")
 
@@ -42,7 +43,8 @@ def test_chat_turn_dry_run_route_accepts_attachment_payload():
     assert roles[-1] == "user"
 
 
-def test_chat_turn_dry_run_route_coerces_alias_payload():
+def test_chat_turn_dry_run_route_coerces_alias_payload(monkeypatch):
+    monkeypatch.setenv("NOVA_DEBUG_ROUTES", "1")
     app_module = importlib.import_module("app")
     flask_app = getattr(app_module, "app")
 
@@ -74,3 +76,4 @@ def test_chat_turn_dry_run_route_coerces_alias_payload():
     assert data["turn"]["session_id"] == "session_dry_run_alias_test_001"
     assert data["turn"]["user_text_preview"] == "analyze attached image"
     assert data["turn"]["attachment_count"] == 1
+

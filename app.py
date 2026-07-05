@@ -20028,6 +20028,10 @@ except Exception as _nmssv1_error_20260703:
 @app.route("/api/debug/chat-turn-dry-run", methods=["POST"])
 def api_debug_chat_turn_dry_run():
     try:
+        # NOVA_CHAT_TURN_DRY_RUN_ROUTE_GUARDED_20260705
+        if not _nova_debug_routes_enabled():
+            return _nova_debug_routes_disabled_response()
+
         from flask import jsonify, request
         from nova_backend.services.chat_turn_pipeline import (
             build_chat_turn_from_request,
@@ -20155,11 +20159,51 @@ except Exception as _nvcvr_error:
     except Exception:
         pass
 
+
+# NOVA_DEBUG_ROUTES_GUARD_20260705
+def _nova_debug_routes_enabled():
+    try:
+        import os
+
+        value = str(os.getenv("NOVA_DEBUG_ROUTES", "")).strip().lower()
+
+        return value in {
+            "1",
+            "true",
+            "yes",
+            "on",
+            "enabled",
+        }
+    except Exception:
+        return False
+
+
+def _nova_debug_routes_disabled_response():
+    try:
+        from flask import jsonify
+
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Debug routes are disabled. Set NOVA_DEBUG_ROUTES=1 to enable.",
+            }
+        ), 404
+    except Exception:
+        return {
+            "ok": False,
+            "error": "Debug routes are disabled. Set NOVA_DEBUG_ROUTES=1 to enable.",
+        }, 404
+
+
 # NOVA_CHAT_TURN_DEBUG_ROUTE_20260705
 # NOVA_CHAT_TURN_DEBUG_ROUTE_GLOBAL_20260705
 @app.route("/api/debug/chat-turn-shadow", methods=["GET"])
 def api_debug_chat_turn_shadow():
     try:
+        # NOVA_CHAT_TURN_DEBUG_ROUTE_GUARDED_20260705
+        if not _nova_debug_routes_enabled():
+            return _nova_debug_routes_disabled_response()
+
         from flask import jsonify
         from nova_backend.services.chat_service import ChatService
 
