@@ -1,25 +1,23 @@
-﻿/* NOVA_MOBILE_ATTACH_BUTTON_AUTHORITY_DISABLED_NOOP_20260705 */
-(function disableNovaMobileAttachButtonAuthority() {
+﻿(function () {
     "use strict";
 
-    window.__NOVA_MOBILE_ATTACH_BUTTON_AUTHORITY_DISABLED_NOOP_20260705__ = true;
-
     /*
-      This file is intentionally disabled.
+      NOVA ATTACH BUTTON AUTHORITY DISABLED
 
-      Reason:
-      The normal + menu upload path works.
-      This override was hijacking the + button and causing first-click/double-click issues.
-      If this file is still loaded by an old hidden loader, it must do nothing.
+      2026-07-05 decision:
+      The + button must NOT open the native file picker directly.
+
+      Correct attachment path:
+      + button -> attachment menu
+      Upload button inside menu -> file picker
+      file input change -> upload-change authority
+      send authority -> /api/chat payload
+
+      This file is intentionally a no-op to prevent old cached/script references
+      from reintroducing double-click / first-click attachment bugs.
     */
 
-    try {
-        delete window.NovaMobileAttachButtonAuthorityV1;
-    } catch (_) {
-        window.NovaMobileAttachButtonAuthorityV1 = undefined;
-    }
+    window.__NOVA_MOBILE_ATTACH_BUTTON_AUTHORITY_DISABLED_20260705__ = true;
 
-    try {
-        console.log("[Nova Attach Button Authority] disabled no-op loaded");
-    } catch (_) {}
+    console.log("[Nova Attach Button Authority] disabled - + button is menu-only");
 })();
