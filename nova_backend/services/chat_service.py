@@ -11631,28 +11631,49 @@ if (not attachments) and (__name__ == "__main__"):
                 try:
                     result = attempt()
 
-                    text = ""
+                    fallback = (
+                        "I could not verify live hours for that exact location from the current web route. "
+                        "Check Google Maps or the official Tim Hortons store locator for the most current "
+                        "open/closed status. For a better check, include the exact address or nearby cross street."
+                    )
+
+                    found_text_parts = []
+
                     if isinstance(result, dict):
-                        text = (
-                            result.get("text")
-                            or result.get("answer")
-                            or result.get("content")
-                            or ""
-                        )
+                        for key in ("text", "answer", "content"):
+                            value = result.get(key)
+                            if value:
+                                found_text_parts.append(str(value))
 
-                    if "No verified fresh web results were retrieved" in text:
-                        fallback = (
-                            "I could not verify live hours for that exact location from the current web route. "
-                            "Check Google Maps or the official Tim Hortons store locator for the most current "
-                            "open/closed status. For a better check, include the exact address or nearby cross street."
-                        )
+                        assistant_message = result.get("assistant_message")
+                        if isinstance(assistant_message, dict):
+                            for key in ("text", "content", "answer"):
+                                value = assistant_message.get(key)
+                                if value:
+                                    found_text_parts.append(str(value))
 
+                    combined_text = "\n".join(found_text_parts)
+
+                    if "No verified fresh web results were retrieved" in combined_text:
                         if isinstance(result, dict):
                             result["text"] = fallback
                             result["answer"] = fallback
                             result["content"] = fallback
                             result["route"] = "live_store_hours"
                             result["verified"] = False
+
+                            assistant_message = result.get("assistant_message")
+                            if isinstance(assistant_message, dict):
+                                assistant_message["text"] = fallback
+                                assistant_message["content"] = fallback
+                                assistant_message["answer"] = fallback
+
+                            session = result.get("session")
+                            if isinstance(session, dict):
+                                working_state = session.get("working_state")
+                                if isinstance(working_state, dict):
+                                    working_state["last_assistant_message"] = fallback
+
                             return result
 
                         return {
