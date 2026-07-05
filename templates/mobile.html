@@ -3540,10 +3540,39 @@ console.log("[" + MARK + "] ready");
         btn.setAttribute("onmousedown", "return this.__novaV10Action20260625 && this.__novaV10Action20260625(event)");
     }
 
+    function unparkRealHeaderButtons() {
+        [
+            "nova-mobile-new-chat",
+            "nova-mobile-sessions-toggle"
+        ].forEach(function (id) {
+            const el = document.getElementById(id);
+
+            if (!el) {
+                return;
+            }
+
+            el.classList.remove("nova-mobile-v10-parked", "hidden");
+            el.removeAttribute("hidden");
+            el.style.removeProperty("display");
+            el.style.removeProperty("visibility");
+            el.style.removeProperty("opacity");
+            el.style.removeProperty("pointer-events");
+            el.style.setProperty("display", "inline-flex", "important");
+            el.style.setProperty("visibility", "visible", "important");
+            el.style.setProperty("opacity", "1", "important");
+            el.style.setProperty("pointer-events", "auto", "important");
+        });
+    }
+
+    /* NOVA_MOBILE_REAL_HEADER_UNPARK_20260705 */
+
     function apply(reason = "apply") {
         PARK_IDS.forEach(parkOldButton);
+        unparkRealHeaderButtons();
 
         ensureRow();
+
+        unparkRealHeaderButtons();
 
         bindButton("nova-mobile-row-new", openNew);
         // NOVA_MOBILE_DISABLE_V10_GARBAGE_SESSIONS_BUTTON_20260703: V10 Sessions button disabled; original owner remains window.NovaMobileOpenSessions().
@@ -4281,6 +4310,7 @@ composer.style.setProperty("overflow", "visible", "important");
 </html>
 
 <!-- DEPLOY_MARKER_UPLOAD_MENU_OWNER_EE1B706_20260705 -->
+
 
 
 
