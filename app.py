@@ -19634,3 +19634,76 @@ except Exception as _nvcvr_error:
 
 
 
+
+
+# ============================================================
+# NOVA_STATE_USAGE_INJECTION_20260705
+# Adds token usage totals to /api/state without rewriting api_state.
+# ============================================================
+
+def _nova_wrap_api_state_with_usage_20260705():
+    try:
+        original = globals().get("api_state")
+        if not callable(original):
+            return
+
+        if getattr(original, "_nova_usage_wrapped_20260705", False):
+            return
+
+        def wrapped_api_state(*args, **kwargs):
+            response = original(*args, **kwargs)
+
+            try:
+                from flask import jsonify
+                from nova_backend.services.usage_ledger_service import usage_summary
+
+                usage = usage_summary()
+                usage_compact = {
+                    "totals": usage.get("totals", {}),
+                    "by_model": usage.get("by_model", {}),
+                    "updated_at": usage.get("updated_at"),
+                }
+
+                # json_ok usually returns a Flask Response.
+                if hasattr(response, "get_json"):
+                    payload = response.get_json(silent=True)
+                    if isinstance(payload, dict):
+                        payload["usage"] = usage_compact
+                        return jsonify(payload), getattr(response, "status_code", 200)
+
+                # If original returned (response, status), preserve status.
+                if isinstance(response, tuple) and response:
+                    raw = response[0]
+                    status = response[1] if len(response) > 1 else 200
+
+                    if hasattr(raw, "get_json"):
+                        payload = raw.get_json(silent=True)
+                        if isinstance(payload, dict):
+                            payload["usage"] = usage_compact
+                            return jsonify(payload), status
+
+                return response
+            except Exception as exc:
+                try:
+                    print("[NOVA_STATE_USAGE_INJECTION] failed:", exc)
+                except Exception:
+                    pass
+                return response
+
+        wrapped_api_state._nova_usage_wrapped_20260705 = True
+        globals()["api_state"] = wrapped_api_state
+
+        try:
+            app.view_functions["api_state"] = wrapped_api_state
+        except Exception:
+            pass
+
+    except Exception as exc:
+        try:
+            print("[NOVA_STATE_USAGE_INJECTION_SETUP] failed:", exc)
+        except Exception:
+            pass
+
+
+_nova_wrap_api_state_with_usage_20260705()
+
