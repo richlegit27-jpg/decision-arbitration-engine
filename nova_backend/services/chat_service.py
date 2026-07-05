@@ -26009,3 +26009,182 @@ def _nova_token_usage_wrap_finalize_response_20260705():
 
 _nova_token_usage_wrap_finalize_response_20260705()
 
+# NOVA_ATTACHMENT_GUARD_WEB_SUPPRESSION_20260705
+def _nova_attachment_guard_find_payload_from_args(args=None, kwargs=None):
+    args = args or ()
+    kwargs = kwargs or {}
+
+    candidates = []
+
+    for key in (
+        "payload",
+        "request_json",
+        "request_payload",
+        "data",
+        "body",
+        "body_json",
+        "json_data",
+        "message_payload",
+        "chat_payload",
+        "request",
+        "chat_request",
+        "turn",
+        "chat_turn",
+        "attachments",
+        "files",
+        "uploads",
+        "uploaded_files",
+        "pending_attachments",
+    ):
+        if key in kwargs:
+            candidates.append(kwargs.get(key))
+
+    for value in args:
+        candidates.append(value)
+
+    for value in candidates:
+        try:
+            from nova_backend.services.chat_attachment_intent_guard import has_attachments
+
+            if has_attachments(value):
+                return value
+        except Exception:
+            continue
+
+    try:
+        from flask import g, has_request_context
+
+        if has_request_context():
+            boundary_attachments = getattr(g, "nova_api_chat_attachments", None) or []
+
+            if boundary_attachments:
+                return boundary_attachments
+    except Exception:
+        pass
+
+    return None
+
+
+def _nova_attachment_guard_find_user_text_from_args(args=None, kwargs=None):
+    args = args or ()
+    kwargs = kwargs or {}
+
+    for key in (
+        "user_text",
+        "message",
+        "text",
+        "prompt",
+        "query",
+        "search_query",
+        "user_message",
+        "input_text",
+    ):
+        value = kwargs.get(key)
+
+        if isinstance(value, str) and value.strip():
+            return value
+
+    for value in args:
+        if isinstance(value, str) and value.strip():
+            return value
+
+        if isinstance(value, dict):
+            for key in (
+                "user_text",
+                "message",
+                "text",
+                "prompt",
+                "query",
+                "search_query",
+                "user_message",
+                "input_text",
+            ):
+                nested = value.get(key)
+
+                if isinstance(nested, str) and nested.strip():
+                    return nested
+
+    try:
+        from flask import request, has_request_context
+
+        if has_request_context():
+            payload = request.get_json(silent=True) or {}
+
+            for key in (
+                "user_text",
+                "message",
+                "text",
+                "prompt",
+                "query",
+                "search_query",
+                "user_message",
+                "input_text",
+            ):
+                value = payload.get(key)
+
+                if isinstance(value, str) and value.strip():
+                    return value
+    except Exception:
+        pass
+
+    return ""
+
+
+def _nova_attachment_guard_web_disabled_result(user_text=""):
+    return {
+        "ok": True,
+        "disabled": True,
+        "suppressed": True,
+        "reason": "attachment_focused_turn",
+        "results": [],
+        "cards": [],
+        "items": [],
+        "sources": [],
+        "query": user_text,
+        "message": "Web/search suppressed because this turn is focused on attached file content.",
+    }
+
+
+def _nova_install_attachment_guard_web_suppression():
+    try:
+        target_class = ChatService
+    except Exception:
+        return False
+
+    if getattr(target_class, "_nova_attachment_guard_web_suppression_installed", False):
+        return True
+
+    original = getattr(target_class, "_execute_web_fetch", None)
+
+    if original is None:
+        return False
+
+    def _nova_guarded_execute_web_fetch(self, *args, **kwargs):
+        user_text = _nova_attachment_guard_find_user_text_from_args(args, kwargs)
+        payload = _nova_attachment_guard_find_payload_from_args(args, kwargs)
+
+        try:
+            from nova_backend.services.chat_attachment_intent_guard import (
+                should_suppress_web_for_attachment,
+            )
+
+            if should_suppress_web_for_attachment(user_text, payload):
+                return _nova_attachment_guard_web_disabled_result(user_text)
+        except Exception:
+            pass
+
+        return original(self, *args, **kwargs)
+
+    setattr(target_class, "_nova_original_execute_web_fetch", original)
+    setattr(target_class, "_execute_web_fetch", _nova_guarded_execute_web_fetch)
+    setattr(target_class, "_nova_attachment_guard_web_suppression_installed", True)
+
+    return True
+
+
+try:
+    _nova_install_attachment_guard_web_suppression()
+except Exception:
+    pass
+
+
