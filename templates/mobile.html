@@ -4306,10 +4306,55 @@ composer.style.setProperty("overflow", "visible", "important");
 <script src="/static/js/mobile/nova-mobile-upload-change-authority-v1.js?v=upload-single-owner-20260705"></script>
 <script src="/static/js/mobile/nova-mobile-send-stable-v1.js?v=send-single-upload-owner-20260705"></script>
 <script src="/static/js/mobile/nova-mobile-chat-visible-recovery-v1.js?v=chat-visible-recovery-dedupe-final-20260703c"></script>
+
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_MOBILE_SESSIONS_HEADER_VISIBLE_20260705__) {
+        return;
+    }
+
+    window.__NOVA_MOBILE_SESSIONS_HEADER_VISIBLE_20260705__ = true;
+
+    function keepSessionsHeaderVisible() {
+        const btn = document.getElementById("nova-mobile-sessions-toggle");
+
+        if (!btn) {
+            return;
+        }
+
+        btn.removeAttribute("data-nova-hidden-by-sessions-final");
+        btn.classList.remove("hidden", "nova-mobile-v10-parked");
+        btn.removeAttribute("hidden");
+
+        btn.style.removeProperty("display");
+        btn.style.removeProperty("visibility");
+        btn.style.removeProperty("opacity");
+        btn.style.removeProperty("pointer-events");
+
+        btn.style.setProperty("display", "inline-flex", "important");
+        btn.style.setProperty("visibility", "visible", "important");
+        btn.style.setProperty("opacity", "1", "important");
+        btn.style.setProperty("pointer-events", "auto", "important");
+    }
+
+    keepSessionsHeaderVisible();
+
+    document.addEventListener("DOMContentLoaded", keepSessionsHeaderVisible);
+    window.addEventListener("load", keepSessionsHeaderVisible);
+
+    setTimeout(keepSessionsHeaderVisible, 100);
+    setTimeout(keepSessionsHeaderVisible, 500);
+    setTimeout(keepSessionsHeaderVisible, 1200);
+})();
+</script>
+<!-- NOVA_MOBILE_SESSIONS_HEADER_VISIBLE_20260705 -->
 </body>
 </html>
 
 <!-- DEPLOY_MARKER_UPLOAD_MENU_OWNER_EE1B706_20260705 -->
+
 
 
 
