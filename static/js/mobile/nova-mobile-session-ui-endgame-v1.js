@@ -771,3 +771,319 @@
 })();
 /* NOVA_VISIBLE_SESSIONS_LAUNCHER_FINAL_V4_END */
 
+/* NOVA_STANDALONE_SESSIONS_DRAWER_V5_START */
+(function () {
+    "use strict";
+
+    if (window.__NOVA_STANDALONE_SESSIONS_DRAWER_V5_20260704__) {
+        return;
+    }
+
+    window.__NOVA_STANDALONE_SESSIONS_DRAWER_V5_20260704__ = true;
+
+    const LOG = "[Nova Standalone Sessions Drawer V5]";
+    const BTN_ID = "nova-standalone-sessions-button-v5";
+    const DRAWER_ID = "nova-standalone-sessions-drawer-v5";
+    const STYLE_ID = "nova-standalone-sessions-style-v5";
+
+    function installStyle() {
+        let style = document.getElementById(STYLE_ID);
+
+        if (!style) {
+            style = document.createElement("style");
+            style.id = STYLE_ID;
+            document.head.appendChild(style);
+        }
+
+        style.textContent = `
+#${BTN_ID} {
+    position: fixed !important;
+    left: 12px !important;
+    bottom: 88px !important;
+    width: 154px !important;
+    height: 52px !important;
+    z-index: 2147483647 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 16px !important;
+    border: 2px solid rgba(255,255,255,0.35) !important;
+    background: #6d28d9 !important;
+    color: #fff !important;
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.45) !important;
+    pointer-events: auto !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+#${DRAWER_ID} {
+    position: fixed !important;
+    top: 64px !important;
+    right: 8px !important;
+    bottom: 76px !important;
+    width: min(390px, calc(100vw - 16px)) !important;
+    z-index: 2147483646 !important;
+    display: none !important;
+    background: rgba(18,18,26,0.98) !important;
+    color: #fff !important;
+    border: 1px solid rgba(255,255,255,0.18) !important;
+    border-radius: 18px !important;
+    box-shadow: 0 18px 50px rgba(0,0,0,0.55) !important;
+    overflow: hidden !important;
+    pointer-events: auto !important;
+}
+#${DRAWER_ID}.nova-open {
+    display: flex !important;
+    flex-direction: column !important;
+}
+#${DRAWER_ID} .nova-sessions-head {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+    padding: 14px 14px 10px 14px !important;
+    border-bottom: 1px solid rgba(255,255,255,0.12) !important;
+}
+#${DRAWER_ID} .nova-sessions-title {
+    font-size: 17px !important;
+    font-weight: 900 !important;
+}
+#${DRAWER_ID} .nova-sessions-close {
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 12px !important;
+    border: 1px solid rgba(255,255,255,0.22) !important;
+    background: rgba(255,255,255,0.08) !important;
+    color: #fff !important;
+    font-size: 22px !important;
+    font-weight: 900 !important;
+}
+#${DRAWER_ID} .nova-sessions-body {
+    overflow: auto !important;
+    padding: 10px !important;
+}
+#${DRAWER_ID} .nova-session-row {
+    display: block !important;
+    width: 100% !important;
+    text-align: left !important;
+    margin: 0 0 8px 0 !important;
+    padding: 12px !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    background: rgba(255,255,255,0.06) !important;
+    color: #fff !important;
+}
+#${DRAWER_ID} .nova-session-row-title {
+    display: block !important;
+    font-weight: 850 !important;
+    font-size: 14px !important;
+    margin-bottom: 4px !important;
+}
+#${DRAWER_ID} .nova-session-row-meta {
+    display: block !important;
+    opacity: 0.72 !important;
+    font-size: 12px !important;
+}
+`;
+    }
+
+    function hardShowButton(btn) {
+        if (!btn) return;
+
+        btn.hidden = false;
+        btn.removeAttribute("hidden");
+        btn.removeAttribute("inert");
+        btn.setAttribute("aria-hidden", "false");
+
+        btn.style.setProperty("display", "flex", "important");
+        btn.style.setProperty("visibility", "visible", "important");
+        btn.style.setProperty("opacity", "1", "important");
+        btn.style.setProperty("pointer-events", "auto", "important");
+    }
+
+    function ensureButton() {
+        installStyle();
+
+        let btn = document.getElementById(BTN_ID);
+
+        if (!btn) {
+            btn = document.createElement("button");
+            btn.id = BTN_ID;
+            btn.type = "button";
+            btn.textContent = "☰ Sessions";
+            btn.setAttribute("aria-label", "Sessions");
+            btn.setAttribute("title", "Sessions");
+
+            btn.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
+                openDrawer("button-click");
+            }, true);
+
+            document.body.appendChild(btn);
+        }
+
+        hardShowButton(btn);
+        return btn;
+    }
+
+    function ensureDrawer() {
+        installStyle();
+
+        let drawer = document.getElementById(DRAWER_ID);
+
+        if (!drawer) {
+            drawer = document.createElement("section");
+            drawer.id = DRAWER_ID;
+            drawer.setAttribute("aria-label", "Sessions drawer");
+            drawer.innerHTML = `
+                <div class="nova-sessions-head">
+                    <div class="nova-sessions-title">Sessions</div>
+                    <button type="button" class="nova-sessions-close" aria-label="Close sessions">×</button>
+                </div>
+                <div class="nova-sessions-body">Loading sessions...</div>
+            `;
+
+            drawer.querySelector(".nova-sessions-close").addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                closeDrawer("close-button");
+            }, true);
+
+            document.body.appendChild(drawer);
+        }
+
+        return drawer;
+    }
+
+    function normalizeSessions(data) {
+        if (Array.isArray(data)) return data;
+        if (Array.isArray(data.sessions)) return data.sessions;
+        if (data.session && Array.isArray(data.session.sessions)) return data.session.sessions;
+        if (Array.isArray(data.items)) return data.items;
+        return [];
+    }
+
+    function sessionTitle(s) {
+        return (
+            s.title ||
+            s.name ||
+            s.label ||
+            s.id ||
+            "Untitled session"
+        );
+    }
+
+    function sessionMeta(s) {
+        const id = s.id || "";
+        const count = s.message_count ?? s.messages_count ?? s.count ?? "";
+        const shortId = id ? id.slice(-8) : "";
+        return [
+            count !== "" ? `${count} messages` : "",
+            shortId ? `…${shortId}` : ""
+        ].filter(Boolean).join(" · ");
+    }
+
+    async function loadSessions() {
+        const drawer = ensureDrawer();
+        const body = drawer.querySelector(".nova-sessions-body");
+
+        body.textContent = "Loading sessions...";
+
+        try {
+            const res = await fetch("/api/sessions?cache_bust=" + Date.now(), {
+                credentials: "include",
+                cache: "no-store",
+                headers: {
+                    "Accept": "application/json"
+                }
+            });
+
+            const data = await res.json();
+            const sessions = normalizeSessions(data);
+
+            if (!sessions.length) {
+                body.textContent = "No sessions found.";
+                return;
+            }
+
+            body.innerHTML = "";
+
+            sessions.forEach(function (s) {
+                const id = s.id || s.session_id;
+                const row = document.createElement("button");
+                row.type = "button";
+                row.className = "nova-session-row";
+                row.innerHTML = `
+                    <span class="nova-session-row-title"></span>
+                    <span class="nova-session-row-meta"></span>
+                `;
+
+                row.querySelector(".nova-session-row-title").textContent = sessionTitle(s);
+                row.querySelector(".nova-session-row-meta").textContent = sessionMeta(s);
+
+                row.addEventListener("click", function () {
+                    if (!id) return;
+                    location.href = "/mobile?session_id=" + encodeURIComponent(id) + "&v=session-switch-" + Date.now();
+                });
+
+                body.appendChild(row);
+            });
+        } catch (err) {
+            console.warn(LOG, "load sessions failed", err);
+            body.textContent = "Could not load sessions.";
+        }
+    }
+
+    function openDrawer(reason) {
+        ensureButton();
+
+        const drawer = ensureDrawer();
+        drawer.classList.add("nova-open");
+        drawer.hidden = false;
+        drawer.removeAttribute("hidden");
+        drawer.setAttribute("aria-hidden", "false");
+
+        loadSessions();
+
+        console.log(LOG, "opened", reason);
+        return true;
+    }
+
+    function closeDrawer(reason) {
+        const drawer = ensureDrawer();
+        drawer.classList.remove("nova-open");
+        drawer.setAttribute("aria-hidden", "true");
+
+        console.log(LOG, "closed", reason);
+        return true;
+    }
+
+    function boot() {
+        if (!document.body) {
+            setTimeout(boot, 50);
+            return;
+        }
+
+        ensureButton();
+        ensureDrawer();
+
+        setTimeout(boot, 500);
+    }
+
+    const oldApi = window.NovaMobileSessionUiEndgameV1 || {};
+
+    window.NovaMobileSessionUiEndgameV1 = Object.assign(oldApi, {
+        standaloneOpenSessions: openDrawer,
+        standaloneCloseSessions: closeDrawer,
+        ensureStandaloneSessionsButton: ensureButton
+    });
+
+    boot();
+
+    console.log(LOG, "installed");
+})();
+/* NOVA_STANDALONE_SESSIONS_DRAWER_V5_END */
+
