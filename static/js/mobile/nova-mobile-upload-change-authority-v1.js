@@ -1,298 +1,520 @@
-﻿/* NOVA_MOBILE_UPLOAD_CHANGE_AUTHORITY_V1_20260705 */
-(function installNovaMobileUploadChangeAuthorityV1() {
+﻿(function () {
     "use strict";
 
-    if (window.__NOVA_MOBILE_UPLOAD_CHANGE_AUTHORITY_V1_20260705__) {
+    var MARK = "NOVA_MOBILE_UPLOAD_CHANGE_AUTHORITY_SINGLE_OWNER_20260705";
+
+    if (window.__NOVA_MOBILE_UPLOAD_CHANGE_AUTHORITY_SINGLE_OWNER_20260705__) {
         return;
     }
 
-    window.__NOVA_MOBILE_UPLOAD_CHANGE_AUTHORITY_V1_20260705__ = true;
+    window.__NOVA_MOBILE_UPLOAD_CHANGE_AUTHORITY_SINGLE_OWNER_20260705__ = true;
+
+    var pendingAttachments = [];
 
     function log() {
         try {
-            console.log.apply(console, arguments);
+            console.log.apply(console, ["[" + MARK + "]"].concat(Array.from(arguments)));
         } catch (_) {}
     }
 
-    function getInput() {
-        return (
-            document.getElementById("nova-mobile-file-input") ||
-            document.querySelector("input[type='file'][id*='mobile']") ||
-            document.querySelector("input[type='file']")
-        );
-    }
+    function normalizeAttachment(value) {
+        if (!value || typeof value !== "object") return null;
 
-    function getPreviewOwner() {
-        let owner = document.getElementById("nova-mobile-upload-preview-owner");
+        var filename =
+            value.filename ||
+            value.name ||
+            value.file_name ||
+            value.original_filename ||
+            value.original_name ||
+            "";
 
-        if (!owner) {
-            owner = document.createElement("div");
-            owner.id = "nova-mobile-upload-preview-owner";
-            owner.className = "nova-mobile-upload-preview-owner";
+        var url =
+            value.url ||
+            value.file_url ||
+            value.fileUrl ||
+            value.path ||
+            value.upload_path ||
+            value.saved_path ||
+            value.file_path ||
+            "";
 
-            const composer =
-                document.querySelector(".mobile-composer") ||
-                document.querySelector("#mobileComposer") ||
-                document.querySelector(".mobile-input-area") ||
-                document.body;
+        var mimeType =
+            value.mime_type ||
+            value.mimeType ||
+            value.type ||
+            value.content_type ||
+            "";
 
-            composer.insertBefore(owner, composer.firstChild || null);
-        }
+        var size =
+            value.size ||
+            value.size_bytes ||
+            value.sizeBytes ||
+            0;
 
-        try {
-            owner.hidden = false;
-            owner.removeAttribute("hidden");
-            owner.removeAttribute("aria-hidden");
-            owner.style.setProperty("display", "flex", "important");
-            owner.style.setProperty("visibility", "visible", "important");
-            owner.style.setProperty("opacity", "1", "important");
-            owner.style.setProperty("gap", "8px", "important");
-            owner.style.setProperty("padding", "6px 10px", "important");
-            owner.style.setProperty("overflow-x", "auto", "important");
-        } catch (_) {}
-
-        return owner;
-    }
-
-    function normalizeUploadResponse(data, file) {
-        const url =
-            data.url ||
-            data.file_url ||
-            data.upload_url ||
-            data.path ||
-            data.src ||
-            data.href ||
-            (data.filename ? "/api/uploads/" + encodeURIComponent(data.filename) : "");
+        if (!filename && !url) return null;
 
         return {
-            ok: data.ok !== false,
-            name: data.name || data.original_filename || data.filename || file.name,
-            filename: data.filename || data.name || file.name,
-            original_filename: data.original_filename || file.name,
-            type: data.type || data.mime_type || file.type || "application/octet-stream",
-            mime_type: data.mime_type || data.type || file.type || "application/octet-stream",
-            size: data.size || data.size_bytes || file.size || 0,
-            size_bytes: data.size_bytes || data.size || file.size || 0,
+            id: value.id || value.attachment_id || value.file_id || "",
+            attachment_id: value.attachment_id || value.id || value.file_id || "",
+            filename: filename,
+            name: filename,
             url: url,
             file_url: url,
-            path: data.path || url,
-            source: "nova-mobile-upload-change-authority-v1",
-            raw: data
+            path: value.path || value.upload_path || value.saved_path || value.file_path || url,
+            mime_type: mimeType,
+            type: mimeType,
+            content_type: mimeType,
+            size: size,
+            size_bytes: size
         };
     }
 
-    function ensureQueues() {
-        if (!Array.isArray(window.NovaMobileSharedAttachments)) {
-            window.NovaMobileSharedAttachments = [];
-        }
+    function savePending() {
+        try {
+            localStorage.setItem("nova_mobile_upload", JSON.stringify(pendingAttachments));
+            localStorage.setItem("nova_mobile_pending_attachments", JSON.stringify(pendingAttachments));
+        } catch (_) {}
 
-        if (!Array.isArray(window.__novaMobilePendingAttachments)) {
-            window.__novaMobilePendingAttachments = [];
-        }
-
-        if (!Array.isArray(window.NovaMobilePendingAttachments)) {
-            window.NovaMobilePendingAttachments = [];
-        }
-
-        if (!Array.isArray(window.__NOVA_MOBILE_PENDING_ATTACHMENTS__)) {
-            window.__NOVA_MOBILE_PENDING_ATTACHMENTS__ = [];
-        }
+        window.NovaMobilePendingAttachments = pendingAttachments;
+        window.NovaMobileUploadedAttachments = pendingAttachments;
+        window.NovaMobileAttachmentQueue = pendingAttachments;
+        window.NovaMobileUploadQueue = pendingAttachments;
+        window.NovaMobileSharedAttachments = pendingAttachments;
     }
 
-    function pushAttachment(attachment) {
-        ensureQueues();
-
-        const queues = [
-            window.NovaMobileSharedAttachments,
-            window.__novaMobilePendingAttachments,
-            window.NovaMobilePendingAttachments,
-            window.__NOVA_MOBILE_PENDING_ATTACHMENTS__
+    function loadPending() {
+        var keys = [
+            "nova_mobile_upload",
+            "nova_mobile_pending_attachments",
+            "nova_mobile_uploaded_attachments",
+            "nova_mobile_attachment_queue"
         ];
 
-        for (const queue of queues) {
-            if (!Array.isArray(queue)) continue;
+        keys.forEach(function (key) {
+            try {
+                var raw = localStorage.getItem(key);
+                if (!raw) return;
 
-            const already = queue.some(function (item) {
-                return (
-                    item &&
-                    (
-                        item.url === attachment.url ||
-                        item.file_url === attachment.file_url ||
-                        item.filename === attachment.filename
-                    )
-                );
-            });
+                var parsed = JSON.parse(raw);
+                if (!Array.isArray(parsed)) return;
 
-            if (!already) {
-                queue.push(attachment);
+                parsed.forEach(function (item) {
+                    var clean = normalizeAttachment(item);
+                    if (clean) pendingAttachments.push(clean);
+                });
+            } catch (_) {}
+        });
+
+        dedupePending();
+        savePending();
+    }
+
+    function dedupePending() {
+        var seen = {};
+        var clean = [];
+
+        pendingAttachments.forEach(function (item) {
+            var key = [
+                item.filename || "",
+                item.url || item.file_url || item.path || "",
+                item.mime_type || item.type || "",
+                item.size || ""
+            ].join("|");
+
+            if (seen[key]) return;
+
+            seen[key] = true;
+            clean.push(item);
+        });
+
+        pendingAttachments.length = 0;
+        clean.forEach(function (item) {
+            pendingAttachments.push(item);
+        });
+    }
+
+    function getOrCreateInput() {
+        var input = document.getElementById("nova-mobile-upload-authority-input");
+
+        if (!input) {
+            input = document.createElement("input");
+            input.id = "nova-mobile-upload-authority-input";
+            input.type = "file";
+            input.multiple = false;
+            input.style.position = "fixed";
+            input.style.left = "-10000px";
+            input.style.top = "0";
+            input.style.width = "1px";
+            input.style.height = "1px";
+            input.style.opacity = "0";
+            input.style.pointerEvents = "none";
+            document.body.appendChild(input);
+        }
+
+        if (input.dataset.novaUploadAuthorityBound !== "1") {
+            input.dataset.novaUploadAuthorityBound = "1";
+
+            input.addEventListener("change", function () {
+                var file = input.files && input.files[0];
+
+                if (!file) {
+                    log("no file selected");
+                    return;
+                }
+
+                uploadFile(file);
+            }, true);
+        }
+
+        return input;
+    }
+
+    function openPicker(event) {
+        try {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
             }
-        }
+        } catch (_) {}
 
-        log("[Nova Upload Change Authority] queued attachment", attachment);
+        var input = getOrCreateInput();
+
+        try {
+            input.value = "";
+        } catch (_) {}
+
+        input.click();
+
+        log("picker opened");
+
+        return false;
     }
 
-    function renderPreview(attachment) {
-        const owner = getPreviewOwner();
+    function uploadFile(file) {
+        var form = new FormData();
+        form.append("file", file);
+        form.append("attachment", file);
 
-        const chip = document.createElement("div");
-        chip.className = "nova-mobile-upload-preview-chip";
-        chip.setAttribute("data-nova-role", "attachment-preview-chip");
-        chip.setAttribute("data-attachment-id", attachment.filename || attachment.name || String(Date.now()));
-
-        chip.style.cssText = [
-            "display:inline-flex",
-            "align-items:center",
-            "gap:8px",
-            "max-width:220px",
-            "padding:6px 8px",
-            "border-radius:10px",
-            "background:rgba(255,255,255,0.08)",
-            "color:white",
-            "font-size:12px",
-            "white-space:nowrap",
-            "overflow:hidden",
-            "text-overflow:ellipsis"
-        ].join(";");
-
-        if (/^image\//i.test(attachment.mime_type || attachment.type || "") && attachment.url) {
-            const img = document.createElement("img");
-            img.src = attachment.url;
-            img.alt = attachment.name || attachment.filename || "attachment";
-            img.style.cssText = [
-                "width:34px",
-                "height:34px",
-                "object-fit:cover",
-                "border-radius:8px",
-                "flex:0 0 auto"
-            ].join(";");
-
-            chip.appendChild(img);
-        }
-
-        const label = document.createElement("span");
-        label.textContent = attachment.name || attachment.filename || "Attachment";
-        label.style.cssText = [
-            "overflow:hidden",
-            "text-overflow:ellipsis",
-            "max-width:160px"
-        ].join(";");
-
-        chip.appendChild(label);
-        owner.appendChild(chip);
-    }
-
-    async function uploadFile(file) {
-        const form = new FormData();
-        form.append("file", file, file.name);
-
-        log("[Nova Upload Change Authority] uploading", {
+        log("uploading", {
             name: file.name,
             type: file.type,
             size: file.size
         });
 
-        const response = await fetch("/api/upload", {
+        fetch("/api/upload", {
             method: "POST",
-            body: form,
             credentials: "include",
-            cache: "no-store"
+            body: form
+        })
+            .then(function (response) {
+                return response.text().then(function (raw) {
+                    var payload = {};
+
+                    try {
+                        payload = JSON.parse(raw);
+                    } catch (_) {
+                        payload = {
+                            ok: response.ok,
+                            filename: file.name,
+                            name: file.name,
+                            mime_type: file.type,
+                            size: file.size,
+                            raw: raw
+                        };
+                    }
+
+                    if (!response.ok || payload.ok === false) {
+                        throw new Error(payload.error || payload.message || raw || "Upload failed");
+                    }
+
+                    var clean =
+                        normalizeAttachment(payload) ||
+                        normalizeAttachment(payload.file) ||
+                        normalizeAttachment(payload.attachment) ||
+                        normalizeAttachment({
+                            filename: file.name,
+                            name: file.name,
+                            mime_type: file.type,
+                            type: file.type,
+                            size: file.size,
+                            url: payload.url || payload.file_url || payload.path || ""
+                        });
+
+                    if (!clean) {
+                        clean = {
+                            filename: file.name,
+                            name: file.name,
+                            mime_type: file.type,
+                            type: file.type,
+                            size: file.size,
+                            size_bytes: file.size,
+                            url: "",
+                            file_url: "",
+                            path: ""
+                        };
+                    }
+
+                    pendingAttachments.length = 0;
+                    pendingAttachments.push(clean);
+                    savePending();
+                    renderPreview(clean);
+
+                    if (typeof window.NovaMobileReceiveUploadedAttachment === "function") {
+                        try {
+                            window.NovaMobileReceiveUploadedAttachment(clean);
+                        } catch (_) {}
+                    }
+
+                    log("uploaded and queued", clean);
+                });
+            })
+            .catch(function (error) {
+                log("upload failed", error);
+                alert("Upload failed: " + (error && error.message ? error.message : String(error)));
+            });
+    }
+
+    function findPreviewHost() {
+        var selectors = [
+            "#nova-mobile-upload-preview-owner",
+            "#nova-mobile-attachment-preview",
+            "#mobileAttachmentPreview",
+            ".nova-mobile-upload-preview-owner",
+            ".nova-mobile-attachment-preview",
+            ".mobile-attachment-preview",
+            "[data-mobile-attachment-preview]",
+            "#nova-mobile-preview-bar"
+        ];
+
+        for (var i = 0; i < selectors.length; i += 1) {
+            var el = document.querySelector(selectors[i]);
+            if (el) return el;
+        }
+
+        var composer = document.getElementById("nova-mobile-composer");
+        var host = document.createElement("div");
+
+        host.id = "nova-mobile-upload-preview-owner";
+        host.setAttribute("data-mobile-attachment-preview", "true");
+
+        if (composer && composer.parentNode) {
+            composer.parentNode.insertBefore(host, composer);
+        } else {
+            document.body.appendChild(host);
+        }
+
+        return host;
+    }
+
+    function renderPreview(item) {
+        var host = findPreviewHost();
+        if (!host) return;
+
+        host.innerHTML = "";
+
+        var chip = document.createElement("div");
+        chip.className = "nova-mobile-upload-preview-chip";
+        chip.setAttribute("data-nova-role", "attachment-preview-chip");
+        chip.textContent = "Attached: " + (item.filename || item.name || "file");
+
+        var clear = document.createElement("button");
+        clear.type = "button";
+        clear.textContent = "×";
+        clear.setAttribute("aria-label", "Clear attachment");
+        clear.style.marginLeft = "8px";
+
+        clear.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            clearPendingAttachments();
+        }, true);
+
+        chip.appendChild(clear);
+        host.appendChild(chip);
+
+        host.hidden = false;
+        host.style.setProperty("display", "flex", "important");
+        host.style.setProperty("visibility", "visible", "important");
+        host.style.setProperty("opacity", "1", "important");
+        host.setAttribute("data-has-attachment", "1");
+
+        document.body.classList.add("nova-mobile-has-attachment");
+    }
+
+    function clearPendingAttachments() {
+        pendingAttachments.length = 0;
+        savePending();
+
+        [
+            "nova_mobile_upload",
+            "nova_mobile_uploads",
+            "nova_mobile_pending_attachments",
+            "nova_mobile_uploaded_attachments",
+            "nova_mobile_attachment_queue",
+            "nova_mobile_last_uploaded_attachment",
+            "nova_mobile_pending_attachment",
+            "nova_mobile_attachment",
+            "nova_pending_attachment",
+            "pending_attachment",
+            "pending_attachments"
+        ].forEach(function (key) {
+            try {
+                localStorage.removeItem(key);
+                sessionStorage.removeItem(key);
+            } catch (_) {}
         });
 
-        const text = await response.text();
-
-        let data = {};
-
-        try {
-            data = JSON.parse(text);
-        } catch (_) {
-            data = {
-                ok: response.ok,
-                text: text
-            };
-        }
-
-        log("[Nova Upload Change Authority] upload response", response.status, data);
-
-        if (!response.ok || data.ok === false) {
-            throw new Error(data.error || data.message || ("Upload failed: " + response.status));
-        }
-
-        const attachment = normalizeUploadResponse(data, file);
-
-        pushAttachment(attachment);
-        renderPreview(attachment);
-
-        try {
-            if (typeof window.NovaMobileReceiveUploadedAttachment === "function") {
-                window.NovaMobileReceiveUploadedAttachment(attachment);
-            }
-        } catch (error) {
-            log("[Nova Upload Change Authority] receiver failed", error);
-        }
-
-        return attachment;
-    }
-
-    async function handleChange(event) {
-        const input = event.target || getInput();
-        const files = Array.from((input && input.files) || []);
-
-        log("[Nova Upload Change Authority] input change", files.length, files[0]);
-
-        if (!files.length) return;
-
-        for (const file of files) {
+        document.querySelectorAll("input[type='file']").forEach(function (input) {
             try {
-                await uploadFile(file);
-            } catch (error) {
-                console.error("[Nova Upload Change Authority] upload failed", error);
+                input.value = "";
+            } catch (_) {}
+        });
+
+        document.querySelectorAll([
+            "#nova-mobile-upload-preview-owner",
+            ".nova-mobile-upload-preview-owner",
+            ".nova-mobile-upload-preview-chip",
+            "[data-nova-role='attachment-preview-chip']",
+            "#nova-mobile-attachment-preview",
+            ".nova-mobile-attachment-preview",
+            "#mobileAttachmentPreview",
+            ".mobile-attachment-preview",
+            "[data-mobile-attachment-preview]",
+            "#nova-mobile-preview-bar",
+            ".nova-mobile-preview-bar",
+            ".nova-mobile-preview-strip",
+            ".nova-mobile-upload-preview",
+            ".nova-mobile-attachment-chip",
+            ".nova-mobile-upload-chip",
+            "[data-nova-attachment-preview]",
+            "[data-nova-upload-preview]",
+            "[data-nova-attachment-chip]",
+            "[data-upload-preview]",
+            "[data-attachment-preview]"
+        ].join(",")).forEach(function (node) {
+            try {
+                node.innerHTML = "";
+                node.hidden = true;
+                node.style.setProperty("display", "none", "important");
+                node.style.setProperty("visibility", "hidden", "important");
+                node.style.setProperty("opacity", "0", "important");
+                node.removeAttribute("data-has-attachment");
+                node.classList.remove("open", "is-open", "active", "visible", "show", "has-attachment", "is-visible");
+            } catch (_) {}
+        });
+
+        document.body.classList.remove(
+            "nova-has-attachment",
+            "nova-mobile-has-attachment",
+            "nova-upload-active",
+            "nova-attachment-active"
+        );
+
+        log("cleared pending attachments");
+    }
+
+    function isUploadButton(button) {
+        if (!button) return false;
+
+        var hay = [
+            button.id,
+            button.className,
+            button.textContent,
+            button.getAttribute("aria-label"),
+            button.getAttribute("title"),
+            button.getAttribute("data-action")
+        ].join(" ").toLowerCase();
+
+        if (hay.indexOf("send") >= 0) return false;
+        if (hay.indexOf("session") >= 0) return false;
+        if (hay.indexOf("voice") >= 0) return false;
+        if (hay.indexOf("speak") >= 0) return false;
+        if (hay.indexOf("stop") >= 0) return false;
+        if (hay.indexOf("copy") >= 0) return false;
+        if (hay.indexOf("regen") >= 0) return false;
+        if (hay.indexOf("menu") >= 0 && hay.indexOf("upload") < 0 && hay.indexOf("attach") < 0) return false;
+
+        return (
+            button.id === "nova-mobile-attach" ||
+            hay.indexOf("attach") >= 0 ||
+            hay.indexOf("upload") >= 0 ||
+            String(button.textContent || "").trim() === "+"
+        );
+    }
+
+    function bindUploadButtons() {
+        getOrCreateInput();
+
+        Array.from(document.querySelectorAll("button, [role='button'], a")).forEach(function (button) {
+            if (!isUploadButton(button)) return;
+            if (button.dataset.novaUploadAuthorityBound === "1") return;
+
+            button.dataset.novaUploadAuthorityBound = "1";
+            button.removeAttribute("onclick");
+
+            button.addEventListener("click", openPicker, true);
+
+            button.style.setProperty("pointer-events", "auto", "important");
+            button.style.setProperty("visibility", "visible", "important");
+            button.style.setProperty("opacity", "1", "important");
+
+            log("bound upload button", {
+                id: button.id,
+                text: String(button.textContent || "").trim()
+            });
+        });
+    }
+
+    function boot() {
+        loadPending();
+        bindUploadButtons();
+
+        window.NovaMobileUpload = {
+            version: MARK,
+            openPicker: openPicker,
+            open: openPicker,
+            getPendingAttachments: function () {
+                dedupePending();
+                return pendingAttachments.slice();
+            },
+            clearPendingAttachments: clearPendingAttachments,
+            clear: clearPendingAttachments,
+            reset: clearPendingAttachments,
+            addAttachment: function (item) {
+                var clean = normalizeAttachment(item);
+                if (!clean) return false;
+                pendingAttachments.length = 0;
+                pendingAttachments.push(clean);
+                savePending();
+                renderPreview(clean);
+                return true;
             }
-        }
+        };
+
+        window.NovaMobileOpenUploadPicker = openPicker;
+        window.NovaMobileClearPendingAttachments = clearPendingAttachments;
+
+        log("ready");
     }
 
-    function bind() {
-        const input = getInput();
+    document.addEventListener("DOMContentLoaded", boot);
+    document.addEventListener("click", function () {
+        setTimeout(bindUploadButtons, 50);
+    }, true);
 
-        if (!input) {
-            return false;
-        }
+    var observer = new MutationObserver(function () {
+        bindUploadButtons();
+    });
 
-        if (input.dataset.novaUploadChangeAuthorityBound === "1") {
-            return true;
-        }
-
-        input.dataset.novaUploadChangeAuthorityBound = "1";
-        input.addEventListener("change", handleChange, true);
-
-        log("[Nova Upload Change Authority] bound", input.id || input.className || input);
-
-        return true;
-    }
-
-    function bindLoop() {
-        bind();
-        setTimeout(bind, 300);
-        setTimeout(bind, 1000);
-        setTimeout(bind, 2500);
-    }
-
-    document.addEventListener("DOMContentLoaded", bindLoop);
-    window.addEventListener("load", bindLoop);
-
-    const observer = new MutationObserver(bind);
-    observer.observe(document.documentElement || document.body, {
+    observer.observe(document.documentElement, {
         childList: true,
         subtree: true
     });
 
-    bindLoop();
+    setTimeout(boot, 50);
+    setTimeout(boot, 250);
+    setTimeout(boot, 900);
 
-    window.NovaMobileUploadChangeAuthorityV1 = {
-        version: "NOVA_MOBILE_UPLOAD_CHANGE_AUTHORITY_V1_20260705",
-        bind: bind,
-        uploadFile: uploadFile,
-        handleChange: handleChange
-    };
-
-    log("[Nova Upload Change Authority] installed");
+    boot();
 })();
