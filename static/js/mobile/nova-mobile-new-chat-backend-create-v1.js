@@ -1,100 +1,65 @@
-(function () {
+﻿(function () {
     "use strict";
 
-    var VERSION = "backend-create-v2-no-auto-run-20260703b";
-    window.__NOVA_MOBILE_NEW_CHAT_BACKEND_CREATE_V2_NO_AUTO_RUN_20260703__ = VERSION;
+    var MARK = "NOVA_MOBILE_NEW_CHAT_BACKEND_CREATE_SINGLE_OWNER_20260705";
+
+    if (window.__NOVA_MOBILE_NEW_CHAT_BACKEND_CREATE_SINGLE_OWNER_20260705__) {
+        return;
+    }
+
+    window.__NOVA_MOBILE_NEW_CHAT_BACKEND_CREATE_SINGLE_OWNER_20260705__ = true;
 
     var inFlight = false;
-    var lastRunAt = 0;
 
     function log() {
         try {
-            console.log.apply(console, ["[Nova Mobile New Chat Backend Create V2]"].concat(Array.from(arguments)));
+            console.log.apply(console, ["[" + MARK + "]"].concat(Array.from(arguments)));
         } catch (_) {}
     }
 
-    function extractSessionId(payload) {
-        if (!payload) return "";
+    function isNewChatButton(el) {
+        if (!el) return false;
 
-        return String(
-            payload.session_id ||
-            payload.id ||
-            payload.active_session_id ||
-            (payload.session && (payload.session.session_id || payload.session.id)) ||
-            (payload.data && (payload.data.session_id || payload.data.id || payload.data.active_session_id)) ||
+        var text = String(el.innerText || el.textContent || "").trim().toLowerCase();
+        var id = String(el.id || "").toLowerCase();
+        var klass = String(el.className || "").toLowerCase();
+        var aria = String(el.getAttribute("aria-label") || "").toLowerCase();
+        var title = String(el.getAttribute("title") || "").toLowerCase();
+        var dataAction = String(el.getAttribute("data-action") || "").toLowerCase();
+        var novaAction = String(el.getAttribute("data-nova-action") || "").toLowerCase();
+
+        var haystack = [text, id, klass, aria, title, dataAction, novaAction].join(" ");
+
+        if (haystack.indexOf("rename") >= 0) return false;
+        if (haystack.indexOf("delete") >= 0) return false;
+        if (haystack.indexOf("pin") >= 0) return false;
+        if (haystack.indexOf("close") >= 0) return false;
+        if (haystack.indexOf("send") >= 0) return false;
+        if (haystack.indexOf("attach") >= 0) return false;
+
+        return (
+            text === "new chat" ||
+            text === "+ new chat" ||
+            haystack.indexOf("new-chat") >= 0 ||
+            haystack.indexOf("new chat") >= 0 ||
+            haystack.indexOf("new session") >= 0 ||
+            haystack.indexOf("nova-mobile-new-chat") >= 0
+        );
+    }
+
+    function extractSessionId(data) {
+        if (!data || typeof data !== "object") return "";
+
+        return (
+            data.session_id ||
+            data.id ||
+            (data.session && (data.session.id || data.session.session_id)) ||
+            (data.data && (data.data.id || data.data.session_id)) ||
             ""
-        ).trim();
+        );
     }
 
-    function createBackendSession() {
-        return fetch("/api/sessions/new", {
-            method: "POST",
-            credentials: "include",
-            cache: "no-store",
-            headers: {
-                "Accept": "application/json",
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                source: "mobile_new_chat_backend_create_v2",
-                title: "New Chat"
-            })
-        }).then(function (response) {
-            if (!response.ok) {
-                throw new Error("Session create HTTP " + response.status);
-            }
-            return response.json();
-        }).then(function (payload) {
-            var id = extractSessionId(payload);
-
-            if (!id) {
-                throw new Error("Session create returned no usable id: " + JSON.stringify(payload).slice(0, 600));
-            }
-
-            return { id: id, payload: payload };
-        });
-    }
-
-    function clearVisibleChat() {
-        try {
-            [
-                "#messages",
-                "#chat-messages",
-                "#nova-chat-messages",
-                "#nova-mobile-messages",
-                ".messages",
-                ".chat-messages",
-                ".nova-mobile-messages"
-            ].forEach(function (selector) {
-                document.querySelectorAll(selector).forEach(function (el) {
-                    if (el && el.id !== "nova-session-drawer-v2-panel") {
-                        el.innerHTML = "";
-                    }
-                });
-            });
-        } catch (_) {}
-    }
-
-    function goToSession(id) {
-        try {
-            localStorage.setItem("nova_mobile_active_session_id", id);
-            localStorage.setItem("nova_active_session_id", id);
-        } catch (_) {}
-
-        clearVisibleChat();
-
-        try {
-            var url = new URL(window.location.href);
-            url.pathname = "/mobile";
-            url.searchParams.set("session_id", id);
-            url.searchParams.set("v", "new-chat-backend-create-v2-" + Date.now());
-            window.location.href = url.toString();
-        } catch (_) {
-            window.location.href = "/mobile?session_id=" + encodeURIComponent(id) + "&v=new-chat-backend-create-v2-" + Date.now();
-        }
-    }
-
-    function runNewChatFlow(event) {
+    async function createNewChat(event) {
         try {
             if (event) {
                 event.preventDefault();
@@ -103,90 +68,113 @@
             }
         } catch (_) {}
 
-        var now = Date.now();
-
-        if (inFlight || now - lastRunAt < 1500) {
-            log("ignored duplicate new-chat request");
+        if (inFlight) {
+            log("ignored duplicate new chat");
             return;
         }
 
         inFlight = true;
-        lastRunAt = now;
 
-        createBackendSession().then(function (result) {
-            log("created", result.id);
-            goToSession(result.id);
-        }).catch(function (err) {
-            log("failed once", err);
-        }).finally(function () {
-            setTimeout(function () {
-                inFlight = false;
-            }, 1000);
-        });
-    }
+        try {
+            log("creating new chat");
 
-    function looksLikeNewChatButton(el) {
-        if (!el) return false;
-
-        var text = String(el.textContent || "").trim().toLowerCase();
-        var aria = String(el.getAttribute("aria-label") || "").trim().toLowerCase();
-        var title = String(el.getAttribute("title") || "").trim().toLowerCase();
-        var id = String(el.id || "").toLowerCase();
-        var klass = String(el.className || "").toLowerCase();
-
-        var haystack = [text, aria, title, id, klass].join(" ");
-
-        if (haystack.indexOf("session") >= 0 && haystack.indexOf("new") < 0) {
-            return false;
-        }
-
-        return (
-            haystack.indexOf("new chat") >= 0 ||
-            haystack.indexOf("new-chat") >= 0 ||
-            haystack.indexOf("start new") >= 0 ||
-            haystack === "+" ||
-            text === "+"
-        );
-    }
-
-    function installClickCapture() {
-        if (window.__NOVA_MOBILE_NEW_CHAT_BACKEND_CREATE_V2_CLICK_CAPTURE_INSTALLED_20260703__) {
-            return;
-        }
-
-        window.__NOVA_MOBILE_NEW_CHAT_BACKEND_CREATE_V2_CLICK_CAPTURE_INSTALLED_20260703__ = true;
-
-        document.addEventListener("click", function (event) {
-            try {
-                var target = event.target;
-                var button = target && target.closest && target.closest("button, a, [role='button']");
-                if (!button) return;
-
-                if (button.closest && button.closest("#nova-session-drawer-v2-panel")) {
-                    return;
+            var response = await fetch("/api/sessions/new", {
+                method: "POST",
+                credentials: "include",
+                cache: "no-store",
+                headers: {
+                    "Accept": "application/json"
                 }
+            });
 
-                if (!looksLikeNewChatButton(button)) {
-                    return;
-                }
+            var raw = await response.text();
 
-                runNewChatFlow(event);
-            } catch (err) {
-                log("click capture failed", err);
+            if (!response.ok) {
+                throw new Error("HTTP " + response.status + ": " + raw.slice(0, 500));
             }
-        }, true);
+
+            var data = {};
+            try {
+                data = JSON.parse(raw);
+            } catch (_) {}
+
+            var sid = extractSessionId(data);
+
+            if (!sid) {
+                throw new Error("New chat created but no session id returned: " + raw.slice(0, 500));
+            }
+
+            try {
+                localStorage.setItem("nova_mobile_active_session_id", sid);
+                localStorage.setItem("nova_active_session_id", sid);
+            } catch (_) {}
+
+            location.href = "/mobile?session_id=" + encodeURIComponent(sid) + "&v=new-chat-owner-" + Date.now();
+        } catch (error) {
+            console.error("[" + MARK + "] failed", error);
+            alert("New Chat failed: " + (error && error.message ? error.message : String(error)));
+        } finally {
+            inFlight = false;
+        }
     }
 
-    installClickCapture();
+    function bindButtons() {
+        var count = 0;
+
+        Array.from(document.querySelectorAll("button, a, [role='button']")).forEach(function (el) {
+            if (!isNewChatButton(el)) return;
+
+            count += 1;
+
+            if (el.dataset.novaNewChatSingleOwner === "1") return;
+
+            el.dataset.novaNewChatSingleOwner = "1";
+            el.addEventListener("click", createNewChat, true);
+
+            try {
+                el.disabled = false;
+                el.removeAttribute("disabled");
+                el.style.pointerEvents = "auto";
+            } catch (_) {}
+        });
+
+        return count;
+    }
+
+    document.addEventListener("click", function (event) {
+        var target = event.target;
+        var button = target && target.closest && target.closest("button, a, [role='button']");
+        if (!button) return;
+
+        if (isNewChatButton(button)) {
+            createNewChat(event);
+        }
+    }, true);
+
+    function boot() {
+        var count = bindButtons();
+        log("ready", { bound: count });
+    }
 
     if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", installClickCapture);
+        document.addEventListener("DOMContentLoaded", boot, { once: true });
+    } else {
+        boot();
     }
 
-    window.NovaMobileNewChatBackendCreateV2 = {
-        version: VERSION,
-        run: runNewChatFlow
-    };
+    setTimeout(boot, 250);
+    setTimeout(boot, 900);
+    setTimeout(boot, 1800);
 
-    log("ready", VERSION);
+    var observer = new MutationObserver(boot);
+    observer.observe(document.documentElement || document.body, {
+        childList: true,
+        subtree: true
+    });
+
+    window.NovaMobileNewChatBackendCreateV1 = {
+        version: MARK,
+        createNewChat: createNewChat,
+        bindButtons: bindButtons
+    };
 })();
