@@ -1,33 +1,18 @@
 ﻿(function () {
     "use strict";
 
-    if (window.__NOVA_MOBILE_PLUS_MENU_RELIABILITY_V1_NO_SHAKE_20260705__) {
+    if (window.__NOVA_MOBILE_PLUS_MENU_HARD_NO_SHAKE_20260705__) {
         return;
     }
 
-    window.__NOVA_MOBILE_PLUS_MENU_RELIABILITY_V1_NO_SHAKE_20260705__ = true;
+    window.__NOVA_MOBILE_PLUS_MENU_HARD_NO_SHAKE_20260705__ = true;
+
+    var lastOpenAt = 0;
 
     function log() {
         try {
-            console.log.apply(console, ["[Nova Plus Menu No Shake]"].concat([].slice.call(arguments)));
+            console.log.apply(console, ["[Nova Plus Menu Hard No Shake]"].concat([].slice.call(arguments)));
         } catch (_) {}
-    }
-
-    function isVisible(el) {
-        if (!el) {
-            return false;
-        }
-
-        var s = getComputedStyle(el);
-        var r = el.getBoundingClientRect();
-
-        return (
-            s.display !== "none" &&
-            s.visibility !== "hidden" &&
-            s.opacity !== "0" &&
-            r.width > 0 &&
-            r.height > 0
-        );
     }
 
     function findPlusButton() {
@@ -41,25 +26,21 @@
     }
 
     function findUploadButton() {
-        var direct = document.querySelector("[data-mobile-tool='upload']");
+        return (
+            document.querySelector("[data-mobile-tool='upload']") ||
+            [].slice.call(document.querySelectorAll("button, a, [role='button']")).find(function (el) {
+                var haystack = [
+                    el.id || "",
+                    el.className || "",
+                    el.getAttribute("aria-label") || "",
+                    el.getAttribute("title") || "",
+                    el.textContent || ""
+                ].join(" ").toLowerCase();
 
-        if (direct) {
-            return direct;
-        }
-
-        var buttons = [].slice.call(document.querySelectorAll("button, a, [role='button']"));
-
-        return buttons.find(function (el) {
-            var haystack = [
-                el.id || "",
-                el.className || "",
-                el.getAttribute("aria-label") || "",
-                el.getAttribute("title") || "",
-                el.textContent || ""
-            ].join(" ").toLowerCase();
-
-            return /upload|file|image|photo|attach/.test(haystack);
-        }) || null;
+                return /upload|file|image|photo/.test(haystack);
+            }) ||
+            null
+        );
     }
 
     function looksLikeMenu(el) {
@@ -107,14 +88,52 @@
             node.style.opacity = "1";
             node.style.pointerEvents = "auto";
             node.style.transform = "none";
+            node.style.animation = "none";
+            node.style.transitionProperty = "opacity, visibility";
             node.classList.add("open", "is-open", "visible", "is-visible", "active");
         } catch (_) {}
     }
 
+    function calmPlusButton() {
+        var plus = findPlusButton();
+
+        if (!plus) {
+            return;
+        }
+
+        try {
+            plus.style.transform = "none";
+            plus.style.animation = "none";
+            plus.style.transitionProperty = "background-color, color, border-color, opacity";
+            plus.classList.remove(
+                "shake",
+                "shaking",
+                "is-shaking",
+                "nova-shake",
+                "nova-mobile-shake",
+                "bounce",
+                "bouncing",
+                "pulse",
+                "pulsing",
+                "active"
+            );
+        } catch (_) {}
+    }
+
     function openMenu() {
+        var now = Date.now();
+
+        if (now - lastOpenAt < 180) {
+            calmPlusButton();
+            return true;
+        }
+
+        lastOpenAt = now;
+
         var uploadButton = findUploadButton();
 
         if (!uploadButton) {
+            calmPlusButton();
             log("upload button not found");
             return false;
         }
@@ -123,6 +142,7 @@
 
         revealNode(menu);
         revealNode(uploadButton);
+        calmPlusButton();
 
         try {
             document.body.classList.add("nova-mobile-plus-menu-open");
@@ -130,6 +150,33 @@
 
         log("opened menu");
         return true;
+    }
+
+    function isPlusTarget(target) {
+        var plus = findPlusButton();
+
+        return !!(
+            plus &&
+            (
+                target === plus ||
+                plus.contains(target)
+            )
+        );
+    }
+
+    function stopPlusEvent(event) {
+        if (!isPlusTarget(event.target)) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        calmPlusButton();
+        openMenu();
+
+        return false;
     }
 
     function closeMenuIfOutside(target) {
@@ -152,34 +199,27 @@
         } catch (_) {}
     }
 
-    function bindPlusButton() {
-        var plus = findPlusButton();
-
-        if (!plus || plus.__novaPlusNoShakeBound) {
+    function bindHardCapture() {
+        if (window.__NOVA_MOBILE_PLUS_HARD_CAPTURE_BOUND_20260705__) {
             return;
         }
 
-        plus.__novaPlusNoShakeBound = true;
+        window.__NOVA_MOBILE_PLUS_HARD_CAPTURE_BOUND_20260705__ = true;
 
-        plus.addEventListener("click", function (event) {
-            event.preventDefault();
-            event.stopPropagation();
-            event.stopImmediatePropagation();
+        ["pointerdown", "touchstart", "mousedown", "click"].forEach(function (type) {
+            document.addEventListener(type, stopPlusEvent, true);
+        });
 
-            openMenu();
-
-            return false;
+        document.addEventListener("click", function (event) {
+            closeMenuIfOutside(event.target);
         }, true);
 
-        log("bound plus button");
+        log("hard capture bound");
     }
 
-    document.addEventListener("click", function (event) {
-        closeMenuIfOutside(event.target);
-    }, true);
-
     function boot() {
-        bindPlusButton();
+        calmPlusButton();
+        bindHardCapture();
     }
 
     boot();
@@ -199,8 +239,7 @@
         findUploadButton: findUploadButton,
         findMenuFromUploadButton: findMenuFromUploadButton,
         openMenu: openMenu,
-        bindPlusButton: bindPlusButton,
-        isVisible: isVisible
+        calmPlusButton: calmPlusButton
     };
 
     log("installed");
