@@ -20105,6 +20105,59 @@ def api_debug_chat_turn_dry_run():
             return {"ok": False, "error": str(error)}, 500
 
 
+
+
+# NOVA_ATTACHMENT_CONTEXT_DEBUG_ROUTE_20260705
+@app.route("/api/debug/attachment-context-dry-run", methods=["POST"])
+def api_debug_attachment_context_dry_run():
+    try:
+        if not _nova_debug_routes_enabled():
+            return _nova_debug_routes_disabled_response()
+
+        from flask import jsonify, request
+        from nova_backend.services.chat_turn_attachment_context import (
+            build_attachment_context_text,
+            collect_attachments_from_scope,
+        )
+
+        payload = request.get_json(silent=True) or {}
+
+        attachments = collect_attachments_from_scope(
+            {
+                "request_json": payload,
+                "payload": payload,
+                "body_json": payload,
+            }
+        )
+
+        context_text = build_attachment_context_text(attachments)
+
+        return jsonify(
+            {
+                "ok": True,
+                "attachment_count": len(attachments),
+                "attachment_context_present": bool(context_text),
+                "attachment_context": context_text,
+            }
+        )
+    except Exception as exc:
+        try:
+            from flask import jsonify
+
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": str(exc),
+                }
+            ), 500
+        except Exception:
+            return {
+                "ok": False,
+                "error": str(exc),
+            }, 500
+
+
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
