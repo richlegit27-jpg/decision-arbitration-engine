@@ -1,146 +1,70 @@
 ﻿(function () {
     "use strict";
 
+    /*
+     * V3 rule:
+     * Do NOT clean preview on upload, mutation, focus, drawer close, or random DOM change.
+     * Only clean after a real /api/chat send finishes, or when called manually.
+     */
+
     window.__NOVA_MOBILE_ATTACHMENT_POSTSEND_CLEAR_V1_20260704__ = true;
+    window.__NOVA_MOBILE_ATTACHMENT_POSTSEND_CLEAR_V3_SEND_ONLY__ = true;
 
     const LOG = "[Nova Mobile Attachment Postsend Clear V1]";
-    let lastChatSendAt = 0;
 
-    const PREVIEW_SELECTORS = [
-        "[data-nova-attachment-preview]",
-        "[data-nova-mobile-attachment-preview]",
-        "[data-nova-upload-preview]",
-        "[data-attachment-preview]",
-        "[data-upload-preview]",
-        "#nova-mobile-attachment-preview",
-        "#nova-mobile-attachment-preview-bar",
-        "#nova-mobile-preview-bar",
-        ".nova-mobile-attachment-preview",
-        ".nova-mobile-attachment-preview-bar",
-        ".nova-mobile-preview-bar",
-        ".nova-mobile-attachment-chip",
-        ".mobile-attachment-preview",
-        ".mobile-attachment-chip",
-        ".attachment-preview",
-        ".attachment-chip",
-        ".upload-preview",
-        ".upload-chip",
-        ".preview-chip"
-    ];
-
-    function queueItems() {
+    function queuedCount() {
         try {
             if (
                 window.NovaMobileAttachmentSendBridgeV1 &&
                 typeof window.NovaMobileAttachmentSendBridgeV1.getQueuedAttachments === "function"
             ) {
-                return window.NovaMobileAttachmentSendBridgeV1.getQueuedAttachments() || [];
+                return (window.NovaMobileAttachmentSendBridgeV1.getQueuedAttachments() || []).length;
             }
         } catch (_) {}
 
-        return [];
+        return 0;
     }
 
-    function resetQueues() {
-        [
-            "__NOVA_MOBILE_ATTACHMENT_SEND_QUEUE_V1__",
-            "NovaMobilePendingAttachments",
-            "novaMobilePendingAttachments",
-            "NovaMobileSharedAttachments",
-            "novaMobileSharedAttachments",
-            "NovaMobileAttachmentQueue",
-            "novaMobileAttachmentQueue"
-        ].forEach(function (key) {
-            try {
-                if (Array.isArray(window[key])) {
-                    window[key].length = 0;
-                } else {
-                    window[key] = [];
-                }
-            } catch (_) {}
-        });
-    }
-
-    function clearFileInputs() {
-        document.querySelectorAll("input[type='file']").forEach(function (input) {
-            try {
-                input.value = "";
-            } catch (_) {}
-        });
-    }
-
-    function removeBySelectors() {
+    function removeFallbackPreviewNodes(reason) {
         let removed = 0;
 
-        PREVIEW_SELECTORS.forEach(function (selector) {
+        const selectors = [
+            ".nova-mobile-upload-preview",
+            ".nova-mobile-attachment-preview",
+            ".mobile-upload-preview",
+            ".attachment-preview",
+            ".upload-preview",
+            ".file-preview",
+            ".preview-chip",
+            ".attachment-chip",
+            ".file-chip",
+            "[data-preview]",
+            "[data-attachment-preview]",
+            "[data-upload-preview]",
+            "[data-file-preview]"
+        ];
+
+        selectors.forEach(function (selector) {
             document.querySelectorAll(selector).forEach(function (el) {
+                if (el.closest("#mobileChatMessages,.mobile-chat-container,.nova-mobile-visible-message-v1")) {
+                    return;
+                }
+
                 try {
                     el.remove();
+                    removed += 1;
                 } catch (_) {
                     el.style.setProperty("display", "none", "important");
                     el.innerHTML = "";
+                    removed += 1;
                 }
-
-                removed += 1;
             });
         });
 
         return removed;
     }
 
-    function removeLikelyPreviewNodes() {
-        let removed = 0;
-
-        document.querySelectorAll("div,section,aside,span,label").forEach(function (el) {
-            if (!el || !el.getBoundingClientRect) {
-                return;
-            }
-
-            const rect = el.getBoundingClientRect();
-            const text = (el.innerText || el.textContent || "").replace(/\s+/g, " ").trim();
-            const hay = (
-                String(el.id || "") + " " +
-                String(el.className || "") + " " +
-                text
-            ).toLowerCase();
-
-            if (rect.width < 10 || rect.height < 10) {
-                return;
-            }
-
-            if (rect.height > 180 || rect.width > window.innerWidth * 0.98) {
-                return;
-            }
-
-            if (text.length > 260) {
-                return;
-            }
-
-            if (!/(attachment|preview|upload|chip|rich_.*\.jpg|\.jpg|\.jpeg|\.png|\.webp|\.gif)/i.test(hay)) {
-                return;
-            }
-
-            if (el.closest("#mobileChatMessages,.mobile-chat-container,.nova-mobile-visible-message-v1")) {
-                return;
-            }
-
-            try {
-                el.remove();
-            } catch (_) {
-                el.style.setProperty("display", "none", "important");
-                el.innerHTML = "";
-            }
-
-            removed += 1;
-        });
-
-        return removed;
-    }
-
     function clear(reason) {
-        resetQueues();
-        clearFileInputs();
-
         let removed = 0;
 
         try {
@@ -148,88 +72,73 @@
                 window.NovaMobileAttachmentPreviewCleanupV1 &&
                 typeof window.NovaMobileAttachmentPreviewCleanupV1.clear === "function"
             ) {
-                removed += Number(window.NovaMobileAttachmentPreviewCleanupV1.clear(reason || "postsend-clear-owner")) || 0;
+                removed += Number(window.NovaMobileAttachmentPreviewCleanupV1.clear(reason || "postsend-v3-clear")) || 0;
             }
         } catch (err) {
-            console.warn(LOG, "preview cleanup owner failed", err);
+            console.warn(LOG, "preview cleanup failed", err);
         }
 
-        removed += removeBySelectors();
-        removed += removeLikelyPreviewNodes();
+        removed += removeFallbackPreviewNodes(reason || "postsend-v3-clear");
 
-        console.log(LOG, "cleared", {
-            reason: reason || "postsend-clear",
+        console.log(LOG, "clear", {
+            reason: reason || "postsend-v3-clear",
             removed: removed,
-            queued: queueItems().length
+            queued: queuedCount()
         });
 
         return removed;
     }
 
     function scheduleClear(reason) {
-        [0, 80, 200, 450, 800, 1200, 1800, 2600, 4000, 6500].forEach(function (delay) {
+        [500, 900, 1400, 2200, 3400, 5200, 7200].forEach(function (delay) {
             setTimeout(function () {
-                clear((reason || "scheduled") + "-" + delay);
+                /*
+                 * Only clean once the send bridge has finished with attachments.
+                 * This prevents upload preview from disappearing before send.
+                 */
+                if (queuedCount() === 0) {
+                    clear((reason || "postsend-v3") + "-" + delay);
+                } else {
+                    console.log(LOG, "skip clear; queue not empty", {
+                        reason: reason || "postsend-v3",
+                        delay: delay,
+                        queued: queuedCount()
+                    });
+                }
             }, delay);
         });
     }
 
-    function isChatUrl(url) {
-        return /\/api\/chat(?:\/stream)?(?:\?|$)/.test(String(url || ""));
-    }
+    if (!window.__NOVA_MOBILE_ATTACHMENT_POSTSEND_CLEAR_FETCH_PATCHED_V3__) {
+        window.__NOVA_MOBILE_ATTACHMENT_POSTSEND_CLEAR_FETCH_PATCHED_V3__ = true;
 
-    if (window.fetch && !window.__NOVA_MOBILE_ATTACHMENT_POSTSEND_CLEAR_FETCH_PATCHED_V2__) {
-        window.__NOVA_MOBILE_ATTACHMENT_POSTSEND_CLEAR_FETCH_PATCHED_V2__ = true;
-
-        const previousFetch = window.fetch.bind(window);
+        const originalFetch = window.fetch.bind(window);
 
         window.fetch = async function novaMobileAttachmentPostsendClearFetch(input, init) {
-            const url = typeof input === "string" ? input : (input && input.url) || "";
-            const isChat = isChatUrl(url);
+            const url = String(
+                (input && input.url) ||
+                input ||
+                ""
+            );
 
-            if (isChat) {
-                lastChatSendAt = Date.now();
-                scheduleClear("chat-before-response");
-            }
+            const isChatSend = /\/api\/chat(?:\?|$)/.test(url);
 
-            const response = await previousFetch(input, init);
+            const response = await originalFetch(input, init);
 
-            if (isChat) {
-                lastChatSendAt = Date.now();
-                scheduleClear("chat-after-response");
+            if (isChatSend) {
+                scheduleClear("api-chat-finished");
             }
 
             return response;
         };
     }
 
-    const observer = new MutationObserver(function () {
-        if (!lastChatSendAt) {
-            return;
-        }
-
-        if (Date.now() - lastChatSendAt > 9000) {
-            return;
-        }
-
-        if (queueItems().length === 0) {
-            scheduleClear("mutation-after-send");
-        }
-    });
-
-    try {
-        observer.observe(document.documentElement, {
-            childList: true,
-            subtree: true
-        });
-    } catch (_) {}
-
     window.NovaMobileAttachmentPostsendClearV1 = {
+        version: "v3-send-only",
         clear: clear,
         scheduleClear: scheduleClear,
-        removeBySelectors: removeBySelectors,
-        removeLikelyPreviewNodes: removeLikelyPreviewNodes
+        queuedCount: queuedCount
     };
 
-    console.log(LOG, "installed v2");
+    console.log(LOG, "installed v3 send-only");
 })();
