@@ -275,8 +275,18 @@ function clearPendingAttachmentsAfterSend() {
     window.pendingAttachments = [];
 
     try {
-        localStorage.removeItem("nova_mobile_pending_attachments");
-        localStorage.removeItem("nova_mobile_last_uploaded_attachment");
+        [
+            "nova_mobile_pending_attachments",
+            "nova_mobile_last_uploaded_attachment",
+            "nova_mobile_pending_attachment",
+            "nova_mobile_attachment",
+            "nova_mobile_upload",
+            "nova_pending_attachment",
+            "pending_attachment"
+        ].forEach(function (key) {
+            localStorage.removeItem(key);
+            sessionStorage.removeItem(key);
+        });
     } catch (_) {}
 
     var selectors = [
@@ -306,7 +316,32 @@ function clearPendingAttachmentsAfterSend() {
     ];
 
     document.querySelectorAll(selectors.join(",")).forEach(function (node) {
-        node.remove();
+        try {
+            node.innerHTML = "";
+            node.hidden = true;
+            node.style.display = "none";
+            node.style.visibility = "hidden";
+            node.style.opacity = "0";
+            node.classList.remove(
+                "open",
+                "is-open",
+                "active",
+                "visible",
+                "show",
+                "has-attachment",
+                "is-visible"
+            );
+            node.removeAttribute("data-has-attachment");
+        } catch (_) {}
+
+        try {
+            if (
+                node.id !== "nova-mobile-upload-preview-owner" &&
+                node.id !== "nova-mobile-preview-bar"
+            ) {
+                node.remove();
+            }
+        } catch (_) {}
     });
 
     document.querySelectorAll("input[type='file']").forEach(function (input) {
@@ -322,12 +357,6 @@ function clearPendingAttachmentsAfterSend() {
     } catch (_) {}
 
     try {
-        if (window.NovaMobileUploadPreviewOwner && typeof window.NovaMobileUploadPreviewOwner.renderUploadPreview === "function") {
-            window.NovaMobileUploadPreviewOwner.renderUploadPreview();
-        }
-    } catch (_) {}
-
-    try {
         document.body.classList.remove(
             "nova-has-attachment",
             "nova-mobile-has-attachment",
@@ -338,7 +367,6 @@ function clearPendingAttachmentsAfterSend() {
 
     log("cleared attachments after send");
 }
-
     function sendNow(event) {
         try {
             if (event) {
