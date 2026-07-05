@@ -382,6 +382,94 @@
         input.style.pointerEvents = "auto";
         input.style.cursor = "pointer";
     }
+    /* NOVA_ATTACH_RECLAIM_PATCH_20260705: existing static attach owner only */
+    function forceNativeInputOverAttach() {
+        const attach = document.getElementById(ATTACH_ID);
+        const input = document.getElementById(INPUT_ID);
+
+        if (!attach || !input) {
+            return;
+        }
+
+        attach.removeAttribute("type");
+        attach.setAttribute("for", INPUT_ID);
+        attach.htmlFor = INPUT_ID;
+        attach.style.setProperty("position", "relative", "important");
+        attach.style.setProperty("overflow", "hidden", "important");
+        attach.style.setProperty("pointer-events", "auto", "important");
+        attach.style.setProperty("cursor", "pointer", "important");
+
+        if (input.parentElement !== attach) {
+            attach.appendChild(input);
+        }
+
+        input.disabled = false;
+        input.removeAttribute("disabled");
+        input.removeAttribute("hidden");
+        input.setAttribute("aria-label", "Attach file");
+
+        input.style.cssText = [
+            "display:block !important",
+            "visibility:visible !important",
+            "position:absolute !important",
+            "left:0 !important",
+            "top:0 !important",
+            "right:auto !important",
+            "bottom:auto !important",
+            "inset:0 auto auto 0 !important",
+            "width:100% !important",
+            "height:100% !important",
+            "min-width:100% !important",
+            "min-height:100% !important",
+            "max-width:none !important",
+            "max-height:none !important",
+            "opacity:0.01 !important",
+            "z-index:2147483647 !important",
+            "pointer-events:auto !important",
+            "cursor:pointer !important",
+            "margin:0 !important",
+            "padding:0 !important",
+            "border:0 !important",
+            "appearance:none !important",
+            "-webkit-appearance:none !important"
+        ].join("; ");
+    }
+
+    function installNativeAttachClickFallback() {
+        const attach = document.getElementById(ATTACH_ID);
+
+        if (!attach || attach.dataset.novaStaticAttachClickFallback === "1") {
+            return;
+        }
+
+        attach.dataset.novaStaticAttachClickFallback = "1";
+
+        attach.addEventListener("click", function (event) {
+            const input = document.getElementById(INPUT_ID);
+
+            if (!input || event.target === input) {
+                return;
+            }
+
+            forceNativeInputOverAttach();
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            input.click();
+        }, true);
+    }
+
+    function scheduleNativeAttachReclaim() {
+        forceNativeInputOverAttach();
+        installNativeAttachClickFallback();
+
+        requestAnimationFrame(forceNativeInputOverAttach);
+        setTimeout(forceNativeInputOverAttach, 50);
+        setTimeout(forceNativeInputOverAttach, 250);
+        setTimeout(forceNativeInputOverAttach, 1000);
+        setTimeout(forceNativeInputOverAttach, 2000);
+    }
     function install() {
         const attach = document.getElementById(ATTACH_ID);
         const input = document.getElementById(INPUT_ID);
@@ -410,4 +498,5 @@
         install();
     }
 })();
+
 
