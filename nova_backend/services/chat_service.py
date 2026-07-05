@@ -1,7 +1,5 @@
+﻿from __future__ import annotations
 from nova_backend.services.chat_turn_pipeline import build_chat_turn_from_request, build_model_messages
-
-from __future__ import annotations
-
 def _nova_boot_log_20260701(*args, **kwargs):
     import os as _nova_boot_log_os_20260701
 
@@ -79,7 +77,7 @@ def _nova_local_project_status_answer_20260607(user_text):
     return (
         "Here is what we actually fixed today:\n\n"
         "- Fixed the mobile composer buttons so the send/voice/attach/tools buttons stopped stretching and now hold a clean square size.\n"
-        "- Fixed the mojibukakke icon problem where symbols were showing as broken text like Ã¢Å¾Â¤, Ã°Å¸Å½â„¢, and Ã¯Â¼â€¹.\n"
+        "- Fixed the mojibukakke icon problem where symbols were showing as broken text like ÃƒÂ¢Ã…Â¾Ã‚Â¤, ÃƒÂ°Ã…Â¸Ã…Â½Ã¢â€žÂ¢, and ÃƒÂ¯Ã‚Â¼Ã¢â‚¬Â¹.\n"
         "- Fixed the stale frontend cache problem where /mobile kept loading an old nova-mobile-app.js?v=attachment-payload-bridge-20260607204432 version instead of the patched one.\n"
         "- Slimmed the mobile input/composer bar down so the textarea and main composer buttons are now 40px high.\n"
         "- Found the next real issue: Nova's answer quality is contaminated by stale web/search context, so normal project questions can get wrong web-result answers.\n\n"
@@ -1002,7 +1000,7 @@ Rules:
         if not code:
             return code
 
-        # 1. convert tabs Ã¢â€ â€™ 4 spaces
+        # 1. convert tabs ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 4 spaces
         code = code.replace("\t", "    ")
 
         # 2. normalize line endings
@@ -3273,9 +3271,9 @@ if (not attachments) and (__name__ == "__main__"):
                 "assembly news headlines today",
                 "curated for you",
                 "you're my favorite song",
-                "youâ€™re my favorite song",
+                "youÃ¢â‚¬â„¢re my favorite song",
                 "introduces today's new top stars",
-                "introduces todayâ€™s new top stars",
+                "introduces todayÃ¢â‚¬â„¢s new top stars",
                 "gma network",
                 "kanak news odisha",
                 "odia news",
@@ -6045,7 +6043,7 @@ if (not attachments) and (__name__ == "__main__"):
                 answer_text = "No active task is currently tracked."
 
             assistant_msg = self._build_assistant_message(
-                text=f"Weâ€™re working on {answer_text}."
+                text=f"WeÃ¢â‚¬â„¢re working on {answer_text}."
             )
 
             return self._finalize_response(
@@ -7153,7 +7151,7 @@ if (not attachments) and (__name__ == "__main__"):
 
         user_text_lc = str(user_text or "").lower().strip()
 
-        # ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ 1. HARD USER OVERRIDE (strongest)
+        # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ 1. HARD USER OVERRIDE (strongest)
         if any(
             p in user_text_lc
             for p in [
@@ -7180,7 +7178,7 @@ if (not attachments) and (__name__ == "__main__"):
         ):
             return "short"
 
-        # ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ 2. MEMORY (most recent wins)
+        # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ 2. MEMORY (most recent wins)
         for m in reversed(memory_items or []):
             if not isinstance(m, dict):
                 continue
@@ -7193,7 +7191,7 @@ if (not attachments) and (__name__ == "__main__"):
             if "short answers" in text:
                 return "short"
 
-        # ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ 3. DEFAULT
+        # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ 3. DEFAULT
         return "normal"
 
     def _build_diff_preview(self, old: str, new: str, file_path: str) -> str:
@@ -7542,7 +7540,7 @@ if (not attachments) and (__name__ == "__main__"):
             "send the code",
             "send one of these",
             "send the code and",
-            "whatÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s the symptom",
+            "whatÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢s the symptom",
             "what's the symptom",
             "tell me what you need",
             "i can help",
@@ -8004,7 +8002,7 @@ if (not attachments) and (__name__ == "__main__"):
                 "SMFF mode:\n"
                 "- Send full file path.\n"
                 "- Send the full broken function or file.\n"
-                "- IÃ¢â‚¬â„¢ll return the full replacement, cleanly indented."
+                "- IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll return the full replacement, cleanly indented."
             ).strip()
 
         stuck_exact = {
@@ -8042,7 +8040,7 @@ if (not attachments) and (__name__ == "__main__"):
             return {
                 "assistant_text": (
                     "Send the full function and file path.\n"
-                    "IÃ¢â‚¬â„¢ll return the full replacement block, cleanly indented."
+                    "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll return the full replacement block, cleanly indented."
                 ),
                 "intelligence": {
                     "strategy": "smff_bug_intake",
@@ -8058,7 +8056,7 @@ if (not attachments) and (__name__ == "__main__"):
             return {
                 "assistant_text": (
                     "Paste the error, file path, or failing behavior.\n"
-                    "IÃ¢â‚¬â„¢ll help patch it."
+                    "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll help patch it."
                 ),
                 "intelligence": {
                     "strategy": "bug_intake",
@@ -8075,7 +8073,7 @@ if (not attachments) and (__name__ == "__main__"):
             return {
                 "assistant_text": (
                     "Paste the text, code, error, screenshot, or link.\n"
-                    "IÃ¢â‚¬â„¢ll break it down clearly."
+                    "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll break it down clearly."
                 ),
                 "intelligence": {
                     "strategy": "clarify_missing_subject",
@@ -8095,7 +8093,7 @@ if (not attachments) and (__name__ == "__main__"):
         hard_override_applied = False
 
         if not assistant_text:
-            assistant_text = "I couldnÃ¢â‚¬â„¢t generate a useful answer from that. Send the exact thing you want handled."
+            assistant_text = "I couldnÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢t generate a useful answer from that. Send the exact thing you want handled."
 
         try:
             intelligence = self._fuse_response_intelligence(
@@ -8295,18 +8293,18 @@ if (not attachments) and (__name__ == "__main__"):
         if smff_active and code_intent and not asks_alternatives:
             return (
                 "Send full file path + full broken code.\n"
-                "IÃ¢â‚¬â„¢ll return the full replacement, cleanly indented.\n\n"
+                "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll return the full replacement, cleanly indented.\n\n"
                 "PowerShell test:\n"
                 "python -m py_compile <file_path>"
             )
 
         if smff_active and code_intent and asks_alternatives:
             return (
-                "Option A Ã¢â‚¬â€ safest:\n"
-                "Send the full file path + full broken file. IÃ¢â‚¬â„¢ll return the full-file replacement.\n\n"
-                "Option B Ã¢â‚¬â€ faster:\n"
-                "Send the full function only. IÃ¢â‚¬â„¢ll return the full function replacement.\n\n"
-                "Option C Ã¢â‚¬â€ debug-only:\n"
+                "Option A ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â safest:\n"
+                "Send the full file path + full broken file. IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll return the full-file replacement.\n\n"
+                "Option B ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â faster:\n"
+                "Send the full function only. IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll return the full function replacement.\n\n"
+                "Option C ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â debug-only:\n"
                 "Run this and send the exact error:\n"
                 "python -m py_compile <file_path>"
             )
@@ -8348,7 +8346,7 @@ if (not attachments) and (__name__ == "__main__"):
         ):
             return (
                 "Send the full function and file path.\n"
-                "IÃ¢â‚¬â„¢ll return the full replacement block, cleanly indented."
+                "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll return the full replacement block, cleanly indented."
             )
 
         kill_phrases = [
@@ -8379,7 +8377,7 @@ if (not attachments) and (__name__ == "__main__"):
 
         bad_endings = [
             "Example:",
-            "HereÃ¢â‚¬â„¢s how:",
+            "HereÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s how:",
             "Here's how:",
             "This prints:",
             "That prints:",
@@ -8401,7 +8399,7 @@ if (not attachments) and (__name__ == "__main__"):
                 last.endswith(":")
                 or last.endswith("-")
                 or last_lc
-                in {"example", "output", "result", "hereÃ¢â‚¬â„¢s how", "here's how"}
+                in {"example", "output", "result", "hereÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s how", "here's how"}
             ):
                 lines.pop()
                 continue
@@ -8931,7 +8929,7 @@ if (not attachments) and (__name__ == "__main__"):
 
         clean_query = re.sub(r"\s+", " ", clean_query).strip()
 
-        # Ã°Å¸â€Â¥ empty Ã¢â€ â€™ global news
+        # ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ empty ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ global news
         if not clean_query:
             return [
                 "world news",
@@ -9172,7 +9170,7 @@ if (not attachments) and (__name__ == "__main__"):
                     "eye-catching prints",
                     "url removed from extracted attachment text",
                     "free_shipping",
-                    "furniture & dÃƒÂ©cor",
+                    "furniture & dÃƒÆ’Ã‚Â©cor",
                     "kitchen appliances",
                     "love, horror and more themes",
                     "plain field in front of mountain peak",
@@ -9195,7 +9193,7 @@ if (not attachments) and (__name__ == "__main__"):
                     if not _line:
                         continue
 
-                    _low = _line.lower().strip(" :;-Ã¢â‚¬Â¢*|")
+                    _low = _line.lower().strip(" :;-ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢*|")
                     _compact = _nova_attach_re.sub(r"[^a-z0-9]+", " ", _low).strip()
 
                     if _compact in _noise_exact:
@@ -9567,11 +9565,11 @@ if (not attachments) and (__name__ == "__main__"):
                 summary_looks_raw = (
                     len(summary) > 400
                     or "search wikipedia" in summary.lower()
-                    or "ÃƒËœ" in summary
-                    or "Ãƒâ„¢" in summary
-                    or "ÃƒÂ" in summary
-                    or "ÃƒÆ’" in summary
-                    or "ÃƒÂ Ã‚Â¦" in summary
+                    or "ÃƒÆ’Ã‹Å“" in summary
+                    or "ÃƒÆ’Ã¢â€žÂ¢" in summary
+                    or "ÃƒÆ’Ã‚Â" in summary
+                    or "ÃƒÆ’Ã†â€™" in summary
+                    or "ÃƒÆ’Ã‚Â Ãƒâ€šÃ‚Â¦" in summary
                 )
 
                 assistant_text = "" if summary_looks_raw else summary
@@ -11474,9 +11472,9 @@ if (not attachments) and (__name__ == "__main__"):
         lowered = text.lower().strip()
         attachments = attachments or []
 
-        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         # LOAD EXECUTION STATE
-        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         execution_state = (
             self._get_session_meta(session_id, "execution_state")
             or self._get_session_meta(session_id, "active_execution")
@@ -11495,23 +11493,23 @@ if (not attachments) and (__name__ == "__main__"):
             "retry", "run it"
         }
 
-        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         # 1. EXECUTION MODE
-        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         if execution_active:
             if lowered in execution_commands:
                 return ("execution", "run")
             return ("chat", "escape_execution")
 
-        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         # 2. ATTACHMENTS
-        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         if attachments:
             return ("attachment", "analyze")
 
-        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         # 3. WEB (STRICT ONLY)
-        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         web_keywords = (
             "news",
             "weather",
@@ -11524,15 +11522,15 @@ if (not attachments) and (__name__ == "__main__"):
         if any(keyword in lowered for keyword in web_keywords):
             return ("web", "fetch")
 
-        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         # 4. START EXECUTION
-        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         if lowered.startswith(("auto-plan", "build", "create", "fix", "implement", "upgrade")):
             return ("execution", "start")
 
-        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         # 5. DEFAULT (IMPORTANT FIX)
-        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         return ("chat", "normal")
 
 
@@ -11700,7 +11698,7 @@ if (not attachments) and (__name__ == "__main__"):
             or "use the web route to verify" in combined_lower
             or "can't directly browse from here" in combined_lower
             or "cannot directly browse from here" in combined_lower
-            or "i can’t directly browse from here" in combined_lower
+            or "i canâ€™t directly browse from here" in combined_lower
             or "i can't directly browse from here" in combined_lower
             or "fastest exact query is" in combined_lower
             or "paste the listing here" in combined_lower
@@ -12108,7 +12106,7 @@ if (not attachments) and (__name__ == "__main__"):
                     "eye-catching prints",
                     "url removed from extracted attachment text",
                     "free_shipping",
-                    "furniture & dÃƒÂ©cor",
+                    "furniture & dÃƒÆ’Ã‚Â©cor",
                     "kitchen appliances",
                     "love, horror and more themes",
                     "plain field in front of mountain peak",
@@ -12134,7 +12132,7 @@ if (not attachments) and (__name__ == "__main__"):
                     if not _nova_line:
                         continue
 
-                    _nova_low = _nova_line.lower().strip(" :;-Ã¢â‚¬Â¢*|")
+                    _nova_low = _nova_line.lower().strip(" :;-ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢*|")
                     _nova_low_compact = _nova_attach_re.sub(
                         r"[^a-z0-9]+", " ", _nova_low
                     ).strip()
@@ -12765,10 +12763,10 @@ if (not attachments) and (__name__ == "__main__"):
 
         lowered = self._safe_str(user_text).lower().strip()
 
-        # ðŸš¨ HARD RULE: execution cannot be bypassed by other routers
-        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # Ã°Å¸Å¡Â¨ HARD RULE: execution cannot be bypassed by other routers
+        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         # SAFE ROUTE DISPATCH (FIXED)
-        # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
         route, command = self._single_router(
             user_text,
@@ -15523,7 +15521,7 @@ Auto-fix result:
             if text_parts:
                 return "\n".join(text_parts).strip()
 
-        return "IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢m here, but the model returned an empty response."
+        return "IÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢m here, but the model returned an empty response."
 
     # ==============================
     # DECISION CONTRACT
@@ -16284,11 +16282,11 @@ Auto-fix result:
         if not text:
             return False
 
-        # ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ PLAN CREATION
+        # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ PLAN CREATION
         if any(x in text for x in ["plan", "steps", "how to", "next steps"]):
             return True
 
-        # ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ FALLBACK: coding / structured intent
+        # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ FALLBACK: coding / structured intent
         if decision and decision.get("mode") in {"coding", "analysis"}:
             return True
 
@@ -17716,7 +17714,7 @@ Next action:
         current_index = -1
 
         for i, line in enumerate(lines):
-            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â", "ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â"]):
+            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â", "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â"]):
                 step_indexes.append(i)
 
             if "[>]" in line:
@@ -17730,12 +17728,12 @@ Next action:
         total = sum(
             1
             for line in lines
-            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â", "ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â"])
+            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â", "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â"])
         )
         done = sum(
             1
             for line in lines
-            if any(x in line for x in ["[x]", "[X]", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â", "ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â"])
+            if any(x in line for x in ["[x]", "[X]", "ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â", "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â"])
         )
 
         updated = "\n".join(lines)
@@ -17753,8 +17751,8 @@ Next action:
                     .replace("[ ]", "")
                     .replace("[x]", "")
                     .replace("[X]", "")
-                    .replace("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â", "")
                     .replace("ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â", "")
+                    .replace("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â", "")
                     .strip(" -")
                     .strip()
                 )
@@ -18466,7 +18464,7 @@ Next action:
         def _clean_value(value: str) -> str:
             value = self._safe_str(value).strip()
             value = value.strip(
-                "+    ÃƒÂ¢Ã¢â‚¬Â Ã‚Â (FOUR SPACES ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â press space 4 times)\r\n-:;,."
+                "+    ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â (FOUR SPACES ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â press space 4 times)\r\n-:;,."
             )
             return value
 
@@ -19829,7 +19827,7 @@ Next action:
             return 9.0
 
         if k in {"style"}:
-            return 8.0  # ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ NEW ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â how you want responses
+            return 8.0  # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ NEW ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â how you want responses
 
         if k in {"preference"}:
             return 7.0
@@ -19885,7 +19883,7 @@ Next action:
         item_session = self._safe_str(item.get("session_id"))
 
         if current_session and item_session and current_session == item_session:
-            return 0.75  # ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬Å“ reduced from 1.5
+            return 0.75  # ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ reduced from 1.5
 
         return 0.0
 
@@ -20643,7 +20641,7 @@ def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict
             return ""
 
         return (
-            "\n\nRESPONSE POLICY Ã¢â‚¬â€ HIGH PRIORITY:\n"
+            "\n\nRESPONSE POLICY ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â HIGH PRIORITY:\n"
             f"- Mode: {mode or 'normal'}\n"
             f"- Answer length: {answer_length or 'normal'}\n"
             f"- Tone: {tone or 'direct'}\n"
@@ -25906,3 +25904,4 @@ def _nova_token_usage_wrap_finalize_response_20260705():
 
 
 _nova_token_usage_wrap_finalize_response_20260705()
+
