@@ -177,6 +177,67 @@
         display: inline-flex;
     }
 </style>
+<!-- NOVA_MOBILE_HEADER_ACTIONS_UNBLOCK_20260705 -->
+<style>
+    .mobile-header-actions {
+        position: fixed !important;
+        top: 6px !important;
+        right: 6px !important;
+        left: auto !important;
+        width: auto !important;
+        max-width: 72vw !important;
+        height: 36px !important;
+        z-index: 80 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+        gap: 6px !important;
+        pointer-events: none !important;
+        overflow: visible !important;
+    }
+
+    .mobile-header-actions button,
+    .mobile-header-actions a,
+    .mobile-header-actions [role="button"] {
+        pointer-events: auto !important;
+        position: relative !important;
+        z-index: 81 !important;
+    }
+
+    .mobile-header-actions button,
+    .mobile-header-actions a {
+        height: 30px !important;
+        min-width: 0 !important;
+        max-width: 92px !important;
+        padding: 4px 8px !important;
+        font-size: 11px !important;
+        line-height: 1 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .mobile-header-actions button:first-child,
+    .mobile-header-actions a:first-child {
+        position: fixed !important;
+        left: 8px !important;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 8px) !important;
+        top: auto !important;
+        right: auto !important;
+        z-index: 40 !important;
+        opacity: 0.45 !important;
+        transform: scale(0.86) !important;
+        transform-origin: left bottom !important;
+    }
+
+    .mobile-header-actions button:first-child:hover,
+    .mobile-header-actions a:first-child:hover,
+    .mobile-header-actions button:first-child:focus,
+    .mobile-header-actions a:first-child:focus {
+        opacity: 1 !important;
+    }
+</style>
+<!-- /NOVA_MOBILE_HEADER_ACTIONS_UNBLOCK_20260705 -->
 </head>
 
 <body>
@@ -4675,6 +4736,7 @@ composer.style.setProperty("overflow", "visible", "important");
 </html>
 
 <!-- DEPLOY_MARKER_UPLOAD_MENU_OWNER_EE1B706_20260705 -->
+
 
 
 
