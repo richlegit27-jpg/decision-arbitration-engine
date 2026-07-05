@@ -1,4 +1,4 @@
-from nova_backend.services.chat_turn_pipeline import build_chat_turn_from_request
+from nova_backend.services.chat_turn_pipeline import build_chat_turn_from_request, build_model_messages
 
 from __future__ import annotations
 
@@ -11762,7 +11762,16 @@ if (not attachments) and (__name__ == "__main__"):
                     getattr(self, "chat_model", "")
                     or getattr(self, "model", "")
                     or ""
-                ),
+                )
+
+            # NOVA_CHAT_TURN_MESSAGES_SHADOW_20260705
+
+            self._last_chat_turn_messages_shadow = build_model_messages(
+
+                self._last_chat_turn_shadow
+
+            )
+,
                 metadata={"source": "chat_service.handle.shadow"},
             )
         except Exception as _nova_turn_error:
