@@ -648,6 +648,33 @@ def mobile():
 # HEALTH
 # -----------------------
 
+
+# ============================================================
+# NOVA_USAGE_API_ROUTES_ACTIVE_20260705
+# Token / usage tracking endpoints.
+# ============================================================
+
+@app.get("/api/usage")
+def nova_api_usage_summary_active_20260705():
+    try:
+        from nova_backend.services.usage_ledger_service import usage_summary
+        return json_ok(**usage_summary())
+    except Exception as exc:
+        return json_error(str(exc), route="nova_api_usage_summary_active_20260705")
+
+
+@app.get("/api/usage/session/<session_id>")
+def nova_api_usage_session_summary_active_20260705(session_id):
+    try:
+        from nova_backend.services.usage_ledger_service import usage_summary
+        return json_ok(**usage_summary(session_id=session_id))
+    except Exception as exc:
+        return json_error(
+            str(exc),
+            route="nova_api_usage_session_summary_active_20260705",
+            session_id=session_id,
+        )
+
 @app.get("/api/health")
 def api_health():
     return json_ok(
@@ -19599,6 +19626,7 @@ except Exception as _nvcvr_error:
         print("[NOVA_MOBILE_CHAT_VISIBLE_RECOVERY_INJECT_20260703] install failed:", _nvcvr_error)
     except Exception:
         pass
+
 
 
 
