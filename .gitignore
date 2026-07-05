@@ -65,3 +65,20 @@ static/**/*.[Bb][Aa][Kk]*
 static/**/*.bak*
 static/**/*BROKEN*
 static/**/*STABLE*
+
+# NOVA_GENERATED_REGRESSION_CLUTTER_20260705
+*.backup-*
+app.py.backup-*
+**/*.backup-*
+__pycache__/
+.pytest_cache/
+*.pyc
+runtime/regression_tools/smoke_*.py
+runtime/regression_tools/patch_*.py
+uploads/*smoke*
+uploads/*compat*
+uploads/*chain*
+uploads/*readiness*
+uploads/*no-web*
+uploads/*summary*
+uploads/*canonical*
