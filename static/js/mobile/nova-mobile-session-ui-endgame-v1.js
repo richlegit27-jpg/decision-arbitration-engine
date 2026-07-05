@@ -239,3 +239,233 @@
 
     console.log(LOG, "installed");
 })();
+
+/* NOVA_SESSION_UI_AGGRESSIVE_CLOSE_V2_START */
+(function () {
+    "use strict";
+
+    if (window.__NOVA_MOBILE_SESSION_UI_ENDGAME_AGGRESSIVE_CLOSE_V2_20260704__) {
+        return;
+    }
+
+    window.__NOVA_MOBILE_SESSION_UI_ENDGAME_AGGRESSIVE_CLOSE_V2_20260704__ = true;
+
+    const LOG = "[Nova Mobile Session UI Aggressive Close V2]";
+
+    function txt(el) {
+        if (!el) return "";
+
+        return [
+            el.id || "",
+            el.className || "",
+            el.getAttribute && (el.getAttribute("aria-label") || ""),
+            el.getAttribute && (el.getAttribute("title") || ""),
+            el.getAttribute && (el.getAttribute("role") || ""),
+            el.getAttribute && (el.getAttribute("data-action") || ""),
+            el.textContent || ""
+        ].join(" ").toLowerCase();
+    }
+
+    function visible(el) {
+        if (!el || !el.getBoundingClientRect) return false;
+
+        const style = getComputedStyle(el);
+        if (
+            style.display === "none" ||
+            style.visibility === "hidden" ||
+            Number(style.opacity || "1") <= 0.01
+        ) {
+            return false;
+        }
+
+        const rect = el.getBoundingClientRect();
+
+        return (
+            rect.width >= 80 &&
+            rect.height >= 80 &&
+            rect.bottom > 0 &&
+            rect.right > 0 &&
+            rect.top < window.innerHeight &&
+            rect.left < window.innerWidth
+        );
+    }
+
+    function isBadCandidate(el) {
+        if (!el || el === document.body || el === document.documentElement) {
+            return true;
+        }
+
+        const tag = (el.tagName || "").toLowerCase();
+        if (/^(script|style|link|meta|html|body|button|input|textarea|select|option|svg|path)$/.test(tag)) {
+            return true;
+        }
+
+        const t = txt(el);
+
+        return /mobilechatmessages|chatmessages|chat-message|composer|textarea|chat-input|message-input|final-input|quick-prompt|upload|preview-bar/.test(t);
+    }
+
+    function scoreSurface(el) {
+        if (isBadCandidate(el) || !visible(el)) {
+            return -999;
+        }
+
+        const t = txt(el);
+        const style = getComputedStyle(el);
+        const rect = el.getBoundingClientRect();
+
+        let score = 0;
+
+        if (/session|sessions|conversation|history|drawer|panel|sidebar|sheet|modal|overlay/.test(t)) score += 8;
+        if (/close|rename|pin|delete|new chat|chat history|session list/.test(t)) score += 4;
+        if (style.position === "fixed" || style.position === "absolute") score += 5;
+        if (Number(style.zIndex || "0") >= 10) score += 3;
+        if (rect.width >= 180 && rect.height >= 180) score += 3;
+        if (rect.left <= 40 || rect.right >= window.innerWidth - 40) score += 2;
+        if (rect.height >= window.innerHeight * 0.4) score += 2;
+
+        return score;
+    }
+
+    function findSurfaces() {
+        const selector = [
+            "[id*='session' i]",
+            "[class*='session' i]",
+            "[id*='drawer' i]",
+            "[class*='drawer' i]",
+            "[id*='panel' i]",
+            "[class*='panel' i]",
+            "[id*='sidebar' i]",
+            "[class*='sidebar' i]",
+            "[id*='sheet' i]",
+            "[class*='sheet' i]",
+            "[id*='modal' i]",
+            "[class*='modal' i]",
+            "[id*='overlay' i]",
+            "[class*='overlay' i]",
+            "[id*='history' i]",
+            "[class*='history' i]",
+            "[id*='conversation' i]",
+            "[class*='conversation' i]"
+        ].join(",");
+
+        return [...document.querySelectorAll(selector)]
+            .map(el => ({ el, score: scoreSurface(el) }))
+            .filter(x => x.score >= 8)
+            .sort((a, b) => b.score - a.score)
+            .map(x => x.el);
+    }
+
+    function hardClose(el) {
+        if (!el) return false;
+
+        el.classList.remove(
+            "open",
+            "opened",
+            "active",
+            "show",
+            "shown",
+            "visible",
+            "is-open",
+            "drawer-open",
+            "panel-open"
+        );
+
+        el.setAttribute("aria-hidden", "true");
+        el.dataset.novaAggressiveClosed = "true";
+
+        el.style.setProperty("display", "none", "important");
+        el.style.setProperty("visibility", "hidden", "important");
+        el.style.setProperty("opacity", "0", "important");
+        el.style.setProperty("pointer-events", "none", "important");
+        el.style.setProperty("transform", "translateX(120%)", "important");
+
+        return true;
+    }
+
+    function closeAll(reason) {
+        const surfaces = findSurfaces();
+        surfaces.forEach(hardClose);
+
+        console.log(LOG, "closeAll", {
+            reason,
+            closed: surfaces.length,
+            surfaces
+        });
+
+        return surfaces.length > 0;
+    }
+
+    function looksCloseLike(el) {
+        if (!el) return false;
+
+        const t = txt(el).trim();
+
+        return (
+            t === "x" ||
+            t === "×" ||
+            t === "close" ||
+            /(^|\s)(x|×|close|dismiss|hide|back)(\s|$)/.test(t) ||
+            /close|dismiss|hide/.test(t)
+        );
+    }
+
+    document.addEventListener("click", function (event) {
+        const target = event.target;
+
+        const clickable = target && target.closest
+            ? target.closest("button, a, [role='button'], [aria-label], [title], [data-action], .close, .btn-close")
+            : null;
+
+        if (!clickable || !looksCloseLike(clickable)) {
+            return;
+        }
+
+        const didClose = closeAll("captured-close-click");
+
+        if (didClose) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+        }
+    }, true);
+
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+            closeAll("escape");
+        }
+    }, true);
+
+    const oldApi = window.NovaMobileSessionUiEndgameV1 || {};
+
+    window.NovaMobileSessionUiEndgameV1 = Object.assign(oldApi, {
+        close: function () {
+            return closeAll("manual-close");
+        },
+        closeAll: function () {
+            return closeAll("manual-close-all");
+        },
+        dumpSurfaces: function () {
+            const surfaces = findSurfaces();
+
+            console.table(surfaces.map(function (el) {
+                const rect = el.getBoundingClientRect();
+                return {
+                    tag: el.tagName,
+                    id: el.id,
+                    className: String(el.className || ""),
+                    score: scoreSurface(el),
+                    width: Math.round(rect.width),
+                    height: Math.round(rect.height),
+                    text: (el.textContent || "").trim().slice(0, 80)
+                };
+            }));
+
+            return surfaces;
+        }
+    });
+
+    console.log(LOG, "installed");
+})();
+/* NOVA_SESSION_UI_AGGRESSIVE_CLOSE_V2_END */
+
