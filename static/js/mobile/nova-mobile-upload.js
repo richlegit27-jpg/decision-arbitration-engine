@@ -30,7 +30,6 @@
     function findAttachButtons() {
         return Array.from(document.querySelectorAll([
             "#nova-mobile-attach",
-            "[data-mobile-tool='upload']",
             "[data-mobile-tool='attach']",
             "[aria-label='Attach']",
             "[title='Attach']"
@@ -391,4 +390,5 @@
 
     log("installed");
 })();
+
 
