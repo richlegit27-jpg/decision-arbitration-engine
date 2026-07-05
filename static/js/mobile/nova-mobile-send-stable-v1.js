@@ -1,7 +1,7 @@
 ﻿(function () {
     "use strict";
 
-    var VERSION = "mobile-send-stable-v1-20260703";
+    var VERSION = "send-stable-universal-attachment-collector-20260705-004";
     window.__NOVA_MOBILE_SEND_STABLE_V1_20260703__ = VERSION;
 
     var inFlight = false;
@@ -130,20 +130,63 @@
         );
     }
 
-return {
-    id: item.id || item.attachment_id || item.file_id || "",
-    attachment_id: item.attachment_id || item.id || item.file_id || "",
-    filename: filename,
-    name: filename,
-    url: url,
-    file_url: url,
-    path: item.path || item.upload_path || item.saved_path || item.file_path || url,
-    mime_type: mimeType,
-    type: mimeType,
-    content_type: mimeType,
-    size: size,
-    size_bytes: size
-};
+function normalizeAttachmentForSend(item) {
+    if (!item || typeof item !== "object") {
+        return null;
+    }
+
+    var filename =
+        item.filename ||
+        item.name ||
+        item.file_name ||
+        item.original_name ||
+        item.original_filename ||
+        "";
+
+    var url =
+        item.url ||
+        item.file_url ||
+        item.fileUrl ||
+        item.path ||
+        item.upload_path ||
+        item.saved_path ||
+        item.file_path ||
+        item.upload_url ||
+        item.uploadUrl ||
+        "";
+
+    var mimeType =
+        item.mime_type ||
+        item.mimeType ||
+        item.type ||
+        item.content_type ||
+        "";
+
+    var size =
+        item.size ||
+        item.size_bytes ||
+        item.sizeBytes ||
+        null;
+
+    if (!filename && !url) {
+        return null;
+    }
+
+    return {
+        id: item.id || item.attachment_id || item.file_id || "",
+        attachment_id: item.attachment_id || item.id || item.file_id || "",
+        filename: filename,
+        name: filename,
+        url: url,
+        file_url: url,
+        path: item.path || item.upload_path || item.saved_path || item.file_path || url,
+        mime_type: mimeType,
+        type: mimeType,
+        content_type: mimeType,
+        size: size,
+        size_bytes: size
+    };
+}
 
 function addAttachmentCandidates(out, value) {
     if (!value) {
@@ -507,6 +550,7 @@ if (pendingAttachments.length) {
 } else {
     log("sending without attachments");
 }
+
 fetch("/api/chat", {
     method: "POST",
     credentials: "include",
