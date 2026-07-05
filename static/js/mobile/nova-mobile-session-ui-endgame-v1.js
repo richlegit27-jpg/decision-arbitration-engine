@@ -689,3 +689,85 @@
 })();
 /* NOVA_SESSION_UI_FORCE_SESSIONS_OPENER_V3_END */
 
+/* NOVA_VISIBLE_SESSIONS_LAUNCHER_FINAL_V4_START */
+(function () {
+    "use strict";
+
+    if (window.__NOVA_VISIBLE_SESSIONS_LAUNCHER_FINAL_V4_20260704__) {
+        return;
+    }
+
+    window.__NOVA_VISIBLE_SESSIONS_LAUNCHER_FINAL_V4_20260704__ = true;
+
+    const LOG = "[Nova Visible Sessions Launcher Final V4]";
+
+    function showLauncher() {
+        if (!document.body) {
+            setTimeout(showLauncher, 50);
+            return;
+        }
+
+        let btn = document.getElementById("nova-visible-sessions-launcher-final");
+
+        if (!btn) {
+            btn = document.createElement("button");
+            btn.id = "nova-visible-sessions-launcher-final";
+            btn.type = "button";
+            btn.textContent = "☰ Sessions";
+            btn.setAttribute("aria-label", "Sessions");
+            btn.setAttribute("title", "Sessions");
+
+            btn.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
+
+                console.log(LOG, "clicked");
+
+                if (
+                    window.NovaMobileSessionUiEndgameV1 &&
+                    typeof window.NovaMobileSessionUiEndgameV1.openSessions === "function"
+                ) {
+                    window.NovaMobileSessionUiEndgameV1.openSessions("visible-launcher-click");
+                }
+            }, true);
+
+            document.body.appendChild(btn);
+        }
+
+        btn.hidden = false;
+        btn.removeAttribute("hidden");
+        btn.removeAttribute("inert");
+        btn.setAttribute("aria-hidden", "false");
+
+        btn.style.setProperty("position", "fixed", "important");
+        btn.style.setProperty("left", "12px", "important");
+        btn.style.setProperty("bottom", "88px", "important");
+        btn.style.setProperty("width", "150px", "important");
+        btn.style.setProperty("height", "52px", "important");
+        btn.style.setProperty("z-index", "2147483647", "important");
+        btn.style.setProperty("display", "flex", "important");
+        btn.style.setProperty("align-items", "center", "important");
+        btn.style.setProperty("justify-content", "center", "important");
+        btn.style.setProperty("border-radius", "16px", "important");
+        btn.style.setProperty("border", "2px solid rgba(255,255,255,0.35)", "important");
+        btn.style.setProperty("background", "#6d28d9", "important");
+        btn.style.setProperty("color", "#fff", "important");
+        btn.style.setProperty("font-size", "16px", "important");
+        btn.style.setProperty("font-weight", "800", "important");
+        btn.style.setProperty("box-shadow", "0 12px 30px rgba(0,0,0,0.45)", "important");
+        btn.style.setProperty("pointer-events", "auto", "important");
+
+        setTimeout(showLauncher, 1000);
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", showLauncher, { once: true });
+    } else {
+        showLauncher();
+    }
+
+    console.log(LOG, "installed");
+})();
+/* NOVA_VISIBLE_SESSIONS_LAUNCHER_FINAL_V4_END */
+
