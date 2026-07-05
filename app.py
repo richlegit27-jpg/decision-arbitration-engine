@@ -20022,6 +20022,85 @@ except Exception as _nmssv1_error_20260703:
 
 
 
+
+
+# NOVA_CHAT_TURN_DRY_RUN_ROUTE_20260705
+@app.route("/api/debug/chat-turn-dry-run", methods=["POST"])
+def api_debug_chat_turn_dry_run():
+    try:
+        from flask import jsonify, request
+        from nova_backend.services.chat_turn_pipeline import (
+            build_chat_turn_from_request,
+            build_model_messages,
+        )
+
+        payload = request.get_json(silent=True) or {}
+
+        turn = build_chat_turn_from_request(
+            payload,
+            metadata={"source": "api_debug_chat_turn_dry_run"},
+        )
+        messages = build_model_messages(turn)
+
+        safe_messages = []
+        for message in messages:
+            content = message.get("content", "") if isinstance(message, dict) else ""
+            safe_messages.append(
+                {
+                    "role": message.get("role", "") if isinstance(message, dict) else "",
+                    "content_length": len(content),
+                    "content_preview": content[:240],
+                }
+            )
+
+        attachments = []
+        for item in turn.attachments:
+            attachments.append(
+                {
+                    "id": item.id,
+                    "filename": item.filename,
+                    "mime_type": item.mime_type,
+                    "kind": item.kind,
+                    "has_url": bool(item.url),
+                }
+            )
+
+        return jsonify(
+            {
+                "ok": True,
+                "turn": {
+                    "request_id": turn.request_id,
+                    "session_id": turn.session_id,
+                    "intent": turn.intent,
+                    "user_text_preview": turn.user_text[:240],
+                    "user_text_length": len(turn.user_text),
+                    "attachment_count": len(turn.attachments),
+                    "attachments": attachments,
+                    "history_count": len(turn.history),
+                    "memory_count": len(turn.memory),
+                    "attachment_context_count": len(turn.attachment_context),
+                    "tool_result_count": len(turn.tool_results),
+                    "metadata": turn.metadata,
+                },
+                "messages": {
+                    "count": len(messages),
+                    "items": safe_messages,
+                },
+            }
+        )
+
+    except Exception as error:
+        try:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": str(error),
+                }
+            ), 500
+        except Exception:
+            return {"ok": False, "error": str(error)}, 500
+
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
