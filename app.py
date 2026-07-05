@@ -20243,6 +20243,74 @@ def api_debug_attachment_intent_guard():
 
 
 
+
+
+# NOVA_ATTACHMENT_READINESS_DEBUG_ROUTE_20260705
+@app.route("/api/debug/attachment-readiness", methods=["POST"])
+def api_debug_attachment_readiness():
+    try:
+        if not _nova_debug_routes_enabled():
+            return _nova_debug_routes_disabled_response()
+
+        from flask import jsonify, request
+        from nova_backend.services.chat_attachment_payload_normalizer import (
+            normalize_api_chat_attachments,
+        )
+        from nova_backend.services.chat_turn_attachment_hydrator import (
+            hydrate_attachments_for_context,
+        )
+        from nova_backend.services.chat_turn_attachment_context import (
+            build_attachment_context_text,
+        )
+        from nova_backend.services.chat_attachment_intent_guard import (
+            attachment_guard_metadata,
+        )
+
+        payload = request.get_json(silent=True) or {}
+
+        user_text = (
+            payload.get("message")
+            or payload.get("text")
+            or payload.get("user_text")
+            or payload.get("prompt")
+            or ""
+        )
+
+        attachments = normalize_api_chat_attachments(payload)
+        hydrated = hydrate_attachments_for_context(attachments)
+        context_text = build_attachment_context_text(hydrated)
+        guard = attachment_guard_metadata(user_text, payload)
+
+        return jsonify(
+            {
+                "ok": True,
+                "message_text": user_text,
+                "attachment_count": len(attachments),
+                "hydrated_attachment_count": len(hydrated),
+                "attachment_context_present": bool(context_text),
+                "attachment_context_marker_present": "NOVA_ATTACHMENT_CONTEXT_20260705" in context_text,
+                "attachment_context_preview": context_text[:1200],
+                "guard": guard,
+            }
+        )
+    except Exception as exc:
+        try:
+            from flask import jsonify
+
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": str(exc),
+                }
+            ), 500
+        except Exception:
+            return {
+                "ok": False,
+                "error": str(exc),
+            }, 500
+
+
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
