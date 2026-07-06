@@ -20350,6 +20350,15 @@ def api_debug_attachment_web_guard_dry_run():
 
         suppressed = bool(boundary_attachments and attachment_focused and not explicit_web)
 
+        if suppressed:
+            reason = "attachment_focused_turn"
+        elif explicit_web:
+            reason = "explicit_web_request"
+        elif not boundary_attachments:
+            reason = "no_boundary_attachments"
+        else:
+            reason = "not_attachment_focused"
+
         return jsonify(
             {
                 "ok": True,
@@ -20360,13 +20369,30 @@ def api_debug_attachment_web_guard_dry_run():
                 "explicit_web": explicit_web,
                 "suppressed": suppressed,
                 "would_suppress_web": suppressed,
+                "reason": reason,
             }
         )
     except Exception as error:
         try:
-            return jsonify({"ok": False, "available": False, "error": str(error)}), 500
+            return jsonify(
+                {
+                    "ok": False,
+                    "available": False,
+                    "suppressed": False,
+                    "would_suppress_web": False,
+                    "reason": "error",
+                    "error": str(error),
+                }
+            ), 500
         except Exception:
-            return {"ok": False, "available": False, "error": str(error)}, 500
+            return {
+                "ok": False,
+                "available": False,
+                "suppressed": False,
+                "would_suppress_web": False,
+                "reason": "error",
+                "error": str(error),
+            }, 500
 # NOVA_UPLOAD_ATTACHMENT_RESPONSE_NORMALIZER_HOOK_20260705
 try:
     @app.after_request
