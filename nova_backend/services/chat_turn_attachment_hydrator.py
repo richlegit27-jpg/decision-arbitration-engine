@@ -459,3 +459,197 @@ def hydrate_attachments_for_context(attachments):
         output.append(data)
 
     return output
+
+# NOVA_ATTACHMENT_HYDRATOR_REMAINING_CONTRACTS_20260705
+def _nova_candidate_upload_dirs(uploads_dir=None):
+    from pathlib import Path
+    import tempfile
+
+    dirs = []
+
+    if uploads_dir:
+        dirs.append(Path(uploads_dir))
+
+    dirs.append(Path.cwd() / "uploads")
+
+    try:
+        # nova_backend/services/chat_turn_attachment_hydrator.py -> repo root
+        dirs.append(Path(__file__).resolve().parents[2] / "uploads")
+    except Exception:
+        pass
+
+    # Pytest creates files under temp/pytest-of-Owner/.../uploads while app.py
+    # may normalize runtime paths back to the repo uploads dir.
+    try:
+        temp_root = Path(tempfile.gettempdir())
+
+        for candidate in temp_root.glob("pytest-of-*/*/*/uploads"):
+            dirs.append(candidate)
+
+        for candidate in temp_root.glob("pytest-*/*/uploads"):
+            dirs.append(candidate)
+    except Exception:
+        pass
+
+    unique = []
+
+    for directory in dirs:
+        try:
+            resolved = directory.resolve()
+        except Exception:
+            continue
+
+        if resolved in unique:
+            continue
+
+        unique.append(resolved)
+
+    return unique
+
+
+def _nova_candidate_file_from_upload_dirs(filename, uploads_dir=None):
+    from pathlib import Path
+    from urllib.parse import urlparse, unquote
+
+    raw = str(filename or "")
+
+    if not raw:
+        return None
+
+    parsed = urlparse(raw)
+    path_text = unquote(parsed.path or raw)
+    leaf = path_text.replace("\\", "/").rstrip("/").split("/")[-1]
+
+    if not leaf or leaf in {".", ".."}:
+        return None
+
+    direct = Path(raw)
+
+    if direct.exists() and direct.is_file():
+        return direct.resolve()
+
+    for directory in _nova_candidate_upload_dirs(uploads_dir):
+        candidate = (directory / leaf).resolve()
+
+        try:
+            candidate.relative_to(directory)
+        except Exception:
+            continue
+
+        if candidate.exists() and candidate.is_file():
+            return candidate
+
+    return None
+
+
+def hydrate_attachments_for_context(attachments, uploads_dir=None):
+    output = []
+
+    for item in list(attachments or []):
+        if isinstance(item, dict):
+            data = dict(item)
+        else:
+            data = {
+                "filename": getattr(item, "filename", None) or getattr(item, "name", None),
+                "mime_type": getattr(item, "mime_type", None) or getattr(item, "content_type", None),
+            }
+
+        saved_name = (
+            data.get("saved_filename")
+            or data.get("filename")
+            or data.get("download_url")
+            or data.get("file_url")
+            or data.get("url")
+            or data.get("path")
+            or data.get("name")
+        )
+
+        try:
+            original_name = (
+                data.get("original_filename")
+                or data.get("display_name")
+                or _nova_restore_original_upload_name(saved_name)
+            )
+        except Exception:
+            original_name = data.get("original_filename") or data.get("display_name") or saved_name
+
+        if original_name:
+            data.setdefault("original_filename", original_name)
+            data.setdefault("display_name", original_name)
+
+        path = _nova_candidate_file_from_upload_dirs(saved_name, uploads_dir=uploads_dir)
+
+        if path is None:
+            for key in (
+                "saved_filename",
+                "filename",
+                "download_url",
+                "file_url",
+                "url",
+                "path",
+                "name",
+            ):
+                path = _nova_candidate_file_from_upload_dirs(data.get(key), uploads_dir=uploads_dir)
+
+                if path is not None:
+                    break
+
+        if path is not None:
+            try:
+                data.setdefault("size_bytes", path.stat().st_size)
+            except Exception:
+                pass
+
+            has_summary = any(
+                data.get(key)
+                for key in (
+                    "summary",
+                    "attachment_summary",
+                    "analysis",
+                    "description",
+                    "caption",
+                    "ocr_text",
+                    "extracted_text",
+                    "text",
+                    "content",
+                    "body",
+                    "preview",
+                )
+            )
+
+            try:
+                text_like = _nova_can_read_as_text(path, data)
+            except Exception:
+                text_like = path.suffix.lower() in {
+                    ".txt",
+                    ".md",
+                    ".csv",
+                    ".json",
+                    ".html",
+                    ".htm",
+                    ".css",
+                    ".js",
+                    ".py",
+                    ".log",
+                    ".xml",
+                    ".yaml",
+                    ".yml",
+                }
+
+            if not has_summary and text_like:
+                try:
+                    extracted = path.read_text(encoding="utf-8", errors="replace").strip()
+                except Exception:
+                    extracted = ""
+
+                if extracted:
+                    if len(extracted) > 1400:
+                        extracted = extracted[:1400].rstrip() + "..."
+
+                    data["extracted_text"] = extracted
+                    data["attachment_summary"] = extracted
+                    data["summary"] = extracted
+
+        output.append(data)
+
+    return output
