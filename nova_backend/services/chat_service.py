@@ -26594,3 +26594,155 @@ try:
     _nova_attachment_guard_install_web_routing_suppression()
 except Exception:
     pass
+
+# NOVA_CHAT_SERVICE_ATTACHMENT_WEB_SUPPRESSION_RESULT_WRAP_V3_20260705
+def _nova_attachment_guard_method_looks_like_bool_web_route(name):
+    lowered = str(name or "").lower()
+
+    return (
+        "web" in lowered
+        and (
+            lowered.startswith("_should")
+            or lowered.startswith("should")
+            or lowered.startswith("_needs")
+            or lowered.startswith("needs")
+            or lowered.startswith("_route")
+            or lowered.startswith("route")
+        )
+    )
+
+
+def _nova_attachment_guard_method_looks_like_result_web_route(name):
+    lowered = str(name or "").lower()
+
+    if not (
+        "web" in lowered
+        or "fetch" in lowered
+        or "search" in lowered
+        or "lookup" in lowered
+    ):
+        return False
+
+    if _nova_attachment_guard_method_looks_like_bool_web_route(lowered):
+        return False
+
+    blocked = (
+        "suppress",
+        "guard",
+        "install",
+        "wrap",
+        "predicate",
+        "should",
+        "needs",
+    )
+
+    if any(word in lowered for word in blocked):
+        return False
+
+    return True
+
+
+def _nova_attachment_guard_install_web_routing_suppression():
+    wrapped_bool_methods = []
+    wrapped_result_methods = []
+
+    bool_route_names = (
+        "_should_use_web",
+        "_should_use_web_search",
+        "_should_search_web",
+        "_needs_web",
+        "_needs_web_search",
+        "_route_to_web",
+        "_should_route_to_web",
+        "should_use_web",
+        "should_search_web",
+        "needs_web_search",
+    )
+
+    result_route_names = (
+        "_execute_web_fetch",
+        "execute_web_fetch",
+        "_perform_web_fetch",
+        "perform_web_fetch",
+        "_web_fetch",
+        "web_fetch",
+        "_run_web_search",
+        "run_web_search",
+        "_execute_web_search",
+        "execute_web_search",
+        "_perform_web_search",
+        "perform_web_search",
+        "_get_web_results",
+        "get_web_results",
+        "_fetch_web_results",
+        "fetch_web_results",
+        "_search_web",
+        "search_web",
+    )
+
+    for name in bool_route_names:
+        try:
+            if _nova_attachment_guard_wrap_module_bool_route(name):
+                wrapped_bool_methods.append(name)
+        except Exception:
+            pass
+
+    for name in result_route_names:
+        try:
+            if _nova_attachment_guard_wrap_module_result_route(name):
+                wrapped_result_methods.append(name)
+        except Exception:
+            pass
+
+    for object_name, value in list(globals().items()):
+        if not isinstance(value, type):
+            continue
+
+        method_names = []
+
+        try:
+            method_names.extend(list(vars(value).keys()))
+        except Exception:
+            method_names = []
+
+        for method_name in set(list(bool_route_names) + method_names):
+            if not _nova_attachment_guard_method_looks_like_bool_web_route(method_name):
+                if method_name not in bool_route_names:
+                    continue
+
+            try:
+                if _nova_attachment_guard_wrap_class_bool_route(value, method_name):
+                    wrapped_bool_methods.append(f"{object_name}.{method_name}")
+            except Exception:
+                pass
+
+        for method_name in set(list(result_route_names) + method_names):
+            if not _nova_attachment_guard_method_looks_like_result_web_route(method_name):
+                if method_name not in result_route_names:
+                    continue
+
+            try:
+                if _nova_attachment_guard_wrap_class_result_route(value, method_name):
+                    wrapped_result_methods.append(f"{object_name}.{method_name}")
+            except Exception:
+                pass
+
+    wrapped = list(wrapped_bool_methods) + list(wrapped_result_methods)
+
+    return {
+        "ok": True,
+        "installed": True,
+        "wrapped": wrapped,
+        "wrapped_bool_methods": wrapped_bool_methods,
+        "wrapped_result_methods": wrapped_result_methods,
+    }
+
+
+def _nova_install_attachment_guard_web_suppression():
+    return _nova_attachment_guard_install_web_routing_suppression()
+
+
+try:
+    _nova_attachment_guard_install_web_routing_suppression()
+except Exception:
+    pass
