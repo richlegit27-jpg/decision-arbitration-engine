@@ -209,21 +209,6 @@
         );
     }
 
-    document.addEventListener("click", function (event) {
-        if (!isSessionsButton(event.target)) return;
-
-        if (typeof window.NovaMobileFinalSessionActionsOpen !== "function") {
-            return;
-        }
-
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
-
-        window.NovaMobileFinalSessionActionsOpen();
-    }, true);
-
-    console.log("[Nova Mobile Sessions Button Final Owner] ready");
 })();
 
 // NOVA_MOBILE_RESTORE_QUICK_PROMPTS_20260610

@@ -46,7 +46,12 @@
             window.NovaMobileBridge.scrollBottom();
         }
 
-        if (role !== "system" && !window.__NOVA_SESSION_RENDERING__) {
+if (
+    role !== "system" &&
+    !window.__NOVA_SESSION_RENDERING__ &&
+    !window.__NOVA_SUPPRESS_SAVE
+) {
+
             setTimeout(function () {
                 if (
                     window.NovaMobileBridge &&
@@ -140,6 +145,49 @@ if (!bubble && window.__NOVA_SESSION_RENDERING__) {
         createThinkingBubble,
         updateThinkingBubble
     };
+
+window.addEventListener("nova:session-selected", function (event) {
+    const sessionId = event.detail?.session_id;
+    const session = event.detail?.session;
+
+    if (!sessionId) return;
+
+    // 1. mark rendering state
+    window.__NOVA_SESSION_RENDERING__ = true;
+
+    // 2. clear UI
+    if (window.chatContainer) {
+        window.chatContainer.innerHTML = "";
+    }
+
+    // 3. reset local state
+    window.NOVA_MESSAGES = [];
+
+    // 4. rebuild messages from session
+    const messages = session?.messages || [];
+
+    window.NOVA_MESSAGES = messages;
+
+    // 5. render all messages using existing function
+    if (Array.isArray(messages)) {
+        messages.forEach(msg => {
+            appendMessage(msg.role, msg.content);
+        });
+    }
+
+    // 6. stop rendering flag
+    setTimeout(() => {
+        window.__NOVA_SESSION_RENDERING__ = false;
+    }, 0);
+
+    // 7. scroll fix
+    if (
+        window.NovaMobileBridge &&
+        typeof window.NovaMobileBridge.scrollBottom === "function"
+    ) {
+        window.NovaMobileBridge.scrollBottom();
+    }
+});
 
 })();
 

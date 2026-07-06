@@ -16486,3 +16486,169 @@ a {
 }
 
 /* End full mobile CSS */
+
+/* =========================================================
+   NOVA MOBILE UI - FULL STYLESHEET (UPDATED STOP BUTTON)
+   ========================================================= */
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: #0f0f10;
+    color: #ffffff;
+    overflow: hidden;
+}
+
+/* =========================================================
+   CHAT LAYOUT
+   ========================================================= */
+
+.chat-container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* =========================================================
+   MESSAGE STYLES
+   ========================================================= */
+
+.message {
+    margin: 8px 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    max-width: 85%;
+    word-wrap: break-word;
+    line-height: 1.3;
+}
+
+.message.user {
+    background: #2a2a2e;
+    margin-left: auto;
+}
+
+.message.assistant {
+    background: #1b1b1f;
+    margin-right: auto;
+}
+
+/* =========================================================
+   COMPOSER BAR
+   ========================================================= */
+
+.composer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    border-top: 1px solid #222;
+    background: #0f0f10;
+    position: sticky;
+    bottom: 0;
+}
+
+/* input field */
+.composer input {
+    flex: 1;
+    padding: 10px;
+    border-radius: 10px;
+    border: none;
+    outline: none;
+    background: #1c1c20;
+    color: #fff;
+    font-size: 14px;
+}
+
+/* =========================================================
+   BUTTON BASES
+   ========================================================= */
+
+.icon-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    border: none;
+    background: #1c1c20;
+    color: #fff;
+    cursor: pointer;
+}
+
+/* SEND BUTTON */
+#send-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    border: none;
+    background: #4c7dff;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* =========================================================
+   STOP BUTTON (ANIMATED SQUARE)
+   ========================================================= */
+
+#stop-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    border: none;
+    background: #ff3b3b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    animation: stopPulse 1.2s infinite ease-in-out;
+}
+
+/* inner square */
+#stop-btn::after {
+    content: "";
+    width: 14px;
+    height: 14px;
+    background: #ffffff;
+    border-radius: 2px;
+}
+
+/* pulse animation */
+@keyframes stopPulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.06);
+        opacity: 0.85;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* hidden state */
+.hidden {
+    display: none !important;
+}
+
+/* =========================================================
+   SCROLLBAR (OPTIONAL POLISH)
+   ========================================================= */
+
+.messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+.messages::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 10px;
+}

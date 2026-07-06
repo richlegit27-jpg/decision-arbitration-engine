@@ -1,6 +1,5 @@
 from nova_backend.services.tools.tool_detector import ToolDetector
 
-
 class NovaOrchestrator:
     """
     Central Brain Controller for Nova (STABLE VERSION)
@@ -87,7 +86,14 @@ class NovaOrchestrator:
             tool_name = tool_request["tool"]
             payload = tool_request.get("payload", {})
 
-            allowed = getattr(self.tool_executor, "allowed_tools", set())
+            allowed = getattr(self.tool_executor, "allowed_tools", None)
+
+            if allowed is None:
+                return {
+                    "ok": False,
+                    "error": "tool_executor_missing_allowed_tools",
+                    "tool": tool_name
+                }
 
             if tool_name in allowed:
                 tool_result = self.tool_executor.run(tool_name, payload)
@@ -149,20 +155,8 @@ class NovaOrchestrator:
             return None
 
         try:
-            from nova_backend.app import extract_memory_fact
-            from nova_backend.app import memory_exists_for_session
-        except Exception:
-            return None
+            extract_memory_fact = getattr(self.memory_service, "extract_memory_fact", None)
 
-        fact = extract_memory_fact(text)
-        if not fact:
-            return None
-
-        try:
-            if memory_exists_for_session(session_id, fact["text"]):
-                return fact
-        except Exception:
-            pass
 
         try:
             self.memory_service.add(

@@ -3770,11 +3770,7 @@ if (not attachments) and (__name__ == "__main__"):
     ):
 
         self.runtime_cognitive_firewall = RuntimeCognitiveFirewall()
-
-        # =========================
-        # CORE SERVICES
-        # =========================
-
+        self.usage_tracker = UsageTracker()
         self.session_service = session_service
         self.memory_service = memory_service
         self.artifact_service = artifact_service
@@ -11884,28 +11880,57 @@ if (not attachments) and (__name__ == "__main__"):
             "verified": False,
         })
 
+def handle(self, user_text: str, session_id: str = "", attachments=None):
 
-    def handle(self, user_text: str, session_id: str = "", attachments=None):
+    attachments = attachments or []
 
-        # NOVA_CHAT_TURN_HANDLE_HELPER_SHADOW_20260705
-        try:
-            _nova_turn_payload = {
-                _key: _value
-                for _key, _value in locals().items()
-                if _key != "self"
-            }
-            self._nova_build_chat_turn_shadow(
-                _nova_turn_payload,
-                metadata={"source": "chat_service.handle.shadow"},
-            )
-        except Exception as _nova_turn_error:
-            self._last_chat_turn_shadow = None
-            self._last_chat_turn_messages_shadow = []
+    try:
+        _nova_turn_payload = {
+            _key: _value
+            for _key, _value in locals().items()
+            if _key != "self"
+        }
+
+        self._nova_build_chat_turn_shadow(
+            _nova_turn_payload,
+            metadata={"source": "chat_service.handle.shadow"},
+        )
+
+    except Exception as _nova_turn_error:
+        self._last_chat_turn_shadow = None
+        self._last_chat_turn_messages_shadow = []
+
             try:
                 print("[Nova ChatTurn Shadow Helper] failed:", _nova_turn_error)
             except Exception:
                 pass
 
+            # -------------------------
+            # STORE FAILURE DEBUG SNAPSHOT
+            # -------------------------
+            try:
+                import json
+                import os
+                from datetime import datetime
+
+                debug_dir = "nova_backend/data/shadow_logs"
+                os.makedirs(debug_dir, exist_ok=True)
+
+                debug_file = os.path.join(debug_dir, "shadow_failures.jsonl")
+
+                snapshot = {
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "error": str(_nova_turn_error),
+                    "session_id": session_id,
+                    "user_text": user_text,
+                    "attachments": str(attachments),
+                }
+
+                with open(debug_file, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(snapshot) + "\n")
+
+            except Exception:
+                pass
 
         # LIVE_STORE_HOURS_ROUTE_V1: force current business hours/open-now questions to web.
         if self._looks_like_live_store_hours_request(user_text):
@@ -11917,31 +11942,34 @@ if (not attachments) and (__name__ == "__main__"):
             )
 
         # NOVA_PROJECT_NEXT_HANDLE_EARLY_RETURN_20260701
-        # Exact early return for project-brain "what's next?" questions.
-        # This must run before generic chat/model fallback.
+        # Early routing for project "what's next?" intent
         try:
-            _nova_pn_locals_20260701 = locals()
-            _nova_pn_user_text_20260701 = ""
+            _locals = locals()
 
-            for _nova_pn_key_20260701 in ("user_text", "message", "text", "prompt", "content"):
-                _nova_pn_value_20260701 = _nova_pn_locals_20260701.get(_nova_pn_key_20260701)
-                if isinstance(_nova_pn_value_20260701, str) and _nova_pn_value_20260701.strip():
-                    _nova_pn_user_text_20260701 = _nova_pn_value_20260701.strip()
-                    break
+            _user_text = (
+                _locals.get("user_text")
+                or _locals.get("message")
+                or _locals.get("text")
+                or _locals.get("prompt")
+                or _locals.get("content")
+                or ""
+            )
 
-            if not _nova_pn_user_text_20260701:
-                _nova_pn_args_20260701 = _nova_pn_locals_20260701.get("args", ())
-                for _nova_pn_arg_20260701 in _nova_pn_args_20260701:
-                    if isinstance(_nova_pn_arg_20260701, str) and _nova_pn_arg_20260701.strip():
-                        _nova_pn_user_text_20260701 = _nova_pn_arg_20260701.strip()
+            if isinstance(_user_text, str):
+                _user_text = _user_text.strip()
+
+            if not _user_text:
+                for arg in _locals.get("args", ()):
+                    if isinstance(arg, str) and arg.strip():
+                        _user_text = arg.strip()
                         break
-                    if isinstance(_nova_pn_arg_20260701, dict):
-                        for _nova_pn_key_20260701 in ("user_text", "message", "text", "prompt", "content"):
-                            _nova_pn_value_20260701 = _nova_pn_arg_20260701.get(_nova_pn_key_20260701)
-                            if isinstance(_nova_pn_value_20260701, str) and _nova_pn_value_20260701.strip():
-                                _nova_pn_user_text_20260701 = _nova_pn_value_20260701.strip()
+                    if isinstance(arg, dict):
+                        for k in ("user_text", "message", "text", "prompt", "content"):
+                            v = arg.get(k)
+                            if isinstance(v, str) and v.strip():
+                                _user_text = v.strip()
                                 break
-                    if _nova_pn_user_text_20260701:
+                    if _user_text:
                         break
 
             if not _nova_pn_user_text_20260701:

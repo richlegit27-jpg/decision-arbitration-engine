@@ -7,6 +7,11 @@ Final guard:
 - hides stray attachment ? markers
 */
 
+function NOVA_UI_ALLOWED() {
+    return !window.__NOVA_SESSION_PANEL_LOCK__ &&
+           !window.__NOVA_POLISH_DISABLED__;
+}
+
 (function () {
 
     // NOVA_MOBILE_ARIA_HIDDEN_SETATTRIBUTE_FOCUS_GUARD_20260701
@@ -207,7 +212,8 @@ Final guard:
         });
     }
 
-    function polish() {
+function polish() {
+    if (window.__NOVA_SESSION_PANEL_LOCK__ || window.__NOVA_POLISH_DISABLED__) return;
         cleanSummaryPanel();
         blurIfHiddenPanelHasFocus();
         hideStrayQuestionMarks();
@@ -220,34 +226,41 @@ Final guard:
 
         let queued = false;
 
-        window.__novaMobileFinalPolishGuardObserver = new MutationObserver(function () {
-            if (queued) return;
+window.__novaMobileFinalPolishGuardObserver = new MutationObserver(function () {
+    if (window.__NOVA_SESSION_PANEL_LOCK__ || window.__NOVA_POLISH_DISABLED__) return;
 
-            queued = true;
+    if (queued) return;
 
-            requestAnimationFrame(function () {
-                queued = false;
-                polish();
-            });
-        });
+    queued = true;
 
-        window.__novaMobileFinalPolishGuardObserver.observe(document.body, {
-            subtree: true,
-            childList: true,
-            attributes: true,
-            attributeFilter: ["class", "style", "hidden", "aria-hidden"]
-        });
-    }
+    requestAnimationFrame(function () {
+        queued = false;
+
+        if (window.__NOVA_SESSION_PANEL_LOCK__ || window.__NOVA_POLISH_DISABLED__) return;
+
+        if (NOVA_UI_ALLOWED()) polish();
+    });
+});
+
+if (window.__NOVA_SESSION_PANEL_LOCK__) return;
+
+window.__novaMobileFinalPolishGuardObserver.observe(document.body, {
+    subtree: true,
+    childList: true,
+    attributes: true,
+    attributeFilter: ["class", "style", "hidden", "aria-hidden"]
+});
 
     function boot() {
         document.addEventListener("pointerdown", closeButtonBlurGuard, true);
         document.addEventListener("click", closeButtonBlurGuard, true);
 
-        polish();
+        if (NOVA_UI_ALLOWED()) polish();
         installObserver();
 
         window.clearInterval(window.__novaMobileFinalPolishGuardTimer);
-        window.__novaMobileFinalPolishGuardTimer = window.setInterval(polish, 1500);
+        window.__novaMobileFinalPolishGuardTimer = window.// disabled to prevent UI re-lock conflicts
+// setInterval(polish, 1500);
 
         console.log("[" + FIX_ID + "] ready");
     }
@@ -562,20 +575,42 @@ Final guard:
     window.NovaMobileSessionsPanelPolish = polishSessionsPanelV2;
     window.NovaMobileSessionsPanelPolishV2 = polishSessionsPanelV2;
 
-    document.addEventListener("click", function () {
-        setTimeout(polishSessionsPanelV2, 80);
-        setTimeout(polishSessionsPanelV2, 350);
-        setTimeout(polishSessionsPanelV2, 900);
-    }, true);
+document.addEventListener("click", function () {
+    if (window.__NOVA_UI_FROZEN__) return;
 
-    window.addEventListener("load", function () {
-        setTimeout(polishSessionsPanelV2, 800);
-        setTimeout(polishSessionsPanelV2, 2200);
-    });
+    setTimeout(function () {
+        if (!window.__NOVA_UI_FROZEN__) polishSessionsPanelV2();
+    }, 80);
 
-    window.addEventListener("pageshow", function () {
-        setTimeout(polishSessionsPanelV2, 700);
-    });
+    setTimeout(function () {
+        if (!window.__NOVA_UI_FROZEN__) polishSessionsPanelV2();
+    }, 350);
+
+    setTimeout(function () {
+        if (!window.__NOVA_UI_FROZEN__) polishSessionsPanelV2();
+    }, 900);
+}, true);
+
+window.addEventListener("load", function () {
+    if (window.__NOVA_UI_FROZEN__) return;
+
+    setTimeout(function () {
+        if (!window.__NOVA_UI_FROZEN__) polishSessionsPanelV2();
+    }, 800);
+
+    setTimeout(function () {
+        if (!window.__NOVA_UI_FROZEN__) polishSessionsPanelV2();
+    }, 2200);
+});
+
+window.addEventListener("pageshow", function () {
+    if (window.__NOVA_UI_FROZEN__) return;
+
+    setTimeout(function () {
+        if (!window.__NOVA_UI_FROZEN__) polishSessionsPanelV2();
+    }, 700);
+});
+
 
     console.log("[NOVA_MOBILE_SESSIONS_PANEL_POLISH_V2_20260624] ready");
 })();
@@ -584,7 +619,10 @@ Final guard:
 (function () {
     "use strict";
 
-    var previousPolish = window.NovaMobileSessionsPanelPolish;
+var previousPolish =
+    (window.__NOVA_POLISH_DISABLED__)
+        ? null
+        : window.NovaMobileSessionsPanelPolish;
 
     function imp(el, prop, value) {
         if (!el) return;
@@ -592,10 +630,9 @@ Final guard:
     }
 
     function shellCenterSessionsPanelV3() {
-        if (typeof previousPolish === "function") {
-            previousPolish();
-        }
-
+if (window.__NOVA_SESSION_PANEL_LOCK__ || window.__NOVA_POLISH_DISABLED__) {
+    return;
+}
         var panel = document.getElementById("nova-mobile-sessions-panel");
         if (!panel) return;
 
@@ -613,10 +650,11 @@ Final guard:
         imp(panel, "max-width", width + "px");
     }
 
-    window.NovaMobileSessionsPanelPolish = shellCenterSessionsPanelV3;
+// DISABLED: V3 override causes panel re-lock bugs
+// window.NovaMobileSessionsPanelPolish = shellCenterSessionsPanelV3;
     window.NovaMobileSessionsPanelPolishV3 = shellCenterSessionsPanelV3;
 
-    document.addEventListener("click", function () {
+    document.addEventListene("click", function () {
         setTimeout(shellCenterSessionsPanelV3, 100);
         setTimeout(shellCenterSessionsPanelV3, 400);
         setTimeout(shellCenterSessionsPanelV3, 900);
@@ -629,5 +667,36 @@ Final guard:
     setTimeout(shellCenterSessionsPanelV3, 2500);
 
     console.log("[NOVA_MOBILE_SESSIONS_PANEL_SHELL_CENTER_V3_20260624] ready");
-})();
 
+(function () {
+    const TARGET_ID = "nova-mobile-sessions-panel";
+
+    function findNode() {
+        return document.getElementById(TARGET_ID);
+    }
+
+    const obs = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+            for (const node of m.addedNodes) {
+                if (node && node.id === TARGET_ID) {
+                    console.log("[NOVA TRACE] PANEL RECREATED:", node);
+                }
+            }
+
+            for (const node of m.removedNodes) {
+                if (node && node.id === TARGET_ID) {
+                    console.log("[NOVA TRACE] PANEL REMOVED:", node);
+                }
+            }
+        }
+    });
+
+    window.addEventListener("load", () => {
+        obs.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+
+        console.log("[NOVA TRACE GLOBAL] attached");
+    });
+})();

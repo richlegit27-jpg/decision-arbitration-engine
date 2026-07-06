@@ -5452,14 +5452,10 @@ if (
             "sessions-open"
         );
 
-        panel.setAttribute("aria-hidden", "true");
-        panel.hidden = true;
+panel.setAttribute("aria-hidden", "true");
+panel.hidden = true;
 
-        panel.style.setProperty("display", "none", "important");
-        panel.style.setProperty("visibility", "hidden", "important");
-        panel.style.setProperty("opacity", "0", "important");
-        panel.style.setProperty("pointer-events", "none", "important");
-    }
+panel.style.setProperty("display", "none", "important");
 
     function closeAll(reason) {
         allSessionPanels().forEach(closePanel);
@@ -5483,61 +5479,56 @@ if (
         );
     }
 
-    function isCloseTarget(target) {
-        if (!target || target.nodeType !== 1) return false;
+function isCloseTarget(target) {
+    if (!target || target.nodeType !== 1) return false;
 
-        const button = target.closest("button, a, [role='button'], [data-close], [data-dismiss], .close, .modal-close");
+    const button = target.closest("button, a, [role='button'], [data-close], [data-dismiss], .close, .modal-close");
 
-        if (!button) return false;
+    if (!button) return false;
 
-        const raw = lower(
-            (button.id || "") + " " +
-            (button.className || "") + " " +
-            (button.getAttribute("aria-label") || "") + " " +
-            (button.getAttribute("title") || "") + " " +
-            (button.dataset ? Object.keys(button.dataset).join(" ") : "")
-        );
+    const raw = lower(
+        (button.id || "") + " " +
+        (button.className || "") + " " +
+        (button.getAttribute("aria-label") || "") + " " +
+        (button.getAttribute("title") || "") + " " +
+        (button.dataset ? Object.keys(button.dataset).join(" ") : "")
+    );
 
-        const label = lower(button.innerText || button.textContent || "");
+    const label = lower(button.innerText || button.textContent || "");
 
-        return (
-            raw.includes("close") ||
-            raw.includes("dismiss") ||
-            label === "×" ||
-            label === "x" ||
-            label === "close" ||
-            label === "done"
-        );
+    return (
+        raw.includes("close") ||
+        raw.includes("dismiss") ||
+        label === "×" ||
+        label === "x" ||
+        label === "close" ||
+        label === "done"
+    );
+}
+
+document.addEventListener("click", (event) => {
+    const panel = closestSessionPanel(event.target);
+
+    if (!panel) return;
+    if (!isCloseTarget(event.target)) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
+
+    closeAll("close-button");
+}, true);
+
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+        closeAll("escape");
     }
+}, true);
 
-    document.addEventListener("click", (event) => {
-        const panel = closestSessionPanel(event.target);
+window.NovaMobileCloseAllSessionPanels = closeAll;
 
-        if (!panel) return;
-        if (!isCloseTarget(event.target)) return;
+console.log("[Nova Mobile Safe Session Close] ready");
 
-        event.preventDefault();
-        event.stopPropagation();
-
-        if (typeof event.stopImmediatePropagation === "function") {
-            event.stopImmediatePropagation();
-        }
-
-        closeAll("close-button");
-
-        setTimeout(() => closeAll("close-lock-120"), 120);
-        setTimeout(() => closeAll("close-lock-300"), 300);
-    }, true);
-
-    document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") {
-            closeAll("escape");
-        }
-    }, true);
-
-    window.NovaMobileCloseAllSessionPanels = closeAll;
-
-    console.log("[Nova Mobile Safe Session Close] ready");
 })();
 
 
@@ -8499,7 +8490,8 @@ if (
             '<label style="display:block;font-size:12px;opacity:.78;margin:0 0 4px 2px;">Email optional</label>',
             '<input id="' + EMAIL_ID + '" name="email" placeholder="email optional" autocomplete="email" autocapitalize="none" spellcheck="false" style="' + inputStyle() + '">',
             '<label style="display:block;font-size:12px;opacity:.78;margin:0 0 4px 2px;">Password</label>',
-            '<input id="' + PASSWORD_ID + '" name="password" placeholder="password" type="password" autocomplete="current-password" style="' + inputStyle() + '">',
+            '<input id="' + PASSWORD_ID + '" name="password" placeholder="password" type="password" autocomplete="current-password" style="' + inputStyle()C:\Users\Owner\nova\static\js\nova-mobile-app.js
+ + '">',
             '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;">',
             '<button type="submit" id="nova-auth-workmode-login-v2" style="' + buttonStyle(true) + ';">Login</button>',
             '<button type="button" id="nova-auth-workmode-register-v2" style="' + buttonStyle(false) + ';">Create account</button>',

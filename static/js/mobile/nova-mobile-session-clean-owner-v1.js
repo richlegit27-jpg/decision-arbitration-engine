@@ -158,21 +158,51 @@
         return panel;
     }
 
-    function openPanel() {
-        const panel = ensurePanel();
-        panel.style.setProperty("display", "flex", "important");
-        loadSessions().catch(function (error) {
-            console.error("[Nova Clean Sessions] load failed", error);
-            setStatus("Sessions failed: " + error.message);
-        });
+function openPanel() {
+    const panel = ensurePanel();
+
+    // 🔥 reset accessibility state BEFORE showing
+    panel.removeAttribute("aria-hidden");
+
+    // show panel
+    panel.style.setProperty("display", "flex", "important");
+
+    // ensure no stale focus conflicts
+    setTimeout(() => {
+        const closeBtn = document.getElementById("nova-clean-session-close-v1");
+        closeBtn?.blur?.();
+    }, 0);
+
+    loadSessions().catch(err => {
+        console.error(err);
+        setStatus("Failed to load sessions");
+    });
+}
+
+function closePanel() {
+    const panel = $(IDS.panel);
+    if (!panel) return;
+
+    // 1. kill focus FIRST (critical)
+    if (document.activeElement) {
+        document.activeElement.blur();
     }
 
-    function closePanel() {
-        const panel = $(IDS.panel);
-        if (panel) {
-            panel.style.setProperty("display", "none", "important");
-        }
-    }
+    // 2. force pointer reset
+    panel.style.pointerEvents = "none";
+
+    // 3. hide visually (ONLY ONE METHOD)
+    panel.style.display = "none";
+
+    // 4. REMOVE aria-hidden completely (do NOT set it again anywhere)
+    panel.removeAttribute("aria-hidden");
+
+    // 5. optional cleanup of focus trap
+    setTimeout(() => {
+        panel.blur?.();
+        document.body.focus?.();
+    }, 0);
+}
 
     async function loadSessions() {
         setStatus("Loading sessions...");
@@ -236,11 +266,16 @@
         const data = await jsonFetch(API.create + "?clean_new=" + Date.now(), { method: "POST", body: "{}" });
         const id = data.id || data.session_id || (data.session && (data.session.id || data.session.session_id));
 
-        if (id) {
-            localStorage.setItem("nova_mobile_active_session_id", id);
-            location.href = "/mobile?session_id=" + encodeURIComponent(id) + "&v=session-new-" + Date.now();
-            return;
-        }
+if (id) {
+    localStorage.setItem("nova_mobile_active_session_id", id);
+
+    window.dispatchEvent(new CustomEvent("nova:session-selected", {
+        detail: { session_id: id }
+    }));
+
+    closePanel();
+    return;
+}
 
         await loadSessions();
     }
@@ -255,11 +290,16 @@
         const id = row ? row.dataset.sessionId : "";
         const action = button.dataset.novaAction;
 
-        if (action === "open" && id) {
-            localStorage.setItem("nova_mobile_active_session_id", id);
-            location.href = "/mobile?session_id=" + encodeURIComponent(id) + "&v=session-open-" + Date.now();
-            return;
-        }
+if (action === "open" && id) {
+    localStorage.setItem("nova_mobile_active_session_id", id);
+
+    window.dispatchEvent(new CustomEvent("nova:session-selected", {
+        detail: { session_id: id }
+    }));
+
+    closePanel();
+    return;
+}
 
         if (action === "rename" && id) {
             const current = row.querySelector("[data-nova-action='open']")?.textContent || "";
