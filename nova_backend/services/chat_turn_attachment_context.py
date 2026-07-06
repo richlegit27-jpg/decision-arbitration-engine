@@ -324,3 +324,134 @@ def nova_chat_turn_inject_attachment_context_from_locals(
 
     return inject_attachment_context_message(messages, attachments)
 
+# NOVA_ATTACHMENT_CONTEXT_REGRESSION_REPAIR_20260705
+def _nova_attachment_originalish_filename(value: Any) -> str:
+    import re
+
+    text = _stringify(value).strip()
+
+    if not text:
+        return ""
+
+    text = text.replace("\\", "/").rstrip("/").split("/")[-1]
+    text = re.sub(r"_([0-9a-fA-F]{32})(?=\.)", "", text)
+
+    return text
+
+
+def _normalize_attachment(item: Any, index: int) -> dict[str, str]:
+    if isinstance(item, dict):
+        data = item
+    else:
+        data = {
+            "display_name": getattr(item, "display_name", None),
+            "original_filename": getattr(item, "original_filename", None),
+            "filename": getattr(item, "filename", None) or getattr(item, "name", None),
+            "mime_type": getattr(item, "mime_type", None) or getattr(item, "content_type", None),
+            "size": getattr(item, "size", None) or getattr(item, "size_bytes", None),
+            "summary": getattr(item, "summary", None),
+            "text": getattr(item, "text", None),
+            "description": getattr(item, "description", None),
+        }
+
+    filename = _first_text(
+        data,
+        (
+            "display_name",
+            "original_filename",
+            "client_filename",
+            "source_filename",
+            "name",
+            "file_name",
+            "title",
+            "filename",
+            "path",
+            "url",
+            "download_url",
+            "file_url",
+        ),
+    )
+
+    filename = _nova_attachment_originalish_filename(filename)
+
+    mime_type = _first_text(data, ("mime_type", "content_type", "type", "media_type"))
+    size = _first_text(data, ("size_bytes", "bytes", "size", "length"))
+
+    summary = _first_text(
+        data,
+        (
+            "summary",
+            "attachment_summary",
+            "analysis",
+            "description",
+            "caption",
+            "ocr_text",
+            "extracted_text",
+            "text",
+            "content",
+            "body",
+            "preview",
+        ),
+    )
+
+    if len(summary) > _MAX_ATTACHMENT_CHARS:
+        summary = summary[:_MAX_ATTACHMENT_CHARS].rstrip() + "..."
+
+    return {
+        "index": str(index),
+        "filename": filename or f"attachment_{index}",
+        "mime_type": mime_type,
+        "size": size,
+        "summary": summary,
+    }
+
+
+def collect_attachments_from_scope(scope: dict[str, Any] | None) -> list[Any]:
+    if not isinstance(scope, dict):
+        return []
+
+    try:
+        from nova_backend.services.chat_attachment_payload_normalizer import (
+            normalize_api_chat_attachments,
+        )
+
+        attachments = normalize_api_chat_attachments(scope)
+    except Exception:
+        attachments = []
+
+    unique: list[Any] = []
+    seen_keys: set[str] = set()
+
+    for item in attachments:
+        if isinstance(item, dict):
+            marker = "|".join(
+                _stringify(item.get(key))
+                for key in (
+                    "id",
+                    "attachment_id",
+                    "upload_id",
+                    "file_id",
+                    "url",
+                    "download_url",
+                    "file_url",
+                    "path",
+                    "saved_path",
+                    "filename",
+                    "name",
+                    "original_filename",
+                )
+                if item.get(key)
+            )
+        else:
+            marker = str(id(item))
+
+        if not marker:
+            marker = str(id(item))
+
+        if marker in seen_keys:
+            continue
+
+        seen_keys.add(marker)
+        unique.append(item)
+
+    return unique

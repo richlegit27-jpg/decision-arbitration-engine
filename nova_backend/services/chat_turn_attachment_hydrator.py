@@ -297,3 +297,165 @@ def hydrate_attachments_for_context(
         hydrate_attachment_for_context(item, uploads_dir=uploads_dir)
         for item in list(attachments or [])
     ]
+
+# NOVA_ATTACHMENT_HYDRATOR_REGRESSION_REPAIR_20260705
+def _nova_restore_original_upload_name(filename):
+    import re
+
+    text = str(filename or "").replace("\\", "/").rstrip("/").split("/")[-1]
+    return re.sub(r"_([0-9a-fA-F]{32})(?=\.)", "", text)
+
+
+def _nova_upload_candidate_path(item):
+    from pathlib import Path
+    from urllib.parse import urlparse, unquote
+
+    if not isinstance(item, dict):
+        return None
+
+    raw = ""
+
+    for key in (
+        "local_path",
+        "file_path",
+        "filepath",
+        "saved_path",
+        "server_path",
+        "path",
+        "download_url",
+        "file_url",
+        "url",
+        "href",
+        "src",
+        "filename",
+        "saved_filename",
+        "name",
+    ):
+        value = item.get(key)
+
+        if value:
+            raw = str(value)
+            break
+
+    if not raw:
+        return None
+
+    parsed = urlparse(raw)
+    path_text = unquote(parsed.path or raw)
+    filename = path_text.replace("\\", "/").rstrip("/").split("/")[-1]
+
+    if not filename or filename in {".", ".."}:
+        return None
+
+    uploads_dir = (Path.cwd() / "uploads").resolve()
+    candidate = (uploads_dir / filename).resolve()
+
+    try:
+        candidate.relative_to(uploads_dir)
+    except ValueError:
+        return None
+
+    if candidate.exists() and candidate.is_file():
+        return candidate
+
+    return None
+
+
+def _nova_can_read_as_text(path, item):
+    suffix = path.suffix.lower()
+    mime = str(item.get("mime_type") or item.get("content_type") or "").lower()
+
+    if "text" in mime:
+        return True
+
+    return suffix in {
+        ".txt",
+        ".md",
+        ".csv",
+        ".json",
+        ".html",
+        ".htm",
+        ".css",
+        ".js",
+        ".py",
+        ".log",
+        ".xml",
+        ".yaml",
+        ".yml",
+    }
+
+
+def hydrate_attachments_for_context(attachments):
+    output = []
+
+    for item in list(attachments or []):
+        if isinstance(item, dict):
+            data = dict(item)
+        else:
+            data = {
+                "filename": getattr(item, "filename", None) or getattr(item, "name", None),
+                "mime_type": getattr(item, "mime_type", None) or getattr(item, "content_type", None),
+            }
+
+        saved_name = (
+            data.get("saved_filename")
+            or data.get("filename")
+            or data.get("download_url")
+            or data.get("file_url")
+            or data.get("url")
+            or data.get("path")
+            or data.get("name")
+        )
+
+        original_name = (
+            data.get("original_filename")
+            or data.get("display_name")
+            or _nova_restore_original_upload_name(saved_name)
+        )
+
+        if original_name:
+            data.setdefault("original_filename", original_name)
+            data.setdefault("display_name", original_name)
+
+        path = _nova_upload_candidate_path(data)
+
+        if path is not None:
+            try:
+                data.setdefault("size_bytes", path.stat().st_size)
+            except Exception:
+                pass
+
+            has_summary = any(
+                data.get(key)
+                for key in (
+                    "summary",
+                    "attachment_summary",
+                    "analysis",
+                    "description",
+                    "caption",
+                    "ocr_text",
+                    "extracted_text",
+                    "text",
+                    "content",
+                    "body",
+                    "preview",
+                )
+            )
+
+            if not has_summary and _nova_can_read_as_text(path, data):
+                try:
+                    extracted = path.read_text(encoding="utf-8", errors="replace").strip()
+                except Exception:
+                    extracted = ""
+
+                if extracted:
+                    if len(extracted) > 1400:
+                        extracted = extracted[:1400].rstrip() + "..."
+
+                    data["extracted_text"] = extracted
+                    data["attachment_summary"] = extracted
+                    data["summary"] = extracted
+
+        output.append(data)
+
+    return output

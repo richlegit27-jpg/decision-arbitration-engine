@@ -20114,52 +20114,40 @@ def api_debug_attachment_context_dry_run():
         if not _nova_debug_routes_enabled():
             return _nova_debug_routes_disabled_response()
 
-        from flask import jsonify, request
+        from flask import jsonify, request, g
+        from nova_backend.services.chat_attachment_payload_normalizer import (
+            normalize_api_chat_attachments,
+        )
+        from nova_backend.services.chat_turn_attachment_hydrator import (
+            hydrate_attachments_for_context,
+        )
         from nova_backend.services.chat_turn_attachment_context import (
             build_attachment_context_text,
-            collect_attachments_from_scope,
         )
 
         payload = request.get_json(silent=True) or {}
 
-        attachments = collect_attachments_from_scope(
-            {
-                "request_json": payload,
-                "payload": payload,
-                "body_json": payload,
-            }
-        )
+        attachments = normalize_api_chat_attachments(payload)
 
-        context_text = build_attachment_context_text(attachments)
+        if not attachments:
+            attachments = list(getattr(g, "nova_api_chat_attachments", None) or [])
+
+        attachments = hydrate_attachments_for_context(attachments)
+        context = build_attachment_context_text(attachments)
 
         return jsonify(
             {
                 "ok": True,
                 "attachment_count": len(attachments),
-                "attachment_context_present": bool(context_text),
-                "attachment_context": context_text,
+                "has_context": bool(context),
+                "context": context,
             }
         )
-    except Exception as exc:
+    except Exception as error:
         try:
-            from flask import jsonify
-
-            return jsonify(
-                {
-                    "ok": False,
-                    "error": str(exc),
-                }
-            ), 500
+            return jsonify({"ok": False, "error": str(error)}), 500
         except Exception:
-            return {
-                "ok": False,
-                "error": str(exc),
-            }, 500
-
-
-
-
-
+            return {"ok": False, "error": str(error)}, 500
 # NOVA_API_CHAT_ATTACHMENT_BOUNDARY_HOOK_20260705
 try:
     @app.before_request
@@ -20321,62 +20309,59 @@ def api_debug_attachment_web_guard_dry_run():
             return _nova_debug_routes_disabled_response()
 
         from flask import jsonify, request, g
-        from nova_backend.services.chat_service import ChatService
+        from nova_backend.services.chat_attachment_payload_normalizer import (
+            normalize_api_chat_attachments,
+        )
+        from nova_backend.services.chat_attachment_intent_guard import (
+            is_attachment_focused_message,
+        )
+        import re
 
         payload = request.get_json(silent=True) or {}
 
-        user_text = (
+        boundary_attachments = normalize_api_chat_attachments(payload)
+
+        if not boundary_attachments:
+            boundary_attachments = list(getattr(g, "nova_api_chat_attachments", None) or [])
+
+        message = (
             payload.get("message")
             or payload.get("text")
             or payload.get("user_text")
             or payload.get("prompt")
-            or "summarize this attached file"
+            or ""
         )
 
-        service = ChatService()
+        focused_payload = dict(payload)
+        focused_payload["attachments"] = boundary_attachments
 
-        if not hasattr(service, "_execute_web_fetch"):
-            return jsonify(
-                {
-                    "ok": True,
-                    "available": False,
-                    "message": "ChatService has no _execute_web_fetch method on this branch.",
-                    "boundary_attachment_count": len(getattr(g, "nova_api_chat_attachments", []) or []),
-                }
+        attachment_focused = is_attachment_focused_message(message, focused_payload)
+
+        explicit_web = bool(
+            re.search(
+                r"\b(web|internet|search|look up|lookup|google|news|latest|current|today|online)\b",
+                str(message or "").lower(),
             )
+        )
 
-        result = service._execute_web_fetch(user_text)
+        suppressed = bool(boundary_attachments and attachment_focused and not explicit_web)
 
         return jsonify(
             {
                 "ok": True,
-                "available": True,
-                "boundary_attachment_count": len(getattr(g, "nova_api_chat_attachments", []) or []),
-                "result": result,
-                "suppressed": bool(isinstance(result, dict) and result.get("suppressed")),
-                "reason": result.get("reason") if isinstance(result, dict) else None,
+                "boundary_attachment_count": len(boundary_attachments),
+                "attachment_count": len(boundary_attachments),
+                "attachment_focused": attachment_focused,
+                "explicit_web": explicit_web,
+                "suppressed": suppressed,
+                "would_suppress_web": suppressed,
             }
         )
-    except Exception as exc:
+    except Exception as error:
         try:
-            from flask import jsonify
-
-            return jsonify(
-                {
-                    "ok": False,
-                    "error": str(exc),
-                }
-            ), 500
+            return jsonify({"ok": False, "error": str(error)}), 500
         except Exception:
-            return {
-                "ok": False,
-                "error": str(exc),
-            }, 500
-
-
-
-
-
+            return {"ok": False, "error": str(error)}, 500
 # NOVA_UPLOAD_ATTACHMENT_RESPONSE_NORMALIZER_HOOK_20260705
 try:
     @app.after_request
@@ -20717,3 +20702,99 @@ def api_debug_chat_turn_shadow():
         except Exception:
             return {"ok": False, "error": str(error)}, 500
 
+# NOVA_UPLOAD_ATTACHMENT_SUMMARY_AFTER_REQUEST_20260705
+@app.after_request
+def _nova_upload_attachment_summary_after_request(response):
+    try:
+        from flask import request
+        from pathlib import Path
+        import json as _json
+        import re as _re
+
+        if request.method != "POST":
+            return response
+
+        if request.path.rstrip("/") != "/api/upload":
+            return response
+
+        if not getattr(response, "is_json", False):
+            return response
+
+        data = response.get_json(silent=True)
+
+        if not isinstance(data, dict):
+            return response
+
+        filename = (
+            data.get("filename")
+            or data.get("saved_filename")
+            or data.get("path")
+            or data.get("download_url")
+            or data.get("file_url")
+            or data.get("url")
+            or data.get("name")
+        )
+
+        if filename:
+            saved_name = str(filename).replace("\\", "/").rstrip("/").split("/")[-1]
+            original_name = _re.sub(r"_([0-9a-fA-F]{32})(?=\.)", "", saved_name)
+
+            data.setdefault("saved_filename", saved_name)
+            data.setdefault("original_filename", original_name)
+            data.setdefault("display_name", original_name)
+            data.setdefault("name", original_name)
+
+            uploads_dir = (Path.cwd() / "uploads").resolve()
+            candidate = (uploads_dir / saved_name).resolve()
+
+            try:
+                candidate.relative_to(uploads_dir)
+            except ValueError:
+                candidate = None
+
+            if candidate and candidate.exists() and candidate.is_file():
+                data.setdefault("size_bytes", candidate.stat().st_size)
+
+                mime = str(data.get("mime_type") or data.get("content_type") or "").lower()
+                suffix = candidate.suffix.lower()
+
+                text_like = (
+                    "text" in mime
+                    or suffix in {
+                        ".txt",
+                        ".md",
+                        ".csv",
+                        ".json",
+                        ".html",
+                        ".htm",
+                        ".css",
+                        ".js",
+                        ".py",
+                        ".log",
+                        ".xml",
+                        ".yaml",
+                        ".yml",
+                    }
+                )
+
+                if text_like and not (
+                    data.get("summary")
+                    or data.get("attachment_summary")
+                    or data.get("extracted_text")
+                ):
+                    extracted = candidate.read_text(encoding="utf-8", errors="replace").strip()
+
+                    if extracted:
+                        if len(extracted) > 1400:
+                            extracted = extracted[:1400].rstrip() + "..."
+
+                        data["summary"] = extracted
+                        data["attachment_summary"] = extracted
+                        data["extracted_text"] = extracted
+
+        response.set_data(_json.dumps(data))
+        response.content_type = "application/json"
+    except Exception:
+        return response
+
+    return response

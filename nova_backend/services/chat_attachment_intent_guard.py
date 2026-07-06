@@ -128,3 +128,38 @@ def attachment_guard_metadata(user_text: Any, payload_or_attachments: Any = None
         "attachment_focused": attachment_focused,
         "suppress_web": suppress_web,
     }
+
+# NOVA_ATTACHMENT_INTENT_EXPLICIT_WEB_COMPAT_20260705
+def is_attachment_focused_message(message, payload=None, *args, **kwargs):
+    try:
+        from nova_backend.services.chat_attachment_payload_normalizer import (
+            normalize_api_chat_attachments,
+        )
+
+        attachments = normalize_api_chat_attachments(payload or {})
+    except Exception:
+        attachments = []
+
+    if not attachments:
+        return False
+
+    text = str(message or "").lower()
+
+    attachment_terms = (
+        "attached",
+        "attachment",
+        "file",
+        "upload",
+        "uploaded",
+        "image",
+        "photo",
+        "picture",
+        "document",
+        "pdf",
+        "summarize this",
+        "what is this",
+        "read this",
+        "analyze this",
+    )
+
+    return any(term in text for term in attachment_terms)

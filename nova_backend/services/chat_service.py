@@ -26380,4 +26380,13 @@ try:
 except Exception:
     pass
 
+# NOVA_CHAT_SERVICE_MODEL_CALL_COMPAT_HOOK_20260705
+def chat_completions_create(*args, **kwargs):
+    from nova_backend.services.model_gateway_service import (
+        chat_completions_create as _nova_gateway_chat_completions_create,
+    )
 
+    return _nova_gateway_chat_completions_create(*args, **kwargs)
+
+
+_chat_completions_create = chat_completions_create
