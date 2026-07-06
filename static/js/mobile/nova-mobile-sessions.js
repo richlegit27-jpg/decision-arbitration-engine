@@ -7,6 +7,14 @@
 
     window.__NOVA_MOBILE_SESSIONS_FINAL_OWNER_V1_20260703__ = true;
 
+    window.NOVA_SESSION_CORE = {
+        activeSessionId: null,
+        sessions: [],
+        isOpen: false
+    };
+})();
+
+
     const API = {
         list: "/api/sessions",
         detail: (id) => "/api/sessions/" + encodeURIComponent(id),
@@ -145,7 +153,8 @@
             }
 
             if (/session/i.test(text)) {
-                button.style.display = "none";
+                button.blur?.();
+button.style.display = "none";
                 button.dataset.novaHiddenBySessionsFinal = "1";
             }
         });
@@ -379,9 +388,7 @@
         url.searchParams.set("session_id", id);
         history.replaceState({}, "", url.toString());
 
-        setTimeout(function () {
-            window.location.href = url.toString();
-        }, 120);
+history.replaceState({}, "", url.toString());
     }
 
     async function renameSession(id, row) {
@@ -446,20 +453,63 @@
         setStatus("Deleted");
     }
 
-    function openPanel() {
-        const panel = ensurePanel();
-        panel.style.display = "flex";
-        loadSessions().catch(function (error) {
-            setStatus("Error: " + (error && error.message ? error.message : String(error)));
-        });
-    }
+function openPanel() {
+    const panel = ensurePanel();
 
-    function closePanel() {
-        const panel = $(IDS.panel);
-        if (panel) {
-            panel.style.display = "none";
-        }
-    }
+    panel.hidden = false;
+    panel.setAttribute("aria-hidden", "false");
+
+    panel.style.setProperty("display", "flex", "important");
+    panel.style.removeProperty("visibility");
+
+    loadSessions().catch(function (error) {
+        setStatus("Error: " + (error && error.message ? error.message : String(error)));
+    });
+}
+
+document.addEventListener("click", function (e) {
+    const btn = e.target.closest("#nova-clean-session-close-v1");
+
+    if (!btn) return;
+
+    // 🚨 STOP EVERYTHING FIRST
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation?.();
+
+    // 🔥 REMOVE FOCUS IMMEDIATELY
+    btn.blur();
+    document.activeElement?.blur?.();
+
+    // THEN CALL CLOSE
+    requestAnimationFrame(() => {
+        closePanel();
+    });
+}, true);
+
+function bindCloseButton() {
+    const closeBtn = document.getElementById("nova-clean-session-close-v1");
+
+    if (!closeBtn || closeBtn.dataset.bound === "1") return;
+
+    closeBtn.dataset.bound = "1";
+
+    // STOP focus before it ever happens
+    closeBtn.addEventListener("mousedown", function (e) {
+        e.preventDefault();
+    });
+}
+
+function closePanel() {
+    const panel = document.getElementById("nova-mobile-sessions-panel");
+
+    if (!panel) return;
+
+    panel.setAttribute("aria-hidden", "true");
+    panel.hidden = true;
+
+    panel.style.setProperty("display", "none", "important");
+}
 
     // NOVA_MOBILE_SESSIONS_FINAL_GLOBAL_LOCK_20260703
     // NOVA_MOBILE_SESSIONS_FINAL_GLOBAL_HARD_LOCK_20260703
@@ -484,37 +534,26 @@
         lockFinalGlobal("NovaMobileReloadSessions", loadSessions);
     }
 
-    installFinalSessionGlobals();
+let __novaBooted = false;
 
-    function boot() {
-        removeOldSessionUi();
-        ensureButton();
-        ensurePanel();
-        console.log("[NOVA_MOBILE_SESSIONS_FINAL_OWNER_V1_20260703] ready");
-    }
+function boot() {
+    console.trace("[NOVA BOOT TRACE]");
 
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", boot);
-    } else {
-        boot();
-    }
+    if (__novaBooted) return;
+    __novaBooted = true;
 
-    setTimeout(boot, 500);
-    setTimeout(boot, 1500);
-    setTimeout(boot, 3000);
-    setTimeout(boot, 6000);
+    console.log("[NOVA] boot running once");
 
-    let finalLockCount = 0;
-    const finalLockTimer = setInterval(function () {
-        finalLockCount += 1;
-        installFinalSessionGlobals();
-        removeOldSessionUi();
-        ensureButton();
+    ensureButton();
+    ensurePanel();
+    loadSessions();
+}
 
-        if (finalLockCount >= 20) {
-            clearInterval(finalLockTimer);
-        }
-    }, 750);
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+} else {
+    boot();
+}
 
     /* NOVA_MOBILE_VISIBLE_HEADER_DIRECT_SESSION_OWNER_FINAL_20260705 */
     function bindVisibleHeaderSessionsButtonFinal() {
@@ -527,62 +566,6 @@
         headerButton.dataset.novaVisibleHeaderDirectSessionOwner = "1";
     }
 
-    function openVisibleHeaderSessionsDirectFinal(event) {
-        const headerButton = event.target && event.target.closest
-            ? event.target.closest("#nova-mobile-sessions-toggle")
-            : null;
-
-        if (!headerButton) {
-            return;
-        }
-
-        event.preventDefault();
-        event.stopPropagation();
-
-        if (typeof event.stopImmediatePropagation === "function") {
-            event.stopImmediatePropagation();
-        }
-
-        bindVisibleHeaderSessionsButtonFinal();
-
-        try {
-            ensureButton();
-        } catch (_) {}
-
-        try {
-            ensurePanel();
-        } catch (_) {}
-
-        const panel = document.getElementById(IDS.panel);
-
-        if (panel) {
-            panel.removeAttribute("hidden");
-            panel.removeAttribute("data-nova-hidden-by-sessions-final");
-            panel.style.setProperty("display", "flex", "important");
-            panel.style.setProperty("visibility", "visible", "important");
-            panel.style.setProperty("opacity", "1", "important");
-            panel.style.setProperty("pointer-events", "auto", "important");
-        }
-
-        Promise.resolve()
-            .then(loadSessions)
-            .catch(function (error) {
-                console.error("[Nova Mobile Sessions] visible header direct owner failed", error);
-
-                try {
-                    setStatus("Sessions failed to load.");
-                } catch (_) {}
-            });
-    }
-
-    document.addEventListener("click", openVisibleHeaderSessionsDirectFinal, true);
-
-    bindVisibleHeaderSessionsButtonFinal();
-    document.addEventListener("DOMContentLoaded", bindVisibleHeaderSessionsButtonFinal);
-    window.addEventListener("load", bindVisibleHeaderSessionsButtonFinal);
-    setTimeout(bindVisibleHeaderSessionsButtonFinal, 100);
-    setTimeout(bindVisibleHeaderSessionsButtonFinal, 500);
-    setTimeout(bindVisibleHeaderSessionsButtonFinal, 1200);
 
 })();
 
