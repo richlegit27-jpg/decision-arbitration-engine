@@ -20108,8 +20108,7 @@ def api_debug_chat_turn_dry_run():
 
 
 # NOVA_ATTACHMENT_CONTEXT_DEBUG_ROUTE_20260705
-@app.route("/api/debug/attachment-context-dry-run",
-                "/api/debug/attachment-web-guard-dry-run", methods=["POST"])
+@app.route("/api/debug/attachment-context-dry-run", methods=["POST"])
 def api_debug_attachment_context_dry_run():
     try:
         if not _nova_debug_routes_enabled():
