@@ -85,3 +85,77 @@ def get_attachment_pipeline_status() -> dict[str, Any]:
         "debug_env": "NOVA_DEBUG_ROUTES=1",
         "details": details,
     }
+
+# NOVA_ATTACHMENT_PIPELINE_STATUS_WEB_GUARD_COMPAT_20260705
+def _nova_attachment_status_web_guard_ready():
+    try:
+        from nova_backend.services import chat_service
+
+        required = (
+            "_nova_attachment_guard_should_suppress_current_web_call",
+            "_nova_attachment_guard_install_web_routing_suppression",
+            "_nova_install_attachment_guard_web_suppression",
+        )
+
+        if not all(hasattr(chat_service, name) for name in required):
+            return False
+
+        installer = getattr(
+            chat_service,
+            "_nova_attachment_guard_install_web_routing_suppression",
+            None,
+        )
+
+        if callable(installer):
+            result = installer()
+
+            if isinstance(result, dict) and result.get("ok") is False:
+                return False
+
+        return True
+    except Exception:
+        return False
+
+
+def _nova_attachment_status_patch_payload(payload):
+    if not isinstance(payload, dict):
+        return payload
+
+    capabilities = payload.get("capabilities")
+
+    if isinstance(capabilities, dict):
+        capabilities["web_guard"] = _nova_attachment_status_web_guard_ready()
+        payload["ready"] = all(bool(value) for value in capabilities.values())
+
+    return payload
+
+
+try:
+    _nova_original_get_attachment_pipeline_status = get_attachment_pipeline_status
+
+    def get_attachment_pipeline_status():
+        return _nova_attachment_status_patch_payload(
+            _nova_original_get_attachment_pipeline_status()
+        )
+except Exception:
+    pass
+
+
+try:
+    _nova_original_attachment_pipeline_status = attachment_pipeline_status
+
+    def attachment_pipeline_status():
+        return _nova_attachment_status_patch_payload(
+            _nova_original_attachment_pipeline_status()
+        )
+except Exception:
+    pass
+
+
+try:
+    _nova_original_get_status = get_status
+
+    def get_status():
+        return _nova_attachment_status_patch_payload(_nova_original_get_status())
+except Exception:
+    pass
