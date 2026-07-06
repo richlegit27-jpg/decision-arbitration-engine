@@ -159,3 +159,71 @@ try:
         return _nova_attachment_status_patch_payload(_nova_original_get_status())
 except Exception:
     pass
+
+# NOVA_ATTACHMENT_PIPELINE_STATUS_SHAPE_V2_20260705
+def _nova_attachment_status_web_guard_ready_v2():
+    try:
+        from nova_backend.services import chat_service
+
+        required = (
+            "_nova_attachment_guard_should_suppress_current_web_call",
+            "_nova_attachment_guard_install_web_routing_suppression",
+            "_nova_install_attachment_guard_web_suppression",
+        )
+
+        if not all(hasattr(chat_service, name) for name in required):
+            return False
+
+        installer = getattr(
+            chat_service,
+            "_nova_attachment_guard_install_web_routing_suppression",
+            None,
+        )
+
+        if callable(installer):
+            result = installer()
+
+            if isinstance(result, dict) and result.get("ok") is False:
+                return False
+
+        return True
+    except Exception:
+        return False
+
+
+def _nova_attachment_status_patch_payload_v2(payload):
+    if not isinstance(payload, dict):
+        return payload
+
+    web_guard_ready = _nova_attachment_status_web_guard_ready_v2()
+
+    for key in ("attachment_pipeline", "capabilities"):
+        flags = payload.get(key)
+
+        if isinstance(flags, dict):
+            flags["web_guard"] = web_guard_ready
+            payload[key] = flags
+            payload["ready"] = all(bool(value) for value in flags.values())
+
+    return payload
+
+
+for _name in (
+    "get_attachment_pipeline_status",
+    "attachment_pipeline_status",
+    "get_status",
+):
+    try:
+        _original = globals().get(_name)
+
+        if callable(_original) and not getattr(_original, "_nova_status_shape_v2_wrapped", False):
+            def _make_wrapper(fn):
+                def _wrapped(*args, **kwargs):
+                    return _nova_attachment_status_patch_payload_v2(fn(*args, **kwargs))
+
+                _wrapped._nova_status_shape_v2_wrapped = True
+                return _wrapped
+
+            globals()[_name] = _make_wrapper(_original)
+    except Exception:
+        pass

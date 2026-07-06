@@ -21031,3 +21031,66 @@ def _nova_upload_attachment_summary_after_request_v2(response):
         return response
 
     return response
+
+# NOVA_ATTACHMENT_STATUS_RESPONSE_SHAPE_V2_20260705
+@app.after_request
+def _nova_attachment_status_response_shape_v2(response):
+    try:
+        from flask import request
+        import json as _json
+
+        if request.path.rstrip("/") not in {
+            "/api/attachment/status",
+            "/api/attachments/status",
+            "/api/status/attachment",
+        }:
+            return response
+
+        if not getattr(response, "is_json", False):
+            return response
+
+        data = response.get_json(silent=True)
+
+        if not isinstance(data, dict):
+            return response
+
+        try:
+            from nova_backend.services import chat_service
+
+            web_guard_ready = all(
+                hasattr(chat_service, name)
+                for name in (
+                    "_nova_attachment_guard_should_suppress_current_web_call",
+                    "_nova_attachment_guard_install_web_routing_suppression",
+                    "_nova_install_attachment_guard_web_suppression",
+                )
+            )
+
+            installer = getattr(
+                chat_service,
+                "_nova_attachment_guard_install_web_routing_suppression",
+                None,
+            )
+
+            if callable(installer):
+                install_result = installer()
+
+                if isinstance(install_result, dict) and install_result.get("ok") is False:
+                    web_guard_ready = False
+        except Exception:
+            web_guard_ready = False
+
+        for key in ("attachment_pipeline", "capabilities"):
+            flags = data.get(key)
+
+            if isinstance(flags, dict):
+                flags["web_guard"] = web_guard_ready
+                data[key] = flags
+                data["ready"] = all(bool(value) for value in flags.values())
+
+        response.set_data(_json.dumps(data))
+        response.content_type = "application/json"
+    except Exception:
+        return response
+
+    return response
