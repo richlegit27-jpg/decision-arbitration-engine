@@ -1,5 +1,6 @@
 ﻿(function () {
     "use strict";
+    return;
 
     if (window.__NOVA_MOBILE_SESSION_RESTORE_BRIDGE_V1__) {
         return;
@@ -143,7 +144,7 @@
             "#nova-mobile-session-drawer, #nova-mobile-sessions-panel, .nova-mobile-session-drawer, .nova-mobile-sessions-panel, [data-nova-sessions-drawer]"
         ).forEach((drawer) => {
             drawer.classList.remove("open", "active", "visible", "is-open", "show");
-            drawer.setAttribute("aria-hidden", "true");
+            drawer.removeAttribute("aria-hidden");
         });
     }
 

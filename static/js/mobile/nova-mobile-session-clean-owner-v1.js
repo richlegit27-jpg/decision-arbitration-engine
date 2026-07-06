@@ -150,7 +150,12 @@
 
         document.body.appendChild(panel);
 
-        $(IDS.close).addEventListener("click", closePanel);
+        $(IDS.close).addEventListener("click", function (event) {
+    event.preventDefault();
+    event.currentTarget.blur();
+    closePanel();
+});
+
         $(IDS.newButton).addEventListener("click", createSession);
 
         panel.addEventListener("click", handlePanelClick);
@@ -160,6 +165,10 @@
 
 function openPanel() {
     const panel = ensurePanel();
+
+    // kill stale accessibility state from old session controllers
+    panel.removeAttribute("aria-hidden");
+    panel.removeAttribute("hidden");
 
     // 🔥 reset accessibility state BEFORE showing
     panel.removeAttribute("aria-hidden");
@@ -183,25 +192,22 @@ function closePanel() {
     const panel = $(IDS.panel);
     if (!panel) return;
 
-    // 1. kill focus FIRST (critical)
-    if (document.activeElement) {
-        document.activeElement.blur();
+    const active = document.activeElement;
+
+    if (active) {
+        active.blur();
     }
 
-    // 2. force pointer reset
-    panel.style.pointerEvents = "none";
+    panel.setAttribute("inert", "");
 
-    // 3. hide visually (ONLY ONE METHOD)
-    panel.style.display = "none";
+    panel.style.setProperty("display", "none", "important");
 
-    // 4. REMOVE aria-hidden completely (do NOT set it again anywhere)
     panel.removeAttribute("aria-hidden");
+    panel.removeAttribute("hidden");
 
-    // 5. optional cleanup of focus trap
     setTimeout(() => {
-        panel.blur?.();
-        document.body.focus?.();
-    }, 0);
+        panel.removeAttribute("inert");
+    }, 50);
 }
 
     async function loadSessions() {

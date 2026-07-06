@@ -19,11 +19,13 @@
         "NovaMobilePendingAttachments"
     ];
 
-    const PREVIEW_SELECTORS = [
-        "#nova-mobile-upload-preview",
-        "#nova-mobile-attachment-preview",
-        "#nova-mobile-attachment-preview-bar",
-        "#nova-mobile-upload-preview-bar",
+const PREVIEW_SELECTORS = [
+    "#nova-main-visible-attachment-preview",
+    "#nova-mobile-upload-preview",
+    "#nova-mobile-attachment-preview",
+    "#nova-mobile-attachment-preview-bar",
+    "#nova-mobile-upload-preview-bar",
+
         "[data-nova-upload-preview]",
         "[data-nova-attachment-preview]",
         "[data-nova-preview]",

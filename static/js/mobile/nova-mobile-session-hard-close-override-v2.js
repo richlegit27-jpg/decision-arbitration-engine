@@ -147,7 +147,6 @@
             attributeFilter: ["style", "aria-hidden", "inert"]
         });
 
-        setInterval(normalizeOpenPanel, 500);
     }
 
     bootObserver();

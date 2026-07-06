@@ -1690,12 +1690,11 @@ setTimeout(() => {
         style.textContent = `
             #nova-mobile-composer {
                 position: fixed !important;
-                left: 50% !important;
-                right: auto !important;
-                bottom: calc(10px + env(safe-area-inset-bottom)) !important;
-                width: min(calc(100vw - 16px), 760px) !important;
-                max-width: 760px !important;
-                transform: translateX(-50%) !important;
+left: 0 !important;
+right: 0 !important;
+width: 100% !important;
+max-width: 100% !important;
+transform: none !important;
                 display: flex !important;
                 flex-direction: column !important;
                 align-items: stretch !important;
@@ -1849,12 +1848,12 @@ setTimeout(() => {
         composer.removeAttribute("aria-hidden");
 
         composer.style.setProperty("position", "fixed", "important");
-        composer.style.setProperty("left", "50%", "important");
-        composer.style.setProperty("right", "auto", "important");
-        composer.style.setProperty("bottom", "calc(10px + env(safe-area-inset-bottom))", "important");
-        composer.style.setProperty("width", "min(calc(100vw - 16px), 760px)", "important");
-        composer.style.setProperty("max-width", "760px", "important");
-        composer.style.setProperty("transform", "translateX(-50%)", "important");
+composer.style.setProperty("left", "0", "important");
+composer.style.setProperty("right", "0", "important");
+composer.style.setProperty("bottom", "0", "important");
+composer.style.setProperty("width", "100%", "important");
+composer.style.setProperty("max-width", "100%", "important");
+composer.style.setProperty("transform", "none", "important");
         composer.style.setProperty("display", "flex", "important");
         composer.style.setProperty("flex-direction", "column", "important");
         composer.style.setProperty("gap", "8px", "important");

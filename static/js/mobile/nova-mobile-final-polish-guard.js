@@ -322,7 +322,7 @@ window.__novaMobileFinalPolishGuardObserver.observe(document.body, {
         imp(chat, "max-height", "none");
         imp(chat, "overflow-y", "auto");
         imp(chat, "overflow-x", "hidden");
-        imp(chat, "padding-bottom", "24px");
+        imp(chat, "padding-bottom", "140px");
         imp(chat, "z-index", "10");
     }
 
@@ -402,7 +402,7 @@ window.__novaMobileFinalPolishGuardObserver.observe(document.body, {
         imp(chat, "max-height", "none");
         imp(chat, "overflow-y", "auto");
         imp(chat, "overflow-x", "hidden");
-        imp(chat, "padding-bottom", "24px");
+        imp(chat, "padding-bottom", "140px");
         imp(chat, "z-index", "10");
     }
 

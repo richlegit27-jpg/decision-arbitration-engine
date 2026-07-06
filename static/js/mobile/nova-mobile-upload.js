@@ -141,17 +141,48 @@
 
         for (var i = 0; i < files.length; i += 1) {
             try {
-                var item = await uploadOne(files[i]);
 
-                pendingAttachments.push(item);
-                syncGlobals();
+var localItem = {
+    ok: true,
+    filename: files[i].name,
+    name: files[i].name,
+    original_name: files[i].name,
+    type: files[i].type || "",
+    mime_type: files[i].type || "",
+    size: files[i].size || 0,
+    url: "",
+    local_preview: URL.createObjectURL(files[i]),
+    pending_upload: true
+};
 
-                dispatch("nova-mobile-upload-complete", item);
-                dispatch("nova-mobile-attachment-uploaded", item);
-                dispatch("nova-mobile-attachments-changed", {
-                    pendingAttachments: pendingAttachments.slice(),
-                    attachments: pendingAttachments.slice()
-                });
+pendingAttachments.push(localItem);
+syncGlobals();
+
+dispatch("nova-mobile-attachment-preview", localItem);
+dispatch("nova-mobile-attachments-changed", {
+    pendingAttachments: pendingAttachments.slice(),
+    attachments: pendingAttachments.slice()
+});
+
+log("preview shown", localItem.filename);
+
+
+/* upload after preview */
+var item = await uploadOne(files[i]);
+
+localItem.url = item.url;
+localItem.file_url = item.file_url;
+localItem.path = item.path;
+localItem.pending_upload = false;
+
+syncGlobals();
+
+dispatch("nova-mobile-upload-complete", localItem);
+dispatch("nova-mobile-attachment-uploaded", localItem);
+dispatch("nova-mobile-attachments-changed", {
+    pendingAttachments: pendingAttachments.slice(),
+    attachments: pendingAttachments.slice()
+});
 
                 log("uploaded", item.filename || item.name);
             } catch (error) {

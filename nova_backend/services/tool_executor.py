@@ -5,14 +5,13 @@ from nova_backend.services.tools.calendar_tool import CalendarTool
 class ToolExecutor:
     """
     Central Tool Gate for Nova.
-
     SAFETY LAYER + TOOL ROUTER
     """
 
     def __init__(self, action_router):
         self.action_router = action_router
 
-        # internal tools handled by ActionRouter
+        # internal tools (system actions)
         self.internal_tools = {
             "chat.send",
             "session.rename",
@@ -22,7 +21,7 @@ class ToolExecutor:
             "attachment.analyze",
         }
 
-        # external tools (REAL WORLD)
+        # external tools (real-world actions)
         self.email_tool = EmailTool()
         self.calendar_tool = CalendarTool()
 
@@ -31,7 +30,7 @@ class ToolExecutor:
             "calendar.create",
         }
 
-        # require confirmation
+        # tools requiring confirmation
         self.requires_confirmation = {
             "email.send",
             "calendar.create",
@@ -94,10 +93,9 @@ class ToolExecutor:
         }
 
     # =========================================================
-    # AI MODE (later)
+    # INTENT → TOOL MAPPER
     # =========================================================
     def auto_decide_and_run(self, intent: str, payload: dict):
-
         intent_map = {
             "rename": "session.rename",
             "pin": "session.pin",
@@ -106,7 +104,7 @@ class ToolExecutor:
             "analyze": "attachment.analyze",
             "chat": "chat.send",
 
-            # external
+            # external tools
             "email": "email.send",
             "calendar": "calendar.create",
         }
@@ -120,27 +118,3 @@ class ToolExecutor:
             }
 
         return self.run(tool, payload)
-
-def auto_decide_and_run(self, intent: str, payload: dict):
-    intent_map = {
-        "rename": "session.rename",
-        "pin": "session.pin",
-        "delete": "session.delete",
-        "upload": "attachment.upload",
-        "analyze": "attachment.analyze",
-        "chat": "chat.send",
-
-        # external tools
-        "email": "email.send",
-        "calendar": "calendar.create",
-    }
-
-    tool = intent_map.get((intent or "").lower())
-
-    if not tool:
-        return {
-            "ok": False,
-            "error": f"No tool mapped for intent: {intent}"
-        }
-
-    return self.run(tool, payload)
