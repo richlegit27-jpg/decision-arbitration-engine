@@ -1,6 +1,7 @@
 ﻿(function () {
     "use strict";
-    return;
+
+    console.log("[BRIDGE TEST] session restore bridge started");
 
     if (window.__NOVA_MOBILE_SESSION_RESTORE_BRIDGE_V1__) {
         return;
@@ -259,10 +260,20 @@
         });
     }, true);
 
+console.log("[BRIDGE DEBUG] reached export");
+
     window.NovaMobileRestoreSession = {
         restore: restoreSession,
         renderMessages: renderMessages
     };
+
+    const initialSessionId = new URLSearchParams(window.location.search).get("session_id");
+
+    if (initialSessionId) {
+        restoreSession(initialSessionId).catch((error) => {
+            console.error(LOG, "initial restore failed", error);
+        });
+    }
 
     console.log(LOG, "installed");
 })();
