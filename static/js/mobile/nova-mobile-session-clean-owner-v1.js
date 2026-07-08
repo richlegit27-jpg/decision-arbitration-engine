@@ -214,7 +214,9 @@ setTimeout(() => {
     panel.style.setProperty("display", "none", "important");
 }, 0);
 
-    async function loadSessions() {
+}
+
+async function loadSessions() {
         setStatus("Loading sessions...");
         const data = await jsonFetch(API.list + "?clean_owner=" + Date.now(), { method: "GET" });
         const sessions = normalizeSessions(data);
