@@ -5459,28 +5459,55 @@ function normalizeStableActions() {
         });
     }
 
-    function closePanel(panel) {
-        if (!panel) return;
+function closePanel(panel) {
+    if (!panel) return;
 
-        panel.classList.remove(
-            "open",
-            "show",
-            "active",
-            "visible",
-            "is-open",
-            "is-visible",
-            "nova-open",
-            "sessions-open"
-        );
+    // NOVA_SESSION_CLEAN_OWNER_SKIP_20260708
+    // Clean session panel owns its own accessibility lifecycle.
+    if (panel.id === "nova-clean-session-panel-v1") {
+        const active = document.activeElement;
 
-        panel.setAttribute("aria-hidden", "true");
+        if (active && panel.contains(active) && typeof active.blur === "function") {
+            active.blur();
+        }
+
+        panel.setAttribute("inert", "");
+        panel.removeAttribute("aria-hidden");
         panel.hidden = true;
 
         panel.style.setProperty("display", "none", "important");
         panel.style.setProperty("visibility", "hidden", "important");
         panel.style.setProperty("opacity", "0", "important");
         panel.style.setProperty("pointer-events", "none", "important");
+
+        return;
     }
+
+    panel.classList.remove(
+        "open",
+        "show",
+        "active",
+        "visible",
+        "is-open",
+        "is-visible",
+        "nova-open",
+        "sessions-open"
+    );
+
+    const active = document.activeElement;
+
+    if (active && panel.contains(active) && typeof active.blur === "function") {
+        active.blur();
+    }
+
+    panel.setAttribute("aria-hidden", "true");
+    panel.hidden = true;
+
+    panel.style.setProperty("display", "none", "important");
+    panel.style.setProperty("visibility", "hidden", "important");
+    panel.style.setProperty("opacity", "0", "important");
+    panel.style.setProperty("pointer-events", "none", "important");
+}
 
     function closeAll(reason) {
         allSessionPanels().forEach(closePanel);

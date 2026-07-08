@@ -183,6 +183,14 @@ function openPanel() {
     // show panel
     panel.style.setProperty("display", "flex", "important");
 
+panel.style.setProperty("visibility", "visible", "important");
+panel.style.setProperty("opacity", "1", "important");
+panel.style.setProperty("pointer-events", "auto", "important");
+panel.removeAttribute("inert");
+panel.removeAttribute("hidden");
+
+console.log("[OPEN DEBUG]", panel.getAttribute("style"));
+
     // ensure no stale focus conflicts
     setTimeout(() => {
         const closeBtn = document.getElementById("nova-clean-session-close-v1");
@@ -203,17 +211,23 @@ function closePanel() {
 
     const active = document.activeElement;
 
-if (active && panel.contains(active)) {
-    active.blur();
-}
+    if (active && panel.contains(active)) {
+        active.blur();
+    }
 
-setTimeout(() => {
-    panel.setAttribute("inert", "");
-    panel.setAttribute("aria-hidden", "true");
-    panel.setAttribute("hidden", "");
-    panel.style.setProperty("display", "none", "important");
-}, 0);
+    const headerButton = document.getElementById("nova-mobile-sessions-toggle");
 
+    if (headerButton) {
+        headerButton.focus({ preventScroll: true });
+    } else {
+        document.body.setAttribute("tabindex", "-1");
+        document.body.focus();
+    }
+
+panel.setAttribute("inert", "");
+panel.removeAttribute("aria-hidden");
+panel.setAttribute("hidden", "");
+panel.style.setProperty("display", "none", "important");
 }
 
 async function loadSessions() {
