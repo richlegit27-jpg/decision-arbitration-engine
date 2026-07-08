@@ -6207,6 +6207,20 @@ def api_chat():
             len(attachments_for_chat_service or []),
         )
 
+        username = ""
+
+        try:
+            from flask import g
+
+            user = getattr(g, "nova_auth_user", None) or {}
+
+            username = str(
+                user.get("username") or ""
+            ).strip()
+
+        except Exception:
+            pass
+
         result = chat_service.handle(
             user_text=image_command_user_text,
             session_id=session_id,
@@ -6931,8 +6945,6 @@ def _nova_find_uploaded_file_path_20260607(attachment):
         return None
     except Exception:
         return None
-
-
 
 
 @app.get("/api/sessions/<session_id>")

@@ -375,7 +375,6 @@
             }
 
             if (/send/i.test(marker) || /^send$/i.test(text) || /mobile-send/i.test(marker)) {
-                delayedFallbackClear("send-click-delayed-fallback");
             }
         }, true);
 
@@ -387,23 +386,6 @@
             }
         }, true);
 
-        document.addEventListener("keydown", function (event) {
-            if (event.key !== "Enter" || event.shiftKey) return;
-
-            const target = event.target;
-            if (!target) return;
-
-            const marker = markerFor(target);
-
-            if (
-                /message|composer|chat|input|textarea/i.test(marker) ||
-                target.tagName === "TEXTAREA" ||
-                target.isContentEditable
-            ) {
-                delayedFallbackClear("enter-send-delayed-fallback");
-            }
-        }, true);
-    }
 
     window.NovaMobileAttachmentClearAuthorityV1 = {
         version: "NOVA_MOBILE_ATTACHMENT_CLEAR_AUTHORITY_V3_20260705",

@@ -21,24 +21,23 @@
             document.getElementById("nova-mobile-chat-messages") ||
             document.querySelector("[data-nova-chat-messages]") ||
             document.querySelector(".mobile-chat-container") ||
-            document.querySelector(".chat-messages") ||
-            document.querySelector("main")
+            document.querySelector(".chat-messages")
         );
     }
 
-    function getMessageText(message) {
-        return text(
-            message.text ||
-            message.content ||
-            message.message ||
-            message.body ||
-            ""
-        );
-    }
+function getMessageText(message) {
+    return text(
+        message.text ||
+        message.content ||
+        message.message ||
+        message.body ||
+        ""
+    );
+}
 
-    function getMessageRole(message) {
-        return message.role === "user" ? "user" : "assistant";
-    }
+function getMessageRole(message) {
+    return message.role === "user" ? "user" : "assistant";
+}
 
     function addAttachmentNodes(wrapper, attachments) {
         if (!Array.isArray(attachments) || attachments.length < 1) {
@@ -118,9 +117,13 @@
         localStorage.setItem("nova_mobile_active_session_id", sessionId);
         localStorage.setItem("nova_active_session_id", sessionId);
 
-        window.__NOVA_ACTIVE_SESSION_ID__ = sessionId;
-        window.NOVA_ACTIVE_SESSION_ID = sessionId;
-        window.NovaActiveSessionId = sessionId;
+window.__NOVA_ACTIVE_SESSION_ID = sessionId;
+window.NOVA_ACTIVE_SESSION_ID = sessionId;
+window.NovaActiveSessionId = sessionId;
+
+window.NovaMobileActiveSessionId = sessionId;
+window.__novaMobileActiveSessionId = sessionId;
+window.novaMobileActiveSessionId = sessionId;
 
         try {
             const url = new URL(window.location.href);
@@ -237,29 +240,6 @@
         return true;
     }
 
-    document.addEventListener("click", function (event) {
-        const target = event.target.closest(
-            "[data-session-id], [data-nova-session-id], [data-id], a, button, [role='button'], .session-item, .nova-session-item"
-        );
-
-        if (!target || !isSessionActionElement(target)) {
-            return;
-        }
-
-        const sessionId = extractSessionIdFromElement(target);
-
-        if (!sessionId) {
-            return;
-        }
-
-        event.preventDefault();
-        event.stopPropagation();
-
-        restoreSession(sessionId).catch((error) => {
-            console.error(LOG, "restore crashed", error);
-        });
-    }, true);
-
 console.log("[BRIDGE DEBUG] reached export");
 
     window.NovaMobileRestoreSession = {
@@ -267,13 +247,34 @@ console.log("[BRIDGE DEBUG] reached export");
         renderMessages: renderMessages
     };
 
-    const initialSessionId = new URLSearchParams(window.location.search).get("session_id");
+const startRestore = () => {
+    const sessionId = new URLSearchParams(window.location.search).get("session_id");
 
-    if (initialSessionId) {
-        restoreSession(initialSessionId).catch((error) => {
-            console.error(LOG, "initial restore failed", error);
-        });
+    console.log(LOG, "startup restore check", {
+        sessionId,
+        href: window.location.href,
+        readyState: document.readyState
+    });
+
+    if (!sessionId) {
+        return;
     }
 
-    console.log(LOG, "installed");
+    setTimeout(() => {
+        restoreSession(sessionId).catch((error) => {
+            console.error(LOG, "initial restore failed", error);
+        });
+    }, 300);
+};
+
+if (document.readyState === "complete") {
+    startRestore();
+} else {
+    window.addEventListener("load", startRestore, { once: true });
+}
+
+console.log(LOG, "installed");
+
 })();
+
+

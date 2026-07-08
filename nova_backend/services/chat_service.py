@@ -25956,37 +25956,41 @@ def _nova_token_usage_wrap_finalize_response_20260705():
         return
 
     def wrapped(self, *args, **kwargs):
+
         result = original(self, *args, **kwargs)
 
         try:
             from nova_backend.services.usage_ledger_service import record_model_usage
+            from nova_backend.services.billing_service import consume_usage
 
-            session_id = kwargs.get("session_id", "")
-            user_text = kwargs.get("user_text", "")
-            assistant_msg = kwargs.get("assistant_msg")
+            username = ""
 
-            # Fallback extraction by common positional order:
-            # _finalize_response(session_id, user_text, user_msg, assistant_msg, ...)
-            if not session_id and len(args) >= 1:
-                session_id = args[0]
-            if not user_text and len(args) >= 2:
-                user_text = args[1]
-            if assistant_msg is None and len(args) >= 4:
-                assistant_msg = args[3]
+            try:
+                from flask import g
 
-            assistant_text = _nova_token_usage_extract_assistant_text_20260705(assistant_msg)
-            if not assistant_text:
-                assistant_text = _nova_token_usage_extract_result_text_20260705(result)
+                user = getattr(g, "nova_auth_user", None) or {}
 
-            model_name = (
-                getattr(self, "model", None)
-                or getattr(self, "chat_model", None)
-                or getattr(self, "default_model", None)
-                or "unknown"
-            )
+                username = str(
+                    user.get("username") or ""
+                ).strip()
+
+            except Exception:
+                pass
+
+            if not username:
+                try:
+                    from auth_utils import current_user, normalize_username
+
+                    username = normalize_username(
+                        str(current_user().get("username", "") or "")
+                    )
+
+                except Exception:
+                    pass
 
             record_model_usage(
                 session_id=str(session_id or ""),
+                username=username,
                 model=str(model_name or "unknown"),
                 input_text=user_text or "",
                 output_text=assistant_text or "",
@@ -25995,6 +25999,30 @@ def _nova_token_usage_wrap_finalize_response_20260705():
                     "estimated": True,
                 },
             )
+
+            try:
+                billing_result = consume_usage(
+                    username=username,
+                    model=str(model_name or "unknown"),
+                    input_tokens=len((user_text or "").split()),
+                    output_tokens=len((assistant_text or "").split()),
+                )
+
+                print(
+                    "[NOVA_BILLING]",
+                    "username=", username,
+                    "model=", model_name,
+                    "result=", billing_result,
+                    flush=True,
+                )
+
+            except Exception as billing_error:
+
+                print(
+                    "[NOVA_BILLING] failed:",
+                    billing_error
+                )
+
         except Exception as exc:
             try:
                 print("[NOVA_TOKEN_USAGE_FINALIZE_WRAPPER] usage record failed:", exc)

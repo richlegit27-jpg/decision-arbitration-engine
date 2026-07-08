@@ -18,7 +18,7 @@
     const IDS = {
         button: "nova-mobile-sessions-toggle",
         panel: "nova-clean-session-panel-v1",
-        list: "nova-clean-session-list-v1",
+        list: "nova-mobile-v10-sessions-body",
         status: "nova-clean-session-status-v1",
         close: "nova-clean-session-close-v1",
         newButton: "nova-clean-session-new-v1"
@@ -112,56 +112,63 @@
         }
     }
 
-    function ensurePanel() {
-        let panel = $(IDS.panel);
+function ensurePanel() {
+    let panel = $(IDS.panel);
 
-        if (panel) {
-            return panel;
+    if (panel) {
+        if (panel.dataset.sessionClickBound !== "1") {
+            panel.dataset.sessionClickBound = "1";
+            panel.addEventListener("click", handlePanelClick);
         }
-
-        panel = document.createElement("div");
-        panel.id = IDS.panel;
-        panel.innerHTML = `
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-                <div style="flex:1;font-size:18px;font-weight:900;">Sessions</div>
-                <button id="${IDS.newButton}" type="button" style="border:0;border-radius:10px;padding:8px 10px;font-weight:800;">New</button>
-                <button id="${IDS.close}" type="button" style="border:0;border-radius:10px;padding:8px 10px;font-weight:800;">Close</button>
-            </div>
-            <div id="${IDS.status}" style="font-size:12px;color:rgba(255,255,255,.7);margin-bottom:10px;"></div>
-            <div id="${IDS.list}" style="display:flex;flex-direction:column;gap:10px;overflow:auto;padding-bottom:30px;"></div>
-        `;
-
-        panel.style.cssText = [
-            "position:fixed",
-            "top:0",
-            "right:0",
-            "bottom:0",
-            "width:min(430px,94vw)",
-            "z-index:2147483647",
-            "display:none",
-            "flex-direction:column",
-            "padding:18px",
-            "box-sizing:border-box",
-            "background:rgba(10,10,18,.98)",
-            "color:#fff",
-            "box-shadow:-20px 0 60px rgba(0,0,0,.45)",
-            "overflow:hidden"
-        ].join(";");
-
-        document.body.appendChild(panel);
-
-        $(IDS.close).addEventListener("click", function (event) {
-    event.preventDefault();
-    event.currentTarget.blur();
-    closePanel();
-});
-
-        $(IDS.newButton).addEventListener("click", createSession);
-
-        panel.addEventListener("click", handlePanelClick);
 
         return panel;
     }
+
+    panel = document.createElement("div");
+    panel.id = IDS.panel;
+
+    panel.innerHTML = `
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <div style="flex:1;font-size:18px;font-weight:900;">Sessions</div>
+            <button id="${IDS.newButton}" type="button" style="border:0;border-radius:10px;padding:8px 10px;font-weight:800;">New</button>
+            <button id="${IDS.close}" type="button" style="border:0;border-radius:10px;padding:8px 10px;font-weight:800;">Close</button>
+        </div>
+        <div id="${IDS.status}" style="font-size:12px;color:rgba(255,255,255,.7);margin-bottom:10px;"></div>
+        <div id="${IDS.list}" style="display:flex;flex-direction:column;gap:10px;overflow:auto;padding-bottom:30px;"></div>
+    `;
+
+    panel.style.cssText = [
+        "position:fixed",
+        "top:0",
+        "right:0",
+        "bottom:0",
+        "width:min(430px,94vw)",
+        "z-index:2147483647",
+        "display:none",
+        "flex-direction:column",
+        "padding:18px",
+        "box-sizing:border-box",
+        "background:rgba(10,10,18,.98)",
+        "color:#fff",
+        "box-shadow:-20px 0 60px rgba(0,0,0,.45)",
+        "overflow:hidden"
+    ].join(";");
+
+    document.body.appendChild(panel);
+
+    $(IDS.close).addEventListener("click", function (event) {
+        event.preventDefault();
+        event.currentTarget.blur();
+        closePanel();
+    });
+
+    $(IDS.newButton).addEventListener("click", createSession);
+
+    panel.dataset.sessionClickBound = "1";
+    panel.addEventListener("click", handlePanelClick);
+
+    return panel;
+}
 
 function openPanel() {
     const panel = ensurePanel();
@@ -192,6 +199,8 @@ function closePanel() {
     const panel = $(IDS.panel);
     if (!panel) return;
 
+console.log("[SESSION PANEL CLOSED]");
+
     const active = document.activeElement;
 
     if (active) {
@@ -199,11 +208,10 @@ function closePanel() {
     }
 
     panel.setAttribute("inert", "");
+    panel.setAttribute("aria-hidden", "true");
+    panel.setAttribute("hidden", "");
 
     panel.style.setProperty("display", "none", "important");
-
-    panel.removeAttribute("aria-hidden");
-    panel.removeAttribute("hidden");
 
     setTimeout(() => {
         panel.removeAttribute("inert");
@@ -286,31 +294,74 @@ if (id) {
         await loadSessions();
     }
 
-    async function handlePanelClick(event) {
-        const button = event.target.closest("[data-nova-action]");
-        if (!button) {
-            return;
-        }
+async function handlePanelClick(event) {
 
-        const row = button.closest("[data-session-id]");
-        const id = row ? row.dataset.sessionId : "";
-        const action = button.dataset.novaAction;
+    const button = event.target.closest("[data-nova-action]");
+    if (!button) {
+        return;
+    }
+
+    const action = button.dataset.novaAction;
+    const row = button.closest("[data-session-id]");
+    const id = row ? row.dataset.sessionId : "";
 
 if (action === "open" && id) {
-    localStorage.setItem("nova_mobile_active_session_id", id);
 
-    window.dispatchEvent(new CustomEvent("nova:session-selected", {
-        detail: { session_id: id }
-    }));
+    console.log("[SESSION CLICK OPEN]", id);
 
-    closePanel();
-    return;
-}
+    localStorage.setItem(
+        "nova_mobile_active_session_id",
+        id
+    );
+
+    const url = new URL(window.location.href);
+    url.searchParams.set("session_id", id);
+    window.history.pushState({}, "", url);
+
+    try {
+
+            console.log("[CLEAN RESTORE ENTERED]", id);
+
+            const data = await jsonFetch(
+                "/api/sessions/" + encodeURIComponent(id),
+                { method: "GET" }
+            );
+
+console.log("[RESTORE DATA TYPE]", typeof data, data);
+console.log("[RESTORE SESSION]", data.session);
+console.log("[RESTORE MESSAGES]", data.session?.messages?.length, data.messages?.length);
+
+            console.log("[CLEAN RESTORE RESPONSE]", data);
+
+window.dispatchEvent(new CustomEvent("nova:session-selected", {
+    detail: {
+        session_id: id,
+        session: {
+            ...(data.session || data),
+            messages: (data.session?.messages || data.messages || [])
+        }
+    }
+}));
+
+closePanel();
+
+        } catch (err) {
+            console.error("[CLEAN RESTORE ERROR]", err);
+        }
+
+        return;
+    }
+
+    // rename/pin/delete continue here
+
 
         if (action === "rename" && id) {
             const current = row.querySelector("[data-nova-action='open']")?.textContent || "";
-            const title = prompt("Rename session", current.replace(/^PIN\s*/, "").trim() || "New Chat");
-            if (!title) return;
+const title = prompt("Rename session", current.replace(/^PIN\s*/, "").trim() || "New Chat");
+
+console.log("[RENAME DEBUG] current=", current, "entered=", title);
+
+if (!title) return;
 
             setStatus("Renaming...");
             await postFirst(API.rename.concat([

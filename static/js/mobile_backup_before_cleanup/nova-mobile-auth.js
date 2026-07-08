@@ -1,0 +1,268 @@
+﻿(function () {
+    "use strict";
+
+    window.NOVA_MOBILE_AUTH_HEADER_UI_DISABLED_20260705 = true;
+
+    function removeDeadAuthHeaderControls() {
+        [
+            "nova-mobile-account-top",
+            "nova-mobile-auth-logout",
+            "nova-auth-workmode-register-v2",
+            "nova-mobile-account-top-disabled-20260705",
+            "nova-mobile-auth-logout-disabled-20260705",
+            "nova-auth-workmode-register-v2-disabled-20260705"
+        ].forEach(function (id) {
+            document.querySelectorAll("#" + id).forEach(function (el) {
+                el.remove();
+            });
+        });
+
+        document.querySelectorAll(".nova-mobile-auth-chip").forEach(function (el) {
+            el.remove();
+        });
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", removeDeadAuthHeaderControls);
+    } else {
+        removeDeadAuthHeaderControls();
+    }
+
+    window.addEventListener("load", removeDeadAuthHeaderControls);
+    window.addEventListener("pageshow", removeDeadAuthHeaderControls);
+
+    try {
+        new MutationObserver(removeDeadAuthHeaderControls).observe(document.documentElement, {
+            childList: true,
+            subtree: true
+        });
+    } catch (err) {}
+})();
+/* NOVA_MOBILE_AUTH_GUARD_20260610 */
+(function () {
+    "use strict";
+
+    const AUTH_STATUS_URL = "/api/auth/status";
+    const AUTH_LOGOUT_URL = "/api/auth/logout";
+    const LOGIN_URL = "/login";
+
+    function setBodyAuthState(authenticated, username) {
+        document.body.dataset.novaAuthenticated = authenticated ? "true" : "false";
+        document.body.dataset.novaUsername = username || "";
+        window.NovaAuthState = {
+            authenticated: Boolean(authenticated),
+            username: username || ""
+        };
+    }
+
+
+    // NOVA_MOBILE_AUTH_BLANK_SLATE_20260623
+    function clearWorkspaceSessionState(reason) {
+        const keys = [
+            "nova_mobile_active_session_id",
+            "nova_active_session_id",
+            "active_session_id",
+            "session_id",
+            "nova_session_id",
+            "novaMobileSessionId",
+            "NovaMobileActiveSessionId",
+            "NOVA_ACTIVE_SESSION_ID",
+            "nova_pending_session_id",
+            "nova_pending_new_session_id",
+            "nova_mobile_pending_attachments",
+            "nova_desktop_pending_attachments",
+            "nova_mobile_session_cache",
+            "nova_session_restore_cache"
+        ];
+
+        keys.forEach(function (key) {
+            try {
+                localStorage.removeItem(key);
+            } catch (_) {}
+
+            try {
+                sessionStorage.removeItem(key);
+            } catch (_) {}
+        });
+
+        window.NOVA_ACTIVE_SESSION_ID = "";
+        window.NovaActiveSessionId = "";
+        window.NovaMobileActiveSessionId = "";
+        window.novaMobileActiveSessionId = "";
+        window.NovaCurrentSessionId = "";
+        window.currentSessionId = "";
+        window.activeSessionId = "";
+        window.NOVA_FORCE_NEW_SESSION_ON_NEXT_SEND = true;
+        window.NOVA_PENDING_NEW_SESSION_ID = "";
+
+        console.log("[Nova Mobile Auth Blank Slate] cleared workspace session state", reason || "");
+    }
+
+    function normalizeUsername(value) {
+        return String(value || "").trim().toLowerCase();
+    }
+
+    function applyAuthWorkspaceBoundary(authenticated, username) {
+        const currentUser = normalizeUsername(username);
+        const previousUser = normalizeUsername(localStorage.getItem("nova_last_auth_username") || "");
+
+        if (!authenticated || !currentUser) {
+            clearWorkspaceSessionState("not authenticated");
+            localStorage.removeItem("nova_last_auth_username");
+            return;
+        }
+
+        if (previousUser && previousUser !== currentUser) {
+            clearWorkspaceSessionState("user changed from " + previousUser + " to " + currentUser);
+        }
+
+        if (!previousUser) {
+            clearWorkspaceSessionState("fresh authenticated workspace for " + currentUser);
+        }
+
+        localStorage.setItem("nova_last_auth_username", currentUser);
+        document.body.dataset.novaWorkspaceUser = currentUser;
+        window.NovaWorkspaceUser = currentUser;
+    }
+
+    function ensureStyles() {
+        if (document.getElementById("nova-mobile-auth-style")) return;
+
+        const style = document.createElement("style");
+        style.id = "nova-mobile-auth-style";
+        style.textContent = `
+            .nova-mobile-auth-chip {
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                z-index: 2147483000;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 6px 8px;
+                border: 1px solid rgba(255,255,255,.12);
+                border-radius: 999px;
+                background: rgba(12,12,18,.72);
+                backdrop-filter: blur(10px);
+                color: rgba(255,255,255,.88);
+                font: 12px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                box-shadow: 0 8px 24px rgba(0,0,0,.25);
+            }
+
+            .nova-mobile-auth-chip button {
+                border: 0;
+                border-radius: 999px;
+                padding: 4px 7px;
+                background: rgba(255,255,255,.12);
+                color: rgba(255,255,255,.92);
+                font: inherit;
+                cursor: pointer;
+            }
+
+            .nova-mobile-auth-chip button:active {
+                transform: scale(.98);
+            }
+
+            body[data-nova-authenticated="false"] .nova-mobile-auth-chip {
+                display: none;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    function renderChip(username) {
+        ensureStyles();
+
+        let chip = document.getElementById("nova-mobile-auth-chip");
+        if (!chip) {
+            chip = document.createElement("div");
+            chip.id = "nova-mobile-auth-chip";
+            chip.className = "nova-mobile-auth-chip";
+            chip.innerHTML = `
+                <span id="nova-mobile-auth-name"></span>
+                <button id="nova-mobile-auth-logout-disabled-20260705" type="button">Logout</button>
+            `;
+            document.body.appendChild(chip);
+        }
+
+        const name = document.getElementById("nova-mobile-auth-name");
+        const logout = document.getElementById("nova-mobile-auth-logout-disabled-20260705");
+
+        if (name) {
+            name.textContent = username ? `@${username}` : "Signed in";
+        }
+
+        if (logout && !logout.dataset.bound) {
+            logout.dataset.bound = "true";
+            logout.addEventListener("click", async function () {
+                logout.disabled = true;
+                logout.textContent = "Logging out...";
+
+                try {
+                    await fetch(AUTH_LOGOUT_URL, {
+                        method: "POST",
+                        credentials: "include"
+                    });
+                } catch (error) {
+                    console.warn("[Nova Mobile Auth] logout failed", error);
+                }
+
+                clearWorkspaceSessionState("logout");
+                localStorage.removeItem("nova_last_auth_username");
+                window.location.href = LOGIN_URL;
+            });
+        }
+    }
+
+    async function refreshMobileAuth() {
+        try {
+            const response = await fetch(AUTH_STATUS_URL, {
+                method: "GET",
+                credentials: "include",
+                headers: {
+                    "Accept": "application/json"
+                }
+            });
+
+            if (!response.ok) {
+                setBodyAuthState(false, "");
+                window.location.href = LOGIN_URL;
+                return;
+            }
+
+            const data = await response.json();
+            const authenticated = Boolean(data && data.authenticated);
+            const user = data && data.user ? data.user : {};
+            const username = String(user.username || data.username || "");
+
+            setBodyAuthState(authenticated, username);
+            applyAuthWorkspaceBoundary(authenticated, username);
+
+            if (!authenticated) {
+                window.location.href = LOGIN_URL;
+                return;
+            }
+
+            renderChip(username);
+            console.log("[Nova Mobile Auth] authenticated", username || "user");
+        } catch (error) {
+            console.warn("[Nova Mobile Auth] status failed", error);
+            setBodyAuthState(false, "");
+            window.location.href = LOGIN_URL;
+        }
+    }
+
+    window.NovaRefreshMobileAuth = refreshMobileAuth;
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", refreshMobileAuth);
+    } else {
+        refreshMobileAuth();
+    }
+})();
+
+
+
+
+
+

@@ -16795,3 +16795,112 @@ body {
         padding-bottom: 110px !important;
     }
 }
+
+/* NOVA MOBILE CHAT SCROLL SPACE OWNER */
+
+@media (max-width: 768px) {
+    #mobileChatMessages,
+    .mobile-chat-messages {
+        padding-bottom: 140px !important;
+        scroll-padding-bottom: 140px !important;
+    }
+}
+
+/* NOVA MOBILE CHAT SCROLL SPACE OWNER */
+
+@media (max-width: 768px) {
+    #mobileChatMessages,
+    .mobile-chat-messages {
+        padding-bottom: 140px !important;
+        scroll-padding-bottom: 140px !important;
+    }
+}
+
+/* NOVA STOP BUTTON MORPH POLISH */
+
+.mobile-composer-btn.stop-active,
+#nova-mobile-stop-btn.stop-active {
+    animation: novaStopMorph 220ms ease forwards;
+}
+
+@keyframes novaStopMorph {
+    0% {
+        border-radius: 50%;
+        transform: scale(1);
+    }
+
+    50% {
+        border-radius: 12px;
+        transform: scale(0.92);
+    }
+
+    100% {
+        border-radius: 8px;
+        transform: scale(1);
+    }
+}
+
+.mobile-composer-btn.stop-active::before,
+#nova-mobile-stop-btn.stop-active::before {
+    transform: scale(1);
+}
+
+/* NOVA SEND TO STOP MORPH POLISH */
+
+#nova-mobile-send {
+    transition:
+        transform 180ms ease,
+        border-radius 180ms ease,
+        opacity 180ms ease;
+}
+
+#nova-mobile-send.is-stop-mode {
+    border-radius: 10px;
+    transform: scale(0.92);
+}
+
+#nova-mobile-send.is-stop-mode:active {
+    transform: scale(0.84);
+}
+
+#nova-mobile-send {
+    transition:
+        transform 180ms ease,
+        border-radius 180ms ease,
+        opacity 180ms ease;
+}
+
+#nova-mobile-send.is-stop-mode {
+    border-radius: 10px;
+    transform: scale(0.92);
+}
+
+/* NOVA MOBILE ATTACHMENT PREVIEW FINAL OWNER 20260707 */
+
+#nova-mobile-attachment-preview,
+#nova-main-visible-attachment-preview,
+.nova-mobile-upload-preview,
+.nova-preview-bar,
+.attachment-preview {
+    position: fixed !important;
+    left: 10px !important;
+    right: 10px !important;
+    bottom: 78px !important;
+    z-index: 9998 !important;
+    max-height: 70px !important;
+    overflow: hidden !important;
+}
+
+
+#nova-mobile-composer,
+.mobile-composer,
+.nova-mobile-composer {
+    z-index: 9999 !important;
+}
+
+/* NOVA MOBILE ATTACHMENT PREVIEW POSITION FIX */
+#nova-mobile-upload-preview-owner {
+    transform: translateY(-8px) !important;
+    margin-bottom: -8px !important;
+    z-index: 2147483646 !important;
+}

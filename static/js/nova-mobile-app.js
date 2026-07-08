@@ -1821,7 +1821,7 @@ transform: none !important;
         }
 
         const sendButton = firstExisting(["nova-mobile-send"]);
-        const generationStopButton = firstExisting(["nova-mobile-stop-generation", "nova-mobile-stop"]);
+        const generationStopButton = null;
         const micButton = firstExisting(["nova-mobile-voice"]);
         const speechStopButton = firstExisting(["nova-mobile-stop-speech"]);
         const ttsButton = firstExisting(["nova-mobile-tts"]);
@@ -1833,15 +1833,14 @@ transform: none !important;
             "nova-mobile-sessions-toggle"
         ]);
 
-        const buttons = [
-            sendButton,
-            generationStopButton,
-            micButton,
-            speechStopButton,
-            ttsButton,
-            attachButton,
-            menuButton
-        ].filter(Boolean);
+const buttons = [
+    sendButton,
+    micButton,
+    speechStopButton,
+    ttsButton,
+    attachButton,
+    menuButton
+].filter(Boolean);
 
         composer.hidden = false;
         composer.removeAttribute("hidden");
@@ -1968,11 +1967,11 @@ composer.style.setProperty("transform", "none", "important");
         document.addEventListener("DOMContentLoaded", normalizeFinalComposerGeometry, { once: true });
     }
 
-    setTimeout(normalizeFinalComposerGeometry, 100);
-    setTimeout(normalizeFinalComposerGeometry, 500);
-    setTimeout(normalizeFinalComposerGeometry, 1200);
-    setTimeout(normalizeFinalComposerGeometry, 2500);
-    setTimeout(normalizeFinalComposerGeometry, 4500);
+setTimeout(normalizeFinalComposerGeometry, 100);
+setTimeout(normalizeFinalComposerGeometry, 500);
+setTimeout(normalizeFinalComposerGeometry, 1200);
+setTimeout(normalizeFinalComposerGeometry, 2500);
+setTimeout(normalizeFinalComposerGeometry, 4500);
 
     window.addEventListener("resize", normalizeFinalComposerGeometry);
     window.addEventListener("orientationchange", normalizeFinalComposerGeometry);
@@ -4039,12 +4038,12 @@ function styleDock(dock) {
             localStorage.setItem("nova_current_session_id", clean);
         } catch (e) {}
 
-        try {
-            const url = new URL(window.location.href);
-            url.searchParams.set("session", clean);
-            url.searchParams.set("new", String(Date.now()));
-            history.replaceState(null, "", url.toString());
-        } catch (e) {}
+try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("session");
+    url.searchParams.delete("new");
+    history.replaceState(null, "", url.toString());
+} catch (e) {}
 
         const messages = await fetchSessionMessages(clean);
 
@@ -4053,7 +4052,10 @@ function styleDock(dock) {
             return false;
         }
 
-        renderFallback(messages);
+        // NOVA_SESSION_RESTORE_SINGLE_OWNER_20260707
+// Disabled legacy fallback renderer.
+// nova-mobile-session-restore-bridge-v1.js owns message rendering now.
+// renderFallback(messages);
 
         window.NovaMobileActiveSessionId = clean;
 
@@ -4079,7 +4081,9 @@ function styleDock(dock) {
         return true;
     }
 
-    window.NovaMobileRestoreSession = restoreSession;
+    // NOVA_SESSION_RESTORE_SINGLE_OWNER_20260707
+// Disabled legacy restore export.
+// nova-mobile-session-restore-bridge-v1.js owns window.NovaMobileRestoreSession.
 
     setTimeout(() => {
         const urlSession = (() => {
@@ -4937,8 +4941,13 @@ if (
     const chat = chatRoot();
 
     if (chat && window.MutationObserver) {
-        const observer = new MutationObserver(schedule);
+const observer = new MutationObserver(() => {
+    if (__novaNormalizingStableActions) {
+        return;
+    }
 
+    schedule();
+});
         observer.observe(chat, {
             childList: true,
             subtree: true,
@@ -5358,13 +5367,26 @@ if (
         row.style.setProperty("z-index", "4", "important");
     }
 
-    function normalizeStableActions() {
-        const chat = chatRoot();
-        if (!chat) return false;
+let __novaNormalizingStableActions = false;
 
-        Array.from(chat.children || []).forEach(normalizeBubble);
-        return true;
+function normalizeStableActions() {
+    if (__novaNormalizingStableActions) {
+        return false;
     }
+
+    const chat = chatRoot();
+    if (!chat) return false;
+
+    __novaNormalizingStableActions = true;
+
+    try {
+        Array.from(chat.children || []).forEach(normalizeBubble);
+    } finally {
+        __novaNormalizingStableActions = false;
+    }
+
+    return true;
+}
 
     function schedule() {
         clearTimeout(window.__novaMobileStableActionsTimer);

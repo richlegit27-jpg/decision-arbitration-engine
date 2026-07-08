@@ -101,23 +101,23 @@
         document.head.appendChild(style);
     }
 
-    function appendMessage(role, text) {
-        installStyle();
-
-        var container = findMainChatContainer();
-        if (!container) return;
-
-        var row = document.createElement("div");
-        row.className = "nova-stable-send-message";
-        row.setAttribute("data-role", role || "assistant");
-        row.textContent = text || "";
-        container.appendChild(row);
-
-        try {
-            container.scrollTop = container.scrollHeight;
-        } catch (_) {}
+function appendMessage(role, text) {
+    if (
+        window.NovaMobileChatUI &&
+        typeof window.NovaMobileChatUI.appendMessage === "function"
+    ) {
+        return window.NovaMobileChatUI.appendMessage(
+            role,
+            text
+        );
     }
 
+    console.warn(
+        "[Nova Send] chat renderer unavailable"
+    );
+
+    return null;
+}
     function extractReply(payload) {
         if (!payload) return "";
 
@@ -449,10 +449,11 @@ function clearPendingAttachmentsAfterSend() {
             return;
         }
 
-        var input = findInput();
-        var text = input ? String(input.value || "").trim() : "";
+var input = findInput();
+var text = input ? String(input.value || "").trim() : "";
 
-        if (!text) {
+if (!text) {
+
             log("empty send ignored");
             return;
         }
@@ -551,6 +552,13 @@ if (pendingAttachments.length) {
     log("sending without attachments");
 }
 
+if (
+    window.NovaMobileRuntime &&
+    typeof window.NovaMobileRuntime.setGeneratingState === "function"
+) {
+    window.NovaMobileRuntime.setGeneratingState(true);
+}
+
 fetch("/api/chat", {
     method: "POST",
     credentials: "include",
@@ -583,12 +591,28 @@ clearPendingAttachmentsAfterSend();
 
 log("sent", sid);
     });
+
 }).catch(function (err) {
-    appendMessage("system", "Send failed: " + (err && err.message ? err.message : String(err)));
+
+    appendMessage(
+        "system",
+        "Send failed: " + (err && err.message ? err.message : String(err))
+    );
+
     log("failed", err);
+
 }).finally(function () {
+
+    if (
+        window.NovaMobileRuntime &&
+        typeof window.NovaMobileRuntime.setGeneratingState === "function"
+    ) {
+        window.NovaMobileRuntime.setGeneratingState(false);
+    }
+
     inFlight = false;
 });
+
     }
 
     function looksLikeSendButton(el) {
@@ -614,53 +638,58 @@ log("sent", sid);
             haystack.indexOf("send") >= 0
         );
     }
+function installCapture() {
+    if (window.__NOVA_MOBILE_SEND_STABLE_V1_CAPTURE_INSTALLED_20260703__) {
+        return;
+    }
 
-    function installCapture() {
-        if (window.__NOVA_MOBILE_SEND_STABLE_V1_CAPTURE_INSTALLED_20260703__) {
+    window.__NOVA_MOBILE_SEND_STABLE_V1_CAPTURE_INSTALLED_20260703__ = true;
+
+document.addEventListener("click", function (event) {
+    var button = event.target && event.target.closest
+        ? event.target.closest("#nova-mobile-send")
+        : null;
+
+    if (!button) return;
+
+if (button.classList.contains("is-stop-mode")) {
+    if (
+        window.NovaMobileRuntime &&
+        typeof window.NovaMobileRuntime.stopGeneration === "function"
+    ) {
+        window.NovaMobileRuntime.stopGeneration();
+    } else if (window.NovaMobileAbortController) {
+        window.NovaMobileAbortController.abort();
+    } else {
+        console.warn("[Nova Stop] stop handler unavailable");
+    }
+
+    return;
+}
+
+    sendNow(event);
+}, true);
+
+    document.addEventListener("keydown", function (event) {
+        if (!event) return;
+        if (event.key !== "Enter") return;
+        if (event.shiftKey) return;
+
+        var target = event.target;
+
+        if (!target) return;
+        if (!target.matches || !target.matches("textarea, input[type='text']")) return;
+
+        if (target.closest && target.closest("#nova-session-drawer-v2-panel")) {
             return;
         }
 
-        window.__NOVA_MOBILE_SEND_STABLE_V1_CAPTURE_INSTALLED_20260703__ = true;
+         sendNow(event);
+    }, true);
+}
 
-        document.addEventListener("click", function (event) {
-            var target = event.target;
-            var button = target && target.closest && target.closest("button, a, [role='button']");
-            if (!button) return;
-            if (button.closest && button.closest("#nova-session-drawer-v2-panel")) return;
+installCapture();
 
-            if (looksLikeSendButton(button)) {
-                sendNow(event);
-            }
-        }, true);
-
-        document.addEventListener("keydown", function (event) {
-            if (!event) return;
-            if (event.key !== "Enter") return;
-            if (event.shiftKey) return;
-
-            var target = event.target;
-            if (!target) return;
-            if (!target.matches || !target.matches("textarea, input[type='text']")) return;
-            if (target.closest && target.closest("#nova-session-drawer-v2-panel")) return;
-
-            sendNow(event);
-        }, true);
-    }
-
-    installCapture();
-
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", installCapture);
-    }
-
-    window.NovaMobileSendStableV1 = {
-        version: VERSION,
-        sendNow: sendNow
-    };
-
-    log("ready", VERSION);
 })();
-
-
 
 

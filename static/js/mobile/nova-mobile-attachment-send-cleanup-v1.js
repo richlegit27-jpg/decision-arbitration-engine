@@ -132,13 +132,11 @@ const PREVIEW_SELECTORS = [
         console.log(LOG, "cleared attachment queue and preview after send");
     }
 
-    function scheduleClearAfterSend() {
-        clearAttachmentsAfterSend();
-
-        [50, 150, 350, 700, 1200, 2000, 2800].forEach(function (delay) {
-            window.setTimeout(clearAttachmentsAfterSend, delay);
-        });
-    }
+function scheduleClearAfterSend() {
+    [50, 150, 350, 700, 1200, 2000, 2800].forEach(function (delay) {
+        window.setTimeout(clearAttachmentsAfterSend, delay);
+    });
+}
 
     function getFetchUrl(input) {
         if (typeof input === "string") {

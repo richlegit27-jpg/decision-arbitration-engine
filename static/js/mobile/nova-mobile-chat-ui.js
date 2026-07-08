@@ -168,12 +168,15 @@ window.addEventListener("nova:session-selected", function (event) {
 
     window.NOVA_MESSAGES = messages;
 
-    // 5. render all messages using existing function
-    if (Array.isArray(messages)) {
-        messages.forEach(msg => {
-            appendMessage(msg.role, msg.content);
-        });
-    }
+// 5. render all messages using existing function
+if (Array.isArray(messages)) {
+    messages.forEach(msg => {
+        appendMessage(
+            msg.role,
+            msg.content ?? msg.text ?? ""
+        );
+    });
+}
 
     // 6. stop rendering flag
     setTimeout(() => {
@@ -188,6 +191,7 @@ window.addEventListener("nova:session-selected", function (event) {
         window.NovaMobileBridge.scrollBottom();
     }
 });
+
 
 })();
 
