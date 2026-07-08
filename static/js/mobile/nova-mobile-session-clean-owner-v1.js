@@ -199,24 +199,20 @@ function closePanel() {
     const panel = $(IDS.panel);
     if (!panel) return;
 
-console.log("[SESSION PANEL CLOSED]");
+    console.log("[SESSION PANEL CLOSED]");
 
     const active = document.activeElement;
 
-    if (active) {
-        active.blur();
-    }
+if (active && panel.contains(active)) {
+    active.blur();
+}
 
+setTimeout(() => {
     panel.setAttribute("inert", "");
     panel.setAttribute("aria-hidden", "true");
     panel.setAttribute("hidden", "");
-
     panel.style.setProperty("display", "none", "important");
-
-    setTimeout(() => {
-        panel.removeAttribute("inert");
-    }, 50);
-}
+}, 0);
 
     async function loadSessions() {
         setStatus("Loading sessions...");
