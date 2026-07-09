@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Nova Billing — Credits and Plan</title>
     <meta name="description" content="Nova billing dashboard for plan, credits, monthly allowance, usage status, and model tier readiness.">
-    <link rel="stylesheet" href="/static/css/nova-billing.css?v=billing-dashboard-phase1-20260709">
+    <link rel="stylesheet" href="/static/css/nova-billing.css?v=billing-clarity-polish-20260709">
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
     <link rel="manifest" href="/static/site.webmanifest">
     <meta name="theme-color" content="#8b5cf6">
@@ -42,7 +42,10 @@
 
             <div class="nova-billing-actions">
                 <a href="/nova-home-preview">Home</a>
-                <a href="/contact">Contact</a>
+                <a href="/about">About</a>
+                <a href="/features">Features</a>
+                <a href="/faq">FAQ</a>
+                <a href="/contact#nova-contact-form-title">Early Access</a>
                 <a href="/richard-login">Open Nova</a>
             </div>
         </nav>
@@ -52,8 +55,8 @@
                 <p class="nova-billing-kicker">Account overview</p>
                 <h1>Your Nova usage command center.</h1>
                 <span>
-                    Track plan status, available credits, monthly allowance, and model-tier readiness.
-                    This page is wired to the local billing data file first, without changing enforcement logic.
+                    Track plan status, available credits, monthly allowance, usage direction, and model-tier readiness.
+                    This page explains the account system clearly while keeping enforcement safely backend-controlled.
                 </span>
             </div>
 
@@ -68,19 +71,19 @@
             <article class="nova-billing-card primary">
                 <p>Current plan</p>
                 <h2>{{ plan_label }}</h2>
-                <span>Developer account mode is active for owner testing and product polish.</span>
+                <span>Developer account mode is active for owner testing, release checks, product polish, and early-access validation.</span>
             </article>
 
             <article class="nova-billing-card">
                 <p>Credit balance</p>
                 <h2>{{ credits_label }}</h2>
-                <span>Available credits remaining in the current local billing ledger.</span>
+                <span>Available credits remaining in the current local billing ledger. This is the number Nova can use for future account limits and model access.</span>
             </article>
 
             <article class="nova-billing-card">
                 <p>Monthly allowance</p>
                 <h2>{{ monthly_credits_label }}</h2>
-                <span>Configured monthly credits for this account.</span>
+                <span>Configured monthly credits for this account. Later, this can become the visible monthly allowance for each plan tier.</span>
             </article>
         </section>
 
@@ -105,12 +108,75 @@
             </div>
         </section>
 
+        <!-- NOVA_BILLING_CLARITY_POLISH_20260709 -->
+
+        <section class="nova-billing-clarity">
+            <div class="nova-section-head">
+                <p>How credits work</p>
+                <h2>Simple account rules before real payments.</h2>
+                <span>
+                    Nova is keeping billing understandable first: credits show available usage,
+                    monthly allowance shows the planned budget, and model tiers stay marked as planned
+                    until backend enforcement is complete.
+                </span>
+            </div>
+
+            <div class="nova-clarity-grid">
+                <article>
+                    <strong>01</strong>
+                    <h3>Credits are the usage budget</h3>
+                    <p>Credits represent how much Nova usage the account has available. The current page reads that balance from the local billing ledger.</p>
+                </article>
+
+                <article>
+                    <strong>02</strong>
+                    <h3>Plans explain access level</h3>
+                    <p>The plan label explains account mode today. Later, plans can control monthly credits, feature access, and model availability.</p>
+                </article>
+
+                <article>
+                    <strong>03</strong>
+                    <h3>Model tiers stay backend-owned</h3>
+                    <p>Mini, Standard, and Pro should eventually be enforced by backend allowlists and credit costs, not just frontend buttons.</p>
+                </article>
+            </div>
+        </section>
+
+        <section class="nova-plan-section">
+            <div class="nova-section-head">
+                <p>Plan clarity</p>
+                <h2>What is active now vs. planned next.</h2>
+            </div>
+
+            <div class="nova-plan-grid">
+                <article>
+                    <span>Active now</span>
+                    <ul>
+                        <li>Local credit balance display</li>
+                        <li>Monthly allowance display</li>
+                        <li>Usage percentage meter</li>
+                        <li>Developer account status</li>
+                    </ul>
+                </article>
+
+                <article>
+                    <span>Planned later</span>
+                    <ul>
+                        <li>Stripe checkout and invoices</li>
+                        <li>Real plan upgrades</li>
+                        <li>Per-model credit costs</li>
+                        <li>Backend-enforced model access</li>
+                    </ul>
+                </article>
+            </div>
+        </section>
+
         <section class="nova-tier-section">
             <div class="nova-section-head">
                 <p>Model tiers</p>
-                <h2>Ready for future model-based pricing.</h2>
+                <h2>Prepared for future model-based pricing.</h2>
                 <span>
-                    The dashboard is prepared for model tiers, but enforcement should stay backend-controlled later.
+                    The dashboard can explain model tiers now, but actual model access, credit cost, and allowlists should stay backend-controlled later.
                 </span>
             </div>
 
@@ -144,7 +210,7 @@
                 <h2>Local data file connected.</h2>
                 <span>
                     This page reads account status from <code>data/nova_billing.json</code>.
-                    Stripe, invoices, payment methods, and model enforcement can be added later.
+                    Stripe, invoices, payment methods, model enforcement, and user-facing upgrades can be added later without changing this stable display contract.
                 </span>
             </div>
 
@@ -167,7 +233,7 @@
         </footer>
     </main>
 
-    <script src="/static/js/nova-billing.js?v=billing-dashboard-phase1-20260709"></script>
+    <script src="/static/js/nova-billing.js?v=billing-clarity-polish-20260709"></script>
 </body>
 </html>
 
