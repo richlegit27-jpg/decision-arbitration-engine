@@ -3,200 +3,287 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Nova — Your AI project command center</title>
-    <meta name="description" content="Nova is a project-aware AI assistant with chat, memory, sessions, uploads, voice, billing, and mobile-first tools.">
-    <link rel="stylesheet" href="/static/css/nova-landing-home.css?v=landing-home-phase1-20260709">
+    <title>Nova — AI command center for real projects</title>
+    <meta name="description" content="Nova is an AI project command center built for long-running work, memory, sessions, uploads, voice, billing, and desktop-first execution.">
+    <link rel="stylesheet" href="/static/css/nova-landing-home.css?v=landing-home-superpower-phase2-20260709">
 </head>
 <body>
+    <div class="nova-home-bg" aria-hidden="true">
+        <span class="nova-orb nova-orb-one"></span>
+        <span class="nova-orb nova-orb-two"></span>
+        <span class="nova-grid-glow"></span>
+    </div>
+
     <main class="nova-home-shell">
         <nav class="nova-home-nav" aria-label="Nova navigation">
             <a class="nova-home-brand" href="/nova-home-preview" aria-label="Nova home">
                 <span class="nova-home-brand-mark">N</span>
-                <span class="nova-home-brand-text">Nova</span>
+                <span class="nova-home-brand-copy">
+                    <strong>Nova</strong>
+                    <em>Project Command Center</em>
+                </span>
             </a>
 
             <div class="nova-home-nav-links">
-                <a href="#features">Features</a>
+                <a href="#why">Why Nova</a>
+                <a href="#system">System</a>
                 <a href="#workflow">Workflow</a>
-                <a href="#pricing">Pricing</a>
+                <a href="#builder">Builder</a>
                 <a href="/blog">Blog</a>
             </div>
 
             <div class="nova-home-nav-actions">
-                <a class="nova-home-login" href="/richard-login">Owner Login</a>
-                <a class="nova-home-open" href="/mobile">Open App</a>
+                <a class="nova-home-ghost" href="/billing">Billing</a>
+                <a class="nova-home-open" href="/richard-login">Open Nova</a>
             </div>
         </nav>
 
-        <section class="nova-home-hero">
-            <div class="nova-home-hero-copy">
+        <section class="nova-hero">
+            <div class="nova-hero-copy">
                 <div class="nova-home-pill">
                     <span></span>
-                    Mobile chat, memory, files, sessions, voice
+                    Desktop-first. Project-aware. Built to finish.
                 </div>
 
-                <h1>Your AI workspace that remembers the project, not just the prompt.</h1>
+                <h1>
+                    The AI workspace for projects that take more than one chat.
+                </h1>
 
-                <p class="nova-home-lede">
-                    Nova is built for long-running work: coding sessions, project memory, file uploads,
-                    voice tools, billing credits, and mobile-first chat that keeps the whole mission together.
+                <p class="nova-hero-lede">
+                    Nova keeps the mission together: long-running conversations, project memory,
+                    file uploads, sessions, voice tools, usage credits, and a stable desktop workspace
+                    for actually getting work done.
                 </p>
 
-                <div class="nova-home-hero-actions">
-                    <a class="nova-home-primary" href="/mobile">Launch Nova</a>
-                    <a class="nova-home-secondary" href="#features">See what it does</a>
+                <div class="nova-hero-actions">
+                    <a class="nova-home-primary" href="/richard-login">Open Owner Workspace</a>
+                    <a class="nova-home-secondary" href="#system">See the system</a>
                 </div>
 
-                <div class="nova-home-proof">
+                <div class="nova-signal-row" aria-label="Nova status highlights">
+                    <div>
+                        <strong>Desktop</strong>
+                        <span>Stable fast workspace</span>
+                    </div>
+                    <div>
+                        <strong>Memory</strong>
+                        <span>Project context carries forward</span>
+                    </div>
                     <div>
                         <strong>Sessions</strong>
-                        <span>Restore old chats</span>
-                    </div>
-                    <div>
-                        <strong>Uploads</strong>
-                        <span>Images and files</span>
-                    </div>
-                    <div>
-                        <strong>Voice</strong>
-                        <span>Mic and TTS tools</span>
+                        <span>Return to real work</span>
                     </div>
                 </div>
             </div>
 
-            <div class="nova-home-preview-card" aria-label="Nova interface preview">
-                <div class="nova-home-preview-top">
+            <aside class="nova-command-card" aria-label="Nova command center preview">
+                <div class="nova-window-top">
                     <span></span>
                     <span></span>
                     <span></span>
+                    <em>nova://active-mission</em>
                 </div>
 
-                <div class="nova-home-preview-header">
+                <div class="nova-mission-head">
                     <div>
                         <p>Active Mission</p>
-                        <h2>Finish Nova mobile polish</h2>
+                        <h2>Ship the Nova workspace</h2>
                     </div>
-                    <button type="button">Live</button>
+                    <strong>LIVE</strong>
                 </div>
 
-                <div class="nova-home-chat-preview">
-                    <div class="nova-home-message user">
-                        Make the attachment preview look like a real product.
-                    </div>
-                    <div class="nova-home-message ai">
-                        Done. I’ll keep it scoped to attachment UI only: button, preview card, thumbnail, and close control.
-                    </div>
-                    <div class="nova-home-upload-preview">
-                        <div class="nova-home-upload-thumb">📎</div>
+                <div class="nova-command-stack">
+                    <div class="nova-command-line">
+                        <span class="nova-dot purple"></span>
                         <div>
-                            <strong>upload-preview.png</strong>
-                            <span>Ready to send</span>
+                            <strong>Project memory loaded</strong>
+                            <p>Remembers decisions, files, sessions, and current build direction.</p>
                         </div>
-                        <em>READY</em>
+                    </div>
+
+                    <div class="nova-command-line">
+                        <span class="nova-dot green"></span>
+                        <div>
+                            <strong>Desktop route stable</strong>
+                            <p>Fast local workflow, clean app entry, ready for product polish.</p>
+                        </div>
+                    </div>
+
+                    <div class="nova-command-line">
+                        <span class="nova-dot blue"></span>
+                        <div>
+                            <strong>Billing foundation ready</strong>
+                            <p>Credit usage and model tiers can plug into a real plan system.</p>
+                        </div>
                     </div>
                 </div>
 
-                <div class="nova-home-composer-preview">
-                    <span>Ask Nova anything about this project…</span>
-                    <button type="button">Send</button>
+                <div class="nova-ai-preview">
+                    <div class="nova-message user">
+                        What should we work on next?
+                    </div>
+                    <div class="nova-message ai">
+                        Protect the stable desktop build. Polish the public home page. Keep mobile isolated until it is clean.
+                    </div>
                 </div>
-            </div>
+
+                <div class="nova-command-input">
+                    <span>Ask Nova to plan, build, debug, polish, or remember…</span>
+                    <button type="button">Run</button>
+                </div>
+            </aside>
         </section>
 
-        <section id="features" class="nova-home-section">
-            <div class="nova-home-section-head">
-                <p>What Nova has</p>
-                <h2>All the core pieces are already here.</h2>
+        <section id="why" class="nova-section nova-why">
+            <div class="nova-section-head">
+                <p>Why Nova</p>
+                <h2>Most AI chats forget the job. Nova is built around the mission.</h2>
             </div>
 
-            <div class="nova-home-feature-grid">
+            <div class="nova-why-grid">
                 <article>
-                    <div class="nova-home-icon">💬</div>
-                    <h3>Project-aware chat</h3>
-                    <p>Chat that can carry project context, previous decisions, and active work instead of starting from zero every time.</p>
+                    <span>01</span>
+                    <h3>Not a throwaway chat</h3>
+                    <p>Nova is designed for work that keeps going: coding sessions, product polish, research, files, and decisions that matter later.</p>
                 </article>
 
                 <article>
-                    <div class="nova-home-icon">🧠</div>
-                    <h3>Memory and state</h3>
-                    <p>Nova can track useful project memory, active state, and recurring facts that matter across sessions.</p>
+                    <span>02</span>
+                    <h3>Context is the product</h3>
+                    <p>Sessions, memory, project state, and uploaded files work together so the assistant can stay connected to the actual build.</p>
                 </article>
 
                 <article>
-                    <div class="nova-home-icon">🗂️</div>
-                    <h3>Session restore</h3>
-                    <p>Open old conversations, restore messages, and keep working from the exact chat you left off in.</p>
-                </article>
-
-                <article>
-                    <div class="nova-home-icon">📎</div>
-                    <h3>Uploads and attachments</h3>
-                    <p>Attach images and files, preview them, and route them into chat and analysis tools.</p>
-                </article>
-
-                <article>
-                    <div class="nova-home-icon">🎙️</div>
-                    <h3>Voice and TTS</h3>
-                    <p>Mobile mic input and text-to-speech controls for hands-free interaction and readback.</p>
-                </article>
-
-                <article>
-                    <div class="nova-home-icon">💳</div>
-                    <h3>Billing credits</h3>
-                    <p>A credit system is already in place so model usage and paid tiers can be enforced later.</p>
+                    <span>03</span>
+                    <h3>Built for solo builders</h3>
+                    <p>One person can plan, debug, ship, document, and improve a project without constantly rebuilding the same context.</p>
                 </article>
             </div>
         </section>
 
-        <section id="workflow" class="nova-home-workflow">
-            <div class="nova-home-workflow-copy">
+        <section id="system" class="nova-section nova-system">
+            <div class="nova-section-head compact">
+                <p>The System</p>
+                <h2>The pieces are already in motion.</h2>
+            </div>
+
+            <div class="nova-system-grid">
+                <article>
+                    <div class="nova-icon">💬</div>
+                    <h3>Project Chat</h3>
+                    <p>Long-form working conversations with build context and practical execution.</p>
+                </article>
+
+                <article>
+                    <div class="nova-icon">🧠</div>
+                    <h3>Memory</h3>
+                    <p>Stores useful project facts, preferences, decisions, and current direction.</p>
+                </article>
+
+                <article>
+                    <div class="nova-icon">🗂️</div>
+                    <h3>Sessions</h3>
+                    <p>Return to older chats and continue from the same mission instead of starting over.</p>
+                </article>
+
+                <article>
+                    <div class="nova-icon">📎</div>
+                    <h3>Uploads</h3>
+                    <p>Attach files and images so Nova can work with the material directly.</p>
+                </article>
+
+                <article>
+                    <div class="nova-icon">🎙️</div>
+                    <h3>Voice Tools</h3>
+                    <p>Mic and text-to-speech support for faster interaction and readback.</p>
+                </article>
+
+                <article>
+                    <div class="nova-icon">💳</div>
+                    <h3>Billing Credits</h3>
+                    <p>A usage foundation for paid plans, model tiers, and credit tracking.</p>
+                </article>
+            </div>
+        </section>
+
+        <section id="workflow" class="nova-workflow">
+            <div class="nova-workflow-copy">
                 <p>Workflow</p>
-                <h2>Built for long projects, not throwaway chats.</h2>
+                <h2>From messy idea to working product.</h2>
                 <span>
-                    Nova is becoming a full working environment: mobile chat, sessions, uploads,
-                    memory, voice, model routing, billing, planning, and project execution.
+                    Nova is built to help a builder move through the whole loop:
+                    understand the problem, make the plan, edit the files, test the result,
+                    remember what changed, and keep pushing.
                 </span>
             </div>
 
-            <div class="nova-home-steps">
-                <div>
+            <div class="nova-steps">
+                <article>
                     <strong>01</strong>
-                    <h3>Start a mission</h3>
-                    <p>Ask Nova to plan, fix, build, polish, or explain what you are working on.</p>
-                </div>
-                <div>
+                    <h3>Capture the mission</h3>
+                    <p>Start with a goal, a bug, a file, a design problem, or a rough idea.</p>
+                </article>
+
+                <article>
                     <strong>02</strong>
-                    <h3>Keep context</h3>
-                    <p>Sessions and memory help Nova stay connected to the actual project instead of losing the thread.</p>
+                    <h3>Keep the thread</h3>
+                    <p>Use project memory and sessions so the work does not reset every conversation.</p>
+                </article>
+
+                <article>
+                    <strong>03</strong>
+                    <h3>Ship the next move</h3>
+                    <p>Generate patches, polish pages, fix errors, and keep the product moving.</p>
+                </article>
+            </div>
+        </section>
+
+        <section id="builder" class="nova-builder">
+            <div class="nova-builder-card">
+                <p>Builder Mode</p>
+                <h2>Made for people who are actually building something.</h2>
+                <span>
+                    Nova is not trying to be cute. It is becoming a serious workspace:
+                    desktop-fast, project-aware, file-capable, memory-backed, and ready to grow into
+                    model tiers, billing, public pages, and a stronger mobile shell.
+                </span>
+
+                <div class="nova-builder-actions">
+                    <a class="nova-home-primary" href="/richard-login">Open Nova</a>
+                    <a class="nova-home-secondary" href="/billing">View Billing</a>
+                    <a class="nova-home-secondary" href="/blog">Read Blog</a>
+                </div>
+            </div>
+
+            <div class="nova-builder-stats" aria-label="Nova build highlights">
+                <div>
+                    <strong>Desktop</strong>
+                    <span>stable lane</span>
                 </div>
                 <div>
-                    <strong>03</strong>
-                    <h3>Ship the result</h3>
-                    <p>Use uploads, mobile tools, and project-specific patches to move from idea to working app.</p>
+                    <strong>Railway</strong>
+                    <span>deployable preview</span>
+                </div>
+                <div>
+                    <strong>Credits</strong>
+                    <span>billing base</span>
+                </div>
+                <div>
+                    <strong>Memory</strong>
+                    <span>project continuity</span>
                 </div>
             </div>
         </section>
 
-        <section id="pricing" class="nova-home-pricing">
-            <div>
-                <p>Billing ready</p>
-                <h2>Credits and model tiers can plug in cleanly.</h2>
-                <span>
-                    The billing base is already there. Next step later is user-facing plan polish,
-                    model-tier selection, usage tracking, and clean account controls.
-                </span>
-            </div>
-
-            <a href="/billing">View Billing</a>
-        </section>
-
-        <footer class="nova-home-footer">
+        <footer class="nova-footer">
             <div>
                 <strong>Nova</strong>
-                <span>AI project command center</span>
+                <span>AI command center for real projects.</span>
             </div>
 
             <div>
-                <a href="/mobile">App</a>
+                <a href="/nova-home-preview">Home</a>
+                <a href="/richard-login">Owner Login</a>
                 <a href="/billing">Billing</a>
                 <a href="/blog">Blog</a>
                 <a href="/api/health">Health</a>
@@ -204,6 +291,6 @@
         </footer>
     </main>
 
-    <script src="/static/js/nova-landing-home.js?v=landing-home-phase1-20260709"></script>
+    <script src="/static/js/nova-landing-home.js?v=landing-home-superpower-phase2-20260709"></script>
 </body>
 </html>
