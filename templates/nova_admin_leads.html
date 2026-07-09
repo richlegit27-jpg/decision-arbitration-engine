@@ -141,7 +141,7 @@
 
         .filters form {
             display: grid;
-            grid-template-columns: minmax(220px, 1fr) 170px 120px auto auto;
+            grid-template-columns: minmax(220px, 1fr) 160px 150px 120px auto auto;
             gap: 10px;
             align-items: end;
         }
@@ -208,7 +208,7 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 920px;
+            min-width: 1240px;
         }
 
         th,
@@ -255,6 +255,55 @@
             white-space: pre-wrap;
         }
 
+        /* NOVA_ADMIN_LEADS_CRM_LITE_STYLE_20260709 */
+        .status-pill {
+            text-transform: capitalize;
+        }
+
+        .status-new {
+            border-color: rgba(96,165,250,.28);
+            background: rgba(96,165,250,.13);
+        }
+
+        .status-reviewed {
+            border-color: rgba(167,139,250,.30);
+            background: rgba(167,139,250,.14);
+        }
+
+        .status-replied {
+            border-color: rgba(52,211,153,.30);
+            background: rgba(52,211,153,.14);
+        }
+
+        .status-archived {
+            border-color: rgba(148,163,184,.28);
+            background: rgba(148,163,184,.11);
+        }
+
+        .lead-update-form {
+            display: grid;
+            gap: 8px;
+            min-width: 260px;
+        }
+
+        .lead-update-form select,
+        .lead-update-form textarea {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 9px 10px;
+            background: rgba(0,0,0,.24);
+            color: var(--text);
+            outline: none;
+            font: inherit;
+        }
+
+        .lead-update-form textarea {
+            min-height: 76px;
+            resize: vertical;
+        }
+
         .empty {
             padding: 34px;
             color: var(--muted);
@@ -291,7 +340,7 @@
 
             <div class="actions">
                 <a class="btn" href="/admin">Admin dashboard</a>
-                <a class="btn primary" href="{{ url_for('nova_admin_leads_csv_export_20260709', q=q, kind=selected_kind, limit=selected_limit) }}">Export CSV</a>
+                <a class="btn primary" href="{{ url_for('nova_admin_leads_csv_export_20260709', q=q, kind=selected_kind, status=selected_status, limit=selected_limit) }}">Export CSV</a>
                 <a class="btn" href="/contact">Contact page</a>
                 <a class="btn" href="/nova-home-preview">Public home</a>
                 <a class="btn primary" href="/richard-login">Open Nova</a>
@@ -330,6 +379,16 @@
                 </label>
 
                 <label>
+                    Status
+                    <select name="status">
+                        <option value="all" {% if selected_status == "all" %}selected{% endif %}>All statuses</option>
+                        {% for status_name in allowed_statuses %}
+                        <option value="{{ status_name }}" {% if selected_status == status_name %}selected{% endif %}>{{ status_name|capitalize }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+
+                <label>
                     Limit
                     <input name="limit" type="number" min="1" max="10000" value="{{ selected_limit }}">
                 </label>
@@ -359,11 +418,13 @@
                         <tr>
                             <th>Created</th>
                             <th>Kind</th>
+                            <th>Status</th>
                             <th>Name</th>
                             <th>Email</th>
                             <th>Interest</th>
                             <th>Message</th>
                             <th>Source</th>
+                            <th>Owner CRM</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -371,11 +432,31 @@
                         <tr>
                             <td class="muted">{{ lead.created_at }}</td>
                             <td><span class="pill">{{ lead.kind or "contact" }}</span></td>
+                            <td><span class="pill status-pill status-{{ lead.status or 'new' }}">{{ lead.status or "new" }}</span></td>
                             <td>{{ lead.name or "—" }}</td>
                             <td>{{ lead.email or "—" }}</td>
                             <td>{{ lead.interest or "—" }}</td>
                             <td><div class="message">{{ lead.message or "—" }}</div></td>
                             <td class="muted">{{ lead.source or "—" }}</td>
+                            <td>
+                                <form class="lead-update-form" method="post" action="/admin/leads/{{ lead.id }}/update">
+                                    <input type="hidden" name="q" value="{{ q }}">
+                                    <input type="hidden" name="kind" value="{{ selected_kind }}">
+                                    <input type="hidden" name="filter_status" value="{{ selected_status }}">
+                                    <input type="hidden" name="limit" value="{{ selected_limit }}">
+                                    <input type="hidden" name="next" value="{{ request.full_path }}">
+
+                                    <select name="status" aria-label="Lead status">
+                                        {% for status_name in allowed_statuses %}
+                                        <option value="{{ status_name }}" {% if (lead.status or "new") == status_name %}selected{% endif %}>{{ status_name|capitalize }}</option>
+                                        {% endfor %}
+                                    </select>
+
+                                    <textarea name="owner_notes" rows="3" placeholder="Owner notes">{{ lead.owner_notes or "" }}</textarea>
+
+                                    <button class="btn primary" type="submit">Save</button>
+                                </form>
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
