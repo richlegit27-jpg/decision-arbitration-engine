@@ -352,6 +352,27 @@
             line-height: 1.55;
         }
         /* /NOVA_ADMIN_SYSTEM_CHECKS_CARD_STYLE_20260709 */
+    
+        /* NOVA_ADMIN_SYSTEM_CHECK_COPY_STYLE_20260709 */
+        .check-copy-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .check-copy-status {
+            min-height: 18px;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .check-copy-status.good {
+            color: var(--lime);
+        }
+        /* /NOVA_ADMIN_SYSTEM_CHECK_COPY_STYLE_20260709 */
     </style>
 </head>
 <body>
@@ -457,7 +478,13 @@
                 <div>
                     <h2>System checks</h2>
                     <p>Run this before admin/public commits so broken routes do not slip through again.</p>
-                    <code class="check-command">powershell -ExecutionPolicy Bypass -File "C:\Users\Owner\nova\tools\nova_full_release_check.ps1"</code>
+                    <!-- NOVA_ADMIN_SYSTEM_CHECK_COPY_UI_20260709 -->
+                    <code id="nova-full-release-command-20260709" class="check-command">powershell -ExecutionPolicy Bypass -File "C:\Users\Owner\nova\tools\nova_full_release_check.ps1"</code>
+                    <div class="check-copy-row">
+                        <button class="mini primary" type="button" id="nova-copy-full-release-command-20260709">Copy command</button>
+                        <span class="check-copy-status" id="nova-copy-full-release-status-20260709" aria-live="polite"></span>
+                    </div>
+                    <!-- /NOVA_ADMIN_SYSTEM_CHECK_COPY_UI_20260709 -->
                     <div class="check-note">Covers public pages, admin dashboard, leads page, filtered CSV export, and accidental staged mobile files.</div>
                 </div>
                 <div class="card-links">
@@ -531,7 +558,63 @@
             Admin access is protected by the same existing Richard/admin guard used by <code>/admin/leads</code>.
         </div>
     </main>
+
+    <!-- NOVA_ADMIN_SYSTEM_CHECK_COPY_SCRIPT_20260709 -->
+    <script>
+        (function () {
+            "use strict";
+
+            var button = document.getElementById("nova-copy-full-release-command-20260709");
+            var command = document.getElementById("nova-full-release-command-20260709");
+            var status = document.getElementById("nova-copy-full-release-status-20260709");
+
+            if (!button || !command || !status) {
+                return;
+            }
+
+            function setStatus(text, good) {
+                status.textContent = text;
+                status.classList.toggle("good", !!good);
+            }
+
+            button.addEventListener("click", function () {
+                var text = (command.textContent || "").trim();
+
+                if (!text) {
+                    setStatus("Nothing to copy.", false);
+                    return;
+                }
+
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(function () {
+                        setStatus("Copied.", true);
+                    }).catch(function () {
+                        setStatus("Copy failed. Select the command manually.", false);
+                    });
+
+                    return;
+                }
+
+                try {
+                    var textarea = document.createElement("textarea");
+                    textarea.value = text;
+                    textarea.setAttribute("readonly", "readonly");
+                    textarea.style.position = "fixed";
+                    textarea.style.left = "-9999px";
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(textarea);
+                    setStatus("Copied.", true);
+                } catch (error) {
+                    setStatus("Copy failed. Select the command manually.", false);
+                }
+            });
+        })();
+    </script>
+    <!-- /NOVA_ADMIN_SYSTEM_CHECK_COPY_SCRIPT_20260709 -->
 </body>
 </html>
+
 
 
