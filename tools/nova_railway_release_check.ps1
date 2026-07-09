@@ -143,7 +143,7 @@ $csvDisposition = [string]$csv.Headers["Content-Disposition"]
 Write-Host "/admin/leads.csv filtered -> $($csv.StatusCode) | $($csv.Headers["Content-Type"]) | $csvDisposition"
 
 Assert-True ($csv.StatusCode -eq 200) "/admin/leads.csv did not return 200"
-Assert-True ($csvBody -match "created_at,kind,name,email,interest,message,source") "/admin/leads.csv missing CSV header"
+Assert-True ($csvBody -match "created_at,kind,status,name,email,interest,message,source,owner_notes,admin_updated_at") "/admin/leads.csv missing CSV header"
 Assert-True ($csvDisposition -match "attachment") "/admin/leads.csv missing attachment disposition"
 
 Write-Host ""
