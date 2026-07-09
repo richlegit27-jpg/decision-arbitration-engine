@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Contact Nova — Early access and product questions</title>
     <meta name="description" content="Contact Nova for early access, product questions, billing questions, and project workspace updates.">
-    <link rel="stylesheet" href="/static/css/nova-contact.css?v=contact-page-phase1-20260709">
+    <link rel="stylesheet" href="/static/css/nova-contact.css?v=contact-form-capture-20260709">
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
     <link rel="manifest" href="/static/site.webmanifest">
     <meta name="theme-color" content="#8b5cf6">
@@ -175,8 +175,8 @@
                 <p>Contact lanes</p>
                 <h2>Pick the right path.</h2>
                 <span>
-                    No email backend is wired here yet. This page is a clean public contact surface first,
-                    with safe links into the product.
+                    Contact submissions are now saved into Nova leads and visible from the owner-only admin dashboard.
+                    Use the form below for early access, product questions, billing questions, or founder feedback.
                 </span>
             </div>
 
@@ -202,19 +202,53 @@
                 </a>
             </div>
         </section>
-
-        <section class="nova-contact-note">
-            <div>
-                <p>Future upgrade</p>
-                <h2>Contact form can come later.</h2>
+        <!-- NOVA_CONTACT_CAPTURE_FORM_20260709 -->
+        <section class="nova-contact-form-section" aria-labelledby="nova-contact-form-title">
+            <div class="nova-contact-form-copy">
+                <p>Lead capture</p>
+                <h2 id="nova-contact-form-title">Send a Nova contact request.</h2>
                 <span>
-                    Later this page can connect to an email service, support inbox, waitlist table,
-                    CRM, or owner notification system. For now, it stays static and safe.
+                    This writes directly to Nova's saved leads so the owner can review it from
+                    <strong>/admin/leads</strong> and export it as CSV.
                 </span>
             </div>
-        </section>
 
-        <footer class="nova-contact-footer">
+            <form id="nova-contact-form-20260709" class="nova-contact-form" novalidate>
+                <input type="hidden" name="source" value="public_contact_page">
+
+                <label>
+                    Name
+                    <input name="name" type="text" autocomplete="name" maxlength="120" required>
+                </label>
+
+                <label>
+                    Email
+                    <input name="email" type="email" autocomplete="email" maxlength="180" required>
+                </label>
+
+                <label>
+                    Interest
+                    <select name="interest" required>
+                        <option value="early_access">Early access</option>
+                        <option value="product_question">Product question</option>
+                        <option value="billing_question">Billing question</option>
+                        <option value="founder_feedback">Founder feedback</option>
+                    </select>
+                </label>
+
+                <label>
+                    Message
+                    <textarea name="message" rows="5" maxlength="2000" required placeholder="Tell Nova what you want to build, ask, or test."></textarea>
+                </label>
+
+                <button type="submit">Send to Nova</button>
+
+                <p id="nova-contact-form-status-20260709" class="nova-contact-form-status" aria-live="polite"></p>
+            </form>
+        </section>
+        <!-- /NOVA_CONTACT_CAPTURE_FORM_20260709 -->
+
+<footer class="nova-contact-footer">
             <span>Nova Contact · Early access and product questions</span>
             <div>
                 <a href="/nova-home-preview">Home</a>
@@ -233,7 +267,7 @@
         </footer>
     </main>
 
-    <script src="/static/js/nova-contact.js?v=contact-page-phase1-20260709"></script>
+    <script src="/static/js/nova-contact.js?v=contact-form-capture-20260709"></script>
 </body>
 </html>
 

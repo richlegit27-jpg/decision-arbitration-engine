@@ -203,3 +203,70 @@
 })();
 // /NOVA_CONTACT_LEAD_CAPTURE_20260709
 
+/* NOVA_CONTACT_CAPTURE_FORM_20260709 */
+(function () {
+    "use strict";
+
+    const form = document.getElementById("nova-contact-form-20260709");
+    const status = document.getElementById("nova-contact-form-status-20260709");
+
+    if (!form || !status) {
+        return;
+    }
+
+    function setStatus(message, mode) {
+        status.textContent = message || "";
+        status.dataset.mode = mode || "";
+    }
+
+    function getValue(name) {
+        const field = form.elements[name];
+        return field ? String(field.value || "").trim() : "";
+    }
+
+    form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+
+        const payload = {
+            name: getValue("name"),
+            email: getValue("email"),
+            interest: getValue("interest") || "early_access",
+            message: getValue("message"),
+            source: getValue("source") || "public_contact_page"
+        };
+
+        if (!payload.name || !payload.email || !payload.message) {
+            setStatus("Please add your name, email, and message.", "error");
+            return;
+        }
+
+        setStatus("Saving lead…", "loading");
+
+        try {
+            const response = await fetch("/api/contact", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            });
+
+            let data = {};
+            try {
+                data = await response.json();
+            } catch (error) {
+                data = {};
+            }
+
+            if (!response.ok || data.ok === false) {
+                throw new Error(data.error || "Lead save failed");
+            }
+
+            form.reset();
+            setStatus("Saved. Nova has your contact request.", "success");
+        } catch (error) {
+            console.error("[Nova Contact] submit failed", error);
+            setStatus("Could not save yet. Please try again.", "error");
+        }
+    });
+})();
