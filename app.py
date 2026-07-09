@@ -20861,6 +20861,108 @@ def nova_public_not_found_20260709(error):
     return render_template("nova_404.html", path=request.path), 404
 # /NOVA_PUBLIC_404_ROUTES_20260709
 
+
+# NOVA_LEAD_CAPTURE_ROUTES_20260709
+def _nova_lead_request_meta_20260709():
+    from flask import request
+
+    return {
+        "ip": request.headers.get("X-Forwarded-For", request.remote_addr or ""),
+        "user_agent": request.headers.get("User-Agent", ""),
+        "referer": request.headers.get("Referer", ""),
+        "path": request.path,
+    }
+
+
+def _nova_lead_admin_allowed_20260709():
+    import hmac
+    import os
+
+    from flask import request, session
+
+    expected_key = os.environ.get("NOVA_ADMIN_KEY", "").strip()
+    provided_key = (
+        request.headers.get("X-Nova-Admin-Key", "") or
+        request.args.get("key", "")
+    ).strip()
+
+    if expected_key and provided_key and hmac.compare_digest(expected_key, provided_key):
+        return True
+
+    username = (
+        session.get("username") or
+        session.get("user") or
+        session.get("nova_username") or
+        session.get("nova_user") or
+        ""
+    )
+
+    return str(username).lower() == "richard"
+
+
+@app.post("/api/contact")
+def nova_api_contact_submit_20260709():
+    from flask import jsonify, request
+
+    from nova_backend.services.lead_service import save_lead
+
+    payload = request.get_json(silent=True) or request.form.to_dict(flat=True)
+
+    try:
+        lead = save_lead("contact", payload, _nova_lead_request_meta_20260709())
+    except ValueError as error:
+        return jsonify({
+            "ok": False,
+            "error": str(error),
+        }), 400
+
+    return jsonify({
+        "ok": True,
+        "lead_id": lead["id"],
+        "dry_run": bool(lead.get("dry_run")),
+        "message": "Thanks — your message was received.",
+    })
+
+
+@app.post("/api/early-access")
+def nova_api_early_access_submit_20260709():
+    from flask import jsonify, request
+
+    from nova_backend.services.lead_service import save_lead
+
+    payload = request.get_json(silent=True) or request.form.to_dict(flat=True)
+
+    try:
+        lead = save_lead("early_access", payload, _nova_lead_request_meta_20260709())
+    except ValueError as error:
+        return jsonify({
+            "ok": False,
+            "error": str(error),
+        }), 400
+
+    return jsonify({
+        "ok": True,
+        "lead_id": lead["id"],
+        "dry_run": bool(lead.get("dry_run")),
+        "message": "You are on the Nova early access list.",
+    })
+
+
+@app.get("/api/leads")
+def nova_api_leads_admin_20260709():
+    from flask import jsonify, request
+
+    from nova_backend.services.lead_service import list_leads
+
+    if not _nova_lead_admin_allowed_20260709():
+        return jsonify({
+            "ok": False,
+            "error": "Forbidden",
+        }), 403
+
+    return jsonify(list_leads(request.args.get("limit", 100)))
+# /NOVA_LEAD_CAPTURE_ROUTES_20260709
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
@@ -21337,6 +21439,7 @@ def _nova_attachment_status_response_shape_v2(response):
         return response
 
     return response
+
 
 
 
