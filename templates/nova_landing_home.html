@@ -4,8 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Nova — AI command center for real projects</title>
-    <meta name="description" content="Nova is an AI project command center built for long-running work, memory, sessions, uploads, voice, billing, and desktop-first execution.">
-    <link rel="stylesheet" href="/static/css/nova-landing-home.css?v=landing-home-superpower-phase2-20260709">
+    <meta name="description" content="Nova is an early-access AI project command center for builders who need long-running memory, sessions, uploads, billing controls, and a stable workspace for real work.">
+    <link rel="stylesheet" href="/static/css/nova-landing-home.css?v=landing-home-conversion-polish-20260709">
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
     <link rel="manifest" href="/static/site.webmanifest">
     <meta name="theme-color" content="#8b5cf6">
@@ -14,13 +14,13 @@
     <meta property="og:site_name" content="Nova">
     <meta property="og:type" content="website">
     <meta property="og:title" content="Nova — AI project command center">
-    <meta property="og:description" content="Nova is an AI workspace for long-running project work: sessions, uploads, memory, billing credits, and a stable builder workflow.">
+    <meta property="og:description" content="Nova is an early-access AI workspace for long-running project work: sessions, uploads, memory, billing credits, and a stable builder workflow.">
     <meta property="og:url" content="{{ request.url_root.rstrip('/') }}/nova-home-preview">
     <meta property="og:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
     <meta property="og:image:type" content="image/svg+xml">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Nova — AI project command center">
-    <meta name="twitter:description" content="Nova is an AI workspace for long-running project work: sessions, uploads, memory, billing credits, and a stable builder workflow.">
+    <meta name="twitter:description" content="Nova is an early-access AI workspace for long-running project work: sessions, uploads, memory, billing credits, and a stable builder workflow.">
     <meta name="twitter:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
     <!-- /NOVA_SOCIAL_META_20260709 -->
 
@@ -92,10 +92,12 @@
                 <a href="#builder">Builder</a>
                 <a href="/blog">Blog</a>
                 <a href="/contact">Contact</a>
+                <a href="/contact#nova-contact-form-title">Early Access</a>
             </div>
 
             <div class="nova-home-nav-actions">
                 <a class="nova-home-ghost" href="/billing">Billing</a>
+                <a class="nova-home-ghost" href="/contact#nova-contact-form-title">Early Access</a>
                 <a class="nova-home-open" href="/richard-login">Open Nova</a>
             </div>
         </nav>
@@ -337,6 +339,58 @@
             </div>
         </section>
 
+        <!-- NOVA_LANDING_CONVERSION_POLISH_20260709 -->
+        <section class="nova-conversion-band" aria-labelledby="nova-conversion-title">
+            <div class="nova-conversion-copy">
+                <p class="nova-home-kicker">Early access</p>
+                <h2 id="nova-conversion-title">Nova is for builders who keep losing context between tools.</h2>
+                <span>
+                    Nova is not a one-off chatbot page. It is a project command center for long-running work:
+                    saved sessions, uploads, memory, owner controls, billing paths, and a workflow designed
+                    to help real projects keep moving without starting over every day.
+                </span>
+            </div>
+
+            <div class="nova-conversion-actions">
+                <a class="nova-conversion-primary" href="/contact#nova-contact-form-title">Request early access</a>
+                <a class="nova-conversion-secondary" href="/billing">See billing path</a>
+            </div>
+        </section>
+
+        <section class="nova-fit-grid" aria-label="Who Nova is for">
+            <article>
+                <p>For solo builders</p>
+                <h3>Keep one project brain.</h3>
+                <span>Use Nova when you are building, fixing, testing, and shipping across many sessions.</span>
+            </article>
+
+            <article>
+                <p>For serious workflows</p>
+                <h3>Bring files, notes, and decisions together.</h3>
+                <span>Uploads, lead capture, admin review, and release checks make Nova feel like a workspace, not a toy.</span>
+            </article>
+
+            <article>
+                <p>For early teams</p>
+                <h3>Start with clean owner controls.</h3>
+                <span>Contact capture, CRM-lite lead review, CSV export, and billing surfaces are already being wired in.</span>
+            </article>
+        </section>
+
+        <section class="nova-after-contact" aria-labelledby="nova-after-contact-title">
+            <div>
+                <p class="nova-home-kicker">What happens next</p>
+                <h2 id="nova-after-contact-title">Contact Nova, then your request lands in the owner dashboard.</h2>
+                <span>
+                    The public contact form now saves real lead records. From there, owner review can mark
+                    status, add notes, export CSV, and keep track of early-access conversations.
+                </span>
+            </div>
+
+            <a href="/contact#nova-contact-form-title">Send a request</a>
+        </section>
+        <!-- /NOVA_LANDING_CONVERSION_POLISH_20260709 -->
+
         <footer class="nova-footer">
             <div>
                 <strong>Nova</strong>
@@ -357,7 +411,7 @@
         </footer>
     </main>
 
-    <script src="/static/js/nova-landing-home.js?v=landing-home-superpower-phase2-20260709"></script>
+    <script src="/static/js/nova-landing-home.js?v=landing-home-conversion-polish-20260709"></script>
 </body>
 </html>
 
