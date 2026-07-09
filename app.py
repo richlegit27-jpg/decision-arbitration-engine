@@ -21073,6 +21073,20 @@ def nova_admin_leads_csv_export_20260709():
 # /NOVA_LEAD_CAPTURE_ROUTES_20260709
 
 
+
+# NOVA_ADMIN_TEMPLATE_CONTEXT_20260709
+@app.context_processor
+def nova_admin_template_context_20260709():
+    try:
+        allowed = bool(_nova_lead_admin_allowed_20260709())
+    except Exception:
+        allowed = False
+
+    return {
+        "nova_show_admin_link": allowed,
+    }
+# /NOVA_ADMIN_TEMPLATE_CONTEXT_20260709
+
 # NOVA_ADMIN_HOME_DASHBOARD_20260709
 @app.get("/admin")
 def nova_admin_home_dashboard_20260709():
@@ -21582,6 +21596,7 @@ def _nova_attachment_status_response_shape_v2(response):
         return response
 
     return response
+
 
 
 
