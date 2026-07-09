@@ -21087,6 +21087,94 @@ def nova_admin_template_context_20260709():
     }
 # /NOVA_ADMIN_TEMPLATE_CONTEXT_20260709
 
+
+
+# NOVA_ADMIN_LEADS_PAGE_HARD_RESTORE_20260709
+@app.get("/admin/leads")
+def nova_admin_leads_page_20260709():
+    from flask import abort, render_template, request
+
+    from nova_backend.services.lead_service import list_leads
+
+    guard = globals().get("_nova_lead_admin_allowed_20260709")
+    if callable(guard):
+        if not guard():
+            abort(403)
+    else:
+        abort(403)
+
+    raw_limit = request.args.get("limit", 100)
+
+    try:
+        selected_limit = int(raw_limit)
+    except Exception:
+        selected_limit = 100
+
+    selected_limit = max(1, min(selected_limit, 10000))
+
+    data = list_leads(selected_limit)
+    all_leads = data.get("leads", [])
+
+    selected_kind = str(request.args.get("kind", "all") or "all").strip().lower()
+    if selected_kind not in ("all", "contact", "early_access"):
+        selected_kind = "all"
+
+    q = str(request.args.get("q", "") or "").strip()
+    q_lower = q.lower()
+
+    leads = list(all_leads)
+
+    if selected_kind != "all":
+        leads = [
+            lead for lead in leads
+            if str(lead.get("kind", "")).strip().lower() == selected_kind
+        ]
+
+    if q_lower:
+        def lead_matches_query(lead):
+            haystack = " ".join([
+                str(lead.get("created_at", "")),
+                str(lead.get("kind", "")),
+                str(lead.get("name", "")),
+                str(lead.get("email", "")),
+                str(lead.get("interest", "")),
+                str(lead.get("message", "")),
+                str(lead.get("source", "")),
+            ]).lower()
+
+            return q_lower in haystack
+
+        leads = [
+            lead for lead in leads
+            if lead_matches_query(lead)
+        ]
+
+    contact_count = len([
+        lead for lead in all_leads
+        if str(lead.get("kind", "")).lower() == "contact"
+    ])
+
+    early_count = len([
+        lead for lead in all_leads
+        if str(lead.get("kind", "")).lower() == "early_access"
+    ])
+
+    return render_template(
+        "nova_admin_leads.html",
+        leads=leads,
+        count=data.get("count", len(all_leads)),
+        visible_count=len(leads),
+        contact_count=contact_count,
+        early_count=early_count,
+        path=data.get("path", ""),
+        updated_at=data.get("updated_at", ""),
+        q=q,
+        selected_kind=selected_kind,
+        selected_limit=selected_limit,
+    )
+# /NOVA_ADMIN_LEADS_PAGE_HARD_RESTORE_20260709
+
+
 # NOVA_ADMIN_HOME_DASHBOARD_20260709
 @app.get("/admin")
 def nova_admin_home_dashboard_20260709():
@@ -21597,6 +21685,7 @@ def _nova_attachment_status_response_shape_v2(response):
         return response
 
     return response
+
 
 
 
