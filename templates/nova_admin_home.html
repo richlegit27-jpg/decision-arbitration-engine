@@ -373,6 +373,21 @@
             color: var(--lime);
         }
         /* /NOVA_ADMIN_SYSTEM_CHECK_COPY_STYLE_20260709 */
+    
+        /* NOVA_ADMIN_RAILWAY_CHECK_STYLE_20260709 */
+        .check-section-label {
+            margin: 12px 0 0;
+            color: #ddd6fe;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .check-section-label:first-of-type {
+            margin-top: 10px;
+        }
+        /* /NOVA_ADMIN_RAILWAY_CHECK_STYLE_20260709 */
     </style>
 </head>
 <body>
@@ -485,6 +500,15 @@
                         <span class="check-copy-status" id="nova-copy-full-release-status-20260709" aria-live="polite"></span>
                     </div>
                     <!-- /NOVA_ADMIN_SYSTEM_CHECK_COPY_UI_20260709 -->
+
+                    <!-- NOVA_ADMIN_RAILWAY_CHECK_UI_20260709 -->
+                    <div class="check-section-label">Railway live check</div>
+                    <code id="nova-railway-release-command-20260709" class="check-command">powershell -ExecutionPolicy Bypass -File "C:\Users\Owner\nova\tools\nova_railway_release_check.ps1"</code>
+                    <div class="check-copy-row">
+                        <button class="mini primary" type="button" id="nova-copy-railway-release-command-20260709">Copy Railway command</button>
+                        <span class="check-copy-status" id="nova-copy-railway-release-status-20260709" aria-live="polite"></span>
+                    </div>
+                    <!-- /NOVA_ADMIN_RAILWAY_CHECK_UI_20260709 -->
                     <div class="check-note">Covers public pages, admin dashboard, leads page, filtered CSV export, and accidental staged mobile files.</div>
                 </div>
                 <div class="card-links">
@@ -613,8 +637,64 @@
         })();
     </script>
     <!-- /NOVA_ADMIN_SYSTEM_CHECK_COPY_SCRIPT_20260709 -->
+
+    <!-- NOVA_ADMIN_RAILWAY_CHECK_COPY_SCRIPT_20260709 -->
+    <script>
+        (function () {
+            "use strict";
+
+            var button = document.getElementById("nova-copy-railway-release-command-20260709");
+            var command = document.getElementById("nova-railway-release-command-20260709");
+            var status = document.getElementById("nova-copy-railway-release-status-20260709");
+
+            if (!button || !command || !status) {
+                return;
+            }
+
+            function setStatus(text, good) {
+                status.textContent = text;
+                status.classList.toggle("good", !!good);
+            }
+
+            button.addEventListener("click", function () {
+                var text = (command.textContent || "").trim();
+
+                if (!text) {
+                    setStatus("Nothing to copy.", false);
+                    return;
+                }
+
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(function () {
+                        setStatus("Copied.", true);
+                    }).catch(function () {
+                        setStatus("Copy failed. Select the command manually.", false);
+                    });
+
+                    return;
+                }
+
+                try {
+                    var textarea = document.createElement("textarea");
+                    textarea.value = text;
+                    textarea.setAttribute("readonly", "readonly");
+                    textarea.style.position = "fixed";
+                    textarea.style.left = "-9999px";
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(textarea);
+                    setStatus("Copied.", true);
+                } catch (error) {
+                    setStatus("Copy failed. Select the command manually.", false);
+                }
+            });
+        })();
+    </script>
+    <!-- /NOVA_ADMIN_RAILWAY_CHECK_COPY_SCRIPT_20260709 -->
 </body>
 </html>
+
 
 
 
