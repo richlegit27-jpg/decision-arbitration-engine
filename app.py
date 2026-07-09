@@ -21342,6 +21342,24 @@ def nova_admin_home_dashboard_20260709():
     )
 # /NOVA_ADMIN_HOME_DASHBOARD_20260709
 
+
+# NOVA_ADMIN_LAUNCH_CHECKLIST_REPAIR_20260709
+@app.get("/admin/launch-checklist")
+def nova_admin_launch_checklist_repair_20260709():
+    from flask import abort, render_template
+
+    guard = globals().get("_nova_lead_admin_allowed_20260709")
+
+    if callable(guard):
+        if not guard():
+            abort(403)
+    else:
+        abort(403)
+
+    return render_template("nova_admin_launch_checklist.html")
+# /NOVA_ADMIN_LAUNCH_CHECKLIST_REPAIR_20260709
+
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
