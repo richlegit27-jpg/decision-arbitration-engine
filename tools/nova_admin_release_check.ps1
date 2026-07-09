@@ -75,6 +75,31 @@ check("created_at,kind,name,email,interest,message,source" in empty_csv_text, "/
 check("Richard Test" not in empty_csv_text, "/admin/leads.csv empty filter leaked non-matching lead")
 
 print("")
+
+print("")
+print("Checking owner-only admin pills...")
+
+owner_home = client.get("/nova-home-preview")
+owner_home_text = owner_home.get_data(as_text=True)
+print("/nova-home-preview owner admin pill ->", owner_home.status_code, "|", len(owner_home_text))
+check(owner_home.status_code == 200, "/nova-home-preview owner did not return 200")
+check("Open Nova admin dashboard" in owner_home_text, "/nova-home-preview missing owner admin pill after login")
+check('href="/admin"' in owner_home_text, "/nova-home-preview owner admin pill missing /admin href")
+
+owner_contact = client.get("/contact")
+owner_contact_text = owner_contact.get_data(as_text=True)
+print("/contact owner admin pill ->", owner_contact.status_code, "|", len(owner_contact_text))
+check(owner_contact.status_code == 200, "/contact owner did not return 200")
+check("Open Nova admin dashboard" in owner_contact_text, "/contact missing owner admin pill after login")
+check('href="/admin"' in owner_contact_text, "/contact owner admin pill missing /admin href")
+
+public_contact = public_client.get("/contact")
+public_contact_text = public_contact.get_data(as_text=True)
+print("/contact public admin pill hidden ->", public_contact.status_code, "|", len(public_contact_text))
+check(public_contact.status_code == 200, "/contact public did not return 200")
+check("Open Nova admin dashboard" not in public_contact_text, "/contact leaked owner admin pill to public visitor")
+# NOVA_ADMIN_RELEASE_CHECK_OWNER_PILLS_20260709
+
 print("NOVA ADMIN RELEASE CHECK PASSED")
 "@
 
@@ -97,3 +122,4 @@ git status --short
 
 Write-Host ""
 Write-Host "NOVA ADMIN RELEASE CHECK PASSED"
+
