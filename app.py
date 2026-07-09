@@ -20778,6 +20778,14 @@ def nova_billing_status_api_20260709():
     })
 # /NOVA_BILLING_DASHBOARD_ROUTES_20260709
 
+
+# NOVA_BLOG_PAGE_ROUTES_20260709
+@app.get("/blog")
+def nova_blog_page_20260709():
+    from flask import render_template
+    return render_template("nova_blog.html")
+# /NOVA_BLOG_PAGE_ROUTES_20260709
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
@@ -21254,5 +21262,6 @@ def _nova_attachment_status_response_shape_v2(response):
         return response
 
     return response
+
 
 
