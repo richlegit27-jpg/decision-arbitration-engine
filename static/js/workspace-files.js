@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\workspace-files.js
+﻿// C:\Users\Owner\nova\static\js\workspace-files.js
 
 (() => {
 "use strict"
@@ -61,7 +61,7 @@ function formatFileMeta(file = {}){
     parts.push(createdAt)
   }
 
-  return parts.length ? parts.join(" • ") : "File"
+  return parts.length ? parts.join(" â€¢ ") : "File"
 }
 
 function getFileHref(file = {}){
@@ -258,7 +258,7 @@ function renderFileCard(file, index){
       </div>
     `
     : `
-      <div class="workspace-file-icon" aria-hidden="true">📄</div>
+      <div class="workspace-file-icon" aria-hidden="true">ðŸ“„</div>
     `
 
   return `
@@ -458,3 +458,4 @@ if(document.readyState === "loading"){
 }
 
 })()
+

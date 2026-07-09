@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 
 class RuntimeSignalPruningService:
@@ -110,3 +110,4 @@ class RuntimeSignalPruningService:
         )
 
         return ranked[: self.max_engines]
+

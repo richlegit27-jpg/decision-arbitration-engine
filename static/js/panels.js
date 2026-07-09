@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+﻿document.addEventListener("DOMContentLoaded", () => {
     const backendPort = window.NOVA_BACKEND_PORT;
     const panels = {
         newChat: document.getElementById("newChatPanel")
@@ -56,3 +56,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
     loadSessions();
 });
+

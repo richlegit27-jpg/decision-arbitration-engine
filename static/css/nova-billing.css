@@ -1,0 +1,500 @@
+﻿:root {
+    color-scheme: dark;
+    --bg: #07060c;
+    --panel: rgba(22, 19, 34, .78);
+    --panel-strong: rgba(31, 27, 48, .96);
+    --line: rgba(226, 214, 255, .16);
+    --line-strong: rgba(226, 214, 255, .30);
+    --text: #fbf8ff;
+    --muted: rgba(243, 236, 255, .72);
+    --soft: rgba(243, 236, 255, .52);
+    --purple: #8b5cf6;
+    --purple-2: #a855f7;
+    --purple-3: #d8b4fe;
+    --green: #b8ff7a;
+    --blue: #7dd3fc;
+    --shadow: 0 26px 90px rgba(0, 0, 0, .48);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+    background:
+        radial-gradient(circle at 16% 0%, rgba(139, 92, 246, .34), transparent 34%),
+        radial-gradient(circle at 92% 10%, rgba(168, 85, 247, .20), transparent 30%),
+        radial-gradient(circle at 50% 100%, rgba(79, 70, 229, .18), transparent 40%),
+        var(--bg);
+    color: var(--text);
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+code {
+    padding: 3px 7px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .06);
+    color: var(--purple-3);
+    font-size: .92em;
+}
+
+.nova-billing-bg {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+}
+
+.nova-billing-bg span {
+    position: absolute;
+    width: 360px;
+    height: 360px;
+    border-radius: 999px;
+    filter: blur(20px);
+    opacity: .34;
+}
+
+.nova-billing-bg span:first-child {
+    left: -120px;
+    top: 160px;
+    background: rgba(139, 92, 246, .52);
+}
+
+.nova-billing-bg span:last-child {
+    right: -130px;
+    bottom: 110px;
+    background: rgba(216, 180, 254, .28);
+}
+
+.nova-billing-shell {
+    width: min(1120px, calc(100% - 28px));
+    margin: 0 auto;
+    padding: 18px 0 34px;
+}
+
+.nova-billing-nav {
+    position: sticky;
+    top: 12px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 26px;
+    background: rgba(10, 9, 16, .72);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 16px 50px rgba(0, 0, 0, .30);
+}
+
+.nova-billing-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 11px;
+}
+
+.nova-billing-brand > span {
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    border-radius: 16px;
+    background:
+        radial-gradient(circle at 30% 20%, rgba(255, 255, 255, .34), transparent 34%),
+        linear-gradient(135deg, var(--purple), #5036cb);
+    color: white;
+    font-weight: 950;
+    box-shadow:
+        0 0 0 1px rgba(255, 255, 255, .12),
+        0 0 30px rgba(139, 92, 246, .52);
+}
+
+.nova-billing-brand strong,
+.nova-billing-brand em {
+    display: block;
+}
+
+.nova-billing-brand strong {
+    font-size: 17px;
+    line-height: 1;
+}
+
+.nova-billing-brand em {
+    margin-top: 3px;
+    color: var(--soft);
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 800;
+}
+
+.nova-billing-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nova-billing-actions a {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 14px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.nova-billing-actions a:last-child {
+    border-color: rgba(255, 255, 255, .10);
+    background: linear-gradient(135deg, var(--purple), #5136cc);
+    color: white;
+    box-shadow: 0 0 24px rgba(139, 92, 246, .34);
+}
+
+.nova-billing-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 22px;
+    align-items: end;
+    padding: 62px 0 26px;
+}
+
+.nova-billing-kicker,
+.nova-billing-card p,
+.nova-usage-head p,
+.nova-section-head p,
+.nova-billing-ledger p {
+    margin: 0 0 9px;
+    color: var(--purple-3);
+    font-size: 12px;
+    font-weight: 950;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+
+.nova-billing-hero h1 {
+    margin: 0;
+    max-width: 820px;
+    font-size: clamp(43px, 7vw, 82px);
+    line-height: .92;
+    letter-spacing: -.075em;
+}
+
+.nova-billing-hero span,
+.nova-billing-card span,
+.nova-section-head span,
+.nova-billing-ledger span,
+.nova-usage-head span {
+    display: block;
+    margin-top: 18px;
+    color: var(--muted);
+    font-size: 16px;
+    line-height: 1.55;
+    font-weight: 650;
+}
+
+.nova-billing-status-card {
+    padding: 22px;
+    border: 1px solid var(--line-strong);
+    border-radius: 28px;
+    background:
+        radial-gradient(circle at 0% 0%, rgba(184, 255, 122, .16), transparent 38%),
+        rgba(255, 255, 255, .055);
+    box-shadow: var(--shadow);
+}
+
+.nova-billing-status-card p {
+    margin: 0 0 12px;
+    color: var(--soft);
+    font-size: 12px;
+    font-weight: 950;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+
+.nova-billing-status-card strong {
+    display: block;
+    color: var(--green);
+    font-size: 31px;
+    letter-spacing: -.04em;
+}
+
+.nova-billing-status-card span {
+    display: block;
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.nova-billing-grid {
+    display: grid;
+    grid-template-columns: 1.2fr repeat(2, minmax(0, .9fr));
+    gap: 14px;
+}
+
+.nova-billing-card,
+.nova-usage-panel,
+.nova-tier-section,
+.nova-billing-ledger {
+    border: 1px solid var(--line);
+    border-radius: 30px;
+    background: rgba(255, 255, 255, .045);
+    box-shadow: 0 18px 60px rgba(0, 0, 0, .22);
+}
+
+.nova-billing-card {
+    min-height: 210px;
+    padding: 22px;
+}
+
+.nova-billing-card.primary {
+    background:
+        radial-gradient(circle at 0% 0%, rgba(139, 92, 246, .26), transparent 42%),
+        rgba(255, 255, 255, .055);
+}
+
+.nova-billing-card h2 {
+    margin: 0;
+    font-size: clamp(32px, 4vw, 48px);
+    line-height: 1;
+    letter-spacing: -.052em;
+    text-transform: capitalize;
+}
+
+.nova-usage-panel,
+.nova-tier-section,
+.nova-billing-ledger {
+    margin-top: 18px;
+    padding: 24px;
+}
+
+.nova-usage-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+}
+
+.nova-usage-head h2,
+.nova-section-head h2,
+.nova-billing-ledger h2 {
+    margin: 0;
+    font-size: clamp(29px, 4vw, 48px);
+    line-height: 1;
+    letter-spacing: -.05em;
+}
+
+.nova-usage-head strong {
+    min-width: max-content;
+    color: var(--green);
+    font-size: 28px;
+    letter-spacing: -.04em;
+}
+
+.nova-usage-bar {
+    height: 15px;
+    margin-top: 22px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(0, 0, 0, .28);
+    overflow: hidden;
+}
+
+.nova-usage-bar span {
+    display: block;
+    height: 100%;
+    max-width: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--purple), var(--purple-3));
+    box-shadow: 0 0 22px rgba(139, 92, 246, .45);
+}
+
+.nova-usage-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 10px;
+    color: var(--soft);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.nova-tier-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 22px;
+}
+
+.nova-tier-grid article {
+    padding: 20px;
+    border: 1px solid var(--line);
+    border-radius: 25px;
+    background:
+        radial-gradient(circle at 0% 0%, rgba(139, 92, 246, .15), transparent 38%),
+        rgba(255, 255, 255, .045);
+}
+
+.nova-tier-grid article.featured {
+    border-color: rgba(216, 180, 254, .38);
+    box-shadow: 0 0 34px rgba(139, 92, 246, .16);
+}
+
+.nova-tier-grid strong {
+    color: var(--purple-3);
+    font-size: 13px;
+    font-weight: 950;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+
+.nova-tier-grid h3 {
+    margin: 14px 0 8px;
+    font-size: 20px;
+    letter-spacing: -.025em;
+}
+
+.nova-tier-grid p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.55;
+    font-weight: 650;
+}
+
+.nova-tier-grid em {
+    display: inline-flex;
+    margin-top: 16px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: rgba(139, 92, 246, .18);
+    color: white;
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 950;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.nova-billing-ledger {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 18px;
+    align-items: center;
+}
+
+.nova-ledger-box {
+    padding: 17px;
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    background: rgba(0, 0, 0, .20);
+}
+
+.nova-ledger-box span,
+.nova-ledger-box strong {
+    display: block;
+}
+
+.nova-ledger-box span {
+    margin: 0 0 8px;
+    color: var(--soft);
+    font-size: 12px;
+    font-weight: 950;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+
+.nova-ledger-box strong {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.nova-billing-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 28px 6px 0;
+    color: var(--soft);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.nova-billing-footer div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+@media (max-width: 900px) {
+    .nova-billing-shell {
+        width: min(100% - 18px, 760px);
+        padding-top: 9px;
+    }
+
+    .nova-billing-nav {
+        top: 8px;
+        border-radius: 22px;
+    }
+
+    .nova-billing-brand em {
+        display: none;
+    }
+
+    .nova-billing-hero,
+    .nova-billing-grid,
+    .nova-tier-grid,
+    .nova-billing-ledger {
+        grid-template-columns: 1fr;
+    }
+
+    .nova-billing-hero {
+        padding-top: 42px;
+    }
+
+    .nova-usage-head {
+        display: block;
+    }
+
+    .nova-usage-head strong {
+        display: block;
+        margin-top: 12px;
+    }
+
+    .nova-billing-footer {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 520px) {
+    .nova-billing-actions a:first-child {
+        display: none;
+    }
+
+    .nova-billing-card,
+    .nova-usage-panel,
+    .nova-tier-section,
+    .nova-billing-ledger {
+        border-radius: 25px;
+        padding: 18px;
+    }
+}

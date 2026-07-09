@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaUltimateLoaded) {
@@ -379,7 +379,7 @@
               >
                 <div class="session-item-row">
                   <span class="session-item-title">${escapeHtml(title)}</span>
-                  ${isPinned ? `<span class="session-item-pin">📌</span>` : ``}
+                  ${isPinned ? `<span class="session-item-pin">ðŸ“Œ</span>` : ``}
                 </div>
                 ${preview ? `<div class="session-item-preview">${escapeHtml(preview)}</div>` : ``}
                 <div class="session-item-meta">
@@ -467,7 +467,7 @@
                 data-remove-attachment="${index}"
                 aria-label="Remove attachment"
               >
-                ×
+                Ã—
               </button>
             </div>
           `;
@@ -1319,3 +1319,4 @@
     bootstrap();
   }
 })();
+

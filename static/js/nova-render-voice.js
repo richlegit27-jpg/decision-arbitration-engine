@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaRenderVoiceLoaded) return;
@@ -116,7 +116,7 @@
     try {
       state.recognition.start();
       state.listening = true;
-      setButtonState("is-listening", "Listening… click to stop");
+      setButtonState("is-listening", "Listeningâ€¦ click to stop");
     } catch (err) {
       console.error("Voice start failed:", err);
       state.listening = false;
@@ -175,7 +175,7 @@
 
     recognition.onstart = () => {
       state.listening = true;
-      setButtonState("is-listening", "Listening… click to stop");
+      setButtonState("is-listening", "Listeningâ€¦ click to stop");
     };
 
     recognition.onresult = (event) => {
@@ -252,3 +252,4 @@
 
   document.addEventListener("DOMContentLoaded", bootstrap);
 })();
+

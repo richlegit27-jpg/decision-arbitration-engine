@@ -1,4 +1,4 @@
-window.onload = function() {
+﻿window.onload = function() {
     const token = localStorage.getItem('token');
     if (!token) {
         window.location.href = '/static/login.html'; // Redirect to login if no token
@@ -20,3 +20,4 @@ window.onload = function() {
         window.location.href = '/static/login.html'; // Redirect if authentication fails
     });
 };
+

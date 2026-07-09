@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat-sidebar-layout.js
+﻿// C:\Users\Owner\nova\static\js\chat-sidebar-layout.js
 
 (() => {
 "use strict"
@@ -74,3 +74,4 @@ window.NovaChatSidebarLayout = {
 }
 
 })()
+

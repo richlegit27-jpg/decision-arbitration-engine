@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import uuid
 from typing import Any, Callable
@@ -70,3 +70,4 @@ def get_relevant_memory_impl(
 
     scored.sort(key=lambda row: row[0], reverse=True)
     return [item for _, item in scored[:3]]
+

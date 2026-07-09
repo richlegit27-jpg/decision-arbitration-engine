@@ -1470,3 +1470,5 @@ def default_executor(move: NextMove) -> ExecutionResult:
             status="failed",
             error=str(e),
         )
+
+

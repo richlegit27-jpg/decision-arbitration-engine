@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import re
 from typing import Any, Dict, List, Optional
@@ -280,10 +280,11 @@ class MemoryHygieneService:
         text = text.replace("\r\n", "\n").replace("\r", "\n")
         text = re.sub(r"\s+", " ", text).strip()
 
-        text = re.sub(r"^[\-\*\•\s]+", "", text)
+        text = re.sub(r"^[\-\*\â€¢\s]+", "", text)
         text = re.sub(r"\s+([,.;:!?])", r"\1", text)
 
         return text.strip()
 
     def _tokenize(self, text: str) -> List[str]:
         return re.findall(r"[a-z0-9_]+", text.lower())
+

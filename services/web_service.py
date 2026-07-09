@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import html
 import re
@@ -265,3 +265,4 @@ class WebService:
         value = html.unescape(value)
         value = re.sub(r"\s+", " ", value).strip()
         return value
+

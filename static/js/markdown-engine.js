@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 if (window.NovaMarkdown) {
@@ -210,3 +210,4 @@ window.NovaMarkdown = {
   bindCopyButtons
 };
 })();
+

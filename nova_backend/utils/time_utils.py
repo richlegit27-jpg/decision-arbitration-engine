@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
@@ -85,3 +85,4 @@ def newest_first(items: list[Any], *fields: str) -> list[Any]:
 
 def oldest_first(items: list[Any], *fields: str) -> list[Any]:
     return sorted(items or [], key=lambda x: sort_key(x, *fields), reverse=False)
+

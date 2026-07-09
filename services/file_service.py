@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import shutil
 from datetime import datetime
@@ -183,3 +183,4 @@ def build_file_context(limit: int = 5) -> str:
             lines.append(preview[:1000])
 
     return "\n".join(lines)
+

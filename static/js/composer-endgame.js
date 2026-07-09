@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\composer-endgame.js
+﻿// C:\Users\Owner\nova\static\js\composer-endgame.js
 (() => {
 "use strict"
 
@@ -55,7 +55,7 @@ function setBusy(isBusy){
   if(el.attachBtn) el.attachBtn.disabled = isBusy
   if(el.imageBtn) el.imageBtn.disabled = isBusy
   if(el.voiceBtn) el.voiceBtn.disabled = isBusy && !isRecording
-  if(el.thinkingStatus) el.thinkingStatus.textContent = isBusy ? "Thinking…" : ""
+  if(el.thinkingStatus) el.thinkingStatus.textContent = isBusy ? "Thinkingâ€¦" : ""
 }
 
 function renderPendingAttachments(){
@@ -66,7 +66,7 @@ function renderPendingAttachments(){
   el.pendingAttachments.innerHTML = items.map(att=>`
     <div class="pending-attachment-chip" data-pending-attachment-id="${escapeHtml(att.id)}">
       <span>${escapeHtml(att.name)}</span>
-      <button type="button" data-remove-pending-attachment="${escapeHtml(att.id)}">×</button>
+      <button type="button" data-remove-pending-attachment="${escapeHtml(att.id)}">Ã—</button>
     </div>
   `).join("")
 }
@@ -125,7 +125,7 @@ async function startVoiceRecording(){
   mediaRecorder.start()
   isRecording=true
   if(el.voiceBtn){ el.voiceBtn.textContent="Stop"; el.voiceBtn.classList.add("is-recording") }
-  if(el.voiceStatus) el.voiceStatus.textContent="Recording…"
+  if(el.voiceStatus) el.voiceStatus.textContent="Recordingâ€¦"
 }
 
 async function stopVoiceRecording(commit=true){
@@ -133,7 +133,7 @@ async function stopVoiceRecording(commit=true){
   await new Promise(r=>mediaRecorder.addEventListener("stop",r,{once:true})); mediaRecorder.stop()
   mediaStream?.getTracks().forEach(t=>t.stop())
   mediaStream=null; mediaRecorder=null; isRecording=false
-  if(el.voiceBtn){ el.voiceBtn.textContent="🎤"; el.voiceBtn.classList.remove("is-recording") }
+  if(el.voiceBtn){ el.voiceBtn.textContent="ðŸŽ¤"; el.voiceBtn.classList.remove("is-recording") }
   if(el.voiceStatus) el.voiceStatus.textContent=""
   if(!commit){ recordingChunks=[]; return }
   if(!recordingChunks.length) return
@@ -186,3 +186,4 @@ if(document.readyState==="loading"){ document.addEventListener("DOMContentLoaded
 window.NovaComposerEndgame={ sendMessage, addFilesToPending, clearPendingAttachments, renderPendingAttachments }
 
 })()
+

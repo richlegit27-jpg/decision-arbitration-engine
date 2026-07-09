@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 REM -----------------------------
 REM Phase 4 Nova Quickstart Script
 REM -----------------------------

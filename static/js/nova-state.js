@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\nova-state.js
+﻿// C:\Users\Owner\nova\static\js\nova-state.js
 
 (() => {
   "use strict";
@@ -200,3 +200,4 @@
     bootstrapStateFromStorage,
   };
 })();
+

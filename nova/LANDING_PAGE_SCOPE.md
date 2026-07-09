@@ -1,4 +1,4 @@
-\# Nova Landing Page Scope
+﻿\# Nova Landing Page Scope
 
 
 
@@ -121,4 +121,5 @@ It should feel clear, sharp, and real.
 \## Immediate Outcome
 
 Nova should feel like a real product before the user even logs in.
+
 

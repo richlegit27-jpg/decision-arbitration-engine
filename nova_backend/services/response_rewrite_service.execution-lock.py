@@ -1,4 +1,4 @@
-# C:\Users\Owner\nova\nova_backend\services\response_rewrite_service.py
+﻿# C:\Users\Owner\nova\nova_backend\services\response_rewrite_service.py
 
 from nova_backend.services.nova_voice_profile import NOVA_VOICE_PROFILE
 import re
@@ -36,7 +36,7 @@ class ResponseRewriteService:
             "send me the rest",
             "i can also",
 
-            # 🔥 added (anti-chatbot tone)
+            # ðŸ”¥ added (anti-chatbot tone)
             "got it",
             "bugs can be frustrating",
             "step by step",
@@ -48,7 +48,7 @@ class ResponseRewriteService:
     def rewrite(self, text: str, user_text: str = "", route: str = "") -> str:
         original = self._clean(text)
 
-        # 🔥 HARD EXECUTION OVERRIDE (absolute)
+        # ðŸ”¥ HARD EXECUTION OVERRIDE (absolute)
         lowered_input = self._clean(user_text).lower()
 
         if "bug" in lowered_input or "fix" in lowered_input:
@@ -63,14 +63,14 @@ class ResponseRewriteService:
         rewritten = self._remove_weak_openers(rewritten)
         rewritten = self._remove_dead_weight(rewritten)
 
-        # 🔥 enforce voice profile (remove avoided phrases)
+        # ðŸ”¥ enforce voice profile (remove avoided phrases)
         for phrase in self.voice_profile.get("avoid", []):
             rewritten = re.sub(re.escape(phrase), "", rewritten, flags=re.IGNORECASE)
 
-        # 🔥 route-aware tone control
+        # ðŸ”¥ route-aware tone control
         route = (route or "").lower()
 
-        # 🔥 execution-first override
+        # ðŸ”¥ execution-first override
         if self.voice_profile.get("execution_first"):
             rewritten = self._force_execution_first(rewritten)
 
@@ -87,7 +87,7 @@ class ResponseRewriteService:
         rewritten = self._extract_strongest_line(rewritten)
         rewritten = self._tighten_spacing(rewritten)
 
-        # 🔥 FINAL OVERRIDE (must be last)
+        # ðŸ”¥ FINAL OVERRIDE (must be last)
         if self.voice_profile.get("execution_first"):
             rewritten = self._force_execution_first(rewritten)
 
@@ -130,7 +130,7 @@ class ResponseRewriteService:
             if any(k in l.lower() for k in ["fix", "do", "run", "add", "use", "replace"]):
                 return l
 
-        # fallback → first meaningful line
+        # fallback â†’ first meaningful line
         for line in lines:
             l = line.strip()
             if l:
@@ -182,11 +182,11 @@ class ResponseRewriteService:
     def _force_execution_first(self, text: str) -> str:
         lowered = self._clean(text).lower()
 
-        # 🔥 hard override for bug/fix context
+        # ðŸ”¥ hard override for bug/fix context
         if "bug" in lowered or "fix" in lowered:
             return "Reproduce the bug."
 
-        # 🔥 force action extraction only (no soft fallback)
+        # ðŸ”¥ force action extraction only (no soft fallback)
         lines = re.split(r"[.!?\n]", text)
         clean = [l.strip() for l in lines if l.strip()]
 
@@ -197,5 +197,6 @@ class ResponseRewriteService:
             ]):
                 return l
 
-        # 🔥 if nothing actionable → force directive
+        # ðŸ”¥ if nothing actionable â†’ force directive
         return "Identify the issue."
+

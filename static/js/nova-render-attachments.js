@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaRenderAttachmentsLoaded) return;
@@ -262,7 +262,7 @@
             <div class="nova-attachment-chip-icon">${extOf(file.name)}</div>
             <div class="nova-attachment-chip-body">
               <div class="nova-attachment-chip-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
-              <div class="nova-attachment-chip-meta">${formatBytes(file.size)}${file.__uploadedUrl ? " • uploaded" : ""}</div>
+              <div class="nova-attachment-chip-meta">${formatBytes(file.size)}${file.__uploadedUrl ? " â€¢ uploaded" : ""}</div>
             </div>
             <button
               class="nova-attachment-chip-remove"
@@ -272,7 +272,7 @@
               aria-label="Remove attachment"
               title="Remove attachment"
             >
-              ✕
+              âœ•
             </button>
           </div>
         `;
@@ -478,3 +478,4 @@
 
   document.addEventListener("DOMContentLoaded", bootstrap);
 })();
+

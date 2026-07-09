@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any
 
@@ -22,3 +22,4 @@ class ArtifactStore:
 
     def all(self) -> list[dict[str, Any]]:
         return self.load()
+

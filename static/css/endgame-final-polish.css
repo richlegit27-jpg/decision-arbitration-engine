@@ -1,4 +1,4 @@
-/* --- Memory card fade-in/out --- */
+﻿/* --- Memory card fade-in/out --- */
 .memory-card {
   opacity: 0;
   transform: translateY(-5px);

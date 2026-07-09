@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\api-stream.js
+﻿// C:\Users\Owner\nova\static\js\api-stream.js
 
 (() => {
 "use strict"
@@ -369,3 +369,4 @@ window.NovaAPIStream = {
 }
 
 })()
+

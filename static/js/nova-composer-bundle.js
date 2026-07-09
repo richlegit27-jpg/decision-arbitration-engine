@@ -1,6 +1,12 @@
 ﻿(function () {
   "use strict";
 
+  // NOVA_COMPOSER_VISUAL_TEXT_CLEANUP_LOCK
+  // NOVA_REMAINING_COMPOSER_MOJIBAKE_LOCK
+  // NOVA_FINAL_TTS_STOP_TEXT_LOCK
+  // NOVA_TTS_STOP_LINE_DIRECT_LOCK
+  // NOVA_TTS_DEFAULT_OFF_LOCK
+
   function qs(selector, root) {
     return (root || document).querySelector(selector);
   }
@@ -26,7 +32,7 @@ window.finishStreamUi = window.finishStreamUi || function () {
 
   function log() {
     try {
-      console.log("[NovaComposerBundle]", ...arguments);
+
     } catch (_) {}
   }
 
@@ -107,7 +113,7 @@ function applyBackendSessionState(payload, explicitSessionId) {
     state.memory = data.memory;
   }
 
-  console.log("[NOVA SESSION HYDRATE]", {
+
     activeSessionId: state.activeSessionId,
     message_count: Array.isArray(state.messages) ? state.messages.length : -1,
     messages: (state.messages || []).map(function (msg) {
@@ -276,7 +282,7 @@ function showToast(message, kind) {
     const text = String(message || "").trim();
     if (!text) return;
 
-    console.log("[Toast]", kind || "info", text);
+
 
     // OPTIONAL: minimal visual (no render calls)
     const host = document.querySelector("[data-toast-host]") || document.body;
@@ -416,7 +422,7 @@ const mainText = text.trim();
     const text = normalizeText(value).trim();
     const max = Number(limit || 100);
     if (text.length <= max) return text;
-    return text.slice(0, Math.max(0, max - 1)).trimEnd() + "Ã¢â‚¬Â¦";
+    return text.slice(0, Math.max(0, max - 1)).trimEnd() + "...";
   }
 
   function isImageMime(mime) {
@@ -512,7 +518,7 @@ if (
     return null;
   }
 
-// ðŸ”¥ HARD META PRESERVE (fixed correctly)
+// HARD META PRESERVE
 const meta =
   (item && typeof item.meta === "object" && item.meta) ||
   (raw && typeof raw.meta === "object" && raw.meta) ||
@@ -630,7 +636,7 @@ function buildWorkingContextFromWorkingState(rawState) {
 function attachmentSummary(attachment) {
     const name = attachment.filename || attachment.name || "attachment";
     const size = formatBytes(attachment.size);
-    return size ? name + " Ã‚Â· " + size : name;
+    return size ? name + " · " + size : name;
   }
 
   const els = {
@@ -740,7 +746,7 @@ const state = {
   },
 
 tts: {
-  enabled: true,
+  enabled: false,
   playing: false,
   audio: null,
   lastAutoMessageId: "",
@@ -762,7 +768,7 @@ function updateTtsToggleUi() {
 
   if (!state.tts) {
     state.tts = {
-      enabled: true,
+      enabled: false,
       playing: false,
       audio: null,
       lastAutoMessageId: "",
@@ -776,13 +782,13 @@ function updateTtsToggleUi() {
   els.ttsToggleButton.classList.toggle("is-playing", playing);
 
   if (playing) {
-    els.ttsToggleButton.textContent = "â¹";
+    els.ttsToggleButton.textContent = "Stop";
     els.ttsToggleButton.setAttribute("aria-label", "Stop voice reply");
     els.ttsToggleButton.setAttribute("title", "Stop voice reply");
     return;
   }
 
-  els.ttsToggleButton.textContent = enabled ? "ðŸ”Š" : "ðŸ”‡";
+  els.ttsToggleButton.textContent = enabled ? "Voice" : "Muted";
   els.ttsToggleButton.setAttribute(
     "aria-label",
     enabled ? "Voice replies on" : "Voice replies muted"
@@ -1394,7 +1400,7 @@ if (els.sendButton) {
       event.stopPropagation();
     }
 
-    console.log("SEND BUTTON CLICKED");
+
     handleComposerSubmit(null);
   };
 }
@@ -1419,7 +1425,7 @@ if (els.sendButton) {
     event.preventDefault();
     event.stopPropagation();
 
-    console.log("SEND BUTTON CLICKED");
+
 
     handleComposerSubmit(event);
   };
@@ -1792,7 +1798,7 @@ state.messages = dedupeMessages(mergedMessages)
 }
 
 // ==============================
-// ðŸ”¥ UNIFIED SESSION SWITCH (LOCKED)
+// UNIFIED SESSION SWITCH LOCKED
 // ==============================
 
 window.openSessionFromBackend = async function (sessionId) {
@@ -1809,7 +1815,7 @@ window.openSessionFromBackend = async function (sessionId) {
 
 
 // ==============================
-// ðŸ”¥ ARTIFACT â†’ CHAT BRIDGE
+// ARTIFACT TO CHAT BRIDGE
 // ==============================
 
 window.NovaArtifactChatAction = function (text) {
@@ -1873,12 +1879,12 @@ window.NovaAnalyzeArtifactImage = async function (imageUrl, artifact) {
 };
 
 // ==============================
-// ðŸ”¥ COPY + REGENERATE FIX (PUT THIS HERE)
+// COPY + REGENERATE FIX
 // ==============================
 
 document.addEventListener("click", async function (event) {
 
-  // ðŸ”¥ MEMORY BADGE CLICK
+  // MEMORY BADGE CLICK
   const memoryBadge = event.target.closest("[data-memory-used]");
   if (memoryBadge) {
 
@@ -1992,7 +1998,7 @@ viewer.innerHTML = `
     return;
   }
 
-  // ðŸ”¥ COPY MESSAGE
+  // COPY MESSAGE
   const copyBtn = event.target.closest("[data-copy-message]");
   if (copyBtn) {
     const messageId = String(copyBtn.getAttribute("data-copy-message") || "").trim();
@@ -2082,12 +2088,12 @@ viewer.innerHTML = `
     const removeButton = removable
       ? '<button type="button" class="nova-upload-chip__remove" data-upload-remove="' +
         escapeHtml(item.id) +
-        '" aria-label="Remove attachment">Ãƒâ€”</button>'
+        '" aria-label="Remove attachment">×</button>'
       : "";
 
     const statusHtml =
       status === "uploading"
-        ? '<span class="nova-upload-chip__status">UploadingÃ¢â‚¬Â¦</span>'
+        ? '<span class="nova-upload-chip__status">Uploading...</span>'
         : status === "error"
         ? '<span class="nova-upload-chip__status nova-upload-chip__status--error">' +
           escapeHtml(error || "Upload failed") +
@@ -2140,7 +2146,7 @@ function renderAttachmentBlock(attachment) {
   if (mime) sub.push(mime);
   if (item.size) sub.push(formatBytes(item.size));
 
-  const subText = sub.join(" Ã‚Â· ");
+  const subText = sub.join(" · ");
 
   if (item.url && isImageMime(mime)) {
     return (
@@ -2229,7 +2235,7 @@ function renderAttachmentBlock(attachment) {
     '<a href="' +
     escapeHtml(href || "#") +
     '" target="_blank" rel="noopener noreferrer" class="message-attachment__file-link">' +
-    '<div class="message-attachment__icon">ðŸ“Ž</div>' +
+    '<div class="message-attachment__icon">File</div>' +
     '<div class="message-attachment__footer">' +
     '<div class="message-attachment__name">' +
     escapeHtml(name) +
@@ -2541,6 +2547,53 @@ function renderMarkdown(text) {
   return html;
 }
 
+
+// NOVA_FORCE_DESKTOP_SOURCE_CARDS_20260611
+function novaForceSourceCardsHtml_20260611(message) {
+  try {
+    const meta =
+      message &&
+      message.meta &&
+      typeof message.meta === "object"
+        ? message.meta
+        : {};
+
+    const sources = Array.isArray(meta.sources) ? meta.sources : [];
+
+    if (!sources.length) {
+      return "";
+    }
+
+    const cards = sources.map(function (item, index) {
+      item = item && typeof item === "object" ? item : {};
+
+      const title = String(item.title || item.headline || item.name || "Source").trim();
+      const url = String(item.url || item.source_url || item.link || "").trim();
+      const domain = String(item.source || item.domain || item.publisher || "").trim();
+      const snippet = String(item.snippet || item.preview || item.description || "").trim();
+
+      return (
+        '<a class="nova-source-card source-card nova-forced-source-card" ' +
+        'data-no-chat-action="1" ' +
+        'href="' + escapeHtml(url || "#") + '" ' +
+        'target="_blank" rel="noreferrer noopener">' +
+          '<div class="nova-source-card-top">' +
+            '<span class="nova-source-number">' + escapeHtml(String(index + 1)) + '</span>' +
+            '<span class="nova-source-domain">' + escapeHtml(domain || "source") + '</span>' +
+          '</div>' +
+          '<div class="nova-source-title">' + escapeHtml(title) + '</div>' +
+          (snippet ? '<div class="nova-source-snippet">' + escapeHtml(snippet) + '</div>' : '') +
+        '</a>'
+      );
+    }).join("");
+
+    return '<div class="nova-source-grid nova-forced-source-grid">' + cards + '</div>';
+  } catch (err) {
+    console.warn("[Nova Desktop] forced source card render failed", err);
+    return "";
+  }
+}
+
 function renderMessageCard(message) {
   if (!message || typeof message !== "object") {
     console.warn("renderMessageCard received invalid message", message);
@@ -2600,6 +2653,18 @@ function renderMessageCard(message) {
       : renderMarkdown(rawText);
 
   // Source cards already rendered by renderSources().
+  // NOVA_FORCE_DESKTOP_SOURCE_CARDS_20260611
+  try {
+    if (
+      role === "assistant" &&
+      hasMetaSources &&
+      String(renderedText || "").indexOf("nova-source-card") < 0
+    ) {
+      renderedText = String(renderedText || "") + novaForceSourceCardsHtml_20260611(message);
+    }
+  } catch (err) {
+    console.warn("[Nova Desktop] source card fallback skipped", err);
+  }
 
   renderedText = String(renderedText || "")
     .replace(/alt="[^"]*"<\/p>/gi, "")
@@ -2731,10 +2796,10 @@ els.chatThread.__autoOpenedSource = "";
       return `
         <div class="nova-memory-item" data-id="${id}">
           <div>
-            <div>${item.pinned ? "ðŸ“Œ" : "ðŸ§ "} ${text}</div>
-            <small>${String(item.kind || "note")} Â· ${String(item.source || "manual")}</small>
+            <div>${item.pinned ? "Pin" : "Note "} ${text}</div>
+            <small>${String(item.kind || "note")} · ${String(item.source || "manual")}</small>
           </div>
-          <button class="nova-memory-pin" data-id="${id}">ðŸ“Œ</button>
+          <button class="nova-memory-pin" data-id="${id}">Pin</button>
           <button class="nova-memory-delete" data-id="${id}">Remove</button>
         </div>
       `;
@@ -2754,7 +2819,7 @@ els.chatThread.__autoOpenedSource = "";
 const data = await res.json();
 
 window.__lastResponse = data;
-console.log("FULL RESPONSE:", data);
+
 
 if (!data.ok) { 
            state.memory = data.memory || [];
@@ -4044,19 +4109,13 @@ if (!Array.isArray(state.messages)) {
     console.warn("[NovaComposerBundle] prevented message reset");
     return;
 }
-  console.log("[NOVA USER LOCAL APPEND]", {
-    id: userMessage.id,
-    role: userMessage.role,
-    text: userMessage.text,
-    count_before: state.messages.length,
-  });
+
+
 
   state.messages.push(userMessage);
 
-  console.log("[NOVA USER LOCAL APPENDED]", {
-    id: userMessage.id,
-    count_after: state.messages.length,
-  });
+
+
 
   renderChat();
   return userMessage;
@@ -4126,7 +4185,7 @@ throw new Error(message);
 }
 
 window.__lastResponse = data;
-console.log("FULL CHAT RESPONSE:", data);
+
 
 if (data && data.assistant_message && data.assistant_message.image_url) {
   try {
@@ -4448,10 +4507,8 @@ async function sendMessage() {
     return;
   }
 
-  console.log("sendMessage ENTERED", {
-    hasInput: !!inputEl,
-    text: text,
-  });
+
+
 
   await maybeAutoSaveMemoryFromChatText(text);
 
@@ -4666,7 +4723,7 @@ async function regenerateMessage(targetAssistantId) {
       attachments: safeArray(userMessage.attachments),
     });
 
-    console.log("ABOUT TO SEND /api/chat", payload);
+
 
     if (typeof consumeChatStreamStable === "function") {
       await consumeChatStreamStable(payload);
@@ -4850,7 +4907,7 @@ async function recordVoiceOnce() {
   });
 
   recorder.start();
-  showToast("ðŸŽ¤ Recording... click again to send", "info");
+  showToast("Recording... click again to send", "info");
 
   return new Promise(function (resolve, reject) {
     recorder.addEventListener("stop", function () {
@@ -4948,7 +5005,7 @@ const safeText = typeof text === "string" ? text : "";
   }
 
   showToast("Voice ready. Sending...", "success");
-  console.log("VOICE TRANSCRIPT =", text);
+
   await sendMessage();
 
   return text;
@@ -4984,7 +5041,7 @@ function updateTtsToggleUi() {
 
   if (!state.tts) {
     state.tts = {
-      enabled: true,
+      enabled: false,
       playing: false,
       audio: null,
     };
@@ -4995,7 +5052,7 @@ function updateTtsToggleUi() {
 
   els.ttsToggleButton.classList.toggle("is-muted", muted);
   els.ttsToggleButton.classList.toggle("is-playing", playing);
-  els.ttsToggleButton.textContent = muted ? "ðŸ”‡" : "ðŸ”Š";
+  els.ttsToggleButton.textContent = muted ? "Muted" : "Voice";
 
   if (muted) {
     els.ttsToggleButton.setAttribute("aria-label", "Voice replies muted");
@@ -5135,7 +5192,7 @@ async function playVoiceReplyFromText(text) {
 
   if (!state.tts) {
     state.tts = {
-      enabled: true,
+      enabled: false,
       playing: false,
       audio: null,
       lastAutoMessageId: "",
@@ -5327,7 +5384,7 @@ function bindEvents() {
     });
   }
 
-  // ðŸ”¥ execution buttons
+  // execution buttons
   if (els.execRunStepButton) {
     els.execRunStepButton.addEventListener("click", function (event) {
       event.preventDefault();
@@ -5582,7 +5639,7 @@ window.fetchSourcePreviewIntoRail = function fetchSourcePreviewIntoRail(url, tit
       return response.json();
     })
     .then(function (data) {
-      console.log("SOURCE PREVIEW RESPONSE", data);
+
 
       const finalUrl = String((data && data.url) || url);
       const finalTitle = String((data && data.title) || title || "Source preview");
@@ -5697,7 +5754,7 @@ function renderWeb() {
   renderExecution();
 
   if (state.webPreviewOpen) {
-    console.log("renderWeb skipped: preview open");
+
     return;
   }
 
@@ -5851,7 +5908,7 @@ async function maybeAutoSaveMemoryFromChatText(userText) {
 
   const lower = text.toLowerCase();
 
-  // ðŸš« junk filter
+  // junk filter
   if (
     lower.length < 5 ||
     lower === "hi" ||
@@ -5895,14 +5952,14 @@ async function maybeAutoSaveMemoryFromChatText(userText) {
     memoryText = text;
   }
 
-  // ðŸ§  DEDUPE
+  // Note  DEDUPE
   const exists = (state.memory || []).some((m) => {
     return String(m.text || "").toLowerCase() === memoryText.toLowerCase();
   });
 
   if (exists) return;
 
-  // ðŸ”¥ IMPORTANCE SCORING
+  // IMPORTANCE SCORING
   let importance = 1; // default low
 
   if (/^my .+ is .+/i.test(memoryText)) importance = 3; // identity
@@ -5930,7 +5987,7 @@ async function maybeAutoSaveMemoryFromChatText(userText) {
       [];
 
     if (Array.isArray(memoryList)) {
-      // ðŸ”¥ SORT BY IMPORTANCE
+      // SORT BY IMPORTANCE
       const normalized = memoryList.map(normalizeMemoryItem);
 
       normalized.sort((a, b) => {
@@ -5956,7 +6013,7 @@ function wireMemoryControls() {
 
   window.__novaMemoryWired = true;
 
-  console.log("WIRE MEMORY CONTROLS ACTIVE");
+
 
   const addBtn = document.querySelector("[data-memory-add-button]");
   const input = document.querySelector("[data-memory-add-text]");
@@ -5988,7 +6045,7 @@ function wireMemoryControls() {
         });
 
         const data = await res.json();
-        console.log("MEMORY ADD RESPONSE", data);
+
 
         if (data && data.ok && data.data && Array.isArray(data.data.memory)) {
           state.memory = data.data.memory.map(normalizeMemoryItem);
@@ -6002,7 +6059,7 @@ function wireMemoryControls() {
     };
   }
 
-  // âœ… ENTER TO SAVE (no button needed)
+  // ENTER TO SAVE
   if (input && !input.__novaMemoryEnterWired) {
     input.__novaMemoryEnterWired = true;
 
@@ -6014,7 +6071,7 @@ function wireMemoryControls() {
     });
   }
 
-  // âœ… DELETE MEMORY
+  // DELETE MEMORY
   document.querySelectorAll("[data-memory-delete]").forEach(function (btn) {
     if (btn.__wired) return;
     btn.__wired = true;
@@ -6034,7 +6091,7 @@ function wireMemoryControls() {
         });
 
         const data = await res.json();
-        console.log("MEMORY DELETE RESPONSE", data);
+
 
         if (data && data.ok && data.data && Array.isArray(data.data.memory)) {
           state.memory = data.data.memory.map(normalizeMemoryItem);
@@ -6104,7 +6161,7 @@ function summarizeMemoryText(value, limit) {
   const max = typeof limit === "number" ? limit : 140;
   if (!text) return "";
   if (text.length <= max) return text;
-  return text.slice(0, max) + "Ã¢â‚¬Â¦";
+  return text.slice(0, max) + "...";
 }
 
 function findMemoryById(memoryId) {
@@ -6188,9 +6245,9 @@ function renderWorkingContextPanel() {
 
   const collapsedClass = wc.collapsed ? " is-collapsed" : "";
   const buttonLabel = wc.collapsed ? "Expand working context" : "Collapse working context";
-  const chevron = wc.collapsed ? "â–¸" : "â–¾";
+  const chevron = wc.collapsed ? ">" : "v";
 
-  console.log("renderWorkingContextPanel HTML", wc, items);
+
 
   return `
     <section class="nova-working-context-panel${collapsedClass}" data-working-context-panel>
@@ -6393,7 +6450,7 @@ function renderMemoryViewer(memoryList) {
   const container = document.querySelector(".nova-rail-content");
   if (!container) return;
 
-  // ðŸ”¥ normalize to array
+  // normalize to array
   if (!Array.isArray(memoryList)) {
     memoryList = memoryList ? [memoryList] : [];
   }
@@ -6641,6 +6698,165 @@ async function consumeChatStreamStable(payload) {
       }
 
       applyStatePayload(data);
+
+      // NOVA_FORCE_DESKTOP_SOURCE_CARDS_20260611
+      try {
+        const assistantMessage =
+          data &&
+          data.assistant_message &&
+          typeof data.assistant_message === "object"
+            ? data.assistant_message
+            : null;
+
+        const assistantMeta =
+          assistantMessage &&
+          assistantMessage.meta &&
+          typeof assistantMessage.meta === "object"
+            ? assistantMessage.meta
+            : {};
+
+        const sources = Array.isArray(assistantMeta.sources) ? assistantMeta.sources : [];
+
+        if (assistantMessage && sources.length && Array.isArray(state.messages)) {
+          const assistantText = String(
+            assistantMessage.text ||
+            assistantMessage.content ||
+            data.text ||
+            ""
+          ).trim();
+
+          for (let i = state.messages.length - 1; i >= 0; i -= 1) {
+            const msg = state.messages[i];
+            if (!msg || String(msg.role || "") !== "assistant") {
+              continue;
+            }
+
+            const msgText = String(msg.text || msg.content || "").trim();
+
+            if (
+              !assistantText ||
+              msgText === assistantText ||
+              msgText.indexOf(assistantText.slice(0, 64)) >= 0 ||
+              assistantText.indexOf(msgText.slice(0, 64)) >= 0
+            ) {
+              msg.meta = msg.meta && typeof msg.meta === "object" ? msg.meta : {};
+              msg.meta.sources = sources;
+
+              if (Array.isArray(assistantMeta.source_urls)) {
+                msg.meta.source_urls = assistantMeta.source_urls;
+              }
+
+              msg.meta.route = assistantMeta.route || msg.meta.route || "web";
+              msg.meta.strategy = assistantMeta.strategy || msg.meta.strategy || "web_fetch";
+              break;
+            }
+          }
+        }
+
+        if (typeof renderMessages === "function") {
+          renderMessages();
+        }
+      } catch (err) {
+        console.warn("[Nova Desktop] source meta preserve failed", err);
+      }
+
+
+      // NOVA_DESKTOP_WEB_SOURCE_META_BRIDGE_20260611
+      // Preserve assistant_message.meta.sources so desktop web/source cards render.
+      try {
+        const assistantMessage =
+          data &&
+          data.assistant_message &&
+          typeof data.assistant_message === "object"
+            ? data.assistant_message
+            : null;
+
+        const assistantMeta =
+          assistantMessage &&
+          assistantMessage.meta &&
+          typeof assistantMessage.meta === "object"
+            ? assistantMessage.meta
+            : {};
+
+        const sourceList = Array.isArray(assistantMeta.sources)
+          ? assistantMeta.sources
+          : [];
+
+        if (assistantMessage && sourceList.length) {
+          const assistantText = String(
+            assistantMessage.text ||
+            assistantMessage.content ||
+            data.text ||
+            ""
+          ).trim();
+
+          let patchedExisting = false;
+
+          if (Array.isArray(state.messages)) {
+            for (let i = state.messages.length - 1; i >= 0; i -= 1) {
+              const message = state.messages[i];
+              if (!message || String(message.role || "") !== "assistant") {
+                continue;
+              }
+
+              const messageText = String(message.text || message.content || "").trim();
+              const messageHasSources =
+                message.meta &&
+                Array.isArray(message.meta.sources) &&
+                message.meta.sources.length > 0;
+
+              if (
+                messageText === assistantText ||
+                (!messageHasSources && assistantText && messageText.indexOf(assistantText.slice(0, 80)) >= 0)
+              ) {
+                message.meta =
+                  message.meta && typeof message.meta === "object"
+                    ? message.meta
+                    : {};
+
+                message.meta.sources = sourceList;
+                message.meta.source_urls = Array.isArray(assistantMeta.source_urls)
+                  ? assistantMeta.source_urls
+                  : sourceList.map(function (item) {
+                      return item && item.url ? item.url : "";
+                    }).filter(Boolean);
+
+                message.meta.route = assistantMeta.route || message.meta.route || "web";
+                message.meta.strategy = assistantMeta.strategy || message.meta.strategy || "web_fetch";
+
+                if (!message.text && assistantText) {
+                  message.text = assistantText;
+                }
+
+                patchedExisting = true;
+                break;
+              }
+            }
+          }
+
+          if (!patchedExisting && typeof upsertMessage === "function") {
+            upsertMessage({
+              id: assistantMessage.id || makeId("assistant_web"),
+              role: "assistant",
+              text: assistantText,
+              content: assistantText,
+              meta: assistantMeta,
+              attachments: Array.isArray(assistantMessage.attachments)
+                ? assistantMessage.attachments
+                : [],
+            });
+          }
+
+          if (typeof renderMessages === "function") {
+            renderMessages();
+          } else if (typeof renderAll === "function") {
+            renderAll();
+          }
+        }
+      } catch (err) {
+        console.warn("[Nova Desktop] web source meta bridge skipped", err);
+      }
+
 
       finishStreamUi({
         statusText: "Complete",
@@ -7230,7 +7446,7 @@ window.runExecutionAction = async function (action, extra) {
           return;
         }
 
-        console.log("[EXECUTION STREAM]", eventName, payload);
+
 
         if (eventName === "start" && typeof addMessage === "function") {
           addMessage({
@@ -7311,3 +7527,5 @@ function runExec(action) {
 window.runExec = runExec;
 
 })();
+
+

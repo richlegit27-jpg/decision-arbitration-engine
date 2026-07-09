@@ -1,4 +1,4 @@
-class CognitiveGovernor:
+﻿class CognitiveGovernor:
 
     def evaluate(
         self,
@@ -132,3 +132,4 @@ class CognitiveGovernor:
                 interventions
             ),
         }
+

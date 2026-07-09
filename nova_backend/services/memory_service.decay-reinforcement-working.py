@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -365,3 +365,4 @@ class MemoryService:
             "kept": promote_result.get("kept", 0),
             "memory": self.all(),
         }
+

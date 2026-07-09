@@ -1,4 +1,4 @@
-class SelfModelService:
+﻿class SelfModelService:
 
     def __init__(self):
 
@@ -79,3 +79,4 @@ class SelfModelService:
                 False,
             )
         )
+

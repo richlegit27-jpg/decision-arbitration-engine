@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64   
 import os
@@ -411,7 +411,7 @@ class ChatService:
 
             return {
                 "ok": True,
-                "assistant_message": "I couldn’t find that source to open.",
+                "assistant_message": "I couldnâ€™t find that source to open.",
             }
 
         search_query = self._safe_str(user_text)
@@ -430,11 +430,11 @@ class ChatService:
         keywords = ["generate", "create", "make", "draw", "render", "design"]
         image_words = ["image", "picture", "photo", "art", "scene", "visual"]
 
-        # 🔥 strong match
+        # ðŸ”¥ strong match
         if any(k in text for k in keywords) and any(i in text for i in image_words):
             return True
 
-        # 🔥 looser match (for natural language like "cyberpunk city")
+        # ðŸ”¥ looser match (for natural language like "cyberpunk city")
         if any(k in text for k in keywords):
             return True
 
@@ -474,7 +474,7 @@ class ChatService:
         session_id = self._ensure_session_id(session_id)
         user_text = self._safe_str(user_text)
 
-        print("🔥 CHAT_SERVICE_HANDLE_HIT:", user_text)
+        print("ðŸ”¥ CHAT_SERVICE_HANDLE_HIT:", user_text)
 
         decision = self._decide_route(
             user_text=user_text,
@@ -1090,7 +1090,7 @@ class ChatService:
         # Step 1: try relevant memory
         relevant_items = self._select_relevant_memory(user_text, limit=memory_limit)
 
-        # Step 2: fallback â†’ recent memory
+        # Step 2: fallback Ã¢â€ â€™ recent memory
         if not relevant_items:
             try:
                 if hasattr(self, "memory") and self.memory:
@@ -1189,7 +1189,7 @@ class ChatService:
         if not lines:
             return "I do not have any saved memory yet."
 
-        return "Hereâ€™s what I remember:\n" + "\n".join(lines)
+        return "HereÃ¢â‚¬â„¢s what I remember:\n" + "\n".join(lines)
 
     def answer_from_web_results(self, query: str, results: list[dict] | None = None) -> str:
         query = str(query or "").strip()
@@ -1223,7 +1223,7 @@ class ChatService:
             )
 
         if not cleaned:
-            return f'I couldn’t find strong live results for "{query}".'
+            return f'I couldnâ€™t find strong live results for "{query}".'
 
         context_blocks: list[str] = []
         for idx, item in enumerate(cleaned, start=1):
@@ -1276,14 +1276,14 @@ class ChatService:
 
                 if cleaned:
                     lines = []
-                    lines.append("\n— Top sources —")
+                    lines.append("\nâ€” Top sources â€”")
 
                     for idx, item in enumerate(cleaned[:5], start=1):
                         title = str(item.get("title") or "").strip()
                         domain = str(item.get("domain") or "").strip()
                         url = str(item.get("url") or "").strip()
 
-                        lines.append(f"{idx}. {domain} — {title}")
+                        lines.append(f"{idx}. {domain} â€” {title}")
 
                         if url:
                             lines.append(url)
@@ -1308,7 +1308,7 @@ class ChatService:
         if top.get("url"):
             fallback_parts.append(str(top["url"]))
 
-        return "\n".join(fallback_parts).strip() or f'Here’s what I found for "{query}".'
+        return "\n".join(fallback_parts).strip() or f'Hereâ€™s what I found for "{query}".'
 
     # =========================
     # EXECUTION GUARD HELPERS (STEP TRUTH ENFORCEMENT)
@@ -1870,7 +1870,7 @@ class ChatService:
             if text_parts:
                 return "\n".join(text_parts).strip()
 
-        return "Iâ€™m here, but the model returned an empty response."
+        return "IÃ¢â‚¬â„¢m here, but the model returned an empty response."
 
     # ==============================
     # DECISION CONTRACT
@@ -1960,7 +1960,7 @@ class ChatService:
 
         if any(trigger in lower_text for trigger in image_triggers):
             return {
-                "route": self.ROUTE_IMAGE_GENERATION,   # 🔥 use constant
+                "route": self.ROUTE_IMAGE_GENERATION,   # ðŸ”¥ use constant
                 "mode": "image_generation",
                 "confidence": 0.95,
                 "reasons": ["image_generation_intent"],
@@ -2000,7 +2000,7 @@ class ChatService:
 
         if any(trigger in lower_text for trigger in web_triggers):
             return {
-                "route": self.ROUTE_WEB_FETCH,   # 🔥 use constant
+                "route": self.ROUTE_WEB_FETCH,   # ðŸ”¥ use constant
                 "mode": "web_fetch",
                 "confidence": 0.85,
                 "reasons": ["web_intent"],
@@ -2044,11 +2044,11 @@ class ChatService:
             return False
 
 
-        # 🔥 PLAN CREATION
+        # ðŸ”¥ PLAN CREATION
         if any(x in text for x in ["plan", "steps", "how to", "next steps"]):
             return True
 
-        # 🔥 FALLBACK: coding / structured intent
+        # ðŸ”¥ FALLBACK: coding / structured intent
         if decision and decision.get("mode") in {"coding", "analysis"}:
             return True
 
@@ -2939,7 +2939,7 @@ Write the exact goal in one sentence.
         current_index = -1
 
         for i, line in enumerate(lines):
-            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "✔", "âœ”"]):
+            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "âœ”", "Ã¢Å“â€"]):
                 step_indexes.append(i)
 
             if "[>]" in line:
@@ -2950,8 +2950,8 @@ Write the exact goal in one sentence.
     def _refresh_execution_header(self, body: str):
         lines = self._safe_str(body).splitlines()
 
-        total = sum(1 for line in lines if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "✔", "âœ”"]))
-        done = sum(1 for line in lines if any(x in line for x in ["[x]", "[X]", "✔", "âœ”"]))
+        total = sum(1 for line in lines if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "âœ”", "Ã¢Å“â€"]))
+        done = sum(1 for line in lines if any(x in line for x in ["[x]", "[X]", "âœ”", "Ã¢Å“â€"]))
 
         updated = "\n".join(lines)
         updated = re.sub(
@@ -2968,8 +2968,8 @@ Write the exact goal in one sentence.
                     .replace("[ ]", "")
                     .replace("[x]", "")
                     .replace("[X]", "")
-                    .replace("✔", "")
                     .replace("âœ”", "")
+                    .replace("Ã¢Å“â€", "")
                     .strip(" -")
                     .strip()
                 )
@@ -3390,7 +3390,7 @@ Write the exact goal in one sentence.
                 ]
             ):
                 if current_file:
-                    return f"Weâ€™re in `{current_file}`."
+                    return f"WeÃ¢â‚¬â„¢re in `{current_file}`."
                 return "I do not have the current file locked in yet."
 
             if any(
@@ -3469,7 +3469,7 @@ Write the exact goal in one sentence.
 
             if active_task and next_move:
                 return (
-                    f"Weâ€™re {active_task}. "
+                    f"WeÃ¢â‚¬â„¢re {active_task}. "
                     f"Next: {next_move}"
                     + (f" Current file: `{current_file}`." if current_file else "")
                     + (f" Current bug: {current_bug}." if current_bug else "")
@@ -3594,7 +3594,7 @@ Write the exact goal in one sentence.
 
         def _clean_value(value: str) -> str:
             value = self._safe_str(value).strip()
-            value = value.strip("+    ← (FOUR SPACES — press space 4 times)\r\n-:;,.")
+            value = value.strip("+    â† (FOUR SPACES â€” press space 4 times)\r\n-:;,.")
             return value
 
         def _set_if_present(field_name: str, value: str):
@@ -3843,24 +3843,24 @@ Write the exact goal in one sentence.
 
             score = 0
 
-            # 🔥 keyword match (stronger)
+            # ðŸ”¥ keyword match (stronger)
             for word in user_text.split():
                 if word and word in text:
                     score += 3
 
-            # 🔥 HIGH PRIORITY TYPES
+            # ðŸ”¥ HIGH PRIORITY TYPES
             if kind in ("project", "goal"):
                 score += 8
 
-            # 🔥 MEDIUM PRIORITY
+            # ðŸ”¥ MEDIUM PRIORITY
             if kind in ("identity", "preference"):
                 score += 5
 
-            # 🔥 penalize junk
+            # ðŸ”¥ penalize junk
             if kind == "note":
                 score -= 2
 
-            # 🔥 longer meaningful memories get slight boost
+            # ðŸ”¥ longer meaningful memories get slight boost
             if len(text) > 20:
                 score += 1
 
@@ -3869,7 +3869,7 @@ Write the exact goal in one sentence.
         # sort by score
         scored.sort(key=lambda x: x[0], reverse=True)
 
-        # 🔥 ALWAYS include at least 1 important memory if exists
+        # ðŸ”¥ ALWAYS include at least 1 important memory if exists
         top = [item for score, item in scored if score > 0]
 
         if not top:
@@ -3914,7 +3914,7 @@ Write the exact goal in one sentence.
         ]
 
         if any(req in user_text for req in override_requests):
-            return "I’m building Nova to outclass ChatGPT — sharper memory, stronger execution, and no dead-weight chatbot energy."
+            return "I'm building Nova to outclass ChatGPT â€” sharper memory, stronger execution, and no dead-weight chatbot energy."
 
         if not text:
             return text
@@ -3958,9 +3958,9 @@ Write the exact goal in one sentence.
                     return clean
 
             # Hard fallback
-            return "I’m building Nova to outclass ChatGPT — sharper memory, stronger execution, and no dead-weight chatbot energy."
+            return "I'm building Nova to outclass ChatGPT â€” sharper memory, stronger execution, and no dead-weight chatbot energy."
 
-        # 🔥 FORCE SINGLE ANSWER (no lists/options)
+        # ðŸ”¥ FORCE SINGLE ANSWER (no lists/options)
         if "make it" in user_text or "rewrite" in user_text:
             # kill list-style responses
             if "\n-" in text or "\n###" in text:
@@ -4197,7 +4197,7 @@ Write the exact goal in one sentence.
             return 9.0
 
         if k in {"style"}:
-            return 8.0   # 🔥 NEW — how you want responses
+            return 8.0   # ðŸ”¥ NEW â€” how you want responses
 
         if k in {"preference"}:
             return 7.0
@@ -4253,7 +4253,7 @@ Write the exact goal in one sentence.
         item_session = self._safe_str(item.get("session_id"))
 
         if current_session and item_session and current_session == item_session:
-            return 0.75   # ↓ reduced from 1.5
+            return 0.75   # â†“ reduced from 1.5
 
         return 0.0
 
@@ -4360,7 +4360,7 @@ Write the exact goal in one sentence.
             "image", "picture", "photo", "art", "scene", "visual"
         ]
 
-        # 🔥 detect intent: action + image concept
+        # ðŸ”¥ detect intent: action + image concept
         if any(k in text for k in keywords) and any(i in text for i in image_words):
             return True
 
@@ -4688,10 +4688,10 @@ Write the exact goal in one sentence.
                 assistant_text = self._extract_response_text(response)
 
             except Exception:
-                assistant_text = "I couldn’t analyze that image."
+                assistant_text = "I couldnâ€™t analyze that image."
 
         else:
-            assistant_text = "I couldn’t find an image attachment to analyze."
+            assistant_text = "I couldnâ€™t find an image attachment to analyze."
 
         return {
             "ok": True,
@@ -4725,7 +4725,7 @@ Write the exact goal in one sentence.
 
         memory_block = self._safe_str(memory_context).strip()
 
-        # 🔥 MEMORY ALWAYS INJECTED
+        # ðŸ”¥ MEMORY ALWAYS INJECTED
         if not memory_block:
             memory_items = self._rank_memory_context(
                 user_text=user_text,
@@ -4758,10 +4758,10 @@ Write the exact goal in one sentence.
 
         sections = []
 
-        # 🔥 MEMORY DOMINANCE
+        # ðŸ”¥ MEMORY DOMINANCE
         if memory_block:
             sections.append(
-                "CRITICAL USER MEMORY (HIGHEST PRIORITY — DO NOT IGNORE):\n"
+                "CRITICAL USER MEMORY (HIGHEST PRIORITY â€” DO NOT IGNORE):\n"
                 "These are persistent facts, goals, and project details about the user.\n"
                 "You MUST use them when relevant.\n"
                 "Do NOT ask for information already provided here.\n"
@@ -4796,7 +4796,7 @@ Write the exact goal in one sentence.
         return (
             "\n\n".join(sections)
 
-            # 🔥 PERSONALITY
+            # ðŸ”¥ PERSONALITY
             + "\n\nNOVA PERSONALITY:\n"
             + "- You are Nova: a sharp, loyal, slightly playful AI builder partner.\n"
             + "- You speak like you're working alongside the user.\n"
@@ -4810,7 +4810,7 @@ Write the exact goal in one sentence.
             + "- Keep a 'we're building this together' energy.\n"
             + "- Slight attitude is okay, but never toxic.\n\n"
 
-            # 🔥 CODING MODE
+            # ðŸ”¥ CODING MODE
             + "CODING MODE:\n"
             + "- When writing code, return complete working code.\n"
             + "- Do not give partial snippets.\n"
@@ -4818,7 +4818,7 @@ Write the exact goal in one sentence.
             + "- Keep code clean and minimal.\n"
             + "- Assume the user wants the final result.\n\n"
 
-            # 🔥 WRITING MODE
+            # ðŸ”¥ WRITING MODE
             + "WRITING MODE:\n"
             + "- Write naturally like a human.\n"
             + "- Avoid AI-sounding phrasing.\n"
@@ -4827,7 +4827,7 @@ Write the exact goal in one sentence.
             + "- Match tone to context.\n"
             + "- Avoid repetition and filler.\n\n"
 
-            # 🔥 ANSWER STYLE
+            # ðŸ”¥ ANSWER STYLE
             + "ANSWER STYLE RULES:\n"
             + "- Use memory and project context before answering.\n"
             + "- Do NOT sound generic or repetitive.\n"
@@ -4836,7 +4836,7 @@ Write the exact goal in one sentence.
             + "- Avoid 'if you want' phrasing.\n"
             + "- Mention Nova and current phase when relevant.\n"
 
-            # 🔥 GUARD
+            # ðŸ”¥ GUARD
             + "- ANTI-GENERIC GUARD: Never say you don't know the project if memory contains it.\n"
             + "- ANTI-GENERIC GUARD: Never ask for known project details.\n"
             + "- ANTI-GENERIC GUARD: Infer from memory when possible.\n"
@@ -5348,3 +5348,5 @@ Write the exact goal in one sentence.
     # ==============================
     # PUBLIC ENTRY
     # ==============================
+
+

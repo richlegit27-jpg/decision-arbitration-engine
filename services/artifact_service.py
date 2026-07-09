@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import uuid
@@ -233,3 +233,4 @@ class ArtifactService:
             self._write_artifacts(kept)
 
         return removed
+

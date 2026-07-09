@@ -1,0 +1,700 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Nova Admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #07060c;
+            --panel: rgba(255,255,255,.07);
+            --panel-strong: rgba(255,255,255,.10);
+            --line: rgba(226,214,255,.16);
+            --text: #f8fafc;
+            --muted: rgba(226,232,240,.68);
+            --lime: #b8ff7a;
+            --purple: #c084fc;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: var(--text);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background:
+                radial-gradient(circle at 12% 3%, rgba(139,92,246,.36), transparent 34rem),
+                radial-gradient(circle at 88% 8%, rgba(168,85,247,.22), transparent 30rem),
+                radial-gradient(circle at 45% 100%, rgba(184,255,122,.10), transparent 34rem),
+                var(--bg);
+        }
+
+        .shell {
+            width: min(1180px, calc(100% - 32px));
+            margin: 0 auto;
+            padding: 28px 0 54px;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: center;
+            margin-bottom: 28px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .mark {
+            width: 44px;
+            height: 44px;
+            display: grid;
+            place-items: center;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #d8b4fe, #8b5cf6 54%, #4f46e5);
+            color: #fff;
+            font-weight: 950;
+            box-shadow: 0 18px 48px rgba(139,92,246,.26);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(34px, 5vw, 64px);
+            line-height: .94;
+            letter-spacing: -.065em;
+        }
+
+        .sub {
+            margin: 8px 0 0;
+            color: var(--muted);
+            line-height: 1.55;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .btn {
+            min-height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 14px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: rgba(255,255,255,.07);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 850;
+            text-decoration: none;
+        }
+
+        .btn.primary {
+            background: var(--lime);
+            color: #101014;
+            border-color: transparent;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin: 24px 0;
+        }
+
+        .stat {
+            padding: 18px;
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            background: var(--panel);
+        }
+
+        .stat b {
+            display: block;
+            font-size: 28px;
+            letter-spacing: -.04em;
+        }
+
+        .stat span {
+            display: block;
+            margin-top: 4px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .card {
+            min-height: 178px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 18px;
+            padding: 18px;
+            border: 1px solid var(--line);
+            border-radius: 26px;
+            background: var(--panel);
+            box-shadow: 0 24px 70px rgba(0,0,0,.22);
+        }
+
+        .card.strong {
+            background: linear-gradient(135deg, rgba(184,255,122,.16), rgba(139,92,246,.12));
+        }
+
+        .card h2 {
+            margin: 0 0 8px;
+            font-size: 19px;
+            letter-spacing: -.03em;
+        }
+
+        .card p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.55;
+            font-size: 13px;
+        }
+
+        .card-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 9px;
+        }
+
+        .mini {
+            min-height: 32px;
+            display: inline-flex;
+            align-items: center;
+            padding: 0 11px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            color: #fff;
+            background: rgba(255,255,255,.06);
+            font-size: 12px;
+            font-weight: 850;
+            text-decoration: none;
+        }
+
+        .mini.primary {
+            background: var(--lime);
+            border-color: transparent;
+            color: #101014;
+        }
+
+        .foot {
+            margin-top: 18px;
+            padding: 14px 16px;
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            background: rgba(255,255,255,.045);
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.55;
+        }
+
+        .foot code {
+            color: #ede9fe;
+        }
+
+        @media (max-width: 900px) {
+            .grid,
+            .stats {
+                grid-template-columns: 1fr;
+            }
+
+            .topbar {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .actions {
+                justify-content: flex-start;
+            }
+        }
+    
+        /* NOVA_ADMIN_DASHBOARD_RECENT_LEADS_STYLE_20260709 */
+        .recent-panel {
+            margin-top: 16px;
+            border: 1px solid var(--line);
+            border-radius: 26px;
+            background: rgba(255,255,255,.055);
+            overflow: hidden;
+            box-shadow: 0 24px 70px rgba(0,0,0,.22);
+        }
+
+        .recent-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(255,255,255,.045);
+        }
+
+        .recent-head strong {
+            display: block;
+            font-size: 15px;
+        }
+
+        .recent-head span {
+            display: block;
+            margin-top: 3px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .recent-list {
+            display: grid;
+        }
+
+        .recent-row {
+            display: grid;
+            grid-template-columns: 150px minmax(170px, .75fr) minmax(180px, .85fr) minmax(220px, 1.4fr);
+            gap: 12px;
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(226,214,255,.10);
+            align-items: start;
+        }
+
+        .recent-row:last-child {
+            border-bottom: 0;
+        }
+
+        .recent-label {
+            color: #ddd6fe;
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .recent-value {
+            margin-top: 4px;
+            color: rgba(248,250,252,.92);
+            font-size: 13px;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+        }
+
+        .recent-muted {
+            color: var(--muted);
+        }
+
+        .recent-pill {
+            display: inline-flex;
+            align-items: center;
+            min-height: 24px;
+            padding: 0 8px;
+            border-radius: 999px;
+            background: rgba(139,92,246,.18);
+            color: #ede9fe;
+            font-size: 11px;
+            font-weight: 850;
+            white-space: nowrap;
+        }
+
+        .recent-empty {
+            padding: 24px 16px;
+            color: var(--muted);
+            font-size: 13px;
+            text-align: center;
+        }
+
+        @media (max-width: 900px) {
+            .recent-head {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .recent-row {
+                grid-template-columns: 1fr;
+            }
+        }
+        /* /NOVA_ADMIN_DASHBOARD_RECENT_LEADS_STYLE_20260709 */
+    
+        /* NOVA_ADMIN_SYSTEM_CHECKS_CARD_STYLE_20260709 */
+        .check-command {
+            display: block;
+            width: 100%;
+            margin-top: 10px;
+            padding: 12px;
+            border: 1px solid rgba(226,214,255,.14);
+            border-radius: 16px;
+            background: rgba(0,0,0,.24);
+            color: #ede9fe;
+            font-family: "Cascadia Mono", "Consolas", ui-monospace, SFMono-Regular, monospace;
+            font-size: 11px;
+            line-height: 1.55;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .check-note {
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.55;
+        }
+        /* /NOVA_ADMIN_SYSTEM_CHECKS_CARD_STYLE_20260709 */
+    
+        /* NOVA_ADMIN_SYSTEM_CHECK_COPY_STYLE_20260709 */
+        .check-copy-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .check-copy-status {
+            min-height: 18px;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .check-copy-status.good {
+            color: var(--lime);
+        }
+        /* /NOVA_ADMIN_SYSTEM_CHECK_COPY_STYLE_20260709 */
+    
+        /* NOVA_ADMIN_RAILWAY_CHECK_STYLE_20260709 */
+        .check-section-label {
+            margin: 12px 0 0;
+            color: #ddd6fe;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .check-section-label:first-of-type {
+            margin-top: 10px;
+        }
+        /* /NOVA_ADMIN_RAILWAY_CHECK_STYLE_20260709 */
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <div class="topbar">
+            <div class="brand">
+                <div class="mark">N</div>
+                <div>
+                    <h1>Nova Admin</h1>
+                    <p class="sub">Owner dashboard for leads, public pages, and quick checks.</p>
+                </div>
+            </div>
+
+            <div class="actions">
+                <a class="btn primary" href="/richard-login">Open Nova</a>
+                <a class="btn" href="/nova-home-preview">Public home</a>
+                <a class="btn" href="/admin/leads">Leads</a>
+            </div>
+        </div>
+
+        <section class="stats">
+            <div class="stat">
+                <b>{{ count }}</b>
+                <span>Total saved leads</span>
+            </div>
+            <div class="stat">
+                <b>{{ contact_count }}</b>
+                <span>Contact submissions</span>
+            </div>
+            <div class="stat">
+                <b>{{ early_count }}</b>
+                <span>Early-access submissions</span>
+            </div>
+        </section>
+
+        <section class="grid">
+            <article class="card strong">
+                <div>
+                    <h2>Leads</h2>
+                    <p>View, search, filter, and export contact / early-access submissions.</p>
+                </div>
+                <div class="card-links">
+                    <a class="mini primary" href="/admin/leads">Open leads</a>
+                    <a class="mini" href="/admin/leads.csv">Export CSV</a>
+                </div>
+            </article>
+
+            <article class="card">
+                <div>
+                    <h2>Public pages</h2>
+                    <p>Fast links for the public Nova website pages you’ve been polishing.</p>
+                </div>
+                <div class="card-links">
+                    <a class="mini" href="/nova-home-preview">Home</a>
+                    <a class="mini" href="/contact">Contact</a>
+                    <a class="mini" href="/blog">Blog</a>
+                    <a class="mini" href="/billing">Billing</a>
+                    <a class="mini" href="/faq">FAQ</a>
+                    <a class="mini" href="/roadmap">Roadmap</a>
+                </div>
+            </article>
+
+            <article class="card">
+                <div>
+                    <h2>Legal / SEO</h2>
+                    <p>Quick checks for pages and files that matter before public launch.</p>
+                </div>
+                <div class="card-links">
+                    <a class="mini" href="/privacy">Privacy</a>
+                    <a class="mini" href="/terms">Terms</a>
+                    <a class="mini" href="/sitemap.xml">Sitemap</a>
+                    <a class="mini" href="/robots.txt">Robots</a>
+                </div>
+            </article>
+
+            <article class="card">
+                <div>
+                    <h2>Runtime</h2>
+                    <p>Useful backend endpoints for checking whether Nova is alive and routing.</p>
+                </div>
+                <div class="card-links">
+                    <a class="mini" href="/api/health">Health</a>
+                    <a class="mini" href="/api/state">State</a>
+                    <a class="mini" href="/api/memory">Memory</a>
+                </div>
+            </article>
+
+            <article class="card">
+                <div>
+                    <h2>App access</h2>
+                    <p>Owner login and Nova app entry points for local and Railway checks.</p>
+                </div>
+                <div class="card-links">
+                    <a class="mini primary" href="/richard-login">Richard login</a>
+                    <a class="mini" href="/">Desktop app</a>
+                    <a class="mini" href="/mobile">Mobile app</a>
+                </div>
+            </article>
+
+            
+            <!-- NOVA_ADMIN_SYSTEM_CHECKS_CARD_20260709 -->
+            <article class="card">
+                <div>
+                    <h2>System checks</h2>
+                    <p>Run this before admin/public commits so broken routes do not slip through again.</p>
+                    <!-- NOVA_ADMIN_SYSTEM_CHECK_COPY_UI_20260709 -->
+                    <code id="nova-full-release-command-20260709" class="check-command">powershell -ExecutionPolicy Bypass -File "C:\Users\Owner\nova\tools\nova_full_release_check.ps1"</code>
+                    <div class="check-copy-row">
+                        <button class="mini primary" type="button" id="nova-copy-full-release-command-20260709">Copy command</button>
+                        <span class="check-copy-status" id="nova-copy-full-release-status-20260709" aria-live="polite"></span>
+                    </div>
+                    <!-- /NOVA_ADMIN_SYSTEM_CHECK_COPY_UI_20260709 -->
+
+                    <!-- NOVA_ADMIN_RAILWAY_CHECK_UI_20260709 -->
+                    <div class="check-section-label">Railway live check</div>
+                    <code id="nova-railway-release-command-20260709" class="check-command">powershell -ExecutionPolicy Bypass -File "C:\Users\Owner\nova\tools\nova_railway_release_check.ps1"</code>
+                    <div class="check-copy-row">
+                        <button class="mini primary" type="button" id="nova-copy-railway-release-command-20260709">Copy Railway command</button>
+                        <span class="check-copy-status" id="nova-copy-railway-release-status-20260709" aria-live="polite"></span>
+                    </div>
+                    <!-- /NOVA_ADMIN_RAILWAY_CHECK_UI_20260709 -->
+                    <div class="check-note">Covers public pages, admin dashboard, leads page, filtered CSV export, and accidental staged mobile files.</div>
+                </div>
+                <div class="card-links">
+                    <a class="mini" href="/admin">Admin</a>
+                    <a class="mini" href="/admin/leads">Leads</a>
+                    <a class="mini" href="/admin/leads.csv">CSV</a>
+                </div>
+            </article>
+            <!-- /NOVA_ADMIN_SYSTEM_CHECKS_CARD_20260709 -->
+            <article class="card">
+                <div>
+                    <h2>Lead data file</h2>
+                    <p>Current lead storage path reported by the lead service.</p>
+                </div>
+                <div class="card-links">
+                    <span class="mini">{{ path or "No path reported" }}</span>
+                </div>
+            </article>
+        </section>
+
+        
+        <!-- NOVA_ADMIN_DASHBOARD_RECENT_LEADS_UI_20260709 -->
+        <section class="recent-panel" aria-label="Recent leads">
+            <div class="recent-head">
+                <div>
+                    <strong>Recent leads</strong>
+                    <span>Newest saved submissions from contact / early access.</span>
+                </div>
+                <div class="card-links">
+                    <a class="mini primary" href="/admin/leads">View all</a>
+                    <a class="mini" href="/admin/leads.csv">Export CSV</a>
+                </div>
+            </div>
+
+            {% if recent_leads %}
+            <div class="recent-list">
+                {% for lead in recent_leads %}
+                <div class="recent-row">
+                    <div>
+                        <div class="recent-label">Kind</div>
+                        <div class="recent-value">
+                            <span class="recent-pill">{{ lead.kind or "contact" }}</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="recent-label">Name</div>
+                        <div class="recent-value">{{ lead.name or "—" }}</div>
+                    </div>
+
+                    <div>
+                        <div class="recent-label">Email</div>
+                        <div class="recent-value">{{ lead.email or "—" }}</div>
+                    </div>
+
+                    <div>
+                        <div class="recent-label">Message</div>
+                        <div class="recent-value recent-muted">{{ lead.message or lead.interest or "—" }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="recent-empty">
+                No leads yet. Submit a test lead from the contact page.
+            </div>
+            {% endif %}
+        </section>
+        <!-- /NOVA_ADMIN_DASHBOARD_RECENT_LEADS_UI_20260709 -->
+        <div class="foot">
+            Admin access is protected by the same existing Richard/admin guard used by <code>/admin/leads</code>.
+        </div>
+    </main>
+
+    <!-- NOVA_ADMIN_SYSTEM_CHECK_COPY_SCRIPT_20260709 -->
+    <script>
+        (function () {
+            "use strict";
+
+            var button = document.getElementById("nova-copy-full-release-command-20260709");
+            var command = document.getElementById("nova-full-release-command-20260709");
+            var status = document.getElementById("nova-copy-full-release-status-20260709");
+
+            if (!button || !command || !status) {
+                return;
+            }
+
+            function setStatus(text, good) {
+                status.textContent = text;
+                status.classList.toggle("good", !!good);
+            }
+
+            button.addEventListener("click", function () {
+                var text = (command.textContent || "").trim();
+
+                if (!text) {
+                    setStatus("Nothing to copy.", false);
+                    return;
+                }
+
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(function () {
+                        setStatus("Copied.", true);
+                    }).catch(function () {
+                        setStatus("Copy failed. Select the command manually.", false);
+                    });
+
+                    return;
+                }
+
+                try {
+                    var textarea = document.createElement("textarea");
+                    textarea.value = text;
+                    textarea.setAttribute("readonly", "readonly");
+                    textarea.style.position = "fixed";
+                    textarea.style.left = "-9999px";
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(textarea);
+                    setStatus("Copied.", true);
+                } catch (error) {
+                    setStatus("Copy failed. Select the command manually.", false);
+                }
+            });
+        })();
+    </script>
+    <!-- /NOVA_ADMIN_SYSTEM_CHECK_COPY_SCRIPT_20260709 -->
+
+    <!-- NOVA_ADMIN_RAILWAY_CHECK_COPY_SCRIPT_20260709 -->
+    <script>
+        (function () {
+            "use strict";
+
+            var button = document.getElementById("nova-copy-railway-release-command-20260709");
+            var command = document.getElementById("nova-railway-release-command-20260709");
+            var status = document.getElementById("nova-copy-railway-release-status-20260709");
+
+            if (!button || !command || !status) {
+                return;
+            }
+
+            function setStatus(text, good) {
+                status.textContent = text;
+                status.classList.toggle("good", !!good);
+            }
+
+            button.addEventListener("click", function () {
+                var text = (command.textContent || "").trim();
+
+                if (!text) {
+                    setStatus("Nothing to copy.", false);
+                    return;
+                }
+
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(function () {
+                        setStatus("Copied.", true);
+                    }).catch(function () {
+                        setStatus("Copy failed. Select the command manually.", false);
+                    });
+
+                    return;
+                }
+
+                try {
+                    var textarea = document.createElement("textarea");
+                    textarea.value = text;
+                    textarea.setAttribute("readonly", "readonly");
+                    textarea.style.position = "fixed";
+                    textarea.style.left = "-9999px";
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(textarea);
+                    setStatus("Copied.", true);
+                } catch (error) {
+                    setStatus("Copy failed. Select the command manually.", false);
+                }
+            });
+        })();
+    </script>
+    <!-- /NOVA_ADMIN_RAILWAY_CHECK_COPY_SCRIPT_20260709 -->
+</body>
+</html>
+
+
+
+

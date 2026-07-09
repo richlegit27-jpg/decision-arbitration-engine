@@ -1,4 +1,4 @@
-class BrainCore:
+﻿class BrainCore:
     def __init__(self):
         pass
 
@@ -24,3 +24,4 @@ class BrainCore:
             return "cancel"
 
         return "chat"
+

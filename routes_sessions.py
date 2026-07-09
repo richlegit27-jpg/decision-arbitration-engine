@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
@@ -126,3 +126,4 @@ def pin_session():
         save_sessions()
 
     return jsonify({"ok": True, "session": session_obj})
+

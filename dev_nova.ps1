@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $ProjectRoot = "C:\Users\Owner\nova"
 $SaveScript = "C:\Users\Owner\nova\save_nova.ps1"

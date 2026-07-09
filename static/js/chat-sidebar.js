@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict"
 
 const chatStateApi = window.NovaChatState
@@ -107,7 +107,7 @@ function getChatMeta(chat){
     parts.push(String(updatedAt))
   }
 
-  return parts.join(" • ")
+  return parts.join(" â€¢ ")
 }
 
 function moveFocusAfterClose(){
@@ -352,7 +352,7 @@ function renderChatList(){
             data-chat-id="${escapeHtml(id)}"
             aria-label="Rename chat"
             title="Rename"
-          >✎</button>
+          >âœŽ</button>
 
           <button
             class="chat-list-action"
@@ -361,7 +361,7 @@ function renderChatList(){
             data-chat-id="${escapeHtml(id)}"
             aria-label="Delete chat"
             title="Delete"
-          >✕</button>
+          >âœ•</button>
         </div>
       </div>
     `
@@ -745,3 +745,4 @@ window.NovaChatSidebar = {
 }
 
 })()
+

@@ -1,4 +1,4 @@
-/* Full Nova UI CSS — polished and fixed composer */
+﻿/* Full Nova UI CSS â€” polished and fixed composer */
 #appShell { display: flex; height: 100vh; overflow: hidden; font-family: system-ui, sans-serif; }
 
 .sidebar { flex:0 0 320px; display:flex; flex-direction:column; background:linear-gradient(180deg, rgba(13,23,36,0.98), rgba(8,14,23,0.99)); padding:16px; gap:12px; }

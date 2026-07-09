@@ -1,4 +1,4 @@
-class RuntimeSchedulerEngine:
+﻿class RuntimeSchedulerEngine:
 
     name = "runtime_scheduler_engine"
 
@@ -90,3 +90,4 @@ class RuntimeSchedulerEngine:
             execution_plan=execution_plan,
             runtime_signal=runtime_signal,
         )
+

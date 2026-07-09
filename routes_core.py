@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from flask import Blueprint, jsonify, render_template
 
@@ -53,3 +53,4 @@ def api_models():
             "models": [DEFAULT_MODEL, "gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini"],
         }
     )
+

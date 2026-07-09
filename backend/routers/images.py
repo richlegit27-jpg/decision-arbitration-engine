@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
@@ -78,3 +78,4 @@ async def generate_image(payload: ImageRequest):
         raise HTTPException(status_code=504, detail="Image generation timed out.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+

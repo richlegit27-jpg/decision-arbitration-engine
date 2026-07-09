@@ -1,4 +1,4 @@
-# -----------------------------
+﻿# -----------------------------
 # Nova Super Endgame 3.0 One-Click Launcher
 # -----------------------------
 $novaExe       = "C:\Users\Owner\nova\dist\NovaEndgame.exe"

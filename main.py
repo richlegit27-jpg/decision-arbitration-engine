@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,3 +28,4 @@ app.include_router(auth_router)
 app.include_router(chats_router)
 app.include_router(memory_router)
 app.include_router(pages_router)
+

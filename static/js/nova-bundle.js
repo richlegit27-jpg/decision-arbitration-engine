@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 /* --- CORE APP LOGIC --- */
@@ -90,7 +90,7 @@ deleteAllBtn.addEventListener("click",async()=>{
 // Voice recording
 let mediaRecorder,recordingChunks=[];
 voiceBtn.addEventListener("click",async()=>{
-  if(voiceBtn.dataset.recording==="true"){mediaRecorder.stop();voiceBtn.dataset.recording="false";voiceBtn.textContent="🎤 Record";}
+  if(voiceBtn.dataset.recording==="true"){mediaRecorder.stop();voiceBtn.dataset.recording="false";voiceBtn.textContent="ðŸŽ¤ Record";}
   else{
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});
     mediaRecorder=new MediaRecorder(stream);recordingChunks=[];
@@ -104,7 +104,7 @@ voiceBtn.addEventListener("click",async()=>{
       attachInput.files=dt.files;
       showFileThumbnail(file);
     };
-    mediaRecorder.start();voiceBtn.dataset.recording="true";voiceBtn.textContent="⏺ Recording...";
+    mediaRecorder.start();voiceBtn.dataset.recording="true";voiceBtn.textContent="âº Recording...";
   }
 });
 
@@ -132,3 +132,4 @@ window.renderMemory=data=>{memoryList.innerHTML="";data.forEach(item=>{const li=
 // Initial fetch
 fetchChats();
 })();
+

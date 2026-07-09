@@ -1,4 +1,4 @@
-class RuntimePolicyArbitrationService:
+﻿class RuntimePolicyArbitrationService:
 
     def __init__(self):
 
@@ -78,3 +78,4 @@ class RuntimePolicyArbitrationService:
             return policy
 
         return policy
+

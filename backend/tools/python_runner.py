@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import subprocess
 import sys
@@ -52,3 +52,4 @@ def run_python(code: str, timeout: int = 12) -> str:
             parts.append("No output.")
 
         return "\n".join(parts)
+

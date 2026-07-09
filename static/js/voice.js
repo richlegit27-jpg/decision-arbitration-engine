@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+﻿document.addEventListener("DOMContentLoaded", () => {
     const backendPort = window.NOVA_BACKEND_PORT;
     const voicePanel = document.getElementById("voicePanel");
 
@@ -72,3 +72,4 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 });
+

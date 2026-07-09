@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
@@ -169,3 +169,4 @@ async def uploads_remove(upload_id: int, request: Request):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     return result
+

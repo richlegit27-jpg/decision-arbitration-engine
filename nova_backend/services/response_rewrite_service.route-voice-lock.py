@@ -1,4 +1,4 @@
-# C:\Users\Owner\nova\nova_backend\services\response_rewrite_service.py
+﻿# C:\Users\Owner\nova\nova_backend\services\response_rewrite_service.py
 
 from nova_backend.services.nova_voice_profile import NOVA_VOICE_PROFILE
 import re
@@ -36,7 +36,7 @@ class ResponseRewriteService:
             "send me the rest",
             "i can also",
 
-            # 🔥 added (anti-chatbot tone)
+            # ðŸ”¥ added (anti-chatbot tone)
             "got it",
             "bugs can be frustrating",
             "step by step",
@@ -57,11 +57,11 @@ class ResponseRewriteService:
         rewritten = self._remove_weak_openers(rewritten)
         rewritten = self._remove_dead_weight(rewritten)
 
-        # 🔥 enforce voice profile (remove avoided phrases)
+        # ðŸ”¥ enforce voice profile (remove avoided phrases)
         for phrase in self.voice_profile.get("avoid", []):
             rewritten = re.sub(re.escape(phrase), "", rewritten, flags=re.IGNORECASE)
 
-        # 🔥 route-aware tone control
+        # ðŸ”¥ route-aware tone control
         route = (route or "").lower()
 
         if route in ("coding", "analysis"):
@@ -116,7 +116,7 @@ class ResponseRewriteService:
             if any(k in l.lower() for k in ["fix", "do", "run", "add", "use", "replace"]):
                 return l
 
-        # fallback → first meaningful line
+        # fallback â†’ first meaningful line
         for line in lines:
             l = line.strip()
             if l:
@@ -164,3 +164,4 @@ class ResponseRewriteService:
         text = re.sub(r"\b(maybe|perhaps|might|could)\b", "", text, flags=re.IGNORECASE)
         text = re.sub(r"\bi think\b", "", text, flags=re.IGNORECASE)
         return text.strip()
+

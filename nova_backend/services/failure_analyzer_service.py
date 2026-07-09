@@ -1,4 +1,4 @@
-class FailureAnalyzerService:
+﻿class FailureAnalyzerService:
 
     def analyze(
         self,
@@ -77,3 +77,4 @@ class FailureAnalyzerService:
                 "request_llm_analysis"
             ),
         }
+

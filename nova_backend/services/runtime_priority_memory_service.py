@@ -1,4 +1,4 @@
-class RuntimePriorityMemoryService:
+﻿class RuntimePriorityMemoryService:
     def prioritize(
         self,
         execution_state=None,
@@ -65,3 +65,4 @@ class RuntimePriorityMemoryService:
             ),
             "execution_state": execution_state,
         }
+

@@ -1,4 +1,4 @@
-class RuntimeStateDiffEngine:
+﻿class RuntimeStateDiffEngine:
 
     def compare(
         self,
@@ -44,3 +44,4 @@ class RuntimeStateDiffEngine:
             "change_count": severity,
             "changes": changes,
         }
+

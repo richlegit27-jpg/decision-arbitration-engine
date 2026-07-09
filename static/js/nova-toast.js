@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 if (window.NovaToast) return;
@@ -58,3 +58,4 @@ window.NovaToast = {
 };
 
 })();
+

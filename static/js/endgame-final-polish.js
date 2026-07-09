@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 // --- Memory card animation ---
@@ -76,3 +76,4 @@ attachInput.addEventListener("change", ()=>{
   Array.from(attachInput.files).forEach(f=>showFilePreview(f));
 });
 })();
+

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 from typing import Any, Dict, List, Optional
@@ -242,3 +242,4 @@ class AutonomyService:
             "saved_artifact": saved_artifact,
             "prompt_packet": prompt_packet,
         }
+

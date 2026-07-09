@@ -1,4 +1,4 @@
-class RuntimeIdentityService:
+﻿class RuntimeIdentityService:
     def __init__(self):
         self.identity_state = {
             "runtime_identity": "adaptive_runtime",
@@ -163,3 +163,4 @@ class RuntimeIdentityService:
             return float(value)
         except Exception:
             return default
+

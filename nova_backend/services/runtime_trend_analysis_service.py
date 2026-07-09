@@ -1,4 +1,4 @@
-class RuntimeTrendAnalysisService:
+﻿class RuntimeTrendAnalysisService:
     def __init__(
         self,
         graph_memory=None,
@@ -255,3 +255,4 @@ class RuntimeTrendAnalysisService:
             "runtime_signals": runtime_signals,
             "recommendations": recommendations,
         }
+

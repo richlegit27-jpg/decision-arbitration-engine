@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\ui.js
+﻿// C:\Users\Owner\nova\static\js\ui.js
 
 window.NovaUI = (() => {
   const { state, els } = window.NovaState;
@@ -133,7 +133,7 @@ window.NovaUI = (() => {
       <div class="attachment-tray">
         ${attachments.map((file) => `
           <div class="attachment-chip">
-            <span>📎</span>
+            <span>ðŸ“Ž</span>
             <span class="attachment-chip-name">${escapeHtml(file.name)}</span>
           </div>
         `).join("")}
@@ -227,9 +227,9 @@ window.NovaUI = (() => {
       .map((file, index) => {
         return `
           <div class="attachment-chip">
-            <span>📎</span>
+            <span>ðŸ“Ž</span>
             <span class="attachment-chip-name">${escapeHtml(file.name)}</span>
-            <button class="attachment-chip-remove" data-remove-attachment="${index}" title="Remove">✕</button>
+            <button class="attachment-chip-remove" data-remove-attachment="${index}" title="Remove">âœ•</button>
           </div>
         `;
       })
@@ -370,3 +370,4 @@ window.NovaUI = (() => {
     appendTypingBubble,
   };
 })();
+

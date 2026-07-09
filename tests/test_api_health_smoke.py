@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from app import app
 
@@ -14,3 +14,5 @@ def test_api_health_endpoint_smoke() -> None:
 
     assert isinstance(payload, dict)
     assert payload.get("ok") is True
+
+

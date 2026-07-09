@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict"
 
 async function waitForNovaAPIs(timeout=3000){
@@ -32,6 +32,7 @@ if(!window.NovaChatStorage){
   if(window.NovaMemoryPanel) window.NovaMemoryPanel.init({chatStateApi})
   if(window.NovaFilesPanel) window.NovaFilesPanel.init({chatStateApi})
   if(window.NovaApp) window.NovaApp.init({chatStateApi,chatStorageApi})
-  console.log("Nova frontend fully initialized ✅")
+  console.log("Nova frontend fully initialized âœ…")
 })()
 })();
+

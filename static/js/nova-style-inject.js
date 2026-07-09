@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaStyleInjectLoaded) return;
@@ -555,3 +555,4 @@
     injectAll,
   };
 })();
+

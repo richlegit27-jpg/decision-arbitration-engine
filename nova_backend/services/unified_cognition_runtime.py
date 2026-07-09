@@ -1,4 +1,4 @@
-class UnifiedCognitionRuntime:
+﻿class UnifiedCognitionRuntime:
 
     def __init__(
         self,
@@ -191,3 +191,4 @@ class UnifiedCognitionRuntime:
                 .summarize()
             ),
         }
+

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 
 def looks_like_url(text: str) -> bool:
@@ -36,3 +36,4 @@ def should_route_to_web(user_text: str) -> bool:
     if looks_like_url(t):
         return True
     return False
+

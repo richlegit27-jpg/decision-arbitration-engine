@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -649,10 +649,10 @@ class ExecutionService:
             for step in execution["steps"]:
                 marker = {
                     "pending": "-",
-                    "running": "→",
-                    "completed": "✓",
+                    "running": "â†’",
+                    "completed": "âœ“",
                     "blocked": "!",
-                    "failed": "✗",
+                    "failed": "âœ—",
                 }.get(step["status"], "-")
                 lines.append(f"{marker} {step['text']}")
 
@@ -695,7 +695,7 @@ class ExecutionService:
                 line = f"{marker} {step['text']}"
                 notes = self._safe_str(step.get("notes"))
                 if notes:
-                    line = f"{line} — {notes}"
+                    line = f"{line} â€” {notes}"
                 body_lines.append(line)
 
         counts = self._safe_dict(execution.get("meta", {}).get("step_counts"))
@@ -857,3 +857,4 @@ Write the exact goal in one sentence.
 
         # ===== DEFAULT FALLBACK =====
         return "Step executed."
+

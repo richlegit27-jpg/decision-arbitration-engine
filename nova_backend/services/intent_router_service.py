@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import re
 from typing import Any, Dict, List
@@ -78,3 +78,4 @@ class IntentRouterService:
             "save_memory": True,
             "save_artifact": False,
         }
+

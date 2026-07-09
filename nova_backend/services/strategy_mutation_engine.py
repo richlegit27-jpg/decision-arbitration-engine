@@ -1,4 +1,4 @@
-class StrategyMutationEngine:
+﻿class StrategyMutationEngine:
 
     def mutate_strategy(
         self,
@@ -81,3 +81,4 @@ class StrategyMutationEngine:
             "ok": True,
             "mutations": mutations,
         }
+

@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   const VERSION = "brain-debug-2026-04-13-001";
@@ -387,7 +387,7 @@
         <div class="nova-brain-debug-header">
           <div class="nova-brain-debug-title">
             <strong>Nova Brain Debug</strong>
-            <div class="nova-brain-debug-subtitle" data-brain-status>Booting…</div>
+            <div class="nova-brain-debug-subtitle" data-brain-status>Bootingâ€¦</div>
           </div>
           <div class="nova-brain-debug-actions">
             <button type="button" class="nova-brain-debug-btn" data-brain-refresh>Refresh</button>
@@ -656,7 +656,7 @@
     els.badgeConfidence.textContent = `CONF: ${formatNumber(confidence, 2)}`;
 
     if (els.headerStatus) {
-      els.headerStatus.textContent = `Live • ${mode} • ${responseStyle} • ${VERSION}`;
+      els.headerStatus.textContent = `Live â€¢ ${mode} â€¢ ${responseStyle} â€¢ ${VERSION}`;
     }
 
     els.summaryBody.innerHTML = `
@@ -678,7 +678,7 @@
 
         <div class="nova-brain-card">
           <div class="nova-brain-card-label">Artifact</div>
-          <div class="nova-brain-card-value">${artifact ? "SAVED ✅" : "NO"}</div>
+          <div class="nova-brain-card-value">${artifact ? "SAVED âœ…" : "NO"}</div>
         </div>
 
         <div class="nova-brain-card">
@@ -749,11 +749,11 @@
             <div class="nova-brain-score-item">
               <div class="nova-brain-score-head">
                 <span class="nova-brain-score-mode ${itemMode === mode ? "is-winning" : ""}">
-                  ${escapeHtml(itemMode.toUpperCase())}${itemMode === mode ? " • WINNER" : ""}
+                  ${escapeHtml(itemMode.toUpperCase())}${itemMode === mode ? " â€¢ WINNER" : ""}
                 </span>
                 <span class="nova-brain-score-value">
                   final ${escapeHtml(formatNumber(itemScore, 2))}
-                  ${Number.isFinite(baseScore) ? ` • base ${escapeHtml(formatNumber(baseScore, 2))}` : ""}
+                  ${Number.isFinite(baseScore) ? ` â€¢ base ${escapeHtml(formatNumber(baseScore, 2))}` : ""}
                 </span>
               </div>
               ${scoreBar(itemScore, maxScore)}
@@ -786,15 +786,15 @@
     if (items.length) {
       listHtml = items.map(function (item) {
         const safeItem = safeObject(item);
-        const title = `${String(safeItem.kind || "memory")} • ${String(safeItem.id || "").slice(0, 10)}`;
+        const title = `${String(safeItem.kind || "memory")} â€¢ ${String(safeItem.id || "").slice(0, 10)}`;
         const text = safeItem.text || safeItem.memory_text || safeItem.preview || "";
-        const reasons = safeArray(safeItem.reasons).join(" • ");
+        const reasons = safeArray(safeItem.reasons).join(" â€¢ ");
         return `
           <div class="nova-brain-list-item">
             <div class="nova-brain-list-item-title">${escapeHtml(title)}</div>
             <div class="nova-brain-list-item-sub">
               score ${escapeHtml(formatNumber(safeItem.score || safeItem.quality_score || 0, 2))}
-              ${reasons ? ` • ${escapeHtml(reasons)}` : ""}
+              ${reasons ? ` â€¢ ${escapeHtml(reasons)}` : ""}
             </div>
             <div class="nova-brain-list-item-text">${escapeHtml(text)}</div>
           </div>
@@ -919,7 +919,7 @@
     const debug = safeObject(state.lastDebug);
     if (!Object.keys(debug).length) {
       if (els.headerStatus) {
-        els.headerStatus.textContent = `Waiting for debug data • ${VERSION}`;
+        els.headerStatus.textContent = `Waiting for debug data â€¢ ${VERSION}`;
       }
       if (els.summaryBody) {
         els.summaryBody.innerHTML = `<div class="nova-brain-empty">No debug payload available yet.</div>`;
@@ -965,7 +965,7 @@
       await navigator.clipboard.writeText(formatJson(debug));
       log("Copied debug JSON to clipboard");
       if (els.headerStatus) {
-        els.headerStatus.textContent = `Copied debug JSON • ${VERSION}`;
+        els.headerStatus.textContent = `Copied debug JSON â€¢ ${VERSION}`;
       }
     } catch (error) {
       log("Clipboard copy failed", { message: error?.message || "Unknown error" });
@@ -1013,3 +1013,4 @@
     boot();
   }
 })();
+

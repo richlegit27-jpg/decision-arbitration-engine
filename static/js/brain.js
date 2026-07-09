@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 if (window.__novaBrainLoaded) {
@@ -322,3 +322,4 @@ if (document.readyState === "loading") {
   initBrain();
 }
 })();
+

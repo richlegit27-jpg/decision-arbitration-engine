@@ -1,7 +1,7 @@
-(() => {
+﻿(() => {
   "use strict";
 
-  console.log("🚀 Phase 4 Full UI Automated Validation Starting...");
+  console.log("ðŸš€ Phase 4 Full UI Automated Validation Starting...");
 
   const shell = document.querySelector(".nova-app-shell");
   const sidebarBtn = document.getElementById("sidebarToggle");
@@ -10,7 +10,7 @@
   const artifactCards = Array.from(document.querySelectorAll(".nova-artifact-card"));
 
   function logResult(name, pass) {
-    console.log(`${pass ? "✅" : "❌"} ${name}`);
+    console.log(`${pass ? "âœ…" : "âŒ"} ${name}`);
   }
 
   function toggleButtonTest(btn, name, callback) {
@@ -72,10 +72,11 @@
       toggleButtonTest(memoryBtn, "Memory panel toggle", () => {
         artifactViewerTest(artifactCards, () => {
           mobileLayoutTest(() => {
-            console.log("🚀 Phase 4 Full UI Automated Validation Completed!");
+            console.log("ðŸš€ Phase 4 Full UI Automated Validation Completed!");
           });
         });
       });
     });
   });
 })();
+

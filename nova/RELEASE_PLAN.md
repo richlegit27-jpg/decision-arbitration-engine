@@ -1,4 +1,4 @@
-\# Nova Release Plan
+﻿\# Nova Release Plan
 
 
 
@@ -73,4 +73,5 @@ Do not move or restructure the working project until a separate release copy is 
 Never experiment on the main working copy when preparing for release.
 
 Always work from a separate release copy.
+
 

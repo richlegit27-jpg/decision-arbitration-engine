@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaRenderSessionsLoaded) return;
@@ -175,8 +175,8 @@
               <div class="session-meta">${escapeHtml(meta)}</div>
             </button>
             <div class="session-actions">
-              <button class="icon-btn" type="button" data-session-rename="${escapeHtml(sessionId)}" aria-label="Rename chat" title="Rename chat">✎</button>
-              <button class="icon-btn" type="button" data-session-delete="${escapeHtml(sessionId)}" aria-label="Delete chat" title="Delete chat">🗑</button>
+              <button class="icon-btn" type="button" data-session-rename="${escapeHtml(sessionId)}" aria-label="Rename chat" title="Rename chat">âœŽ</button>
+              <button class="icon-btn" type="button" data-session-delete="${escapeHtml(sessionId)}" aria-label="Delete chat" title="Delete chat">ðŸ—‘</button>
             </div>
           </div>
         `;
@@ -356,3 +356,4 @@
     });
   }
 })();
+

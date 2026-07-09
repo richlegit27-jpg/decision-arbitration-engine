@@ -1,4 +1,4 @@
-# =========================================================
+﻿# =========================================================
 # Nova Ultimate 2026 Phase 6
 # Demo backend to pre-populate memory and artifacts
 # =========================================================
@@ -35,3 +35,4 @@ def get_sessions():
     return [
         {"id": "sess1", "title": "Demo Session", "created_at": datetime.now(timezone.utc).isoformat(), "messages": get_messages()},
     ]
+

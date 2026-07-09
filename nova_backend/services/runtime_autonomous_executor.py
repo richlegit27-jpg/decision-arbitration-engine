@@ -1,4 +1,4 @@
-class RuntimeAutonomousExecutor:
+﻿class RuntimeAutonomousExecutor:
     def __init__(
         self,
         allowed_actions=None,
@@ -390,3 +390,4 @@ class RuntimeAutonomousExecutor:
             "remaining_queue": remaining_queue,
             "execution_state": execution_state,
         }
+

@@ -1,4 +1,4 @@
-# notepad C:\Users\Owner\nova\services\pdf_service.py
+﻿# notepad C:\Users\Owner\nova\services\pdf_service.py
 
 from __future__ import annotations
 from pathlib import Path
@@ -18,3 +18,4 @@ def analyze_pdf_attachment(file_path: str) -> Dict:
         "pages": 1,
         "content": "Sample PDF content (dummy)",
     }
+

@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   if (window.NovaComposerSessions) return;
@@ -308,7 +308,7 @@
       pinBtn.type = "button";
       pinBtn.className = "nova-session-action-btn";
       pinBtn.setAttribute("title", isPinned(session) ? "Unpin session" : "Pin session");
-      pinBtn.textContent = "★";
+      pinBtn.textContent = "â˜…";
       pinBtn.onclick = async function (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -319,7 +319,7 @@
       renameBtn.type = "button";
       renameBtn.className = "nova-session-action-btn";
       renameBtn.setAttribute("title", "Rename session");
-      renameBtn.textContent = "✎";
+      renameBtn.textContent = "âœŽ";
       renameBtn.onclick = async function (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -330,7 +330,7 @@
       deleteBtn.type = "button";
       deleteBtn.className = "nova-session-action-btn is-danger";
       deleteBtn.setAttribute("title", "Delete session");
-      deleteBtn.textContent = "×";
+      deleteBtn.textContent = "Ã—";
       deleteBtn.onclick = async function (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -468,3 +468,4 @@
     });
   }
 })();
+

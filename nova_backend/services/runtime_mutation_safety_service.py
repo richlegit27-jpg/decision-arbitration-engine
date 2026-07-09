@@ -1,4 +1,4 @@
-class RuntimeMutationSafetyService:
+﻿class RuntimeMutationSafetyService:
     def __init__(
         self,
     ):
@@ -118,3 +118,4 @@ class RuntimeMutationSafetyService:
             "execution_state": execution_state,
             "safety_result": safety_result,
         }
+

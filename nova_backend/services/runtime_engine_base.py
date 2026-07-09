@@ -1,4 +1,4 @@
-import time
+﻿import time
 import uuid
 
 
@@ -90,3 +90,4 @@ class RuntimeEngineBase:
             "failure_count": self.failure_count,
             "last_result": self.last_result,
         }
+

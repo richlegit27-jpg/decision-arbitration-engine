@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 // Ambient blobs
@@ -32,3 +32,4 @@ if (composer) {
     }, 16);
 }
 })();
+

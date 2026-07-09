@@ -1,4 +1,4 @@
-/* notepad C:\Users\Owner\nova\static\js\draft-autosave.js */
+﻿/* notepad C:\Users\Owner\nova\static\js\draft-autosave.js */
 
 (() => {
 "use strict";
@@ -37,3 +37,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
 });
 })();
+

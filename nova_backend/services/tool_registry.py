@@ -1,4 +1,4 @@
-class ToolRegistry:
+﻿class ToolRegistry:
 
     def __init__(
         self,
@@ -31,3 +31,4 @@ class ToolRegistry:
                 "not implemented yet."
             ),
         }
+

@@ -1,4 +1,4 @@
-class RuntimeMutationSandbox:
+﻿class RuntimeMutationSandbox:
 
     def evaluate(
         self,
@@ -97,3 +97,4 @@ class RuntimeMutationSandbox:
             "after_recovery": after_recovery,
             "mutation_reason": mutation_reason,
         }
+

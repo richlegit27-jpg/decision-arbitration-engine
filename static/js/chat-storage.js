@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict"
 
 // ----------------------------
@@ -36,7 +36,7 @@ function renderChatList(){
     };
 
     const del = document.createElement("button");
-    del.textContent = "✕";
+    del.textContent = "âœ•";
     del.style.float = "right";
     del.onclick = e => {
       e.stopPropagation();
@@ -106,3 +106,4 @@ if(document.readyState === "loading"){
 }
 
 })();
+

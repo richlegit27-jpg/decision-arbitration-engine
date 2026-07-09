@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 
@@ -46,3 +46,5 @@ def restore_nova_memory_file_after_test():
         memory_path.write_text(original_text or "", encoding="utf-8")
     elif memory_path.exists():
         memory_path.unlink()
+
+

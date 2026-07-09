@@ -1,4 +1,4 @@
-class StrategyEngine:
+﻿class StrategyEngine:
     """
     Handles simple decision refinement rules.
     (kept lightweight for now)
@@ -17,3 +17,4 @@ class StrategyEngine:
             return "retry_failed"
 
         return action
+

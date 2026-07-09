@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, HTTPException, Request
+﻿from fastapi import APIRouter, Body, HTTPException, Request
 
 from services.auth_service import get_user_by_username
 from services.memory_service import (
@@ -61,3 +61,4 @@ async def delete_all_memory(request: Request):
     user = get_current_user(request)
     delete_all_memory_items(user["id"])
     return {"ok": True}
+

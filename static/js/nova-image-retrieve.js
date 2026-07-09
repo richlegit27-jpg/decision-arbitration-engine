@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   // Ensure window.Nova exists
   window.Nova = window.Nova || {};
 
@@ -42,3 +42,4 @@
     messagesEl.scrollTop = messagesEl.scrollHeight;
   };
 })();
+

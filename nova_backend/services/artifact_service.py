@@ -1,5 +1,14 @@
 from __future__ import annotations
 
+
+def _nova_boot_log_20260701(*args, **kwargs):
+    import os as _nova_boot_log_os_20260701
+
+    if str(_nova_boot_log_os_20260701.getenv("NOVA_VERBOSE_BOOT_LOGS", "")).strip().lower() in {"1", "true", "yes", "on"}:
+        print(*args, **kwargs)
+
+
+
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -12,7 +21,7 @@ from nova_backend.utils.time_utils import iso_now
 class ArtifactService:
     def __init__(self, artifacts_file: str):
         self.artifacts_file = Path(artifacts_file)
-        print("ARTIFACT FILE PATH =", self.artifacts_file)
+        _nova_boot_log_20260701("ARTIFACT FILE PATH =", self.artifacts_file)
 
         self.media = ArtifactMediaService(UPLOADS_DIR)
         self._ensure_store()
@@ -54,7 +63,7 @@ class ArtifactService:
             return []
 
     # =========================
-    # 🔥 NORMALIZATION CORE
+    # ðŸ”¥ NORMALIZATION CORE
     # =========================
     def _normalize_kind(self, kind: str) -> str:
         k = str(kind or "").lower().strip()
@@ -220,7 +229,7 @@ class ArtifactService:
         if not replaced:
             items.append(artifact)
 
-        # 🔥 STORAGE CONTROL
+        # ðŸ”¥ STORAGE CONTROL
         MAX_ARTIFACTS = 100
         items = items[-MAX_ARTIFACTS:]
 
@@ -232,3 +241,4 @@ class ArtifactService:
 
     def create(self, artifact: Dict[str, Any]) -> Dict[str, Any]:
         return self.save_artifact(artifact)
+

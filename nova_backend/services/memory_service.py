@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -6,6 +6,102 @@ from typing import Any, Dict, List, Optional
 from nova_backend.utils.file_utils import load_json_file, save_json_file
 from nova_backend.utils.time_utils import iso_now
 
+
+
+# NOVA_BAD_MEMORY_SAVE_GUARD_SAFE_20260610
+_BAD_MEMORY_SAVE_MARKERS_20260610 = (
+    "Project-aware context for Nova:",
+    "Recent session context:",
+    "Relevant persistent memory:",
+    "Attachment received:",
+    "Key points:",
+    "[CURRENT UPLOADED",
+    "python app.py Project-aware context",
+)
+
+def _nova_should_reject_memory_item_20260610(item):
+    if not isinstance(item, dict):
+        return False
+
+    value = str(
+        item.get("text")
+        or item.get("content")
+        or item.get("value")
+        or item.get("memory")
+        or ""
+    ).strip()
+
+    kind = str(
+        item.get("type")
+        or item.get("category")
+        or item.get("kind")
+        or ""
+    ).lower()
+
+    if not value:
+        return True
+
+    if any(marker in value for marker in _BAD_MEMORY_SAVE_MARKERS_20260610):
+        return True
+
+    if kind == "user_fact" and len(value) > 500:
+        return True
+
+    lowered = value.lower()
+    question_starters = (
+        "what is ",
+        "what's ",
+        "whats ",
+        "who is ",
+        "where is ",
+        "when is ",
+        "why is ",
+        "how is ",
+        "how do ",
+        "do i ",
+        "did i ",
+        "can you ",
+        "tell me ",
+    )
+
+    if lowered.endswith("?") or lowered.startswith(question_starters):
+        return True
+    transcript_markers = lowered.count("- [user]") + lowered.count("- [assistant]") + lowered.count("[note]")
+    if transcript_markers >= 2:
+        return True
+
+    return False
+
+def _nova_memory_semantic_key_20260618(text: str) -> str:
+    import re
+
+    value = str(text or "").strip().lower()
+
+    value = re.sub(r"[^a-z0-9\s]", " ", value)
+    value = re.sub(r"\s+", " ", value).strip()
+
+    replacements = {
+        "my favourite color is": "favorite color",
+        "my favorite color is": "favorite color",
+        "favourite color is": "favorite color",
+        "favorite color is": "favorite color",
+        "fav color is": "favorite color",
+        "fav color": "favorite color",
+        "i like": "likes",
+        "i prefer": "prefers",
+        "richard likes": "likes",
+        "rich likes": "likes",
+    }
+
+    for old, new in replacements.items():
+        value = value.replace(old, new)
+
+    words = [
+        word for word in value.split()
+        if word not in {"my", "the", "a", "an", "is", "are", "to", "that"}
+    ]
+
+    return " ".join(words)
 
 class MemoryService:
     def __init__(self, memory_file: str):
@@ -149,6 +245,10 @@ class MemoryService:
         return strong[-100:]
 
     def add_memory(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        # NOVA_BAD_MEMORY_SAVE_GUARD_SAFE_20260610_ENTRY
+        if _nova_should_reject_memory_item_20260610(item):
+            return item
+
         data = self._read_store()
         memory = data.get("memory", [])
 
@@ -160,7 +260,7 @@ class MemoryService:
         new_kind = str(item.get("kind") or "note").strip().lower()
         pinned = bool(item.get("pinned"))
 
-        # 🔥 CONFLICT RESOLUTION (newer overrides older)
+        # ðŸ”¥ CONFLICT RESOLUTION (newer overrides older)
         conflict_groups = [
             ("short answers", "long answers"),
             ("concise", "detailed"),
@@ -186,12 +286,26 @@ class MemoryService:
         preference_keys = (
             "favorite color",
             "favourite color",
+            "favorite drink",
+            "favourite drink",
+            "favorite snack",
+            "favourite snack",
+            "favorite food",
+            "favourite food",
+            "favorite movie",
+            "favourite movie",
+            "favorite show",
+            "favourite show",
+            "favorite song",
+            "favourite song",
+            "favorite game",
+            "favourite game",
             "communication style",
             "name is",
             "prefers to be called",
         )
 
-        # 🔥 KEYED PREFERENCE REPLACEMENT
+        # ðŸ”¥ KEYED PREFERENCE REPLACEMENT
         for key in preference_keys:
             if key in new_text_key:
                 for i, existing in enumerate(memory):
@@ -209,7 +323,7 @@ class MemoryService:
                         self._write_store(data)
                         return existing
 
-        # 🔥 DUPLICATE REINFORCEMENT
+        # ðŸ”¥ DUPLICATE REINFORCEMENT
         for i, existing in enumerate(memory):
             existing = dict(existing or {})
             existing_text = str(existing.get("text") or "").strip().lower()
@@ -224,7 +338,7 @@ class MemoryService:
                 existing["updated_at"] = now
                 existing["created_at"] = existing.get("created_at") or now
 
-                # 🔥 DECAY BEFORE BOOST
+                # ðŸ”¥ DECAY BEFORE BOOST
                 try:
                     from datetime import datetime, UTC
                     created_at = existing.get("created_at")
@@ -239,7 +353,7 @@ class MemoryService:
                 except Exception:
                     pass
 
-                # 🔥 IMPORTANCE BOOST
+                # ðŸ”¥ IMPORTANCE BOOST
                 boost = 1.25
                 if existing.get("pinned"):
                     boost = 0.5
@@ -257,7 +371,7 @@ class MemoryService:
                 self._write_store(data)
                 return existing
 
-        # 🔥 NEW MEMORY
+        # ðŸ”¥ NEW MEMORY
         if not item.get("id"):
             import uuid
             item["id"] = f"memory_{uuid.uuid4().hex}"
@@ -266,20 +380,59 @@ class MemoryService:
         item["created_at"] = item.get("created_at") or now
         item["count"] = int(item.get("count") or 1)
 
+        # NOVA_MEMORY_DEDUPE_LOCK_20260618
+        normalized_text = str(item.get("text") or "").strip().lower()
+        semantic_text = _nova_memory_semantic_key_20260618(normalized_text)
+
+        for i, existing in enumerate(memory):
+            existing = dict(existing or {})
+            existing_text = str(existing.get("text") or "").strip().lower()
+            existing_semantic_text = _nova_memory_semantic_key_20260618(existing_text)
+
+            if existing_text == normalized_text or existing_semantic_text == semantic_text:
+
+                existing["updated_at"] = now
+                existing["last_seen_at"] = now
+                existing["count"] = int(existing.get("count") or 1) + 1
+
+                if item.get("weight"):
+                    existing["weight"] = max(
+                        float(existing.get("weight") or 1.0),
+                        float(item.get("weight") or 1.0),
+                    )
+
+                memory[i] = existing
+                data["memory"] = memory
+                self._write_store(data)
+                return existing
+
         memory.append(item)
 
-        # 🔥 CLEANUP WEAK MEMORY
+        # ðŸ”¥ CLEANUP WEAK MEMORY
         memory = [
             m for m in memory
             if float(m.get("weight", 1.0)) > 0.5
         ]
 
-        MAX_MEMORY_ITEMS = 100
+        MAX_MEMORY_ITEMS = 300
         memory = self.summarize_memory_list(memory)
-        memory = memory[-MAX_MEMORY_ITEMS:]
+
+        memory.sort(
+            key=lambda m: (
+                bool(m.get("pinned")),
+                float(m.get("weight") or 1.0),
+                int(m.get("count") or 1),
+                str(m.get("updated_at") or ""),
+            ),
+            reverse=True,
+        )
+
+        memory = memory[:MAX_MEMORY_ITEMS]
 
         data["memory"] = memory
         self._write_store(data)
+
+        return item
 
     def save_memory(self, item: Dict[str, Any]) -> Dict[str, Any]:
         data = self._read_store()
@@ -312,8 +465,19 @@ class MemoryService:
         if not replaced:
             memory.append(item)
 
-        MAX_MEMORY_ITEMS = 100
-        memory = memory[-MAX_MEMORY_ITEMS:]
+        MAX_MEMORY_ITEMS = 300
+
+        memory.sort(
+            key=lambda m: (
+                bool(m.get("pinned")),
+                float(m.get("weight") or 1.0),
+                int(m.get("count") or 1),
+                str(m.get("updated_at") or ""),
+            ),
+            reverse=True,
+        )
+
+        memory = memory[:MAX_MEMORY_ITEMS]
 
         data["memory"] = memory
         self._write_store(data)
@@ -381,18 +545,93 @@ class MemoryService:
             "copy regenerate",
         )
 
+        preference_keys = (
+            "favorite color",
+            "favourite color",
+            "favorite drink",
+            "favourite drink",
+            "favorite snack",
+            "favourite snack",
+            "favorite food",
+            "favourite food",
+            "favorite movie",
+            "favourite movie",
+            "favorite show",
+            "favourite show",
+            "favorite song",
+            "favourite song",
+            "favorite game",
+            "favourite game",
+        )
+
         items = self.all()
         cleaned = []
         removed = []
+        seen_keys = set()
+        latest_preference_by_key = {}
 
         for item in items:
             text = str(item.get("text") or "").lower()
+
+            question_starters = (
+                "what is ",
+                "what's ",
+                "whats ",
+                "who is ",
+                "where is ",
+                "when is ",
+                "why is ",
+                "how is ",
+                "how do ",
+                "do i ",
+                "did i ",
+                "can you ",
+                "tell me ",
+            )
+
+            if text.endswith("?") or text.startswith(question_starters):
+                removed.append(item)
+                continue
 
             if any(pattern in text for pattern in junk_patterns):
                 removed.append(item)
                 continue
 
+            semantic_key = _nova_memory_semantic_key_20260618(text)
+
+            if semantic_key in seen_keys:
+                removed.append(item)
+                continue
+
+            seen_keys.add(semantic_key)
+
+            matched_preference_key = None
+            for key in preference_keys:
+                if key in text:
+                    matched_preference_key = key.replace("favourite", "favorite")
+                    break
+
+            if matched_preference_key:
+                existing = latest_preference_by_key.get(matched_preference_key)
+
+                if existing:
+                    existing_time = str(existing.get("updated_at") or existing.get("created_at") or "")
+                    item_time = str(item.get("updated_at") or item.get("created_at") or "")
+
+                    if item_time > existing_time:
+                        removed.append(existing)
+                        latest_preference_by_key[matched_preference_key] = item
+                    else:
+                        removed.append(item)
+
+                    continue
+
+                latest_preference_by_key[matched_preference_key] = item
+                continue
+
             cleaned.append(item)
+
+        cleaned.extend(latest_preference_by_key.values())
 
         self._write_store({"memory": cleaned})
 
@@ -451,3 +690,5 @@ class MemoryService:
             "kept": promote_result.get("kept", 0),
             "memory": self.all(),
         }
+
+

@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\ui-state-service.js
+﻿// C:\Users\Owner\nova\static\js\ui-state-service.js
 
 (() => {
 "use strict"
@@ -82,3 +82,4 @@ window.NovaUIStateService = {
 }
 
 })()
+

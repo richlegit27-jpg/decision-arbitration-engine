@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, Response, stream_with_context
+﻿from flask import Flask, render_template, request, Response, stream_with_context
 import openai, os
 
 # Set your OpenAI API key in environment
@@ -37,3 +37,4 @@ def chat_stream():
 if __name__ == "__main__":
     # Run Flask natively (WSGI)
     app.run(debug=True)
+

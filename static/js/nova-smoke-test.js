@@ -1,5 +1,5 @@
-(async function novaSmokeTestHarness() {
-  console.log("🔥 Starting Nova Phase 4 automated smoke test harness...");
+﻿(async function novaSmokeTestHarness() {
+  console.log("ðŸ”¥ Starting Nova Phase 4 automated smoke test harness...");
 
   const chatInput = document.getElementById("chatInput");
   const sendBtn = document.getElementById("sendBtn");
@@ -19,7 +19,7 @@
       if (count > lastCount) return true;
       await sleep(100);
     }
-    console.warn("⚠ AI response did not appear in time");
+    console.warn("âš  AI response did not appear in time");
     return false;
   }
 
@@ -31,7 +31,7 @@
     sendBtn.click();
     console.log(`Sent: "${content}"`);
     const aiAppeared = await waitForAI(lastCount);
-    if (!aiAppeared) console.error(`❌ AI response missing for message: "${content}"`);
+    if (!aiAppeared) console.error(`âŒ AI response missing for message: "${content}"`);
     return aiAppeared;
   }
 
@@ -46,20 +46,20 @@
     console.log(`Uploading: ${name}`);
     await sleep(1500);
     const attachCount = messages.querySelectorAll(".attachment-message").length;
-    if (attachCount === 0) console.error(`❌ Attachment failed: ${name}`);
-    else console.log(`✅ Attachment succeeded: ${name}`);
+    if (attachCount === 0) console.error(`âŒ Attachment failed: ${name}`);
+    else console.log(`âœ… Attachment succeeded: ${name}`);
   }
 
   // ------------------ Test sequence ------------------
   try {
-    console.log("➡ Testing empty state...");
-    if (emptyState && emptyState.style.display !== "none") console.log("✅ Empty state visible");
+    console.log("âž¡ Testing empty state...");
+    if (emptyState && emptyState.style.display !== "none") console.log("âœ… Empty state visible");
 
     // Chat tests
     const chatTests = [
       "Hello Nova!",
       "Testing long message for wrapping and scrolling behavior...",
-      "Special characters: !@#$%^&*()_+{}[]<>?/😊",
+      "Special characters: !@#$%^&*()_+{}[]<>?/ðŸ˜Š",
       "Rapid 1",
       "Rapid 2",
       "Rapid 3"
@@ -82,11 +82,12 @@
 
     // Scroll check
     if (messages.scrollTop + messages.clientHeight >= messages.scrollHeight - 10) {
-      console.log("✅ Scroll auto-down working");
+      console.log("âœ… Scroll auto-down working");
     }
 
-    console.log("🔥 Automated smoke test harness completed successfully!");
+    console.log("ðŸ”¥ Automated smoke test harness completed successfully!");
   } catch (err) {
-    console.error("❌ Smoke test harness failed:", err);
+    console.error("âŒ Smoke test harness failed:", err);
   }
 })();
+

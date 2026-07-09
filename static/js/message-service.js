@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\message-service.js
+﻿// C:\Users\Owner\nova\static\js\message-service.js
 
 (() => {
 "use strict"
@@ -353,3 +353,4 @@ window.NovaMessageService = {
 }
 
 })()
+

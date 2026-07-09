@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\attachments-service.js
+﻿// C:\Users\Owner\nova\static\js\attachments-service.js
 
 (() => {
 "use strict"
@@ -328,7 +328,7 @@ function getPreviewMarkup(item){
   if(kind === "audio"){
     return `
       <div class="attachment-preview attachment-preview-audio">
-        <div class="attachment-preview-icon">🎙️</div>
+        <div class="attachment-preview-icon">ðŸŽ™ï¸</div>
         <div class="attachment-preview-meta">
           <div class="attachment-preview-name">${name}</div>
           <div class="attachment-preview-size">${size}</div>
@@ -340,7 +340,7 @@ function getPreviewMarkup(item){
   if(kind === "pdf"){
     return `
       <div class="attachment-preview attachment-preview-pdf">
-        <div class="attachment-preview-icon">📄</div>
+        <div class="attachment-preview-icon">ðŸ“„</div>
         <div class="attachment-preview-meta">
           <div class="attachment-preview-name">${name}</div>
           <div class="attachment-preview-size">${size}</div>
@@ -352,7 +352,7 @@ function getPreviewMarkup(item){
   if(kind === "text"){
     return `
       <div class="attachment-preview attachment-preview-text">
-        <div class="attachment-preview-icon">📝</div>
+        <div class="attachment-preview-icon">ðŸ“</div>
         <div class="attachment-preview-meta">
           <div class="attachment-preview-name">${name}</div>
           <div class="attachment-preview-size">${size}</div>
@@ -363,7 +363,7 @@ function getPreviewMarkup(item){
 
   return `
     <div class="attachment-preview attachment-preview-file">
-      <div class="attachment-preview-icon">📎</div>
+      <div class="attachment-preview-icon">ðŸ“Ž</div>
       <div class="attachment-preview-meta">
         <div class="attachment-preview-name">${name}</div>
         <div class="attachment-preview-size">${size}</div>
@@ -387,3 +387,4 @@ window.NovaAttachmentsService = {
 }
 
 })()
+

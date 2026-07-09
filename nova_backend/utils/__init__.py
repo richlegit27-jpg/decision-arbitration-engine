@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from .file_utils import (
     ensure_dir,
@@ -43,3 +43,4 @@ __all__ = [
     "newest_first",
     "oldest_first",
 ]
+

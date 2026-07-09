@@ -1,4 +1,4 @@
-/* notepad C:\Users\Owner\nova\static\js\message-streaming.js */
+﻿/* notepad C:\Users\Owner\nova\static\js\message-streaming.js */
 
 (() => {
 "use strict";
@@ -22,3 +22,4 @@ window.__novaMessageStreamingLoaded = true;
 
 console.info("Nova legacy message-streaming stub loaded. Real streaming is handled by composer.js.");
 })();
+

@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\composer-reactive.js
+﻿// C:\Users\Owner\nova\static\js\composer-reactive.js
 (() => {
 "use strict"
 
@@ -46,7 +46,7 @@ function renderPendingAttachments(){
   el.pendingAttachments.innerHTML = items.map(a=>`
     <div class="pending-attachment-chip" data-remove-pending-attachment="${escapeHtml(a.id)}">
       <span>${escapeHtml(a.name)}</span>
-      <button type="button" data-remove-pending-attachment="${escapeHtml(a.id)}">×</button>
+      <button type="button" data-remove-pending-attachment="${escapeHtml(a.id)}">Ã—</button>
     </div>
   `).join("")
 }
@@ -91,8 +91,8 @@ async function addFilesToPending(files){ const next=[]; for(const f of Array.fro
 
 // --- Voice recording ---
 function getSupportedMimeType(){ const types=["audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus","audio/mp4"]; for(const t of types) if(window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t; return "" }
-async function startVoiceRecording(){ mediaStream=await navigator.mediaDevices.getUserMedia({audio:true}); recordingChunks=[]; const mime=getSupportedMimeType(); mediaRecorder=mime?new MediaRecorder(mediaStream,{mimeType:mime}):new MediaRecorder(mediaStream); mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size>0) recordingChunks.push(e.data)}; mediaRecorder.start(); isRecording=true; if(el.voiceBtn){el.voiceBtn.textContent="Stop";el.voiceBtn.classList.add("is-recording")} if(el.voiceStatus) el.voiceStatus.textContent="Recording…"}
-async function stopVoiceRecording(commit=true){ if(!mediaRecorder) return; await new Promise(r=>mediaRecorder.addEventListener("stop",r,{once:true})); mediaStream?.getTracks().forEach(t=>t.stop()); mediaStream=null; mediaRecorder=null; isRecording=false; if(el.voiceBtn){el.voiceBtn.textContent="🎤"; el.voiceBtn.classList.remove("is-recording")} if(el.voiceStatus) el.voiceStatus.textContent=""; if(!commit){recordingChunks=[];return} if(!recordingChunks.length)return; const blob=new Blob(recordingChunks,{type:mediaRecorder?.mimeType||"audio/webm"}); recordingChunks=[]; const url=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result||"")); r.onerror=()=>rej(new Error("Voice note failed")); r.readAsDataURL(blob)}); state.pendingAttachments.push({id:makeId("voice"),name:`voice-${Date.now()}.webm`,type:blob.type,size:blob.size,url,content:""}); renderPendingAttachments(); window.dispatchEvent(new CustomEvent("nova:attachments-changed",{detail:state.pendingAttachments}))}
+async function startVoiceRecording(){ mediaStream=await navigator.mediaDevices.getUserMedia({audio:true}); recordingChunks=[]; const mime=getSupportedMimeType(); mediaRecorder=mime?new MediaRecorder(mediaStream,{mimeType:mime}):new MediaRecorder(mediaStream); mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size>0) recordingChunks.push(e.data)}; mediaRecorder.start(); isRecording=true; if(el.voiceBtn){el.voiceBtn.textContent="Stop";el.voiceBtn.classList.add("is-recording")} if(el.voiceStatus) el.voiceStatus.textContent="Recordingâ€¦"}
+async function stopVoiceRecording(commit=true){ if(!mediaRecorder) return; await new Promise(r=>mediaRecorder.addEventListener("stop",r,{once:true})); mediaStream?.getTracks().forEach(t=>t.stop()); mediaStream=null; mediaRecorder=null; isRecording=false; if(el.voiceBtn){el.voiceBtn.textContent="ðŸŽ¤"; el.voiceBtn.classList.remove("is-recording")} if(el.voiceStatus) el.voiceStatus.textContent=""; if(!commit){recordingChunks=[];return} if(!recordingChunks.length)return; const blob=new Blob(recordingChunks,{type:mediaRecorder?.mimeType||"audio/webm"}); recordingChunks=[]; const url=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result||"")); r.onerror=()=>rej(new Error("Voice note failed")); r.readAsDataURL(blob)}); state.pendingAttachments.push({id:makeId("voice"),name:`voice-${Date.now()}.webm`,type:blob.type,size:blob.size,url,content:""}); renderPendingAttachments(); window.dispatchEvent(new CustomEvent("nova:attachments-changed",{detail:state.pendingAttachments}))}
 
 // --- Send ---
 async function sendMessage(){ const text=String(el.composerInput?.value||"").trim(); const attachments=[...ensurePendingAttachments()]; if(!text&&!attachments.length) return; appendUserMessage(text||"[Attachment]",attachments); clearPendingAttachments(); el.composerInput.value=""; autoResizeComposer(); setTimeout(()=>appendAssistantMessage("This is a local offline response"),500) }
@@ -114,3 +114,4 @@ if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded"
 
 window.NovaComposerReactive={sendMessage,addFilesToPending,clearPendingAttachments,renderPendingAttachments,renderMessageList,renderMemoryPanel}
 })();
+

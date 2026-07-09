@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 if(window.__novaRenderLoaded) return;
 window.__novaRenderLoaded=true;
@@ -18,3 +18,4 @@ function renderMessage(msg, role){
 }
 app.renderMessage = renderMessage;
 })();
+

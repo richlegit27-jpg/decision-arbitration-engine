@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
@@ -118,7 +118,7 @@ class SessionService:
         text = self._safe_str(value)
         if len(text) <= limit:
             return text
-        return text[:limit] + " …[truncated]"
+        return text[:limit] + " â€¦[truncated]"
 
     def _sanitize_meta_for_storage(self, meta) -> dict:
         if not isinstance(meta, dict):
@@ -391,7 +391,7 @@ class SessionService:
             if not isinstance(s, dict):
                 continue
 
-            # 🔥 THIS IS THE CRITICAL LINE
+            # ðŸ”¥ THIS IS THE CRITICAL LINE
             cleaned = self.sanitize_session_for_storage(s)
 
             # optional preview cap

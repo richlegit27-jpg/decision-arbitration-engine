@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -71,25 +71,77 @@ def normalize_session_id(value: Any) -> str:
     return str(value or "").strip()
 
 
-def normalize_attachments(value: Any) -> List[Dict[str, Any]]:
+def normalize_attachments(value):
+    # NORMALIZE_ATTACHMENTS_PRESERVE_UPLOAD_FIELDS_LOCK
+    """
+    Normalize attachment payloads without destroying upload metadata.
+
+    Mobile/frontend tests expect the /api/upload payload fields to survive:
+    - filename
+    - original_filename
+    - file_url
+    - url
+
+    Older normalizers sometimes collapsed these into name/url only, which made
+    /api/chat response.session_attachments fail to match the current upload.
+    """
     if not isinstance(value, list):
         return []
 
-    normalized: List[Dict[str, Any]] = []
+    normalized = []
+
     for item in value:
         if not isinstance(item, dict):
             continue
 
-        normalized.append(
-            {
-                "id": str(item.get("id") or "").strip(),
-                "name": str(item.get("name") or "").strip(),
-                "type": str(item.get("type") or "").strip(),
-                "mime_type": str(item.get("mime_type") or item.get("mimeType") or "").strip(),
-                "url": str(item.get("url") or "").strip(),
-                "path": str(item.get("path") or "").strip(),
-                "size": int(item.get("size") or 0),
-            }
-        )
+        filename = str(
+            item.get("filename")
+            or item.get("stored_filename")
+            or item.get("name")
+            or ""
+        ).strip()
+
+        original_filename = str(
+            item.get("original_filename")
+            or item.get("original_name")
+            or item.get("name")
+            or filename
+            or ""
+        ).strip()
+
+        file_url = str(
+            item.get("file_url")
+            or item.get("url")
+            or ""
+        ).strip()
+
+        url = str(
+            item.get("url")
+            or item.get("file_url")
+            or ""
+        ).strip()
+
+        if not filename and file_url:
+            filename = file_url.replace("\\", "/").rsplit("/", 1)[-1].strip()
+
+        if not original_filename:
+            original_filename = filename
+
+        if not filename and not original_filename and not file_url and not url:
+            continue
+
+        cleaned = dict(item)
+        cleaned["filename"] = filename
+        cleaned["original_filename"] = original_filename
+        cleaned["file_url"] = file_url or url
+        cleaned["url"] = url or file_url
+
+        if "name" not in cleaned or not str(cleaned.get("name") or "").strip():
+            cleaned["name"] = original_filename or filename
+
+        normalized.append(cleaned)
 
     return normalized
+
+
+

@@ -1,5 +1,5 @@
-(async function novaSmokeTestHarness() {
-  console.log("🔥 Starting Nova Phase 4 automated smoke test harness (AI stub active)...");
+﻿(async function novaSmokeTestHarness() {
+  console.log("ðŸ”¥ Starting Nova Phase 4 automated smoke test harness (AI stub active)...");
 
   const chatInput = document.getElementById("chatInput");
   const sendBtn = document.getElementById("sendBtn");
@@ -19,7 +19,7 @@
       if (count > lastCount) return true;
       await sleep(100);
     }
-    console.warn("⚠ AI response did not appear in time");
+    console.warn("âš  AI response did not appear in time");
     return false;
   }
 
@@ -31,26 +31,26 @@
     sendBtn.click();
     console.log(`Sent: "${content}"`);
     const aiAppeared = await waitForAI(lastCount);
-    if (!aiAppeared) console.error(`❌ AI response missing for message: "${content}"`);
-    else console.log(`✅ AI response received for: "${content}"`);
+    if (!aiAppeared) console.error(`âŒ AI response missing for message: "${content}"`);
+    else console.log(`âœ… AI response received for: "${content}"`);
     return aiAppeared;
   }
 
   // Upload file helper (manual click required in browser)
   async function uploadFile(name, type) {
-    console.log(`⚠ Manual attachment test: Click 📎 and select ${name} in browser to continue`);
+    console.log(`âš  Manual attachment test: Click ðŸ“Ž and select ${name} in browser to continue`);
     await sleep(2000); // pause for manual upload
   }
 
   try {
     // ------------------ Empty state check ------------------
-    if (emptyState && emptyState.style.display !== "none") console.log("✅ Empty state visible");
+    if (emptyState && emptyState.style.display !== "none") console.log("âœ… Empty state visible");
 
     // ------------------ Chat messages ------------------
     const chatTests = [
       "Hello Nova!",
       "Testing long message for wrapping and scrolling behavior...",
-      "Special characters: !@#$%^&*()_+{}[]<>?/😊",
+      "Special characters: !@#$%^&*()_+{}[]<>?/ðŸ˜Š",
       "Rapid 1",
       "Rapid 2",
       "Rapid 3"
@@ -73,11 +73,12 @@
 
     // ------------------ Scroll check ------------------
     if (messages.scrollTop + messages.clientHeight >= messages.scrollHeight - 10) {
-      console.log("✅ Scroll auto-down working");
+      console.log("âœ… Scroll auto-down working");
     }
 
-    console.log("🔥 Automated Phase 4 smoke test harness completed successfully!");
+    console.log("ðŸ”¥ Automated Phase 4 smoke test harness completed successfully!");
   } catch (err) {
-    console.error("❌ Smoke test harness failed:", err);
+    console.error("âŒ Smoke test harness failed:", err);
   }
 })();
+

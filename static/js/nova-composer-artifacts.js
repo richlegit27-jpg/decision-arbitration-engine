@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   if (window.NovaComposerArtifacts) return;
@@ -41,3 +41,4 @@
 
   document.addEventListener("DOMContentLoaded", boot);
 })();
+

@@ -1,4 +1,4 @@
-# Python
+﻿# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -51,3 +51,34 @@ runtime/
 data/nova_project_state.json
 data/nova_project_state.json
 data/nova_sessions*.json
+
+_nova_check_script_*.js
+_nova_script_2_candidate.js
+_nova_script_2_debug.js
+_nova_script_debug/
+templates/app_STABLE_AFTER_SEND_FIX_*.html
+
+# Nova local/generated backups
+nova_backups/
+static/js_backup_*/
+static/**/*.[Bb][Aa][Kk]*
+static/**/*.bak*
+static/**/*BROKEN*
+static/**/*STABLE*
+
+# NOVA_GENERATED_REGRESSION_CLUTTER_20260705
+*.backup-*
+app.py.backup-*
+**/*.backup-*
+__pycache__/
+.pytest_cache/
+*.pyc
+runtime/regression_tools/smoke_*.py
+runtime/regression_tools/patch_*.py
+uploads/*smoke*
+uploads/*compat*
+uploads/*chain*
+uploads/*readiness*
+uploads/*no-web*
+uploads/*summary*
+uploads/*canonical*

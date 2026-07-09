@@ -1,4 +1,4 @@
-class ContextFusionEngine:
+﻿class ContextFusionEngine:
 
     def fuse(
         self,
@@ -145,3 +145,4 @@ class ContextFusionEngine:
             return "high"
 
         return "normal"
+

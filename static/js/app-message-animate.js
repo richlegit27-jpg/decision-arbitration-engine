@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 // Override renderMessage to animate incoming messages sequentially
@@ -43,3 +43,4 @@ window.renderMessages = async function(messages){
   }
 };
 })();
+

@@ -1,4 +1,4 @@
-class RuntimeGraphAnalyticsService:
+﻿class RuntimeGraphAnalyticsService:
 
     def __init__(
         self,
@@ -100,3 +100,4 @@ class RuntimeGraphAnalyticsService:
             "isolated_nodes": isolated,
             "isolated_count": len(isolated),
         }
+

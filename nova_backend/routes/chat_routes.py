@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from flask import Blueprint, request, jsonify
 
@@ -17,3 +17,4 @@ def register_chat_routes(app, agent_service):
         return jsonify(result)
 
     app.register_blueprint(chat_bp)
+

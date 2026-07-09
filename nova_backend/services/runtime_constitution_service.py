@@ -1,4 +1,4 @@
-class RuntimeConstitutionService:
+﻿class RuntimeConstitutionService:
 
     def evaluate(
         self,
@@ -80,3 +80,4 @@ class RuntimeConstitutionService:
             "veto_action": veto_action,
             "execution_state": execution_state,
         }
+

@@ -1,4 +1,4 @@
-# -----------------------------
+﻿# -----------------------------
 # Nova Endgame One-Click Auto-Update Launcher
 # -----------------------------
 
@@ -20,14 +20,14 @@ if(Test-Path $backupZip){
     $exeTime = if(Test-Path $novaExe){ (Get-Item $novaExe).LastWriteTime } else { Get-Date "1/1/2000" }
 
     if($zipTime -gt $exeTime){
-        Write-Host "🔄 Updating NovaEndgame.exe from backup..."
+        Write-Host "ðŸ”„ Updating NovaEndgame.exe from backup..."
         # Remove old exe
         if(Test-Path $novaExe){ Remove-Item $novaExe -Force }
 
         # Extract from zip
         Add-Type -AssemblyName System.IO.Compression.FileSystem
         [System.IO.Compression.ZipFile]::ExtractToDirectory($backupZip, "C:\Users\Owner\nova\dist")
-        Write-Host "✅ Update complete!"
+        Write-Host "âœ… Update complete!"
     }
 }
 
@@ -40,4 +40,4 @@ Start-Sleep -Seconds 3
 # Open the default browser to Nova workspace
 Start-Process $novaUrl
 
-Write-Host "🚀 Nova Endgame Launched!"
+Write-Host "ðŸš€ Nova Endgame Launched!"

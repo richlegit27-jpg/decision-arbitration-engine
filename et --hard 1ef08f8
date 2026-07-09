@@ -1,0 +1,875 @@
+﻿[33m3f815f9[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mpost-frontend-polish-phase[m[33m)[m Tighten SMFF response triggers
+[33mc227c34[m Gate direct memory response to explicit save commands
+[33m3d143f5[m Remove duplicate artifacts force click handler
+[33m1ef08f8[m Fix desktop session direct render guard
+[33mbd9129b[m Render desktop artifact previews
+[33mda27a42[m Remove duplicate desktop sessions click logger
+[33m91a8753[m Clean up conflicting preference memories
+[33mef58aa8[m Replace conflicting preference memories
+[33mfab39be[m Remove duplicate memory refresh hook
+[33m41154d9[m Refresh memory panel after chat response
+[33m3cf32cb[m Refresh memory panel after chat response
+[33m4432848[m Reject question-shaped memories
+[33mfb42ae4[m Dedupe memories during cleanup
+[33ma3eb4e0[m Add semantic memory dedupe
+[33m6b921e2[m Increase memory retention cap
+[33m406e92b[m Prevent memory recall and forget prompts from save response
+[33md6bef49[m Clean app memory source normalization
+[33m50fb82e[m Normalize explicit memory command source
+[33m4bdb57c[m Save favorite preferences through chat memory path
+[33m00da902[m Isolate memory saves from injected context
+[33m1782994[m Stop web source bleed into direct memory saves
+[33mddf68d8[m Add memory dedupe reinforcement
+[33m3ab84a4[m Polish desktop footer and recent sessions
+[33m0c633e7[m Polish desktop footer sessions and artifacts UI
+[33m0abcf0d[m Polish desktop auth sessions and attachment UI
+[33mf2b8c1d[m Fix auto-plan UI substring routing
+[33m0d225a9[m Fix external desktop sessions syntax
+[33m75097d1[m Fix active session recovery renderSession syntax
+[33m56527e0[m Fix desktop active session recovery render fallback syntax
+[33m45f215d[m Stabilize external desktop session switching
+[33m6c1ebfa[m Remove duplicate desktop session recovery timer
+[33m0880b8c[m Guard desktop session switch and rescue render fallback
+[33m533b9ba[m Guard desktop rescue renderer against stale DOM overwrite
+[33m65258b2[m Remove redundant desktop source card post prune layer
+[33ma45096e[m Stabilize desktop rescue session rendering
+[33medfc343[m Fix missing data-message-id in addMsg for live chat tracking
+[33m46ecfef[m Skip generated image placeholders in chat context
+[33md3622ec[m Fix desktop session switching stale rescue repaint
+[33m0c8891b[m Extract desktop sessions renderer
+[33mda47515[m Stabilize desktop sessions and clean saved chat history
+[33mb342ffb[m Restore desktop session list selection
+[33md226adb[m Add desktop artifacts loader
+[33m1e52da6[m Tighten image intent routing
+[33mdc8eb30[m Stabilize recent sessions responsive layout
+[33mae1cea2[m Fix desktop sessions loader and recent title layout
+[33m6e9b7f5[m Fix desktop script block closures
+[33m34ba953[m Restore desktop voice and TTS buttons
+[33m9597bf0[m Fix desktop memory button click handler
+[33m2897db7[m Fix desktop memory button loader
+[33mb35ae6f[m Keep new desktop chat from restoring stale sessions
+[33m0a2d5da[m Load desktop session messages on session click
+[33m9ef6806[m Fix attachment recursive rewrite and sports history query freshness
+[33mf6b7595[m Polish clickable desktop source cards
+[33m52ea2e7[m Disable session attachment memory context injection
+[33m267b939[m Restore desktop copy regen delete preview UI
+[33mbb07d99[m Remove broken desktop source toggle attempt
+[33m1bd0a61[m Restore desktop copy regen and safe image rendering
+[33m982d38c[m Restore desktop assistant copy button
+[33md255f78[m Add working desktop attachment delete button
+[33m5e92d61[m[33m ([m[1;33mtag: [m[1;33mdesktop-attachments-images-stable[m[33m)[m Lock stable desktop attachments and image rendering
+[33m81bb6ca[m Restore stable desktop attachment preview chip
+[33m6d84ff4[m Kill stale attachment reinjection from intent words
+[33mee7f9b8[m Guard missing attachment web intent flag
+[33m84a0d3d[m Restore desktop text and attachment send pipeline
+[33mf471030[m Fix desktop attachment normalization fallback
+[33mb2f8fa5[m Debug desktop attachment storage
+[33mbcb2f3a[m[33m ([m[1;33mtag: [m[1;33mdesktop-image-render-working[m[33m)[m Fix desktop image rendering pipeline
+[33m89d7d7b[m[33m ([m[1;33mtag: [m[1;33mauth-status-compat-aliases-locked-20260612[m[33m)[m Add auth status compatibility aliases
+[33m8ecfa7b[m[33m ([m[1;33mtag: [m[1;33mdesktop-hard-proxy-id-aliases-locked-20260612[m[33m)[m Add desktop hard proxy ID aliases
+[33ma06e9f9[m[33m ([m[1;33mtag: [m[1;33mdesktop-id-compat-aliases-locked-20260612[m[33m)[m Add desktop getElementById compatibility aliases
+[33m2e73e10[m[33m ([m[1;33mtag: [m[1;33mdesktop-compat-aliases-locked-20260612[m[33m)[m Add desktop compatibility aliases
+[33m3cf6688[m[33m ([m[1;33mtag: [m[1;33mtopic-recall-before-web-locked-20260612[m[33m)[m Route topic recall before web interpretation
+[33me5b9883[m[33m ([m[1;33mtag: [m[1;33minterpretation-clean-input-before-routing-locked-20260612[m[33m)[m Clean routed input before interpretation
+[33mdb2093a[m[33m ([m[1;33mtag: [m[1;33minterpretation-news-phrase-cleanup-locked-20260612[m[33m, [m[1;33mtag: [m[1;33minterpretation-news-context-guard-all-locked-20260612[m[33m)[m Clean up interpreted news query phrasing
+[33m5bdf6ae[m[33m ([m[1;33mtag: [m[1;33minterpretation-news-clean-query-locked-20260612[m[33m)[m Keep interpreted news queries free of project context
+[33mf94ac51[m[33m ([m[1;33mtag: [m[1;33minterpretation-news-rewrite-locked-20260612[m[33m)[m Rewrite messy news prompts before legacy web route
+[33m4f0c682[m[33m ([m[1;33mtag: [m[1;33minterpretation-web-routing-fix-locked-20260612[m[33m)[m Fix interpretation web route original text
+[33ma77839f[m[33m ([m[1;33mtag: [m[1;33minterpretation-web-routing-locked-20260612[m[33m)[m Use interpretation layer for messy news routing
+[33mfc4c30d[m[33m ([m[1;33mtag: [m[1;33mcentral-interpretation-service-locked-20260612[m[33m)[m Add central interpretation service
+[33m3da1859[m[33m ([m[1;33mtag: [m[1;33mdesktop-source-card-observer-prune-locked-20260612[m[33m)[m Keep desktop source cards pruned on refresh
+[33ma41e63f[m[33m ([m[1;33mtag: [m[1;33mdesktop-source-cards-latest-post-prune-locked-20260612[m[33m)[m Prune desktop source cards to latest response
+[33md8c0191[m[33m ([m[1;33mtag: [m[1;33mdesktop-latest-source-cards-locked-20260612[m[33m)[m Show latest desktop source cards only
+[33mff42887[m[33m ([m[1;33mtag: [m[1;33mdesktop-source-cards-dedupe-locked-20260612[m[33m, [m[1;33mtag: [m[1;33mdesktop-news-source-cards-e2e-locked-20260612[m[33m)[m Dedupe forced desktop source cards
+[33mb32a79f[m[33m ([m[1;33mtag: [m[1;33mdesktop-source-cards-dom-locked-20260612[m[33m)[m Force desktop source cards into DOM
+[33mc1b8d36[m[33m ([m[1;33mtag: [m[1;33msession-detail-cache-locked-20260612[m[33m)[m Add final session detail cache fallback
+[33mc699034[m Persist web fetch sessions for session detail
+[33m84e8b6f[m Persist web fetch sessions for detail endpoint
+[33m7578f7f[m Ensure web fetch sessions are readable
+[33m13963a0[m[33m ([m[1;33mtag: [m[1;33mweb-fetch-bridge-qa-locked-20260612[m[33m)[m Fix web fetch bridge response rewrite
+[33mf9861d1[m Force web-fetch responses to persist to requested session
+[33mf774125[m[33m ([m[1;33mtag: [m[1;33msource-card-session-qa-locked-20260612[m[33m)[m Persist web fetch replies to requested session
+[33mde02f5f[m[33m ([m[1;33mtag: [m[1;33mattachment-qa-locked-20260612[m[33m)[m Handle inline text attachments before file lookup
+[33mbdec25e[m Lock final attachment and desktop session QA
+[33m140f6a6[m Persist chat replies to requested session
+[33m99efbff[m Fetch missing mobile sessions
+[33m609090c[m Fetch missing desktop rescue sessions
+[33mb82f59e[m Fix session JSON UTF-8 BOM reads
+[33m996fa6b[m Fix desktop session detail endpoint
+[33m5ac7ffb[m Finalize desktop global source cards
+[33mdbac36c[m Add desktop global source card renderer
+[33mf3aac52[m Expose desktop rescue renderer globally
+[33m507ed03[m Render desktop session source cards
+[33mc063021[m Restore desktop web source cards
+[33m797c28e[m Polish desktop app visuals
+[33m2ea5fcf[m[33m ([m[1;33mtag: [m[1;33mdesktop_app_locked_20260611[m[33m)[m Add auth compatibility aliases
+[33m023b0c4[m Harden session attachment memory recall
+[33mc563547[m Add desktop auth status widget
+[33m01a6929[m Render desktop memory answers through direct chat
+[33mb32e26b[m Fix desktop sessions and Nova focus memory routing
+[33m2da4011[m Skip auth filtering for direct slim sessions
+[33mf5ff1e9[m Preserve slim sessions response before after-request hooks
+[33mfb53f20[m Preserve direct slim sessions response
+[33me19d7e0[m Revert "Use direct slim sessions route only"
+[33m925f223[m Use direct slim sessions route only
+[33mb563d63[m Load slim sessions from session store
+[33mfdc7788[m Short-circuit sessions API with slim payload
+[33m7990703[m Slim sessions API payload
+[33md3dacab[m Recall memory summaries before chat routing
+[33m72575b8[m Recall favorite memories before chat routing
+[33mdcc20f5[m Classify favorite memories as preferences
+[33ma4f8906[m Short-circuit explicit memory commands before chat routing
+[33m7af9774[m Short-circuit explicit memory commands before chat routing
+[33m373304f[m Polish register page copy and links
+[33mecaa4d0[m[33m ([m[1;33mtag: [m[1;33mcheckpoint_frontend_backend_100_20260611[m[33m)[m Add help blog and fix execution stream routing
+[33m3884c27[m Add Nova blog page
+[33m55ebd28[m Add mobile menu memory controls
+[33me3beb36[m Remove mobile fallback overlay and restore real controls
+[33m158bfac[m Hide mobile logout overlay from header controls
+[33mfe41c2f[m Call mobile attachment clear helper after send
+[33ma12f18d[m Clear mobile attachment preview after send
+[33m5c1adaa[m Restore mobile header controls and compact quick prompts
+[33mf7ec739[m Fix mobile auth overlay controls
+[33m09a45ed[m Store mobile upload payloads for chat attachments
+[33mbbd5b51[m Normalize saved attachment shapes
+[33me9b7282[m Prune duplicate empty sessions
+[33mb642257[m Scope sessions to local auth user
+[33mf5ea8a0[m Clear session on logout page
+[33m16f0d80[m Add mobile auth guard
+[33m37c9d03[m Add local auth page flow
+[33m19a6639[m[33m ([m[1;33mtag: [m[1;33mcheckpoint_mobile_parity_locked[m[33m, [m[1;33mtag: [m[1;33mcheckpoint_image_command_fastpath_locked[m[33m)[m Clean image fastpath response text
+[33mb712eef[m Clean image command prompts in fast path
+[33m50e343b[m Route image commands before attachment pipeline
+[33mcdd957c[m Prioritize image commands over attachment state
+[33me3f632a[m[33m ([m[1;33mtag: [m[1;33mcheckpoint_empty_session_guard_locked[m[33m)[m Prevent blank requests from creating sessions
+[33mb30e9ac[m[33m ([m[1;33mtag: [m[1;33mcheckpoint_desktop_voice_confirmed_working[m[33m)[m Animate desktop buttons safely
+[33m1bbf0ef[m[33m ([m[1;33mtag: [m[1;33mcheckpoint_desktop_voice_tts_locked[m[33m)[m Add desktop voice and TTS buttons
+[33mf85f1b2[m[33m ([m[1;33mtag: [m[1;33mcheckpoint_desktop_buttons_locked[m[33m)[m Wire desktop quick action buttons
+[33m8d4e4b8[m[33m ([m[1;33mtag: [m[1;33mcheckpoint_desktop_sessions_memory_execution_attachments_locked[m[33m)[m Restore chat service after bad attachment cleanup patch
+[33me739531[m Clean recursive attachment wrapper text
+[33m3caff32[m Hardlock desktop memory loading state
+[33m0f24142[m Fix desktop execution status renderer
+[33mb93a817[m Replace desktop memory patches with final renderer
+[33m317984b[m Fix desktop memory loading renderer
+[33mbd8eed8[m Clarify empty desktop memory panel
+[33m6d41b22[m Guard memory saves from context leakage
+[33m8993ddc[m Restore memory service after bad guard patch
+[33m78c881d[m Fix desktop memory panel and guard bad memory saves
+[33m4539825[m Restore desktop button visibility
+[33mef08065[m Add desktop current session manager
+[33m644c891[m Compact desktop recent list and scroll to chat
+[33me14c0d9[m Restore desktop app to last working render
+[33m6f45afe[m Revert "Reset desktop controls to simple fixed buttons"
+[33m017b7cc[m Reset desktop controls to simple fixed buttons
+[33m4686e2a[m Replace desktop rescue layers with simple fixed controls
+[33m46653e2[m Log desktop session row clicks
+[33md133a8d[m Fix desktop click trace session classification
+[33m113c633[m Add real desktop sessions button
+[33mf5b692e[m Trace and bind desktop button clicks broadly
+[33m27c004c[m Bind desktop session and memory buttons directly
+[33m618b89d[m Create desktop rescue message container for session loads
+[33mc17eba2[m Load desktop messages when selecting rescue session
+[33m5c04600[m Stop desktop panel refresh recursion
+[33m8d9c33f[m Fix desktop panel recursion and disable missing summary call
+[33m701adc2[m Remove broken desktop inline session memory block
+[33m13196e3[m Add desktop click rescue for sessions and memory
+[33mae044be[m Use local desktop sessions and robust memory rendering
+[33mfd54a3c[m Harden desktop JSON calls and expose memory panel
+[33m6d61424[m Clarify desktop attachment prompts
+[33m4053a61[m Add desktop attachment upload
+[33m4862689[m Add desktop execution status
+[33m9177454[m Add desktop memory panel
+[33m1387bca[m Add desktop sessions list
+[33mba47a20[m Reorganize desktop workspace panels
+[33m04c8242[m Fix desktop object response rendering
+[33m2ff17b7[m Polish desktop app UI
+[33m092eac0[m Fix desktop app route bottom block
+[33m94cdbfd[m Register desktop app route before server start
+[33m65fff61[m Restore missing desktop app route
+[33m39f92ab[m Restore desktop app route
+[33m2fd60a3[m Compact mobile quick prompt buttons
+[33mb46d9b5[m Use plain homepage action arrows
+[33mc810e1d[m Correct homepage health check link
+[33mde9a1c8[m Make homepage secondary action open health check
+[33m57d4a1e[m Fix dead desktop link on homepage
+[33mf438f9e[m Replace homepage with clean Nova dashboard
+[33m73f5f1b[m Prevent web news prompts from image routing
+[33m4894715[m Route mobile sessions button to final owner
+[33m27b64d0[m Add final mobile session actions owner
+[33m721cfa2[m Restore sessions list API route
+[33m8db5167[m Filter junk lines from attachment summaries
+[33mfd1f94a[m Fix docx direct summary user text argument
+[33md67e0db[m Use existing phase2 docx extractor in direct handler
+[33m58c1ffd[m Restore docx attachment text extractor
+[33m5af2eda[m Use clean docx attachment summaries
+[33m657be04[m Return clean attachment text summaries
+[33m3dc9ff7[m Restore uploaded file path resolver
+[33m9dc681e[m Restore uploaded file path resolver
+[33m47d7592[m Refresh attachment payload cache after revert
+[33m6478ed2[m Revert "Isolate stale mobile attachment context"
+[33m4e5fea5[m Isolate stale mobile attachment context
+[33m8ab7605[m Stabilize mobile composer height
+[33mb8b8198[m[33m ([m[1;33mtag: [m[1;33mnova-mobile-real-composer-layout-locked-20260609[m[33m)[m Lock real mobile composer layout
+[33m1c9c586[m[33m ([m[1;33mtag: [m[1;33mnova-mobile-message-bar-layout-fixed-20260609[m[33m)[m Fix mobile message bar layout
+[33mf54cf85[m[33m ([m[1;33mtag: [m[1;33mnova-core-mobile-persistence-stability-20260609[m[33m)[m Improve mobile sessions drawer filtering
+[33m00f26ce[m[33m ([m[1;33mtag: [m[1;33mnova-mobile-normal-chat-session-persistence-fixed-20260609[m[33m)[m Fix mobile normal chat session persistence
+[33m3f6d01f[m Remove mobile sessions hard-open fallback
+[33m51a662d[m[33m ([m[1;33mtag: [m[1;33mnova-mobile-sessions-backend-render-fixed-20260608[m[33m, [m[1;33mtag: [m[1;33mnova-core-v1-stability-lock-20260609[m[33m)[m Render mobile sessions from backend fallback
+[33m05e33a2[m[33m ([m[1;33mtag: [m[1;33mnova-mobile-sessions-panel-visible-20260608[m[33m)[m Fix mobile sessions panel hidden display
+[33m7348c94[m[33m ([m[1;33mtag: [m[1;33mnova-mobile-sessions-drawer-open-fixed-20260608[m[33m)[m Fix mobile sessions drawer opening
+[33m4f9a75d[m[33m ([m[1;33mtag: [m[1;33mnova-docx-attachment-analysis-fixed-20260608[m[33m)[m Fix DOCX attachment analysis and string result handling
+[33m6d2e42e[m[33m ([m[1;33mtag: [m[1;33mnova-mobile-polish-execution-cleanup-20260608[m[33m)[m Lock mobile polish and execution service cleanup
+[33m13812cc[m[33m ([m[1;33mtag: [m[1;33mnova-backend-readiness-100-mobile-attachment-complete-20260608[m[33m)[m Lock backend readiness and complete mobile attachment mission
+[33m204ee83[m[33m ([m[1;33mtag: [m[1;33mmobile-duplicate-binding-cleanup-runtime-verified-20260608[m[33m, [m[1;33mtag: [m[1;33mmobile-app-send-fallback-events-owner-clean-20260608[m[33m)[m Remove mobile app fallback send listeners
+[33m7e3400b[m[33m ([m[1;33mtag: [m[1;33mmobile-app-core-handlers-events-owner-clean-20260608[m[33m)[m Delegate mobile app core handlers to events module
+[33m354e9bc[m[33m ([m[1;33mtag: [m[1;33mmobile-template-sessions-click-owner-clean-20260608[m[33m)[m Remove template-owned mobile sessions click handler
+[33m167a1e0[m[33m ([m[1;33mtag: [m[1;33mmobile-forced-sessions-toggle-events-owner-clean-20260608[m[33m)[m Delegate forced mobile sessions toggle to events module
+[33m0e83d56[m[33m ([m[1;33mtag: [m[1;33mmobile-core-listeners-events-owner-clean-20260608[m[33m)[m Delegate mobile core listeners to events module
+[33m6c09416[m[33m ([m[1;33mtag: [m[1;33mmobile-tts-single-owner-clean-20260608[m[33m)[m Remove duplicate mobile TTS click bindings
+[33mc64dc11[m[33m ([m[1;33mtag: [m[1;33mmobile-upload-single-owner-clean-20260608[m[33m)[m Remove duplicate mobile upload click bindings
+[33m441186f[m[33m ([m[1;33mtag: [m[1;33mmobile-voice-single-owner-clean-20260608[m[33m)[m Remove duplicate mobile voice click bindings
+[33mc730a74[m[33m ([m[1;33mtag: [m[1;33mmobile-app-owned-voice-clean-20260608[m[33m)[m Remove app-owned mobile voice path
+[33m9aa98f1[m[33m ([m[1;33mtag: [m[1;33mmobile-media-sanitizer-ui-utils-clean-20260608[m[33m)[m Move mobile media sanitizer to ui utils
+[33m8b22e53[m[33m ([m[1;33mtag: [m[1;33mmobile-runtime-ui-utils-move-20260608[m[33m)[m Move mobile runtime UI blocks to ui utils
+[33ma4148a1[m[33m ([m[1;33mtag: [m[1;33mmobile-voice-toast-guard-20260608[m[33m)[m Guard mobile voice toast calls
+[33m4f24d0d[m[33m ([m[1;33mtag: [m[1;33mmobile-attachment-global-helper-clean-20260608[m[33m)[m Remove unused mobile attachment globals
+[33mb5620d0[m[33m ([m[1;33mtag: [m[1;33mmobile-fetch-clear-wrapper-clean-20260608[m[33m)[m Remove duplicate mobile fetch clear wrapper
+[33m01a8ee3[m[33m ([m[1;33mtag: [m[1;33mmobile-app-owned-upload-path-clean-20260608[m[33m)[m Remove app-owned mobile upload path
+[33m3b22586[m[33m ([m[1;33mtag: [m[1;33mmobile-sessions-after-state-20260608[m[33m)[m Load mobile sessions module after state
+[33mcfd7db9[m[33m ([m[1;33mtag: [m[1;33mmobile-attachment-cache-bump-20260608[m[33m)[m Bump mobile app cache after attachment bridge cleanup
+[33m5926b10[m[33m ([m[1;33mtag: [m[1;33mmobile-attachment-bridge-wrapper-clean-20260608[m[33m)[m Remove duplicate mobile attachment bridge wrappers
+[33m1d6caed[m[33m ([m[1;33mtag: [m[1;33mmobile-session-toggle-delegate-clean-20260608[m[33m)[m Fix mobile session toggle delegation
+[33m3c0def4[m[33m ([m[1;33mtag: [m[1;33mmobile-session-module-clean-20260608[m[33m)[m Remove duplicate mobile session ownership from app bundle
+[33m3549c14[m[33m ([m[1;33mtag: [m[1;33mmobile-sessions-owner-clean-20260608[m[33m)[m Defer mobile sessions ownership to external bridge
+[33m7b6e2fe[m[33m ([m[1;33mtag: [m[1;33mmobile-session-webfetch-stable-20260608[m[33m)[m Clean mobile sessions placeholder and bump module cache
+[33mb70c6f4[m[33m ([m[1;33mtag: [m[1;33mmobile-webfetch-stable-20260608[m[33m)[m Quiet remaining mobile attachment logs
+[33m37faf35[m Quiet mobile attachment debug logs
+[33m484e2a1[m Filter generic homepage sources from news search
+[33mb323781[m Restore mobile attachment and execution modules
+[33md64c45c[m Add official OpenAI fallback sources for web fetch
+[33md24d9e7[m Expand OpenAI-specific web search queries
+[33mfed8df4[m Filter generic results from OpenAI web searches
+[33m43c1524[m Use original text for empty site-constrained web message
+[33m795417f[m Clarify empty site-constrained web results
+[33me67426a[m Restore chat execution service and strict web domain filter
+[33m5ed6f8c[m Strictly enforce site domain web results
+[33ma7dea1e[m Respect site domain constraints in web fetch
+[33m67378d8[m Clean mobile session restored message layout
+[33me333f2a[m Install hard mobile session switch bridge
+[33m47fa05b[m Hard wire mobile session switching
+[33m9ea1a9c[m Wire mobile sessions button alias
+[33mef5aa07[m Clean mobile attachment clear flow
+[33mf223ae8[m Lock real image vision path
+[33m90f2be3[m Stabilize mobile attachment image pipeline
+[33m7be32b3[m Stabilize mobile composer and project status routing
+[33mc0dd747[m[33m ([m[1;33mtag: [m[1;33mmobile-generated-image-render-lock-20260606[m[33m)[m Render generated images in mobile chat
+[33me82d4d5[m[33m ([m[1;33mtag: [m[1;33mmobile-new-session-save-lock-20260606[m[33m)[m Fix mobile new session save and session module wiring
+[33m1ffbf32[m[33m ([m[1;33mtag: [m[1;33mmobile-session-controls-lock-20260606[m[33m)[m Add stable mobile session pin delete rename controls
+[33m8401b32[m[33m ([m[1;33mtag: [m[1;33mmobile-sessions-drawer-rename-lock-20260606[m[33m)[m Stabilize mobile sessions drawer and rename flow
+[33mfbde10c[m Clean emergency patch artifacts from stable lock
+[33m5b9dc05[m Lock stable Nova after API key and Send fixes
+[33m32f088f[m Stabilize mobile quick actions and image routing
+[33m2a235b1[m Lock working Nova mobile image generation
+[33m788659b[m Stabilize mobile chat and clean image generation prompt flow
+[33m058d93a[m Filter mobile UI junk from attachment summaries
+[33m47a650b[m Remove stale mobile session placeholder
+[33m2231476[m Wire real mobile session history panel
+[33m6a97960[m Stabilize mobile copy regen and attachment summaries
+[33m7dc3744[m Fix mobile attachment payload to use latest upload only
+[33m713a283[m Fix mobile attachment metadata preservation
+[33mbb8ce37[m Enhance attachment analysis and text cleaning
+[33m8ff10c2[m Add direct attachment keypoints endpoint
+[33me584e9f[m Capture latest mobile upload for attachment summary tools
+[33m2b90eca[m Add direct attachment extraction and summary endpoints
+[33ma9c434f[m Lock attachment analysis and current-only attachment memory
+[33m695d0ea[m Skip binary uploads from attachment text injection
+[33m4096e81[m Show mobile attachment previews in fallback send flow
+[33m987acc5[m Route fresh web queries to source card fetch
+[33m19d87ad[m Restore mobile send flow and source cards
+[33m62bf077[m[33m ([m[1;33mtag: [m[1;33mfrontend-live-ui-lock-2026-06-03[m[33m)[m Default TTS off to prevent audio bloat
+[33mcee5154[m[33m ([m[1;33mtag: [m[1;33mfrontend-visual-polish-lock-2026-06-03[m[33m)[m Directly fix TTS stop label
+[33md12edbe[m Fix final TTS stop label mojibake
+[33m9deac75[m Finish composer mojibake cleanup
+[33m7ea00bd[m Clean composer visual text and debug noise
+[33m512abc7[m[33m ([m[1;33mtag: [m[1;33mmobile-fallback-attachments-lock-2026-06-03[m[33m, [m[1;33mtag: [m[1;33mfrontend-complete-lock-2026-06-03[m[33m, [m[1;33mtag: [m[1;33mdesktop-attachment-ui-lock-2026-06-03[m[33m, [m[1;32mproject-workflow-phase[m[33m)[m Preserve attachments in mobile fallback send
+[33mb482cda[m[33m ([m[1;33mtag: [m[1;33mmobile-frontend-smoke-lock-2026-06-03[m[33m, [m[1;33mtag: [m[1;33mmobile-attachment-ui-lock-2026-06-03[m[33m, [m[1;33mtag: [m[1;33mfrontend-smoke-lock-2026-06-03[m[33m, [m[1;33mtag: [m[1;33mdesktop-frontend-smoke-lock-2026-06-03[m[33m)[m Remove missing mobile source drawer script
+[33mba1724f[m Replace hardcoded weak fallback and mobile empty copy
+[33m0bffd9c[m Add final inline weak response guard
+[33m2c48eb8[m Safely guard weak api chat fallback
+[33me1ed17b[m Restore app syntax after weak guard insertion
+[33m23f5eff[m Force api chat weak response guard before return
+[33m178adda[m Guard mojibake weak backend fallback
+[33m64ec71d[m Fix mobile script loading and weak backend fallback
+[33mc714963[m Fix mobile fallback bridge real chat thread
+[33m2bb059f[m Add chat follow-up attachment context test
+[33m7777c2b[m Add project workflow follow-up attachment test
+[33m21a1c4d[m[33m ([m[1;33mtag: [m[1;33mcheckpoint_backend_attachment_locked[m[33m, [m[1;32mmain[m[33m)[m Finalize project-aware attachment integration
+[33m4172116[m[33m ([m[1;31morigin/main[m[33m)[m Add stable mobile sync + attachment integration test
+[33m03611c7[m Stable attachment session test with unique IDs and cleanup
+[33m3092049[m Add stable mobile sync attachment test
+[33mf8ec625[m Add mobile sync + attachment verification test
+[33m3abf2d8[m Add stable attachment memory service test
+[33m70e12d0[m Remove failing attachment session test
+[33m51d7308[m Fix attachment session test by initializing session
+[33m30e4618[m Avoid app import in attachment session test
+[33m16a5e65[m Fix attachment session pytest helper call
+[33mf2fd2f4[m Add pytest for session attachment persistence and summarization
+[33m2db4372[m Remove fragile upload test and unused FastAPI upload route
+[33mbf29cb3[m Add Flask /api/upload test with OpenAI mocked
+[33m08ac5b1[m Add Flask upload endpoint smoke test
+[33m0f76a22[m Remove conflict markers from app.py
+[33ma4fc195[m Remove BOM and force future import to first line
+[33m25f2764[m Remove tracked temporary patch and backup files
+[33m4ecea9c[m Move future import to first line
+[33m526a4e9[m Remove mojibake BOM from app.py
+[33m34e5b58[m Remove hidden BOM from app.py
+[33mb019700[m Consolidate execution_stream assignments with helper
+[33m054a27d[m Remove unreachable memory helper code
+[33md9ca1c6[m Block real OpenAI clients during pytest
+[33m3b7312f[m Restore Nova memory file after pytest tests
+[33md249b43[m Add reusable OpenAI mock patch template for smoke tests
+[33m5b2cfd6[m Mock OpenAI in API chat smoke test
+[33maea650d[m Slim direct recall payloads and guard pong responses
+[33m6e78bc4[m Add mobile fallback and pong memory cleanup
+[33m351ad51[m Ignore large runtime session files
+[33m3869646[m Filter stale memory from project-aware context
+[33m21c32db[m[33m ([m[1;32mbackup-before-history-clean-20260602[m[33m)[m Add session project-state context injection
+[33ma34b579[m Add dedicated project state storage
+[33mc1ca720[m Ignore dedicated project-state file
+[33mcb9ca86[m Finalize project state recall cleanup
+[33m969bed5[m Add project state recall override
+[33mc90f9fa[m Ignore Nova runtime data files
+[33m2196fa5[m Add project state memory recall
+[33m2428725[m Merge remote main keeping local Nova frontend state
+[33m1722be0[m[33m ([m[1;32mbackup-before-remote-sync[m[33m)[m Lock runtime memory after cleanup
+[33mcb493c8[m Use timezone-aware UTC datetimes in memory service
+[33m7241517[m Cleanup project-aware context helpers after recall lock
+[33mef2e4aa[m LOCKPOINT: project-focus memory recall working, all tests passed
+[33m9e1f126[m Add session-aware attachment memory and content injection
+[33ma10e32f[m Lock working mobile panels UI + V2 send bridge
+[33mae29e18[m Restore full pre-restore desktop UI and keep /mobile route
+[33mb85cff9[m Restore chat service before broken go intercept patch
+[33m553e96d[m Let go use execution command flow
+[33mabef9db[m Add SessionService load save compatibility
+[33maab9cc6[m Intercept k and go before general chat
+[33maecf7bb[m Teach Nova go as smart mission command
+[33m5a14f26[m Teach Nova k as short continue command
+[33m9190e33[m Remove decide route debug print
+[33md49597d[m Remove app startup chat service debug prints
+[33m57d8b0c[m Remove API chat raw result debug print
+[33mb17e9cb[m Remove chat handle debug print
+[33m0942600[m Harden API chat assistant response contract
+[33m3be5a21[m Remove failing API chats smoke test
+[33m3ac4a68[m Add API chats smoke test
+[33m245ee49[m Add API chat response contract test
+[33m5e68134[m Fix API chat smoke test payload
+[33mf774836[m Add API chat smoke test
+[33mbd6917f[m Suppress external pytest deprecation warnings
+[33m52aaf38[m Fix API health smoke test for Flask app
+[33me228673[m Add API health smoke test
+[33m8f17c90[m Fix pytest config encoding
+[33mc4578d7[m Lock pytest discovery to real tests
+[33m5112d84[m Fix safe runtime smoke test cycle arguments
+[33m1b16a99[m Add safe runtime smoke tests
+[33m30d96a9[m Use timezone-aware runtime graph timestamps
+[33m41708dc[m Ignore local Nova backup and runtime clutter
+[33m0c2ef87[m Stabilize safe unified runtime policy cycle
+[33m3a58e33[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-web-fetch-main-lock-2026-05-15[m[33m, [m[1;32mweb-fetch-mastery-phase[m[33m, [m[1;32mcheckpoint-web-fetch-main-lock-2026-05-15[m[33m)[m Checkpoint: lock clean web fetch routing and source ranking
+[33m04d0874[m[33m ([m[1;32mui-polish-next[m[33m)[m Stabilize execution completion and clear stale active state
+[33m7f463d8[m Fix execution step advancement and processing flag persistence
+[33mec42d16[m Checkpoint: isolate execution sync rollback corruption path
+[33mf420165[m Checkpoint: isolate execution sync rollback corruption path
+[33m2dc37d9[m Consolidate execution state persistence
+[33mfd692d3[m Checkpoint execution state consolidation helpers
+[33m79cf09e[m Fix runtime summary and execution persistence route
+[33mb5613ae[m Add adaptive runtime throttling and pressure stabilization
+[33m24b27cb[m Add runtime self preservation layer
+[33m44aaeb4[m Add runtime health scoring and degradation detection
+[33mb96e09f[m Clean duplicate runtime imports and constructor assignments
+[33mf45fce7[m Remove duplicate runtime signal debug prints
+[33maf254d1[m Remove duplicate runtime strategy memory reinforcement block
+[33m6fe60c5[m Wire mutation safety rollback intelligence and self repair runtime chain
+[33m99cde8f[m Stabilize runtime cognition memory hygiene and response sanitation
+[33m0309051[m Stabilize cognitive firewall and runtime chat continuity
+[33m4c7fde9[m Wire compressed runtime cognition into chat service
+[33m2412507[m Stabilize runtime cognition and restore identity recall
+[33ma144200[m Checkpoint runtime coordination stabilization phase
+[33ma7b47cb[m Add runtime memory law and constitution wiring
+[33mf06fd3b[m Add runtime consensus and escalation layers
+[33mca49771[m Add live runtime execution routing pipeline
+[33mda6ee1f[m Add runtime execution router integration
+[33m4425cd2[m Add runtime operating loop
+[33mf8798ae[m Add runtime scheduler engine
+[33m566a2b0[m Add runtime checkpoint mutation diff and rollback layers
+[33m5de249e[m Add live runtime cognition cycle and signal infrastructure
+[33m00ce387[m Connect chat activity to runtime panel updates
+[33m6c2bde0[m Wire runtime panel bridge and recovery visibility
+[33m75351f2[m Add collapsible runtime brain panel
+[33me484eba[m Add live runtime brain panel and event updates
+[33maf55d96[m Add live runtime brain UI panel
+[33m432f685[m Wire runtime update event to UI
+[33m6c16379[m Broadcast runtime payload updates
+[33mb826245[m Add runtime payload frontend probe
+[33mea6c153[m Expose live runtime in chat payload
+[33m4b0aae4[m Bind live chat to persistent runtime brain
+[33m9f0e325[m Add runtime persistence and resurrection layer
+[33ma8ff283[m Add runtime compression layer
+[33mf28ecac[m Activate live runtime cognition cycle API
+[33m673f811[m Add runtime summary API route
+[33m98b5f38[m Stabilize runtime compressed observability output
+[33m83c0a60[m Add runtime output compression layer
+[33m18225f4[m Add runtime drift stabilization policy
+[33m96eb471[m Add runtime prediction drift intelligence
+[33me47bb0a[m Add runtime prediction history memory
+[33m4487847[m Add runtime prediction cognition layer
+[33m46cbd34[m Add runtime graph intelligence and evolution loop
+[33ma927c3d[m Add runtime identity goal planning and world model layers
+[33m3df2e9e[m Add runtime governor arbitration visibility
+[33m540e86e[m Add persistent runtime memory compression
+[33m5393641[m Add adaptive runtime graph memory and evolution tests
+[33m9715d8c[m Wire safe runtime graph memory recording
+[33m1cc8338[m Add runtime graph observability report
+[33mdb7790b[m Add runtime graph debugger analytics
+[33m4594669[m Add standalone runtime graph intelligence services
+[33md6cdc20[m Add runtime graph evolution service
+[33md6ef8d4[m Add recursive runtime orchestration system
+[33mf891b49[m Add runtime policy arbitration layer
+[33mc39f171[m Add self-healing orchestration mode
+[33m451a2a1[m Add runtime governor layer
+[33m9395894[m Add runtime confidence decay system
+[33mb283775[m Add autonomous runtime engine suppression
+[33m96218f8[m Add persistent runtime brain and preventive orchestration bias
+[33m4f409e7[m Add runtime engine fusion feedback loop
+[33mbf65525[m Add runtime scheduler engine
+[33m35062ed[m Add modular runtime orchestration engines
+[33m2476442[m Add runtime self healing layer
+[33m0a447c5[m Add runtime debugger inspection layer
+[33m3200ef8[m Add runtime replay service
+[33mec18a2f[m Split safe unified runtime into modular services
+[33m86cc147[m Checkpoint: stabilize execution lane and Python runner bridge
+[33md850a84[m Stabilize execution command flow and completion guard
+[33m3222f6a[m Stabilize execution crash and empty plan handling
+[33md3e8fbc[m Improve empty execution plan response
+[33m29f4331[m Fix mission state None execution crash
+[33mab0c436[m Checkpoint: execution routing and state path stabilized
+[33m376a74a[m Fix continuity state contamination and stale execution mission resurrection
+[33m1f35a7a[m Stabilize execution state cleanup and continuity contamination guards
+[33mc3256d5[m Fix execution state contamination and mission sanitizer
+[33m556051d[m Checkpoint: mission gate routing and session contamination stabilization
+[33m164eb6b[m Persistently clear stale working state during decay
+[33mc18980a[m Add stale mission validity guard to routing
+[33m0df7f62[m Default working state tracking to casual unless operational
+[33mb739491[m Suppress stale operational state during generic chat
+[33mb6e7dd3[m Add conversational decay to working state continuity
+[33m838cd6f[m Tighten continuity routing to strict intent matching
+[33md406bde[m Stop execution recovery from reading working state
+[33mced3078[m Replace hardcoded continuity injection with dynamic execution context
+[33m08938b8[m Hard wipe working state during reset cleanup
+[33m0e2da43[m Purge zombie execution state from session meta on reset
+[33m0df2446[m Lock reset decontamination cleanup and zombie execution purge
+[33m8208cc2[m checkpoint: execution system stable before brain_state refactor
+[33m3fc0e44[m Add retry strategy escalation
+[33mf97adfe[m Clean execution completion state
+[33m481e679[m[33m ([m[1;33mtag: [m[1;33mnova-execution-engine-lock[m[33m)[m Lock autonomous execution engine and intelligence routing
+[33m4619ef5[m[33m ([m[1;33mtag: [m[1;33mexecution-rollover-lock[m[33m)[m Lock execution rollover and next_index completion fix
+[33m08dd4ae[m Checkpoint: restore execution persistence and run step progression
+[33m85b0d53[m Checkpoint: ChatService class reattached memory dominance restored execution reconciliation fixed
+[33mdf43786[m Execution loop stabilized with real step mutation
+[33m147af54[m Remove execution sync daemon side effects
+[33m23563b7[m Lock session continuity and recall stabilization
+[33m83b364f[m Stabilize chat session message persistence
+[33md5c771b[m Stabilize general chat entry and partial session finalize path
+[33m83ecd13[m Fix execution daemon call and session payload fallback
+[33m0899953[m Stabilize ranked memory and chat render guards
+[33m9ab5f88[m Stabilize regenerate flow and mark regenerate requests
+[33mf3de706[m Stabilize Nova composer send flow
+[33m7416870[m Fix duplicate backend chat message persistence
+[33m4586511[m Stabilize Nova chat send and dedupe flow
+[33m663c30c[m Fix empty session message state refresh
+[33m2feaa52[m Fix general chat recent session memory ordering
+[33m61a331c[m[33m ([m[1;32mbackup-local-main-before-remote-sync[m[33m)[m Lock stable image regen and artifact state
+[33mad7ae83[m Fix composer duplicate submit and restore chat render flow
+[33m767f572[m Recovered Nova stable checkpoint
+[33m89522d5[m Recover ChatService class boundary and working state flow
+[33m7b9eade[m Stable image artifacts memory panel checkpoint
+[33me4c5a1d[m Lock image artifacts and memory panel stable state
+[33m5f394a0[m Fix image generation render and artifact persistence
+[33medaa3af[m Fix Nova image pipeline hard-exit and local artifact rendering
+[33m8e644e9[m Restore full chat image rendering pipeline
+[33mc57efcc[m Render generated images in chat bubbles
+[33m5093acf[m Fix image response render bypass after session hydrate
+[33m380fa5b[m Lock isolated tool response shaping
+[33m8b4d3c1[m Hard lock isolated tool route execution
+[33m7c8ca0f[m Lock tool route isolation for web and image modes
+[33m0520f2d[m Repair live web fetch execution chain
+[33m8f00d45[m Lock image generation response handling
+[33m7162899[m Lock image generation clean response checkpoint
+[33mc5a5c13[m Clear completed execution state after finalize
+[33m997d811[m Cleanup sandbox backup artifacts
+[33m0944d47[m Stabilize execution archive callback
+[33m02f03a7[m Normalize execution reset idle state
+[33ma9a7038[m Finalize zero-step execution normalization
+[33mb0ebd82[m Remove final manual current step complete marker
+[33m4b266ac[m Use finalize helper for zero-step execution path
+[33m4e18bbf[m Use finalize helper for completed execution index path
+[33mfa9d729[m Use finalize helper in execution advance completion path
+[33m3d68cad[m Use finalize helper for empty execution completion path
+[33m9348d33[m Use finalize helper in execution step completion path
+[33mdfb9bd5[m Preserve completion context when resetting execution state
+[33m99d0271[m Fix where-are-we fallback and remove dead helper duplicates
+[33m64846f6[m Revert "consolidate working state context formatter"
+[33m253a217[m consolidate working state context formatter
+[33mdd47040[m normalize working state summary pipeline
+[33m7318eb7[m lock stable execution chain completion
+[33m631d152[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-stable-2026-05-07[m[33m, [m[1;33mtag: [m[1;33mcheckpoint-fully-restored-2026-05-07[m[33m)[m show clear quota error for general chat failures
+[33mb4ab4f1[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-ui-stable-after-recovery-2026-05-07[m[33m)[m add safe chat result debug logging
+[33m71ff6a5[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-chat-recovered-2026-05-07[m[33m)[m restore stable composer bundle from json flow checkpoint
+[33m42a1a14[m checkpoint: execution loop extraction + frontend state safety + quota pause handling
+[33m52e8a6c[m runtime verifier autonomy checkpoint
+[33m22c35af[m lock autonomy verifier chain and disable flask reloader
+[33ma78f9e1[m add verifier layer to autonomy execution chain
+[33m757178d[m autonomy execution chain complete - mutation compile test passed
+[33m75e5653[m autonomy routing checkpoint - execution command lane fixed
+[33m7475c35[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-idle-next-clean-2026-05-06[m[33m)[m checkpoint: idle next no longer fabricates execution plan
+[33mdd93acd[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-execution-bleed-fixed-2026-05-06[m[33m)[m checkpoint: execution bleed fix + session preview stabilization
+[33m7f6f3f5[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-stream-recovery-2026-05-06[m[33m)[m checkpoint: stream recovery + duplicate assistant fix + json flow stabilization 2026-05-06
+[33me339e41[m stabilize self healing AST safe execution mutations
+[33m310d081[m add self healing retry loop for execution mutations
+[33m8c95aba[m upgrade execution mutations to AST safe replacement
+[33m99757b7[m upgrade mutation engine to AST-safe function replacement
+[33mf9af491[m complete autonomous execution mutation apply with compile safety
+[33md698b4f[m add transactional compile rollback for execution mutations
+[33m0df61d1[m auto apply generated execution mutation payloads
+[33mb756d91[m generate real function replacement payloads from execution state
+[33mc2ffb64[m clean consumeChatStreamStable debug logs safely
+[33md97969b[m clean consumeChatStreamStable debug logs safely
+[33mdb094ea[m replace execution hydration hack with append_message persistence
+[33m21ad3cb[m restored stable execution hydration debug build
+[33m5e34c48[m stable execution stream cleanup complete
+[33m6566e2a[m execution loop restored and frontend hydration working
+[33mf29d9fa[m compress execution summary and normalize step actions
+[33m02c8e8a[m lock execution step results and action normalization
+[33m7bddf9e[m[33m ([m[1;33mtag: [m[1;33mexecution-pipeline-stable-2026-05-06[m[33m)[m execution persistence + autonomous execution pipeline stable checkpoint
+[33md06968b[m execution loop stabilized checkpoint
+[33m77a3f69[m checkpoint authoritative state cleanup and execution completion reset
+[33m8af774e[m checkpoint fixed stable chat transport controller
+[33mdc3c4be[m checkpoint unified stream routing cleanup
+[33m1f290c6[m checkpoint stable unified stream transport
+[33m6f25465[m checkpoint stable chat stream routing
+[33m110d663[m fix authoritative reset and clear working state
+[33m8f4fefc[m restore general chat response pipeline after early return fix
+[33ma3b7071[m runtime general chat assistant_msg fix checkpoint
+[33maa33699[m[33m ([m[1;33mtag: [m[1;33mexecution-intelligence-lock[m[33m)[m LOCK: execution intelligence state-aware control
+[33m97f2284[m[33m ([m[1;33mtag: [m[1;33mstable-routing-safe-autofix[m[33m)[m LOCK: routing + safe_dict + function-only auto-fix stable
+[33m46294ab[m[33m ([m[1;33mtag: [m[1;33mfunction-only-autofix-lock[m[33m)[m LOCK: function-only safe auto-fix
+[33m3d115be[m[33m ([m[1;33mtag: [m[1;33msafe-autofix-lock[m[33m)[m LOCK: startup backups and safe auto-fix writes
+[33md1b8412[m add proper gitignore for nova
+[33m1532e80[m STABLE: recovered chat_service + fixed structure + compiling
+[33mca48a88[m[33m ([m[1;33mtag: [m[1;33mphase-4-execution-stable[m[33m)[m checkpoint: execution stable + frontend crash fixes (assistantMsg + memory viewer + render loop fixed)
+[33mac3300a[m execution self-heal checkpoint
+[33mba522f7[m stabilize execution auto-loop and clean output
+[33m5cac5e5[m lock silent auto execution chain
+[33ma4ec8c0[m lock autonomous execution mode and mission aware continuation
+[33m50bf345[m stabilize execution stream continuation and UI
+[33m1636669[m stabilize execution UI and mission aware continuation
+[33m46e007b[m add auto mode execution aliases
+[33m9e2afa5[m add mission aware execution continuation
+[33m7f977d5[m add mission state execution UI
+[33m180b378[m fix execution next retry failed state lock
+[33m1e326a9[m add exact execution step replay
+[33me888d0b[m add execution step replay controls
+[33mc3fa1a5[m polish execution panel live step output
+[33md5d751f[m stabilize execution stream retry replay loop
+[33m1fcb9b2[m add execution test failure and retry failed stream support
+[33mf503c71[m add execution test failure and retry failed stream support
+[33m686390e[m final execution UI polish pulse and live progress
+[33m7f6b7b8[m add execution active step polish
+[33m16f0ddd[m add live execution stream route and frontend bridge
+[33m1dc17b9[m restore execution bridge and stable panel controls
+[33ma668df7[m fix execution panel visibility and state sync
+[33m21b116d[m fix execution panel session sync and render state
+[33mbf9c380[m checkpoint: execution run all loop working
+[33m36758e0[m checkpoint: chat working and rail bridge restored
+[33m0c29079[m checkpoint: web-polish-008 parser fixes + execution panel wiring stabilized
+[33m6721e2e[m web fetch 100% complete (rss + clean + rank + sources)
+[33mb921b61[m restore web preview route and source rail interactions
+[33m3a42985[m web fetch stable source metadata rendering checkpoint
+[33m9c81014[m fix execution button capture handler
+[33m2e67923[m fix execution state render and console trigger
+[33m13e8cf3[m fix execution panel render state
+[33m2407572[m fix execution panel frontend state render
+[33m47ad3bf[m checkpoint execution panel run step working
+[33m04f8f40[m add targeted function fix execution move
+[33m83d1f73[m execute resolved execution moves and add apply file fix
+[33m6f54b9d[m advance execution next move from chain output
+[33m1394fb2[m persist execution chain result and next move state
+[33m07810bf[m wire chat service next command into dynamic execution chain
+[33mc3c3453[m switch execution handler to chain-based dynamic moves
+[33mf1a42e8[m lock explicit execution flow and add execution handler
+[33mece711a[m force execution mode from working state
+[33m52a6326[m pass session context into response intelligence
+[33m331fb9a[m[33m ([m[1;33mtag: [m[1;33mstable-chatservice-handle-restored-2026-05-01[m[33m, [m[1;33mtag: [m[1;33mfinal-polish-lock[m[33m)[m checkpoint: rail viewer polished safe replace
+[33m59bb0ee[m checkpoint: source preview metadata fallback
+[33m79b79a9[m checkpoint: disable auto source open
+[33mfd72d7a[m checkpoint: safe source click guard
+[33mc2d49ee[m checkpoint: baseline working state
+[33md0f531a[m checkpoint: memory style injection for SMFF responses
+[33m1a30e6e[m checkpoint: polish core answer behavior
+[33mca13eab[m checkpoint: lock response intelligence gate
+[33m4b7f0c4[m checkpoint: lock stuck prompt behavior
+[33mc15b890[m checkpoint: chat render guard and response polish stable
+[33m2b56a64[m checkpoint: chat render fixed + ui restored
+[33m54f8ecc[m checkpoint: premium chat polish complete
+[33md23110d[m fix: stop duplicate intelligence fallback response
+[33me82e06d[m[33m ([m[1;33mtag: [m[1;33mintelligence-helper-clean[m[33m)[m checkpoint: centralize response intelligence helper
+[33me7e410d[m[33m ([m[1;33mtag: [m[1;33mweb-fetch-85[m[33m)[m checkpoint: web fetch 85% complete, ranking built, output control pending, switching to intelligence layer
+[33m18b6f80[m checkpoint: before web fetch mastery
+[33m5bcf29c[m checkpoint: no duplicate chat, badge lock, send guard stable
+[33m8bcb37c[m checkpoint before quality score self-check upgrade
+[33mf249ae5[m checkpoint-core-chat-stable-no-execution-hijack
+[33m4f507d5[m checkpoint-stable-before-core-stabilization
+[33m85f01f1[m checkpoint-debug-intent-auto-open-file
+[33mb1db8e8[m checkpoint-debug-intent-login-recovery
+[33mb3b0895[m checkpoint-debugging-intent-rewrite-lock
+[33mca81318[m[33m ([m[1;33mtag: [m[1;33mintent-execution-lock[m[33m, [m[1;32mbackup-head[m[33m)[m intent + rewrite engine + execution-first lock
+[33m2796d5d[m memory delete fully wired
+[33mfccb890[m wire memory viewer click handling
+[33m46731bc[m memory click â†’ viewer working
+[33m1a58441[m current best state before leaving image routing
+[33m8d0421c[m lock image generation unified artifact path
+[33m302660d[m lock image generation preview and regenerate
+[33mdeab88b[m lock image generation preview and regenerate
+[33mf5bd459[m chat + memory + routing fully restored
+[33mad30a7a[m restore-chatservice-core-methods
+[33m0833e8c[m fix active handle recovery route
+[33m501feed[m recovery-mode-stable-baseline-2026-04-25
+[33mf6afae2[m checkpoint: execution-aware memory reasoning stable
+[33mac3aa47[m checkpoint: memory overwrite and personality memory stable
+[33ma062344[m checkpoint: memory routing cleanup and personality memory stable
+[33m3e59125[m checkpoint: memory cleanup and memory priority stable
+[33ma80107d[m checkpoint: chat stable after memory panel and web cleanup
+[33m24e52b9[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-memory-panel-start-2026-04-24[m[33m, [m[1;33mtag: [m[1;33mcheckpoint-2026-04-24[m[33m)[m checkpoint: stable build before next phase (memory panel + web fix)
+[33m1ef7864[m memory-write-panel-lock-2026-04-24
+[33m42c3efb[m memory-write-ui-click-lock-2026-04-24
+[33mc004891[m chat stable - general_chat fixed, no crashes
+[33m8f2391a[m artifact-delete-and-execution-restore-stable
+[33mdd7c7d1[m web-source-click-preview-lock
+[33m9c63670[m[33m ([m[1;33mtag: [m[1;33msource-preview-bullets-lock-2026-04-24[m[33m)[m Add source preview fetch summaries and bullet rail UI
+[33m045f42a[m[33m ([m[1;33mtag: [m[1;33msource-preview-fetch-image-lock-2026-04-24[m[33m)[m Source preview + fetch + image support complete
+[33m665857d[m[33m ([m[1;33mtag: [m[1;33mrss-source-preview-lock-2026-04-24[m[33m)[m Fix RSS news search and source preview rail
+[33m2340a3d[m[33m ([m[1;33mtag: [m[1;33mnova-web-search-rss-lock-2026-04-23[m[33m)[m Lock working web search fallback and structured source output
+[33ma38c3ea[m[33m ([m[1;33mtag: [m[1;33mexecution-stable-1[m[33m)[m execution loop fixed: step progression, persistence, and plan output working
+[33mc991939[m[33m ([m[1;33mtag: [m[1;33mnova-greeting-fix-lock[m[33m, [m[1;32mcheckpoint/greeting-fix[m[33m)[m fix: stabilize general_chat path + block model greeting fallback (assistant_text interception in execute_general_chat)
+[33m15da505[m[33m ([m[1;33mtag: [m[1;33mweb-artifact-viewer-lock-2026-04-22[m[33m)[m lock web artifact routing and viewer reopen
+[33m9f52ab9[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-before-real-search[m[33m)[m checkpoint before switching to real search
+[33mdb5c3d9[m[33m ([m[1;33mtag: [m[1;33mweb-fetch-live-tts-lock[m[33m)[m checkpoint: web fetch live + auto routing + tts working
+[33me832b08[m[33m ([m[1;33mtag: [m[1;33mweb-routing-stable-2026-04-20[m[33m, [m[1;33mtag: [m[1;33mchat-working-clean-base[m[33m)[m checkpoint web routing stable (auto url + search working)
+[33m25d5238[m[33m ([m[1;33mtag: [m[1;33mphase4-chat-stable-2026-04-20[m[33m)[m checkpoint: chat stable, duplicate assistant fixed, None bug resolved
+[33m5357179[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-session-sync-and-ui-cleanup-2026-04-20[m[33m)[m fix: session sync bridge restored and basic UI encoding cleanup
+[33mcaab882[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-session-sync-2026-04-20[m[33m)[m checkpoint: session sync bridge fixed + composer export restored + pre-encoding cleanup
+[33mfa8cdfc[m checkpoint before testing alternate restore
+[33me79d412[m[33m ([m[1;33mtag: [m[1;33mphase-4-execution-engine-stable[m[33m)[m checkpoint: execution engine working, extraction fix added
+[33mf8c487f[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-execution-render-base[m[33m)[m checkpoint: stable storage control and execution render path base
+[33mb5d3a0b[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-storage-control-lock[m[33m)[m checkpoint: storage control lock for sessions artifacts memory
+[33m3a7e50c[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-next-phase-lock[m[33m, [m[1;33mtag: [m[1;33mcheckpoint-execution-panel-stable[m[33m)[m checkpoint: stable after execution panel recovery + session lock fix
+[33m1ba72ef[m Phase 3 save: execution methods fixed and indentation corrected
+[33mee87e4f[m[33m ([m[1;33mtag: [m[1;33mphase3-backend-save[m[33m)[m Save point: backend methods _execute_current_step & _advance_execution_request fixed, indentation corrected
+[33m3bb43c5[m[33m ([m[1;33mtag: [m[1;33mlatest-safe[m[33m, [m[1;33mtag: [m[1;33mcheckpoint-execution-smarter-blocking-live-2026-04-18[m[33m, [m[1;32mmemory-panel-upgrade[m[33m)[m checkpoint: execution persistence + smarter blocking working
+[33m488d6cd[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-execution-stable-2026-04-18[m[33m)[m checkpoint: execution lane stable + handle() hardened + renderer fixes
+[33ma7fd21d[m[33m ([m[1;33mtag: [m[1;33mnova-execution-engine-v1[m[33m)[m checkpoint: step execution engine working (plan â†’ step â†’ output â†’ persist)
+[33mb874577[m[33m ([m[1;33mtag: [m[1;33mauto-exec-continuation-lock-2026-04-18[m[33m)[m lock auto-execution continuation and artifact save path
+[33mb2d1ce9[m[33m ([m[1;33mtag: [m[1;33mphase-4-memory-stable[m[33m, [m[1;33mtag: [m[1;33mphase-4-memory-save-recall-stable[m[33m, [m[1;33mtag: [m[1;33mphase-4-memory-recall-working[m[33m)[m fix: memory save and recall working in chat service
+[33m933de33[m[33m ([m[1;33mtag: [m[1;33mphase-4-continuity-summary-polish-stable[m[33m)[m polish: intent-aware continuity summaries for working state
+[33m02f74c4[m[33m ([m[1;33mtag: [m[1;33mphase-4-continuity-recall-verified[m[33m)[m checkpoint: continuity recall and general chat lane verified
+[33m16281d3[m[33m ([m[1;33mtag: [m[1;33mphase-4-model-restore-stable[m[33m)[m checkpoint: real model path restored with working-state continuity
+[33m663ed20[m[33m ([m[1;33mtag: [m[1;33mphase-4-working-state-stable[m[33m)[m checkpoint: working-state + working-context + continuity stable
+[33m5dbb7b9[m[33m ([m[1;33mtag: [m[1;33mworking-context-lock-2026-04-17[m[33m)[m checkpoint: working-context pipeline wired, frontend render ready, backend payload mismatch identified
+[33mfb0ce05[m checkpoint: memory recall path working
+[33m7e6b9a1[m checkpoint: memory match fixed + syntax stabilized
+[33mb8ffba8[m[33m ([m[1;33mtag: [m[1;33mSTABLE-RECOVERY-FULL-2026-04-15[m[33m)[m STABLE: full recovery â€” chat, web, image, memory all working
+[33m7b0e846[m[33m ([m[1;33mtag: [m[1;33mSTABLE-2026-04-15-recovery[m[33m, [m[1;32mstable-recovery-2026-04-15[m[33m)[m STABLE: recovery checkpoint â€” chat, memory, artifacts working; server boot restored
+[33m25c06ae[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-copy-regen-fixed[m[33m)[m checkpoint: copy + regenerate fixed, artifact bridge stable
+[33m702057b[m checkpoint: image generation backend live, uploads writing, no crash
+[33m16acd07[m checkpoint: image generation pipeline working end-to-end
+[33m795ebc6[m Restore clean chat_service baseline
+[33m8f84909[m[33m ([m[1;33mtag: [m[1;33mPHASE-4-PRE-MEMORY-PANEL[m[33m, [m[1;32mrestore-session-family-lock[m[33m)[m checkpoint: backend route contract lock for chat sessions state upload
+[33m1c3aa93[m checkpoint: backend alive, routes working, frontend sync issues remain
+[33m8fbb0a7[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-sidebar-broken-20260413-1221[m[33m)[m checkpoint: chat stable, enter send working, initial delay ok, sidebar broken
+[33m036f48c[m[33m ([m[1;33mtag: [m[1;33mNOVA-STREAM-STABLE-2026-04-13[m[33m)[m checkpoint: stream stable + upload fix + image gen placeholder working + syntax fix
+[33m8aa4289[m[33m ([m[1;33mtag: [m[1;33mPART1_SAFE_LOCK[m[33m)[m checkpoint: uploads route path lock + boot/state restore stable
+[33mbe23193[m checkpoint: stream polish + chat transport fix stable
+[33m36873c6[m[33m ([m[1;33mtag: [m[1;33mSTABLE_SEND_IMAGE_2026-04-10[m[33m)[m checkpoint: stable json send + image working
+[33m8a9917e[m[33m ([m[1;33mtag: [m[1;33mIMAGE_WORKING_2026-04-10[m[33m)[m checkpoint: image generation + chat image render working
+[33m0866e83[m phase 4: right rail artifacts polish stable + session routing fix
+[33m1c06e68[m checkpoint: rail tabs fixed + panel switching working + reopen stable
+[33m4025cf4[m[33m ([m[1;33mtag: [m[1;33mRIGHT-PANEL-FIX-STABLE-2026-04-09[m[33m)[m checkpoint: right panel reopen fixed + rail restore working + full shell sync stable
+[33m4743f4e[m checkpoint: current-info router repaired + app boot restored
+[33mb97f489[m checkpoint: chat_single_response fixed + video mapping stable + non-stream chat working
+[33m2101db8[m[33m ([m[1;33mtag: [m[1;33mstable-chat-web-video-lock[m[33m)[m fix: web route helper import + syntax repair + chat restored
+[33mb4e8831[m checkpoint: helper-split-foundation-locked
+[33mcdd7a8d[m checkpoint: web-fetch-auto-route-locked
+[33m94d4d41[m checkpoint: video-pipeline-pass-2-locked
+[33mcd59013[m[33m ([m[1;33mtag: [m[1;33mapi-chat-thin-wrapper-locked[m[33m)[m checkpoint: api-chat-thin-wrapper-locked
+[33mf474cf2[m[33m ([m[1;33mtag: [m[1;33mUI_POLISH_START[m[33m)[m checkpoint: agent brain + tool follow-through + cleanup lock (pre-ui-polish)
+[33md5bded1[m checkpoint: premium ui lock + stream ui stability
+[33mce2296b[m checkpoint: UI lock + sidebar + stream stable
+[33maeea9a7[m checkpoint: D5 brain + stream stable + memory fixed
+[33m616ee2f[m[33m ([m[1;33mtag: [m[1;33mui-premium-start-2026-04-07[m[33m)[m checkpoint: memory + personality lock stable before UI premium pass
+[33m94a617e[m[33m ([m[1;33mtag: [m[1;33msession-switch-stream-safety-lock-2026-04-07[m[33m)[m lock session switch stream safety and restore chat flow
+[33mc1adeb9[m[33m ([m[1;33mtag: [m[1;33mregenerate-artifact-autosave-lock-2026-04-07[m[33m)[m lock regenerate and assistant artifact autosave
+[33m26cc23a[m[33m ([m[1;33mtag: [m[1;33mregenerate-artifact-autosave-lock-prep-2026-04-07[m[33m)[m regenerate + artifact autosave lock prep
+[33mf18be66[m[33m ([m[1;33mtag: [m[1;33mupload-toast-fix-2026-04-07-001[m[33m)[m fix duplicate throw in upload toast path
+[33md8a1336[m[33m ([m[1;33mtag: [m[1;33mattachment-ui-weld-pass-2026-04-07-001[m[33m)[m attachment ui weld pass
+[33m2bb6076[m[33m ([m[1;33mtag: [m[1;33mattachment-pipeline-dom-frontend-lock-2026-04-07-001[m[33m)[m attachment pipeline dom + frontend lock
+[33m1dbecf3[m fix: body class sync for overlay dim
+[33mf1d1d69[m[33m ([m[1;33mtag: [m[1;33moverlay-dim-css-pass-2026-04-06-2[m[33m, [m[1;33mtag: [m[1;33moverlay-dim-css-pass-2026-04-06[m[33m)[m checkpoint: overlay dim css pass welded into nova-main
+[33mc59b3d3[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-message-actions-regenerate-2026-04-06-001[m[33m)[m lock message actions and regenerate visual pass
+[33m0c4d238[m[33m ([m[1;33mtag: [m[1;33mrail-flow-lock-2026-04-06-001[m[33m)[m rail-flow-lock-2026-04-06-001: session actions and artifact open flow tightened
+[33ma8c319a[m[33m ([m[1;33mtag: [m[1;33mstreaming-upgrade-lock-2026-04-06-001[m[33m)[m streaming-upgrade-lock-2026-04-06-001: add /api/chat/stream and live chat rendering
+[33m52b604c[m[33m ([m[1;33mtag: [m[1;33mui-final-feel-lock-2026-04-06-001[m[33m, [m[1;32mcheckpoint/ui-final-feel-lock-2026-04-06-001[m[33m)[m ui-final-feel-lock-2026-04-06-001: shell + sidebar + rail + chat polish locked
+[33mf9cc80d[m checkpoint: session family backend-true lock
+[33m590ea90[m checkpoint: backend-true session switch lock
+[33m8e9b7bd[m checkpoint: backend-true session switch + safer post-send refresh + stable artifact viewer
+[33mea95b7a[m checkpoint: before chat experience upgrade (stream + grouping + scroll)
+[33m111a1dc[m checkpoint: matched shell restored + scroll working
+[33m716d4bb[m[33m ([m[1;33mtag: [m[1;33mcomposer-pre-streaming-upgrade[m[33m)[m checkpoint: before composer full streaming upgrade
+[33m43a9377[m[33m ([m[1;33mtag: [m[1;33mroute-intelligence-stable-2026-04-03[m[33m)[m feat: add route intelligence with mode instructions and saved route metadata
+[33m477ba68[m[33m ([m[1;33mtag: [m[1;33mstreaming-ui-stable-2026-04-03[m[33m)[m feat: add frontend streaming reveal for assistant replies
+[33md253067[m[33m ([m[1;33mtag: [m[1;33mroute-debug-toggle-stable-2026-04-03[m[33m)[m feat: add topbar route debug toggle
+[33m5f7c463[m[33m ([m[1;33mtag: [m[1;33mroute-badge-hotfix-2026-04-03[m[33m)[m fix: restore getRouteMeta helper for route badges
+[33m28f6c3d[m[33m ([m[1;33mtag: [m[1;33mroute-metadata-lock-2026-04-03[m[33m)[m checkpoint: route_request + mode instructions + route metadata lock
+[33mbfb5a58[m checkpoint: /web + /image backend lock working
+[33m9bd620c[m checkpoint: sessions chat upload restored before artifacts rail finish
+[33mab7346a[m[33m ([m[1;33mtag: [m[1;33mmain-scroll-lock-fixed[m[33m)[m main scroll lock fixed + session mutation lock
+[33mb433df9[m phase-4-stable-image-working
+[33mba19fd0[m checkpoint: real image analysis live
+[33m403d490[m checkpoint: web panel working + auto-router stable
+[33mc4b4f44[m checkpoint: before web panel contract fix
+[33mcc966fe[m fix: clean single chat route + removed duplicate router
+[33m629f4fb[m[33m ([m[1;33mtag: [m[1;33mphase-4-artifact-media-lock[m[33m)[m checkpoint: artifact media engine + composer stable + artifact viewer + UI contract synced
+[33m342d9b1[m[33m ([m[1;33mtag: [m[1;33mweb-fetch-ssl-lock-2026-04-02[m[33m)[m checkpoint: web fetch + SSL fallback working, pre auto-route
+[33me4831d3[m artifact session switch + auto open stable lock
+[33mb1aab50[m simple artifact click session switch lock
+[33ma2b14c9[m[33m ([m[1;32mcheckpoint-stable-shell-after-rollback-2026-04-02[m[33m)[m restore stable shell from 226604c checkpoint
+[33m226604c[m lock artifact image save reopen reuse in stable shell
+[33mb3074f5[m artifacts polished on stable base
+[33md7c78d8[m artifacts viewer working baseline
+[33m2ed6be4[m stable rollback baseline re-locked
+[33mf13085f[m[33m ([m[1;33mtag: [m[1;33mSTABLE-2026-03-31[m[33m)[m STABLE BASELINE: chat + UI + responsive + working send/upload
+[33m072a78d[m composer upload to chat normalized media contract wired
+[33m45fac64[m media-render-path polish image video audio in chat and artifacts
+[33m4b7b63a[m backend-lock-stable-2026-03-31 media-prep checkpoint (chat + artifacts + memory unified, no streaming yet)
+[33mafe5519[m checkpoint: session rail + composer restore + left/right rail controls
+[33mb293347[m wire composer with session rail switching and refresh flow
+[33m3e53c73[m wire session rail list switch refresh and new chat flow
+[33m62bf01c[m add session rail and session switching flow
+[33ma27850e[m finish real session persistence and restore pipeline
+[33m2554399[m stabilize rendered message hooks for session history restore
+[33m12de6f0[m persist session messages and restore chat on load
+[33m93f044f[m history pipeline wired and visible in chat
+[33m38830f7[m show history badge in chat responses
+[33m5a29a95[m frontend sends recent chat history to backend
+[33m7f5d64f[m history pass-through on real model path
+[33mce05409[m checkpoint: unified chat render contract + stable api chat payload + unified right rail
+[33mb0ae2ec[m phase attachments brain working 2026-03-29
+[33mfbfeb8c[m knowledge route + real web sources + source badges checkpoint
+[33mc27ecda[m[33m ([m[1;32msave-source-artifacts[m[33m)[m checkpoint: endgame index + artifacts + source viewer working
+[33m62b2a59[m phase-image-stack-complete
+[33md187abf[m[33m ([m[1;33mtag: [m[1;33mphase3-chat-web-image-working[m[33m)[m checkpoint: chat web fetch and image description working
+[33m36e77e8[m checkpoint: chat web fetch and image description working
+[33m2a0d554[m wire chat runtime into index and add missing ui hooks
+[33m79b5dec[m stabilize chat send flow and render event bridge
+[33m1f7e721[m make artifact service persist unified media contract
+[33maed3a14[m make chat service emit unified media contract
+[33m8e7bdab[m wire unified media web routes and debug payload contract
+[33m4615804[m web service upgraded for media fetch image video audio previews
+[33m34e6d00[m backend route contract pass + live route and stream parity
+[33ma1a2070[m checkpoint 2026-03-27_21-29-40
+[33mb4407d9[m add gitignore (clean saves going forward)
+[33mb0fd097[m cleanup: remove pycache + embedded repo
+[33m3b85fd2[m auto-save checkpoint 2026-03-27_21-27-43
+[33m6813074[m endgame app import parity and web debug route fix
+[33m7fd217a[m endgame web context + route parity + stream prep checkpoint
+[33m0e44638[m[33m ([m[1;32mbackup-origin-main-before-web-fetch-merge[m[33m)[m phase 3.5 artifact rail and message action polish pass
+[33me124e0a[m phase 3.5 targeted stabilization pass for render and artifacts
+[33m24f97f6[m phase 3.5 launch stabilization checkpoint (render + artifacts stable base)
+[33m3575426[m artifact route response parity checkpoint
+[33m5193c80[m send-chain pre-recovery checkpoint 2026-03-25_21-24-55
+[33mf210242[m regenerate theme memory toggle fix
+[33m0368d12[m restore panel alignment bootstrap api stream and copy regenerate ui
+[33m6617274[m fix nova-main.css corruption and restore panel collapse behavior
+[33mbd05758[m save: memory render polish + split shell stabilization
+[33m6cdef2d[m phase 1 split state api dom
+[33m279f78a[m PHASE 6 COMPLETE - modular backend stable
+[33m396f9ea[m phase 3 checkpoint - source cards polish + memory delete polish + web fetch intelligence
+[33mb6e3db5[m phase 3 FINAL - web fetch intelligence + stable UI + memory + agent
+[33mf022602[m LAUNCH READY CHECKPOINT - auth + routing stable
+[33m3363882[m real auth system with register login and protected routes
+[33m696214b[m add mobile route and avoid index collision
+[33m4a826ed[m final remove duplicate index route
+[33m410cf73[m set mobile as default route
+[33m909c735[m serve mobile as default route
+[33m34ad551[m replace bloated requirements with deploy-safe set
+[33m64a8471[m nova pre-v2 master save
+[33m34fa562[m launch polish checkpoint
+[33m7d72a45[m render hardening pass
+[33mb8b9d62[m mobile update
+[33m60b929d[m fix requirements remove start command
+[33m7066a67[m production crash trace + gunicorn
+[33ma5e756d[m render session credentials fix
+[33mf961d94[m render port fix
+[33md9bf16b[m render host port fix
+[33mf7a0620[m[33m ([m[1;33mtag: [m[1;33mmobile-rescue-checkpoint[m[33m, [m[1;32msafe-next-pass[m[33m, [m[1;32mmobile-v1-parity[m[33m)[m phase 4 latest local working build
+[33m6783aa4[m phase 4 deployment readiness pass
+[33mc58d007[m phase 4 stable mobile desktop checkpoint
+[33m29c331b[m phase 4 stream stable endgame checkpoint
+[33maa09726[m pre-surgical-stream-fix
+[33m6702929[m phase 4 router meta fully wired
+[33m57e4363[m phase 4 pre-endgame save
+[33m4cfb2db[m phase 3 stable restore (working baseline)
+[33mf95f467[m stable desktop checkpoint before mobile restore
+[33md5c2faf[m restore desktop to stable checkpoint
+[33m1920c49[m FINAL POLISH PASS - V1 COMPLETE
+[33m091d319[m phase 3 modular system stabilized
+[33mcbe2938[m SAVEPOINT: phase 3 stable before all-for-one polish pass
+[33m8418880[m phase3-brain-router-hook: index wired to brain router panel script
+[33m28edec2[m phase 3 UI responsive + repair layer working
+[33me7f6b2d[m phase 3 index css sync restore point
+[33ma5a2a0f[m v1 final backup desktop and mobile polished
+[33m3f33201[m mobile straighten pass
+[33me0adf3f[m cache bust css and js
+[33mc4f0a00[m phase 3 mobile full overlay fix (no more squeeze)
+[33mba65bfc[m mobile css fix
+[33md6e4eb9[m restore working nova css
+[33m1c7b02f[m add fastapi for render deploy
+[33m16804db[m final fix uvicorn added
+[33m123cdc7[m cleanup backup recursion + final test
+[33m667be6a[m victory pass duplicate background search stable
+[33m83e4195[m FINAL PRE VICTORY PASS SAFE POINT
+[33m4335671[m final cleanup pass complete
+[33m62b1578[m stable restore point all core features working except background
+[33md87082f[m stable restore point before attachment merge
+[33m02b12e3[m restore phase 3 clean ui
+[33m96e6da6[m phase 3 CLEAN save (removed recursive backups, stable state)
+[33m4327033[m phase 3 session controls theme background ui actions working
+[33m5b55b8d[m add gitignore clean project
+[33m29836c8[m final render setup full requirements
+[33m9fe105c[m fix: add flask for render
+[33m9d9702b[m add uvicorn for render deploy
+[33mc897110[m describe the change
+[33me0db29b[m simplify requirements for deploy
+[33mc48e39c[m phase 4 visual polish backgrounds session row actions
+[33m204dca4[m phase 4 launch prep files cleaned
+[33m3ed4768[m phase 3.2 real upload backend working
+[33md0697a6[m phase 3.1 duplicate session backend and ui working
+[33m22a222a[m phase 3 checkpoint ui wired theme background pin voice attachments local
+[33meeb7c77[m phase 5 memory intelligence working
+[33mcc5a6ef[m phase 4 stable - layout fixed + memory working
+[33m5bec6be[m phase 4 context memory upgrade working
+[33ma457ead[m phase 3 chat core and streaming working
+[33me25626c[m Fix FastAPI requirements for Render
+[33m9b54600[m Simplify requirements for Render deploy
+[33m3f8e44c[m Expand gitignore for backups and build artifacts
+[33madfe057[m Add gitignore for secrets
+[33me56f000[m Nova V1 deploy ready
+

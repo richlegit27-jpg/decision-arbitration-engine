@@ -1,4 +1,4 @@
-class RuntimeEngineFusionService:
+﻿class RuntimeEngineFusionService:
     def _safe_dict(self, value):
         return value if isinstance(value, dict) else {}
 
@@ -57,3 +57,4 @@ class RuntimeEngineFusionService:
             )
 
         return fused
+

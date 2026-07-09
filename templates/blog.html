@@ -1,162 +1,324 @@
-<!doctype html>
-<html lang="en" data-theme="dark">
+﻿<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Nova Blog</title>
-  <link rel="stylesheet" href="/static/css/nova-blog.css">
+    <meta charset="utf-8">
+    <title>Nova Blog</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+        :root {
+            --bg: #070712;
+            --card: rgba(15, 23, 42, 0.84);
+            --card2: rgba(30, 41, 59, 0.72);
+            --text: #f8fafc;
+            --muted: rgba(226, 232, 240, 0.68);
+            --line: rgba(216, 180, 254, 0.22);
+            --purple: #a855f7;
+            --purple2: #7c3aed;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at top left, rgba(168, 85, 247, 0.22), transparent 34%),
+                radial-gradient(circle at bottom right, rgba(124, 58, 237, 0.15), transparent 32%),
+                var(--bg);
+            color: var(--text);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        a {
+            color: inherit;
+        }
+
+        .page {
+            width: min(1120px, calc(100% - 28px));
+            margin: 0 auto;
+            padding: 22px 0 46px;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+
+        .brand {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .brand strong {
+            font-size: 18px;
+            letter-spacing: -0.04em;
+        }
+
+        .brand span {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 750;
+        }
+
+        .nav {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .nav a {
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 900;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(168, 85, 247, 0.12);
+        }
+
+        .nav a.primary {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.38), rgba(124, 58, 237, 0.22));
+        }
+
+        .hero {
+            padding: 30px;
+            border: 1px solid var(--line);
+            border-radius: 28px;
+            background:
+                linear-gradient(135deg, rgba(168, 85, 247, 0.22), rgba(15, 23, 42, 0.72)),
+                var(--card);
+            box-shadow: 0 24px 65px rgba(0, 0, 0, 0.34);
+            margin-bottom: 18px;
+        }
+
+        .eyebrow {
+            color: #d8b4fe;
+            font-size: 12px;
+            font-weight: 950;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            margin: 0;
+            max-width: 760px;
+            font-size: clamp(34px, 7vw, 68px);
+            line-height: 0.94;
+            letter-spacing: -0.07em;
+        }
+
+        .hero p {
+            max-width: 660px;
+            color: var(--muted);
+            margin: 16px 0 0;
+            font-size: 15px;
+            line-height: 1.65;
+            font-weight: 650;
+        }
+
+        .posts {
+            display: grid;
+            gap: 14px;
+        }
+
+        .post {
+            display: block;
+            text-decoration: none;
+            padding: 18px;
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            background: var(--card);
+            transition: transform 0.16s ease, border-color 0.16s ease;
+        }
+
+        .post:hover {
+            transform: translateY(-2px);
+            border-color: rgba(216, 180, 254, 0.36);
+        }
+
+        .post h2 {
+            margin: 0 0 8px;
+            font-size: 24px;
+            line-height: 1.05;
+            letter-spacing: -0.045em;
+        }
+
+        .post p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.55;
+            font-weight: 600;
+        }
+
+        .meta {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+
+        .pill {
+            padding: 6px 9px;
+            border-radius: 999px;
+            background: rgba(168, 85, 247, 0.13);
+            border: 1px solid rgba(216, 180, 254, 0.18);
+            color: #f8fafc;
+            font-size: 11px;
+            font-weight: 900;
+        }
+
+        .empty {
+            padding: 22px;
+            border: 1px dashed rgba(216, 180, 254, 0.30);
+            border-radius: 22px;
+            color: var(--muted);
+            background: rgba(15, 23, 42, 0.48);
+            font-weight: 700;
+        }
+
+        @media (max-width: 820px) {
+            .topbar {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .nav {
+                justify-content: flex-start;
+            }
+
+            .hero {
+                padding: 22px;
+            }
+        }
+    </style>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <link rel="manifest" href="/static/site.webmanifest">
+    <meta name="theme-color" content="#8b5cf6">
+    <!-- NOVA_SOCIAL_META_20260709 -->
+    <link rel="canonical" href="{{ request.url_root.rstrip('/') }}/blog">
+    <meta property="og:site_name" content="Nova">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Nova Blog">
+    <meta property="og:description" content="Nova product updates, build notes, and public launch progress.">
+    <meta property="og:url" content="{{ request.url_root.rstrip('/') }}/blog">
+    <meta property="og:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
+    <meta property="og:image:type" content="image/svg+xml">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Nova Blog">
+    <meta name="twitter:description" content="Nova product updates, build notes, and public launch progress.">
+    <meta name="twitter:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
+    <!-- /NOVA_SOCIAL_META_20260709 -->
 </head>
+
 <body>
-  <div class="blog-shell">
-    <header class="blog-topbar">
-      <div class="blog-topbar-left">
-        <a class="blog-brand" href="/">
-          <span class="blog-brand-badge">N</span>
-          <span class="blog-brand-text">
-            <span class="blog-brand-title">Nova</span>
-            <span class="blog-brand-subtitle">Blog</span>
-          </span>
-        </a>
-      </div>
+    <main class="page">
+        <header class="topbar">
+            <div class="brand">
+                <strong>Nova Blog</strong>
+                <span>updates, notes, experiments</span>
+            </div>
 
-      <div class="blog-topbar-right">
-        <a class="blog-topbar-btn" href="/">Back to Nova</a>
-      </div>
-    </header>
+            <nav class="nav">
+                <a href="/">Home</a>
+                <a href="/mobile">Mobile</a>
+                <a href="/blog">Blog</a>
+                <a href="/contact">Contact</a>
+                <a class="primary" href="/blog/write">Write</a>
+            </nav>
+        </header>
 
-    <main class="blog-main">
-      <section class="blog-hero">
-        <div class="blog-hero-copy">
-          <div class="blog-eyebrow">Nova Journal</div>
-          <h1>Thoughts, build notes, and lessons from the road.</h1>
-          <p>
-            This is the content side of Nova. Use it for updates, ideas, product notes,
-            learning breakdowns, and your story.
-          </p>
-        </div>
+        <section class="hero">
+            <div class="eyebrow">Nova Journal</div>
+            <h1>Build notes, updates, and thoughts.</h1>
+            <p>
+                Write posts from the editor, save them locally to Nova, and read them here.
+            </p>
+        </section>
 
-        <div class="blog-hero-card">
-          <div class="blog-hero-card-label">Current Focus</div>
-          <div class="blog-hero-card-title">Version 1 is live</div>
-          <div class="blog-hero-card-text">
-            Desktop polished. Mobile shell built. Memory and sessions wired.
-            Next phase: content and intelligence.
-          </div>
-        </div>
-      </section>
-
-      <section class="blog-toolbar">
-        <div class="blog-search-wrap">
-          <input id="blogSearchInput" class="blog-search-input" type="text" placeholder="Search posts...">
-        </div>
-
-        <div class="blog-filter-wrap">
-          <button class="blog-filter-btn active" data-filter="all" type="button">All</button>
-          <button class="blog-filter-btn" data-filter="build" type="button">Build</button>
-          <button class="blog-filter-btn" data-filter="mindset" type="button">Mindset</button>
-          <button class="blog-filter-btn" data-filter="learning" type="button">Learning</button>
-        </div>
-      </section>
-
-      <section class="blog-grid" id="blogGrid">
-        <article class="blog-card featured" data-category="build">
-          <div class="blog-card-meta">
-            <span class="blog-card-tag">Build</span>
-            <span class="blog-card-date">March 21, 2026</span>
-          </div>
-          <h2 class="blog-card-title">Nova v1: from rough idea to working app</h2>
-          <p class="blog-card-excerpt">
-            Version 1 became real: sessions, memory, uploads, mobile shell, desktop polish,
-            and a real UI that finally feels like a product instead of a test bench.
-          </p>
-          <button class="blog-read-btn" type="button" data-post="v1-launch">Read post</button>
-        </article>
-
-        <article class="blog-card" data-category="mindset">
-          <div class="blog-card-meta">
-            <span class="blog-card-tag">Mindset</span>
-            <span class="blog-card-date">March 21, 2026</span>
-          </div>
-          <h2 class="blog-card-title">Why momentum matters more than perfection</h2>
-          <p class="blog-card-excerpt">
-            A clean move forward beats getting trapped trying to make every screen perfect
-            before the product even exists.
-          </p>
-          <button class="blog-read-btn" type="button" data-post="momentum">Read post</button>
-        </article>
-
-        <article class="blog-card" data-category="learning">
-          <div class="blog-card-meta">
-            <span class="blog-card-tag">Learning</span>
-            <span class="blog-card-date">March 21, 2026</span>
-          </div>
-          <h2 class="blog-card-title">Building while learning: the fast way to level up</h2>
-          <p class="blog-card-excerpt">
-            There is a difference between reading about app building and actually surviving
-            the friction of making one work.
-          </p>
-          <button class="blog-read-btn" type="button" data-post="building-while-learning">Read post</button>
-        </article>
-
-        <article class="blog-card" data-category="build">
-          <div class="blog-card-meta">
-            <span class="blog-card-tag">Build</span>
-            <span class="blog-card-date">March 21, 2026</span>
-          </div>
-          <h2 class="blog-card-title">Desktop and mobile should feel related, not identical</h2>
-          <p class="blog-card-excerpt">
-            Mobile is not just a squeezed desktop screen. It needs its own shell, spacing,
-            controls, and flow.
-          </p>
-          <button class="blog-read-btn" type="button" data-post="desktop-vs-mobile">Read post</button>
-        </article>
-
-        <article class="blog-card" data-category="mindset">
-          <div class="blog-card-meta">
-            <span class="blog-card-tag">Mindset</span>
-            <span class="blog-card-date">March 21, 2026</span>
-          </div>
-          <h2 class="blog-card-title">Why I want Nova to be more than a basic chatbot</h2>
-          <p class="blog-card-excerpt">
-            The goal is not to clone what already exists. The goal is to build something
-            with identity, usefulness, and a real point of view.
-          </p>
-          <button class="blog-read-btn" type="button" data-post="more-than-chatbot">Read post</button>
-        </article>
-
-        <article class="blog-card" data-category="learning">
-          <div class="blog-card-meta">
-            <span class="blog-card-tag">Learning</span>
-            <span class="blog-card-date">March 21, 2026</span>
-          </div>
-          <h2 class="blog-card-title">What shipping version 1 actually teaches you</h2>
-          <p class="blog-card-excerpt">
-            Real lessons do not come from tutorials alone. They come from breakage, fixes,
-            backups, decisions, and pushing through.
-          </p>
-          <button class="blog-read-btn" type="button" data-post="what-v1-teaches">Read post</button>
-        </article>
-      </section>
+        <section class="posts" id="posts">
+            <div class="empty">Loading posts...</div>
+        </section>
     </main>
-  </div>
 
-  <div id="blogPostModal" class="blog-modal hidden" aria-hidden="true">
-    <div class="blog-modal-backdrop" data-close-modal="true"></div>
+    <script>
+        function escapeHtml(value) {
+            return String(value || "").replace(/[&<>"']/g, function (char) {
+                return {
+                    "&": "&amp;",
+                    "<": "&lt;",
+                    ">": "&gt;",
+                    '"': "&quot;",
+                    "'": "&#039;"
+                }[char];
+            });
+        }
 
-    <div class="blog-modal-panel">
-      <div class="blog-modal-header">
-        <div>
-          <div id="blogModalTag" class="blog-modal-tag">Post</div>
-          <h2 id="blogModalTitle" class="blog-modal-title">Blog post</h2>
-        </div>
+        function formatDate(value) {
+            if (!value) return "Draft";
+            try {
+                return new Date(value).toLocaleString();
+            } catch (_) {
+                return value;
+            }
+        }
 
-        <button id="closeBlogModalBtn" class="blog-close-btn" type="button" aria-label="Close post">✕</button>
-      </div>
+        async function loadPosts() {
+            const root = document.getElementById("posts");
 
-      <div id="blogModalBody" class="blog-modal-body"></div>
-    </div>
-  </div>
+            try {
+                const data = await fetch("/api/blog/posts").then(function (res) {
+                    return res.json();
+                });
 
-  <script src="/static/js/nova-blog.js"></script>
+                const posts = Array.isArray(data.posts) ? data.posts : [];
+
+                if (!posts.length) {
+                    root.innerHTML = '<div class="empty">No posts yet. Click Write to make your first one.</div>';
+                    return;
+                }
+
+                root.innerHTML = posts.map(function (post) {
+                    const tags = Array.isArray(post.tags) ? post.tags : [];
+
+                    return [
+                        '<a class="post" href="/blog/' + encodeURIComponent(post.slug) + '">',
+                            '<h2>' + escapeHtml(post.title) + '</h2>',
+                            '<p>' + escapeHtml(post.excerpt || "") + '</p>',
+                            '<div class="meta">',
+                                '<span class="pill">' + escapeHtml(formatDate(post.created_at)) + '</span>',
+                                tags.map(function (tag) {
+                                    return '<span class="pill">' + escapeHtml(tag) + '</span>';
+                                }).join(""),
+                            '</div>',
+                        '</a>'
+                    ].join("");
+                }).join("");
+            } catch (error) {
+                root.innerHTML = '<div class="empty">Could not load posts.</div>';
+            }
+        }
+
+        loadPosts();
+    </script>
+
+        <footer class="nova-public-legal-strip" aria-label="Nova legal links">
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Terms</a>
+        </footer>
 </body>
 </html>
+
+
+
+
+

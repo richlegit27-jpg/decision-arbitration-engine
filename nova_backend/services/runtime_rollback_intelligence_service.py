@@ -1,4 +1,4 @@
-class RuntimeRollbackIntelligenceService:
+﻿class RuntimeRollbackIntelligenceService:
     def __init__(
         self,
         max_snapshots=10,
@@ -146,3 +146,4 @@ class RuntimeRollbackIntelligenceService:
             "rollback_target": rollback_target,
             "rollback_history": rollback_history,
         }
+

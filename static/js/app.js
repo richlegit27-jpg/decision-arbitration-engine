@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 const STORAGE_KEY = "nova_active_chat_id";
@@ -190,14 +190,14 @@ function renderAttachedFiles(){
   el.attachedFilesBar.style.display = "flex";
   el.attachedFilesBar.innerHTML = state.attachedFiles.map((file, index) => `
     <div class="mini-chip" data-file-index="${index}">
-      <span>📎 ${escapeHtml(file.name)}</span>
+      <span>ðŸ“Ž ${escapeHtml(file.name)}</span>
       <button
         type="button"
         class="icon-btn"
         data-remove-file="${index}"
         title="Remove file"
         style="width:24px;height:24px;min-height:24px;padding:0;"
-      >✕</button>
+      >âœ•</button>
     </div>
   `).join("");
 }
@@ -243,7 +243,7 @@ function renderActiveChatCard(){
       el.activeChatMeta.textContent = "0 messages";
     }else{
       const messageCount = getActiveMessages().length || Number(activeChat.message_count || 0);
-      const updated = activeChat.updated_at ? ` • Updated ${formatTime(activeChat.updated_at)}` : "";
+      const updated = activeChat.updated_at ? ` â€¢ Updated ${formatTime(activeChat.updated_at)}` : "";
       el.activeChatMeta.textContent = `${formatCount(messageCount)}${updated}`;
     }
   }
@@ -273,7 +273,7 @@ function renderMessages(){
   if(!state.activeChatId){
     el.chatMessages.innerHTML = `
       <div class="empty-state-card fade-in">
-        <div class="empty-icon">💬</div>
+        <div class="empty-icon">ðŸ’¬</div>
         <h3>No active chat</h3>
         <p>Create a new chat to get moving.</p>
       </div>
@@ -284,7 +284,7 @@ function renderMessages(){
   if(!messages.length){
     el.chatMessages.innerHTML = `
       <div class="empty-state-card fade-in">
-        <div class="empty-icon">⚡</div>
+        <div class="empty-icon">âš¡</div>
         <h3>New chat ready</h3>
         <p>Type a message to start the conversation.</p>
       </div>
@@ -755,3 +755,4 @@ async function init(){
 
 document.addEventListener("DOMContentLoaded", init);
 })();
+

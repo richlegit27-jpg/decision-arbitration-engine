@@ -1,4 +1,4 @@
-/* notepad C:\Users\Owner\nova\static\js\auth.js */
+﻿/* notepad C:\Users\Owner\nova\static\js\auth.js */
 
 (() => {
 "use strict";
@@ -84,7 +84,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function renderAuthState(data) {
     const authenticated = Boolean(data && data.authenticated);
-    const username = authenticated ? String(data.username || "") : "";
+        // NOVA_AUTH_USER_SHAPE_FIX_20260610
+    const user = data && data.user ? data.user : {};
+    const username = authenticated ? String(user.username || data.username || "") : "";
 
     document.body.dataset.authenticated = authenticated ? "true" : "false";
 
@@ -219,7 +221,13 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         const data = await login(username, password);
         if (el.loginPassword) el.loginPassword.value = "";
-        window.location.href = data.redirect_to || "/app";
+        
+        // NOVA_AUTH_SUCCESS_REDIRECT_REGEX_20260610
+        if (data && data.authenticated) {
+          window.location.href = "/mobile";
+          return;
+        }
+window.location.href = data.redirect_to || "/app";
       } catch (error) {
         setMessage(error.message, "error");
       }
@@ -241,7 +249,13 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         const data = await register(username, password);
         if (el.registerPassword) el.registerPassword.value = "";
-        window.location.href = data.redirect_to || "/app";
+        
+        // NOVA_AUTH_SUCCESS_REDIRECT_REGEX_20260610
+        if (data && data.authenticated) {
+          window.location.href = "/mobile";
+          return;
+        }
+window.location.href = data.redirect_to || "/app";
       } catch (error) {
         setMessage(error.message, "error");
       }
@@ -293,3 +307,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 });
 })();
+
+
+
+

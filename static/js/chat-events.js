@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat-events.js
+﻿// C:\Users\Owner\nova\static\js\chat-events.js
 
 (() => {
 "use strict"
@@ -227,3 +227,4 @@ window.NovaChatEvents = {
 }
 
 })()
+

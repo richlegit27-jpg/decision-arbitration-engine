@@ -66,9 +66,10 @@
       const resize = () => {
         try{
           ta.style.height = "auto";
-          const max = 260;
+          const max = 96;
           const h = Math.min(max, ta.scrollHeight || 0);
           ta.style.height = (h || 0) + "px";
+ta.style.overflowY = ta.scrollHeight > max ? "auto" : "hidden";
         }catch(_){}
       };
 
@@ -293,3 +294,5 @@
 
   window.__NOVA_GOLDEN_PATCH__ = { v: "11" };
 })();
+
+

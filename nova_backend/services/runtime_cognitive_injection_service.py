@@ -1,4 +1,4 @@
-class RuntimeCognitiveInjectionService:
+﻿class RuntimeCognitiveInjectionService:
     """
     Converts large runtime state into a small cognition-safe summary.
 
@@ -153,3 +153,4 @@ class RuntimeCognitiveInjectionService:
             return summary + "\n\n" + existing_context
 
         return summary
+

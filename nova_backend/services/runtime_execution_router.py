@@ -1,4 +1,4 @@
-class RuntimeExecutionRouter:
+﻿class RuntimeExecutionRouter:
 
     name = "runtime_execution_router"
 
@@ -151,3 +151,4 @@ class RuntimeExecutionRouter:
             "supervision_mode": supervision_mode,
             "operating_mode": operating_mode,
         }
+

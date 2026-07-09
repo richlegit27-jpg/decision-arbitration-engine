@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict"
 
 function createComposerAttachments(options = {}){
@@ -66,11 +66,11 @@ function createComposerAttachments(options = {}){
     const lowerName = String(name || "").toLowerCase()
 
     if(lowerType.includes("image/")){
-      return "🖼️"
+      return "ðŸ–¼ï¸"
     }
 
     if(lowerType.includes("pdf") || lowerName.endsWith(".pdf")){
-      return "📄"
+      return "ðŸ“„"
     }
 
     if(
@@ -87,7 +87,7 @@ function createComposerAttachments(options = {}){
       lowerName.endsWith(".css") ||
       lowerName.endsWith(".json")
     ){
-      return "💻"
+      return "ðŸ’»"
     }
 
     if(
@@ -97,17 +97,17 @@ function createComposerAttachments(options = {}){
       lowerName.endsWith(".rar") ||
       lowerName.endsWith(".7z")
     ){
-      return "🗜️"
+      return "ðŸ—œï¸"
     }
 
     if(
       lowerType.includes("audio/") ||
       lowerType.includes("video/")
     ){
-      return "🎞️"
+      return "ðŸŽžï¸"
     }
 
-    return "📎"
+    return "ðŸ“Ž"
   }
 
   function renderPendingAttachments(){
@@ -146,7 +146,7 @@ function createComposerAttachments(options = {}){
             data-remove-attachment="${escapeHtml(attachment.id)}"
             aria-label="Remove attachment"
             title="Remove attachment"
-          >✕</button>
+          >âœ•</button>
         </div>
       `
     }).join("")
@@ -162,7 +162,7 @@ function createComposerAttachments(options = {}){
     if(!attachments.length){
       el.filesList.innerHTML = `
         <div class="empty-state-card fade-in panel-empty-card">
-          <div class="empty-icon">📎</div>
+          <div class="empty-icon">ðŸ“Ž</div>
           <h3>No pending files</h3>
           <p>Attach files from the composer and they will appear here before sending.</p>
         </div>
@@ -189,7 +189,7 @@ function createComposerAttachments(options = {}){
                 </span>
                 <div class="file-row-copy">
                   <strong class="file-row-name">${escapeHtml(attachment.name)}</strong>
-                  <small class="file-row-meta">${escapeHtml(attachment.type || "file")} • ${escapeHtml(formatBytes(attachment.size))}</small>
+                  <small class="file-row-meta">${escapeHtml(attachment.type || "file")} â€¢ ${escapeHtml(formatBytes(attachment.size))}</small>
                 </div>
               </div>
               <button
@@ -280,3 +280,4 @@ window.NovaComposerAttachments = {
 }
 
 })()
+

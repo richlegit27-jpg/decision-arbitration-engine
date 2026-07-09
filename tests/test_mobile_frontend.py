@@ -81,3 +81,5 @@ def test_frontend_mobile_attachment_integration():
         # Cleanup files
         temp_path.unlink(missing_ok=True)
         saved_path.unlink(missing_ok=True)
+
+

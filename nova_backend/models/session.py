@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from copy import deepcopy
 from typing import Any, Dict, List
@@ -205,3 +205,4 @@ __all__ = [
     "touch_session",
     "append_message",
 ]
+

@@ -1,0 +1,176 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nova Billing — Credits and Plan</title>
+    <meta name="description" content="Nova billing dashboard for plan, credits, monthly allowance, usage status, and model tier readiness.">
+    <link rel="stylesheet" href="/static/css/nova-billing.css?v=billing-dashboard-phase1-20260709">
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <link rel="manifest" href="/static/site.webmanifest">
+    <meta name="theme-color" content="#8b5cf6">
+    <!-- NOVA_SOCIAL_META_20260709 -->
+    <link rel="canonical" href="{{ request.url_root.rstrip('/') }}/billing">
+    <meta property="og:site_name" content="Nova">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Billing — Nova">
+    <meta property="og:description" content="Nova billing dashboard for credits, plan readiness, usage visibility, and model-tier preparation.">
+    <meta property="og:url" content="{{ request.url_root.rstrip('/') }}/billing">
+    <meta property="og:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
+    <meta property="og:image:type" content="image/svg+xml">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Billing — Nova">
+    <meta name="twitter:description" content="Nova billing dashboard for credits, plan readiness, usage visibility, and model-tier preparation.">
+    <meta name="twitter:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
+    <!-- /NOVA_SOCIAL_META_20260709 -->
+</head>
+<body>
+    <div class="nova-billing-bg" aria-hidden="true">
+        <span></span>
+        <span></span>
+    </div>
+
+    <main class="nova-billing-shell">
+        <nav class="nova-billing-nav" aria-label="Nova billing navigation">
+            <a class="nova-billing-brand" href="/nova-home-preview">
+                <span>N</span>
+                <div>
+                    <strong>Nova Billing</strong>
+                    <em>Credits, plans, and model access</em>
+                </div>
+            </a>
+
+            <div class="nova-billing-actions">
+                <a href="/nova-home-preview">Home</a>
+                <a href="/contact">Contact</a>
+                <a href="/richard-login">Open Nova</a>
+            </div>
+        </nav>
+
+        <section class="nova-billing-hero">
+            <div>
+                <p class="nova-billing-kicker">Account overview</p>
+                <h1>Your Nova usage command center.</h1>
+                <span>
+                    Track plan status, available credits, monthly allowance, and model-tier readiness.
+                    This page is wired to the local billing data file first, without changing enforcement logic.
+                </span>
+            </div>
+
+            <aside class="nova-billing-status-card">
+                <p>Status</p>
+                <strong>{{ status_label }}</strong>
+                <span>{{ username_label }} · {{ plan_label }}</span>
+            </aside>
+        </section>
+
+        <section class="nova-billing-grid">
+            <article class="nova-billing-card primary">
+                <p>Current plan</p>
+                <h2>{{ plan_label }}</h2>
+                <span>Developer account mode is active for owner testing and product polish.</span>
+            </article>
+
+            <article class="nova-billing-card">
+                <p>Credit balance</p>
+                <h2>{{ credits_label }}</h2>
+                <span>Available credits remaining in the current local billing ledger.</span>
+            </article>
+
+            <article class="nova-billing-card">
+                <p>Monthly allowance</p>
+                <h2>{{ monthly_credits_label }}</h2>
+                <span>Configured monthly credits for this account.</span>
+            </article>
+        </section>
+
+        <section class="nova-usage-panel">
+            <div class="nova-usage-head">
+                <div>
+                    <p>Usage</p>
+                    <h2>{{ used_credits_label }} used</h2>
+                    <span>{{ credits_label }} remaining from {{ monthly_credits_label }} monthly credits.</span>
+                </div>
+
+                <strong>{{ usage_percent_label }}</strong>
+            </div>
+
+            <div class="nova-usage-bar" aria-label="Billing usage progress">
+                <span style="width: {{ usage_percent_raw }}%;"></span>
+            </div>
+
+            <div class="nova-usage-meta">
+                <span>Credits used</span>
+                <span>Credits remaining</span>
+            </div>
+        </section>
+
+        <section class="nova-tier-section">
+            <div class="nova-section-head">
+                <p>Model tiers</p>
+                <h2>Ready for future model-based pricing.</h2>
+                <span>
+                    The dashboard is prepared for model tiers, but enforcement should stay backend-controlled later.
+                </span>
+            </div>
+
+            <div class="nova-tier-grid">
+                <article>
+                    <strong>Mini</strong>
+                    <h3>Low-cost fast replies</h3>
+                    <p>Good for quick chat, summaries, simple coding help, and low-credit usage.</p>
+                    <em>Planned</em>
+                </article>
+
+                <article class="featured">
+                    <strong>Standard</strong>
+                    <h3>Balanced project work</h3>
+                    <p>Best default for project-aware conversations, file work, and normal building.</p>
+                    <em>Current target</em>
+                </article>
+
+                <article>
+                    <strong>Pro</strong>
+                    <h3>High-power reasoning</h3>
+                    <p>Reserved for deeper planning, hard debugging, larger files, and premium credits.</p>
+                    <em>Planned</em>
+                </article>
+            </div>
+        </section>
+
+        <section class="nova-billing-ledger">
+            <div>
+                <p>Billing source</p>
+                <h2>Local data file connected.</h2>
+                <span>
+                    This page reads account status from <code>data/nova_billing.json</code>.
+                    Stripe, invoices, payment methods, and model enforcement can be added later.
+                </span>
+            </div>
+
+            <div class="nova-ledger-box">
+                <span>Billing file</span>
+                <strong>{{ billing_file_label }}</strong>
+            </div>
+        </section>
+
+        <footer class="nova-billing-footer">
+            <span>Nova billing dashboard · Phase 1</span>
+            <div>
+                <a href="/api/health">Health</a>
+                <a href="/nova-home-preview">Landing</a>
+                <a href="/richard-login">Owner Login</a>
+            </div>
+        
+                <a href="/privacy">Privacy</a>
+                <a href="/terms">Terms</a>
+        </footer>
+    </main>
+
+    <script src="/static/js/nova-billing.js?v=billing-dashboard-phase1-20260709"></script>
+</body>
+</html>
+
+
+
+

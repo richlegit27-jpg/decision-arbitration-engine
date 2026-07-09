@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 if (window.__novaSidebarLoaded) {
@@ -133,7 +133,7 @@ function ensureTopbarSidebarButton() {
   button.title = "Toggle sidebar";
   button.setAttribute("aria-label", "Toggle sidebar");
   button.innerHTML = `
-    <span class="nova-topbar-sidebar-icon" aria-hidden="true">☰</span>
+    <span class="nova-topbar-sidebar-icon" aria-hidden="true">â˜°</span>
     <span class="nova-topbar-sidebar-text">Chats</span>
   `;
 
@@ -263,8 +263,8 @@ function buildItem(chat) {
 
   const actions = document.createElement("div");
   actions.className = "chat-list-actions";
-  actions.appendChild(buildActionButton("✎", "Rename chat", "rename"));
-  actions.appendChild(buildActionButton("🗑", "Delete chat", "delete"));
+  actions.appendChild(buildActionButton("âœŽ", "Rename chat", "rename"));
+  actions.appendChild(buildActionButton("ðŸ—‘", "Delete chat", "delete"));
 
   row.appendChild(button);
   row.appendChild(actions);
@@ -621,3 +621,4 @@ document.addEventListener("nova:messages-updated", renderSidebar);
 document.addEventListener("nova:chat-changed", renderSidebar);
 document.addEventListener("nova:app-ready", initSidebar);
 })();
+

@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\markdown.js
+﻿// C:\Users\Owner\nova\static\js\markdown.js
 
 (() => {
 "use strict"
@@ -21,3 +21,4 @@ window.NovaMarkdown = {
   render: renderMarkdown,
 }
 })()
+

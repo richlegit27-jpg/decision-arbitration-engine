@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   const Nova = (window.Nova = window.Nova || {});
@@ -313,3 +313,4 @@
     bindEvents,
   };
 })();
+

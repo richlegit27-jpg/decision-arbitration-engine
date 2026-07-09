@@ -1,0 +1,115 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Page not found — Nova</title>
+    <meta name="description" content="Nova page not found. Return to the Nova public site or open the workspace.">
+    <link rel="stylesheet" href="/static/css/nova-404.css?v=public-404-phase1-20260709">
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <link rel="manifest" href="/static/site.webmanifest">
+    <meta name="theme-color" content="#8b5cf6">
+    <!-- NOVA_SOCIAL_META_20260709 -->
+    <link rel="canonical" href="{{ request.url_root.rstrip('/') }}/404">
+    <meta property="og:site_name" content="Nova">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Page not found — Nova">
+    <meta property="og:description" content="Nova page not found. Return to the Nova public site or open the workspace.">
+    <meta property="og:url" content="{{ request.url_root.rstrip('/') }}/404">
+    <meta property="og:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
+    <meta property="og:image:type" content="image/svg+xml">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Page not found — Nova">
+    <meta name="twitter:description" content="Nova page not found. Return to the Nova public site or open the workspace.">
+    <meta name="twitter:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
+    <!-- /NOVA_SOCIAL_META_20260709 -->
+</head>
+<body>
+    <main class="nova-error-shell">
+        <nav class="nova-error-nav" aria-label="Nova 404 navigation">
+            <a class="nova-error-brand" href="/nova-home-preview">
+                <span>N</span>
+                <div>
+                    <strong>Nova</strong>
+                    <em>404</em>
+                </div>
+            </a>
+
+            <div class="nova-error-actions">
+                <a href="/nova-home-preview">Home</a>
+                <a href="/features">Features</a>
+                <a href="/roadmap">Roadmap</a>
+                <a href="/contact">Contact</a>
+                <a href="/richard-login">Open Nova</a>
+            </div>
+        </nav>
+
+        <section class="nova-error-hero">
+            <p>Page not found</p>
+            <h1>This route drifted out of orbit.</h1>
+            <span>
+                The page you requested does not exist, moved, or is not part of the public Nova funnel yet.
+                Use one of the safe paths below to get back into the product.
+            </span>
+
+            <div class="nova-error-buttons">
+                <a href="/nova-home-preview">Back to Home</a>
+                <a href="/contact">Contact / Early Access</a>
+            </div>
+        </section>
+
+        <section class="nova-error-grid">
+            <a href="/features">
+                <strong>Features</strong>
+                <span>See the AI project command center direction.</span>
+            </a>
+
+            <a href="/roadmap">
+                <strong>Roadmap</strong>
+                <span>Check what is planned next for Nova.</span>
+            </a>
+
+            <a href="/faq">
+                <strong>FAQ</strong>
+                <span>Read common product questions.</span>
+            </a>
+
+            <a href="/nova-status">
+                <strong>Status</strong>
+                <span>View system and product readiness.</span>
+            </a>
+
+            <a href="/billing">
+                <strong>Billing</strong>
+                <span>Review credits and billing dashboard readiness.</span>
+            </a>
+
+            <a href="/blog">
+                <strong>Blog</strong>
+                <span>Read Nova product updates.</span>
+            </a>
+        </section>
+
+        <section class="nova-error-note">
+            <p>Requested path</p>
+            <h2>{{ path }}</h2>
+            <span>
+                If this URL should exist, it can be added to the public route map later.
+            </span>
+        </section>
+
+        <footer class="nova-error-footer">
+            <span>Nova · Public 404</span>
+            <div>
+                <a href="/privacy">Privacy</a>
+                <a href="/terms">Terms</a>
+                <a href="/sitemap.xml">Sitemap</a>
+            </div>
+        </footer>
+    </main>
+
+    <script src="/static/js/nova-404.js?v=public-404-phase1-20260709"></script>
+</body>
+</html>
+
+

@@ -1,0 +1,12 @@
+﻿# Nova production deploy ignores
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+nova_backups/
+data/*.bak
+data/*backup*
+uploads/*
+!uploads/.gitkeep

@@ -1,4 +1,4 @@
-class RuntimeSubgoalEngine:
+﻿class RuntimeSubgoalEngine:
 
     def generate(
         self,
@@ -105,3 +105,4 @@ class RuntimeSubgoalEngine:
             "ok": True,
             "subgoals": subgoals,
         }
+

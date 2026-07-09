@@ -335,6 +335,23 @@
     }
   }
 </style>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <link rel="manifest" href="/static/site.webmanifest">
+    <meta name="theme-color" content="#8b5cf6">
+    <!-- NOVA_SOCIAL_META_20260709 -->
+    <link rel="canonical" href="{{ request.url_root.rstrip('/') }}/register">
+    <meta property="og:site_name" content="Nova">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Register — Nova">
+    <meta property="og:description" content="Register for Nova early access and workspace updates.">
+    <meta property="og:url" content="{{ request.url_root.rstrip('/') }}/register">
+    <meta property="og:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
+    <meta property="og:image:type" content="image/svg+xml">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Register — Nova">
+    <meta name="twitter:description" content="Register for Nova early access and workspace updates.">
+    <meta name="twitter:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
+    <!-- /NOVA_SOCIAL_META_20260709 -->
 </head>
 <body>
   <main class="shell">
@@ -371,7 +388,7 @@
           <div class="hero-list">
             <div class="hero-item">Keep usernames simple and memorable.</div>
             <div class="hero-item">Use a strong password you can keep track of.</div>
-            <div class="hero-item">This is the front end. Backend auth routes come next.</div>
+            <div class="hero-item">Registration is active. Create an account, then sign in to enter Nova.</div>
           </div>
         </div>
       </div>
@@ -423,7 +440,8 @@
 
       <div class="meta">
         <span>Already have an account? <a href="/login">Sign in</a></span>
-        <span><a href="/">Back to app</a></span>
+        <span><!-- NOVA_REGISTER_TEXT_POLISH_20260611 --><a href="/app">Back to app</a> Â· <a href="/help">Help</a> Â· <a href="/blog">Blog</a>
+                <a href="/contact">Contact</a></span>
       </div>
     </section>
   </main>
@@ -525,5 +543,17 @@
   }
 })();
 </script>
+
+        <footer class="nova-public-legal-strip" aria-label="Nova legal links">
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Terms</a>
+        </footer>
 </body>
 </html>
+
+
+
+
+
+
+

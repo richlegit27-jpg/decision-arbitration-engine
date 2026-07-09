@@ -1,4 +1,4 @@
-window.Nova = window.Nova || {};
+﻿window.Nova = window.Nova || {};
 window.Nova.addAttachment = function(url, type = "image") {
   const msgDiv = document.createElement("div");
   msgDiv.className = "nova-msg-attachment";
@@ -9,3 +9,4 @@ window.Nova.addAttachment = function(url, type = "image") {
   msgDiv.appendChild(el);
   document.getElementById("messages").appendChild(msgDiv);
 };
+

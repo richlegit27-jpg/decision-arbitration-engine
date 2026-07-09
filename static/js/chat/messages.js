@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\chat\messages.js
+﻿// C:\Users\Owner\nova\static\js\chat\messages.js
 
 (() => {
   const app = window.NovaApp;
@@ -268,3 +268,4 @@
   window.NovaApp = window.NovaApp || {};
   window.NovaApp.messages = messages;
 })();
+

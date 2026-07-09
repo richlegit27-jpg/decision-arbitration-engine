@@ -1,4 +1,4 @@
-# =========================================================
+﻿# =========================================================
 # Nova Ultimate 2026 Phase 6
 # Quick Rebuild + Zip (Endgame)
 # =========================================================
@@ -25,6 +25,6 @@ Pop-Location
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::CreateFromDirectory($BuildRoot, $ZipPath)
 
-Write-Host "✅ Quick rebuild & zip complete!"
+Write-Host "âœ… Quick rebuild & zip complete!"
 Write-Host "Build folder: $BuildRoot"
 Write-Host "Zip package: $ZipPath"

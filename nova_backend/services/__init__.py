@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from .session_service import SessionService
 from .artifact_service import ArtifactService
@@ -21,3 +21,4 @@ __all__ = [
     "ChatService",
     "DebugService",
 ]
+

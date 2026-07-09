@@ -1,4 +1,4 @@
-import copy
+﻿import copy
 import json
 import time
 import uuid
@@ -150,3 +150,4 @@ class ObservabilityService:
 
     def recent_events(self, limit=50):
         return self.events[-limit:]
+

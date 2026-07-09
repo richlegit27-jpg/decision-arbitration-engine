@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$ProjectRoot = "C:\Users\Owner\nova",
     [string]$BackupRoot = "C:\Users\Owner\nova_backups"
 )

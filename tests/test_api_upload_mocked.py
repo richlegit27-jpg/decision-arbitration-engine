@@ -1,4 +1,4 @@
-# notepad C:\Users\Owner\nova\tests\test_api_upload_mocked.py
+﻿# notepad C:\Users\Owner\nova\tests\test_api_upload_mocked.py
 
 import pytest
 from pathlib import Path
@@ -51,3 +51,4 @@ def test_file_upload_flask():
 
     # Cleanup
     saved_path.unlink(missing_ok=True)
+

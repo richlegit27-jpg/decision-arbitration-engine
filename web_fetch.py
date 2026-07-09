@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import re
 from typing import Dict, Optional
@@ -88,3 +88,4 @@ def fetch_page(url: str) -> Optional[Dict[str, str]]:
         "title": title,
         "text": text,
     }
+

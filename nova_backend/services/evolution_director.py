@@ -1,4 +1,4 @@
-class EvolutionDirector:
+﻿class EvolutionDirector:
 
     def determine_next_evolution(
         self,
@@ -148,3 +148,4 @@ class EvolutionDirector:
                 identity_summary
             ),
         }
+

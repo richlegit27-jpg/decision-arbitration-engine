@@ -27,3 +27,4 @@ socket.on('receive_message', function(data) {
     chatBox.appendChild(messageDiv);
     chatBox.scrollTop = chatBox.scrollHeight;  // Scroll to the bottom of the chat box
 });
+

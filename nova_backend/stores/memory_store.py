@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from copy import deepcopy
 from typing import Any
@@ -45,3 +45,4 @@ class SessionStore:
         data = self.load()
         data["active_session_id"] = str(session_id or "").strip()
         return self.save(data)
+

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 import threading
@@ -257,3 +257,4 @@ def ensure_agent_thread() -> None:
         agent_state=AGENT_STATE,
         worker_target=background_agent_worker,
     )
+

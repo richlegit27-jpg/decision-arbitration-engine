@@ -1,6 +1,6 @@
-NOVA FINAL BEHAVIOR AUDIT CHECKLIST
+﻿NOVA FINAL BEHAVIOR AUDIT CHECKLIST
 
-PHASE 1 — CORE LOAD
+PHASE 1 â€” CORE LOAD
 [ ] App opens without console errors
 [ ] Main layout loads
 [ ] Left sidebar visible on desktop
@@ -10,7 +10,7 @@ PHASE 1 — CORE LOAD
 [ ] No white dropdown/background glitches
 [ ] No broken spacing on first load
 
-PHASE 2 — CHAT FLOW
+PHASE 2 â€” CHAT FLOW
 [ ] New Chat creates a chat
 [ ] New chat becomes active
 [ ] Rename chat works
@@ -21,7 +21,7 @@ PHASE 2 — CHAT FLOW
 [ ] Active chat title updates correctly
 [ ] Active chat meta/message count updates correctly
 
-PHASE 3 — MESSAGE FLOW
+PHASE 3 â€” MESSAGE FLOW
 [ ] Type into message box normally
 [ ] Input grows correctly
 [ ] Enter sends message
@@ -36,14 +36,14 @@ PHASE 3 — MESSAGE FLOW
 [ ] Copy button works
 [ ] Copy feedback appears correctly
 
-PHASE 4 — ATTACHMENTS
+PHASE 4 â€” ATTACHMENTS
 [ ] Attach button opens file picker
 [ ] Selected files show in attachment bar
 [ ] Remove file button works
 [ ] Removing one file does not break others
 [ ] Sending with attachment does not break UI
 
-PHASE 5 — MEMORY PANEL
+PHASE 5 â€” MEMORY PANEL
 [ ] Memory top button opens panel
 [ ] Close memory button closes panel
 [ ] Memory panel does not open wrong side
@@ -56,7 +56,7 @@ PHASE 5 — MEMORY PANEL
 [ ] Memory empty state shows correctly when empty
 [ ] Memory status text updates correctly
 
-PHASE 6 — MOBILE RESPONSIVE
+PHASE 6 â€” MOBILE RESPONSIVE
 [ ] Open app on small screen
 [ ] Main chat fits screen
 [ ] Sidebar button opens LEFT panel
@@ -72,7 +72,7 @@ PHASE 6 — MOBILE RESPONSIVE
 [ ] Overlay appears when panel opens
 [ ] Overlay disappears when panel closes
 
-PHASE 7 — VISUAL POLISH
+PHASE 7 â€” VISUAL POLISH
 [ ] Buttons look consistent
 [ ] Hover states feel clean
 [ ] No white flashes
@@ -85,7 +85,7 @@ PHASE 7 — VISUAL POLISH
 [ ] Scrollbars look okay
 [ ] No random inline-style ugliness left
 
-PHASE 8 — FINAL SHIP CHECK
+PHASE 8 â€” FINAL SHIP CHECK
 [ ] Refresh page and state still works
 [ ] Active chat restore works
 [ ] No duplicate event behavior

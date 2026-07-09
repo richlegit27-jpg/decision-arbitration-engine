@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import hashlib
 import os
@@ -86,7 +86,7 @@ class WebService:
     def _clean_url(self, url: str) -> str:
         url = str(url or "").strip()
 
-        # 🔥 Fix Google News redirect URLs
+        # ðŸ”¥ Fix Google News redirect URLs
         if "news.google.com/rss/articles" in url:
             try:
                 import urllib.parse as up
@@ -157,13 +157,13 @@ class WebService:
                 break
 
         if bullets:
-            return "\n".join(f"• {bullet}" for bullet in bullets)
+            return "\n".join(f"â€¢ {bullet}" for bullet in bullets)
 
         if len(text) <= max_len:
-            return "• " + text
+            return "â€¢ " + text
 
         cut = text[:max_len].rsplit(" ", 1)[0].strip()
-        return "• " + (cut or text[:max_len])
+        return "â€¢ " + (cut or text[:max_len])
 
     def _bullets(self, text: str, limit: int = 5) -> List[str]:
         text = str(text or "").strip()
@@ -879,7 +879,7 @@ class WebService:
             soup = BeautifulSoup(response.text, "html.parser")
             results = []
 
-            # 🔥 updated selectors (more reliable)
+            # ðŸ”¥ updated selectors (more reliable)
             for result in soup.find_all("div", class_="result__body"):
                 title_tag = result.find("a", class_="result__a")
                 snippet_tag = result.find("a", class_="result__snippet")
@@ -907,7 +907,7 @@ class WebService:
             return results
 
         except Exception as e:
-            print("DDG ERROR:", e)  # 🔥 debug visibility
+            print("DDG ERROR:", e)  # ðŸ”¥ debug visibility
             return []
 
     def search_web_api(self, query: str, max_results: int = 5, preferred_mode: str = "general") -> dict:
@@ -1146,7 +1146,7 @@ class WebService:
 
         fallback_results: List[dict] = []
 
-        # 1️⃣ DuckDuckGo fallback
+        # 1ï¸âƒ£ DuckDuckGo fallback
         ddg_results = self._duckduckgo_search(query, max_results=max_results)
         print("DDG RESULTS COUNT:", len(ddg_results))
 
@@ -1172,7 +1172,7 @@ class WebService:
                 },
             }
 
-        # 2️⃣ Bing fallback
+        # 2ï¸âƒ£ Bing fallback
         bing_results = self._bing_search(query, max_results=max_results)
 
         if bing_results:
@@ -1197,7 +1197,7 @@ class WebService:
                 },
             }
 
-        # 3️⃣ RSS news fallback — only for real news/latest queries
+        # 3ï¸âƒ£ RSS news fallback â€” only for real news/latest queries
         rss_results = []
         if preferred_mode == "news" and self._looks_like_news_query(query):
             rss_results = self._news_rss_search(query, max_results=max_results)
@@ -1221,7 +1221,7 @@ class WebService:
                 },
             }
 
-        # 4️⃣ Final fallback
+        # 4ï¸âƒ£ Final fallback
         if preferred_mode == "weather":
             fallback_results.append({
                 "title": query.strip().title(),
@@ -1416,7 +1416,7 @@ class WebService:
             })
 
         if not cleaned:
-            return f'I couldn’t find strong live results for "{query}".'
+            return f'I couldnâ€™t find strong live results for "{query}".'
 
         cleaned = self._rank_search_results(query, cleaned)
 
@@ -1438,14 +1438,14 @@ class WebService:
             lines.append(f"Source: {source}")
 
         lines.append("")
-        lines.append("— Top sources —")
+        lines.append("â€” Top sources â€”")
 
         for idx, item in enumerate(cleaned[:5], start=1):
             item_title = self._clean_result_title(item)
             item_source = self._clean_source_name(item)
             item_url = str(item.get("url") or "").strip()
 
-            lines.append(f"{idx}. {item_source} — {item_title}")
+            lines.append(f"{idx}. {item_source} â€” {item_title}")
 
             if item_url:
                 lines.append(item_url)
@@ -1686,3 +1686,5 @@ class WebService:
         except Exception as e:
             print("RSS ERROR:", e)
             return []
+
+

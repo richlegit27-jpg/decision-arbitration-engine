@@ -1,0 +1,4725 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- NOVA_DEPLOY_MARKER_LEGACY_SESSIONS_OWNER_REMOVED_20260703_7f20b27 -->
+
+<script>
+/* NOVA MOBILE CONSOLE STILLNESS SAFE PASS 20260629 */
+(() => {
+    if (window.__NOVA_MOBILE_CONSOLE_STILLNESS_20260629__) return;
+    window.__NOVA_MOBILE_CONSOLE_STILLNESS_20260629__ = true;
+
+    const original = window.__NOVA_ORIGINAL_CONSOLE__ || {
+        log: console.log.bind(console),
+        info: console.info.bind(console),
+        debug: console.debug.bind(console),
+        warn: console.warn.bind(console),
+        error: console.error.bind(console)
+    };
+
+    window.__NOVA_ORIGINAL_CONSOLE__ = original;
+
+    function textOf(args) {
+        try {
+            return args.map((item) => {
+                if (typeof item === "string") return item;
+                if (item && typeof item === "object") return JSON.stringify(item);
+                return String(item);
+            }).join(" ");
+        } catch (e) {
+            return "";
+        }
+    }
+
+    function shouldQuiet(args) {
+        if (window.NOVA_DEBUG_CONSOLE === true) return false;
+
+        const text = textOf(args);
+
+        return (
+            text.includes("[Nova") ||
+            text.includes("[NOVA_") ||
+            text.includes("Nova Mobile") ||
+            text.includes("buttons wired") ||
+            text.includes("ready") ||
+            text.includes("rendered") ||
+            text.includes("preview rendered") ||
+            text.includes("geometry") ||
+            text.includes("scroll") ||
+            text.includes("attachment") ||
+            text.includes("sessions") ||
+            text.includes("voice button wired")
+        );
+    }
+
+    function quiet(method) {
+        return function (...args) {
+            if (shouldQuiet(args)) return;
+            return original[method](...args);
+        };
+    }
+
+    console.log = quiet("log");
+    console.info = quiet("info");
+    console.debug = quiet("debug");
+    console.warn = quiet("warn");
+
+    /* Keep real errors visible */
+    console.error = original.error;
+
+    original.log("[Nova Console Stillness] quiet mode on");
+})();
+</script>
+
+
+<!-- NOVA_MOBILE_CONSOLE_SPAM_STOP_EARLY_QUIET_20260624 -->
+<script>
+(function () {
+    if (window.__novaConsoleSpamStopEarlyQuiet) return;
+    window.__novaConsoleSpamStopEarlyQuiet = true;
+
+    const original = {
+        log: console.log.bind(console),
+        info: console.info.bind(console),
+        warn: console.warn.bind(console),
+        debug: console.debug.bind(console)
+    };
+
+    const blocked = [
+        "NOVA_MOBILE_COPY_REGEN_DOM_SCAN_RESTORE_20260624",
+        "NOVA_MOBILE_COPY_REGEN_AFTER_BUBBLE_20260624",
+        "hosts 0",
+        "hosts 1 rows 1",
+        "bubble copy/regen observer ready",
+        "regen observer ready",
+        "Nova Mobile Canonical Session Owner",
+        "Nova Mobile Primary Session Watchdog",
+        "Nova Mobile Manual Session Lock",
+        "Nova Mobile Session SingleFlight",
+        "allowed-new-localStorage",
+        "blocked session overwrite",
+        "clicked session locked"
+    ];
+
+    function stringify(value) {
+        try {
+            if (typeof value === "string") return value;
+            return JSON.stringify(value);
+        } catch (error) {
+            return String(value);
+        }
+    }
+
+    function shouldBlock(args) {
+        const text = args.map(stringify).join(" ");
+        return blocked.some(item => text.includes(item));
+    }
+
+    ["log", "info", "warn", "debug"].forEach(method => {
+        console[method] = function (...args) {
+            if (shouldBlock(args)) return;
+            original[method](...args);
+        };
+    });
+
+    original.log("[Nova Console Quiet] ready");
+})();
+</script>
+<!-- /NOVA_MOBILE_CONSOLE_SPAM_STOP_EARLY_QUIET_20260624 -->
+
+
+<meta name="theme-color" content="#0b1020">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nova Mobile</title>
+
+<link rel="stylesheet" href="/static/css/nova-mobile.css?v=hidden-panel-hard-lock-20260630-001">
+
+<style>
+    html,
+    body,
+    *,
+    *::before,
+    *::after {
+        cursor: auto !important;
+    }
+
+    .cursor,
+    .custom-cursor,
+    .nova-cursor,
+    .cursor-ring,
+    .cursor-dot,
+    #cursor,
+    #customCursor,
+    #novaCursor,
+    #cursorRing,
+    #cursorDot,
+    #nova-mobile-scroll-bottom,
+    .mobile-scroll-bottom {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        animation: none !important;
+        box-shadow: none !important;
+    }
+
+    #nova-mobile-stop-generation,
+    #nova-mobile-stop-speech {
+        display: none;
+    }
+
+    #nova-mobile-stop-generation[data-active="true"],
+    #nova-mobile-stop-speech[data-active="true"] {
+        display: inline-flex;
+    }
+</style>
+</head>
+
+<body>
+<main class="mobile-shell">
+
+    <header class="mobile-header">
+<!-- NOVA_DEPLOY_MARKER_LEGACY_SESSIONS_OWNER_REMOVED_20260703_7f20b27 -->
+
+<script>
+/* NOVA MOBILE CONSOLE STILLNESS SAFE PASS 20260629 */
+(() => {
+    if (window.__NOVA_MOBILE_CONSOLE_STILLNESS_20260629__) return;
+    window.__NOVA_MOBILE_CONSOLE_STILLNESS_20260629__ = true;
+
+    const original = window.__NOVA_ORIGINAL_CONSOLE__ || {
+        log: console.log.bind(console),
+        info: console.info.bind(console),
+        debug: console.debug.bind(console),
+        warn: console.warn.bind(console),
+        error: console.error.bind(console)
+    };
+
+    window.__NOVA_ORIGINAL_CONSOLE__ = original;
+
+    function textOf(args) {
+        try {
+            return args.map((item) => {
+                if (typeof item === "string") return item;
+                if (item && typeof item === "object") return JSON.stringify(item);
+                return String(item);
+            }).join(" ");
+        } catch (e) {
+            return "";
+        }
+    }
+
+    function shouldQuiet(args) {
+        if (window.NOVA_DEBUG_CONSOLE === true) return false;
+
+        const text = textOf(args);
+
+        return (
+            text.includes("[Nova") ||
+            text.includes("[NOVA_") ||
+            text.includes("Nova Mobile") ||
+            text.includes("buttons wired") ||
+            text.includes("ready") ||
+            text.includes("rendered") ||
+            text.includes("preview rendered") ||
+            text.includes("geometry") ||
+            text.includes("scroll") ||
+            text.includes("attachment") ||
+            text.includes("sessions") ||
+            text.includes("voice button wired")
+        );
+    }
+
+    function quiet(method) {
+        return function (...args) {
+            if (shouldQuiet(args)) return;
+            return original[method](...args);
+        };
+    }
+
+    console.log = quiet("log");
+    console.info = quiet("info");
+    console.debug = quiet("debug");
+    console.warn = quiet("warn");
+
+    /* Keep real errors visible */
+    console.error = original.error;
+
+    original.log("[Nova Console Stillness] quiet mode on");
+})();
+</script>
+
+        <div class="mobile-header-title">Nova Mobile</div>
+
+        <div class="mobile-header-actions">
+            <button
+                id="nova-mobile-new-chat"
+                class="mobile-header-btn"
+                type="button"
+            >New</button>
+
+            <button
+                id="nova-mobile-sessions-toggle"
+                class="mobile-header-btn"
+                type="button"
+            >Sessions</button>
+        </div>
+        </div>
+    </header>
+
+    <div id="mobileChatMessages" class="mobile-chat-container"></div>
+
+<section
+    id="nova-mobile-tools-panel"
+    class="mobile-panel hidden"
+    aria-label="Mobile tools"
+    style="display:none;"
+>
+
+    <button
+        id="nova-mobile-menu-logout"
+        type="button"
+    >
+        Logout
+    </button>
+
+    <button
+        id="nova-mobile-menu-account"
+        type="button"
+    >
+        Account
+    </button>
+
+    <button
+        id="nova-mobile-menu-billing"
+        type="button"
+    >
+        Billing
+    </button>
+
+    <button
+        id="nova-mobile-menu-settings"
+        type="button"
+    >
+        Settings
+    </button>
+
+    <button
+        id="nova-mobile-menu-blog"
+        type="button"
+    >
+        Blog
+    </button>
+
+    <button
+        id="nova-mobile-memory-toggle"
+        type="button"
+        onclick="
+            const toolsPanel = document.getElementById('nova-mobile-tools-panel');
+            const memoryPanel = document.getElementById('nova-mobile-memory-panel');
+
+            if (toolsPanel) {
+                toolsPanel.classList.add('hidden');
+                toolsPanel.style.cssText = 'display:none !important;';
+            }
+
+            if (memoryPanel) {
+                memoryPanel.classList.remove('hidden');
+                memoryPanel.style.cssText = 'display:flex !important; position:fixed !important; left:10px !important; right:10px !important; top:90px !important; z-index:999999 !important; flex-direction:column !important; gap:10px !important; padding:14px !important; background:#111827 !important; border:1px solid rgba(255,255,255,.18) !important; border-radius:18px !important;';
+            }
+        "
+    >Memory</button>
+
+    <button
+        type="button"
+        data-mobile-tool="execution"
+        onclick="
+            const toolsPanel = document.getElementById('nova-mobile-tools-panel');
+            const executionPanel = document.getElementById('nova-mobile-execution-panel');
+
+            if (toolsPanel) {
+                toolsPanel.classList.add('hidden');
+                toolsPanel.style.cssText = 'display:none !important;';
+            }
+
+            if (executionPanel) {
+                executionPanel.classList.remove('hidden');
+                executionPanel.style.cssText = 'display:flex !important; position:fixed !important; left:10px !important; right:10px !important; top:90px !important; z-index:999999 !important; flex-direction:column !important; gap:10px !important; padding:14px !important; background:#111827 !important; border:1px solid rgba(255,255,255,.18) !important; border-radius:18px !important;';
+            }
+        "
+    >Open Execution Panel</button>
+
+    <button
+        id="nova-mobile-menu-export"
+        type="button"
+    >
+        Export
+    </button>
+
+    <button
+        type="button"
+        onclick=""
+            const panel = document.getElementById('nova-mobile-tools-panel');
+
+            if (panel) {
+                panel.classList.add('hidden');
+                panel.style.cssText = 'display:none !important;';
+            }
+        "
+    >Close</button>
+</section>
+
+<section id="nova-mobile-account-panel" class="mobile-panel hidden" aria-label="Mobile account">
+
+<section id="nova-mobile-billing-panel" class="mobile-panel hidden" aria-label="Mobile billing">
+
+<button
+    id="nova-mobile-billing-close"
+    type="button"
+    onclick="
+        const panel = document.getElementById('nova-mobile-billing-panel');
+
+        if (panel) {
+            panel.classList.add('hidden');
+            panel.style.cssText = 'display:none !important;';
+        }
+    "
+>
+Close Billing
+</button>
+
+<div class="mobile-panel-title">
+    Billing
+</div>
+
+<div
+    id="nova-mobile-billing-status"
+    class="mobile-panel-text"
+>
+    Loading billing...
+</div>
+
+</section>
+
+<button
+    id="nova-mobile-account-close"
+    type="button"
+    onclick="
+        const panel = document.getElementById('nova-mobile-account-panel');
+        if (panel) {
+            panel.classList.add('hidden');
+            panel.style.cssText = 'display:none !important;';
+        }
+    "
+>
+Close Account
+</button>
+
+<div class="mobile-panel-title">Account</div>
+
+<div id="nova-mobile-account-status" class="mobile-panel-text">
+    Loading account...
+</div>
+
+</section>
+
+<section id="nova-mobile-account-panel" class="mobile-panel hidden" aria-label="Mobile account">
+
+<button
+    id="nova-mobile-account-close"
+    type="button"
+    onclick="
+        const panel = document.getElementById('nova-mobile-account-panel');
+
+        if (panel) {
+            panel.classList.add('hidden');
+            panel.style.cssText = 'display:none !important;';
+        }
+    "
+>
+Close Account
+</button>
+
+<div class="mobile-panel-title">
+    Account
+</div>
+
+<div
+    id="nova-mobile-account-status"
+    class="mobile-panel-text"
+>
+    Account ready.
+</div>
+
+</section>
+
+<section id="nova-mobile-settings-panel" class="nova-mobile-panel hidden">
+
+    <div class="nova-mobile-panel-title">
+        Settings
+    </div>
+
+    <div id="nova-mobile-settings-status">
+        Loading settings...
+    </div>
+
+    <button type="button"
+            onclick="document.getElementById('nova-mobile-settings-panel').classList.add('hidden')">
+        Close
+    </button>
+
+</section>
+
+<section id="nova-mobile-memory-panel" class="mobile-panel hidden" aria-label="Mobile memory">
+
+<button
+    id="nova-mobile-memory-close"
+    type="button"
+    onclick="
+        const panel = document.getElementById('nova-mobile-memory-panel');
+
+        if (panel) {
+            panel.classList.add('hidden');
+            panel.style.cssText = 'display:none !important;';
+        }
+
+>Close Memory</button>
+    <div class="mobile-panel-title">Memory</div>
+    <div id="nova-mobile-memory-status" class="mobile-panel-text">
+        Memory ready.
+    </div>
+</section>
+
+<section id="nova-mobile-execution-panel" class="mobile-panel hidden" aria-label="Mobile execution">
+<button
+    id="nova-mobile-execution-close"
+    type="button"
+    onclick="
+        const panel = document.getElementById('nova-mobile-execution-panel');
+
+        if (panel) {
+            panel.classList.add('hidden');
+            panel.style.cssText = 'display:none !important;';
+        }
+    "
+>Close Execution</button>
+    <div class="mobile-panel-title">Execution</div>
+<button
+    type="button"
+    data-mobile-tool="refresh_execution"
+>
+    Refresh Status
+</button>
+<div id="nova-mobile-execution-status" class="mobile-panel-text">
+    No active execution loaded.
+</div>
+
+<div class="mobile-execution-progress">
+    <div
+        id="nova-mobile-execution-progress-bar"
+        class="mobile-execution-progress-bar"
+        style="width: 0%;"
+    ></div>
+</div>
+
+<div
+    id="nova-mobile-execution-badge"
+    class="mobile-execution-badge"
+>
+    idle
+</div>
+
+<div
+    id="nova-mobile-execution-last-update"
+    class="mobile-panel-text"
+>
+    Last update: never
+</div>
+
+<button type="button" data-mobile-tool="run_step">Run Step</button>
+<button type="button" data-mobile-tool="run_all">Run All</button>
+</section>
+
+    <!-- MOBILE_QUICK_ACTIONS_CLEAN_FINAL_LOCK -->
+<div class="mobile-quick-actions mobile-quick-actions-final" data-mobile-quick-actions>
+    <button type="button" class="mobile-quick-action" data-quick-prompt="continue">Continue</button>
+    <button type="button" class="mobile-quick-action" data-quick-prompt="summarize">Summarize</button>
+    <button type="button" class="mobile-quick-action" data-quick-prompt="improve">Improve</button>
+    <button type="button" class="mobile-quick-action" data-quick-prompt="next">Next</button>
+</div>
+
+
+<div id="nova-mobile-composer" class="mobile-composer nova-mobile-composer" data-mobile-composer="true">
+        <textarea
+            id="nova-mobile-input"
+            rows="1"
+            placeholder="Type a message..."
+        ></textarea>
+
+<button
+    id="nova-mobile-send"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    type="button"
+    title="Send"
+>
+    <span class="mobile-action-icon">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¾ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¤</span>
+</button>
+
+<!-- DISABLED: merged into nova-mobile-send stop mode -->
+<!--
+<button
+    id="nova-mobile-stop-generation"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    type="button"
+    title="Stop generation"
+    data-active="false"
+>
+    <span class="mobile-action-icon">...</span>
+</button>
+-->
+
+<button
+    id="nova-mobile-voice"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    type="button"
+    title="Voice input"
+>
+    <span class="mobile-action-icon">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢</span>
+</button>
+
+<button
+    id="nova-mobile-stop-speech"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    type="button"
+    title="Stop speech"
+    data-active="false"
+>
+    <span class="mobile-action-icon">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¡</span>
+</button>
+
+<button
+    id="nova-mobile-tts"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    type="button"
+    title="Read aloud"
+>
+    <span class="mobile-action-icon">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â </span>
+</button>
+
+<label
+    id="nova-mobile-attach"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    title="Attach file"
+    data-nova-attach-owner="static-native-v1"
+>
+    <span class="mobile-action-icon">??</span>
+    <input
+        id="nova-mobile-file-input"
+        class="nova-mobile-native-file-input"
+        type="file"
+        multiple
+        accept="image/*,.txt,.md,.json,.js,.py,.css,.html,.pdf,.docx"
+        aria-label="Attach file"
+    />
+</label>
+<button
+    id="nova-mobile-tools-toggle"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    type="button"
+    title="Tools"
+    onclick="
+        const panel = document.getElementById('nova-mobile-tools-panel');
+        if (panel) {
+            panel.classList.remove('hidden');
+            panel.style.cssText = 'display:flex !important; position:fixed !important; left:10px !important; right:10px !important; bottom:90px !important; z-index:999999 !important; flex-direction:column !important; gap:10px !important; padding:14px !important; background:#111827 !important; border:1px solid rgba(255,255,255,.18) !important; border-radius:18px !important;';
+        }
+    "
+>
+    <span class="mobile-action-icon">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¯</span>
+</button>
+    </div>
+
+</main>
+
+<!-- DISABLED_OLD_INLINE_SESSIONS_OPEN_CLOSE_20260606 -->
+
+<script>
+(function () {
+    "use strict";
+
+    function ready(fn) {
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", fn);
+            return;
+        }
+
+        fn();
+    }
+
+    ready(function () {
+        const toolsButton = document.getElementById("nova-mobile-tools-toggle");
+        const toolsPanel = document.getElementById("nova-mobile-tools-panel");
+
+        if (!toolsButton || !toolsPanel) {
+            console.warn("[Nova Mobile] tools menu fallback missing elements", {
+                toolsButton: !!toolsButton,
+                toolsPanel: !!toolsPanel,
+            });
+            return;
+        }
+
+        toolsButton.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            toolsPanel.classList.toggle("hidden");
+
+            const isOpen = !toolsPanel.classList.contains("hidden");
+            toolsButton.setAttribute("aria-expanded", isOpen ? "true" : "false");
+        });
+
+        toolsButton.setAttribute("aria-controls", "nova-mobile-tools-panel");
+        toolsButton.setAttribute("aria-expanded", "false");
+
+        console.log("[Nova Mobile] tools menu fallback wired");
+    });
+})();
+</script>
+
+<!-- NOVA MOBILE PANEL HARD LOCK START -->
+<!-- NOVA_MOBILE_SESSIONS_OWNER_CLEANUP_PHASE2_INLINE_PANEL_20260703: disabled legacy inline sessions panel forceHide/forceShow owner -->
+
+
+<style>
+html,
+body {
+    height: 100%;
+}
+
+#mobileChatMessages,
+.nova-mobile-messages,
+.mobile-chat-messages,
+.chat-messages {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain !important;
+    touch-action: pan-y !important;
+}
+</style>
+
+<script>
+(function () {
+    const FIX_ID = "NOVA_MOBILE_SCROLL_AUTHORITY_20260625";
+
+    if (window.__novaMobileScrollAuthority20260625) {
+        return;
+    }
+
+    window.__novaMobileScrollAuthority20260625 = true;
+
+    let userReadingUntil = 0;
+    let autoAllowedUntil = Date.now() + 2500;
+
+    function now() {
+        return Date.now();
+    }
+
+    function getRoot() {
+        return (
+            document.getElementById("mobileChatMessages") ||
+            document.querySelector(".nova-mobile-messages") ||
+            document.querySelector(".mobile-chat-messages") ||
+            document.querySelector(".chat-messages")
+        );
+    }
+
+    function distanceFromBottom(el) {
+        if (!el) return 0;
+        return el.scrollHeight - el.scrollTop - el.clientHeight;
+    }
+
+    function nearBottom(el) {
+        return distanceFromBottom(el) < 120;
+    }
+
+    function markUserReading() {
+        const root = getRoot();
+
+        if (!root) {
+            userReadingUntil = now() + 5000;
+            return;
+        }
+
+        if (!nearBottom(root)) {
+            userReadingUntil = now() + 7000;
+        }
+    }
+
+    function allowAuto(reason) {
+        autoAllowedUntil = now() + 2500;
+        window.__novaMobileScrollAuthorityLastAllow = reason || "unknown";
+    }
+
+    window.NovaMobileAllowAutoScroll = allowAuto;
+
+    window.NovaMobileSafeScrollToBottom = function (el, reason, options) {
+        el = el || getRoot();
+
+        if (!el) {
+            return false;
+        }
+
+        const force = !!(options && options.force);
+        const userReading = now() < userReadingUntil && !nearBottom(el);
+        const autoAllowed = now() < autoAllowedUntil;
+
+        if (!force && userReading && !autoAllowed) {
+            return false;
+        }
+
+        try {
+            el.scrollTop = el.scrollHeight;
+            return true;
+        } catch (error) {
+            return false;
+        }
+    };
+
+    function wireRoot() {
+        const root = getRoot();
+
+        if (!root || root.dataset.novaScrollAuthorityWired === "1") {
+            return;
+        }
+
+        root.dataset.novaScrollAuthorityWired = "1";
+
+        ["touchstart", "touchmove", "wheel", "pointerdown"].forEach(function (name) {
+            root.addEventListener(name, markUserReading, { passive: true });
+        });
+
+        root.addEventListener("scroll", function () {
+            if (!nearBottom(root)) {
+                markUserReading();
+            }
+        }, { passive: true });
+    }
+
+    document.addEventListener("click", function (event) {
+        const target = event.target && event.target.closest
+            ? event.target.closest("button, [role='button'], input[type='submit']")
+            : null;
+
+        if (!target) return;
+
+        const text = String(target.textContent || target.value || target.id || "").toLowerCase();
+
+        if (
+            text.includes("send") ||
+            text.includes("retry") ||
+            text.includes("regenerate") ||
+            target.id === "sendButton" ||
+            target.id === "mobileSendButton"
+        ) {
+            allowAuto("send-click");
+        }
+    }, true);
+
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" && !event.shiftKey) {
+            allowAuto("enter");
+        }
+    }, true);
+
+    wireRoot();
+
+    console.log("[" + FIX_ID + "] ready");
+})();
+</script>
+<!-- /NOVA_MOBILE_SCROLL_AUTHORITY_20260625 -->
+
+<!-- =========================
+     CORE SYSTEM (MUST BE FIRST)
+========================= -->
+
+<script src="/static/js/mobile/nova-mobile-core.js?v=scroll-authority-20260626-002"></script>
+<script src="/static/js/mobile/nova-mobile-layout.js?v=layout-owner-v1"></script>
+
+<script src="/static/js/mobile/nova-mobile-state.js?v=mobile-state-002"></script>
+
+<script src="/static/js/mobile/nova-mobile-ui-utils.js?v=git-restored-valid-20260623"></script>
+
+
+<!-- =========================
+     CHAT RENDERING LAYER
+========================= -->
+
+<script src="/static/js/mobile/nova-mobile-chat-ui.js?v=mobile-modular-001"></script>
+
+<script src="/static/js/mobile/nova-mobile-message-actions.js?v=mobile-actions-fix-007"></script>
+
+<script src="/static/js/mobile/nova-mobile-stream.js?v=mobile-stream-full-clean-20260604-001"></script>
+
+
+<!-- =========================
+     FEATURES (SAFE MODULES)
+========================= -->
+
+<script src="/static/js/mobile/nova-mobile-images.js?v=scroll-authority-20260626-002"></script>
+
+<script src="/static/js/mobile/nova-mobile-webcards.js?v=source-card-kill-20260624-999"></script>
+<script src="/static/js/mobile/nova-mobile-upload.js?v=upload-menu-owner-hard-bridge-disabled-20260705"></script>
+<script src="/static/js/mobile/nova-mobile-voice.js?v=mobile-voice-endgame-002"></script>
+
+
+<script src="/static/js/mobile/nova-mobile-listeners.js?v=mobile-modular-001"></script>
+
+<script src="/static/js/mobile/nova-mobile-events.js?v=compact-quick-prompts-20260610-001"></script>
+
+<script src="/static/js/mobile/nova-mobile-storage.js?v=mobile-storage-003"></script>
+
+<script src="/static/js/nova-mobile-app.js?v=code-color-20260630-001"></script>
+
+<!-- =========================
+     ATTACHMENTS / ADVANCED UI40
+========================= -->
+
+<!-- DISABLED - handled by nova-mobile-app.js
+<!-- DISABLED 2026-07-05 duplicate mobile attachment owner: <script src="/static/js/mobile/nova-mobile-attachment-payload.js?v=attachment-revert-clean-20260609-001"></script> -->
+-->
+
+<!-- DISABLED - duplicate attachment preview owner
+<!-- DISABLED 2026-07-05 duplicate mobile attachment owner: <script src="/static/js/mobile/nova-mobile-attachment-preview.js?v=legacy-preview-disabled-20260630-001"></script> -->
+-->
+
+<script src="/static/js/mobile/nova-mobile-execution-panel.js?v=execution-panel-cache-state-20260623"></script>
+
+<!-- DISABLED - causes session Copy/Regen nesting loop
+<script src="/static/js/mobile/nova-mobile-assistant-actions.js?v=assistant-actions-retry-20260623"></script>
+-->
+<!-- DISABLED - risky broad mobile render guard, not committed
+<script src="/static/js/mobile/nova-mobile-render-guard.js?v=render-guard-20260630-0010"></script>
+-->
+<script src="/static/js/mobile/nova-mobile-artifacts-panel.js"></script>
+
+<!-- NOVA_BACKEND_READINESS_PILL_FINAL_20260608 -->
+<style>
+    #nova-backend-readiness-pill {
+        position: fixed;
+        top: 8px;
+        right: 8px;
+        z-index: 5000;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+        font-family: inherit;
+        pointer-events: none;
+        font-size: 11px;
+    }
+
+    #nova-backend-readiness-button {
+        pointer-events: auto;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        background: rgba(18, 18, 28, 0.82);
+        color: #ffffff;
+        padding: 5px 9px;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1;
+        cursor: pointer;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+    }
+
+    #nova-backend-readiness-button.ready {
+        border-color: rgba(72, 255, 150, 0.5);
+    }
+
+    #nova-backend-readiness-button.warn {
+        border-color: rgba(255, 210, 90, 0.6);
+    }
+
+    #nova-backend-readiness-button.fail {
+        border-color: rgba(255, 90, 90, 0.7);
+    }
+
+    #nova-backend-readiness-panel {
+        pointer-events: auto;
+        display: none;
+        width: 250px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 14px;
+        background: rgba(18, 18, 28, 0.94);
+        color: #ffffff;
+        padding: 9px;
+        box-shadow: 0 14px 32px rgba(0, 0, 0, 0.36);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        font-size: 11px;
+    }
+
+    #nova-backend-readiness-pill.open #nova-backend-readiness-panel {
+        display: block;
+    }
+
+    .nova-readiness-title {
+        font-size: 12px;
+        font-weight: 800;
+        margin-bottom: 6px;
+    }
+
+    .nova-readiness-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 3px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .nova-readiness-row:last-child {
+        border-bottom: 0;
+    }
+
+    .nova-readiness-label {
+        opacity: 0.72;
+    }
+
+    .nova-readiness-value {
+        font-weight: 800;
+    }
+</style>
+
+<div id="nova-backend-readiness-pill" aria-live="polite">
+    <button id="nova-backend-readiness-button" type="button" title="Tap to show backend readiness">Backend --%</button>
+
+    <div id="nova-backend-readiness-panel">
+        <div class="nova-readiness-title">Backend Readiness</div>
+
+        <div class="nova-readiness-row" title="Total backend readiness score">
+            <span class="nova-readiness-label">Overall</span>
+            <span class="nova-readiness-value" id="nova-readiness-overall">--%</span>
+        </div>
+
+        <div class="nova-readiness-row" title="Memory system readiness">
+            <span class="nova-readiness-label">Memory</span>
+            <span class="nova-readiness-value" id="nova-readiness-memory">--%</span>
+        </div>
+
+        <div class="nova-readiness-row" title="Agent decision system readiness">
+            <span class="nova-readiness-label">Agency</span>
+            <span class="nova-readiness-value" id="nova-readiness-agency">--%</span>
+        </div>
+
+        <div class="nova-readiness-row" title="Planning system readiness">
+            <span class="nova-readiness-label">Planner</span>
+            <span class="nova-readiness-value" id="nova-readiness-planner">--%</span>
+        </div>
+
+        <div class="nova-readiness-row" title="Session storage readiness">
+            <span class="nova-readiness-label">Session</span>
+            <span class="nova-readiness-value" id="nova-readiness-session">--%</span>
+        </div>
+
+        <div class="nova-readiness-row" title="Execution mission completion readiness">
+            <span class="nova-readiness-label">Execution</span>
+            <span class="nova-readiness-value" id="nova-readiness-execution">--%</span>
+        </div>
+
+        <div class="nova-readiness-row" title="Execution, memory, and session record counts">
+            <span class="nova-readiness-label">Records</span>
+            <span class="nova-readiness-value" id="nova-readiness-records">--</span>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    "use strict";
+
+    var pill = document.getElementById("nova-backend-readiness-pill");
+    var button = document.getElementById("nova-backend-readiness-button");
+
+    if (!pill || !button) return;
+
+    function setText(id, value) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = value;
+    }
+
+    function percent(value) {
+        var number = Number(value);
+        if (!Number.isFinite(number)) return "--%";
+        return Math.round(number) + "%";
+    }
+
+    function setButtonState(overall) {
+        button.classList.remove("ready", "warn", "fail");
+
+        if (!Number.isFinite(overall)) {
+            button.classList.add("fail");
+            button.textContent = "Backend offline";
+            return;
+        }
+
+        button.textContent = "Backend " + Math.round(overall) + "%";
+
+        if (overall >= 90) {
+            button.classList.add("ready");
+        } else if (overall >= 70) {
+            button.classList.add("warn");
+        } else {
+            button.classList.add("fail");
+        }
+    }
+
+    async function refreshReadiness() {
+        try {
+            var response = await fetch("/api/backend/readiness", {
+                method: "GET",
+                headers: {
+                    "Accept": "application/json"
+                },
+                cache: "no-store"
+            });
+
+            if (!response.ok) {
+                throw new Error("Readiness endpoint returned " + response.status);
+            }
+
+            var data = await response.json();
+            var overall = Number(data.overall_backend_readiness);
+
+            setButtonState(overall);
+
+            setText("nova-readiness-overall", percent(data.overall_backend_readiness));
+            setText("nova-readiness-memory", percent(data.memory_percent));
+            setText("nova-readiness-agency", percent(data.agency_percent));
+            setText("nova-readiness-planner", percent(data.planner_percent));
+            setText("nova-readiness-session", percent(data.session_percent));
+            setText("nova-readiness-execution", percent(data.execution_percent));
+
+            setText(
+                "nova-readiness-records",
+                "E:" + (data.execution_records ?? "--") +
+                " M:" + (data.memory_items ?? "--") +
+                " S:" + (data.session_records ?? "--")
+            );
+        } catch (error) {
+            setButtonState(NaN);
+            setText("nova-readiness-overall", "offline");
+            setText("nova-readiness-memory", "--%");
+            setText("nova-readiness-agency", "--%");
+            setText("nova-readiness-planner", "--%");
+            setText("nova-readiness-session", "--%");
+            setText("nova-readiness-execution", "--%");
+            setText("nova-readiness-records", "--");
+            console.warn("[Nova Backend Readiness]", error);
+        }
+    }
+
+    button.addEventListener("click", function () {
+        pill.classList.toggle("open");
+        refreshReadiness();
+    });
+
+    refreshReadiness();
+    window.setInterval(refreshReadiness, 15000);
+})();
+</script>
+    <script src="{{ url_for('static', filename='js/mobile/nova-mobile-auth.js') }}?v=auth-header-clean-final-20260705"></script>
+
+<!-- NOVA_MOBILE_REMOVE_RAW_TAIL_GARBAGE_20260703
+     Removed malformed legacy mobile tail blocks that leaked raw JS/CSS into the page.
+     Sessions panel remains owned by static/js/mobile/nova-mobile-sessions.js
+-->
+
+    const MENU_WORDS = [
+        "memory",
+        "upload",
+        "open",
+        "execution",
+        "artifact",
+        "artifacts"
+    ];
+
+    function cleanText(el) {
+        return String((el && el.textContent) || "")
+            .replace(/\s+/g, " ")
+            .trim()
+            .toLowerCase();
+    }
+
+    function attrBag(el) {
+        if (!el) return "";
+
+        return [
+            cleanText(el),
+            el.id || "",
+            el.className || "",
+            el.getAttribute && el.getAttribute("aria-label") || "",
+            el.getAttribute && el.getAttribute("title") || ""
+        ].join(" ").toLowerCase();
+    }
+
+    function isVisible(el) {
+        if (!el || !el.getBoundingClientRect) return false;
+
+        const rect = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+
+        return (
+            rect.width > 20 &&
+            rect.height > 20 &&
+            cs.display !== "none" &&
+            cs.visibility !== "hidden" &&
+            cs.opacity !== "0"
+        );
+    }
+
+    function scoreMenu(el) {
+        const bag = attrBag(el);
+        let score = 0;
+
+        MENU_WORDS.forEach(function (word) {
+            if (bag.includes(word)) {
+                score += 1;
+            }
+        });
+
+        const buttons = el.querySelectorAll("button, a");
+        if (buttons.length >= 3) {
+            score += 2;
+        }
+
+        if (/menu|tools|drawer|panel|actions|more/i.test(String(el.id || "") + " " + String(el.className || ""))) {
+            score += 2;
+        }
+
+        return score;
+    }
+
+    function fixMobileMenuPanels() {
+        const candidates = Array.from(document.querySelectorAll(
+            "div, section, nav, aside, menu, ul, [role='menu'], [class*='menu'], [class*='tools'], [class*='drawer'], [class*='panel'], [id*='menu'], [id*='tools'], [id*='drawer'], [id*='panel']"
+        ));
+
+        candidates
+            .filter(isVisible)
+            .filter(function (el) {
+                if (el.closest(".nova-mobile-auth-dock, .nova-mobile-user-dock, .nova-mobile-backend-dock")) return false;
+
+                const rect = el.getBoundingClientRect();
+                if (rect.width < 100 || rect.height < 80) return false;
+
+                return scoreMenu(el) >= 4;
+            })
+            .forEach(function (panel) {
+                panel.classList.add("nova-mobile-tools-menu-fixed");
+                panel.classList.add("nova-mobile-menu-panel-fixed");
+            });
+    }
+
+    /* NOVA_MOBILE_MENU_PANEL_FIX_DEBOUNCED_20260623 */
+    let novaMobileMenuPanelFixQueued = false;
+    let novaMobileMenuPanelFixTimer = null;
+    let novaMobileMenuPanelFixLastRun = 0;
+
+    function runMenuPanelFixOnce() {
+        novaMobileMenuPanelFixQueued = false;
+        novaMobileMenuPanelFixTimer = null;
+        novaMobileMenuPanelFixLastRun = Date.now();
+        fixMobileMenuPanels();
+    }
+
+    function scheduleFix() {
+        const now = Date.now();
+
+        if (novaMobileMenuPanelFixQueued) {
+            return;
+        }
+
+        novaMobileMenuPanelFixQueued = true;
+
+        if (now - novaMobileMenuPanelFixLastRun < 220) {
+            novaMobileMenuPanelFixTimer = setTimeout(runMenuPanelFixOnce, 220);
+            return;
+        }
+
+        requestAnimationFrame(runMenuPanelFixOnce);
+    }
+
+    document.addEventListener("DOMContentLoaded", scheduleFix);
+    document.addEventListener("click", scheduleFix, true);
+    document.addEventListener("pointerup", scheduleFix, true);
+
+    const observer = new MutationObserver(scheduleFix);
+
+    observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["class", "style", "aria-expanded"]
+    });
+
+    window.NovaMobileFixToolsMenuPanel = fixMobileMenuPanels;
+
+    scheduleFix();
+
+    console.log("[" + FIX_ID + "] ready");
+})();
+</script>
+<!-- NOVA_MOBILE_MENU_PANEL_SCROLL_FIX_END_20260623 -->
+
+<!-- NOVA_MOBILE_MEMORY_REAL_PANEL_V2_20260623 -->
+<style>
+#novaMobileMemoryV2Overlay {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 100050 !important;
+    display: none;
+    align-items: flex-end !important;
+    justify-content: center !important;
+    padding: 14px !important;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 14px) !important;
+    background: rgba(2, 6, 23, 0.58) !important;
+    backdrop-filter: blur(12px) !important;
+    box-sizing: border-box !important;
+}
+
+#novaMobileMemoryV2Overlay.is-open {
+    display: flex !important;
+}
+
+#novaMobileMemoryV2Panel {
+    width: min(520px, 100%) !important;
+    max-height: min(78vh, 720px) !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    overflow: hidden !important;
+    border-radius: 24px !important;
+    border: 1px solid rgba(216, 180, 254, 0.28) !important;
+    background:
+        radial-gradient(circle at top left, rgba(168, 85, 247, 0.18), transparent 34%),
+        rgba(15, 23, 42, 0.96) !important;
+    box-shadow: 0 26px 80px rgba(0, 0, 0, 0.48) !important;
+}
+
+#novaMobileMemoryV2Head {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+    padding: 14px 15px !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.10) !important;
+}
+
+#novaMobileMemoryV2Title {
+    color: #f8fafc !important;
+    font-size: 15px !important;
+    font-weight: 950 !important;
+    letter-spacing: -0.03em !important;
+}
+
+#novaMobileMemoryV2Count {
+    color: #ddd6fe !important;
+    font-size: 11px !important;
+    font-weight: 900 !important;
+    padding: 5px 8px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(216, 180, 254, 0.22) !important;
+    background: rgba(168, 85, 247, 0.16) !important;
+}
+
+#novaMobileMemoryV2Close {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    height: 30px !important;
+    padding: 0 11px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #f8fafc !important;
+    font-size: 11px !important;
+    font-weight: 900 !important;
+    cursor: pointer !important;
+}
+
+#novaMobileMemoryV2Body {
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 12px !important;
+    display: grid !important;
+    gap: 9px !important;
+    align-content: start !important;
+}
+
+.nova-mobile-memory-v2-card {
+    display: grid !important;
+    gap: 6px !important;
+    padding: 11px 12px !important;
+    border-radius: 16px !important;
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    background: rgba(255, 255, 255, 0.055) !important;
+    box-sizing: border-box !important;
+}
+
+.nova-mobile-memory-v2-card.is-pinned {
+    border-color: rgba(216, 180, 254, 0.34) !important;
+    background: rgba(168, 85, 247, 0.13) !important;
+}
+
+.nova-mobile-memory-v2-meta {
+    display: flex !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+}
+
+.nova-mobile-memory-v2-kind {
+    min-width: 0 !important;
+    color: #ddd6fe !important;
+    font-size: 10px !important;
+    line-height: 1 !important;
+    font-weight: 950 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.04em !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+.nova-mobile-memory-v2-date {
+    flex: 0 0 auto !important;
+    color: rgba(226, 232, 240, 0.52) !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+}
+
+.nova-mobile-memory-v2-text {
+    color: rgba(248, 250, 252, 0.92) !important;
+    font-size: 12.5px !important;
+    line-height: 1.45 !important;
+    white-space: pre-wrap !important;
+    overflow-wrap: anywhere !important;
+}
+
+.nova-mobile-memory-v2-state {
+    padding: 16px !important;
+    border-radius: 16px !important;
+    border: 1px dashed rgba(216, 180, 254, 0.26) !important;
+    background: rgba(255, 255, 255, 0.045) !important;
+    color: rgba(226, 232, 240, 0.74) !important;
+    font-size: 12.5px !important;
+    line-height: 1.45 !important;
+    text-align: center !important;
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    const FIX_ID = "NOVA_MOBILE_MEMORY_REAL_PANEL_V2_20260623";
+
+    function getApiKey() {
+        return (
+            window.API_KEY ||
+            window.NOVA_API_KEY ||
+            window.apiKey ||
+            localStorage.getItem("nova_api_key") ||
+            localStorage.getItem("NOVA_API_KEY") ||
+            "dev"
+        );
+    }
+
+    function textOf(el) {
+        return String((el && el.textContent) || "")
+            .replace(/\s+/g, " ")
+            .trim()
+            .toLowerCase();
+    }
+
+    function attrBag(el) {
+        if (!el) return "";
+
+        return [
+            textOf(el),
+            el.id || "",
+            el.className || "",
+            el.getAttribute && el.getAttribute("aria-label") || "",
+            el.getAttribute && el.getAttribute("title") || "",
+            el.getAttribute && el.getAttribute("href") || ""
+        ].join(" ").toLowerCase();
+    }
+
+    function isMemoryButton(el) {
+        if (!el || !el.matches || !el.matches("a, button")) return false;
+        if (el.id === "novaMobileMemoryV2Close") return false;
+        if (el.closest("#novaMobileMemoryV2Overlay")) return false;
+
+        const bag = attrBag(el);
+        const text = textOf(el);
+
+        return text === "memory" || text.includes("memory") || bag.includes("memory");
+    }
+
+    function ensureOverlay() {
+        let overlay = document.getElementById("novaMobileMemoryV2Overlay");
+
+        if (!overlay) {
+            overlay = document.createElement("div");
+            overlay.id = "novaMobileMemoryV2Overlay";
+            overlay.innerHTML = `
+                <section id="novaMobileMemoryV2Panel" role="dialog" aria-modal="true" aria-label="Nova memory">
+                    <div id="novaMobileMemoryV2Head">
+                        <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+                            <div id="novaMobileMemoryV2Title">Memory</div>
+                            <div id="novaMobileMemoryV2Count">0</div>
+                        </div>
+                        <button id="novaMobileMemoryV2Close" type="button">Close</button>
+                    </div>
+                    <div id="novaMobileMemoryV2Body">
+                        <div class="nova-mobile-memory-v2-state">Loading memory?</div>
+                    </div>
+                </section>
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        const close = overlay.querySelector("#novaMobileMemoryV2Close");
+        if (close && !close.dataset.novaBound) {
+            close.dataset.novaBound = "1";
+            close.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                overlay.classList.remove("is-open");
+            }, true);
+        }
+
+        if (!overlay.dataset.novaBackdropBound) {
+            overlay.dataset.novaBackdropBound = "1";
+            overlay.addEventListener("click", function (event) {
+                if (event.target === overlay) {
+                    overlay.classList.remove("is-open");
+                }
+            }, true);
+        }
+
+        return overlay;
+    }
+
+    function setState(message, countText) {
+        const overlay = ensureOverlay();
+        const body = overlay.querySelector("#novaMobileMemoryV2Body");
+        const count = overlay.querySelector("#novaMobileMemoryV2Count");
+
+        if (count) count.textContent = countText || "0";
+        if (body) {
+            body.innerHTML = "";
+            const div = document.createElement("div");
+            div.className = "nova-mobile-memory-v2-state";
+            div.textContent = message;
+            body.appendChild(div);
+        }
+    }
+
+    function extractMemories(payload) {
+        if (!payload) return [];
+
+        if (Array.isArray(payload)) return payload;
+
+        if (payload.data && Array.isArray(payload.data.memory)) return payload.data.memory;
+        if (payload.data && Array.isArray(payload.data.memories)) return payload.data.memories;
+
+        if (Array.isArray(payload.memory)) return payload.memory;
+        if (Array.isArray(payload.memories)) return payload.memories;
+
+        return [];
+    }
+
+    function shortDate(value) {
+        if (!value) return "";
+
+        try {
+            const d = new Date(value);
+            if (Number.isNaN(d.getTime())) return "";
+            return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+        } catch (_) {
+            return "";
+        }
+    }
+
+    function renderMemories(payload) {
+        const overlay = ensureOverlay();
+        const body = overlay.querySelector("#novaMobileMemoryV2Body");
+        const count = overlay.querySelector("#novaMobileMemoryV2Count");
+        const memories = extractMemories(payload);
+
+        if (count) count.textContent = String(memories.length);
+
+        if (!body) return;
+
+        body.innerHTML = "";
+
+        if (!memories.length) {
+            setState("No memory items found from /api/memory.", "0");
+            return;
+        }
+
+        memories
+            .slice()
+            .sort(function (a, b) {
+                if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+                return String(b.updated_at || "").localeCompare(String(a.updated_at || ""));
+            })
+            .forEach(function (item) {
+                const card = document.createElement("article");
+                card.className = "nova-mobile-memory-v2-card";
+                if (item.pinned) card.classList.add("is-pinned");
+
+                const meta = document.createElement("div");
+                meta.className = "nova-mobile-memory-v2-meta";
+
+                const kind = document.createElement("div");
+                kind.className = "nova-mobile-memory-v2-kind";
+                kind.textContent = (item.pinned ? "Pinned ? " : "") + (item.kind || item.type || "memory");
+
+                const date = document.createElement("div");
+                date.className = "nova-mobile-memory-v2-date";
+                date.textContent = shortDate(item.updated_at || item.created_at);
+
+                const text = document.createElement("div");
+                text.className = "nova-mobile-memory-v2-text";
+                text.textContent = item.text || item.content || item.value || item.summary || "";
+
+                meta.appendChild(kind);
+                meta.appendChild(date);
+                card.appendChild(meta);
+                card.appendChild(text);
+                body.appendChild(card);
+            });
+    }
+
+    async function loadMemory() {
+        setState("Loading memory?", "?");
+
+        try {
+            const response = await fetch("/api/memory", {
+                method: "GET",
+                headers: {
+                    "x-api-key": getApiKey()
+                }
+            });
+
+            const payload = await response.json();
+
+            console.log("[" + FIX_ID + "] payload", payload);
+
+            if (!response.ok || payload.ok === false) {
+                throw new Error(payload.error || payload.message || "Memory request failed.");
+            }
+
+            renderMemories(payload);
+        } catch (error) {
+            console.warn("[" + FIX_ID + "] failed", error);
+            setState("Could not load memory: " + String(error && error.message || error), "!");
+        }
+    }
+
+    function openMemory() {
+        const overlay = ensureOverlay();
+        overlay.classList.add("is-open");
+        loadMemory();
+    }
+
+    function bindMemoryButtons() {
+        Array.from(document.querySelectorAll("a, button"))
+            .filter(isMemoryButton)
+            .forEach(function (btn) {
+                if (btn.dataset.novaMemoryV2Bound === "1") return;
+
+                btn.dataset.novaMemoryV2Bound = "1";
+                btn.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    event.stopImmediatePropagation();
+                    openMemory();
+                    return false;
+                }, true);
+            });
+    }
+
+    function scheduleBind() {
+        [50, 200, 600, 1200].forEach(function (ms) {
+            setTimeout(bindMemoryButtons, ms);
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", scheduleBind);
+    document.addEventListener("click", scheduleBind, true);
+
+    const observer = new MutationObserver(scheduleBind);
+    observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true
+    });
+
+    document.addEventListener("keyup", function (event) {
+        if (event.key === "Escape") {
+            const overlay = document.getElementById("novaMobileMemoryV2Overlay");
+            if (overlay) overlay.classList.remove("is-open");
+        }
+    });
+
+    window.NovaMobileOpenMemoryPanelV2 = openMemory;
+    window.NovaMobileLoadMemoryPanelV2 = loadMemory;
+
+    ensureOverlay();
+    scheduleBind();
+
+    console.log("[" + FIX_ID + "] ready");
+})();
+</script>
+<!-- NOVA_MOBILE_MEMORY_REAL_PANEL_V2_END_20260623 -->
+
+<!-- NOVA_MOBILE_MEMORY_V2_ADD_BOX_20260623 -->
+<style>
+#novaMobileMemoryV2Panel {
+    grid-template-rows: auto auto minmax(0, 1fr) !important;
+}
+
+#novaMobileMemoryV2AddBox {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 8px !important;
+    padding: 10px 12px !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.10) !important;
+    background: rgba(255, 255, 255, 0.035) !important;
+    box-sizing: border-box !important;
+}
+
+#novaMobileMemoryV2Kind,
+#novaMobileMemoryV2Input,
+#novaMobileMemoryV2Save {
+    min-width: 0 !important;
+    height: 34px !important;
+    border-radius: 13px !important;
+    box-sizing: border-box !important;
+    font-size: 12px !important;
+    font-weight: 850 !important;
+}
+
+#novaMobileMemoryV2Kind {
+    width: 100% !important;
+    padding: 0 9px !important;
+    border: 1px solid rgba(216, 180, 254, 0.22) !important;
+    background: rgba(15, 23, 42, 0.86) !important;
+    color: rgba(248, 250, 252, 0.92) !important;
+}
+
+#novaMobileMemoryV2Input {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    padding: 0 10px !important;
+    border: 1px solid rgba(216, 180, 254, 0.22) !important;
+    background: rgba(2, 6, 23, 0.55) !important;
+    color: rgba(248, 250, 252, 0.96) !important;
+    outline: none !important;
+}
+
+#novaMobileMemoryV2Input::placeholder {
+    color: rgba(226, 232, 240, 0.48) !important;
+}
+
+#novaMobileMemoryV2Save {
+    width: 74px !important;
+    padding: 0 10px !important;
+    border: 1px solid rgba(216, 180, 254, 0.32) !important;
+    background: rgba(168, 85, 247, 0.22) !important;
+    color: #f8fafc !important;
+    cursor: pointer !important;
+}
+
+#novaMobileMemoryV2Save:disabled {
+    opacity: 0.58 !important;
+    cursor: default !important;
+}
+
+#novaMobileMemoryV2AddStatus {
+    grid-column: 1 / -1 !important;
+    min-height: 14px !important;
+    color: rgba(226, 232, 240, 0.62) !important;
+    font-size: 10.5px !important;
+    line-height: 1.25 !important;
+    font-weight: 800 !important;
+}
+
+@media (max-width: 420px) {
+    #novaMobileMemoryV2AddBox {
+        gap: 7px !important;
+        padding: 9px 10px !important;
+    }
+
+    #novaMobileMemoryV2Save {
+        width: 66px !important;
+    }
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    const FIX_ID = "NOVA_MOBILE_MEMORY_V2_ADD_BOX_20260623";
+
+    function getApiKey() {
+        return (
+            window.API_KEY ||
+            window.NOVA_API_KEY ||
+            window.apiKey ||
+            localStorage.getItem("nova_api_key") ||
+            localStorage.getItem("NOVA_API_KEY") ||
+            "dev"
+        );
+    }
+
+    function getOverlay() {
+        return document.getElementById("novaMobileMemoryV2Overlay");
+    }
+
+    function getPanel() {
+        return document.getElementById("novaMobileMemoryV2Panel");
+    }
+
+    function closeMemoryPanelHard() {
+        const overlay = getOverlay();
+        if (!overlay) return;
+
+        overlay.classList.remove("is-open");
+        overlay.style.display = "none";
+
+        setTimeout(function () {
+            overlay.style.removeProperty("display");
+        }, 250);
+    }
+
+    function setAddStatus(text) {
+        const status = document.getElementById("novaMobileMemoryV2AddStatus");
+        if (status) status.textContent = text || "";
+    }
+
+    async function saveMobileMemory() {
+        const input = document.getElementById("novaMobileMemoryV2Input");
+        const kind = document.getElementById("novaMobileMemoryV2Kind");
+        const save = document.getElementById("novaMobileMemoryV2Save");
+
+        const text = String((input && input.value) || "").trim();
+        const kindValue = String((kind && kind.value) || "preference").trim();
+
+        if (!text) {
+            setAddStatus("Type something to remember first.");
+            if (input) input.focus();
+            return;
+        }
+
+        if (save) {
+            save.disabled = true;
+            save.textContent = "Saving";
+        }
+
+        setAddStatus("Saving memory?");
+
+        try {
+            const response = await fetch("/api/memory/add", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-api-key": getApiKey()
+                },
+                body: JSON.stringify({
+                    text: text,
+                    kind: kindValue,
+                    pinned: false
+                })
+            });
+
+            const payload = await response.json();
+
+            console.log("[" + FIX_ID + "] add payload", payload);
+
+            if (!response.ok || payload.ok === false) {
+                throw new Error(payload.error || payload.message || "Save failed.");
+            }
+
+            if (input) input.value = "";
+
+            setAddStatus("Saved.");
+
+            if (typeof window.NovaMobileLoadMemoryPanelV2 === "function") {
+                window.NovaMobileLoadMemoryPanelV2();
+            }
+        } catch (error) {
+            console.warn("[" + FIX_ID + "] save failed", error);
+            setAddStatus("Could not save: " + String(error && error.message || error));
+        } finally {
+            if (save) {
+                save.disabled = false;
+                save.textContent = "Save";
+            }
+        }
+    }
+
+    function installAddBox() {
+        const panel = getPanel();
+
+        if (!panel) return;
+        if (document.getElementById("novaMobileMemoryV2AddBox")) return;
+
+        const body = document.getElementById("novaMobileMemoryV2Body");
+        const addBox = document.createElement("div");
+
+        addBox.id = "novaMobileMemoryV2AddBox";
+        addBox.innerHTML = `
+            <select id="novaMobileMemoryV2Kind" aria-label="Memory kind">
+                <option value="preference">Preference</option>
+                <option value="people">People</option>
+                <option value="project">Project</option>
+                <option value="note">Note</option>
+            </select>
+            <button id="novaMobileMemoryV2Save" type="button">Save</button>
+            <input id="novaMobileMemoryV2Input" type="text" placeholder="Add memory, e.g. favorite color is purple">
+            <div id="novaMobileMemoryV2AddStatus"></div>
+        `;
+
+        if (body && body.parentElement === panel) {
+            panel.insertBefore(addBox, body);
+        } else {
+            panel.appendChild(addBox);
+        }
+
+        const save = document.getElementById("novaMobileMemoryV2Save");
+        const input = document.getElementById("novaMobileMemoryV2Input");
+
+        if (save) {
+            save.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                saveMobileMemory();
+            }, true);
+        }
+
+        if (input) {
+            input.addEventListener("keydown", function (event) {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    saveMobileMemory();
+                }
+            }, true);
+        }
+    }
+
+    function bindCloseHard() {
+        document.addEventListener("pointerdown", function (event) {
+            const close = event.target.closest && event.target.closest("#novaMobileMemoryV2Close");
+            const overlay = getOverlay();
+
+            if (close || (overlay && event.target === overlay)) {
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
+                closeMemoryPanelHard();
+                return false;
+            }
+        }, true);
+
+        document.addEventListener("click", function (event) {
+            const close = event.target.closest && event.target.closest("#novaMobileMemoryV2Close");
+            const overlay = getOverlay();
+
+            if (close || (overlay && event.target === overlay)) {
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
+                closeMemoryPanelHard();
+                return false;
+            }
+        }, true);
+    }
+
+    function scheduleInstall() {
+        [50, 200, 600, 1200, 1800].forEach(function (ms) {
+            setTimeout(installAddBox, ms);
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", scheduleInstall);
+    document.addEventListener("click", scheduleInstall, true);
+
+    const observer = new MutationObserver(scheduleInstall);
+    observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true
+    });
+
+    bindCloseHard();
+
+    window.NovaMobileInstallMemoryAddBox = installAddBox;
+    window.NovaMobileSaveMemoryFromPanel = saveMobileMemory;
+    window.NovaMobileCloseMemoryPanelHard = closeMemoryPanelHard;
+
+    scheduleInstall();
+
+    console.log("[" + FIX_ID + "] ready");
+})();
+</script>
+<!-- NOVA_MOBILE_MEMORY_V2_ADD_BOX_END_20260623 -->
+
+
+
+
+
+
+
+
+<!-- NOVA_MOBILE_EXECUTION_PANEL_POLISH_20260623 -->
+<style>
+#nova-mobile-execution-panel {
+    gap: 11px !important;
+}
+
+#nova-mobile-execution-panel .mobile-panel-title {
+    color: #f8fafc !important;
+    font-size: 15px !important;
+    font-weight: 950 !important;
+    letter-spacing: -0.03em !important;
+}
+
+#nova-mobile-execution-status {
+    display: grid !important;
+    gap: 8px !important;
+    padding: 11px 12px !important;
+    border-radius: 15px !important;
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    background: rgba(255, 255, 255, 0.055) !important;
+    color: rgba(248, 250, 252, 0.92) !important;
+    font-size: 12.5px !important;
+    line-height: 1.38 !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+}
+
+.nova-mobile-execution-status-line {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    gap: 6px !important;
+    align-items: start !important;
+}
+
+.nova-mobile-execution-status-label {
+    color: #ddd6fe !important;
+    font-size: 11px !important;
+    font-weight: 950 !important;
+    white-space: nowrap !important;
+}
+
+.nova-mobile-execution-status-value {
+    color: rgba(248, 250, 252, 0.94) !important;
+    font-size: 12.5px !important;
+    font-weight: 750 !important;
+    overflow-wrap: anywhere !important;
+}
+
+#nova-mobile-execution-badge {
+    align-self: flex-start !important;
+    width: fit-content !important;
+    max-width: 100% !important;
+    padding: 5px 9px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(216, 180, 254, 0.26) !important;
+    background: rgba(168, 85, 247, 0.16) !important;
+    color: #ddd6fe !important;
+    font-size: 11px !important;
+    font-weight: 950 !important;
+}
+
+.mobile-execution-progress {
+    height: 7px !important;
+    overflow: hidden !important;
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, 0.10) !important;
+}
+
+.mobile-execution-progress-bar {
+    height: 100% !important;
+    border-radius: 999px !important;
+    background: linear-gradient(90deg, rgba(168, 85, 247, 0.95), rgba(216, 180, 254, 0.95)) !important;
+}
+
+#nova-mobile-execution-last-update {
+    color: rgba(226, 232, 240, 0.58) !important;
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+}
+
+#nova-mobile-execution-panel button {
+    min-height: 34px !important;
+    border-radius: 13px !important;
+    border: 1px solid rgba(216, 180, 254, 0.24) !important;
+    background: rgba(168, 85, 247, 0.14) !important;
+    color: #f8fafc !important;
+    font-size: 11.5px !important;
+    font-weight: 900 !important;
+}
+</style>
+<!-- NOVA_MOBILE_EXECUTION_PANEL_POLISH_END_20260623 -->
+<!-- NOVA_MOBILE_EXECUTION_LINE_TIGHTEN_20260623 -->
+<style>
+#nova-mobile-execution-status {
+    gap: 6px !important;
+}
+
+.nova-mobile-execution-status-line {
+    display: block !important;
+    line-height: 1.42 !important;
+}
+
+.nova-mobile-execution-status-label {
+    display: inline !important;
+    white-space: nowrap !important;
+    margin-right: 4px !important;
+}
+
+.nova-mobile-execution-status-value {
+    display: inline !important;
+}
+</style>
+
+
+<style>
+#nova-mobile-artifacts-panel {
+    color: #f8fafc !important;
+}
+
+#nova-mobile-artifacts-panel .mobile-panel-title {
+    color: #f8fafc !important;
+    font-size: 15px !important;
+    font-weight: 950 !important;
+    letter-spacing: -0.03em !important;
+}
+
+#nova-mobile-artifacts-count {
+    color: rgba(226, 232, 240, 0.66) !important;
+    font-size: 11.5px !important;
+    line-height: 1.35 !important;
+}
+
+.nova-mobile-artifacts-body {
+    display: grid !important;
+    gap: 10px !important;
+    min-height: 0 !important;
+}
+
+.nova-mobile-artifacts-state {
+    padding: 14px !important;
+    border-radius: 15px !important;
+    border: 1px dashed rgba(216, 180, 254, 0.26) !important;
+    background: rgba(255, 255, 255, 0.045) !important;
+    color: rgba(226, 232, 240, 0.74) !important;
+    font-size: 12.5px !important;
+    line-height: 1.45 !important;
+    text-align: center !important;
+}
+
+.nova-mobile-artifact-card {
+    display: grid !important;
+    gap: 7px !important;
+    padding: 11px !important;
+    border-radius: 16px !important;
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    background: rgba(255, 255, 255, 0.055) !important;
+    min-width: 0 !important;
+}
+
+.nova-mobile-artifact-title {
+    color: rgba(248, 250, 252, 0.96) !important;
+    font-size: 13px !important;
+    line-height: 1.28 !important;
+    font-weight: 950 !important;
+    overflow-wrap: anywhere !important;
+}
+
+.nova-mobile-artifact-meta {
+    color: #ddd6fe !important;
+    font-size: 10px !important;
+    line-height: 1 !important;
+    font-weight: 950 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.04em !important;
+}
+
+.nova-mobile-artifact-image {
+    width: 100% !important;
+    max-height: 190px !important;
+    object-fit: contain !important;
+    border-radius: 13px !important;
+    background: rgba(2, 6, 23, 0.42) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.nova-mobile-artifact-summary {
+    color: rgba(226, 232, 240, 0.72) !important;
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+    max-height: 48px !important;
+    overflow: hidden !important;
+}
+
+.nova-mobile-artifact-open,
+#nova-mobile-artifacts-panel button {
+    min-height: 34px !important;
+    border-radius: 13px !important;
+    border: 1px solid rgba(216, 180, 254, 0.24) !important;
+    background: rgba(168, 85, 247, 0.14) !important;
+    color: #f8fafc !important;
+    font-size: 11.5px !important;
+    font-weight: 900 !important;
+}
+</style>
+
+<style>
+.nova-mobile-assistant-actions {
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 6px !important;
+    margin: 0 0 7px 0 !important;
+    padding: 0 !important;
+}
+
+.nova-mobile-assistant-action {
+    min-height: 26px !important;
+    padding: 4px 9px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(216, 180, 254, 0.26) !important;
+    background: rgba(168, 85, 247, 0.14) !important;
+    color: #f8fafc !important;
+    font-size: 10.5px !important;
+    line-height: 1 !important;
+    font-weight: 900 !important;
+    letter-spacing: -0.01em !important;
+    box-shadow: none !important;
+}
+
+.nova-mobile-assistant-action:active {
+    transform: scale(0.98) !important;
+}
+</style>
+<!-- NOVA_MOBILE_ASSISTANT_ACTIONS_STYLE_END_20260623 -->
+
+
+<!-- NOVA_MOBILE_TOP_COPY_EXPORT_SESSION_20260623 -->
+<style>
+<!-- NOVA_MOBILE_REMOVE_COPY_EXPORT_RAW_CSS_20260703: removed malformed raw copy/export CSS block -->
+
+#nova-mobile-copy-chat.nova-mobile-top-copy-export-hidden,
+#nova-mobile-export-chat.nova-mobile-top-copy-export-hidden {
+    display: inline-flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    const FIX_ID = "NOVA_MOBILE_TOP_COPY_EXPORT_SESSION_20260623";
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function clean(value) {
+        return String(value || "")
+            .replace(/\r/g, "")
+            .replace(/[ \t]+\n/g, "\n")
+            .replace(/\n[ \t]+/g, "\n")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim();
+    }
+
+    function toast(message) {
+        if (typeof window.showToast === "function") {
+            window.showToast(message);
+            return;
+        }
+
+        if (window.NovaMobileUI && typeof window.NovaMobileUI.showToast === "function") {
+            window.NovaMobileUI.showToast(message);
+            return;
+        }
+
+        console.log("[" + FIX_ID + "] " + message);
+    }
+
+    function getApiKey() {
+        return (
+            window.API_KEY ||
+            window.NOVA_API_KEY ||
+            window.apiKey ||
+            localStorage.getItem("nova_api_key") ||
+            localStorage.getItem("NOVA_API_KEY") ||
+            "dev"
+        );
+    }
+
+    function getSessionId() {
+        try {
+            if (window.NovaMobileBridge && typeof window.NovaMobileBridge.getSessionId === "function") {
+                const sid = window.NovaMobileBridge.getSessionId();
+
+                if (sid) return sid;
+            }
+        } catch (_) {}
+
+        const keys = [
+            "nova_mobile_active_session_id",
+            "novaMobileSessionId",
+            "active_session_id",
+            "session_id",
+            "nova_session_id"
+        ];
+
+        for (const key of keys) {
+            try {
+                const value = localStorage.getItem(key);
+
+                if (value) return value;
+            } catch (_) {}
+        }
+
+        return "";
+    }
+
+    function extractMessages(payload) {
+        if (!payload) return [];
+
+        if (Array.isArray(payload.messages)) return payload.messages;
+        if (payload.session && Array.isArray(payload.session.messages)) return payload.session.messages;
+        if (payload.data && Array.isArray(payload.data.messages)) return payload.data.messages;
+        if (payload.chat && Array.isArray(payload.chat.messages)) return payload.chat.messages;
+
+        return [];
+    }
+
+    function roleOf(message) {
+        const raw = String(
+            message.role ||
+            message.sender ||
+            message.type ||
+            message.author ||
+            ""
+        ).toLowerCase();
+
+        if (raw.includes("user") || raw.includes("human")) return "user";
+        if (raw.includes("assistant") || raw.includes("bot") || raw.includes("ai")) return "assistant";
+
+        return "";
+    }
+
+    function textOfMessage(message) {
+        return clean(
+            message.text ||
+            message.content ||
+            message.body ||
+            message.message ||
+            message.value ||
+            message.output ||
+            ""
+        );
+    }
+
+    function formatSessionMessages(messages) {
+        const parts = [];
+
+        messages.forEach(function (message) {
+            const role = roleOf(message);
+            const value = textOfMessage(message);
+
+            if (!role || !value) return;
+            if (value === "New chat started and saved to Sessions.") return;
+
+            parts.push(role + "\n" + value);
+        });
+
+        return clean(parts.join("\n\n"));
+    }
+
+    async function fetchSessionTranscript() {
+        const sessionId = getSessionId();
+
+        if (!sessionId) return "";
+
+        const urls = [
+            "/api/sessions/" + encodeURIComponent(sessionId),
+            "/api/chat/" + encodeURIComponent(sessionId)
+        ];
+
+        for (const url of urls) {
+            try {
+                const response = await fetch(url, {
+                    method: "GET",
+                    headers: {
+                        "Accept": "application/json",
+                        "x-api-key": getApiKey()
+                    }
+                });
+
+                if (!response.ok) continue;
+
+                const payload = await response.json();
+                const messages = extractMessages(payload);
+                const transcript = formatSessionMessages(messages);
+
+                if (transcript) return transcript;
+            } catch (_) {}
+        }
+
+        return "";
+    }
+
+    function getDomTranscriptFallback() {
+        const root =
+            $("mobileChatMessages") ||
+            $("nova-mobile-messages") ||
+            $("messagesContainer") ||
+            $("messages-container") ||
+            document.querySelector("[data-mobile-chat-messages]") ||
+            document.querySelector(".mobile-chat-messages") ||
+            document.querySelector(".mobile-chat-container") ||
+            document.querySelector(".chat-messages");
+
+        if (!root) return "";
+
+        const clone = root.cloneNode(true);
+
+        clone.querySelectorAll([
+            "button",
+            ".nova-mobile-assistant-actions",
+            ".nova-mobile-message-actions",
+            ".nova-code-copy-btn",
+            ".mobile-panel",
+            "#nova-mobile-tools-panel",
+            "#nova-mobile-artifacts-panel",
+            "#nova-mobile-execution-panel",
+            "#nova-mobile-memory-panel",
+            "[data-mobile-assistant-action]"
+        ].join(",")).forEach(function (el) {
+            el.remove();
+        });
+
+        return clean(
+            String(clone.innerText || clone.textContent || "")
+                .replace(/New chat started and saved to Sessions\./g, "")
+        );
+    }
+
+    async function getTranscript() {
+        const sessionTranscript = await fetchSessionTranscript();
+
+        if (sessionTranscript) return sessionTranscript;
+
+        return getDomTranscriptFallback() || "No chat messages.";
+    }
+
+    async function copyText(value) {
+        value = clean(value);
+
+        if (!value) {
+            toast("Nothing to copy.");
+            return false;
+        }
+
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(value);
+                toast("Copied chat.");
+                return true;
+            }
+        } catch (_) {}
+
+        const area = document.createElement("textarea");
+        area.value = value;
+        area.style.position = "fixed";
+        area.style.left = "-9999px";
+        area.style.top = "0";
+
+        document.body.appendChild(area);
+        area.focus();
+        area.select();
+
+        try {
+            document.execCommand("copy");
+            toast("Copied chat.");
+            return true;
+        } catch (error) {
+            toast("Copy failed.");
+            return false;
+        } finally {
+            area.remove();
+        }
+    }
+
+    async function copyWholeChat() {
+        const transcript = await getTranscript();
+        await copyText(transcript);
+    }
+
+    async function exportWholeChat() {
+        const transcript = await getTranscript();
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+        const filename = "nova-chat-" + stamp + ".txt";
+
+        try {
+            const blob = new Blob([transcript], {
+                type: "text/plain;charset=utf-8"
+            });
+
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+
+            link.href = url;
+            link.download = filename;
+            link.style.display = "none";
+
+            document.body.appendChild(link);
+            link.click();
+
+            setTimeout(function () {
+                URL.revokeObjectURL(url);
+                link.remove();
+            }, 800);
+
+            toast("Exported chat.");
+        } catch (error) {
+            await copyText(transcript);
+            toast("Export failed, copied instead.");
+        }
+    }
+
+    function restoreButton(button) {
+        if (!button) return;
+
+        button.classList.remove("nova-mobile-top-copy-export-hidden");
+        button.classList.remove("nova-mobile-hidden-duplicate");
+        button.removeAttribute("aria-hidden");
+        button.tabIndex = 0;
+
+        button.style.setProperty("display", "inline-flex", "important");
+        button.style.setProperty("visibility", "visible", "important");
+        button.style.setProperty("opacity", "1", "important");
+        button.style.setProperty("pointer-events", "auto", "important");
+    }
+
+    function bind(id, handler) {
+        const oldButton = $(id);
+
+        if (!oldButton || !oldButton.parentNode) return;
+
+        const button = oldButton.cloneNode(true);
+
+        restoreButton(button);
+        button.removeAttribute("onclick");
+        button.dataset.novaTopCopyExportSession = "1";
+
+        button.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            handler();
+            return false;
+        }, true);
+
+        oldButton.parentNode.replaceChild(button, oldButton);
+    }
+
+    function wire() {
+        bind("nova-mobile-copy-chat", copyWholeChat);
+        bind("nova-mobile-export-chat", exportWholeChat);
+    }
+
+    window.NovaMobileCopyWholeChat = copyWholeChat;
+    window.NovaMobileExportWholeChat = exportWholeChat;
+    window.NovaMobileGetTopTranscript = getTranscript;
+
+    document.addEventListener("DOMContentLoaded", wire);
+    wire();
+
+    setTimeout(wire, 250);
+    setTimeout(wire, 900);
+
+    console.log("[" + FIX_ID + "] ready");
+})();
+</script>
+<!-- NOVA_MOBILE_TOP_COPY_EXPORT_SESSION_END_20260623 -->
+
+
+<!-- NOVA_MOBILE_ASSISTANT_ACTIONS_ONLY_POLISH_20260624 -->
+<style>
+/* Keep assistant action buttons polished. Summary/Horsemen UI is killed elsewhere. */
+.nova-mobile-assistant-actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    margin: 8px 12px !important;
+    align-items: center !important;
+}
+
+.nova-mobile-assistant-action,
+.nova-mobile-assistant-actions button {
+    min-height: 30px !important;
+    padding: 6px 10px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(216, 180, 254, 0.26) !important;
+    background: rgba(168, 85, 247, 0.14) !important;
+    color: #f8fafc !important;
+    font-size: 11px !important;
+    font-weight: 900 !important;
+    line-height: 1 !important;
+    cursor: pointer !important;
+}
+
+.nova-mobile-assistant-action:active,
+.nova-mobile-assistant-actions button:active {
+    transform: translateY(1px) !important;
+    filter: brightness(1.08) !important;
+}
+</style>
+
+<script>
+(function () {
+    "use strict";
+
+    const BAD = [
+        ".nova-mobile-summary-horsemen",
+        "#nova-mobile-summary-horsemen",
+        ".nova-mobile-summary-body",
+        "#nova-mobile-summary-body",
+        ".nova-mobile-backend-dock",
+        "#nova-mobile-backend-dock",
+        "#nova-backend-readiness-button",
+        ".nova-backend-readiness-button",
+        ".nova-mobile-backend-button"
+    ];
+
+    function kill() {
+        for (const sel of BAD) {
+            document.querySelectorAll(sel).forEach(el => {
+                el.style.setProperty("display", "none", "important");
+                el.style.setProperty("visibility", "hidden", "important");
+                el.style.setProperty("opacity", "0", "important");
+                el.style.setProperty("pointer-events", "none", "important");
+                el.style.setProperty("height", "0", "important");
+                el.style.setProperty("min-height", "0", "important");
+                el.style.setProperty("max-height", "0", "important");
+                el.style.setProperty("overflow", "hidden", "important");
+            });
+        }
+    }
+
+
+    /* NOVA_MOBILE_VISIBLE_HEADER_DIRECT_SESSION_OWNER_FINAL_20260705 */
+function bindVisibleHeaderSessionsButtonFinal() {
+    const headerButton = document.getElementById("nova-mobile-sessions-toggle");
+
+    if (!headerButton) {
+        return;
+    }
+
+    if (headerButton.dataset.novaVisibleHeaderDirectSessionOwner === "1") {
+        return;
+    }
+
+    headerButton.dataset.novaVisibleHeaderDirectSessionOwner = "1";
+
+    headerButton.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (window.NovaMobileOpenSessions) {
+            window.NovaMobileOpenSessions();
+        }
+    });
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bindVisibleHeaderSessionsButtonFinal);
+} else {
+    bindVisibleHeaderSessionsButtonFinal();
+}
+
+})();
+
+</script>
+<!-- END_NOVA_MOBILE_KILL_SUMMARY_HORSEMEN_20260623 -->
+
+
+
+<!-- NOVA_MOBILE_INLINE_SESSION_SHAPE_ADAPTER_20260623 -->
+<script>
+(function () {
+    const MARK = "NOVA_MOBILE_INLINE_SESSION_SHAPE_ADAPTER_20260623";
+
+    if (window.__NOVA_MOBILE_INLINE_SESSION_SHAPE_ADAPTER_20260623__) {
+        return;
+    }
+
+    window.__NOVA_MOBILE_INLINE_SESSION_SHAPE_ADAPTER_20260623__ = true;
+
+    function normalize(data) {
+        try {
+            if (
+                data &&
+                typeof data === "object" &&
+                data.session &&
+                typeof data.session === "object"
+            ) {
+                if (!Array.isArray(data.messages) && Array.isArray(data.session.messages)) {
+                    data.messages = data.session.messages;
+                }
+
+                data.id = data.id || data.session.id || data.active_session_id || "";
+                data.title = data.title || data.session.title || "";
+                data.created_at = data.created_at || data.session.created_at || "";
+                data.updated_at = data.updated_at || data.session.updated_at || "";
+                data.active_session_id = data.active_session_id || data.session.id || "";
+            }
+        } catch (e) {}
+
+        return data;
+    }
+
+    if (!Response.prototype.__novaMobileSessionShapeAdapterPatched) {
+        const rawJson = Response.prototype.json;
+
+        Response.prototype.json = function () {
+            return rawJson.call(this).then(data => normalize(data));
+        };
+
+        Response.prototype.__novaMobileSessionShapeAdapterPatched = true;
+    }
+
+    window.NovaMobileNormalizeSessionResponse = normalize;
+
+    console.log("[" + MARK + "] ready");
+})();
+</script>
+<!-- /NOVA_MOBILE_INLINE_SESSION_SHAPE_ADAPTER_20260623 -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- NOVA_MOBILE_BLANK_PAGE_RECOVERY_CLEANUP_20260623 -->
+<style>
+    #nova-mobile-active-session,
+    .nova-mobile-active-session,
+    .mobile-quick-actions,
+    .mobile-quick-actions-final,
+    .nova-mobile-quick-actions,
+    .quick-actions,
+    .quick-prompts,
+    .nova-quick-prompts,
+    #mobileChatMessages .nova-mobile-message-actions,
+    #mobileChatMessages .nova-mobile-copy-message,
+    #mobileChatMessages .nova-mobile-regen-message {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    html,
+    body {
+        background: #08050f !important;
+        color: #f7f2ff !important;
+    }
+</style>
+
+<script>
+(function () {
+    const MARK = "NOVA_MOBILE_BLANK_PAGE_RECOVERY_CLEANUP_20260623";
+
+    function clean() {
+        document
+            .querySelectorAll(
+                "#nova-mobile-active-session, .nova-mobile-active-session, " +
+                ".mobile-quick-actions, .mobile-quick-actions-final, .nova-mobile-quick-actions, " +
+                ".quick-actions, .quick-prompts, .nova-quick-prompts"
+            )
+            .forEach(el => el.remove());
+
+        const chat = document.getElementById("mobileChatMessages");
+        if (chat) {
+            chat
+                .querySelectorAll(".nova-mobile-message-actions, .nova-mobile-copy-message, .nova-mobile-regen-message")
+                .forEach(el => el.remove());
+        }
+    }
+
+    window.NovaMobileBlankPageRecoveryCleanup = clean;
+
+    setInterval(clean, 1000);
+    setTimeout(clean, 50);
+    setTimeout(clean, 300);
+    setTimeout(clean, 1000);
+
+    console.log("[" + MARK + "] ready");
+})();
+</script>
+<!-- /NOVA_MOBILE_BLANK_PAGE_RECOVERY_CLEANUP_20260623 -->
+
+
+<!-- NOVA_MOBILE_CHAT_AVOID_COMPOSER_GEOMETRY_20260623_DISABLED_20260624
+Disabled because it fought the final scroll/composer geometry lock by rewriting
+#mobileChatMessages height/max-height/bottom every 500ms.
+The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
+-->
+
+
+<!-- NOVA_MOBILE_NO_FLASH_ACTION_HIDE_20260623 -->
+<style>
+#mobileChatMessages .nova-mobile-message-actions,
+#mobileChatMessages .message-actions,
+#mobileChatMessages .bubble-actions,
+#mobileChatMessages .nova-mobile-copy-message,
+#mobileChatMessages .nova-mobile-regen-message {
+    display: none !important;
+}
+</style>
+
+<script>
+(function () {
+    const MARK = "NOVA_MOBILE_NO_FLASH_ACTION_HIDE_20260623";
+
+    window.NovaMobileNoFlashActionHide = function () {
+        return true;
+    };
+
+    console.log("[" + MARK + "] ready");
+})();
+</script>
+<!-- /NOVA_MOBILE_NO_FLASH_ACTION_HIDE_20260623 -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- NOVA_MOBILE_SAFE_ICON_BUTTONS_CODEPOINT_20260624 -->
+<style>
+    #nova-mobile-menu-rescue-btn,
+    #nova-mobile-voice-stop-rescue-btn,
+    #nova-mobile-bottom-rescue-rail {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    #nova-mobile-send,
+    #nova-mobile-stop-generation,
+    #nova-mobile-voice,
+    #nova-mobile-stop-speech,
+    #nova-mobile-tts,
+    #nova-mobile-attach,
+    #nova-mobile-tools-toggle {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", system-ui, Arial, sans-serif !important;
+        font-size: 17px !important;
+        font-weight: 800 !important;
+        line-height: 1 !important;
+        white-space: nowrap !important;
+        transition:
+            transform 0.14s ease,
+            opacity 0.14s ease,
+            background 0.14s ease,
+            box-shadow 0.14s ease !important;
+    }
+
+    #nova-mobile-send:active,
+    #nova-mobile-stop-generation:active,
+    #nova-mobile-voice:active,
+    #nova-mobile-stop-speech:active,
+    #nova-mobile-tts:active,
+    #nova-mobile-attach:active,
+    #nova-mobile-tools-toggle:active {
+        transform: scale(0.92) !important;
+    }
+
+    #nova-mobile-tools-toggle {
+        min-width: 38px !important;
+        flex: 0 0 auto !important;
+    }
+
+    #nova-mobile-stop-generation {
+        display: none !important;
+    }
+
+    body.is-generating #nova-mobile-stop-generation,
+    body.is-streaming #nova-mobile-stop-generation,
+    body.nova-mobile-generating #nova-mobile-stop-generation {
+        display: inline-flex !important;
+    }
+</style>
+
+<script>
+(function () {
+    const MARK = "NOVA_MOBILE_SAFE_ICON_BUTTONS_CODEPOINT_20260624";
+
+    function cp() {
+        return String.fromCodePoint.apply(String, arguments);
+    }
+
+    const ICONS = {
+        send: cp(0x27A4),
+        mic: cp(0x1F3A4),
+        speak: cp(0x1F50A),
+        attach: "+",
+        tools: "Menu",
+        stop: "Stop"
+    };
+
+    function setLabel(id, label, aria) {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        el.textContent = label;
+        el.setAttribute("aria-label", aria || label);
+        el.title = aria || label;
+    }
+
+    function isGenerating() {
+        return !!(
+            window.NovaMobileIsStreaming ||
+            window.NovaMobileStreaming ||
+            window.__novaMobileStreaming ||
+            document.body.classList.contains("is-streaming") ||
+            document.body.classList.contains("is-generating") ||
+            document.querySelector(".typing-indicator, .streaming, .is-streaming, .generating")
+        );
+    }
+
+    function stopSpeech() {
+        try { window.speechSynthesis?.cancel?.(); } catch (e) {}
+        try { window.NovaMobileStopTTS?.(); } catch (e) {}
+        try { window.NovaMobileVoiceStop?.(); } catch (e) {}
+        try { window.NovaMobileStopVoice?.(); } catch (e) {}
+
+        document.querySelectorAll("audio").forEach(audio => {
+            try {
+                audio.pause();
+                audio.currentTime = 0;
+            } catch (e) {}
+        });
+    }
+
+    function polish() {
+        document.getElementById("nova-mobile-bottom-rescue-rail")?.remove();
+        document.getElementById("nova-mobile-menu-rescue-btn")?.remove();
+        document.getElementById("nova-mobile-voice-stop-rescue-btn")?.remove();
+
+        setLabel("nova-mobile-send", ICONS.send, "Send");
+        setLabel("nova-mobile-stop-generation", ICONS.stop, "Stop generation");
+        setLabel("nova-mobile-voice", ICONS.mic, "Voice");
+        setLabel("nova-mobile-stop-speech", ICONS.stop, "Stop speech");
+        setLabel("nova-mobile-tts", ICONS.speak, "Speak");
+        setLabel("nova-mobile-attach", ICONS.attach, "Attach");
+        setLabel("nova-mobile-tools-toggle", ICONS.tools, "Tools");
+
+        const stopMsg = document.getElementById("nova-mobile-stop-generation");
+        if (stopMsg) {
+            stopMsg.style.setProperty("display", isGenerating() ? "inline-flex" : "none", "important");
+        }
+
+        const stopSpeechBtn = document.getElementById("nova-mobile-stop-speech");
+        if (stopSpeechBtn) {
+            stopSpeechBtn.onclick = stopSpeech;
+            stopSpeechBtn.style.setProperty("display", "inline-flex", "important");
+            stopSpeechBtn.style.setProperty("visibility", "visible", "important");
+            stopSpeechBtn.style.setProperty("opacity", "1", "important");
+            stopSpeechBtn.style.setProperty("pointer-events", "auto", "important");
+        }
+
+        const tools = document.getElementById("nova-mobile-tools-toggle");
+        if (tools) {
+            tools.style.setProperty("display", "inline-flex", "important");
+            tools.style.setProperty("visibility", "visible", "important");
+            tools.style.setProperty("opacity", "1", "important");
+            tools.style.setProperty("pointer-events", "auto", "important");
+            tools.style.setProperty("flex", "0 0 auto", "important");
+        }
+    }
+
+window.NovaMobileSafeIconButtonsCodepoint = polish;
+window.NovaMobileRestoreIconButtons = polish;
+window.NovaMobileStopSpeechReal = stopSpeech;
+
+setTimeout(polish, 50);
+setTimeout(polish, 250);
+setTimeout(polish, 1000);
+
+console.log("[" + MARK + "] ready");
+
+})();
+</script>
+<!-- /NOVA_MOBILE_SAFE_ICON_BUTTONS_CODEPOINT_20260624 -->
+
+<!-- NOVA_MOBILE_REMOVE_COPY_EXPORT_RAW_CSS_20260703: removed malformed raw copy/export CSS block -->
+
+    #nova-mobile-tools-panel {
+        z-index: 2147483647 !important;
+        box-sizing: border-box !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        padding: 12px !important;
+        padding-bottom: 18px !important;
+        max-height: calc(100vh - 32px) !important;
+        gap: 0 !important;
+    }
+
+    #nova-mobile-tools-panel button,
+    #nova-mobile-tools-panel [role="button"],
+    #nova-mobile-tools-panel a {
+        display: flex !important;
+        width: 100% !important;
+        min-height: 42px !important;
+        height: 42px !important;
+        max-height: 42px !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-sizing: border-box !important;
+        padding: 0 12px !important;
+        margin: 6px 0 !important;
+        border-radius: 12px !important;
+        font-family: Arial, system-ui, sans-serif !important;
+        font-size: 13px !important;
+        font-weight: 800 !important;
+        line-height: 1 !important;
+        text-align: center !important;
+        white-space: nowrap !important;
+        position: static !important;
+        inset: auto !important;
+        transform: none !important;
+    }
+
+    #nova-mobile-tools-panel .nova-mobile-original-close-last {
+        margin-top: 10px !important;
+        background: rgba(124,58,237,0.82) !important;
+        color: #ffffff !important;
+    }
+</style>
+<!-- /NOVA_MOBILE_STABLE_TOOLS_PANEL_NO_SHAKE_20260624 -->
+
+
+<!-- NOVA_MOBILE_MENU_MEMORY_COLOR_MATCH_20260624 -->
+<style>
+    #nova-mobile-tools-panel #nova-mobile-memory-toggle {
+        background: rgba(255,255,255,0.08) !important;
+        color: #f7f2ff !important;
+        border: 1px solid rgba(255,255,255,0.14) !important;
+        box-shadow: none !important;
+        opacity: 1 !important;
+    }
+
+    #nova-mobile-tools-panel #nova-mobile-memory-toggle:hover,
+    #nova-mobile-tools-panel #nova-mobile-memory-toggle:active,
+    #nova-mobile-tools-panel #nova-mobile-memory-toggle:focus {
+        background: rgba(255,255,255,0.10) !important;
+        color: #ffffff !important;
+        border-color: rgba(255,255,255,0.18) !important;
+    }
+</style>
+
+<script>
+(function () {
+    const MARK = "NOVA_MOBILE_MENU_MEMORY_COLOR_MATCH_20260624";
+
+    function polish() {
+        const memory = document.querySelector("#nova-mobile-tools-panel #nova-mobile-memory-toggle");
+        if (!memory) return false;
+
+        memory.style.setProperty("background", "rgba(255,255,255,0.08)", "important");
+        memory.style.setProperty("color", "#f7f2ff", "important");
+        memory.style.setProperty("border", "1px solid rgba(255,255,255,0.14)", "important");
+        memory.style.setProperty("box-shadow", "none", "important");
+        memory.style.setProperty("opacity", "1", "important");
+
+        return true;
+    }
+
+    window.NovaMobileMenuMemoryColorMatch = polish;
+
+    setTimeout(polish, 50);
+    setTimeout(polish, 250);
+    setTimeout(polish, 1000);
+
+    console.log("[" + MARK + "] ready");
+})();
+</script>
+<!-- /NOVA_MOBILE_MENU_MEMORY_COLOR_MATCH_20260624 -->
+
+<!-- NOVA_MOBILE_REMOVE_REMAINING_RAW_TAIL_MARKERS_20260703_FIXED: removed malformed leftover mobile raw block -->
+
+</script>
+
+<!-- NOVA_MOBILE_ONE_ROW_NEW_SESSIONS_COPY_REGEN_V10_CONSOLIDATED_20260625 -->
+<style>
+@media (max-width: 900px) {
+    #nova-mobile-primary-action-row {
+        position: fixed !important;
+        top: 6px !important;
+        left: 8px !important;
+        right: 8px !important;
+        height: 36px !important;
+        z-index: 2147483600 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: stretch !important;
+        gap: 5px !important;
+        box-sizing: border-box !important;
+        pointer-events: auto !important;
+    }
+
+    #nova-mobile-primary-action-row button {
+        flex: 1 1 0 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        min-width: 0 !important;
+        height: 34px !important;
+        padding: 0 4px !important;
+        border-radius: 999px !important;
+        border: 1px solid rgba(168, 85, 247, 0.46) !important;
+        background: rgba(168, 85, 247, 0.22) !important;
+        color: #f8f5ff !important;
+        font-size: 11.5px !important;
+        font-weight: 850 !important;
+        white-space: nowrap !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        touch-action: manipulation !important;
+        box-sizing: border-box !important;
+    }
+
+.nova-mobile-v10-parked {
+    display: none !important;
+}
+
+</style>
+
+<!-- DISABLED_V10_TOP_ROW_SESSION_OWNER_20260706
+<script>
+(() => {
+    const TAG = "[NOVA_MOBILE_ONE_ROW_NEW_SESSIONS_COPY_REGEN_V10_CONSOLIDATED_20260625]";
+
+    if (window.__novaMobileTopRowV10Consolidated20260625) return;
+    window.__novaMobileTopRowV10Consolidated20260625 = true;
+
+    const PARK_IDS = [
+        "mobileMenuButton",
+        "mobileMemoryButton",
+        "nova-mobile-copy-chat",
+        "nova-mobile-rail-copy",
+        "nova-mobile-rail-regen",
+        "nova-mobile-bottom-login",
+        "nova-mobile-account-fallback-menu",
+        "nova-mobile-real-menu-account"
+    ];
+
+    function setImportant(el, prop, value) {
+        if (el) el.style.setProperty(prop, value, "important");
+    }
+
+    function parkOldButton(id) {
+        const el = document.getElementById(id);
+
+        if (!el || el.closest("#nova-mobile-primary-action-row")) return;
+
+        el.classList.add("nova-mobile-v10-parked");
+        el.setAttribute("aria-hidden", "true");
+        el.setAttribute("tabindex", "-1");
+
+        setImportant(el, "position", "fixed");
+        setImportant(el, "top", "-12000px");
+        setImportant(el, "left", "-12000px");
+        setImportant(el, "width", "1px");
+        setImportant(el, "height", "1px");
+        setImportant(el, "overflow", "hidden");
+        setImportant(el, "opacity", "0");
+        setImportant(el, "visibility", "hidden");
+        setImportant(el, "pointer-events", "none");
+        setImportant(el, "z-index", "-1");
+    }
+
+    function ensureRow() {
+        let row = document.getElementById("nova-mobile-primary-action-row");
+
+        if (!row) {
+            row = document.createElement("div");
+            row.id = "nova-mobile-primary-action-row";
+            document.body.appendChild(row);
+        }
+
+        row.innerHTML = `
+            <button id="nova-mobile-row-new" type="button">New</button>
+            <!-- NOVA_MOBILE_DISABLE_V10_GARBAGE_SESSIONS_BUTTON_20260703: disabled garbage V10 Sessions button -->
+            <button id="nova-mobile-row-copy" type="button">Copy</button>
+            <button id="nova-mobile-row-regen" type="button">Regen</button>
+        `;
+
+        setImportant(row, "display", "flex");
+        setImportant(row, "position", "fixed");
+        setImportant(row, "top", "6px");
+        setImportant(row, "left", "8px");
+        setImportant(row, "right", "8px");
+        setImportant(row, "height", "36px");
+        setImportant(row, "gap", "5px");
+        setImportant(row, "z-index", "2147483600");
+        setImportant(row, "pointer-events", "auto");
+        setImportant(row, "visibility", "visible");
+        setImportant(row, "opacity", "1");
+
+        return row;
+    }
+
+    function setSessionId(sid) {
+        if (!sid) return;
+
+        localStorage.setItem("nova_mobile_active_session_id", sid);
+        localStorage.setItem("nova_active_session_id", sid);
+        window.currentSessionId = sid;
+        window.NOVA_SESSION_ID = sid;
+    }
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
+
+    function cleanText(el) {
+        if (!el) return "";
+
+        const clone = el.cloneNode(true);
+
+        clone.querySelectorAll("button, [role='button'], .message-actions, .bubble-actions, .source-card, .sources, .web-sources")
+            .forEach(x => x.remove());
+
+        return String(clone.innerText || clone.textContent || "")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim();
+    }
+
+    function openNew() {
+        fetch("/api/sessions/new", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ source: "mobile-v10-top-row" })
+        })
+            .then(r => r.json())
+            .then(data => {
+                const sid =
+                    data.session_id ||
+                    data.id ||
+                    data.sessionId ||
+                    data?.session?.id ||
+                    "";
+
+                if (!sid) {
+                    console.warn(TAG, "new missing session id", data);
+                    return;
+                }
+
+                setSessionId(sid);
+                console.log(TAG, "new session", sid);
+
+                location.href =
+                    "/mobile?session_id=" +
+                    encodeURIComponent(sid) +
+                    "&fresh=v10-new-session-20260625-001&bust=" +
+                    Date.now();
+            })
+            .catch(error => console.warn(TAG, "new failed", error));
+
+        return true;
+    }
+
+    function openSessions() {
+        const old = document.getElementById("nova-mobile-v10-sessions-panel");
+
+        if (old) {
+            old.remove();
+            console.log(TAG, "closed sessions");
+            return true;
+        }
+
+        const panel = document.createElement("div");
+        panel.id = "nova-mobile-v10-sessions-panel";
+        panel.style.cssText = [
+            "position:fixed!important",
+            "top:50px!important",
+            "left:8px!important",
+            "right:8px!important",
+            "bottom:86px!important",
+            "z-index:2147483647!important",
+            "display:flex!important",
+            "flex-direction:column!important",
+            "gap:8px!important",
+            "padding:10px!important",
+            "box-sizing:border-box!important",
+            "overflow-y:auto!important",
+            "background:rgba(15,23,42,.97)!important",
+            "border:1px solid rgba(168,85,247,.45)!important",
+            "border-radius:18px!important",
+            "box-shadow:0 24px 80px rgba(0,0,0,.58)!important",
+            "color:#fff!important"
+        ].join(";");
+
+        panel.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                <strong style="font:900 14px Arial,sans-serif;">Sessions</strong>
+                <button id="nova-mobile-v10-sessions-close" type="button" style="height:30px;border-radius:999px;padding:0 12px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;font-weight:900;">Close</button>
+            </div>
+        `;
+
+        document.body.appendChild(panel);
+
+        document.getElementById("nova-mobile-v10-sessions-close")?.addEventListener("click", () => {
+            panel.remove();
+        }, true);
+
+        fetch("/api/sessions", { cache: "no-store" })
+            .then(r => r.json())
+            .then(data => {
+                const sessions =
+                    Array.isArray(data) ? data :
+                    Array.isArray(data.sessions) ? data.sessions :
+                    Array.isArray(data.items) ? data.items :
+                    Array.isArray(data.data) ? data.data :
+                    [];
+
+                console.log(TAG, "sessions loaded", { count: sessions.length });
+
+                if (!sessions.length) {
+                    body.innerHTML = `<div style="opacity:.75;font-size:13px;">No sessions found.</div>`;
+                    return;
+                }
+
+                body.innerHTML = sessions.slice(0, 60).map((s, index) => {
+                    const sid = s.session_id || s.id || s.sessionId || s.key || "";
+                    const title = s.title || s.name || s.label || "Untitled session";
+                    const count = s.count || s.message_count || s.messages_count || s.messageCount || "";
+                    const meta = count ? `${count} messages` : (s.updated_at || s.updatedAt || s.created_at || "");
+
+                    return `
+                        <!-- NOVA_MOBILE_V10_SESSION_NAME_ROOM_ONLY_20260625 -->
+                        <button type="button" data-v10-session-id="${escapeHtml(sid)}" style="display:flex;flex-direction:column;align-items:flex-start;gap:5px;width:100%;min-height:56px;padding:10px 11px;border-radius:13px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.07);color:#fff;text-align:left;box-sizing:border-box;">
+                            <span style="display:block;width:100%;font:900 14.5px/1.25 Arial,sans-serif;white-space:normal;overflow-wrap:anywhere;word-break:break-word;">${escapeHtml(title)}</span>
+                            <span style="display:block;width:100%;font:700 10.5px/1.25 Arial,sans-serif;opacity:.62;white-space:normal;overflow-wrap:anywhere;word-break:break-word;">${escapeHtml(meta || sid || ("#" + (index + 1)))}</span>
+                        </button>
+                    `;
+                }).join("");
+
+                // NOVA_MOBILE_V10_SESSION_ROW_DIRECT_OPEN_HARDENED_20260625
+                body.querySelectorAll("[data-v10-session-id]").forEach(btn => {
+                    function openV10SessionRow(event) {
+                        if (event) {
+                            try {
+                                event.preventDefault();
+                                event.stopPropagation();
+
+                                if (typeof event.stopImmediatePropagation === "function") {
+                                    event.stopImmediatePropagation();
+                                }
+                            } catch (_) {}
+                        }
+
+                        const sid = btn.getAttribute("data-v10-session-id") || "";
+
+                        if (!sid) return;
+
+                        try {
+                            setSessionId(sid);
+                            localStorage.setItem("nova_mobile_active_session_id", sid);
+                            localStorage.setItem("nova_active_session_id", sid);
+                            localStorage.setItem("nova_session_id", sid);
+                            sessionStorage.setItem("nova_mobile_v10_direct_open_session_id", sid);
+                            window.currentSessionId = sid;
+                            window.NOVA_SESSION_ID = sid;
+                        } catch (_) {}
+
+                        console.log(TAG, "open session direct hardened", sid);
+
+                        location.replace(
+                            "/mobile?session_id=" +
+                            encodeURIComponent(sid) +
+                            "&v10_direct_open=1" +
+                            "&fresh=v10-open-session-direct-hardened-20260625-001&bust=" +
+                            Date.now()
+                        );
+                    }
+
+                    ["pointerdown", "touchstart", "mousedown"].forEach(type => {
+                        btn.addEventListener(type, event => {
+                            try {
+                                event.stopPropagation();
+
+                                if (typeof event.stopImmediatePropagation === "function") {
+                                    event.stopImmediatePropagation();
+                                }
+                            } catch (_) {}
+                        }, true);
+                    });
+
+                    btn.addEventListener("click", openV10SessionRow, true);
+                });
+            })
+            .catch(error => {
+                console.warn(TAG, "sessions failed", error);
+                body.innerHTML = `<div style="opacity:.75;font-size:13px;">Sessions failed. Check console.</div>`;
+            });
+
+        console.log(TAG, "opened sessions");
+        return true;
+    }
+
+    async function runCopy() {
+        const root = document.getElementById("mobileChatMessages");
+        let text = cleanText(root);
+
+        if (!text) {
+            text = Array.from(document.querySelectorAll(".message, .assistant, .user, [data-role]"))
+                .map(cleanText)
+                .filter(Boolean)
+                .join("\n\n")
+                .trim();
+        }
+
+        if (!text) {
+            console.warn(TAG, "copy skipped: no chat text");
+            return false;
+        }
+
+        try {
+            await navigator.clipboard.writeText(text);
+            console.log(TAG, "copied chat", { chars: text.length });
+            return true;
+        } catch (_) {
+            const area = document.createElement("textarea");
+            area.value = text;
+            area.style.position = "fixed";
+            area.style.left = "-9999px";
+            document.body.appendChild(area);
+            area.focus();
+            area.select();
+            document.execCommand("copy");
+            area.remove();
+            console.log(TAG, "copied chat fallback", { chars: text.length });
+            return true;
+        }
+    }
+
+    function runRegen() {
+        const root = document.getElementById("mobileChatMessages");
+        let last = "";
+
+        if (root) {
+            last = Array.from(root.children).reverse()
+                .filter(el => String(el.className || "").toLowerCase().includes("user") || el.matches?.("[data-role='user']"))
+                .map(cleanText)
+                .find(Boolean) || "";
+        }
+
+        last = last.replace(/^you\s*[:\-]\s*/i, "").trim();
+
+        if (!last) {
+            console.warn(TAG, "regen skipped: no last user message");
+            return false;
+        }
+
+        const input =
+            document.getElementById("nova-mobile-input") ||
+            document.querySelector("textarea, input[type='text']");
+
+        const send =
+            document.getElementById("nova-mobile-send") ||
+            document.querySelector("[data-action='send'], button[aria-label='Send']");
+
+        if (!input || !send) {
+            console.warn(TAG, "regen failed: missing input/send", { input: !!input, send: !!send });
+            return false;
+        }
+
+        input.focus();
+        input.value = last;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+
+        setTimeout(() => {
+            send.dispatchEvent(new MouseEvent("click", {
+                bubbles: true,
+                cancelable: true,
+                view: window
+            }));
+
+            console.log(TAG, "resent last user message", { chars: last.length });
+        }, 80);
+
+        return true;
+    }
+
+    /*
+      NOVA_MOBILE_V10_WINDOW_CAPTURE_ACTION_BRIDGE_20260625
+      Catch top-row clicks before later mobile guards swallow them.
+    */
+    const ACTION_MAP = {};
+
+    function runCapturedRowAction(event) {
+        const target = event.target?.closest?.("#nova-mobile-row-new, #nova-mobile-row-sessions, #nova-mobile-row-copy, #nova-mobile-row-regen");
+
+        if (!target) return;
+
+        const action = ACTION_MAP[target.id] || target.__novaV10Action20260625;
+
+        if (!action) return;
+
+        try {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+        } catch (_) {}
+
+        console.log(TAG, "window capture action", target.id);
+
+        action({
+            preventDefault(){},
+            stopPropagation(){},
+            stopImmediatePropagation(){}
+        });
+
+        return false;
+    }
+
+    ["pointerdown", "click", "touchstart", "mousedown"].forEach(type => {
+        window.addEventListener(type, runCapturedRowAction, true);
+        document.addEventListener(type, runCapturedRowAction, true);
+    });
+
+    function bindButton(id, handler) {
+        const btn = document.getElementById(id);
+
+        if (!btn) return;
+
+        function run(event) {
+            try {
+                event.preventDefault();
+                event.stopPropagation();                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+            } catch (_) {}
+
+            console.log(TAG, "button action", id);
+
+            try {
+                handler();
+            } catch (error) {
+                console.warn(TAG, "button action failed", id, error);
+            }
+
+            return false;
+        }
+
+        ACTION_MAP[id] = run;
+
+        btn.__novaV10Action20260625 = run;
+        btn.dataset.novaV10Bound = "1";
+
+        btn.onclick = run;
+        btn.onpointerdown = run;
+        btn.ontouchstart = run;
+        btn.onmousedown = run;
+
+        btn.setAttribute("onclick", "return this.__novaV10Action20260625 && this.__novaV10Action20260625(event)");
+        btn.setAttribute("onpointerdown", "return this.__novaV10Action20260625 && this.__novaV10Action20260625(event)");
+        btn.setAttribute("ontouchstart", "return this.__novaV10Action20260625 && this.__novaV10Action20260625(event)");
+        btn.setAttribute("onmousedown", "return this.__novaV10Action20260625 && this.__novaV10Action20260625(event)");
+    }
+
+    function unparkRealHeaderButtons() {
+        [
+            "nova-mobile-new-chat",
+            "nova-mobile-sessions-toggle"
+        ].forEach(function (id) {
+            const el = document.getElementById(id);
+
+            if (!el) {
+                return;
+            }
+
+            el.classList.remove("nova-mobile-v10-parked", "hidden");
+            el.removeAttribute("hidden");
+            el.style.removeProperty("display");
+            el.style.removeProperty("visibility");
+            el.style.removeProperty("opacity");
+            el.style.removeProperty("pointer-events");
+            el.style.setProperty("display", "inline-flex", "important");
+            el.style.setProperty("visibility", "visible", "important");
+            el.style.setProperty("opacity", "1", "important");
+            el.style.setProperty("pointer-events", "auto", "important");
+        });
+    }
+
+    /* NOVA_MOBILE_REAL_HEADER_UNPARK_20260705 */
+
+    function apply(reason = "apply") {
+        PARK_IDS.forEach(parkOldButton);
+        unparkRealHeaderButtons();
+
+        ensureRow();
+
+        unparkRealHeaderButtons();
+
+        bindButton("nova-mobile-row-new", openNew);
+        // NOVA_MOBILE_DISABLE_V10_GARBAGE_SESSIONS_BUTTON_20260703: V10 Sessions button disabled; original owner remains window.NovaMobileOpenSessions().
+setTimeout(() => {
+    const staleV10 = document.getElementById("nova-mobile-v10-sessions-panel");
+    if (staleV10) staleV10.remove();
+}, 0);
+
+        bindButton("nova-mobile-row-copy", runCopy);
+        bindButton("nova-mobile-row-regen", runRegen);
+
+        console.log(TAG, reason, {
+            new: !!document.getElementById("nova-mobile-row-new"),
+            sessions: !!document.getElementById("nova-mobile-row-sessions"),
+            copy: !!document.getElementById("nova-mobile-row-copy"),
+            regen: !!document.getElementById("nova-mobile-row-regen")
+        });
+    }
+
+window.NovaMobileTopRowV10Apply20260625 = apply;
+window.NovaMobileTopRowV10OpenSessions20260625 = openSessions;
+
+})();
+</script>
+-->
+
+<!-- NOVA_MOBILE_ATTACHMENT_PREVIEW_MENU_TEXT_POLISH_V1_20260624 -->
+<style>
+
+/* Attachment preview polish */
+#nova-mobile-attachment-preview,
+.nova-mobile-attachment-preview,
+#mobileAttachmentPreview,
+.mobile-attachment-preview {
+    max-width: calc(100vw - 24px) !important;
+    margin: 6px 10px 4px 10px !important;
+    padding: 7px 8px !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(216, 180, 254, 0.22) !important;
+    background: rgba(20, 16, 32, 0.92) !important;
+    color: #f8fafc !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    box-sizing: border-box !important;
+    min-height: 36px !important;
+}
+
+#nova-mobile-attachment-preview:empty,
+.nova-mobile-attachment-preview:empty,
+#mobileAttachmentPreview:empty,
+.mobile-attachment-preview:empty {
+    display: none !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+}
+
+#nova-mobile-attachment-preview img,
+.nova-mobile-attachment-preview img,
+#mobileAttachmentPreview img,
+.mobile-attachment-preview img {
+    width: 34px !important;
+    height: 34px !important;
+    max-width: 34px !important;
+    max-height: 34px !important;
+    border-radius: 10px !important;
+    object-fit: cover !important;
+    flex: 0 0 auto !important;
+}
+
+#nova-mobile-attachment-preview *,
+.nova-mobile-attachment-preview *,
+#mobileAttachmentPreview *,
+.mobile-attachment-preview * {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Long menu button text should wrap instead of being chopped. */
+#nova-mobile-tools-panel button,
+#nova-mobile-memory-panel button,
+#nova-mobile-execution-panel button,
+#nova-mobile-session-restore-panel-v2 button,
+.mobile-panel button,
+[class*="mobile-panel"] button {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    line-height: 1.15 !important;
+    min-height: 38px !important;
+    height: auto !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    text-align: center !important;
+    word-break: normal !important;
+    overflow-wrap: anywhere !important;
+}
+
+#nova-mobile-execution-panel button,
+#nova-mobile-execution-close,
+[id*="execution" i][id*="close" i] {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+}
+</style>
+
+<script>
+(() => {
+    const TAG = "[NOVA_MOBILE_ATTACHMENT_PREVIEW_MENU_TEXT_POLISH_V1_20260624]";
+
+    if (window.NovaMobileAttachmentPreviewMenuTextPolishV1Installed) {
+        console.log(TAG, "already installed");
+        return;
+    }
+
+    window.NovaMobileAttachmentPreviewMenuTextPolishV1Installed = true;
+
+    const PREVIEW_SELECTORS = [
+        "#nova-mobile-attachment-preview",
+        ".nova-mobile-attachment-preview",
+        "#mobileAttachmentPreview",
+        ".mobile-attachment-preview",
+        "[data-mobile-attachment-preview]"
+    ];
+
+    const PAYLOAD_IDS = [
+        "nova-mobile-attachment-payload",
+        "mobileAttachmentPayload",
+        "attachmentPayload"
+    ];
+
+    const FILE_IDS = [
+        "nova-mobile-file-input",
+        "mobileFileInput",
+        "fileInput"
+    ];
+
+    function findPreview() {
+        for (const selector of PREVIEW_SELECTORS) {
+            const el = document.querySelector(selector);
+            if (el) return el;
+        }
+        return null;
+    }
+
+    function hasPreviewContent(el) {
+        if (!el) return false;
+        return Boolean(
+            el.children.length ||
+            String(el.textContent || "").trim() ||
+            el.querySelector("img, video, audio")
+        );
+    }
+
+    function polishPreview() {
+        const el = findPreview();
+        if (!el) return;
+
+        if (!hasPreviewContent(el)) {
+            el.style.display = "none";
+            return;
+        }
+
+        el.style.display = "flex";
+        el.style.alignItems = "center";
+        el.style.gap = "8px";
+
+if (!el.querySelector("[data-nova-clear-attachment-v1]")) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.setAttribute("aria-label", "Clear attachment");
+    btn.dataset.novaClearAttachmentV1 = "1";
+
+    btn.addEventListener("click", ev => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        clearAttachmentPreview();
+    }, true);
+
+    // OLD DUPLICATE CLEAR BUTTON DISABLED
+}
+if (!el.querySelector("[data-nova-clear-attachment-v1]")) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.setAttribute("aria-label", "Clear attachment");
+    btn.dataset.novaClearAttachmentV1 = "1";
+
+    btn.addEventListener("click", ev => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        clearAttachmentPreview();
+    }, true);
+
+    // OLD DUPLICATE CLEAR BUTTON DISABLED
+}
+}
+
+    function clearAttachmentPreview() {
+        const previews = PREVIEW_SELECTORS
+            .flatMap(selector => Array.from(document.querySelectorAll(selector)));
+
+        previews.forEach(el => {
+            el.innerHTML = "";
+            el.style.display = "none";
+            el.removeAttribute("data-has-attachment");
+            el.classList.remove("has-attachment", "is-visible", "visible");
+        });
+
+        PAYLOAD_IDS.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.value = "";
+                el.textContent = "";
+                el.removeAttribute("value");
+            }
+        });
+
+        FILE_IDS.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = "";
+        });
+
+        try {
+            [
+                "nova_mobile_pending_attachment",
+                "nova_mobile_attachment",
+                "nova_mobile_upload",
+                "nova_pending_attachment",
+                "pending_attachment"
+            ].forEach(key => {
+                localStorage.removeItem(key);
+                sessionStorage.removeItem(key);
+            });
+        } catch {}
+
+        window.NovaMobilePendingAttachment = null;
+        window.novaMobilePendingAttachment = null;
+        window.NovaMobileCurrentAttachment = null;
+        window.novaMobileCurrentAttachment = null;
+
+        console.log(TAG, "attachment preview cleared");
+    }
+
+    function clearAfterSendSoon() {
+        setTimeout(clearAttachmentPreview, 900);
+        setTimeout(clearAttachmentPreview, 1800);
+        setTimeout(clearAttachmentPreview, 3200);
+    }
+
+    function bindSendClear() {
+        const send =
+            document.getElementById("nova-mobile-send") ||
+            document.getElementById("mobileSendButton") ||
+            document.querySelector("[data-mobile-send]") ||
+            document.querySelector("button[type='submit']");
+
+        if (send && send.dataset.attachmentPreviewClearV1 !== "1") {
+            send.dataset.attachmentPreviewClearV1 = "1";
+            send.addEventListener("click", () => clearAfterSendSoon(), true);
+            send.addEventListener("pointerup", () => clearAfterSendSoon(), true);
+        }
+
+        document.querySelectorAll("form").forEach(form => {
+            if (form.dataset.attachmentPreviewClearV1 === "1") return;
+            form.dataset.attachmentPreviewClearV1 = "1";
+            form.addEventListener("submit", () => clearAfterSendSoon(), true);
+        });
+    }
+
+    function patchFetch() {
+        if (window.__NovaMobileAttachmentPreviewFetchPatchedV1) return;
+        window.__NovaMobileAttachmentPreviewFetchPatchedV1 = true;
+
+        const originalFetch = window.fetch;
+        if (typeof originalFetch !== "function") return;
+
+        window.fetch = async function patchedFetch(input, init) {
+            const url = String(input?.url || input || "");
+            const method = String(init?.method || input?.method || "GET").toUpperCase();
+
+            const isChatSend =
+                method === "POST" &&
+                (
+                    url.includes("/api/chat") ||
+                    url.includes("/api/chat/stream")
+                );
+
+            const response = await originalFetch.apply(this, arguments);
+
+            if (isChatSend) {
+                setTimeout(clearAttachmentPreview, 350);
+                setTimeout(clearAttachmentPreview, 1200);
+            }
+
+            return response;
+        };
+    }
+
+    function boot() {
+        bindSendClear();
+        patchFetch();
+        polishPreview();
+
+        const obs = new MutationObserver(() => {
+            polishPreview();
+            bindSendClear();
+        });
+
+        obs.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+
+        window.NovaMobileClearAttachmentPreviewV1 = clearAttachmentPreview;
+        window.NovaMobileAttachmentPreviewMenuTextPolishV1 = () => {
+            polishPreview();
+            bindSendClear();
+            return {
+                preview: !!findPreview(),
+                send: !!document.getElementById("nova-mobile-send")
+            };
+        };
+
+        console.log(TAG, "ready");
+    }
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+} else {
+    boot();
+}
+
+    /* NOVA_MOBILE_VISIBLE_HEADER_DIRECT_SESSION_OWNER_FINAL_20260705 */
+    function bindVisibleHeaderSessionsButtonFinal() {
+        const headerButton = document.getElementById("nova-mobile-sessions-toggle");
+
+        if (!headerButton) {
+            return;
+        }
+
+        headerButton.dataset.novaVisibleHeaderDirectSessionOwner = "1";
+    }
+
+})();
+
+</script>
+
+
+<!-- NOVA_MOBILE_SCROLL_GEOMETRY_USER_TRUCE_20260625 -->
+<script>
+(function () {
+    const FIX_ID = "NOVA_MOBILE_SCROLL_GEOMETRY_USER_TRUCE_20260625";
+
+    if (window.__novaMobileScrollGeometryUserTruce20260625) {
+        return;
+    }
+
+    window.__novaMobileScrollGeometryUserTruce20260625 = true;
+
+    let userScrollingUntil = 0;
+
+    function now() {
+        return Date.now();
+    }
+
+    function getChat() {
+        return document.getElementById("mobileChatMessages");
+    }
+
+    function distanceFromBottom(el) {
+        if (!el) return 0;
+        return el.scrollHeight - el.scrollTop - el.clientHeight;
+    }
+
+    function userIsReading() {
+        const chat = getChat();
+        return !!chat && now() < userScrollingUntil && distanceFromBottom(chat) > 120;
+    }
+
+    function markUserScroll() {
+        const chat = getChat();
+        if (!chat) return;
+
+        if (distanceFromBottom(chat) > 120) {
+            userScrollingUntil = now() + 4500;
+            document.documentElement.dataset.novaUserReadingScroll = "1";
+        }
+    }
+
+    function clearFlagWhenSettled() {
+        if (now() >= userScrollingUntil) {
+            delete document.documentElement.dataset.novaUserReadingScroll;
+        }
+    }
+
+    function wire() {
+        const chat = getChat();
+
+        if (!chat || chat.dataset.novaGeometryTruceWired === "1") {
+            return;
+        }
+
+        chat.dataset.novaGeometryTruceWired = "1";
+
+        ["scroll", "touchstart", "touchmove", "wheel", "pointerdown"].forEach(function (name) {
+            chat.addEventListener(name, markUserScroll, { passive: true });
+        });
+    }
+
+    const nativeSetProperty = CSSStyleDeclaration.prototype.setProperty;
+
+    CSSStyleDeclaration.prototype.setProperty = function (name, value, priority) {
+        try {
+            const chat = getChat();
+
+            if (
+                chat &&
+                this === chat.style &&
+                userIsReading() &&
+                /^(height|max-height|min-height|bottom|padding-bottom)$/i.test(String(name || ""))
+            ) {
+                return;
+            }
+        } catch (error) {}
+
+        return nativeSetProperty.call(this, name, value, priority);
+    };
+
+    function boot() {
+        wire();
+        clearFlagWhenSettled();
+    }
+
+    boot();
+    setTimeout(boot, 250);
+    setTimeout(boot, 900);
+    setInterval(boot, 1000);
+
+    console.log("[" + FIX_ID + "] ready");
+})();
+</script>
+<!-- /NOVA_MOBILE_SCROLL_GEOMETRY_USER_TRUCE_20260625 -->
+<style>
+html, body {
+    height: 100%;
+}
+
+    #mobileChatMessages {
+        position: fixed !important;
+        left: 0 !important;
+        right: 0 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior: contain !important;
+        padding-bottom: 44px !important;
+        scroll-padding-bottom: 44px !important;
+    }
+
+    #nova-mobile-composer {
+        position: fixed !important;
+        bottom: env(safe-area-inset-bottom, 0px) !important;
+    }
+</style>
+<script>
+(function () {
+    "use strict";
+
+    const TAG = "[NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624]";
+
+    function numberOr(value, fallback) {
+        value = Number(value);
+        return Number.isFinite(value) ? value : fallback;
+    }
+
+    function updateGeometry() {
+        const chat = document.getElementById("mobileChatMessages");
+        const composer = document.getElementById("nova-mobile-composer");
+
+        if (!chat || !composer) {
+            return false;
+        }
+
+        const viewportHeight = Math.round(
+            window.visualViewport && window.visualViewport.height
+                ? window.visualViewport.height
+                : window.innerHeight
+        );
+
+        const composerRect = composer.getBoundingClientRect();
+        const composerTop = Math.round(numberOr(composerRect.top, viewportHeight - 132));
+        const composerHeight = 150;
+
+        /*
+          Important:
+          Old patches left inline height/max-height/inset values on #mobileChatMessages.
+          Clear them first or they keep causing the 49px composer overlap.
+        */
+        chat.style.removeProperty("inset");
+        chat.style.removeProperty("height");
+        chat.style.removeProperty("min-height");
+        chat.style.removeProperty("max-height");
+        chat.style.removeProperty("bottom");
+
+        /*
+          NOVA_MOBILE_CHAT_TOP_FIXED_20260625
+
+          The top action row is 36px tall at top 6px.
+          50px gives the chat a small gap under that row instead of forcing
+          messages to begin halfway down the screen.
+        */
+        const topPx = 50;
+        const bottomPx = 150;
+
+        document.documentElement.style.setProperty(
+            "--nova-mobile-composer-live-height",
+            composerHeight + "px"
+        );
+
+        chat.style.setProperty("position", "fixed", "important");
+        chat.style.setProperty("left", "0px", "important");
+        chat.style.setProperty("right", "0px", "important");
+        chat.style.setProperty("top", topPx + "px", "important");
+        chat.style.setProperty("bottom", bottomPx + "px", "important");
+        chat.style.setProperty("height", "auto", "important");
+        chat.style.setProperty("min-height", "0px", "important");
+        chat.style.setProperty("max-height", "none", "important");
+        chat.style.setProperty("overflow-y", "auto", "important");
+        chat.style.setProperty("-webkit-overflow-scrolling", "touch", "important");
+        chat.style.setProperty("overscroll-behavior", "contain", "important");
+        chat.style.setProperty("padding-bottom", "44px", "important");
+        chat.style.setProperty("scroll-padding-bottom", "44px", "important");
+
+        composer.style.setProperty("position", "fixed", "important");
+        composer.style.setProperty("bottom", "0px", "important");
+document.getElementById("nova-mobile-composer").getBoundingClientRect().height
+composer.style.setProperty("height", "auto", "important");
+composer.style.setProperty("overflow", "visible", "important");
+
+        return true;
+    }
+
+    function schedule() {
+        requestAnimationFrame(updateGeometry);
+    }
+
+    updateGeometry();
+    setTimeout(updateGeometry, 50);
+    setTimeout(updateGeometry, 250);
+    setTimeout(updateGeometry, 900);
+    setTimeout(updateGeometry, 1600);
+
+    window.clearInterval(window.__novaMobileScrollComposerGeometryFinalTimer);
+
+    let settleRuns = 0;
+    window.__novaMobileScrollComposerGeometryFinalTimer = window.setInterval(function () {
+        settleRuns += 1;
+        updateGeometry();
+
+        if (settleRuns >= 20) {
+            window.clearInterval(window.__novaMobileScrollComposerGeometryFinalTimer);
+            window.__novaMobileScrollComposerGeometryFinalTimer = null;
+        }
+    }, 250);
+
+    window.addEventListener("resize", schedule, { passive: true });
+    window.addEventListener("orientationchange", schedule, { passive: true });
+    window.addEventListener("focusin", schedule, true);
+    window.addEventListener("focusout", schedule, true);
+
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", schedule, { passive: true });
+        window.visualViewport.addEventListener("scroll", schedule, { passive: true });
+    }
+
+    if (window.ResizeObserver) {
+        const composer = document.getElementById("nova-mobile-composer");
+        if (composer && !composer.__novaMobileScrollComposerGeometryObservedV3) {
+            composer.__novaMobileScrollComposerGeometryObservedV3 = "1";
+            new ResizeObserver(schedule).observe(composer);
+        }
+    }
+
+    window.NovaMobileScrollComposerGeometryFinal = updateGeometry;
+
+    console.log(TAG, "ready");
+})();
+</script>
+<!-- /NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624 -->
+
+
+<!-- NOVA_MOBILE_QUIET_GEOMETRY_INTERVAL_20260625 -->
+<script>
+(function () {
+    const FIX_ID = "NOVA_MOBILE_QUIET_GEOMETRY_INTERVAL_20260625";
+
+    if (window.__novaMobileQuietGeometryInterval20260625) {
+        return;
+    }
+
+    window.__novaMobileQuietGeometryInterval20260625 = true;
+
+    function quietGeometryTimer(reason) {
+        try {
+            if (window.__novaMobileScrollComposerGeometryFinalTimer) {
+                window.clearInterval(window.__novaMobileScrollComposerGeometryFinalTimer);
+                window.__novaMobileScrollComposerGeometryFinalTimer = null;
+                console.log("[" + FIX_ID + "] cleared geometry interval", reason || "");
+            }
+        } catch (error) {}
+    }
+
+    function quietLater(reason) {
+        setTimeout(function () {
+            quietGeometryTimer(reason);
+        }, 50);
+
+        setTimeout(function () {
+            quietGeometryTimer(reason + "-settle");
+        }, 500);
+
+        setTimeout(function () {
+            quietGeometryTimer(reason + "-late");
+        }, 1500);
+    }
+
+    quietLater("boot");
+
+    window.addEventListener("resize", function () {
+        quietLater("resize");
+    }, { passive: true });
+
+    window.addEventListener("orientationchange", function () {
+        quietLater("orientationchange");
+    }, { passive: true });
+
+    document.addEventListener("focusin", function () {
+        quietLater("focusin");
+    }, true);
+
+    document.addEventListener("focusout", function () {
+        quietLater("focusout");
+    }, true);
+
+    console.log("[" + FIX_ID + "] ready");
+})();
+</script>
+<!-- /NOVA_MOBILE_QUIET_GEOMETRY_INTERVAL_20260625 -->
+
+<!-- NOVA_MOBILE_CHAT_BOTTOM_BREATHING_ROOM_20260624 -->
+<style>
+    #mobileChatMessages {
+        padding-bottom: 44px !important;
+        scroll-padding-bottom: 44px !important;
+    }
+
+    #mobileChatMessages::after {
+        content: "";
+        display: block;
+        height: 28px;
+        flex: 0 0 28px;
+    }
+</style>
+<script>
+(function () {
+    "use strict";
+
+    const TAG = "[NOVA_MOBILE_CHAT_BOTTOM_BREATHING_ROOM_20260624]";
+
+    function applyBottomRoom() {
+        const chat = document.getElementById("mobileChatMessages");
+        if (!chat) return false;
+
+        chat.style.setProperty("padding-bottom", "44px", "important");
+        chat.style.setProperty("scroll-padding-bottom", "44px", "important");
+        return true;
+    }
+
+    applyBottomRoom();
+    setTimeout(applyBottomRoom, 250);
+    setTimeout(applyBottomRoom, 900);
+
+    window.NovaMobileChatBottomBreathingRoom = applyBottomRoom;
+
+    console.log(TAG, "ready");
+})();
+</script>
+<!-- /NOVA_MOBILE_CHAT_BOTTOM_BREATHING_ROOM_20260624 -->
+
+
+<!-- NOVA_MOBILE_LAST_MESSAGE_VISUAL_GAP_20260624 -->
+<style>
+    #mobileChatMessages > :last-child {
+        margin-bottom: 34px !important;
+    }
+
+    #nova-mobile-composer {
+        border-top-color: rgba(168, 85, 247, 0.22) !important;
+        box-shadow: 0 -8px 18px rgba(11, 11, 18, 0.72) !important;
+    }
+
+    #nova-mobile-stop,
+    #nova-mobile-send,
+    #nova-mobile-voice,
+    #nova-mobile-stop-speech,
+    #nova-mobile-tts,
+    #nova-mobile-attach,
+    #nova-mobile-tools-toggle {
+        transform: translateY(-2px) !important;
+    }
+
+</style>
+<!-- /NOVA_MOBILE_LAST_MESSAGE_VISUAL_GAP_20260624 -->
+
+<script src="{{ url_for('static', filename='js/mobile/nova-mobile-copy-action-fix.js') }}?v=20260702"></script>
+
+<!-- NOVA_SESSION_OWNER_CLEANUP_20260703: disabled duplicate session restore-lock loader -->
+<!-- NOVA_MOBILE_SESSIONS_OWNER_CLEANUP_PHASE1_20260703: disabled legacy sessions owner: nova-mobile-session-restore-override-v4.js -->
+<!-- NOVA_MOBILE_SESSIONS_OWNER_CLEANUP_PHASE1_20260703: disabled legacy sessions owner: nova-mobile-session-drawer-restore-v5.js -->
+<!-- NOVA_MOBILE_SESSIONS_OWNER_CLEANUP_PHASE1_20260703: disabled legacy sessions owner: nova-mobile-session-panel-v6.js -->
+
+<!-- TEST_DISABLED_TOP_ACTIONS_OWNER -->
+<!--
+
+-->
+<script src="/static/js/mobile/nova-mobile-new-chat-backend-create-v1.js?v=new-chat-single-owner-20260705"></script>
+<!-- DISABLED_DUPLICATE_SEND_OWNER_20260706 -->
+<!-- <script src="/static/js/mobile/nova-mobile-send-dedupe-guard-v1.js?v=send-dedupe-v1-20260703"></script> -->
+<script src="/static/js/mobile/nova-mobile-layout.js?v=layout-owner-v1"></script>
+<!-- DISABLED_CHAT_VISIBLE_RECOVERY_AFTER_SESSION_CLEAN_20260706 -->
+<!-- <script src="/static/js/mobile/nova-mobile-chat-visible-recovery-v1.js?v=chat-visible-recovery-dedupe-final-20260703c"></script> -->>
+<!-- NOVA_SESSION_OWNER_CLEANUP_20260703: disabled duplicate sessions rescue-final loader -->
+<!-- NOVA_SESSION_OWNER_CLEANUP_20260703: disabled duplicate session fallback renderer loader -->
+
+<!-- DISABLED_DUPLICATE_SESSION_SANITIZER_20260706 -->
+<!--
+<script src="/static/js/mobile/nova-mobile-active-session-sanitizer-v1.js?v=active-session-sanitizer-v1-20260703"></script>
+-->
+<!-- DISABLED_DUPLICATE_SESSION_RESTORE_KEEPER_20260706 -->
+<!--
+<script src="/static/js/mobile/nova-mobile-chat-restore-keeper-v1.js?v=chat-restore-keeper-v1-20260703"></script>
+-->
+<!-- DISABLED_OLD_SESSION_OWNER_20260705: nova-mobile-session-flat-actions-v1.js -->
+
+<script src="/static/js/mobile/nova-mobile-attachment-boot-reset-v1.js?v=attachment-boot-reset-v1-20260705"></script>
+<!-- NOVA_CLEANUP_DISABLED_20260705: disabled plus-menu attach experiment :: <script src="/static/js/mobile/nova-mobile-plus-menu-reliability-v1.js?v=plus-menu-reliability-v1-20260705"></script> -->
+<script src="/static/js/mobile/nova-mobile-upload-change-authority-v1.js?v=upload-single-owner-20260705"></script>
+<script src="/static/js/mobile/nova-mobile-runtime.js?v=runtime-stop-wire-20260706"></script>
+<script src="/static/js/mobile/nova-mobile-send-stable-v1.js?v=send-single-upload-owner-20260705"></script>
+<script src="/static/js/mobile/nova-mobile-attachment-send-cleanup-v1.js?v=attachment-send-cleanup-v2-20260706"></script>
+<!-- TEST_DISABLED_CHAT_VISIBLE_RECOVERY_20260706 -->
+<!--
+<script src="/static/js/mobile/nova-mobile-chat-visible-recovery-v1.js?v=chat-visible-recovery-dedupe-final-20260703c"></script>
+-->
+
+<script>
+(function () {
+    "use strict";
+
+    if (window.__NOVA_MOBILE_SESSIONS_HEADER_VISIBLE_20260705__) {
+        return;
+    }
+
+    window.__NOVA_MOBILE_SESSIONS_HEADER_VISIBLE_20260705__ = true;
+
+    function keepSessionsHeaderVisible() {
+        const btn = document.getElementById("nova-mobile-sessions-toggle");
+
+        if (!btn) {
+            return;
+        }
+
+        btn.removeAttribute("data-nova-hidden-by-sessions-final");
+        btn.classList.remove("hidden", "nova-mobile-v10-parked");
+        btn.removeAttribute("hidden");
+
+        btn.style.removeProperty("display");
+        btn.style.removeProperty("visibility");
+        btn.style.removeProperty("opacity");
+        btn.style.removeProperty("pointer-events");
+
+        btn.style.setProperty("display", "inline-flex", "important");
+        btn.style.setProperty("visibility", "visible", "important");
+        btn.style.setProperty("opacity", "1", "important");
+        btn.style.setProperty("pointer-events", "auto", "important");
+    }
+
+    keepSessionsHeaderVisible();
+
+    document.addEventListener("DOMContentLoaded", keepSessionsHeaderVisible);
+    window.addEventListener("load", keepSessionsHeaderVisible);
+
+    setTimeout(keepSessionsHeaderVisible, 100);
+    setTimeout(keepSessionsHeaderVisible, 500);
+    setTimeout(keepSessionsHeaderVisible, 1200);
+})();
+</script>
+
+<!-- NOVA_MOBILE_SESSIONS_HEADER_VISIBLE_20260705 -->
+
+<script src="/static/js/mobile/nova-mobile-session-clean-owner-v1.js?v=session-clean-owner-v1-20260705"></script>
+
+<!-- DISABLED DUPLICATE SESSION OWNER -->
+<!-- <script src="/static/js/mobile/nova-mobile-session-drawer-owner-v1.js?v=session-drawer-owner-v1-20260706"></script> -->
+
+
+<script src="/static/js/mobile/nova-mobile-sessions.js?v=sessions-direct-owner-no-drawer-duplicate-20260705"></script>
+
+<script>
+(function () {
+    "use strict";
+
+    function hideTools() {
+        const panel = document.getElementById("nova-mobile-tools-panel");
+        if (panel) {
+            panel.classList.add("hidden");
+            panel.style.display = "none";
+        }
+    }
+
+    const logout = document.getElementById("nova-mobile-menu-logout");
+    if (logout) {
+        logout.onclick = function () {
+            const real = document.getElementById("nova-mobile-auth-logout");
+            if (real) {
+                real.click();
+            }
+        };
+    }
+
+const account = document.getElementById("nova-mobile-menu-account");
+
+if (account) {
+    account.onclick = async function () {
+        hideTools();
+
+        const panel = document.getElementById("nova-mobile-account-panel");
+
+        if (panel) {
+            panel.classList.remove("hidden");
+            panel.style.cssText =
+                "display:flex !important; position:fixed !important; left:10px !important; right:10px !important; top:90px !important; z-index:999999 !important; flex-direction:column !important; gap:10px !important; padding:14px !important; background:#111827 !important; border:1px solid rgba(255,255,255,.18) !important; border-radius:18px !important;";
+        }
+
+        const box = document.getElementById("nova-mobile-account-status");
+
+        if (!box) return;
+
+        box.innerHTML = "Loading account...";
+
+        try {
+            const r = await fetch("/api/account", {
+                credentials: "include",
+                cache: "no-store"
+            });
+
+            const data = await r.json();
+
+            box.innerHTML =
+                "Username: " + (data.username || "") +
+                "<br><br>Plan: " + (data.plan || "") +
+                "<br>Credits: " + (data.credits ?? 0) +
+                "<br>Monthly Credits: " + (data.monthly_credits ?? 0);
+
+        } catch (e) {
+            box.innerHTML = "Failed to load account.";
+        }
+    };
+}
+
+const billing = document.getElementById("nova-mobile-menu-billing");
+
+if (billing) {
+    billing.onclick = async function () {
+        hideTools();
+
+        const panel = document.getElementById("nova-mobile-billing-panel");
+
+        if (panel) {
+            panel.classList.remove("hidden");
+            panel.style.cssText =
+                "display:flex !important; position:fixed !important; left:10px !important; right:10px !important; top:90px !important; z-index:999999 !important; flex-direction:column !important; gap:10px !important; padding:14px !important; background:#111827 !important; border:1px solid rgba(255,255,255,.18) !important; border-radius:18px !important;";
+        }
+
+        const box = document.getElementById("nova-mobile-billing-status");
+
+        if (!box) return;
+
+        box.innerHTML = "Loading billing...";
+
+        try {
+            const r = await fetch("/api/account", {
+                credentials: "include",
+                cache: "no-store"
+            });
+
+            const data = await r.json();
+
+            box.innerHTML =
+                "Plan: " + (data.plan || "") +
+                "<br><br>Credits: " + (data.credits ?? 0) +
+                "<br>Monthly Credits: " + (data.monthly_credits ?? 0);
+
+        } catch (e) {
+            box.innerHTML = "Failed to load billing.";
+        }
+    };
+}
+
+const settings = document.getElementById("nova-mobile-menu-settings");
+
+if (settings) {
+    settings.onclick = async function () {
+        hideTools();
+
+        const panel = document.getElementById("nova-mobile-settings-panel");
+
+        if (panel) {
+            panel.classList.remove("hidden");
+            panel.style.cssText =
+                "display:flex !important; position:fixed !important; left:10px !important; right:10px !important; top:90px !important; z-index:999999 !important; flex-direction:column !important; gap:10px !important; padding:14px !important; background:#111827 !important; border:1px solid rgba(255,255,255,.18) !important; border-radius:18px !important;";
+        }
+
+        const box = document.getElementById("nova-mobile-settings-status");
+
+        if (!box) return;
+
+        box.innerHTML = "Loading settings...";
+
+        try {
+            const r = await fetch("/api/account", {
+                credentials: "include",
+                cache: "no-store"
+            });
+
+            const data = await r.json();
+
+            box.innerHTML =
+                "Username: " + (data.username || "") +
+                "<br><br>Plan: " + (data.plan || "") +
+                "<br><br>Credits: " + (data.credits ?? 0) +
+                "<br>Monthly Credits: " + (data.monthly_credits ?? 0) +
+                "<br><br>Theme: Coming soon" +
+                "<br>Voice settings: Coming soon";
+
+        } catch (e) {
+            box.innerHTML = "Failed to load settings.";
+        }
+    };
+}
+
+/* NOVA MOBILE ATTACHMENT PREVIEW COMPACT MODE */
+
+#nova-mobile-upload-preview-owner {
+    height: 70px !important;
+    max-height: 70px !important;
+    overflow: hidden !important;
+    display: flex !important;
+    align-items: center !important;
+    padding: 6px 8px !important;
+    box-sizing: border-box !important;
+}
+
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-chip {
+    height: 56px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-thumb {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    overflow: hidden !important;
+    border-radius: 8px !important;
+}
+
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-thumb img {
+    width: 48px !important;
+    height: 48px !important;
+    max-width: 48px !important;
+    max-height: 48px !important;
+    object-fit: cover !important;
+    border-radius: 8px !important;
+}
+
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-name {
+    max-width: 180px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+    const blog = document.getElementById("nova-mobile-menu-blog");
+    if (blog) {
+        blog.onclick = function () {
+            hideTools();
+            location.href = "/blog";
+        };
+    }
+
+    const exportBtn = document.getElementById("nova-mobile-menu-export");
+
+    if (exportBtn) {
+        exportBtn.onclick = function () {
+            const panel = document.getElementById("nova-mobile-tools-panel");
+
+            if (panel) {
+                panel.classList.add("hidden");
+                panel.style.display = "none";
+            }
+
+            if (
+                window.NovaMobileUiUtils &&
+                typeof window.NovaMobileUiUtils.exportWholeChat === "function"
+            ) {
+                window.NovaMobileUiUtils.exportWholeChat();
+                return;
+            }
+
+            if (typeof window.NovaMobileExportWholeChat === "function") {
+                window.NovaMobileExportWholeChat();
+                return;
+            }
+
+            alert("Export is not available yet");
+        };
+    }
+
+})();
+</script>
+
+</html>

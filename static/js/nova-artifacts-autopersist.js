@@ -1,10 +1,10 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaArtifactsAutoPersistLoaded) return;
   window.__novaArtifactsAutoPersistLoaded = true;
 
-  console.log("🚀 Nova Phase 4 Auto-Persist Artifacts Engaged");
+  console.log("ðŸš€ Nova Phase 4 Auto-Persist Artifacts Engaged");
 
   const Nova = (window.Nova = window.Nova || {});
   Nova.artifacts = Nova.artifacts || {};
@@ -145,5 +145,6 @@
     persistMessageArtifacts(e.detail);
   });
 
-  console.log("✅ Nova Phase 4 Auto-Persist Artifacts Loaded");
+  console.log("âœ… Nova Phase 4 Auto-Persist Artifacts Loaded");
 })();
+

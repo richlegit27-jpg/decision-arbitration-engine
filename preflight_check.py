@@ -1,4 +1,4 @@
-# notepad C:\Users\Owner\nova\preflight_check.py
+﻿# notepad C:\Users\Owner\nova\preflight_check.py
 
 import os
 from pathlib import Path
@@ -49,10 +49,11 @@ def main():
         print(f"Missing CSS files: {missing_css}")
 
     if any_missing:
-        print("\n⚠️ Some required files are missing! Fix them before starting Nova.")
+        print("\nâš ï¸ Some required files are missing! Fix them before starting Nova.")
         sys.exit(1)
     else:
-        print("✅ All required files are present. Ready to launch Nova!")
+        print("âœ… All required files are present. Ready to launch Nova!")
 
 if __name__ == "__main__":
     main()
+

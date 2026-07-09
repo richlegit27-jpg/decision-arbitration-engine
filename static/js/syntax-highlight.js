@@ -1,4 +1,4 @@
-/* notepad C:\Users\Owner\nova\static\js\syntax-highlight.js */
+﻿/* notepad C:\Users\Owner\nova\static\js\syntax-highlight.js */
 
 (() => {
 "use strict";
@@ -39,3 +39,4 @@ observer.observe(document.body,{
 });
 
 })();
+

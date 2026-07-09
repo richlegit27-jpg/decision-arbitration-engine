@@ -1,4 +1,4 @@
-import os
+﻿import os
 import time
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -41,3 +41,4 @@ if __name__ == "__main__":
         observer.stop()
         process.terminate()
     observer.join()
+

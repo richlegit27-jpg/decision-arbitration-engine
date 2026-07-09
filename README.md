@@ -1,4 +1,4 @@
-\# Nova
+﻿\# Nova
 
 
 
@@ -20,21 +20,21 @@ The goal of Nova is to provide a powerful AI interface that behaves more like a 
 
 
 
-• Persistent chat sessions  
+â€¢ Persistent chat sessions  
 
-• Memory system for contextual learning  
+â€¢ Memory system for contextual learning  
 
-• File attachments and uploads  
+â€¢ File attachments and uploads  
 
-• Workspace awareness of project files  
+â€¢ Workspace awareness of project files  
 
-• Streaming AI responses  
+â€¢ Streaming AI responses  
 
-• Sidebar chat navigation  
+â€¢ Sidebar chat navigation  
 
-• Memory panel management  
+â€¢ Memory panel management  
 
-• Local runtime storage
+â€¢ Local runtime storage
 
 
 
@@ -52,53 +52,53 @@ C:\\Users\\Owner\\nova
 
 nova
 
-│
+â”‚
 
-├── backend
+â”œâ”€â”€ backend
 
-│   ├── main.py
+â”‚   â”œâ”€â”€ main.py
 
-│   ├── brain.py
+â”‚   â”œâ”€â”€ brain.py
 
-│   ├── routes\_chat.py
+â”‚   â”œâ”€â”€ routes\_chat.py
 
-│   ├── memory\_store.py
+â”‚   â”œâ”€â”€ memory\_store.py
 
-│   ├── workspace\_state.py
+â”‚   â”œâ”€â”€ workspace\_state.py
 
-│   └── other backend modules
+â”‚   â””â”€â”€ other backend modules
 
-│
+â”‚
 
-├── static
+â”œâ”€â”€ static
 
-│   ├── css
+â”‚   â”œâ”€â”€ css
 
-│   ├── js
+â”‚   â”œâ”€â”€ js
 
-│   └── assets
+â”‚   â””â”€â”€ assets
 
-│
+â”‚
 
-├── templates
+â”œâ”€â”€ templates
 
-│   └── index.html
+â”‚   â””â”€â”€ index.html
 
-│
+â”‚
 
-├── runtime
+â”œâ”€â”€ runtime
 
-│   ├── uploads
+â”‚   â”œâ”€â”€ uploads
 
-│   ├── runtime\_chats.json
+â”‚   â”œâ”€â”€ runtime\_chats.json
 
-│   └── runtime\_workspace\_state.json
+â”‚   â””â”€â”€ runtime\_workspace\_state.json
 
-│
+â”‚
 
-├── requirements.txt
+â”œâ”€â”€ requirements.txt
 
-└── README.md
+â””â”€â”€ README.md
 
 
 
@@ -237,4 +237,5 @@ Further development may include improved UI polish, enhanced reasoning modules, 
 
 
 Private project.
+
 

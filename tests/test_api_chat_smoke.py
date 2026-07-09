@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 
 def test_api_chat_endpoint_smoke(monkeypatch):
@@ -42,3 +42,5 @@ def test_api_chat_endpoint_smoke(monkeypatch):
     assert payload["ok"] is True
     assert payload["assistant_message"]["text"] == "mock assistant response"
     assert payload["active_session_id"] == "pytest_mock_session"
+
+

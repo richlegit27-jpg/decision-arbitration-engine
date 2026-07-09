@@ -1,4 +1,4 @@
-import hashlib
+﻿import hashlib
 import hmac
 
 from db import get_connection, init_db
@@ -127,3 +127,4 @@ def get_user_by_username(username: str):
         ).fetchone()
 
     return row
+

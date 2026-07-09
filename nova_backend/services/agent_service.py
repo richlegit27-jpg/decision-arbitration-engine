@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import re
 from typing import Any, Dict, List, Tuple
@@ -593,3 +593,4 @@ class AgentService:
         text = str(value or "").strip().lower()
         text = re.sub(r"\s+", " ", text)
         return text
+

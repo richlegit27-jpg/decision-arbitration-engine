@@ -1,4 +1,4 @@
-import os, uuid
+﻿import os, uuid
 from pathlib import Path
 from typing import Any, Dict
 import mimetypes
@@ -29,3 +29,4 @@ class AttachmentService:
     def _guess_mimetype(self, filepath:Path)->str:
         mimetype,_ = mimetypes.guess_type(str(filepath))
         return mimetype or "application/octet-stream"
+

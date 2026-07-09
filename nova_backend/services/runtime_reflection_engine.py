@@ -1,4 +1,4 @@
-from nova_backend.services.runtime_engine_base import RuntimeEngineBase
+﻿from nova_backend.services.runtime_engine_base import RuntimeEngineBase
 
 
 class RuntimeReflectionEngine(RuntimeEngineBase):
@@ -85,3 +85,4 @@ class RuntimeReflectionEngine(RuntimeEngineBase):
             "lessons": lessons,
             "lesson_count": len(lessons),
         }
+

@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   window.Nova = window.Nova || {};
 
   /**
@@ -30,3 +30,4 @@
       data.attachments.forEach(att => window.Nova.addAttachment(att.url, att.type));
   };
 })();
+

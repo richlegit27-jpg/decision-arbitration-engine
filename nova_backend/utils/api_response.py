@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
@@ -35,3 +35,4 @@ def error_response(
         },
         "error": str(error or "Request failed."),
     }
+

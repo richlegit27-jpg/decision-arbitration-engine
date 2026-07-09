@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaApiLoaded) return;
@@ -541,3 +541,4 @@
   api.normalizeChatPayload = normalizeChatPayload;
   api.normalizeModelsPayload = normalizeModelsPayload;
 })();
+

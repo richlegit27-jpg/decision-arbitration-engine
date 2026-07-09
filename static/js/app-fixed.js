@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 if (window.__novaAppFixedLoaded) {
@@ -183,3 +183,4 @@ function makeId(prefix = "id") {
 // includes all: normalizeChat, normalizeMessage, ensureStateShape, getChatById, getMessagesForChat, setMessagesForChat, theme, memory, API functions, boot(), initAppCore(), etc.
 
 })();
+

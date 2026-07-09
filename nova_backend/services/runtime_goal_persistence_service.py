@@ -1,4 +1,4 @@
-class RuntimeGoalPersistenceService:
+﻿class RuntimeGoalPersistenceService:
     def __init__(self):
         self.goal_state = {
             "current_goal": "maintain_runtime_stability",
@@ -157,3 +157,4 @@ class RuntimeGoalPersistenceService:
             return float(value)
         except Exception:
             return default
+

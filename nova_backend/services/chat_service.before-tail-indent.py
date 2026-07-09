@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64   
 import os
@@ -628,7 +628,7 @@ class ChatService:
         # Step 1: try relevant memory
         relevant_items = self._select_relevant_memory(user_text, limit=memory_limit)
 
-        # Step 2: fallback â†’ recent memory
+        # Step 2: fallback Ã¢â€ â€™ recent memory
         if not relevant_items:
             try:
                 if hasattr(self, "memory") and self.memory:
@@ -727,7 +727,7 @@ class ChatService:
         if not lines:
             return "I do not have any saved memory yet."
 
-        return "Hereâ€™s what I remember:\n" + "\n".join(lines)
+        return "HereÃ¢â‚¬â„¢s what I remember:\n" + "\n".join(lines)
 
     def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -> None:
         if not isinstance(decision, dict):
@@ -1102,7 +1102,7 @@ class ChatService:
             if text_parts:
                 return "\n".join(text_parts).strip()
 
-        return "Iâ€™m here, but the model returned an empty response."
+        return "IÃ¢â‚¬â„¢m here, but the model returned an empty response."
 
     # ==============================
     # DECISION CONTRACT
@@ -1596,7 +1596,7 @@ class ChatService:
 
         for i, line in enumerate(body_lines):
             if "[>]" in line and not advanced:
-                new_lines.append(line.replace("[>]", "[âœ“]"))
+                new_lines.append(line.replace("[>]", "[Ã¢Å“â€œ]"))
                 advanced = True
                 current_index = i
             else:
@@ -1608,8 +1608,8 @@ class ChatService:
                     new_lines[j] = new_lines[j].replace("[ ]", "[>]")
                     break
 
-        total = sum(1 for l in new_lines if "[ ]" in l or "[>]" in l or "[âœ“]" in l)
-        done = sum(1 for l in new_lines if "[âœ“]" in l)
+        total = sum(1 for l in new_lines if "[ ]" in l or "[>]" in l or "[Ã¢Å“â€œ]" in l)
+        done = sum(1 for l in new_lines if "[Ã¢Å“â€œ]" in l)
 
         updated_body = "\n".join(new_lines)
         updated_body = re.sub(
@@ -1705,7 +1705,7 @@ class ChatService:
         current_index = -1
 
         for i, line in enumerate(lines):
-            if "[âœ“]" in line or "[ ]" in line or "[>]" in line:
+            if "[Ã¢Å“â€œ]" in line or "[ ]" in line or "[>]" in line:
                 step_indexes.append(i)
             if "[>]" in line:
                 current_index = i
@@ -1713,8 +1713,8 @@ class ChatService:
         return lines, step_indexes, current_index
 
     def _rewrite_execution_progress(self, lines):
-        total = sum(1 for line in lines if "[âœ“]" in line or "[ ]" in line or "[>]" in line)
-        done = sum(1 for line in lines if "[âœ“]" in line)
+        total = sum(1 for line in lines if "[Ã¢Å“â€œ]" in line or "[ ]" in line or "[>]" in line)
+        done = sum(1 for line in lines if "[Ã¢Å“â€œ]" in line)
 
         updated = "\n".join(lines)
         updated = re.sub(
@@ -1729,7 +1729,7 @@ class ChatService:
                 current_line = (
                     line.replace("[>]", "")
                     .replace("[ ]", "")
-                    .replace("[âœ“]", "")
+                    .replace("[Ã¢Å“â€œ]", "")
                     .strip(" -")
                     .strip()
                 )
@@ -1821,14 +1821,14 @@ class ChatService:
                 lines[current_index]
                 .replace("[>]", "")
                 .replace("[ ]", "")
-                .replace("[âœ“]", "")
+                .replace("[Ã¢Å“â€œ]", "")
                 .strip(" -")
                 .strip()
             )
             executed_steps.append(current_text)
 
             # mark current complete
-            lines[current_index] = lines[current_index].replace("[>]", "[âœ“]")
+            lines[current_index] = lines[current_index].replace("[>]", "[Ã¢Å“â€œ]")
 
             # move to next pending
             next_index = -1
@@ -2047,7 +2047,7 @@ class ChatService:
                 ]
             ):
                 if current_file:
-                    return f"Weâ€™re in `{current_file}`."
+                    return f"WeÃ¢â‚¬â„¢re in `{current_file}`."
                 return "I do not have the current file locked in yet."
 
             if any(
@@ -2126,7 +2126,7 @@ class ChatService:
 
             if active_task and next_move:
                 return (
-                    f"Weâ€™re {active_task}. "
+                    f"WeÃ¢â‚¬â„¢re {active_task}. "
                     f"Next: {next_move}"
                     + (f" Current file: `{current_file}`." if current_file else "")
                     + (f" Current bug: {current_bug}." if current_bug else "")
@@ -3764,3 +3764,5 @@ class ChatService:
                 working_state=working_state,
                 working_context_block=working_context_block,
             )
+
+

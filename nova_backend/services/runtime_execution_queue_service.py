@@ -1,4 +1,4 @@
-class RuntimeExecutionQueueService:
+﻿class RuntimeExecutionQueueService:
 
     name = "runtime_execution_queue_service"
 
@@ -309,3 +309,4 @@ class RuntimeExecutionQueueService:
             "runtime_signal": runtime_signal,
             "execution_state": execution_state,
         }
+

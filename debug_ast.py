@@ -1,4 +1,4 @@
-import ast
+﻿import ast
 
 p = r"C:\Users\Owner\nova\nova_backend\services\chat_service.py"
 
@@ -25,3 +25,4 @@ for node in ast.walk(tree):
             if isinstance(item, ast.FunctionDef):
                 if item.name in ("handle", "_execute_general_chat"):
                     print("METHOD:", item.name, item.lineno, item.end_lineno)
+

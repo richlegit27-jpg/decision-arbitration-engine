@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\files-panel.js
+﻿// C:\Users\Owner\nova\static\js\files-panel.js
 
 (() => {
 "use strict"
@@ -72,11 +72,11 @@ function getIconForType(type = "", name = ""){
   const lowerName = String(name || "").toLowerCase()
 
   if(lowerType.includes("image/")){
-    return "🖼️"
+    return "ðŸ–¼ï¸"
   }
 
   if(lowerType.includes("pdf") || lowerName.endsWith(".pdf")){
-    return "📄"
+    return "ðŸ“„"
   }
 
   if(
@@ -98,7 +98,7 @@ function getIconForType(type = "", name = ""){
     lowerName.endsWith(".txt") ||
     lowerName.endsWith(".md")
   ){
-    return "💻"
+    return "ðŸ’»"
   }
 
   if(
@@ -108,14 +108,14 @@ function getIconForType(type = "", name = ""){
     lowerName.endsWith(".rar") ||
     lowerName.endsWith(".7z")
   ){
-    return "🗜️"
+    return "ðŸ—œï¸"
   }
 
   if(lowerType.includes("audio/") || lowerType.includes("video/")){
-    return "🎞️"
+    return "ðŸŽžï¸"
   }
 
-  return "📎"
+  return "ðŸ“Ž"
 }
 
 function getPendingAttachments(){
@@ -148,7 +148,7 @@ function renderEmptyState(){
 
   el.filesList.innerHTML = `
     <div class="empty-state-card fade-in">
-      <div class="empty-icon">📎</div>
+      <div class="empty-icon">ðŸ“Ž</div>
       <h3>No files yet</h3>
       <p>Attach files from the composer and uploaded files will appear here.</p>
     </div>
@@ -178,7 +178,7 @@ function renderPendingSection(pending){
                 <div class="file-row-copy">
                   <strong class="file-row-name">${escapeHtml(attachment.name || "Unnamed file")}</strong>
                   <small class="file-row-meta">
-                    ${escapeHtml(attachment.type || "file")} • ${escapeHtml(formatBytes(attachment.size))}
+                    ${escapeHtml(attachment.type || "file")} â€¢ ${escapeHtml(formatBytes(attachment.size))}
                   </small>
                 </div>
               </div>
@@ -208,7 +208,7 @@ function renderUploadedSection(files){
         </div>
 
         <div class="empty-state-card fade-in">
-          <div class="empty-icon">🗂️</div>
+          <div class="empty-icon">ðŸ—‚ï¸</div>
           <h3>No uploaded files</h3>
           <p>Upload from the composer to populate this list.</p>
         </div>
@@ -236,7 +236,7 @@ function renderUploadedSection(files){
                 <div class="file-row-copy">
                   <strong class="file-row-name">${escapeHtml(file.name || "Unnamed file")}</strong>
                   <small class="file-row-meta">
-                    ${escapeHtml(file.content_type || "file")} • ${escapeHtml(formatBytes(file.size))}${modified ? ` • ${escapeHtml(modified)}` : ""}
+                    ${escapeHtml(file.content_type || "file")} â€¢ ${escapeHtml(formatBytes(file.size))}${modified ? ` â€¢ ${escapeHtml(modified)}` : ""}
                   </small>
                 </div>
               </div>
@@ -442,3 +442,4 @@ if(document.readyState === "loading"){
 }
 
 })()
+

@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import datetime
 
 
 class CollectiveMemoryCore:
@@ -78,3 +78,4 @@ class CollectiveMemoryCore:
         )
 
         return items[-limit:]
+

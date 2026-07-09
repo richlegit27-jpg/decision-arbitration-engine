@@ -1,4 +1,4 @@
-class RuntimePredictionDriftService:
+﻿class RuntimePredictionDriftService:
 
     def __init__(
         self,
@@ -113,3 +113,4 @@ class RuntimePredictionDriftService:
             "recommendations": recommendations,
             "drift": drift,
         }
+

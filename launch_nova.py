@@ -1,4 +1,4 @@
-# notepad C:\Users\Owner\nova\launch_nova.py
+﻿# notepad C:\Users\Owner\nova\launch_nova.py
 
 import os
 from pathlib import Path
@@ -28,7 +28,7 @@ def check_files(folder, required_files):
     return missing
 
 def main():
-    print("🔍 Running preflight check for Nova...")
+    print("ðŸ” Running preflight check for Nova...")
 
     templates_folder = BASE_DIR / "templates"
     static_js_folder = BASE_DIR / "static" / "js"
@@ -42,19 +42,19 @@ def main():
 
     if missing_templates:
         any_missing = True
-        print(f"❌ Missing templates: {missing_templates}")
+        print(f"âŒ Missing templates: {missing_templates}")
     if missing_js:
         any_missing = True
-        print(f"❌ Missing JS files: {missing_js}")
+        print(f"âŒ Missing JS files: {missing_js}")
     if missing_css:
         any_missing = True
-        print(f"❌ Missing CSS files: {missing_css}")
+        print(f"âŒ Missing CSS files: {missing_css}")
 
     if any_missing:
-        print("\n⚠️ Cannot start Nova. Fix missing files first!")
+        print("\nâš ï¸ Cannot start Nova. Fix missing files first!")
         sys.exit(1)
     else:
-        print("✅ All required files are present. Launching Nova...")
+        print("âœ… All required files are present. Launching Nova...")
 
     # Launch Uvicorn
     uvicorn_cmd = [
@@ -65,3 +65,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

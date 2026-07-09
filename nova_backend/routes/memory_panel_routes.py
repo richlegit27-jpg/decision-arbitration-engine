@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any, Dict, List
 
@@ -85,3 +85,4 @@ def register_memory_panel_routes(app, memory_service):
             return _json_ok(deleted=bool(deleted))
 
         return _json_error("Memory service missing delete method", 500)
+

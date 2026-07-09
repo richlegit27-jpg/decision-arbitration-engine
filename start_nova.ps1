@@ -1,4 +1,4 @@
-# --- Step 1: Kill all old Python processes ---
+﻿# --- Step 1: Kill all old Python processes ---
 Write-Host "`n=== Stopping old Python servers ===" -ForegroundColor Cyan
 $pythonProcesses = Get-Process python -ErrorAction SilentlyContinue
 if ($pythonProcesses) {

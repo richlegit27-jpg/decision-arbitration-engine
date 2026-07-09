@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 if (window.NovaApp && window.NovaApp.state) {
@@ -225,3 +225,4 @@ window.NovaApp.initState = initState;
 
 document.addEventListener("DOMContentLoaded", initState);
 })();
+

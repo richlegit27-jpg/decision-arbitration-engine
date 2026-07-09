@@ -1,4 +1,4 @@
-class ReflectionEngine:
+﻿class ReflectionEngine:
 
     def reflect(
         self,
@@ -106,3 +106,4 @@ class ReflectionEngine:
             )
 
         return reflection
+

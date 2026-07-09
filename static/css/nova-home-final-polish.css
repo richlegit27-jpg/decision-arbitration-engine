@@ -1,0 +1,276 @@
+﻿/* NOVA_HOME_FINAL_POLISH_20260709 */
+
+:root {
+    --nova-home-purple: #8b5cf6;
+    --nova-home-purple-2: #a855f7;
+    --nova-home-lime: #b8ff7a;
+    --nova-home-ink: #07060c;
+    --nova-home-card: rgba(255, 255, 255, 0.075);
+    --nova-home-card-strong: rgba(255, 255, 255, 0.11);
+    --nova-home-line: rgba(226, 214, 255, 0.18);
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    background:
+        radial-gradient(circle at 14% 4%, rgba(139, 92, 246, 0.34), transparent 34rem),
+        radial-gradient(circle at 86% 10%, rgba(168, 85, 247, 0.22), transparent 30rem),
+        #07060c !important;
+}
+
+.nova-public-page,
+.nova-landing-page,
+body {
+    color: #f8fafc;
+}
+
+.nova-home-polish-announcement {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    display: flex;
+    justify-content: center;
+    padding: 10px 14px;
+    background: rgba(7, 6, 12, 0.82);
+    border-bottom: 1px solid rgba(226, 214, 255, 0.12);
+    backdrop-filter: blur(18px);
+}
+
+.nova-home-polish-announcement-inner {
+    width: min(1120px, 100%);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 9px 12px;
+    border: 1px solid rgba(184, 255, 122, 0.18);
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(184, 255, 122, 0.08), rgba(139, 92, 246, 0.13));
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.26);
+}
+
+.nova-home-polish-announcement strong {
+    color: #ffffff;
+    font-size: 13px;
+    letter-spacing: -0.01em;
+}
+
+.nova-home-polish-announcement span {
+    color: rgba(226, 232, 240, 0.78);
+    font-size: 12px;
+}
+
+.nova-home-polish-announcement a {
+    color: #101014;
+    background: #b8ff7a;
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 900;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.nova-home-polish-shell {
+    width: min(1120px, calc(100% - 32px));
+    margin: 0 auto;
+}
+
+.nova-home-polish-proof {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin: 24px auto 0;
+}
+
+.nova-home-polish-proof-card {
+    min-height: 92px;
+    padding: 16px;
+    border: 1px solid var(--nova-home-line);
+    border-radius: 22px;
+    background: linear-gradient(180deg, var(--nova-home-card-strong), rgba(255, 255, 255, 0.035));
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.24);
+}
+
+.nova-home-polish-proof-card b {
+    display: block;
+    margin-bottom: 7px;
+    color: #ffffff;
+    font-size: 14px;
+    letter-spacing: -0.02em;
+}
+
+.nova-home-polish-proof-card span {
+    display: block;
+    color: rgba(226, 232, 240, 0.72);
+    font-size: 12.5px;
+    line-height: 1.45;
+}
+
+.nova-home-polish-section {
+    width: min(1120px, calc(100% - 32px));
+    margin: 54px auto;
+    padding: 28px;
+    border: 1px solid rgba(226, 214, 255, 0.16);
+    border-radius: 30px;
+    background:
+        radial-gradient(circle at 10% 0%, rgba(139, 92, 246, 0.18), transparent 22rem),
+        rgba(255, 255, 255, 0.055);
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.28);
+}
+
+.nova-home-polish-section h2 {
+    margin: 0 0 10px;
+    color: #ffffff;
+    font-size: clamp(28px, 4vw, 48px);
+    line-height: 0.98;
+    letter-spacing: -0.055em;
+}
+
+.nova-home-polish-section p {
+    max-width: 760px;
+    margin: 0;
+    color: rgba(226, 232, 240, 0.76);
+    font-size: 16px;
+    line-height: 1.65;
+}
+
+.nova-home-polish-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 22px;
+}
+
+.nova-home-polish-feature {
+    padding: 18px;
+    border: 1px solid rgba(226, 214, 255, 0.15);
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.055);
+}
+
+.nova-home-polish-feature strong {
+    display: block;
+    margin-bottom: 8px;
+    color: #ffffff;
+    font-size: 15px;
+}
+
+.nova-home-polish-feature span {
+    color: rgba(226, 232, 240, 0.72);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.nova-home-polish-cta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.nova-home-polish-cta-row a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 18px;
+    border-radius: 999px;
+    font-weight: 900;
+    text-decoration: none;
+}
+
+.nova-home-polish-primary {
+    color: #111018;
+    background: #b8ff7a;
+}
+
+.nova-home-polish-secondary {
+    color: #f8fafc;
+    border: 1px solid rgba(226, 214, 255, 0.22);
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.nova-home-polish-sticky-cta {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: min(390px, calc(100vw - 36px));
+    padding: 10px;
+    border: 1px solid rgba(226, 214, 255, 0.18);
+    border-radius: 999px;
+    background: rgba(7, 6, 12, 0.86);
+    box-shadow: 0 20px 70px rgba(0, 0, 0, 0.38);
+    backdrop-filter: blur(18px);
+}
+
+.nova-home-polish-sticky-cta span {
+    padding-left: 10px;
+    color: rgba(248, 250, 252, 0.86);
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.nova-home-polish-sticky-cta a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 0 13px;
+    border-radius: 999px;
+    color: #101014;
+    background: #b8ff7a;
+    font-size: 12px;
+    font-weight: 950;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+@media (max-width: 780px) {
+    .nova-home-polish-announcement-inner {
+        border-radius: 22px;
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .nova-home-polish-proof {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .nova-home-polish-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .nova-home-polish-sticky-cta {
+        left: 14px;
+        right: 14px;
+        bottom: 14px;
+        justify-content: space-between;
+    }
+}
+
+@media (max-width: 460px) {
+    .nova-home-polish-proof {
+        grid-template-columns: 1fr;
+    }
+
+    .nova-home-polish-section {
+        padding: 22px;
+    }
+
+    .nova-home-polish-sticky-cta span {
+        display: none;
+    }
+
+    .nova-home-polish-sticky-cta a {
+        width: 100%;
+    }
+}

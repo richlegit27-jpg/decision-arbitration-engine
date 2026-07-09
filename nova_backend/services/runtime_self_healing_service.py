@@ -1,4 +1,4 @@
-import time
+﻿import time
 
 
 class RuntimeSelfHealingService:
@@ -307,3 +307,4 @@ class RuntimeSelfHealingService:
 
     def get_healing_history(self, limit=25):
         return self.healing_history[-limit:]
+

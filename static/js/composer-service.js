@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\composer-service.js
+﻿// C:\Users\Owner\nova\static\js\composer-service.js
 
 (() => {
 "use strict"
@@ -360,3 +360,4 @@ window.NovaComposerService = {
 }
 
 })()
+

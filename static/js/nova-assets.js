@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   const Nova = (window.Nova = window.Nova || {});
@@ -93,7 +93,7 @@
 
         // Pin button
         const pinBtn = document.createElement("button");
-        pinBtn.textContent = item.pinned ? "📌" : "📍";
+        pinBtn.textContent = item.pinned ? "ðŸ“Œ" : "ðŸ“";
         pinBtn.className = "asset-action";
         pinBtn.title = "Toggle Pin";
         pinBtn.addEventListener("click", async (e) => {
@@ -254,3 +254,4 @@
     bootstrap();
   }
 })();
+

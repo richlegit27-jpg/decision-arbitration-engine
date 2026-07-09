@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   const state = (window.NovaState = window.NovaState || {});
   state.artifacts = Array.isArray(state.artifacts) ? state.artifacts : [];
   state.activeArtifactId = state.activeArtifactId || "";
@@ -476,3 +476,4 @@
     boot();
   }
 })();
+

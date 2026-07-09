@@ -1,4 +1,4 @@
-import os
+﻿import os
 from typing import Iterable
 
 from openai import OpenAI
@@ -184,3 +184,4 @@ def generate_reply(messages: list[dict], model: str | None = None) -> str:
 
     except Exception as error:
         return _build_fallback_reply(messages, f"AI request failed: {error}")
+

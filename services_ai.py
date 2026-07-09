@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any
 
@@ -82,3 +82,4 @@ Draft answer:
 
     improved = _clean_text(call_model_func(refine_prompt, context))
     return improved or base_answer
+

@@ -1,4 +1,4 @@
-import sqlite3
+﻿import sqlite3
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -80,6 +80,8 @@ def init_db() -> None:
             )
 
         connection.commit()
+
+
 
 
 

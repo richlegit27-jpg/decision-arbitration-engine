@@ -1,4 +1,4 @@
-from nova_backend.services.runtime_engine_base import RuntimeEngineBase
+﻿from nova_backend.services.runtime_engine_base import RuntimeEngineBase
 
 
 class RuntimePlanningEngine(RuntimeEngineBase):
@@ -47,3 +47,4 @@ class RuntimePlanningEngine(RuntimeEngineBase):
             "final_action": final_action,
             "recommended_next": "build_execution_plan",
         }
+

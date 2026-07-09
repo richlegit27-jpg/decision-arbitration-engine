@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import re
 from typing import Any, Dict, List
@@ -473,3 +473,4 @@ class ReconService:
                 "bullets": top_findings,
             },
         }
+

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 from pathlib import Path
@@ -94,3 +94,4 @@ def ensure_runtime_dirs() -> None:
         FILES_DIR,
     ):
         path.mkdir(parents=True, exist_ok=True)
+

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64   
 import os
@@ -637,7 +637,7 @@ class ChatService:
         # Step 1: try relevant memory
         relevant_items = self._select_relevant_memory(user_text, limit=memory_limit)
 
-        # Step 2: fallback â†’ recent memory
+        # Step 2: fallback Ã¢â€ â€™ recent memory
         if not relevant_items:
             try:
                 if hasattr(self, "memory") and self.memory:
@@ -736,7 +736,7 @@ class ChatService:
         if not lines:
             return "I do not have any saved memory yet."
 
-        return "Hereâ€™s what I remember:\n" + "\n".join(lines)
+        return "HereÃ¢â‚¬â„¢s what I remember:\n" + "\n".join(lines)
 
     def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -> None:
         if not isinstance(decision, dict):
@@ -1296,7 +1296,7 @@ class ChatService:
             if text_parts:
                 return "\n".join(text_parts).strip()
 
-        return "Iâ€™m here, but the model returned an empty response."
+        return "IÃ¢â‚¬â„¢m here, but the model returned an empty response."
 
     # ==============================
     # DECISION CONTRACT
@@ -1483,11 +1483,11 @@ class ChatService:
             return False
 
 
-        # 🔥 PLAN CREATION
+        # ðŸ”¥ PLAN CREATION
         if any(x in text for x in ["plan", "steps", "how to", "next steps"]):
             return True
 
-        # 🔥 FALLBACK: coding / structured intent
+        # ðŸ”¥ FALLBACK: coding / structured intent
         if decision and decision.get("mode") in {"coding", "analysis"}:
             return True
 
@@ -2285,7 +2285,7 @@ class ChatService:
         current_index = -1
 
         for i, line in enumerate(lines):
-            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "✔", "âœ”"]):
+            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "âœ”", "Ã¢Å“â€"]):
                 step_indexes.append(i)
 
             if "[>]" in line:
@@ -2296,8 +2296,8 @@ class ChatService:
     def _refresh_execution_header(self, body: str):
         lines = self._safe_str(body).splitlines()
 
-        total = sum(1 for line in lines if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "✔", "âœ”"]))
-        done = sum(1 for line in lines if any(x in line for x in ["[x]", "[X]", "✔", "âœ”"]))
+        total = sum(1 for line in lines if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "âœ”", "Ã¢Å“â€"]))
+        done = sum(1 for line in lines if any(x in line for x in ["[x]", "[X]", "âœ”", "Ã¢Å“â€"]))
 
         updated = "\n".join(lines)
         updated = re.sub(
@@ -2314,8 +2314,8 @@ class ChatService:
                     .replace("[ ]", "")
                     .replace("[x]", "")
                     .replace("[X]", "")
-                    .replace("✔", "")
                     .replace("âœ”", "")
+                    .replace("Ã¢Å“â€", "")
                     .strip(" -")
                     .strip()
                 )
@@ -2717,7 +2717,7 @@ class ChatService:
                 ]
             ):
                 if current_file:
-                    return f"Weâ€™re in `{current_file}`."
+                    return f"WeÃ¢â‚¬â„¢re in `{current_file}`."
                 return "I do not have the current file locked in yet."
 
             if any(
@@ -2796,7 +2796,7 @@ class ChatService:
 
             if active_task and next_move:
                 return (
-                    f"Weâ€™re {active_task}. "
+                    f"WeÃ¢â‚¬â„¢re {active_task}. "
                     f"Next: {next_move}"
                     + (f" Current file: `{current_file}`." if current_file else "")
                     + (f" Current bug: {current_bug}." if current_bug else "")
@@ -3933,11 +3933,11 @@ class ChatService:
                     "hi",
                     "hello",
                     "hey",
-                    "hi — what do you need help with?",
+                    "hi â€” what do you need help with?",
                     "hi - what do you need help with?",
-                    "hello — how can i help?",
+                    "hello â€” how can i help?",
                     "hello - how can i help?",
-                    "hello — what do you need help with?",
+                    "hello â€” what do you need help with?",
                     "hello - what do you need help with?",
                     "how can i help?",
                     "what do you need?",
@@ -3945,7 +3945,7 @@ class ChatService:
                 ]
 
                 if any(g in normalized for g in blocked_model_greetings):
-                    assistant_text = "Say the task directly and I’ll act on it."
+                    assistant_text = "Say the task directly and Iâ€™ll act on it."
 
                 print("DEBUG _run_chat_model final =", repr(assistant_text))
                 return assistant_text
@@ -4277,13 +4277,13 @@ class ChatService:
                     "hi",
                     "hello",
                     "hey",
-                    "hi — what do you need?",
+                    "hi â€” what do you need?",
                     "hi - what do you need?",
-                    "hi — what do you need help with?",
+                    "hi â€” what do you need help with?",
                     "hi - what do you need help with?",
-                    "hello — what do you need?",
+                    "hello â€” what do you need?",
                     "hello - what do you need?",
-                    "hello — how can i help?",
+                    "hello â€” how can i help?",
                     "hello - how can i help?",
                     "how can i help?",
                     "what do you need?",
@@ -4291,7 +4291,7 @@ class ChatService:
                 ]
 
                 if any(g in normalized for g in blocked_model_greetings):
-                    assistant_text = "Say the task directly and I’ll act on it."
+                    assistant_text = "Say the task directly and Iâ€™ll act on it."
 
             updates = self._extract_working_state_updates(
                 user_text=user_text,
@@ -4965,3 +4965,4 @@ class ChatService:
                 },
                 saved_artifact=None,
             )
+

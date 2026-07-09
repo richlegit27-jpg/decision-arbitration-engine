@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64
 import hashlib
@@ -241,3 +241,4 @@ def require_session_user(request: Request) -> dict[str, Any]:
 
 def is_authenticated(request: Request) -> bool:
     return get_session_user(request) is not None
+

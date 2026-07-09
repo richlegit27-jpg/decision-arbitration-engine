@@ -1,4 +1,4 @@
-// C:\Users\Owner\nova\static\js\composer-actions.js
+﻿// C:\Users\Owner\nova\static\js\composer-actions.js
 
 (() => {
 "use strict"
@@ -311,7 +311,7 @@ function createComposerActions(options = {}){
   function showThinkingIndicator(){
     clearThinkingIndicator()
 
-    const thinkingMessage = appendAssistantMessage("● ● ●", [], {
+    const thinkingMessage = appendAssistantMessage("â— â— â—", [], {
       status: "thinking",
       message_type: "thinking",
       thinking: true,
@@ -805,3 +805,4 @@ window.NovaComposerActions = {
 }
 
 })()
+

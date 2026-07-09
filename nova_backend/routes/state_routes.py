@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from flask import Blueprint, jsonify
 
@@ -20,3 +20,4 @@ def register_state_routes(app, session_store, artifact_store, memory_store):
         })
 
     app.register_blueprint(state_bp)
+

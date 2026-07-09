@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import shutil
 from datetime import datetime
@@ -81,3 +81,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

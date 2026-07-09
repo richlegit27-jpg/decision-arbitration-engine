@@ -1,4 +1,4 @@
-# -----------------------------
+﻿# -----------------------------
 # Nova Endgame One-Click Backend Launcher
 # -----------------------------
 
@@ -25,4 +25,4 @@ Start-Sleep -Seconds 3
 # Open browser to Nova frontend
 Start-Process $novaUrl
 
-Write-Host "✅ Nova backend started and browser opened at $novaUrl"
+Write-Host "âœ… Nova backend started and browser opened at $novaUrl"

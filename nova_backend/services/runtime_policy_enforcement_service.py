@@ -1,4 +1,4 @@
-class RuntimePolicyEnforcementService:
+﻿class RuntimePolicyEnforcementService:
     def __init__(
         self,
         policy_adapter=None,
@@ -659,3 +659,5 @@ class RuntimePolicyEnforcementService:
             "notes": notes,
             "control": control,
         }
+
+

@@ -1,4 +1,4 @@
-class RuntimeGoalArbitrationEngine:
+﻿class RuntimeGoalArbitrationEngine:
 
     def prioritize(
         self,
@@ -75,3 +75,4 @@ class RuntimeGoalArbitrationEngine:
             priority,
             0,
         )
+

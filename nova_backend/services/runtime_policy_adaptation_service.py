@@ -1,4 +1,4 @@
-class RuntimePolicyAdaptationService:
+﻿class RuntimePolicyAdaptationService:
     def __init__(
         self,
         trend_analyzer=None,
@@ -396,3 +396,4 @@ class RuntimePolicyAdaptationService:
             ),
             "adaptive_policy": policy,
         }
+

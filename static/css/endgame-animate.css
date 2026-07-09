@@ -1,4 +1,4 @@
-/* Memory panel slide-in/out */
+﻿/* Memory panel slide-in/out */
 .memory-panel {
   transform: translateX(100%);
   opacity: 0;

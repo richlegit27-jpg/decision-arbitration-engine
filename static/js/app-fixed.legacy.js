@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 if (window.__novaAppFixedCleanupLoaded) {
@@ -15,3 +15,4 @@ console.warn(
 // This file intentionally does nothing so old script references do not break the page.
 window.NovaApp = window.NovaApp || {};
 })();
+

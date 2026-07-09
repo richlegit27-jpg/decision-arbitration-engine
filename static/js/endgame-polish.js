@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict"
 
 // Quick helpers
@@ -73,3 +73,4 @@ document.addEventListener("keydown", (event) => {
 addClass(document.body, "endgame-ready")
 
 })()
+

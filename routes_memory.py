@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import uuid
 
@@ -106,3 +106,4 @@ def extract_memory_route():
         save_memory()
 
     return jsonify({"ok": True, "item": item})
+

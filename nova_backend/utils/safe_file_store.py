@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import os
@@ -44,3 +44,4 @@ def atomic_write_json(path: str | Path, payload: Any, encoding: str = "utf-8") -
         text=json.dumps(payload, indent=2, ensure_ascii=False),
         encoding=encoding,
     )
+

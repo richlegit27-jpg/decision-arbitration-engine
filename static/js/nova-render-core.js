@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   window.NovaRender = window.NovaRender || {};
@@ -277,3 +277,4 @@
   NovaRender.pickMessagesFromSession = pickMessagesFromSession;
   NovaRender.pickMemoryItems = pickMemoryItems;
 })();
+

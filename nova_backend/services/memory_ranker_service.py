@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
@@ -596,3 +596,4 @@ class MemoryRankerService:
             return ""
 
         return str(value).replace("\r\n", "\n").replace("\r", "\n").strip()
+

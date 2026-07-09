@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaRenderMessagesLoaded) return;
@@ -472,3 +472,4 @@
     });
   }
 })();
+

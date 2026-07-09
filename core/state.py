@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from pathlib import Path
@@ -282,3 +282,4 @@ def initialize_runtime_state() -> None:
 
     if not USERS_FILE.exists():
         save_users([])
+

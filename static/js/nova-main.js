@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   if (window.__novaMainLoaded) return;
@@ -34,3 +34,4 @@
     bootstrap();
   }
 })();
+

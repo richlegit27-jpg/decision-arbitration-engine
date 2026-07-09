@@ -1,6 +1,6 @@
-(async () => {
+﻿(async () => {
 "use strict";
-console.log("🚀 Starting Ultimate Nova Stress-Test...");
+console.log("ðŸš€ Starting Ultimate Nova Stress-Test...");
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const { state } = window.NovaChatState;
@@ -15,24 +15,24 @@ while(retries--) {
   await sleep(200);
 }
 if(!window.NovaChatState || !window.NovaChatStorage){
-  console.error("❌ Nova APIs not ready. Abort.");
+  console.error("âŒ Nova APIs not ready. Abort.");
   return;
 }
 
 // ----------------------
 // Create multiple chats
 // ----------------------
-console.log("📌 Creating chats...");
+console.log("ðŸ“Œ Creating chats...");
 for(let i=1; i<=MAX_CHATS; i++){
   document.getElementById("newChatBtn")?.click();
   await sleep(400);
-  console.log(`✅ Chat ${i} created`);
+  console.log(`âœ… Chat ${i} created`);
 }
 
 // ----------------------
 // Send multiple messages per chat
 // ----------------------
-console.log("💬 Sending messages...");
+console.log("ðŸ’¬ Sending messages...");
 const textarea = document.getElementById("composerInput");
 const sendBtn = document.getElementById("sendBtn");
 for(const chat of state.chats){
@@ -44,13 +44,13 @@ for(const chat of state.chats){
       await sleep(300);
     }
   }
-  console.log(`✅ Messages sent for chat: ${chat.title}`);
+  console.log(`âœ… Messages sent for chat: ${chat.title}`);
 }
 
 // ----------------------
 // Add attachments
 // ----------------------
-console.log("📎 Adding attachments...");
+console.log("ðŸ“Ž Adding attachments...");
 for(const chat of state.chats){
   window.NovaChatState.setActiveChat(chat.id);
   if(window.addAttachment){
@@ -59,13 +59,13 @@ for(const chat of state.chats){
       await sleep(150);
     }
   }
-  console.log(`✅ Attachments added for chat: ${chat.title}`);
+  console.log(`âœ… Attachments added for chat: ${chat.title}`);
 }
 
 // ----------------------
 // Toggle panels, theme, sidebar
 // ----------------------
-console.log("🔄 Toggling panels & theme...");
+console.log("ðŸ”„ Toggling panels & theme...");
 document.getElementById("sidebarToggleBtn")?.click(); await sleep(200);
 document.getElementById("sidebarToggleBtn")?.click(); await sleep(200);
 document.getElementById("themeToggleBtn")?.click(); await sleep(200);
@@ -78,7 +78,7 @@ filesPanel.style.display="block"; await sleep(200); filesPanel.style.display="no
 // ----------------------
 // Delete all chats
 // ----------------------
-console.log("🗑 Deleting chats...");
+console.log("ðŸ—‘ Deleting chats...");
 for(const chat of [...state.chats]){
   if(window.NovaChatStorage?.deleteChat){
     await window.NovaChatStorage.deleteChat(chat.id);
@@ -87,15 +87,16 @@ for(const chat of [...state.chats]){
   }
   await sleep(200);
 }
-console.assert(state.chats.length===0,"✅ All chats deleted");
+console.assert(state.chats.length===0,"âœ… All chats deleted");
 
 // ----------------------
 // Logout
 // ----------------------
-console.log("🔒 Logging out...");
+console.log("ðŸ”’ Logging out...");
 await fetch("/api/logout",{method:"POST",credentials:"include"});
 state.activeChatId=null;
 state.chats=[];
 state.messages=[];
-console.log("🎯 Ultimate Nova Stress-Test complete. Everything fully functional.");
+console.log("ðŸŽ¯ Ultimate Nova Stress-Test complete. Everything fully functional.");
 })();
+

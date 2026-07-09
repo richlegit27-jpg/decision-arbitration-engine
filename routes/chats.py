@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, HTTPException, Request
+﻿from fastapi import APIRouter, Body, HTTPException, Request
 
 from services.ai_service import generate_reply
 from services.auth_service import get_user_by_username
@@ -209,3 +209,4 @@ async def create_real_ai_reply(chat_id: int, request: Request, payload: dict = B
         "chat": updated_chat,
         "messages": updated_messages,
     }
+

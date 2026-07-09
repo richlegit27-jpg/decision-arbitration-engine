@@ -1,4 +1,4 @@
-class RuntimeAutonomySupervisor:
+﻿class RuntimeAutonomySupervisor:
 
     name = "runtime_autonomy_supervisor"
 
@@ -72,3 +72,4 @@ class RuntimeAutonomySupervisor:
             ),
             "observed_execution": executed,
         }
+

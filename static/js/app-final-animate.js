@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
 "use strict";
 
 // Memory panel slide toggle
@@ -40,3 +40,4 @@ attachInput.addEventListener("change", () => {
   Array.from(attachInput.files).forEach(f => addFileThumbnail(f));
 });
 })();
+

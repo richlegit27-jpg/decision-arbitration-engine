@@ -1,4 +1,4 @@
-class RuntimeOutputCompressionService:
+﻿class RuntimeOutputCompressionService:
 
     def _safe_dict(self, value):
 
@@ -105,3 +105,4 @@ class RuntimeOutputCompressionService:
                 )
             ),
         }
+

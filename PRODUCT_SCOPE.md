@@ -1,4 +1,4 @@
-\# Nova Product Scope
+﻿\# Nova Product Scope
 
 
 
@@ -67,4 +67,5 @@ Nova should:
 \## Rule
 
 No major new features until the core launch version feels stable.
+
 
