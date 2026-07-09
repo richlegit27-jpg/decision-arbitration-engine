@@ -20961,6 +20961,63 @@ def nova_api_leads_admin_20260709():
         }), 403
 
     return jsonify(list_leads(request.args.get("limit", 100)))
+
+# NOVA_ADMIN_LEADS_CSV_EXPORT_20260709
+@app.get("/admin/leads.csv")
+def nova_admin_leads_csv_export_20260709():
+    import csv
+    import io
+    from datetime import datetime, timezone
+
+    from flask import Response, abort, request
+
+    from nova_backend.services.lead_service import list_leads
+
+    if not _nova_lead_admin_allowed_20260709():
+        abort(403)
+
+    data = list_leads(request.args.get("limit", 10000))
+    leads = data.get("leads", [])
+
+    headers = [
+        "created_at",
+        "kind",
+        "name",
+        "email",
+        "interest",
+        "message",
+        "source",
+    ]
+
+    def safe_csv_value(value):
+        text = "" if value is None else str(value)
+        if text[:1] in ("=", "+", "-", "@"):
+            return "'" + text
+        return text
+
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=headers, extrasaction="ignore")
+    writer.writeheader()
+
+    for lead in leads:
+        writer.writerow({
+            key: safe_csv_value(lead.get(key, ""))
+            for key in headers
+        })
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    body = "\ufeff" + output.getvalue()
+
+    return Response(
+        body,
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="nova-leads-{stamp}.csv"',
+            "Cache-Control": "no-store",
+        },
+    )
+# /NOVA_ADMIN_LEADS_CSV_EXPORT_20260709
+
 # /NOVA_LEAD_CAPTURE_ROUTES_20260709
 
 if __name__ == "__main__":
@@ -21439,6 +21496,7 @@ def _nova_attachment_status_response_shape_v2(response):
         return response
 
     return response
+
 
 
 
