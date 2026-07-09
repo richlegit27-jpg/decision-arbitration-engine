@@ -20786,6 +20786,14 @@ def nova_blog_page_20260709():
     return render_template("nova_blog.html")
 # /NOVA_BLOG_PAGE_ROUTES_20260709
 
+
+# NOVA_ROADMAP_PAGE_ROUTES_20260709
+@app.get("/roadmap")
+def nova_roadmap_page_20260709():
+    from flask import render_template
+    return render_template("nova_roadmap.html")
+# /NOVA_ROADMAP_PAGE_ROUTES_20260709
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
@@ -21262,6 +21270,7 @@ def _nova_attachment_status_response_shape_v2(response):
         return response
 
     return response
+
 
 
 
