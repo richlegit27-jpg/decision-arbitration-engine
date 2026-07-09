@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>About Nova — AI project command center</title>
+    <meta name="description" content="About Nova: an early-access AI project command center for long-running work, memory, sessions, uploads, billing controls, and practical execution.">
+    <link rel="stylesheet" href="/static/css/nova-about.css?v=about-page-consistency-20260709">
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <link rel="manifest" href="/static/site.webmanifest">
+    <meta name="theme-color" content="#8b5cf6">
+    <!-- NOVA_SOCIAL_META_20260709 -->
+    <link rel="canonical" href="{{ request.url_root.rstrip('/') }}/about">
+    <meta property="og:site_name" content="Nova">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="About Nova">
+    <meta property="og:description" content="Nova is an early-access AI project command center for builders doing long-running work.">
+    <meta property="og:url" content="{{ request.url_root.rstrip('/') }}/about">
+    <meta property="og:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
+    <meta property="og:image:type" content="image/svg+xml">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="About Nova">
+    <meta name="twitter:description" content="Nova is an early-access AI project command center for builders doing long-running work.">
+    <meta name="twitter:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
+    <!-- /NOVA_SOCIAL_META_20260709 -->
+</head>
+<body>
+    <main class="nova-public-shell">
+        <nav class="nova-public-nav" aria-label="Nova about navigation">
+            <a class="nova-public-brand" href="/nova-home-preview">
+                <span>N</span>
+                <div>
+                    <strong>Nova</strong>
+                    <em>About</em>
+                </div>
+            </a>
+
+            <div class="nova-public-actions">
+                <a href="/nova-home-preview">Home</a>
+                <a href="/features">Features</a>
+                <a href="/roadmap">Roadmap</a>
+                <a href="/faq">FAQ</a>
+                <a href="/billing">Billing</a>
+                <a href="/contact#nova-contact-form-title">Early Access</a>
+            </div>
+        </nav>
+
+        <section class="nova-public-hero">
+            <p class="nova-public-kicker">About Nova</p>
+            <h1>Nova is a command center for real project work.</h1>
+            <span>
+                Nova is being built for builders who need more than a single prompt box:
+                saved sessions, uploads, memory, owner controls, billing paths, and a clean workflow
+                for moving a project forward without losing context.
+            </span>
+
+            <div class="nova-public-buttons">
+                <a href="/contact#nova-contact-form-title">Request early access</a>
+                <a href="/features">See features</a>
+            </div>
+        </section>
+
+        <section class="nova-public-grid">
+            <article class="nova-public-card">
+                <p>Purpose</p>
+                <h2>Keep the project brain together.</h2>
+                <span>Nova is shaped around ongoing work: plans, fixes, files, decisions, and release checks.</span>
+            </article>
+
+            <article class="nova-public-card">
+                <p>Direction</p>
+                <h2>Build stable before adding more noise.</h2>
+                <span>The current product lane favors public polish, desktop stability, billing clarity, and clean owner tools.</span>
+            </article>
+
+            <article class="nova-public-card">
+                <p>Access</p>
+                <h2>Early access is intentional.</h2>
+                <span>Contact requests are captured into the owner dashboard so the product can grow with real feedback.</span>
+            </article>
+        </section>
+
+        <section class="nova-public-cta">
+            <div>
+                <p>Early access</p>
+                <h2>Want to try Nova or follow the build?</h2>
+                <span>Send a request through the contact page. Nova now saves lead records for owner review, notes, status, and CSV export.</span>
+            </div>
+
+            <div class="nova-public-buttons">
+                <a href="/contact#nova-contact-form-title">Contact Nova</a>
+                <a href="/billing">View billing path</a>
+            </div>
+        </section>
+
+        <footer class="nova-public-footer">
+            <span>Nova About · Early-access product story</span>
+            <div>
+                <a href="/nova-home-preview">Home</a>
+                <a href="/features">Features</a>
+                <a href="/roadmap">Roadmap</a>
+                <a href="/faq">FAQ</a>
+                <a href="/contact">Contact</a>
+                <a href="/privacy">Privacy</a>
+                <a href="/terms">Terms</a>
+            </div>
+        </footer>
+    </main>
+</body>
+</html>

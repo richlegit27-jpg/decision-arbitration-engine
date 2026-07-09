@@ -20787,6 +20787,21 @@ def nova_blog_page_20260709():
 # /NOVA_BLOG_PAGE_ROUTES_20260709
 
 
+
+# NOVA_ABOUT_FEATURES_PAGE_ROUTES_20260709
+@app.get("/about")
+def nova_about_page_20260709():
+    from flask import render_template
+    return render_template("nova_about.html")
+
+
+@app.get("/features")
+def nova_features_page_20260709():
+    from flask import render_template
+    return render_template("nova_features.html")
+# /NOVA_ABOUT_FEATURES_PAGE_ROUTES_20260709
+
+
 # NOVA_ROADMAP_PAGE_ROUTES_20260709
 @app.get("/roadmap")
 def nova_roadmap_page_20260709():
