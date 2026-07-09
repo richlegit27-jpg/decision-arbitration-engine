@@ -20668,6 +20668,15 @@ except Exception:
 
 
 
+
+# NOVA_PUBLIC_HOME_PREVIEW_ROUTES_20260709
+@app.get("/nova-home-preview")
+@app.get("/landing")
+def nova_public_home_preview_20260709():
+    from flask import render_template
+    return render_template("nova_landing_home.html")
+# /NOVA_PUBLIC_HOME_PREVIEW_ROUTES_20260709
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
@@ -21144,3 +21153,4 @@ def _nova_attachment_status_response_shape_v2(response):
         return response
 
     return response
+
