@@ -8,7 +8,22 @@
     <link rel="stylesheet" href="/static/css/nova-landing-home.css?v=landing-home-superpower-phase2-20260709">
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
     <link rel="manifest" href="/static/site.webmanifest">
-    <meta name="theme-color" content="#8b5cf6"></head>
+    <meta name="theme-color" content="#8b5cf6">
+    <!-- NOVA_SOCIAL_META_20260709 -->
+    <link rel="canonical" href="{{ request.url_root.rstrip('/') }}/nova-home-preview">
+    <meta property="og:site_name" content="Nova">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Nova — AI project command center">
+    <meta property="og:description" content="Nova is an AI workspace for long-running project work: sessions, uploads, memory, billing credits, and a stable builder workflow.">
+    <meta property="og:url" content="{{ request.url_root.rstrip('/') }}/nova-home-preview">
+    <meta property="og:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
+    <meta property="og:image:type" content="image/svg+xml">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Nova — AI project command center">
+    <meta name="twitter:description" content="Nova is an AI workspace for long-running project work: sessions, uploads, memory, billing credits, and a stable builder workflow.">
+    <meta name="twitter:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
+    <!-- /NOVA_SOCIAL_META_20260709 -->
+</head>
 <body>
     <div class="nova-home-bg" aria-hidden="true">
         <span class="nova-orb nova-orb-one"></span>
@@ -301,6 +316,7 @@
     <script src="/static/js/nova-landing-home.js?v=landing-home-superpower-phase2-20260709"></script>
 </body>
 </html>
+
 
 
 

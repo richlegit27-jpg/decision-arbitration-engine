@@ -8,7 +8,22 @@
     <link rel="stylesheet" href="/static/css/nova-faq.css?v=faq-page-phase1-20260709">
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
     <link rel="manifest" href="/static/site.webmanifest">
-    <meta name="theme-color" content="#8b5cf6"></head>
+    <meta name="theme-color" content="#8b5cf6">
+    <!-- NOVA_SOCIAL_META_20260709 -->
+    <link rel="canonical" href="{{ request.url_root.rstrip('/') }}/faq">
+    <meta property="og:site_name" content="Nova">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Nova FAQ">
+    <meta property="og:description" content="Answers to common questions about Nova, the AI project command center.">
+    <meta property="og:url" content="{{ request.url_root.rstrip('/') }}/faq">
+    <meta property="og:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
+    <meta property="og:image:type" content="image/svg+xml">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Nova FAQ">
+    <meta name="twitter:description" content="Answers to common questions about Nova, the AI project command center.">
+    <meta name="twitter:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
+    <!-- /NOVA_SOCIAL_META_20260709 -->
+</head>
 <body>
     <main class="nova-faq-shell">
         <nav class="nova-faq-nav" aria-label="Nova FAQ navigation">
@@ -135,6 +150,7 @@
     <script src="/static/js/nova-faq.js?v=faq-page-phase1-20260709"></script>
 </body>
 </html>
+
 
 
 
