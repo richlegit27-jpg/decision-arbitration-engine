@@ -1,1 +1,392 @@
-﻿
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Nova Leads Admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #07060c;
+            --panel: rgba(255,255,255,.07);
+            --line: rgba(226,214,255,.16);
+            --text: #f8fafc;
+            --muted: rgba(226,232,240,.68);
+            --lime: #b8ff7a;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: var(--text);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background:
+                radial-gradient(circle at 14% 4%, rgba(139,92,246,.34), transparent 34rem),
+                radial-gradient(circle at 86% 10%, rgba(168,85,247,.22), transparent 30rem),
+                var(--bg);
+        }
+
+        .shell {
+            width: min(1180px, calc(100% - 32px));
+            margin: 0 auto;
+            padding: 28px 0 52px;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: center;
+            margin-bottom: 22px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .mark {
+            width: 42px;
+            height: 42px;
+            display: grid;
+            place-items: center;
+            border-radius: 15px;
+            background: linear-gradient(135deg, #d8b4fe, #8b5cf6 54%, #4f46e5);
+            color: #fff;
+            font-weight: 950;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(30px, 5vw, 56px);
+            line-height: .96;
+            letter-spacing: -.06em;
+        }
+
+        .sub {
+            margin: 8px 0 0;
+            color: var(--muted);
+            line-height: 1.55;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .btn {
+            min-height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 14px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: rgba(255,255,255,.07);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 850;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .btn.primary {
+            background: var(--lime);
+            color: #101014;
+            border-color: transparent;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin: 24px 0;
+        }
+
+        .stat {
+            padding: 18px;
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            background: var(--panel);
+        }
+
+        .stat b {
+            display: block;
+            font-size: 28px;
+            letter-spacing: -.04em;
+        }
+
+        .stat span {
+            display: block;
+            margin-top: 4px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .filters {
+            margin: 0 0 18px;
+            padding: 16px;
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            background: rgba(255,255,255,.055);
+        }
+
+        .filters form {
+            display: grid;
+            grid-template-columns: minmax(220px, 1fr) 170px 120px auto auto;
+            gap: 10px;
+            align-items: end;
+        }
+
+        .filters label {
+            display: grid;
+            gap: 7px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 850;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+        }
+
+        .filters input,
+        .filters select {
+            min-height: 40px;
+            width: 100%;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 0 12px;
+            background: rgba(0,0,0,.22);
+            color: var(--text);
+            outline: none;
+        }
+
+        .filter-note {
+            margin: 11px 0 0;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: 26px;
+            background: rgba(255,255,255,.055);
+            overflow: hidden;
+            box-shadow: 0 28px 80px rgba(0,0,0,.28);
+        }
+
+        .panel-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(255,255,255,.055);
+        }
+
+        .panel-head strong {
+            font-size: 15px;
+        }
+
+        .panel-head span {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 920px;
+        }
+
+        th,
+        td {
+            padding: 13px 14px;
+            border-bottom: 1px solid rgba(226,214,255,.10);
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            color: #ddd6fe;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            background: rgba(255,255,255,.035);
+        }
+
+        td {
+            color: rgba(248,250,252,.9);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            min-height: 24px;
+            padding: 0 8px;
+            border-radius: 999px;
+            background: rgba(139,92,246,.18);
+            color: #ede9fe;
+            font-size: 11px;
+            font-weight: 850;
+            white-space: nowrap;
+        }
+
+        .message {
+            max-width: 380px;
+            white-space: pre-wrap;
+        }
+
+        .empty {
+            padding: 34px;
+            color: var(--muted);
+            text-align: center;
+        }
+
+        @media (max-width: 860px) {
+            .topbar {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .actions {
+                justify-content: flex-start;
+            }
+
+            .stats,
+            .filters form {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <div class="topbar">
+            <div class="brand">
+                <div class="mark">N</div>
+                <div>
+                    <h1>Nova Leads</h1>
+                    <p class="sub">Contact and early-access submissions saved by Nova.</p>
+                </div>
+            </div>
+
+            <div class="actions">
+                <a class="btn" href="/admin">Admin dashboard</a>
+                <a class="btn primary" href="{{ url_for('nova_admin_leads_csv_export_20260709', q=q, kind=selected_kind, limit=selected_limit) }}">Export CSV</a>
+                <a class="btn" href="/contact">Contact page</a>
+                <a class="btn" href="/nova-home-preview">Public home</a>
+                <a class="btn primary" href="/richard-login">Open Nova</a>
+            </div>
+        </div>
+
+        <section class="stats">
+            <div class="stat">
+                <b>{{ count }}</b>
+                <span>Total saved leads</span>
+            </div>
+            <div class="stat">
+                <b>{{ contact_count }}</b>
+                <span>Contact submissions</span>
+            </div>
+            <div class="stat">
+                <b>{{ early_count }}</b>
+                <span>Early-access submissions</span>
+            </div>
+        </section>
+
+        <section class="filters" aria-label="Lead filters">
+            <form method="get" action="/admin/leads">
+                <label>
+                    Search
+                    <input name="q" value="{{ q }}" placeholder="Name, email, interest, message">
+                </label>
+
+                <label>
+                    Kind
+                    <select name="kind">
+                        <option value="all" {% if selected_kind == "all" %}selected{% endif %}>All leads</option>
+                        <option value="contact" {% if selected_kind == "contact" %}selected{% endif %}>Contact</option>
+                        <option value="early_access" {% if selected_kind == "early_access" %}selected{% endif %}>Early access</option>
+                    </select>
+                </label>
+
+                <label>
+                    Limit
+                    <input name="limit" type="number" min="1" max="10000" value="{{ selected_limit }}">
+                </label>
+
+                <button class="btn primary" type="submit">Filter</button>
+                <a class="btn" href="/admin/leads">Clear</a>
+            </form>
+
+            <p class="filter-note">
+                Showing {{ visible_count }} of {{ count }} saved leads.
+            </p>
+        </section>
+
+        <section class="panel">
+            <div class="panel-head">
+                <div>
+                    <strong>Recent leads</strong>
+                    <span>Newest first</span>
+                </div>
+                <span>{{ path }}</span>
+            </div>
+
+            {% if leads %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Created</th>
+                            <th>Kind</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Interest</th>
+                            <th>Message</th>
+                            <th>Source</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for lead in leads %}
+                        <tr>
+                            <td class="muted">{{ lead.created_at }}</td>
+                            <td><span class="pill">{{ lead.kind or "contact" }}</span></td>
+                            <td>{{ lead.name or "—" }}</td>
+                            <td>{{ lead.email or "—" }}</td>
+                            <td>{{ lead.interest or "—" }}</td>
+                            <td><div class="message">{{ lead.message or "—" }}</div></td>
+                            <td class="muted">{{ lead.source or "—" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty">
+                No leads match this filter.
+            </div>
+            {% endif %}
+        </section>
+    </main>
+</body>
+</html>
