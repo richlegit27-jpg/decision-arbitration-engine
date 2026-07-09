@@ -20677,6 +20677,107 @@ def nova_public_home_preview_20260709():
     return render_template("nova_landing_home.html")
 # /NOVA_PUBLIC_HOME_PREVIEW_ROUTES_20260709
 
+
+# NOVA_BILLING_DASHBOARD_ROUTES_20260709
+@app.get("/billing")
+def nova_billing_dashboard_20260709():
+    from flask import render_template, request
+    import json
+    import os
+
+    username = (
+        request.args.get("user")
+        or request.cookies.get("nova_username")
+        or "richard"
+    )
+
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    billing_file = os.path.join(base_dir, "data", "nova_billing.json")
+
+    data = {}
+    try:
+        with open(billing_file, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except Exception:
+        data = {}
+
+    users = data.get("users") if isinstance(data, dict) else {}
+    if not isinstance(users, dict):
+        users = {}
+
+    account = users.get(username) or users.get("richard") or {}
+
+    def as_int(value, fallback=0):
+        try:
+            return int(value)
+        except Exception:
+            return fallback
+
+    plan = str(account.get("plan") or "developer").strip() or "developer"
+    credits = as_int(account.get("credits"), 0)
+    monthly_credits = as_int(account.get("monthly_credits"), 0)
+
+    used_credits = max(monthly_credits - credits, 0) if monthly_credits else 0
+    usage_percent = 0.0
+    if monthly_credits > 0:
+        usage_percent = min(max((used_credits / monthly_credits) * 100, 0), 100)
+
+    status_label = "Active" if credits > 0 or plan else "Needs credits"
+
+    return render_template(
+        "nova_billing.html",
+        username_label=str(username),
+        plan_label=plan,
+        status_label=status_label,
+        credits_label=f"{credits:,}",
+        monthly_credits_label=f"{monthly_credits:,}",
+        used_credits_label=f"{used_credits:,}",
+        usage_percent_raw=f"{usage_percent:.2f}",
+        usage_percent_label=f"{usage_percent:.1f}%",
+        billing_file_label=billing_file,
+    )
+
+
+@app.get("/api/billing/status")
+def nova_billing_status_api_20260709():
+    from flask import jsonify, request
+    import json
+    import os
+
+    username = (
+        request.args.get("user")
+        or request.cookies.get("nova_username")
+        or "richard"
+    )
+
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    billing_file = os.path.join(base_dir, "data", "nova_billing.json")
+
+    data = {}
+    try:
+        with open(billing_file, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "error": str(exc),
+            "billing_file": billing_file,
+        }), 200
+
+    users = data.get("users") if isinstance(data, dict) else {}
+    if not isinstance(users, dict):
+        users = {}
+
+    account = users.get(username) or users.get("richard") or {}
+
+    return jsonify({
+        "ok": True,
+        "username": username,
+        "account": account,
+        "billing_file": billing_file,
+    })
+# /NOVA_BILLING_DASHBOARD_ROUTES_20260709
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
@@ -21153,4 +21254,5 @@ def _nova_attachment_status_response_shape_v2(response):
         return response
 
     return response
+
 
