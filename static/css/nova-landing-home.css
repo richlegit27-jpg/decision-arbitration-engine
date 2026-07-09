@@ -884,3 +884,121 @@ a {
         animation: none !important;
     }
 }
+
+/* NOVA_LANDING_CONVERSION_POLISH_20260709 */
+.nova-conversion-band {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
+    gap: 22px;
+    align-items: center;
+    margin: 28px 0;
+    padding: 28px;
+    border: 1px solid rgba(167, 139, 250, 0.28);
+    border-radius: 30px;
+    background:
+        radial-gradient(circle at top left, rgba(139, 92, 246, 0.18), transparent 34%),
+        rgba(15, 23, 42, 0.72);
+    box-shadow: 0 24px 90px rgba(15, 23, 42, 0.42);
+}
+
+.nova-conversion-copy h2,
+.nova-after-contact h2 {
+    margin: 8px 0 12px;
+    letter-spacing: -0.04em;
+}
+
+.nova-conversion-copy span,
+.nova-fit-grid span,
+.nova-after-contact span {
+    display: block;
+    color: rgba(226, 232, 240, 0.72);
+    line-height: 1.7;
+}
+
+.nova-conversion-actions {
+    display: grid;
+    gap: 12px;
+}
+
+.nova-conversion-primary,
+.nova-conversion-secondary,
+.nova-after-contact a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 46px;
+    padding: 0 18px;
+    border-radius: 999px;
+    text-decoration: none;
+    font-weight: 900;
+}
+
+.nova-conversion-primary,
+.nova-after-contact a {
+    color: #ffffff;
+    background: linear-gradient(135deg, #8b5cf6, #ec4899);
+    box-shadow: 0 18px 44px rgba(139, 92, 246, 0.30);
+}
+
+.nova-conversion-secondary {
+    color: rgba(248, 250, 252, 0.92);
+    border: 1px solid rgba(226, 232, 240, 0.16);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.nova-fit-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin: 28px 0;
+}
+
+.nova-fit-grid article {
+    padding: 22px;
+    border: 1px solid rgba(226, 232, 240, 0.12);
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.055);
+}
+
+.nova-fit-grid p {
+    margin: 0 0 8px;
+    color: rgba(196, 181, 253, 0.92);
+    font-size: 12px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
+}
+
+.nova-fit-grid h3 {
+    margin: 0 0 10px;
+    letter-spacing: -0.03em;
+}
+
+.nova-after-contact {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    justify-content: space-between;
+    margin: 28px 0 34px;
+    padding: 24px;
+    border: 1px solid rgba(52, 211, 153, 0.18);
+    border-radius: 28px;
+    background: rgba(6, 78, 59, 0.18);
+}
+
+.nova-after-contact > div {
+    max-width: 780px;
+}
+
+@media (max-width: 860px) {
+    .nova-conversion-band,
+    .nova-fit-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .nova-after-contact {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}
+/* /NOVA_LANDING_CONVERSION_POLISH_20260709 */
