@@ -226,6 +226,107 @@
                 justify-content: flex-start;
             }
         }
+    
+        /* NOVA_ADMIN_DASHBOARD_RECENT_LEADS_STYLE_20260709 */
+        .recent-panel {
+            margin-top: 16px;
+            border: 1px solid var(--line);
+            border-radius: 26px;
+            background: rgba(255,255,255,.055);
+            overflow: hidden;
+            box-shadow: 0 24px 70px rgba(0,0,0,.22);
+        }
+
+        .recent-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(255,255,255,.045);
+        }
+
+        .recent-head strong {
+            display: block;
+            font-size: 15px;
+        }
+
+        .recent-head span {
+            display: block;
+            margin-top: 3px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .recent-list {
+            display: grid;
+        }
+
+        .recent-row {
+            display: grid;
+            grid-template-columns: 150px minmax(170px, .75fr) minmax(180px, .85fr) minmax(220px, 1.4fr);
+            gap: 12px;
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(226,214,255,.10);
+            align-items: start;
+        }
+
+        .recent-row:last-child {
+            border-bottom: 0;
+        }
+
+        .recent-label {
+            color: #ddd6fe;
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .recent-value {
+            margin-top: 4px;
+            color: rgba(248,250,252,.92);
+            font-size: 13px;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+        }
+
+        .recent-muted {
+            color: var(--muted);
+        }
+
+        .recent-pill {
+            display: inline-flex;
+            align-items: center;
+            min-height: 24px;
+            padding: 0 8px;
+            border-radius: 999px;
+            background: rgba(139,92,246,.18);
+            color: #ede9fe;
+            font-size: 11px;
+            font-weight: 850;
+            white-space: nowrap;
+        }
+
+        .recent-empty {
+            padding: 24px 16px;
+            color: var(--muted);
+            font-size: 13px;
+            text-align: center;
+        }
+
+        @media (max-width: 900px) {
+            .recent-head {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .recent-row {
+                grid-template-columns: 1fr;
+            }
+        }
+        /* /NOVA_ADMIN_DASHBOARD_RECENT_LEADS_STYLE_20260709 */
     </style>
 </head>
 <body>
@@ -336,9 +437,59 @@
             </article>
         </section>
 
+        
+        <!-- NOVA_ADMIN_DASHBOARD_RECENT_LEADS_UI_20260709 -->
+        <section class="recent-panel" aria-label="Recent leads">
+            <div class="recent-head">
+                <div>
+                    <strong>Recent leads</strong>
+                    <span>Newest saved submissions from contact / early access.</span>
+                </div>
+                <div class="card-links">
+                    <a class="mini primary" href="/admin/leads">View all</a>
+                    <a class="mini" href="/admin/leads.csv">Export CSV</a>
+                </div>
+            </div>
+
+            {% if recent_leads %}
+            <div class="recent-list">
+                {% for lead in recent_leads %}
+                <div class="recent-row">
+                    <div>
+                        <div class="recent-label">Kind</div>
+                        <div class="recent-value">
+                            <span class="recent-pill">{{ lead.kind or "contact" }}</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="recent-label">Name</div>
+                        <div class="recent-value">{{ lead.name or "—" }}</div>
+                    </div>
+
+                    <div>
+                        <div class="recent-label">Email</div>
+                        <div class="recent-value">{{ lead.email or "—" }}</div>
+                    </div>
+
+                    <div>
+                        <div class="recent-label">Message</div>
+                        <div class="recent-value recent-muted">{{ lead.message or lead.interest or "—" }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="recent-empty">
+                No leads yet. Submit a test lead from the contact page.
+            </div>
+            {% endif %}
+        </section>
+        <!-- /NOVA_ADMIN_DASHBOARD_RECENT_LEADS_UI_20260709 -->
         <div class="foot">
             Admin access is protected by the same existing Richard/admin guard used by <code>/admin/leads</code>.
         </div>
     </main>
 </body>
 </html>
+

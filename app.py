@@ -21115,6 +21115,7 @@ def nova_admin_home_dashboard_20260709():
         count=data.get("count", len(leads)),
         contact_count=contact_count,
         early_count=early_count,
+        recent_leads=leads[:5],
         path=data.get("path", ""),
         updated_at=data.get("updated_at", ""),
     )
@@ -21596,6 +21597,7 @@ def _nova_attachment_status_response_shape_v2(response):
         return response
 
     return response
+
 
 
 
