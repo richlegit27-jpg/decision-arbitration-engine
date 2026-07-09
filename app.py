@@ -20803,6 +20803,15 @@ def nova_faq_page_20260709():
     return render_template("nova_faq.html")
 # /NOVA_FAQ_PAGE_ROUTES_20260709
 
+
+# NOVA_CONTACT_PAGE_ROUTES_20260709
+@app.get("/contact")
+@app.get("/early-access")
+def nova_contact_page_20260709():
+    from flask import render_template
+    return render_template("nova_contact.html")
+# /NOVA_CONTACT_PAGE_ROUTES_20260709
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
@@ -21279,6 +21288,7 @@ def _nova_attachment_status_response_shape_v2(response):
         return response
 
     return response
+
 
 
 
