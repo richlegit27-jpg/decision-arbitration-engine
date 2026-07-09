@@ -7,9 +7,10 @@
 
     window.__NOVA_MOBILE_UPLOAD_NO_LAYOUT_OWNER_20260705__ = true;
 
-    var pendingAttachments = [];
-    var fileInput = null;
-    var lastPickerOpenAt = 0;
+var pendingAttachments = [];
+var fileInput = null;
+var lastPickerOpenAt = 0;
+var uploadGeneration = 0;
 
     function log() {
         try {
@@ -129,9 +130,11 @@
         return normalizeUploadResponse(data, file);
     }
 
-    async function handleFileChange(event) {
-        var input = event.target;
-        var files = Array.from(input.files || []);
+async function handleFileChange(event) {
+    var myGeneration = ++uploadGeneration;
+
+    var input = event.target;
+    var files = Array.from(input.files || []);
 
         if (!files.length) {
             return;
@@ -155,10 +158,13 @@ var localItem = {
     pending_upload: true
 };
 
+pendingAttachments.length = 0;
 pendingAttachments.push(localItem);
+
 syncGlobals();
 
 dispatch("nova-mobile-attachment-preview", localItem);
+
 dispatch("nova-mobile-attachments-changed", {
     pendingAttachments: pendingAttachments.slice(),
     attachments: pendingAttachments.slice()
@@ -169,6 +175,10 @@ log("preview shown", localItem.filename);
 
 /* upload after preview */
 var item = await uploadOne(files[i]);
+if (myGeneration !== uploadGeneration) {
+    console.log("[UPLOAD CANCELLED BY CLEAR]");
+    return;
+}
 
 localItem.url = item.url;
 localItem.file_url = item.file_url;
@@ -229,24 +239,30 @@ dispatch("nova-mobile-attachments-changed", {
         button.__novaUploadNoLayoutBound = true;
         button.setAttribute("data-nova-upload-no-layout-owner", "true");
 
-        button.addEventListener("click", function (event) {
-            event.preventDefault();
-            event.stopPropagation();
+button.addEventListener("click", function (event) {
 
-            if (event.stopImmediatePropagation) {
-                event.stopImmediatePropagation();
-            }
+    if (event.target.closest("#nova-mobile-upload-preview-owner")) {
+        return;
+    }
 
-            openUploadPicker();
-            return false;
-        }, true);
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (event.stopImmediatePropagation) {
+        event.stopImmediatePropagation();
+    }
+
+    openUploadPicker();
+    return false;
+}, true);
 
         log("bound attach button");
     }
 
     function clearAttachments() {
-        pendingAttachments = [];
-        syncGlobals();
+    uploadGeneration++;
+pendingAttachments.length = 0;
+syncGlobals();
 
         dispatch("nova-mobile-attachments-cleared", {
             pendingAttachments: [],

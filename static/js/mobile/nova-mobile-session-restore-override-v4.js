@@ -246,7 +246,12 @@
         if (!item) return;
 
         const text = String(item.textContent || "").toLowerCase();
-        if (text.includes("new chat")) return;
+        if (
+    element.tagName === "BUTTON" &&
+    text.includes("new chat")
+) {
+    return;
+}
 
         const id = String(
             item.getAttribute("data-session-id") ||

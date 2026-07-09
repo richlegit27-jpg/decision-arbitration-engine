@@ -599,25 +599,25 @@
         return session;
     }
 
-    function looksLikeNewChat(node) {
-        if (!node) {
-            return false;
-        }
-
-        const text = String(node.textContent || "").toLowerCase();
-        const id = String(node.id || "").toLowerCase();
-        const cls = String(node.className || "").toLowerCase();
-        const action = String(node.getAttribute("data-action") || "").toLowerCase();
-
-        return (
-            text.includes("new chat") ||
-            id.includes("new-chat") ||
-            id.includes("newchat") ||
-            cls.includes("new-chat") ||
-            cls.includes("newchat") ||
-            action.includes("new")
-        );
+function looksLikeNewChat(node) {
+    if (!node) {
+        return false;
     }
+
+    const id = String(node.id || "").toLowerCase();
+    const cls = String(node.className || "").toLowerCase();
+    const action = String(node.getAttribute("data-action") || "").toLowerCase();
+    const role = String(node.getAttribute("data-role") || "").toLowerCase();
+
+    return (
+        id.includes("new-chat") ||
+        id.includes("newchat") ||
+        cls.includes("new-chat") ||
+        cls.includes("newchat") ||
+        action === "new-chat" ||
+        role === "new-chat"
+    );
+}
 
     function findSessionClickTarget(startNode) {
         if (!startNode || !startNode.closest) {

@@ -4486,8 +4486,11 @@ composer.style.setProperty("overflow", "visible", "important");
     setTimeout(keepSessionsHeaderVisible, 1200);
 })();
 </script>
-<!-- SESSION CLEAN OWNER DISABLED -->
-<!-- <script src="/static/js/mobile/nova-mobile-session-clean-owner-v1.js?v=session-clean-owner-v1-20260705"></script> -->
+
+<!-- NOVA_MOBILE_SESSIONS_HEADER_VISIBLE_20260705 -->
+
+<script src="/static/js/mobile/nova-mobile-session-clean-owner-v1.js?v=session-clean-owner-v1-20260705"></script>
+
 <!-- DISABLED DUPLICATE SESSION OWNER -->
 <!-- <script src="/static/js/mobile/nova-mobile-session-drawer-owner-v1.js?v=session-drawer-owner-v1-20260706"></script> -->
 
@@ -4637,7 +4640,48 @@ if (settings) {
     };
 }
 
+/* NOVA MOBILE ATTACHMENT PREVIEW COMPACT MODE */
 
+#nova-mobile-upload-preview-owner {
+    height: 70px !important;
+    max-height: 70px !important;
+    overflow: hidden !important;
+    display: flex !important;
+    align-items: center !important;
+    padding: 6px 8px !important;
+    box-sizing: border-box !important;
+}
+
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-chip {
+    height: 56px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-thumb {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    overflow: hidden !important;
+    border-radius: 8px !important;
+}
+
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-thumb img {
+    width: 48px !important;
+    height: 48px !important;
+    max-width: 48px !important;
+    max-height: 48px !important;
+    object-fit: cover !important;
+    border-radius: 8px !important;
+}
+
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-name {
+    max-width: 180px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
 
     const blog = document.getElementById("nova-mobile-menu-blog");
     if (blog) {

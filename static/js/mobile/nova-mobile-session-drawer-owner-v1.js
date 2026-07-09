@@ -278,7 +278,12 @@ function toggleDrawer(event) {
 
         var haystack = [text, id, klass, aria, title].join(" ");
 
-        if (haystack.indexOf("new chat") >= 0) return false;
+        if (
+    node.tagName === "BUTTON" &&
+    haystack.indexOf("new chat") >= 0
+) {
+    return false;
+}
         if (haystack.indexOf("rename") >= 0) return false;
         if (haystack.indexOf("delete") >= 0) return false;
         if (haystack.indexOf("pin") >= 0) return false;

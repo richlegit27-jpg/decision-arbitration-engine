@@ -11,6 +11,18 @@
 
     var pendingAttachments = [];
 
+try {
+    var saved = localStorage.getItem("nova_mobile_upload");
+
+    if (saved) {
+        var parsed = JSON.parse(saved);
+
+        if (Array.isArray(parsed)) {
+            pendingAttachments = parsed.slice();
+        }
+    }
+} catch (e) {}
+
     function log() {
         try {
             console.log.apply(console, ["[" + MARK + "]"].concat(Array.from(arguments)));
@@ -169,6 +181,15 @@
         return input;
     }
 
+if (
+    event &&
+    event.target &&
+    event.target.closest &&
+    event.target.closest("[data-nova-upload-remove='1']")
+) {
+    return false;
+}
+
     function openPicker(event) {
         try {
             if (event) {
@@ -258,8 +279,13 @@
                     pendingAttachments.length = 0;
                     pendingAttachments.push(clean);
                     savePending();
-                    renderPreview(clean);
-
+try {
+    console.log("[PREVIEW DEBUG] calling renderPreview", clean);
+    if (typeof renderPreview === "function") renderPreview(clean);
+    console.log("[PREVIEW DEBUG] renderPreview finished");
+} catch (e) {
+    console.error("[PREVIEW DEBUG] renderPreview failed", e);
+}
                     if (typeof window.NovaMobileReceiveUploadedAttachment === "function") {
                         try {
                             window.NovaMobileReceiveUploadedAttachment(clean);
@@ -307,112 +333,136 @@
         return host;
     }
 
-    function renderPreview(item) {
-        var host = findPreviewHost();
-        if (!host) return;
+function renderPreview(item) {
+    var host = findPreviewHost();
+    if (!host) return;
 
-        host.innerHTML = "";
+    host.innerHTML = "";
 
-        var chip = document.createElement("div");
-        chip.className = "nova-mobile-upload-preview-chip";
-        chip.setAttribute("data-nova-role", "attachment-preview-chip");
-        chip.textContent = "Attached: " + (item.filename || item.name || "file");
+    var chip = document.createElement("div");
+    chip.className = "nova-mobile-upload-preview-chip";
+    chip.setAttribute("data-nova-role", "attachment-preview-chip");
 
-        var clear = document.createElement("button");
-        clear.type = "button";
-        clear.textContent = "×";
-        clear.setAttribute("aria-label", "Clear attachment");
-        clear.style.marginLeft = "8px";
+    var thumb = document.createElement("div");
+    thumb.className = "nova-mobile-upload-preview-thumb";
 
-        clear.addEventListener("click", function (event) {
-            event.preventDefault();
-            event.stopPropagation();
-            clearPendingAttachments();
-        }, true);
+    if (item.local_preview && String(item.type || "").indexOf("image/") === 0) {
+var img =
+    document.createElement("img");
 
-        chip.appendChild(clear);
-        host.appendChild(chip);
+img.src =
+    item.local_preview;
 
-        host.hidden = false;
-        host.style.setProperty("display", "flex", "important");
-        host.style.setProperty("visibility", "visible", "important");
-        host.style.setProperty("opacity", "1", "important");
-        host.setAttribute("data-has-attachment", "1");
+img.style.width = "48px";
+img.style.height = "48px";
+img.style.maxWidth = "48px";
+img.style.maxHeight = "48px";
+img.style.objectFit = "cover";
+img.style.borderRadius = "8px";
 
-        document.body.classList.add("nova-mobile-has-attachment");
+        img.alt = item.filename || "attachment";
+        thumb.appendChild(img);
+    } else {
+        thumb.textContent = "📎";
     }
 
-    function clearPendingAttachments() {
-        pendingAttachments.length = 0;
-        savePending();
+    var name = document.createElement("div");
+    name.className = "nova-mobile-upload-preview-name";
+    name.textContent = item.filename || item.name || "attachment";
 
-        [
-            "nova_mobile_upload",
-            "nova_mobile_uploads",
-            "nova_mobile_pending_attachments",
-            "nova_mobile_uploaded_attachments",
-            "nova_mobile_attachment_queue",
-            "nova_mobile_last_uploaded_attachment",
-            "nova_mobile_pending_attachment",
-            "nova_mobile_attachment",
-            "nova_pending_attachment",
-            "pending_attachment",
-            "pending_attachments"
-        ].forEach(function (key) {
-            try {
-                localStorage.removeItem(key);
-                sessionStorage.removeItem(key);
-            } catch (_) {}
-        });
+    var remove = document.createElement("button");
+    remove.className = "nova-mobile-upload-preview-remove";
+    remove.type = "button";
+remove.setAttribute("data-nova-upload-remove", "1");
+    remove.textContent = "×";
+    remove.setAttribute("aria-label", "Remove attachment");
 
-        document.querySelectorAll("input[type='file']").forEach(function (input) {
-            try {
-                input.value = "";
-            } catch (_) {}
-        });
+remove.addEventListener("click", function (event) {
+    event.preventDefault();
 
-        document.querySelectorAll([
-            "#nova-mobile-upload-preview-owner",
-            ".nova-mobile-upload-preview-owner",
-            ".nova-mobile-upload-preview-chip",
-            "[data-nova-role='attachment-preview-chip']",
-            "#nova-mobile-attachment-preview",
-            ".nova-mobile-attachment-preview",
-            "#mobileAttachmentPreview",
-            ".mobile-attachment-preview",
-            "[data-mobile-attachment-preview]",
-            "#nova-mobile-preview-bar",
-            ".nova-mobile-preview-bar",
-            ".nova-mobile-preview-strip",
-            ".nova-mobile-upload-preview",
-            ".nova-mobile-attachment-chip",
-            ".nova-mobile-upload-chip",
-            "[data-nova-attachment-preview]",
-            "[data-nova-upload-preview]",
-            "[data-nova-attachment-chip]",
-            "[data-upload-preview]",
-            "[data-attachment-preview]"
-        ].join(",")).forEach(function (node) {
-            try {
-                node.innerHTML = "";
-                node.hidden = true;
-                node.style.setProperty("display", "none", "important");
-                node.style.setProperty("visibility", "hidden", "important");
-                node.style.setProperty("opacity", "0", "important");
-                node.removeAttribute("data-has-attachment");
-                node.classList.remove("open", "is-open", "active", "visible", "show", "has-attachment", "is-visible");
-            } catch (_) {}
-        });
-
-        document.body.classList.remove(
-            "nova-has-attachment",
-            "nova-mobile-has-attachment",
-            "nova-upload-active",
-            "nova-attachment-active"
-        );
-
-        log("cleared pending attachments");
+    if (event.stopImmediatePropagation) {
+        event.stopImmediatePropagation();
     }
+
+    event.stopPropagation();
+
+    window.dispatchEvent(
+        new CustomEvent("nova-mobile-attachments-clear-request")
+    );
+
+    return false;
+
+}, true);
+
+    chip.appendChild(thumb);
+    chip.appendChild(name);
+    chip.appendChild(remove);
+
+    host.appendChild(chip);
+
+    host.hidden = false;
+    host.style.setProperty("display", "flex", "important");
+    host.style.setProperty("visibility", "visible", "important");
+    host.style.setProperty("opacity", "1", "important");
+
+    host.setAttribute("data-has-attachment", "1");
+    document.body.classList.add("nova-mobile-has-attachment");
+}
+
+window.NovaMobileRenderPreview = renderPreview;
+
+if (!window.__NOVA_PREVIEW_EVENT_BOUND__) {
+    window.__NOVA_PREVIEW_EVENT_BOUND__ = true;
+
+    window.addEventListener("nova-mobile-attachment-preview", function (event) {
+        try {
+            if (!event.detail) return;
+
+            console.log("[PREVIEW EVENT RECEIVED]", event.detail);
+
+            if (typeof window.NovaMobileRenderPreview === "function") {
+                window.NovaMobileRenderPreview(event.detail);
+            }
+
+        } catch (error) {
+            console.error("[PREVIEW EVENT FAILED]", error);
+        }
+    });
+}
+
+function clearPendingAttachments() {
+    pendingAttachments.length = 0;
+
+    window.NovaMobilePendingAttachments = [];
+    window.NovaMobileAttachments = [];
+    window.novaMobilePendingAttachments = [];
+    window.__novaMobilePendingAttachments = [];
+
+    try {
+        localStorage.removeItem("nova_mobile_upload");
+        localStorage.removeItem("nova_mobile_attachment");
+        localStorage.removeItem("nova_pending_attachment");
+        localStorage.removeItem("nova_mobile_pending_attachments");
+    } catch (_) {}
+
+    document.querySelectorAll([
+        "#nova-mobile-upload-preview-owner",
+        ".nova-mobile-upload-preview-chip",
+        "[data-nova-role='attachment-preview-chip']"
+    ].join(",")).forEach(function (node) {
+        node.innerHTML = "";
+        node.hidden = true;
+        node.style.setProperty("display", "none", "important");
+    });
+
+    document.body.classList.remove("nova-mobile-has-attachment");
+
+    log("cleared all attachment state");
+}
+
+window.addEventListener("nova-mobile-attachments-clear-request", function () {
+    clearPendingAttachments();
+});
 
     function isUploadButton(button) {
         if (!button) return false;
@@ -474,10 +524,27 @@
             version: MARK,
             openPicker: openPicker,
             open: openPicker,
-            getPendingAttachments: function () {
-                dedupePending();
-                return pendingAttachments.slice();
-            },
+
+getPendingAttachments: function () {
+    if (pendingAttachments.length) {
+        return pendingAttachments.slice();
+    }
+
+    try {
+        var saved = localStorage.getItem("nova_mobile_upload");
+
+        if (saved) {
+            var parsed = JSON.parse(saved);
+
+            if (Array.isArray(parsed)) {
+                return parsed.slice();
+            }
+        }
+    } catch (e) {}
+
+    return [];
+},
+
             clearPendingAttachments: clearPendingAttachments,
             clear: clearPendingAttachments,
             reset: clearPendingAttachments,
@@ -487,7 +554,7 @@
                 pendingAttachments.length = 0;
                 pendingAttachments.push(clean);
                 savePending();
-                renderPreview(clean);
+                if (typeof renderPreview === "function") renderPreview(clean);
                 return true;
             }
         };

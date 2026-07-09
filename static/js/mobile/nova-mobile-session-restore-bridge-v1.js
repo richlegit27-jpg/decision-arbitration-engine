@@ -189,23 +189,20 @@ window.novaMobileActiveSessionId = sessionId;
         const label = text(element.innerText || element.textContent).trim().toLowerCase();
         const action = text(element.dataset.action || element.getAttribute("data-action")).toLowerCase();
 
-        if (
-            label === "new chat" ||
-            label === "account" ||
-            label === "logout" ||
-            label.includes("delete") ||
-            label.includes("rename") ||
-            label.includes("pin") ||
-            action.includes("delete") ||
-            action.includes("rename") ||
-            action.includes("pin") ||
-            action.includes("new")
-        ) {
-            return false;
-        }
+if (
+    label === "account" ||
+    label === "logout" ||
+    label.includes("delete") ||
+    label.includes("rename") ||
+    label.includes("pin") ||
+    action.includes("delete") ||
+    action.includes("rename") ||
+    action.includes("pin") ||
+    action === "new-chat"
+) {
+    return false;
+}
 
-        return true;
-    }
 
     async function restoreSession(sessionId) {
         if (!sessionId) {

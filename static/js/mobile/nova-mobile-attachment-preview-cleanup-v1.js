@@ -79,28 +79,29 @@
         return /(^x$)|(^×$)|close|remove|clear|delete|dismiss|cancel/.test(t);
     }
 
-    function looksLikePreview(el) {
-        if (!el || el === document.body || el === document.documentElement) {
-            return false;
-        }
+function looksLikePreview(el) {
 
-        const t = textOf(el).toLowerCase();
-
-        if (/preview|attachment|upload|chip|file|image|photo/.test(String(el.id || "") + " " + String(el.className || ""))) {
-            return true;
-        }
-
-        if (el.querySelector && el.querySelector("img, video, canvas")) {
-            return true;
-        }
-
-        if (/\.(png|jpe?g|webp|gif|pdf|txt|md|docx?|csv|json)\b/i.test(t)) {
-            return true;
-        }
-
+    if (el && el.id === "nova-mobile-upload-preview-owner") {
         return false;
     }
 
+    if (!el || el === document.body || el === document.documentElement) {
+        return false;
+    }
+
+    const t = textOf(el).toLowerCase();
+
+    if (/preview|attachment|upload|chip|file|image|photo/.test(String(el.id || "") + " " + String(el.className || ""))) {
+        return true;
+    }
+
+    if (el.querySelector && el.querySelector("img, video, canvas")) {
+        return true;
+    }
+
+    if (/\.(png|jpe?g|webp|gif|pdf|txt|md|docx?|csv|json)\b/i.test(t)) {
+        return true;
+    }
     function findPreviewRoot(start) {
         if (!start || !start.closest) {
             return null;

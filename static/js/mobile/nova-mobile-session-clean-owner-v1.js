@@ -295,10 +295,15 @@ async function loadSessions() {
 if (id) {
     localStorage.setItem("nova_mobile_active_session_id", id);
 
-    window.dispatchEvent(new CustomEvent("nova:session-selected", {
-        detail: { session_id: id }
-    }));
-
+window.dispatchEvent(new CustomEvent("nova:session-selected", {
+    detail: {
+        session_id: id,
+        session: {
+            id: id,
+            messages: []
+        }
+    }
+}));
     closePanel();
     return;
 }

@@ -1,6 +1,9 @@
 ﻿(function () {
     "use strict";
 
+    console.log("[DISABLED] static preview renderer disabled");
+    return;
+
     if (window.__NOVA_MOBILE_ATTACH_STATIC_PREVIEW_V1__) {
         return;
     }
@@ -116,6 +119,8 @@
     }
 
     function ensurePreviewBar() {
+console.log("[DISABLED] old static preview disabled");
+return;
         removeOldPreviewBars();
 
         let bar = document.getElementById(PREVIEW_ID);
@@ -143,7 +148,8 @@
 
     function renderPreview() {
         const queue = saveQueue(readQueue());
-        const bar = ensurePreviewBar();
+        return;
+const bar = ensurePreviewBar();
 
         bar.innerHTML = "";
 

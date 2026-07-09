@@ -69,15 +69,14 @@
             el && el.getAttribute && el.getAttribute("title")
         ].join(" ").toLowerCase();
 
-        return (
-            text.includes("rename") ||
-            text.includes("delete") ||
-            text.includes("remove") ||
-            text.includes("pin") ||
-            text.includes("close") ||
-            text.includes("×") ||
-            text.includes("new chat")
-        );
+return (
+    text.includes("rename") ||
+    text.includes("delete") ||
+    text.includes("remove") ||
+    text.includes("pin") ||
+    text.includes("close") ||
+    text.includes("×")
+);
     }
 
     function switchToSession(sid) {
