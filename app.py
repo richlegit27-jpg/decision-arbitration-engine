@@ -20846,6 +20846,21 @@ def nova_terms_page_20260709():
     return render_template("nova_terms.html")
 # /NOVA_LEGAL_PAGE_ROUTES_20260709
 
+
+# NOVA_PUBLIC_404_ROUTES_20260709
+@app.errorhandler(404)
+def nova_public_not_found_20260709(error):
+    from flask import jsonify, render_template, request
+
+    if request.path.startswith("/api/"):
+        return jsonify({
+            "ok": False,
+            "error": "Not found"
+        }), 404
+
+    return render_template("nova_404.html", path=request.path), 404
+# /NOVA_PUBLIC_404_ROUTES_20260709
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
@@ -21322,6 +21337,7 @@ def _nova_attachment_status_response_shape_v2(response):
         return response
 
     return response
+
 
 
 
