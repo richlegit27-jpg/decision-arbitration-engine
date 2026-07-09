@@ -231,3 +231,95 @@ h2 {
         padding: 22px;
     }
 }
+
+/* NOVA_CONTACT_TRUST_POLISH_20260709 */
+.nova-contact-trust-polish {
+    width: min(1120px, calc(100% - 32px));
+    margin: 28px auto 34px;
+    padding: clamp(22px, 4vw, 38px);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 28px;
+    background:
+        radial-gradient(circle at top left, rgba(167, 125, 255, 0.22), transparent 26rem),
+        rgba(255, 255, 255, 0.07);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+}
+
+.nova-contact-trust-polish__intro {
+    max-width: 820px;
+}
+
+.nova-contact-trust-polish__eyebrow {
+    margin: 0 0 12px;
+    color: rgba(216, 199, 255, 0.94);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 0.76rem;
+    font-weight: 850;
+}
+
+.nova-contact-trust-polish h2 {
+    margin: 0;
+    max-width: 820px;
+    color: #ffffff;
+    font-size: clamp(2rem, 4.5vw, 4rem);
+    line-height: 0.98;
+    letter-spacing: -0.055em;
+}
+
+.nova-contact-trust-polish__intro p {
+    margin: 18px 0 0;
+    max-width: 760px;
+    color: rgba(247, 244, 255, 0.74);
+    font-size: clamp(1rem, 1.7vw, 1.16rem);
+    line-height: 1.65;
+}
+
+.nova-contact-trust-polish__grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 28px;
+}
+
+.nova-contact-trust-polish__grid article {
+    min-height: 100%;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    border-radius: 22px;
+    background: rgba(8, 8, 18, 0.44);
+}
+
+.nova-contact-trust-polish__grid span {
+    display: inline-flex;
+    margin-bottom: 12px;
+    color: rgba(216, 199, 255, 0.92);
+    font-size: 0.78rem;
+    font-weight: 850;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.nova-contact-trust-polish__grid strong {
+    display: block;
+    color: #ffffff;
+    font-size: 1.06rem;
+    line-height: 1.25;
+}
+
+.nova-contact-trust-polish__grid p {
+    margin: 10px 0 0;
+    color: rgba(247, 244, 255, 0.7);
+    line-height: 1.58;
+}
+
+@media (max-width: 820px) {
+    .nova-contact-trust-polish {
+        margin: 20px auto 28px;
+        border-radius: 24px;
+    }
+
+    .nova-contact-trust-polish__grid {
+        grid-template-columns: 1fr;
+    }
+}
