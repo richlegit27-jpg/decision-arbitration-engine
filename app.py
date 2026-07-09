@@ -20832,6 +20832,20 @@ def nova_public_robots_20260709():
     return Response(text, mimetype="text/plain")
 # /NOVA_PUBLIC_SEO_ROUTES_20260709
 
+
+# NOVA_LEGAL_PAGE_ROUTES_20260709
+@app.get("/privacy")
+def nova_privacy_page_20260709():
+    from flask import render_template
+    return render_template("nova_privacy.html")
+
+
+@app.get("/terms")
+def nova_terms_page_20260709():
+    from flask import render_template
+    return render_template("nova_terms.html")
+# /NOVA_LEGAL_PAGE_ROUTES_20260709
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
@@ -21308,6 +21322,7 @@ def _nova_attachment_status_response_shape_v2(response):
         return response
 
     return response
+
 
 
 
