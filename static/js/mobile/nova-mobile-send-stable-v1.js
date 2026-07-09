@@ -1,4 +1,5 @@
-﻿(function () {
+﻿collectPendingAttachments()
+(function () {
     "use strict";
 
     var VERSION = "send-single-upload-owner-20260705";
