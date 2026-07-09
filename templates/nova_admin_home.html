@@ -327,6 +327,31 @@
             }
         }
         /* /NOVA_ADMIN_DASHBOARD_RECENT_LEADS_STYLE_20260709 */
+    
+        /* NOVA_ADMIN_SYSTEM_CHECKS_CARD_STYLE_20260709 */
+        .check-command {
+            display: block;
+            width: 100%;
+            margin-top: 10px;
+            padding: 12px;
+            border: 1px solid rgba(226,214,255,.14);
+            border-radius: 16px;
+            background: rgba(0,0,0,.24);
+            color: #ede9fe;
+            font-family: "Cascadia Mono", "Consolas", ui-monospace, SFMono-Regular, monospace;
+            font-size: 11px;
+            line-height: 1.55;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .check-note {
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.55;
+        }
+        /* /NOVA_ADMIN_SYSTEM_CHECKS_CARD_STYLE_20260709 */
     </style>
 </head>
 <body>
@@ -426,6 +451,22 @@
                 </div>
             </article>
 
+            
+            <!-- NOVA_ADMIN_SYSTEM_CHECKS_CARD_20260709 -->
+            <article class="card">
+                <div>
+                    <h2>System checks</h2>
+                    <p>Run this before admin/public commits so broken routes do not slip through again.</p>
+                    <code class="check-command">powershell -ExecutionPolicy Bypass -File "C:\Users\Owner\nova\tools\nova_full_release_check.ps1"</code>
+                    <div class="check-note">Covers public pages, admin dashboard, leads page, filtered CSV export, and accidental staged mobile files.</div>
+                </div>
+                <div class="card-links">
+                    <a class="mini" href="/admin">Admin</a>
+                    <a class="mini" href="/admin/leads">Leads</a>
+                    <a class="mini" href="/admin/leads.csv">CSV</a>
+                </div>
+            </article>
+            <!-- /NOVA_ADMIN_SYSTEM_CHECKS_CARD_20260709 -->
             <article class="card">
                 <div>
                     <h2>Lead data file</h2>
@@ -492,4 +533,5 @@
     </main>
 </body>
 </html>
+
 
