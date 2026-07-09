@@ -1,0 +1,9 @@
+﻿User-agent: *
+Allow: /
+
+Disallow: /api/
+Disallow: /uploads/
+Disallow: /mobile
+Disallow: /richard-login
+
+Sitemap: {{ base_url }}/sitemap.xml

@@ -20812,6 +20812,26 @@ def nova_contact_page_20260709():
     return render_template("nova_contact.html")
 # /NOVA_CONTACT_PAGE_ROUTES_20260709
 
+
+# NOVA_PUBLIC_SEO_ROUTES_20260709
+@app.get("/sitemap.xml")
+def nova_public_sitemap_20260709():
+    from flask import Response, render_template, request
+
+    base_url = request.url_root.rstrip("/")
+    xml = render_template("nova_sitemap.xml", base_url=base_url)
+    return Response(xml, mimetype="application/xml")
+
+
+@app.get("/robots.txt")
+def nova_public_robots_20260709():
+    from flask import Response, render_template, request
+
+    base_url = request.url_root.rstrip("/")
+    text = render_template("nova_robots.txt", base_url=base_url)
+    return Response(text, mimetype="text/plain")
+# /NOVA_PUBLIC_SEO_ROUTES_20260709
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
@@ -21288,6 +21308,7 @@ def _nova_attachment_status_response_shape_v2(response):
         return response
 
     return response
+
 
 
 
