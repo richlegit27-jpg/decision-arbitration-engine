@@ -1,0 +1,344 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Nova Admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #07060c;
+            --panel: rgba(255,255,255,.07);
+            --panel-strong: rgba(255,255,255,.10);
+            --line: rgba(226,214,255,.16);
+            --text: #f8fafc;
+            --muted: rgba(226,232,240,.68);
+            --lime: #b8ff7a;
+            --purple: #c084fc;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: var(--text);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background:
+                radial-gradient(circle at 12% 3%, rgba(139,92,246,.36), transparent 34rem),
+                radial-gradient(circle at 88% 8%, rgba(168,85,247,.22), transparent 30rem),
+                radial-gradient(circle at 45% 100%, rgba(184,255,122,.10), transparent 34rem),
+                var(--bg);
+        }
+
+        .shell {
+            width: min(1180px, calc(100% - 32px));
+            margin: 0 auto;
+            padding: 28px 0 54px;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: center;
+            margin-bottom: 28px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .mark {
+            width: 44px;
+            height: 44px;
+            display: grid;
+            place-items: center;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #d8b4fe, #8b5cf6 54%, #4f46e5);
+            color: #fff;
+            font-weight: 950;
+            box-shadow: 0 18px 48px rgba(139,92,246,.26);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(34px, 5vw, 64px);
+            line-height: .94;
+            letter-spacing: -.065em;
+        }
+
+        .sub {
+            margin: 8px 0 0;
+            color: var(--muted);
+            line-height: 1.55;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .btn {
+            min-height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 14px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: rgba(255,255,255,.07);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 850;
+            text-decoration: none;
+        }
+
+        .btn.primary {
+            background: var(--lime);
+            color: #101014;
+            border-color: transparent;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin: 24px 0;
+        }
+
+        .stat {
+            padding: 18px;
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            background: var(--panel);
+        }
+
+        .stat b {
+            display: block;
+            font-size: 28px;
+            letter-spacing: -.04em;
+        }
+
+        .stat span {
+            display: block;
+            margin-top: 4px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .card {
+            min-height: 178px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 18px;
+            padding: 18px;
+            border: 1px solid var(--line);
+            border-radius: 26px;
+            background: var(--panel);
+            box-shadow: 0 24px 70px rgba(0,0,0,.22);
+        }
+
+        .card.strong {
+            background: linear-gradient(135deg, rgba(184,255,122,.16), rgba(139,92,246,.12));
+        }
+
+        .card h2 {
+            margin: 0 0 8px;
+            font-size: 19px;
+            letter-spacing: -.03em;
+        }
+
+        .card p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.55;
+            font-size: 13px;
+        }
+
+        .card-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 9px;
+        }
+
+        .mini {
+            min-height: 32px;
+            display: inline-flex;
+            align-items: center;
+            padding: 0 11px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            color: #fff;
+            background: rgba(255,255,255,.06);
+            font-size: 12px;
+            font-weight: 850;
+            text-decoration: none;
+        }
+
+        .mini.primary {
+            background: var(--lime);
+            border-color: transparent;
+            color: #101014;
+        }
+
+        .foot {
+            margin-top: 18px;
+            padding: 14px 16px;
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            background: rgba(255,255,255,.045);
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.55;
+        }
+
+        .foot code {
+            color: #ede9fe;
+        }
+
+        @media (max-width: 900px) {
+            .grid,
+            .stats {
+                grid-template-columns: 1fr;
+            }
+
+            .topbar {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .actions {
+                justify-content: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <div class="topbar">
+            <div class="brand">
+                <div class="mark">N</div>
+                <div>
+                    <h1>Nova Admin</h1>
+                    <p class="sub">Owner dashboard for leads, public pages, and quick checks.</p>
+                </div>
+            </div>
+
+            <div class="actions">
+                <a class="btn primary" href="/richard-login">Open Nova</a>
+                <a class="btn" href="/nova-home-preview">Public home</a>
+                <a class="btn" href="/admin/leads">Leads</a>
+            </div>
+        </div>
+
+        <section class="stats">
+            <div class="stat">
+                <b>{{ count }}</b>
+                <span>Total saved leads</span>
+            </div>
+            <div class="stat">
+                <b>{{ contact_count }}</b>
+                <span>Contact submissions</span>
+            </div>
+            <div class="stat">
+                <b>{{ early_count }}</b>
+                <span>Early-access submissions</span>
+            </div>
+        </section>
+
+        <section class="grid">
+            <article class="card strong">
+                <div>
+                    <h2>Leads</h2>
+                    <p>View, search, filter, and export contact / early-access submissions.</p>
+                </div>
+                <div class="card-links">
+                    <a class="mini primary" href="/admin/leads">Open leads</a>
+                    <a class="mini" href="/admin/leads.csv">Export CSV</a>
+                </div>
+            </article>
+
+            <article class="card">
+                <div>
+                    <h2>Public pages</h2>
+                    <p>Fast links for the public Nova website pages you’ve been polishing.</p>
+                </div>
+                <div class="card-links">
+                    <a class="mini" href="/nova-home-preview">Home</a>
+                    <a class="mini" href="/contact">Contact</a>
+                    <a class="mini" href="/blog">Blog</a>
+                    <a class="mini" href="/billing">Billing</a>
+                    <a class="mini" href="/faq">FAQ</a>
+                    <a class="mini" href="/roadmap">Roadmap</a>
+                </div>
+            </article>
+
+            <article class="card">
+                <div>
+                    <h2>Legal / SEO</h2>
+                    <p>Quick checks for pages and files that matter before public launch.</p>
+                </div>
+                <div class="card-links">
+                    <a class="mini" href="/privacy">Privacy</a>
+                    <a class="mini" href="/terms">Terms</a>
+                    <a class="mini" href="/sitemap.xml">Sitemap</a>
+                    <a class="mini" href="/robots.txt">Robots</a>
+                </div>
+            </article>
+
+            <article class="card">
+                <div>
+                    <h2>Runtime</h2>
+                    <p>Useful backend endpoints for checking whether Nova is alive and routing.</p>
+                </div>
+                <div class="card-links">
+                    <a class="mini" href="/api/health">Health</a>
+                    <a class="mini" href="/api/state">State</a>
+                    <a class="mini" href="/api/memory">Memory</a>
+                </div>
+            </article>
+
+            <article class="card">
+                <div>
+                    <h2>App access</h2>
+                    <p>Owner login and Nova app entry points for local and Railway checks.</p>
+                </div>
+                <div class="card-links">
+                    <a class="mini primary" href="/richard-login">Richard login</a>
+                    <a class="mini" href="/">Desktop app</a>
+                    <a class="mini" href="/mobile">Mobile app</a>
+                </div>
+            </article>
+
+            <article class="card">
+                <div>
+                    <h2>Lead data file</h2>
+                    <p>Current lead storage path reported by the lead service.</p>
+                </div>
+                <div class="card-links">
+                    <span class="mini">{{ path or "No path reported" }}</span>
+                </div>
+            </article>
+        </section>
+
+        <div class="foot">
+            Admin access is protected by the same existing Richard/admin guard used by <code>/admin/leads</code>.
+        </div>
+    </main>
+</body>
+</html>

@@ -21072,6 +21072,40 @@ def nova_admin_leads_csv_export_20260709():
 
 # /NOVA_LEAD_CAPTURE_ROUTES_20260709
 
+
+# NOVA_ADMIN_HOME_DASHBOARD_20260709
+@app.get("/admin")
+def nova_admin_home_dashboard_20260709():
+    from flask import abort, render_template
+
+    from nova_backend.services.lead_service import list_leads
+
+    if not _nova_lead_admin_allowed_20260709():
+        abort(403)
+
+    data = list_leads(10000)
+    leads = data.get("leads", [])
+
+    contact_count = len([
+        lead for lead in leads
+        if str(lead.get("kind", "")).lower() == "contact"
+    ])
+
+    early_count = len([
+        lead for lead in leads
+        if str(lead.get("kind", "")).lower() == "early_access"
+    ])
+
+    return render_template(
+        "nova_admin_home.html",
+        count=data.get("count", len(leads)),
+        contact_count=contact_count,
+        early_count=early_count,
+        path=data.get("path", ""),
+        updated_at=data.get("updated_at", ""),
+    )
+# /NOVA_ADMIN_HOME_DASHBOARD_20260709
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
@@ -21548,6 +21582,7 @@ def _nova_attachment_status_response_shape_v2(response):
         return response
 
     return response
+
 
 
 
