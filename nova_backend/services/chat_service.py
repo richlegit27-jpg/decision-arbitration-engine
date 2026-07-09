@@ -105,6 +105,8 @@ from nova_backend.services.execution_handler import (
 )
 
 from openai import OpenAI
+from nova_backend.services.model_gateway_service import chat_completions_create
+# NOVA_CHAT_SERVICE_MODEL_GATEWAY_IMPORT_20260709
 
 from nova_backend.models.session import new_message
 from nova_backend.services.agent_service import AgentService
@@ -9692,7 +9694,9 @@ if (not attachments) and (__name__ == "__main__"):
                             f"Page text:\n{clean_body}"
                         )
 
-                        response = self.client.chat.completions.create(
+                        response = chat_completions_create(
+                            nova_username=getattr(self, "username", None) or os.getenv("NOVA_DEFAULT_USERNAME") or "richard",
+                            nova_session_id=locals().get("session_id") or getattr(getattr(self, "session_service", None), "active_session_id", "") or "",
                             model=getattr(self, "model", "gpt-4o-mini"),
                             messages=[
                                 {
@@ -10418,7 +10422,9 @@ if (not attachments) and (__name__ == "__main__"):
                     f"Web results:\n{body}\n"
                 )
 
-                response = self.client.chat.completions.create(
+                response = chat_completions_create(
+                    nova_username=getattr(self, "username", None) or os.getenv("NOVA_DEFAULT_USERNAME") or "richard",
+                    nova_session_id=locals().get("session_id") or getattr(getattr(self, "session_service", None), "active_session_id", "") or "",
                     model=getattr(self, "model", "gpt-4o-mini"),
                     messages=[
                         {
@@ -20606,7 +20612,9 @@ def _save_artifact_fallback(self, artifact: dict):
 
             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-            response = client.chat.completions.create(
+            response = chat_completions_create(
+                nova_username=getattr(self, "username", None) or os.getenv("NOVA_DEFAULT_USERNAME") or "richard",
+                nova_session_id=locals().get("session_id") or getattr(getattr(self, "session_service", None), "active_session_id", "") or "",
                 model=os.getenv("NOVA_VISION_MODEL", "gpt-4o-mini"),
                 messages=[
                     {
@@ -21441,7 +21449,9 @@ def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict
 
                         _nova_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-                        _nova_response = _nova_client.chat.completions.create(
+                        _nova_response = chat_completions_create(
+                            nova_username=getattr(self, "username", None) or os.getenv("NOVA_DEFAULT_USERNAME") or "richard",
+                            nova_session_id=locals().get("session_id") or getattr(getattr(self, "session_service", None), "active_session_id", "") or "",
                             model=os.getenv("NOVA_VISION_MODEL", "gpt-4o-mini"),
                             messages=[
                                 {
@@ -26774,3 +26784,5 @@ try:
     _nova_attachment_guard_install_web_routing_suppression()
 except Exception:
     pass
+
+# NOVA_CHAT_SERVICE_MODEL_GATEWAY_CALLS_20260709

@@ -21360,6 +21360,237 @@ def nova_admin_launch_checklist_repair_20260709():
 # /NOVA_ADMIN_LAUNCH_CHECKLIST_REPAIR_20260709
 
 
+
+
+# NOVA_PAYMENTS_READINESS_ROUTES_20260709
+# Staged payment readiness routes. Safe mode: no live checkout, no charge creation,
+# no invoice creation, no subscription mutation, and webhook is a no-op until live wiring.
+try:
+    def _nova_payments_route_exists_20260709(rule_text):
+        try:
+            return any(str(rule) == rule_text for rule in app.url_map.iter_rules())
+        except Exception:
+            return False
+
+
+    def _nova_payments_current_username_20260709():
+        try:
+            from flask import request, session
+
+            username = (
+                session.get("username")
+                or session.get("nova_username")
+                or request.args.get("username")
+                or ""
+            )
+        except Exception:
+            username = ""
+
+        username = (username or "richard").strip()
+        return username or "richard"
+
+
+    def _nova_payments_json_20260709(payload, status_code=200):
+        from flask import jsonify
+
+        response = jsonify(payload)
+        response.status_code = status_code
+        return response
+
+
+    def _nova_payments_bool_label_20260709(value):
+        return "YES" if bool(value) else "NO"
+
+
+    def _nova_render_admin_billing_readiness_20260709(data):
+        from html import escape
+
+        account = data.get("account") or {}
+        payments = data.get("payments") or {}
+        usage = data.get("usage_enforcement") or {}
+        summary = data.get("summary") or {}
+        blockers = data.get("blockers") or []
+        plans = data.get("plans") or []
+
+        rows = [
+            ("Mode", data.get("mode", "")),
+            ("Username", data.get("username", "")),
+            ("Plan", account.get("plan", "")),
+            ("Credits", account.get("credits", 0)),
+            ("Monthly credits", account.get("monthly_credits", 0)),
+            ("Stripe customer configured", _nova_payments_bool_label_20260709(account.get("stripe_customer_configured"))),
+            ("Payments live enabled", _nova_payments_bool_label_20260709(payments.get("live_enabled"))),
+            ("Checkout ready", _nova_payments_bool_label_20260709(payments.get("checkout_ready"))),
+            ("Webhook ready", _nova_payments_bool_label_20260709(payments.get("webhook_ready"))),
+            ("Stripe secret configured", _nova_payments_bool_label_20260709(payments.get("stripe_secret_configured"))),
+            ("Stripe webhook secret configured", _nova_payments_bool_label_20260709(payments.get("stripe_webhook_secret_configured"))),
+            ("Paid price configured", _nova_payments_bool_label_20260709(payments.get("paid_price_configured"))),
+            ("consume_usage exists", _nova_payments_bool_label_20260709(usage.get("billing_service_consume_usage_exists"))),
+            ("Gateway usage enforced", _nova_payments_bool_label_20260709(usage.get("gateway_usage_enforced"))),
+            ("Chat usage enforced", _nova_payments_bool_label_20260709(usage.get("chat_usage_enforced"))),
+            ("Safe to take payment", _nova_payments_bool_label_20260709(summary.get("safe_to_take_payment"))),
+            ("Next patch", summary.get("next_patch", "")),
+        ]
+
+        row_html = "\n".join(
+            '<tr><th style="text-align:left;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.12);">'
+            + escape(str(label))
+            + '</th><td style="padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.12);">'
+            + escape(str(value))
+            + "</td></tr>"
+            for label, value in rows
+        )
+
+        blocker_html = "\n".join(
+            "<li>" + escape(str(item)) + "</li>"
+            for item in blockers
+        ) or "<li>No blockers detected.</li>"
+
+        plan_html = "\n".join(
+            "<li><strong>"
+            + escape(str(plan.get("label", "")))
+            + "</strong> ? "
+            + escape(str(plan.get("status", "")))
+            + " ? monthly credits: "
+            + escape(str(plan.get("monthly_credits", "")))
+            + " ? price env: "
+            + escape(str(plan.get("stripe_price_env", "") or "none"))
+            + "</li>"
+            for plan in plans
+        )
+
+        return (
+            '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width, initial-scale=1">'
+            '<title>Nova Admin ? Billing Readiness</title></head>'
+            '<body style="margin:0;background:#090816;color:#f7f3ff;font-family:Inter,system-ui,Segoe UI,sans-serif;">'
+            '<main style="max-width:980px;margin:0 auto;padding:32px 18px 56px;">'
+            '<p><a href="/admin" style="color:#c9b7ff;">? Admin</a> ? '
+            '<a href="/billing" style="color:#c9b7ff;">Billing page</a> ? '
+            '<a href="/api/billing/readiness" style="color:#c9b7ff;">Readiness JSON</a></p>'
+            '<h1 style="margin:18px 0 6px;font-size:34px;">Billing readiness</h1>'
+            '<p style="color:#cfc6ee;max-width:760px;">Staged payments audit panel. This shows local billing state, planned Stripe readiness, route safety, and whether Nova is safe to take live payments.</p>'
+            '<section style="margin-top:24px;padding:18px;border:1px solid rgba(255,255,255,.14);border-radius:18px;background:rgba(255,255,255,.06);">'
+            '<h2>State</h2>'
+            '<table style="width:100%;border-collapse:collapse;">'
+            + row_html +
+            '</table></section>'
+            '<section style="margin-top:24px;padding:18px;border:1px solid rgba(255,255,255,.14);border-radius:18px;background:rgba(255,255,255,.06);">'
+            '<h2>Blockers</h2><ul>'
+            + blocker_html +
+            '</ul></section>'
+            '<section style="margin-top:24px;padding:18px;border:1px solid rgba(255,255,255,.14);border-radius:18px;background:rgba(255,255,255,.06);">'
+            '<h2>Plans</h2><ul>'
+            + plan_html +
+            '</ul></section>'
+            '<p style="margin-top:26px;color:#aaa0cc;">NOVA_PAYMENTS_READINESS_ROUTES_20260709</p>'
+            '</main></body></html>'
+        )
+
+
+    if not _nova_payments_route_exists_20260709("/api/billing/readiness"):
+        @app.get("/api/billing/readiness")
+        def nova_billing_readiness_api_20260709():
+            from nova_backend.services.payments_readiness_service import build_payments_readiness
+
+            username = _nova_payments_current_username_20260709()
+            data = build_payments_readiness(username=username)
+            return _nova_payments_json_20260709({"ok": True, **data})
+
+
+    if not _nova_payments_route_exists_20260709("/api/billing/plans"):
+        @app.get("/api/billing/plans")
+        def nova_billing_plans_api_20260709():
+            from nova_backend.services.payments_readiness_service import build_payments_readiness
+
+            username = _nova_payments_current_username_20260709()
+            data = build_payments_readiness(username=username)
+            return _nova_payments_json_20260709({
+                "ok": True,
+                "mode": data.get("mode"),
+                "plans": data.get("plans", []),
+                "payments": data.get("payments", {}),
+            })
+
+
+    if not _nova_payments_route_exists_20260709("/api/billing/checkout"):
+        @app.post("/api/billing/checkout")
+        def nova_billing_checkout_staged_api_20260709():
+            from flask import request
+            from nova_backend.services.payments_readiness_service import build_payments_readiness
+
+            username = _nova_payments_current_username_20260709()
+            payload = request.get_json(silent=True) or {}
+            data = build_payments_readiness(username=username)
+
+            return _nova_payments_json_20260709({
+                "ok": True,
+                "live": False,
+                "processed": False,
+                "status": "staged_planned",
+                "route": "/api/billing/checkout",
+                "message": "Checkout route exists, but live Stripe checkout is intentionally disabled until payments are configured and usage enforcement is wired.",
+                "requested_plan": payload.get("plan") or payload.get("plan_id") or "",
+                "readiness": data,
+            })
+
+
+    if not _nova_payments_route_exists_20260709("/api/billing/portal"):
+        @app.post("/api/billing/portal")
+        def nova_billing_portal_staged_api_20260709():
+            from nova_backend.services.payments_readiness_service import build_payments_readiness
+
+            username = _nova_payments_current_username_20260709()
+            data = build_payments_readiness(username=username)
+
+            return _nova_payments_json_20260709({
+                "ok": True,
+                "live": False,
+                "processed": False,
+                "status": "staged_planned",
+                "route": "/api/billing/portal",
+                "message": "Customer portal route exists, but live Stripe portal sessions are intentionally disabled until Stripe is configured.",
+                "readiness": data,
+            })
+
+
+    if not _nova_payments_route_exists_20260709("/api/stripe/webhook"):
+        @app.post("/api/stripe/webhook")
+        def nova_stripe_webhook_staged_api_20260709():
+            from flask import request
+            from nova_backend.services.payments_readiness_service import build_payments_readiness
+
+            username = _nova_payments_current_username_20260709()
+            data = build_payments_readiness(username=username)
+
+            return _nova_payments_json_20260709({
+                "ok": True,
+                "received": True,
+                "processed": False,
+                "live": False,
+                "status": "staged_noop",
+                "route": "/api/stripe/webhook",
+                "stripe_signature_present": bool(request.headers.get("Stripe-Signature")),
+                "message": "Stripe webhook route exists, but event processing is intentionally disabled until live Stripe verification and account updates are wired.",
+                "readiness": data,
+            })
+
+
+    if not _nova_payments_route_exists_20260709("/admin/billing-readiness"):
+        @app.get("/admin/billing-readiness")
+        def nova_admin_billing_readiness_20260709():
+            from nova_backend.services.payments_readiness_service import build_payments_readiness
+
+            username = _nova_payments_current_username_20260709()
+            data = build_payments_readiness(username=username)
+            return _nova_render_admin_billing_readiness_20260709(data)
+
+
+    print("[NOVA_PAYMENTS_READINESS_ROUTES_20260709] installed")
+except Exception as _nova_payments_readiness_routes_error_20260709:
+    print("[NOVA_PAYMENTS_READINESS_ROUTES_20260709] install failed:", _nova_payments_readiness_routes_error_20260709)
+# /NOVA_PAYMENTS_READINESS_ROUTES_20260709
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
