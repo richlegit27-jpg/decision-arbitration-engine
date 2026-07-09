@@ -631,7 +631,8 @@ def cleanup_competing_name_memories(session_id: str, winning_text: str):
 
 @app.get("/")
 def index():
-    return render_template("index.html")
+    # NOVA_ROOT_PUBLIC_HOME_ALIGNMENT_20260709
+    return render_template("nova_landing_home.html")
 
 @app.get("/preview")
 def preview():
