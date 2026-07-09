@@ -5,56 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Nova Launch Checklist</title>
     <style>
-        :root {
-            color-scheme: dark;
-            --bg: #070711;
-            --panel: rgba(255, 255, 255, 0.075);
-            --border: rgba(255, 255, 255, 0.14);
-            --text: #f7f4ff;
-            --muted: rgba(247, 244, 255, 0.72);
-            --accent: #b896ff;
-            --good: #8ff0bf;
-            --warn: #ffd38a;
-            --bad: #ff9da8;
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
         body {
             margin: 0;
-            min-height: 100vh;
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            color: var(--text);
-            background:
-                radial-gradient(circle at top left, rgba(184, 150, 255, 0.22), transparent 32rem),
-                linear-gradient(180deg, #090914, #05050b);
-        }
-
-        a {
-            color: inherit;
+            font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: #f7f4ff;
+            background: radial-gradient(circle at top left, rgba(184,150,255,.24), transparent 32rem), #070711;
         }
 
         .wrap {
             width: min(1120px, calc(100% - 32px));
             margin: 0 auto;
-            padding: 28px 0 64px;
+            padding: 32px 0 70px;
         }
 
         .top {
             display: flex;
+            align-items: center;
             justify-content: space-between;
             gap: 16px;
-            align-items: center;
-            margin-bottom: 42px;
+            margin-bottom: 34px;
         }
 
-        .brand {
-            font-weight: 950;
-            letter-spacing: -0.045em;
+        .top a {
+            color: #f7f4ff;
             text-decoration: none;
-            font-size: 1.25rem;
         }
 
         .nav {
@@ -64,46 +38,45 @@
         }
 
         .nav a {
-            min-height: 38px;
-            display: inline-flex;
-            align-items: center;
-            padding: 0 13px;
+            padding: 10px 13px;
+            border: 1px solid rgba(255,255,255,.14);
             border-radius: 999px;
-            text-decoration: none;
-            color: var(--muted);
-            background: rgba(255, 255, 255, 0.07);
-            border: 1px solid var(--border);
+            background: rgba(255,255,255,.07);
+        }
+
+        .hero,
+        .card {
+            border: 1px solid rgba(255,255,255,.14);
+            border-radius: 26px;
+            background: rgba(255,255,255,.075);
+            box-shadow: 0 24px 80px rgba(0,0,0,.34);
         }
 
         .hero {
-            padding: clamp(26px, 5vw, 48px);
-            border: 1px solid var(--border);
-            border-radius: 32px;
-            background: var(--panel);
-            box-shadow: 0 26px 85px rgba(0, 0, 0, 0.36);
+            padding: clamp(28px, 5vw, 48px);
         }
 
         .eyebrow {
             margin: 0 0 12px;
-            color: var(--accent);
+            color: #cdb7ff;
             text-transform: uppercase;
-            letter-spacing: 0.16em;
+            letter-spacing: .16em;
+            font-size: .76rem;
             font-weight: 850;
-            font-size: 0.76rem;
         }
 
         h1 {
-            max-width: 900px;
+            max-width: 850px;
             margin: 0;
-            font-size: clamp(2.7rem, 7vw, 6rem);
-            line-height: 0.96;
-            letter-spacing: -0.065em;
+            font-size: clamp(2.7rem, 7vw, 5.8rem);
+            line-height: .96;
+            letter-spacing: -.06em;
         }
 
         .hero p {
             max-width: 760px;
-            margin: 20px 0 0;
-            color: var(--muted);
+            margin: 18px 0 0;
+            color: rgba(247,244,255,.72);
             font-size: 1.08rem;
             line-height: 1.62;
         }
@@ -112,77 +85,44 @@
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 16px;
-            margin-top: 30px;
+            margin-top: 28px;
         }
 
         .card {
-            min-height: 100%;
             padding: 22px;
-            border: 1px solid var(--border);
-            border-radius: 24px;
-            background: var(--panel);
         }
 
         .card h2 {
             margin: 0 0 14px;
-            letter-spacing: -0.04em;
-            font-size: 1.35rem;
+            letter-spacing: -.04em;
         }
 
         .card ul {
             margin: 0;
             padding-left: 20px;
-            color: var(--muted);
+            color: rgba(247,244,255,.72);
             line-height: 1.65;
         }
 
         .status {
             display: inline-flex;
-            align-items: center;
-            min-height: 28px;
             margin-bottom: 12px;
-            padding: 0 10px;
+            padding: 7px 10px;
             border-radius: 999px;
-            font-size: 0.76rem;
+            font-size: .74rem;
             font-weight: 900;
-            letter-spacing: 0.08em;
+            letter-spacing: .08em;
             text-transform: uppercase;
         }
 
-        .live {
-            color: #06150d;
-            background: var(--good);
-        }
-
-        .planned {
-            color: #191103;
-            background: var(--warn);
-        }
-
-        .blocked {
-            color: #1d0508;
-            background: var(--bad);
-        }
-
-        .wide {
-            grid-column: 1 / -1;
-        }
-
-        .note {
-            margin-top: 16px;
-            color: rgba(247, 244, 255, 0.55);
-            font-size: 0.95rem;
-        }
+        .live { background: #8ff0bf; color: #06150d; }
+        .planned { background: #ffd38a; color: #191103; }
+        .blocked { background: #ff9da8; color: #1d0508; }
+        .wide { grid-column: 1 / -1; }
 
         @media (max-width: 850px) {
-            .top {
-                align-items: flex-start;
-                flex-direction: column;
-            }
-
-            .grid {
-                grid-template-columns: 1fr;
-            }
+            .top { align-items: flex-start; flex-direction: column; }
+            .grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -190,7 +130,7 @@
     <!-- NOVA_ADMIN_LAUNCH_CHECKLIST_REPAIR_20260709 -->
     <main class="wrap">
         <header class="top">
-            <a class="brand" href="/admin">Nova Admin</a>
+            <a href="/admin"><strong>Nova Admin</strong></a>
             <nav class="nav" aria-label="Admin navigation">
                 <a href="/admin">Dashboard</a>
                 <a href="/admin/leads">Leads</a>
@@ -203,8 +143,8 @@
             <p class="eyebrow">Owner launch readiness</p>
             <h1>Public-site launch checklist</h1>
             <p>
-                A simple admin-only truth sheet for what is live, what is planned,
-                and what still blocks real users, payments, and wider promotion.
+                Admin-only truth sheet for what is live, what is planned, and what still blocks real users,
+                payments, and wider promotion.
             </p>
         </section>
 
@@ -213,7 +153,7 @@
                 <span class="status live">Live</span>
                 <h2>Public site</h2>
                 <ul>
-                    <li>Root homepage renders the polished public homepage.</li>
+                    <li>Root homepage renders the polished public home.</li>
                     <li>Public navigation and footer are consistent.</li>
                     <li>FAQ, billing, contact, roadmap, blog, privacy, and terms render.</li>
                     <li>Canonical SEO cleanup is locked.</li>
@@ -227,7 +167,7 @@
                     <li>Contact and Early Access submissions are saved.</li>
                     <li>Admin lead review is available.</li>
                     <li>Lead CSV export passes release checks.</li>
-                    <li>Owner-only admin pills remain hidden publicly.</li>
+                    <li>Owner-only admin pills stay hidden publicly.</li>
                 </ul>
             </article>
 
@@ -235,10 +175,10 @@
                 <span class="status live">Live</span>
                 <h2>Release checks</h2>
                 <ul>
-                    <li>Local public smoke check passes after compatibility repair.</li>
+                    <li>Public smoke checks run.</li>
                     <li>Admin release check passes.</li>
                     <li>Railway release check passes.</li>
-                    <li>Ship check confirms no accidental mobile changes.</li>
+                    <li>Ship check guards accidental mobile changes.</li>
                 </ul>
             </article>
 
@@ -248,8 +188,8 @@
                 <ul>
                     <li>Stripe checkout is still planned.</li>
                     <li>Paid plan activation is still planned.</li>
-                    <li>Production payment collection is not yet live.</li>
-                    <li>Billing copy already explains planned payment state.</li>
+                    <li>Production payment collection is not live yet.</li>
+                    <li>Billing copy explains the planned payment state.</li>
                 </ul>
             </article>
 
@@ -259,7 +199,7 @@
                 <ul>
                     <li>User-selectable models are planned.</li>
                     <li>Model-based credit costs are planned.</li>
-                    <li>Backend-enforced model allowlist should come before launch billing.</li>
+                    <li>Backend model allowlist should come before paid launch.</li>
                     <li>Usage ledger should stay server-side and auditable.</li>
                 </ul>
             </article>
@@ -269,7 +209,7 @@
                 <h2>Must finish</h2>
                 <ul>
                     <li>Stripe live-mode checkout and webhook verification.</li>
-                    <li>Account plan state tied to real payment state.</li>
+                    <li>Account plan state tied to payment state.</li>
                     <li>Usage limits and credit enforcement tested end-to-end.</li>
                     <li>Final privacy/terms review before taking money.</li>
                 </ul>
@@ -279,14 +219,10 @@
                 <span class="status planned">Operating rule</span>
                 <h2>Launch rule</h2>
                 <ul>
-                    <li>Public marketing can continue after ship checks pass.</li>
                     <li>Early Access can collect interest without payment collection.</li>
                     <li>Do not claim paid launch until Stripe, plans, usage, and account state are wired together.</li>
-                    <li>Do not touch mobile/app internals during public-site polish unless explicitly starting a mobile/app phase.</li>
+                    <li>Do not touch mobile/app internals during public-site polish unless explicitly starting that phase.</li>
                 </ul>
-                <p class="note">
-                    Stable umbrella: nova-stable-public-site-launch-polish-20260709.
-                </p>
             </article>
         </section>
     </main>
