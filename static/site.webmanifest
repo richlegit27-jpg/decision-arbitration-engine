@@ -1,19 +1,18 @@
 ﻿{
-    "name": "Nova",
-    "short_name": "Nova",
-    "description": "Nova AI project command center for long-running work.",
-    "start_url": "/nova-home-preview",
-    "scope": "/",
-    "display": "standalone",
-    "background_color": "#07060c",
-    "theme_color": "#8b5cf6",
-    "orientation": "portrait-primary",
-    "icons": [
-        {
-            "src": "/static/favicon.svg",
-            "sizes": "any",
-            "type": "image/svg+xml",
-            "purpose": "any maskable"
-        }
-    ]
+  "name": "Nova",
+  "short_name": "Nova",
+  "description": "Nova AI assistant and project workspace.",
+  "start_url": "/nova-home-preview",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#07060c",
+  "theme_color": "#8b5cf6",
+  "icons": [
+    {
+      "src": "/static/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }
