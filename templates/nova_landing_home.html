@@ -62,6 +62,13 @@
     </style>
     <!-- /NOVA_PUBLIC_HOME_ADMIN_LINK_STYLE_20260709 -->
     <link rel="stylesheet" href="/static/css/nova-public-trust.css">
+
+    <!-- NOVA_PUBLIC_SEO_CANONICAL_CLEANUP_20260709 -->
+    {% if request.path == "/nova-home-preview" %}
+    <meta name="robots" content="noindex,follow">
+    {% endif %}
+    <link rel="canonical" href="{{ request.url_root.rstrip('/') }}/">
+    <!-- /NOVA_PUBLIC_SEO_CANONICAL_CLEANUP_20260709 -->
 </head>
 <body>
 
