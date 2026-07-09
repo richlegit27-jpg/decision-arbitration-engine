@@ -20976,8 +20976,49 @@ def nova_admin_leads_csv_export_20260709():
     if not _nova_lead_admin_allowed_20260709():
         abort(403)
 
-    data = list_leads(request.args.get("limit", 10000))
+    raw_limit = request.args.get("limit", 10000)
+
+    try:
+        selected_limit = int(raw_limit)
+    except Exception:
+        selected_limit = 10000
+
+    selected_limit = max(1, min(selected_limit, 10000))
+
+    data = list_leads(selected_limit)
     leads = data.get("leads", [])
+
+    selected_kind = str(request.args.get("kind", "all") or "all").strip().lower()
+    if selected_kind not in ("all", "contact", "early_access"):
+        selected_kind = "all"
+
+    q = str(request.args.get("q", "") or "").strip()
+    q_lower = q.lower()
+
+    if selected_kind != "all":
+        leads = [
+            lead for lead in leads
+            if str(lead.get("kind", "")).strip().lower() == selected_kind
+        ]
+
+    if q_lower:
+        def lead_matches_query(lead):
+            haystack = " ".join([
+                str(lead.get("created_at", "")),
+                str(lead.get("kind", "")),
+                str(lead.get("name", "")),
+                str(lead.get("email", "")),
+                str(lead.get("interest", "")),
+                str(lead.get("message", "")),
+                str(lead.get("source", "")),
+            ]).lower()
+
+            return q_lower in haystack
+
+        leads = [
+            lead for lead in leads
+            if lead_matches_query(lead)
+        ]
 
     headers = [
         "created_at",
@@ -21008,11 +21049,22 @@ def nova_admin_leads_csv_export_20260709():
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     body = "\ufeff" + output.getvalue()
 
+    filename_bits = ["nova-leads"]
+
+    if selected_kind != "all":
+        filename_bits.append(selected_kind.replace("_", "-"))
+
+    if q:
+        filename_bits.append("filtered")
+
+    filename_bits.append(stamp)
+    filename = "-".join(filename_bits) + ".csv"
+
     return Response(
         body,
         mimetype="text/csv",
         headers={
-            "Content-Disposition": f'attachment; filename="nova-leads-{stamp}.csv"',
+            "Content-Disposition": f'attachment; filename="{filename}"',
             "Cache-Control": "no-store",
         },
     )
@@ -21496,6 +21548,7 @@ def _nova_attachment_status_response_shape_v2(response):
         return response
 
     return response
+
 
 
 
