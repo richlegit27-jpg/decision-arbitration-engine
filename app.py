@@ -20992,6 +20992,11 @@ def nova_admin_leads_csv_export_20260709():
     if selected_kind not in ("all", "contact", "early_access"):
         selected_kind = "all"
 
+    allowed_statuses = ("new", "reviewed", "replied", "archived")
+    selected_status = str(request.args.get("status", "all") or "all").strip().lower()
+    if selected_status not in ("all",) + allowed_statuses:
+        selected_status = "all"
+
     q = str(request.args.get("q", "") or "").strip()
     q_lower = q.lower()
 
@@ -20999,6 +21004,12 @@ def nova_admin_leads_csv_export_20260709():
         leads = [
             lead for lead in leads
             if str(lead.get("kind", "")).strip().lower() == selected_kind
+        ]
+
+    if selected_status != "all":
+        leads = [
+            lead for lead in leads
+            if str(lead.get("status", "new") or "new").strip().lower() == selected_status
         ]
 
     if q_lower:
@@ -21011,6 +21022,8 @@ def nova_admin_leads_csv_export_20260709():
                 str(lead.get("interest", "")),
                 str(lead.get("message", "")),
                 str(lead.get("source", "")),
+                str(lead.get("status", "")),
+                str(lead.get("owner_notes", "")),
             ]).lower()
 
             return q_lower in haystack
@@ -21023,11 +21036,14 @@ def nova_admin_leads_csv_export_20260709():
     headers = [
         "created_at",
         "kind",
+        "status",
         "name",
         "email",
         "interest",
         "message",
         "source",
+        "owner_notes",
+        "admin_updated_at",
     ]
 
     def safe_csv_value(value):
@@ -21053,6 +21069,9 @@ def nova_admin_leads_csv_export_20260709():
 
     if selected_kind != "all":
         filename_bits.append(selected_kind.replace("_", "-"))
+
+    if selected_status != "all":
+        filename_bits.append(selected_status)
 
     if q:
         filename_bits.append("filtered")
@@ -21089,6 +21108,89 @@ def nova_admin_template_context_20260709():
 
 
 
+
+# NOVA_ADMIN_LEADS_CRM_LITE_20260709
+@app.post("/admin/leads/<lead_id>/update")
+def nova_admin_lead_update_20260709(lead_id):
+    import json
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from urllib.parse import urlencode
+
+    from flask import abort, redirect, request
+
+    if not _nova_lead_admin_allowed_20260709():
+        abort(403)
+
+    allowed_statuses = ("new", "reviewed", "replied", "archived")
+
+    status = str(request.form.get("status", "new") or "new").strip().lower()
+    if status not in allowed_statuses:
+        status = "new"
+
+    owner_notes = str(request.form.get("owner_notes", "") or "").strip()
+    if len(owner_notes) > 4000:
+        owner_notes = owner_notes[:4000]
+
+    data_path = Path(__file__).resolve().parent / "data" / "nova_leads.json"
+
+    try:
+        data = json.loads(data_path.read_text(encoding="utf-8"))
+    except Exception:
+        abort(500)
+
+    if not isinstance(data, dict):
+        abort(500)
+
+    leads = data.get("leads", [])
+    if not isinstance(leads, list):
+        abort(500)
+
+    target = None
+
+    for lead in leads:
+        if str(lead.get("id", "")) == str(lead_id):
+            target = lead
+            break
+
+    if target is None:
+        abort(404)
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    target["status"] = status
+    target["owner_notes"] = owner_notes
+    target["admin_updated_at"] = now
+    data["updated_at"] = now
+
+    tmp_path = data_path.with_suffix(".json.tmp")
+    tmp_path.write_text(
+        json.dumps(data, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    tmp_path.replace(data_path)
+
+    next_url = str(request.form.get("next", "") or "").strip()
+    if next_url.startswith("/admin/leads"):
+        return redirect(next_url)
+
+    params = {
+        "q": str(request.form.get("q", "") or "").strip(),
+        "kind": str(request.form.get("kind", "all") or "all").strip(),
+        "status": str(request.form.get("filter_status", "all") or "all").strip(),
+        "limit": str(request.form.get("limit", "100") or "100").strip(),
+    }
+
+    clean_params = {
+        key: value
+        for key, value in params.items()
+        if value
+    }
+
+    suffix = "?" + urlencode(clean_params) if clean_params else ""
+    return redirect("/admin/leads" + suffix)
+# /NOVA_ADMIN_LEADS_CRM_LITE_20260709
+
 # NOVA_ADMIN_LEADS_PAGE_HARD_RESTORE_20260709
 @app.get("/admin/leads")
 def nova_admin_leads_page_20260709():
@@ -21119,6 +21221,11 @@ def nova_admin_leads_page_20260709():
     if selected_kind not in ("all", "contact", "early_access"):
         selected_kind = "all"
 
+    allowed_statuses = ("new", "reviewed", "replied", "archived")
+    selected_status = str(request.args.get("status", "all") or "all").strip().lower()
+    if selected_status not in ("all",) + allowed_statuses:
+        selected_status = "all"
+
     q = str(request.args.get("q", "") or "").strip()
     q_lower = q.lower()
 
@@ -21128,6 +21235,12 @@ def nova_admin_leads_page_20260709():
         leads = [
             lead for lead in leads
             if str(lead.get("kind", "")).strip().lower() == selected_kind
+        ]
+
+    if selected_status != "all":
+        leads = [
+            lead for lead in leads
+            if str(lead.get("status", "new") or "new").strip().lower() == selected_status
         ]
 
     if q_lower:
@@ -21140,6 +21253,8 @@ def nova_admin_leads_page_20260709():
                 str(lead.get("interest", "")),
                 str(lead.get("message", "")),
                 str(lead.get("source", "")),
+                str(lead.get("status", "")),
+                str(lead.get("owner_notes", "")),
             ]).lower()
 
             return q_lower in haystack
@@ -21171,6 +21286,8 @@ def nova_admin_leads_page_20260709():
         q=q,
         selected_kind=selected_kind,
         selected_limit=selected_limit,
+        selected_status=selected_status,
+        allowed_statuses=allowed_statuses,
     )
 # /NOVA_ADMIN_LEADS_PAGE_HARD_RESTORE_20260709
 

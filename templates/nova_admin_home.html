@@ -427,7 +427,7 @@
             <article class="card strong">
                 <div>
                     <h2>Leads</h2>
-                    <p>View, search, filter, and export contact / early-access submissions.</p>
+                    <p>View, search, filter, export, update status, and add owner notes to contact / early-access submissions.</p>
                 </div>
                 <div class="card-links">
                     <a class="mini primary" href="/admin/leads">Open leads</a>
@@ -535,7 +535,7 @@
             <div class="recent-head">
                 <div>
                     <strong>Recent leads</strong>
-                    <span>Newest saved submissions from contact / early access.</span>
+                    <span>Newest saved submissions from contact / early access, including owner review status.</span>
                 </div>
                 <div class="card-links">
                     <a class="mini primary" href="/admin/leads">View all</a>
@@ -551,6 +551,13 @@
                         <div class="recent-label">Kind</div>
                         <div class="recent-value">
                             <span class="recent-pill">{{ lead.kind or "contact" }}</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="recent-label">Status</div>
+                        <div class="recent-value">
+                            <span class="recent-pill">{{ lead.status or "new" }}</span>
                         </div>
                     </div>
 
