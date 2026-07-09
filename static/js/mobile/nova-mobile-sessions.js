@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     "use strict";
 
     if (window.__NOVA_MOBILE_SESSIONS_FINAL_OWNER_V2_20260708__) {
@@ -412,10 +412,10 @@ if (!title || /^(new|new chat|chat|untitled|\d+)$/i.test(title)) {
             "            background:" + (active ? "rgba(255,255,255,.12)" : "rgba(255,255,255,.05)") + ';">',
             '    <button type="button" data-nova-action="open"',
             '            style="display:block;width:100%;text-align:left;background:transparent;color:#fff;border:0;padding:0;margin:0 0 8px;font-size:14px;font-weight:800;">',
-            "        " + (pinned ? "📌 " : "") + escapeHtml(title),
+            "        " + (pinned ? "ðŸ“Œ " : "") + escapeHtml(title),
             "    </button>",
             '    <div style="display:flex;align-items:center;gap:6px;">',
-            '        <span style="flex:1;color:rgba(255,255,255,.62);font-size:12px;">' + escapeHtml(id.slice(-8)) + " · " + count + " msgs</span>",
+            '        <span style="flex:1;color:rgba(255,255,255,.62);font-size:12px;">' + escapeHtml(id.slice(-8)) + " Â· " + count + " msgs</span>",
             '        <button type="button" data-nova-action="rename" style="border:0;border-radius:9px;padding:7px 9px;font-weight:700;">Rename</button>',
             '        <button type="button" data-nova-action="pin" data-pinned="' + (pinned ? "true" : "false") + '" style="border:0;border-radius:9px;padding:7px 9px;font-weight:700;">' + (pinned ? "Unpin" : "Pin") + "</button>",
             '        <button type="button" data-nova-action="delete" style="border:0;border-radius:9px;padding:7px 9px;font-weight:700;">Delete</button>',
@@ -425,7 +425,7 @@ if (!title || /^(new|new chat|chat|untitled|\d+)$/i.test(title)) {
     }
 
     async function loadSessions() {
-        setStatus("Loading sessions…");
+        setStatus("Loading sessionsâ€¦");
 
         const data = await jsonFetch(API.list + "?ui_final=" + Date.now(), {
             method: "GET"
@@ -472,7 +472,7 @@ sessions.sort(function (a, b) {
     }
 
     async function createNewSession() {
-        setStatus("Creating session…");
+        setStatus("Creating sessionâ€¦");
 
         const data = await jsonFetch(API.newSession + "?ui_final_new=" + Date.now(), {
             method: "POST",
@@ -557,7 +557,7 @@ function renderSession(payload) {
         }
 
         setActiveId(id);
-        setStatus("Opening session…");
+        setStatus("Opening sessionâ€¦");
 
         const data = await jsonFetch(API.detail(id) + "?ui_final_detail=" + Date.now(), {
             method: "GET"
@@ -583,13 +583,13 @@ function renderSession(payload) {
             ? (row.querySelector("[data-nova-action='open']")?.textContent || "")
             : "";
 
-        const title = prompt("Rename session", current.replace(/^📌\s*/, "").trim() || "New Chat");
+        const title = prompt("Rename session", current.replace(/^ðŸ“Œ\s*/, "").trim() || "New Chat");
 
         if (!title) {
             return;
         }
 
-        setStatus("Renaming…");
+        setStatus("Renamingâ€¦");
 
         await jsonFetch(API.rename, {
             method: "POST",
@@ -605,7 +605,7 @@ function renderSession(payload) {
     }
 
     async function pinSession(id, pinned) {
-        setStatus(pinned ? "Pinning…" : "Unpinning…");
+        setStatus(pinned ? "Pinningâ€¦" : "Unpinningâ€¦");
 
         await jsonFetch(API.pin, {
             method: "POST",
@@ -629,7 +629,7 @@ function renderSession(payload) {
             return;
         }
 
-        setStatus("Deleting…");
+        setStatus("Deletingâ€¦");
 
         await jsonFetch(API.delete, {
             method: "POST",
@@ -651,14 +651,34 @@ function renderSession(payload) {
 function openPanel() {
     const panel = ensurePanel();
 
+    if (!document.body.contains(panel)) {
+        document.body.appendChild(panel);
+    }
+
     panel.hidden = false;
+    panel.removeAttribute("hidden");
+    panel.removeAttribute("inert");
     panel.setAttribute("aria-hidden", "false");
 
     panel.style.setProperty("display", "flex", "important");
+    panel.style.setProperty("visibility", "visible", "important");
+    panel.style.setProperty("opacity", "1", "important");
     panel.style.setProperty("pointer-events", "auto", "important");
-    panel.style.removeProperty("visibility");
+    panel.style.setProperty("z-index", "2147483647", "important");
+
+    forceVisibleButton($(IDS.headerButton));
+    forceVisibleButton($(IDS.finalButton));
 
     window.NOVA_SESSION_CORE.isOpen = true;
+
+    console.log("[SESSION PANEL OPEN CLEAN]", {
+        id: panel.id,
+        hidden: panel.hidden,
+        ariaHidden: panel.getAttribute("aria-hidden"),
+        display: panel.style.display,
+        visibility: panel.style.visibility,
+        pointerEvents: panel.style.pointerEvents
+    });
 
     loadSessions().catch(function (error) {
         setStatus("Error: " + (error && error.message ? error.message : String(error)));
@@ -669,6 +689,7 @@ function closePanel() {
     const panel = document.getElementById(IDS.panel);
 
     if (!panel) {
+        window.NOVA_SESSION_CORE.isOpen = false;
         return;
     }
 
@@ -678,12 +699,32 @@ function closePanel() {
         active.blur();
     }
 
+    window.NOVA_SESSION_CORE.isOpen = false;
+
+    panel.removeAttribute("inert");
     panel.setAttribute("aria-hidden", "true");
     panel.hidden = true;
-    panel.style.setProperty("display", "none", "important");
-    panel.style.removeProperty("pointer-events");
+    panel.setAttribute("hidden", "");
 
-    window.NOVA_SESSION_CORE.isOpen = false;
+    panel.style.setProperty("display", "none", "important");
+    panel.style.setProperty("visibility", "hidden", "important");
+    panel.style.setProperty("opacity", "0", "important");
+    panel.style.setProperty("pointer-events", "none", "important");
+
+    setTimeout(function () {
+        forceVisibleButton($(IDS.headerButton));
+        forceVisibleButton($(IDS.finalButton));
+        bindHeaderButton();
+    }, 0);
+
+    console.log("[SESSION PANEL CLOSED CLEAN]", {
+        id: panel.id,
+        hidden: panel.hidden,
+        ariaHidden: panel.getAttribute("aria-hidden"),
+        display: panel.style.display,
+        visibility: panel.style.visibility,
+        pointerEvents: panel.style.pointerEvents
+    });
 }
 
     function lockFinalGlobal(name, value) {
@@ -771,532 +812,5 @@ function closePanel() {
     installFinalSessionGlobals();
 })();
 
-// NOVA_MOBILE_SESSIONS_REOPEN_GUARD_20260709
-(function () {
-    "use strict";
 
-    if (window.__NOVA_MOBILE_SESSIONS_REOPEN_GUARD_20260709__) {
-        return;
-    }
 
-    window.__NOVA_MOBILE_SESSIONS_REOPEN_GUARD_20260709__ = true;
-
-    function findSessionsPanel() {
-        return (
-            document.getElementById("nova-mobile-sessions-panel") ||
-            document.getElementById("nova-clean-session-panel-v1") ||
-            document.querySelector("[data-nova-sessions-panel]") ||
-            document.querySelector("[id*='session'][role='dialog']") ||
-            document.querySelector("[id*='sessions'][role='dialog']")
-        );
-    }
-
-    function forceShowPanel() {
-        const panel = findSessionsPanel();
-
-        if (!panel) {
-            return false;
-        }
-
-        panel.hidden = false;
-        panel.removeAttribute("hidden");
-        panel.removeAttribute("inert");
-        panel.setAttribute("aria-hidden", "false");
-
-        panel.style.setProperty("display", "block", "important");
-        panel.style.setProperty("visibility", "visible", "important");
-        panel.style.setProperty("opacity", "1", "important");
-        panel.style.setProperty("pointer-events", "auto", "important");
-        panel.style.setProperty("z-index", "2147483647", "important");
-
-        console.log("[SESSIONS REOPEN GUARD] panel forced visible", {
-            id: panel.id,
-            children: panel.children.length,
-            text: panel.textContent.trim().slice(0, 120)
-        });
-
-        return true;
-    }
-
-    function isSessionsLauncher(target) {
-        const el = target && target.closest
-            ? target.closest(
-                [
-                    "#nova-mobile-sessions-toggle",
-                    "#nova-mobile-row-sessions",
-                    "#nova-session-fallback-button-v1",
-                    "[data-nova-action='sessions']",
-                    "[data-nova-action='open-sessions']",
-                    "[data-action='sessions']",
-                    "button"
-                ].join(",")
-            )
-            : null;
-
-        if (!el) {
-            return false;
-        }
-
-        const text = (el.textContent || "").trim().toLowerCase();
-        const id = (el.id || "").toLowerCase();
-        const aria = (el.getAttribute("aria-label") || "").toLowerCase();
-        const title = (el.getAttribute("title") || "").toLowerCase();
-
-        return (
-            id.includes("session") ||
-            aria.includes("session") ||
-            title.includes("session") ||
-            text === "sessions" ||
-            text.includes("sessions")
-        );
-    }
-
-    document.addEventListener(
-        "click",
-        function (event) {
-            if (!isSessionsLauncher(event.target)) {
-                return;
-            }
-
-            console.log("[SESSIONS REOPEN GUARD] launcher click captured");
-
-            event.preventDefault();
-            event.stopImmediatePropagation();
-
-            try {
-                if (typeof window.NovaMobileOpenSessions === "function") {
-                    window.NovaMobileOpenSessions();
-                }
-            } catch (err) {
-                console.warn("[SESSIONS REOPEN GUARD] NovaMobileOpenSessions failed", err);
-            }
-
-            setTimeout(forceShowPanel, 0);
-            setTimeout(forceShowPanel, 80);
-            setTimeout(forceShowPanel, 250);
-        },
-        true
-    );
-
-    window.NovaMobileForceShowSessionsPanel20260709 = forceShowPanel;
-
-    console.log("[SESSIONS REOPEN GUARD] installed");
-})();
-
-// NOVA_MOBILE_SESSIONS_HARD_REOPEN_FALLBACK_20260709
-(function () {
-    "use strict";
-
-    if (window.__NOVA_MOBILE_SESSIONS_HARD_REOPEN_FALLBACK_20260709__) {
-        return;
-    }
-
-    window.__NOVA_MOBILE_SESSIONS_HARD_REOPEN_FALLBACK_20260709__ = true;
-
-    const PANEL_ID = "nova-mobile-hard-sessions-panel-20260709";
-
-    function getActiveSessionId() {
-        return (
-            localStorage.getItem("nova_mobile_active_session_id") ||
-            localStorage.getItem("nova_active_session_id") ||
-            new URLSearchParams(location.search).get("session_id") ||
-            ""
-        );
-    }
-
-    function setActiveSessionId(id) {
-        if (!id) {
-            return;
-        }
-
-        localStorage.setItem("nova_mobile_active_session_id", id);
-        localStorage.setItem("nova_active_session_id", id);
-    }
-
-    function removePanel() {
-        const old = document.getElementById(PANEL_ID);
-
-        if (old) {
-            old.remove();
-        }
-    }
-
-    function normalizeSessions(data) {
-        if (Array.isArray(data)) {
-            return data;
-        }
-
-        if (Array.isArray(data.sessions)) {
-            return data.sessions;
-        }
-
-        if (data.sessions && typeof data.sessions === "object") {
-            return Object.values(data.sessions);
-        }
-
-        return [];
-    }
-
-    function titleForSession(session) {
-        return (
-            session.title ||
-            session.name ||
-            session.label ||
-            session.id ||
-            session.session_id ||
-            "Untitled session"
-        );
-    }
-
-    function idForSession(session) {
-        return session.id || session.session_id || "";
-    }
-
-    async function fetchJson(url, options) {
-        const response = await fetch(url, options || {});
-
-        if (!response.ok) {
-            throw new Error("HTTP " + response.status + ": " + await response.text());
-        }
-
-        return response.json();
-    }
-
-    function renderIntoChat(payload) {
-        const session = payload.session || {};
-        const id = payload.session_id || session.id || session.session_id || "";
-        const messages = Array.isArray(payload.messages)
-            ? payload.messages
-            : Array.isArray(session.messages)
-                ? session.messages
-                : [];
-
-        const normalizedSession = Object.assign({}, session, {
-            id: session.id || id,
-            session_id: session.session_id || id,
-            messages: messages
-        });
-
-        const normalizedPayload = {
-            session_id: id,
-            session: normalizedSession,
-            messages: messages
-        };
-
-        if (typeof window.NovaMobileRenderSession === "function") {
-            window.NovaMobileRenderSession(normalizedSession, id);
-            return true;
-        }
-
-        if (
-            window.NovaMobileChatUI &&
-            typeof window.NovaMobileChatUI.renderSessionPayload === "function"
-        ) {
-            window.NovaMobileChatUI.renderSessionPayload(normalizedPayload, "hard-reopen-fallback");
-            return true;
-        }
-
-        window.dispatchEvent(new CustomEvent("nova:session-selected", {
-            detail: normalizedPayload
-        }));
-
-        return true;
-    }
-
-    async function openSession(id) {
-        if (!id) {
-            return;
-        }
-
-        console.log("[HARD SESSIONS FALLBACK] open", id);
-
-        setActiveSessionId(id);
-
-        const data = await fetchJson("/api/sessions/" + encodeURIComponent(id) + "?hard_reopen=" + Date.now(), {
-            method: "GET"
-        });
-
-        renderIntoChat(data);
-
-        removePanel();
-    }
-
-    async function renameSession(id, currentTitle) {
-        const nextTitle = prompt("Rename session:", currentTitle || "");
-
-        if (!nextTitle || !nextTitle.trim()) {
-            return;
-        }
-
-        const cleanTitle = nextTitle.trim();
-
-        console.log("[HARD SESSIONS FALLBACK] rename", id, cleanTitle);
-
-        await fetchJson("/api/sessions/rename", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                session_id: id,
-                title: cleanTitle
-            })
-        });
-
-        await openPanel();
-    }
-
-    async function deleteSession(id, title) {
-        if (!confirm("Delete this session?\n\n" + (title || id))) {
-            return;
-        }
-
-        console.log("[HARD SESSIONS FALLBACK] delete", id);
-
-        await fetchJson("/api/sessions/delete", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                session_id: id
-            })
-        });
-
-        await openPanel();
-    }
-
-    function makeButton(label, className) {
-        const button = document.createElement("button");
-
-        button.type = "button";
-        button.textContent = label;
-        button.className = className || "";
-        button.style.cssText = [
-            "border:1px solid rgba(255,255,255,.16)",
-            "background:rgba(255,255,255,.08)",
-            "color:#fff",
-            "border-radius:10px",
-            "padding:7px 9px",
-            "font-size:12px",
-            "line-height:1",
-            "cursor:pointer"
-        ].join(";");
-
-        return button;
-    }
-
-    function renderPanel(sessions) {
-        removePanel();
-
-        const activeId = getActiveSessionId();
-
-        const panel = document.createElement("div");
-        panel.id = PANEL_ID;
-        panel.setAttribute("role", "dialog");
-        panel.setAttribute("aria-label", "Sessions");
-
-        panel.style.cssText = [
-            "position:fixed",
-            "top:54px",
-            "right:10px",
-            "left:10px",
-            "bottom:84px",
-            "z-index:2147483647",
-            "background:rgba(15,15,22,.98)",
-            "border:1px solid rgba(255,255,255,.14)",
-            "border-radius:18px",
-            "box-shadow:0 18px 60px rgba(0,0,0,.45)",
-            "padding:12px",
-            "overflow:auto",
-            "-webkit-overflow-scrolling:touch",
-            "color:#fff"
-        ].join(";");
-
-        const header = document.createElement("div");
-        header.style.cssText = [
-            "display:flex",
-            "align-items:center",
-            "justify-content:space-between",
-            "gap:10px",
-            "margin-bottom:10px",
-            "position:sticky",
-            "top:0",
-            "background:rgba(15,15,22,.98)",
-            "padding-bottom:8px",
-            "z-index:2"
-        ].join(";");
-
-        const title = document.createElement("div");
-        title.textContent = "Sessions";
-        title.style.cssText = "font-weight:700;font-size:15px;";
-
-        const close = makeButton("Close");
-        close.onclick = removePanel;
-
-        header.appendChild(title);
-        header.appendChild(close);
-        panel.appendChild(header);
-
-        if (!sessions.length) {
-            const empty = document.createElement("div");
-            empty.textContent = "No sessions found.";
-            empty.style.cssText = "opacity:.75;padding:14px;";
-            panel.appendChild(empty);
-        }
-
-        sessions.forEach(function (session) {
-            const id = idForSession(session);
-            const titleText = titleForSession(session);
-            const messages = Array.isArray(session.messages)
-                ? session.messages.length
-                : Number(session.message_count || session.messages_count || 0);
-
-            const row = document.createElement("div");
-            row.style.cssText = [
-                "display:flex",
-                "gap:8px",
-                "align-items:center",
-                "justify-content:space-between",
-                "padding:10px",
-                "margin:7px 0",
-                "border:1px solid rgba(255,255,255,.10)",
-                "border-radius:14px",
-                id === activeId ? "background:rgba(128,90,213,.24)" : "background:rgba(255,255,255,.05)"
-            ].join(";");
-
-            const open = document.createElement("button");
-            open.type = "button";
-            open.style.cssText = [
-                "flex:1",
-                "text-align:left",
-                "border:0",
-                "background:transparent",
-                "color:#fff",
-                "padding:4px",
-                "cursor:pointer",
-                "min-width:0"
-            ].join(";");
-
-            open.innerHTML = [
-                "<div style='font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" +
-                    titleText.replace(/[&<>"']/g, function (ch) {
-                        return {
-                            "&": "&amp;",
-                            "<": "&lt;",
-                            ">": "&gt;",
-                            '"': "&quot;",
-                            "'": "&#39;"
-                        }[ch];
-                    }) +
-                "</div>",
-                "<div style='font-size:11px;opacity:.7;margin-top:3px;'>" +
-                    String(messages || 0) +
-                    " messages · " +
-                    String(id).slice(-6) +
-                "</div>"
-            ].join("");
-
-            open.onclick = function () {
-                openSession(id).catch(function (err) {
-                    console.error("[HARD SESSIONS FALLBACK] open failed", err);
-                    alert("Open session failed: " + err.message);
-                });
-            };
-
-            const actions = document.createElement("div");
-            actions.style.cssText = "display:flex;gap:6px;flex-shrink:0;";
-
-            const rename = makeButton("Rename");
-            rename.onclick = function (event) {
-                event.preventDefault();
-                event.stopPropagation();
-
-                renameSession(id, titleText).catch(function (err) {
-                    console.error("[HARD SESSIONS FALLBACK] rename failed", err);
-                    alert("Rename failed: " + err.message);
-                });
-            };
-
-            const del = makeButton("Delete");
-            del.onclick = function (event) {
-                event.preventDefault();
-                event.stopPropagation();
-
-                deleteSession(id, titleText).catch(function (err) {
-                    console.error("[HARD SESSIONS FALLBACK] delete failed", err);
-                    alert("Delete failed: " + err.message);
-                });
-            };
-
-            actions.appendChild(rename);
-            actions.appendChild(del);
-
-            row.appendChild(open);
-            row.appendChild(actions);
-            panel.appendChild(row);
-        });
-
-        document.body.appendChild(panel);
-
-        console.log("[HARD SESSIONS FALLBACK] panel rendered", {
-            sessions: sessions.length,
-            activeId: activeId
-        });
-    }
-
-    async function openPanel() {
-        console.log("[HARD SESSIONS FALLBACK] open panel");
-
-        const data = await fetchJson("/api/sessions?hard_reopen=" + Date.now(), {
-            method: "GET"
-        });
-
-        renderPanel(normalizeSessions(data));
-    }
-
-    function isSessionsLauncher(target) {
-        const el = target && target.closest
-            ? target.closest("button,a,[role='button'],[data-nova-action]")
-            : null;
-
-        if (!el) {
-            return false;
-        }
-
-        const haystack = [
-            el.id || "",
-            el.className || "",
-            el.textContent || "",
-            el.getAttribute("aria-label") || "",
-            el.getAttribute("title") || "",
-            el.getAttribute("data-nova-action") || ""
-        ].join(" ").toLowerCase();
-
-        return haystack.includes("session");
-    }
-
-    document.addEventListener(
-        "click",
-        function (event) {
-            if (!isSessionsLauncher(event.target)) {
-                return;
-            }
-
-            console.log("[HARD SESSIONS FALLBACK] launcher captured");
-
-            event.preventDefault();
-            event.stopImmediatePropagation();
-
-            openPanel().catch(function (err) {
-                console.error("[HARD SESSIONS FALLBACK] panel failed", err);
-                alert("Sessions failed: " + err.message);
-            });
-        },
-        true
-    );
-
-    window.NovaMobileHardOpenSessions20260709 = openPanel;
-
-    console.log("[HARD SESSIONS FALLBACK] installed");
-})();
