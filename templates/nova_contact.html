@@ -61,8 +61,52 @@
         }
     </style>
     <!-- /NOVA_CONTACT_PAGE_ADMIN_LINK_STYLE_20260709 -->
+
+    <!-- NOVA_CONTACT_OWNER_ADMIN_PILL_STYLE_20260709 -->
+    <style>
+        .nova-contact-owner-admin-pill-20260709 {
+            position: fixed;
+            top: max(16px, env(safe-area-inset-top));
+            right: 16px;
+            z-index: 2147483000;
+            min-height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 14px;
+            border: 1px solid rgba(226,214,255,.22);
+            border-radius: 999px;
+            background: rgba(184,255,122,.94);
+            color: #101014;
+            box-shadow: 0 18px 54px rgba(0,0,0,.32);
+            font: 850 13px/1 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            text-decoration: none;
+            backdrop-filter: blur(18px);
+        }
+
+        .nova-contact-owner-admin-pill-20260709:hover {
+            transform: translateY(-1px);
+        }
+
+        @media (max-width: 700px) {
+            .nova-contact-owner-admin-pill-20260709 {
+                top: max(10px, env(safe-area-inset-top));
+                right: 10px;
+                min-height: 34px;
+                padding: 0 11px;
+                font-size: 12px;
+            }
+        }
+    </style>
+    <!-- /NOVA_CONTACT_OWNER_ADMIN_PILL_STYLE_20260709 -->
 </head>
 <body>
+
+    <!-- NOVA_CONTACT_OWNER_ADMIN_PILL_20260709 -->
+    {% if nova_show_admin_link %}
+    <a class="nova-contact-owner-admin-pill-20260709" href="/admin" aria-label="Open Nova admin dashboard">Admin</a>
+    {% endif %}
+    <!-- /NOVA_CONTACT_OWNER_ADMIN_PILL_20260709 -->
 
     <!-- NOVA_CONTACT_PAGE_ADMIN_LINK_20260709 -->
     {% if nova_show_admin_link %}
@@ -192,6 +236,7 @@
     <script src="/static/js/nova-contact.js?v=contact-page-phase1-20260709"></script>
 </body>
 </html>
+
 
 
 
