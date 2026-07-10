@@ -11,6 +11,9 @@ It only provides context.
 from nova_backend.services.nova_behavior_memory_store import (
     behavior_memory_store,
 )
+from nova_backend.services.nova_behavior_memory import (
+    behavior_memory
+)
 
 BEHAVIOR_UPGRADE_WORDING = {
     "increase_solution_depth_and_next_steps":
@@ -62,6 +65,39 @@ def build_behavior_context(
                     str(upgrade)
                 )
             )
+
+    try:
+
+        improvement_priority = (
+            behavior_memory
+            .create_improvement_priority()
+        )
+
+        focus = improvement_priority.get(
+            "focus",
+            ""
+        )
+
+        if (
+            focus
+            and focus != "collect_behavior_data"
+        ):
+
+            guidance.append(
+                (
+                    "Current Nova improvement focus: "
+                    f"{focus}."
+                )
+            )
+
+
+    except Exception as exc:
+
+        print(
+            "[NOVA_BEHAVIOR_CONTEXT_PRIORITY_FAILED]",
+            exc
+        )
+
 
     return list(
         dict.fromkeys(guidance)
