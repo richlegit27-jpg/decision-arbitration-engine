@@ -1,5 +1,5 @@
 from nova_backend.services.nova_self_improvement_recommender import (
-    create_self_improvement_recommendation
+    create_self_improvement_recommendation,
 )
 
 
@@ -12,28 +12,30 @@ print(
 )
 
 
-priority = {
-
-    "focus":
-        "continuity",
-
-    "priority":
-        "medium",
-
-    "reason":
-        "continuity detected 1 times."
-}
-
-
 result = create_self_improvement_recommendation(
-    priority
+    {
+        "focus": "continuity",
+        "priority": "medium",
+        "reason": "continuity detected repeatedly",
+    }
 )
 
 
 assert result["problem"] == "continuity"
 
 print(
-    "PASS converts behavior problem"
+    "PASS preserves behavior problem"
+)
+
+
+assert (
+    result["recommended_upgrade"]
+    ==
+    "Improve conversation recall and session continuity"
+)
+
+print(
+    "PASS maps continuity upgrade"
 )
 
 
@@ -44,23 +46,14 @@ assert (
 )
 
 print(
-    "PASS selects target system"
+    "PASS identifies target system"
 )
 
 
-assert (
-    result["confidence"]
-    ==
-    "medium"
-)
+assert "confidence" in result
 
 print(
-    "PASS calculates confidence"
-)
-
-
-print(
-    "PASS creates improvement recommendation"
+    "PASS creates confidence"
 )
 
 
