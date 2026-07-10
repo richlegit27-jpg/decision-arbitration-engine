@@ -2241,7 +2241,11 @@ Current step:
     def _ensure_session_id(self, session_id: str = "") -> str:
         sid = self._safe_str(session_id).strip()
 
-        if sid.startswith("session_") and " " not in sid and len(sid) >= 20:
+        if (
+            sid
+            and " " not in sid
+            and len(sid) >= 8
+        ):
             return sid
 
         created = None
@@ -12561,14 +12565,46 @@ if (not attachments) and (__name__ == "__main__"):
 
         _clean_recall_probe = clean_interpretation_text.lower().strip(" ?.!")
 
+
         # NOVA_TOPIC_RECALL_USE_CONTINUITY_CONTEXT_20260612
         # Use the existing continuity helper. Do not call missing topic/recent-session helpers.
+
         if _clean_recall_probe in _conversation_recall_phrases:
             try:
-                _recall_session = self._get_session_payload(session_id) if session_id else {}
-                _recent_context = self._build_continuity_context(_recall_session)
-            except Exception:
+                _recall_session = (
+                    self._get_session_payload(session_id)
+                    if session_id
+                    else {}
+                )
+
+                exec_debug(
+                    "[CONTINUITY BEFORE BUILD]",
+                    {
+                        "session_id": session_id,
+                        "keys": (
+                            list(_recall_session.keys())
+                            if isinstance(_recall_session, dict)
+                            else str(type(_recall_session))
+                        ),
+                        "message_count": (
+                            len(_recall_session.get("messages", []))
+                            if isinstance(_recall_session, dict)
+                            else -1
+                        ),
+                    },
+                )
+
+                _recent_context = self._build_continuity_context(
+                    _recall_session
+                )
+
+            except Exception as exc:
+                exec_debug(
+                    "[CONTINUITY RECALL FAILED]",
+                    repr(exc),
+                )
                 _recent_context = ""
+
 
             if _recent_context:
                 return {
@@ -15498,6 +15534,8 @@ Auto-fix result:
             return ""
 
         return "Working context:\n" + "\n".join(lines)
+
+
 
     def _build_continuity_context(self, session=None, limit: int = 14):
         session = session or {}
