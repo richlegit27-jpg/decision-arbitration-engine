@@ -61,6 +61,30 @@ def _append_behavior_context(answer: str) -> str:
     if not behavior_context:
         return answer
 
+    improvement_lines = []
+
+    for item in behavior_context.split("\n"):
+
+        if "Current Nova improvement focus:" in item:
+
+            improvement_lines.append(
+                item
+            )
+
+
+    if improvement_lines:
+
+        return (
+            answer
+            + "\n\nBehavior guidance:\n"
+            + behavior_context
+            + "\n\nRecommended improvement awareness:\n"
+            + "\n".join(
+                improvement_lines
+            )
+        )
+
+
     return (
         answer
         + "\n\nBehavior guidance:\n"
@@ -386,6 +410,7 @@ def build_project_brain_general_answer(user_text: object) -> Optional[ProjectBra
         )
 
     return None
+
 # NOVA_PROJECT_BRAIN_GENERAL_LIVE_SELECTOR_CLASSIFIER_20260702
 # Broadens Project Brain general question detection so live selector can win
 # before stale compact project_state_context fallback handles paraphrases.
