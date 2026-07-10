@@ -564,6 +564,80 @@ def _apply_operator_plan_to_decision(
         rationale=rationale,
     )
 
+def _apply_behavior_improvement_signal(
+    decision: ProjectBrainDecision,
+) -> ProjectBrainDecision:
+    """
+    Adds Nova learning awareness to low-risk decisions.
+
+    Does not override:
+    - failures
+    - safety decisions
+    - route risks
+    - explicit operator requests
+    """
+
+    if decision.risk != "low":
+        return decision
+
+
+    try:
+
+        from nova_backend.services.nova_behavior_memory import (
+            behavior_memory,
+        )
+
+
+        priority = (
+            behavior_memory
+            .create_improvement_priority()
+        )
+
+
+        focus = priority.get(
+            "focus",
+            ""
+        )
+
+
+        if (
+            not focus
+            or focus == "collect_behavior_data"
+        ):
+            return decision
+
+
+        rationale = (
+            decision.rationale
+            + " "
+            + (
+                "Behavior learning signal: "
+                f"current improvement focus is {focus}."
+            )
+        )
+
+
+        return ProjectBrainDecision(
+            intent=decision.intent,
+            confidence=decision.confidence,
+            risk=decision.risk,
+            recommended_next_move=decision.recommended_next_move,
+            target_layers=decision.target_layers,
+            target_files=decision.target_files,
+            validation=decision.validation,
+            avoid=decision.avoid,
+            rationale=rationale,
+        )
+
+
+    except Exception as exc:
+
+        print(
+            "[NOVA_BEHAVIOR_DECISION_SIGNAL_FAILED]",
+            exc,
+        )
+
+        return decision
 
 def decide_project_brain_next_move(
     user_text: str = "",
@@ -574,9 +648,13 @@ def decide_project_brain_next_move(
         pasted_output=pasted_output,
     )
 
-    return _apply_operator_plan_to_decision(
+    decision = _apply_operator_plan_to_decision(
         decision,
         user_text=user_text,
+    )
+
+    return _apply_behavior_improvement_signal(
+        decision
     )
 
 def format_project_brain_decision(decision: ProjectBrainDecision) -> str:
