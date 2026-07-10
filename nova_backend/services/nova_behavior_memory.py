@@ -3,66 +3,147 @@ NOVA BEHAVIOR MEMORY
 
 Stores repeated conversation behavior signals
 and converts them into improvement priorities.
+
+Persistent version.
 """
 
+import json
+from pathlib import Path
 from collections import defaultdict
 from datetime import datetime, timezone
+
+
+BEHAVIOR_MEMORY_PATH = (
+    Path(__file__)
+    .resolve()
+    .parents[2]
+    / "data"
+    / "nova_behavior_memory.json"
+)
 
 
 class NovaBehaviorMemory:
 
     def __init__(self):
+
         self.events = []
+
+        self._load()
+
+
+    def _load(self):
+
+        try:
+
+            if BEHAVIOR_MEMORY_PATH.exists():
+
+                with open(
+                    BEHAVIOR_MEMORY_PATH,
+                    "r",
+                    encoding="utf-8"
+                ) as file:
+
+                    data = json.load(file)
+
+                if isinstance(data, list):
+
+                    self.events = data
+
+
+        except Exception as exc:
+
+            print(
+                "[NOVA_BEHAVIOR_MEMORY_LOAD_FAILED]",
+                exc
+            )
+
+
+    def _save(self):
+
+        try:
+
+            BEHAVIOR_MEMORY_PATH.parent.mkdir(
+                parents=True,
+                exist_ok=True
+            )
+
+            with open(
+                BEHAVIOR_MEMORY_PATH,
+                "w",
+                encoding="utf-8"
+            ) as file:
+
+                json.dump(
+                    self.events,
+                    file,
+                    indent=2,
+                    ensure_ascii=False
+                )
+
+
+        except Exception as exc:
+
+            print(
+                "[NOVA_BEHAVIOR_MEMORY_SAVE_FAILED]",
+                exc
+            )
 
 
     def record_behavior(self, behavior_upgrade):
-        """
-        Store a behavior upgrade event.
-
-        Accepts:
-        - dict
-        - object with as_dict()
-        """
 
         if hasattr(behavior_upgrade, "as_dict"):
+
             data = behavior_upgrade.as_dict()
+
         else:
-            data = dict(behavior_upgrade or {})
+
+            data = dict(
+                behavior_upgrade or {}
+            )
 
 
         event = {
-            "timestamp": datetime.now(
-                timezone.utc
-            ).isoformat(),
 
-            "behavior_problem": data.get(
-                "behavior_problem",
-                "unknown"
-            ),
+            "timestamp":
+                datetime.now(
+                    timezone.utc
+                ).isoformat(),
 
-            "severity": data.get(
-                "severity",
-                "unknown"
-            ),
+            "behavior_problem":
+                data.get(
+                    "behavior_problem",
+                    "unknown"
+                ),
 
-            "upgrade": data.get(
-                "upgrade",
-                ""
-            ),
+            "severity":
+                data.get(
+                    "severity",
+                    "unknown"
+                ),
 
-            "action": data.get(
-                "action",
-                ""
-            ),
+            "upgrade":
+                data.get(
+                    "upgrade",
+                    ""
+                ),
 
-            "reason": data.get(
-                "reason",
-                ""
-            ),
+            "action":
+                data.get(
+                    "action",
+                    ""
+                ),
+
+            "reason":
+                data.get(
+                    "reason",
+                    ""
+                ),
         }
 
 
         self.events.append(event)
+
+        self._save()
 
         return event
 
@@ -73,9 +154,11 @@ class NovaBehaviorMemory:
         counts = defaultdict(int)
 
         for event in self.events:
+
             counts[
                 event["behavior_problem"]
             ] += 1
+
 
         return dict(counts)
 
@@ -93,6 +176,7 @@ class NovaBehaviorMemory:
 
 
         results = []
+
 
         for problem, count in ranked:
 
@@ -128,10 +212,16 @@ class NovaBehaviorMemory:
 
 
         if not ranked:
+
             return {
-                "focus": "collect_behavior_data",
-                "priority": "low",
-                "reason": "No behavior history exists yet."
+                "focus":
+                    "collect_behavior_data",
+
+                "priority":
+                    "low",
+
+                "reason":
+                    "No behavior history exists yet."
             }
 
 
@@ -139,12 +229,18 @@ class NovaBehaviorMemory:
 
 
         return {
-            "focus": top["problem"],
-            "priority": top["priority"],
-            "reason": (
-                f"{top['problem']} detected "
-                f"{top['occurrences']} times."
-            ),
+
+            "focus":
+                top["problem"],
+
+            "priority":
+                top["priority"],
+
+            "reason":
+                (
+                    f'{top["problem"]} detected '
+                    f'{top["occurrences"]} times.'
+                )
         }
 
 
@@ -152,12 +248,18 @@ class NovaBehaviorMemory:
     def export_report(self):
 
         return {
-            "total_events": len(self.events),
-            "behavior_counts": self.get_behavior_counts(),
-            "ranked_problems": self.rank_behavior_problems(),
-            "recommended_focus": (
-                self.create_improvement_priority()
-            ),
+
+            "total_events":
+                len(self.events),
+
+            "behavior_counts":
+                self.get_behavior_counts(),
+
+            "ranked_problems":
+                self.rank_behavior_problems(),
+
+            "recommended_focus":
+                self.create_improvement_priority(),
         }
 
 
