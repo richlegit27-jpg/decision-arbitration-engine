@@ -31,7 +31,15 @@ def update_execution_state_safe(execution, status=None, current_step=None, last_
         execution["last_action"] = last_action
 
 from werkzeug.utils import secure_filename
-from nova_backend.routes.memory_panel_routes import register_memory_panel_routes
+
+from nova_backend.routes.memory_panel_routes import (
+    register_memory_panel_routes,
+)
+
+from nova_backend.routes.improvement_routes import (
+    register_improvement_routes,
+)
+
 from nova_backend.utils.api_response import ok_response, error_response
 from nova_backend.utils.request_utils import get_json_body, get_str, get_list, normalize_attachments
 from nova_backend.services.attachment_memory_service import (
