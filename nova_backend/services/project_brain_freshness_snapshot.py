@@ -123,7 +123,8 @@ def build_project_brain_freshness_snapshot() -> ProjectBrainFreshnessSnapshot:
     available_smokes = _available_smoke_files()
 
     checkpoint = (
-        "Decision Engine v1, broad Project Brain routing, Mission Control v1.2 / Failure Interpreter API, and Decision Log API route are locked: "
+        "Protected systems: Decision Engine v1, Project Brain routing, "
+        "Mission Control, Failure Interpreter API, and Decision Log API route remain locked: "
         "exact project-state recall stays on direct recall, broad Nova project paraphrases route through "
         "Project Brain general intelligence, explicit operator prompts route to Mission Control, answer "
         "quality is 100%, and regression now protects the route contracts."
@@ -167,24 +168,25 @@ def build_project_brain_freshness_snapshot() -> ProjectBrainFreshnessSnapshot:
         recent_commits=_recent_commits(),
     )
 
-# NOVA_PROJECT_BRAIN_FRESHNESS_SNAPSHOT_SANITIZER_20260702
-# Final structured-field sanitizer for Project Brain freshness snapshot.
-# Rejects malformed memory-derived fields such as "text: Current Nova project state..."
-# and restores clean checkpoint/blocker/next-move wording.
+
 try:
     from dataclasses import replace as _nova_freshness_snapshot_replace_20260702
 
-    _NOVA_PRE_SANITIZED_BUILD_PROJECT_BRAIN_FRESHNESS_SNAPSHOT_20260702 = build_project_brain_freshness_snapshot
+    _NOVA_PRE_SANITIZED_BUILD_PROJECT_BRAIN_FRESHNESS_SNAPSHOT_20260702 = (
+        build_project_brain_freshness_snapshot
+    )
 
     _NOVA_CLEAN_CHECKPOINT_20260702 = (
-        "Decision Engine v1, broad Project Brain routing, Mission Control v1.2 / Failure Interpreter API, and Decision Log API route are locked: "
+        "Protected systems: Decision Engine v1, Project Brain routing, "
+        "Mission Control, Failure Interpreter API, and Decision Log API route remain locked: "
         "exact project-state recall stays on direct recall, broad Nova project paraphrases route through "
         "Project Brain general intelligence, explicit operator prompts route to Mission Control, answer "
         "quality is 100%, and regression now protects the route contracts."
     )
 
     _NOVA_CLEAN_BLOCKER_20260702 = (
-        "No active Decision Engine blocker is open, no active Mission Control blocker is open, no active Failure Interpreter blocker is open, and no active Decision Log blocker is open. "
+        "No active Decision Engine blocker is open, no active Mission Control blocker is open, "
+        "no active Failure Interpreter blocker is open, and no active Decision Log blocker is open. "
         "The remaining risk is cleanup/consolidation: app.py still has many historical guards and wrappers, "
         "so future work should avoid new route-layer patches and move intelligence into services."
     )
@@ -194,82 +196,6 @@ try:
         "v1.1 behavior, preserve direct recall, broad Project Brain routing, and explicit operator Mission "
         "Control prompts, and consolidate stale route/context wording without adding another app.py guard."
     )
-
-    def _nova_project_brain_snapshot_bad_field_20260702(value, required_terms=None):
-        text_value = str(value or "").strip()
-        lower = text_value.lower()
-        required_terms = required_terms or []
-
-        if not text_value:
-            return True
-
-        if any(term.lower() not in lower for term in required_terms):
-            return True
-
-        bad_terms = [
-            "project brain answer freshness v2",
-            "use the project brain freshness snapshot",
-            "fallback-route priority",
-            "instead of another wording patch",
-            "text: current nova project state",
-            "current nova project state: richard is working",
-            "and fres current blocker",
-            "next concrete move / safe move: next concrete move / safe move",
-            "current safe direction: next concrete move",
-            "next move: harden",
-            "live_answer_sample.py",
-            "idle/generic fallback",
-            "finish nova project brain answer quality",
-            "larger nova answer-quality 95 smoke now passes 20/20",
-            "measured answer-policy intelligence",
-        ]
-
-        return any(term in lower for term in bad_terms)
-
-    def _nova_project_brain_sanitize_snapshot_20260702(snapshot):
-        updates = {}
-
-        checkpoint = getattr(snapshot, "checkpoint", "")
-        blocker = getattr(snapshot, "blocker", "")
-        next_move = getattr(snapshot, "next_move", "")
-
-        if _nova_project_brain_snapshot_bad_field_20260702(
-            checkpoint,
-            ["Decision Engine v1", "Project Brain routing", "Mission Control v1.2 / Failure Interpreter API"],
-        ):
-            updates["checkpoint"] = _NOVA_CLEAN_CHECKPOINT_20260702
-
-        if _nova_project_brain_snapshot_bad_field_20260702(
-            blocker,
-            ["No active Decision Engine blocker", "Mission Control blocker", "cleanup/consolidation"],
-        ):
-            updates["blocker"] = _NOVA_CLEAN_BLOCKER_20260702
-
-        if _nova_project_brain_snapshot_bad_field_20260702(
-            next_move,
-            ["Project Brain cleanup/consolidation", "Mission Control v1.2 / Failure Interpreter API", "without adding another app.py guard"],
-        ):
-            updates["next_move"] = _NOVA_CLEAN_NEXT_MOVE_20260702
-
-        if not updates:
-            return snapshot
-
-        try:
-            return _nova_freshness_snapshot_replace_20260702(snapshot, **updates)
-        except Exception:
-            for key, value in updates.items():
-                try:
-                    setattr(snapshot, key, value)
-                except Exception:
-                    pass
-            return snapshot
-
-    def build_project_brain_freshness_snapshot(*args, **kwargs):
-        snapshot = _NOVA_PRE_SANITIZED_BUILD_PROJECT_BRAIN_FRESHNESS_SNAPSHOT_20260702(
-            *args,
-            **kwargs,
-        )
-        return _nova_project_brain_sanitize_snapshot_20260702(snapshot)
 
 except Exception as _nova_project_brain_freshness_snapshot_sanitizer_error_20260702:
     try:

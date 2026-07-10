@@ -12,11 +12,39 @@ from __future__ import annotations
 
 import time
 from typing import Any, Dict, List
-
+from nova_backend.services.mission_service import mission_service
 
 class PlannerService:
     def __init__(self) -> None:
         self.plans: Dict[str, Dict[str, Any]] = {}
+
+    def create_mission(self, mission_name: str) -> Dict[str, Any]:
+        """
+        Convert a planner output into a Nova Mission.
+        Keeps planning and execution separated.
+        """
+
+        plan = self.build_plan(mission_name)
+
+        steps = [
+            (
+                item.get("step", "").strip()
+                if isinstance(item, dict)
+                else str(item)
+            )
+            for item in plan.get("steps", [])
+        ]
+
+        mission = mission_service.create_mission(
+            goal=plan.get("goal", mission_name),
+            steps=steps,
+            metadata={
+                "source": "planner_service",
+                "planner_status": plan.get("status"),
+            },
+        )
+
+        return mission
 
     def build_plan(self, mission_name: str) -> Dict[str, Any]:
         safe_mission = str(mission_name or "generic").strip() or "generic"

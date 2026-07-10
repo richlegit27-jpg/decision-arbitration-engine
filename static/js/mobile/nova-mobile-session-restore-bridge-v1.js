@@ -209,6 +209,8 @@ if (
             return false;
         }
 
+console.log("[RESTORE CLICK]", sessionId);
+
         console.log(LOG, "restore requested", sessionId);
 
         const response = await fetch("/api/sessions/" + encodeURIComponent(sessionId) + "?cb=" + Date.now(), {

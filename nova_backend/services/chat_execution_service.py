@@ -13,7 +13,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-
+from nova_backend.services.mission_service import mission_service
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,25 @@ class ChatExecutionService:
         clean = self._clean_text(user_text)
         return clean in EXECUTION_TRIGGER_WORDS
 
+    def attach_mission(
+        self,
+        session_id: str,
+        mission_id: str,
+    ):
+        state = self.states.get(session_id)
+
+        if not state:
+            return None
+
+        state["mission_id"] = mission_id
+
+        mission_service.attach_execution(
+            mission_id,
+            session_id,
+        )
+
+        return state
+
     def start(
         self,
         session_id: str,
@@ -73,6 +92,7 @@ class ChatExecutionService:
             "waiting": True,
             "complete": False,
             "error": None,
+            "mission_id": None,
         }
 
         self._states[safe_session_id] = state
@@ -167,6 +187,19 @@ class ChatExecutionService:
             state["waiting"] = True
             state["complete"] = False
             state["current_step"] = steps[next_index]
+
+        mission_id = state.get("mission_id")
+
+        if mission_id:
+            mission_service.update_progress(
+                mission_id,
+                next_index,
+                {
+                    "step": state.get("current_step"),
+                    "status": "advanced",
+                },
+            )
+            
 
         self._save_states()
 
@@ -617,3 +650,6 @@ try:
         print("[NOVA_EXECUTION_EMPTY_COMPLETE_NORMALIZER_20260630] skipped: ChatExecutionService not found")
 except Exception as _nova_execution_empty_complete_error_20260630:
     print("[NOVA_EXECUTION_EMPTY_COMPLETE_NORMALIZER_20260630] failed:", _nova_execution_empty_complete_error_20260630)
+# NOVA_CHAT_EXECUTION_SINGLETON_20260710
+# Shared execution service instance for imports across Nova.
+chat_execution_service = ChatExecutionService()

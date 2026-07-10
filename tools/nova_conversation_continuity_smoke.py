@@ -65,10 +65,21 @@ def main():
 
     session_id = f"continuity_{int(time.time())}"
 
-    post_chat(
+    first = post_chat(
         "We are working on Nova Project Brain cleanup and consolidation.",
         session_id,
     )
+
+    print("REQUESTED SESSION:", session_id)
+    print("RETURNED ACTIVE SESSION:", first.get("active_session_id"))
+    print("RETURNED SESSION:", first.get("session_id"))
+
+    if first.get("session"):
+        print("STORED SESSION ID:", first["session"].get("id"))
+        print(
+            "STORED MESSAGE COUNT:",
+            len(first["session"].get("messages", []))
+        )
 
     data = post_chat(
         "what were we talking about",

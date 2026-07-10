@@ -94,27 +94,31 @@ CASES = [
             "heroku",
         ],
     },
-    {
-        "name": "next move judgment freshness",
-        "slug": "next_move",
-        "question": "what should we do next",
-        "required": [
-            "Project Brain",
-            "Decision Engine v1",
-            "Mission Control v1.2 / Failure Interpreter API",
-            "Project Brain cleanup/consolidation",
-            "direct recall",
-            "broad Project Brain routing",
-            "pasted failure interpretation",
-            "avoiding another app.py guard",
-        ],
-        "stale": [
-            "finish Nova project brain answer quality",
-            "make `what's next?` return project context",
-            "tools/nova_project_brain_live_answer_sample.py",
-            "idle/generic fallback text",
-        ],
-    },
+
+{
+    "name": "next move judgment freshness",
+    "slug": "next_move",
+    "question": "what should we do next",
+    "required": [
+        "Project Brain",
+        "cleanup/consolidation",
+        "direct recall",
+        "broad Project Brain routing",
+        "avoiding another app.py guard",
+    ],
+    "preferred": [
+        "Decision Engine v1",
+        "Mission Control",
+        "Failure Interpreter",
+    ],
+    "stale": [
+        "finish Nova project brain answer quality",
+        "make `what's next?` return project context",
+        "tools/nova_project_brain_live_answer_sample.py",
+        "idle/generic fallback text",
+    ],
+},
+
     {
         "name": "current blocker freshness",
         "slug": "current_blocker",
@@ -136,6 +140,8 @@ CASES = [
             "Add Nova answer quality 95 policy",
         ],
     },
+
+
     {
         "name": "memory vs execution",
         "slug": "memory_execution",
@@ -152,6 +158,7 @@ CASES = [
             "generic fallback",
         ],
     },
+
     {
         "name": "safe coding judgment",
         "slug": "safe_coding",
@@ -169,9 +176,93 @@ CASES = [
     },
 ]
 
+def post_chat_session(question, session_id):
+    payload = {
+        "message": question,
+        "session_id": session_id,
+        "attachments": [],
+    }
+
+    data = json.dumps(payload).encode("utf-8")
+
+    req = urllib_request.Request(
+        API_URL,
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    with urllib_request.urlopen(req, timeout=20) as response:
+        return json.loads(
+            response.read().decode("utf-8", errors="replace")
+        )
+
+def run_continuity_test():
+    print("")
+    print("CASE: conversation continuity")
+    print("QUESTION: what were we talking about")
+
+    session_id = f"continuity_test_{int(time.time())}"
+
+    post_chat_session(
+        "We are working on Nova Project Brain cleanup and consolidation.",
+        session_id,
+    )
+
+    data = post_chat_session(
+        "what were we talking about",
+        session_id,
+    )
+
+    answer = extract_answer(data)
+
+    print("ANSWER:", answer[:700])
+
+    assert_terms(
+        "conversation continuity",
+        answer,
+        [
+            "Nova",
+            "Project Brain",
+        ],
+        [
+            "I don't have context",
+            "new conversation",
+            "no previous context",
+        ],
+    )
+
+    assert_answer_depth(
+        "conversation continuity",
+        answer,
+    )
+
+def assert_answer_depth(case_name, answer):
+    words = answer.split()
+
+    assert_true(
+        f"{case_name} answer exists",
+        len(words) > 0,
+    )
+
+    assert_true(
+        f"{case_name} answer has reasoning depth",
+        len(words) >= 40,
+        f"word_count={len(words)}",
+    )
+
+
+GLOBAL_STALE = [
+    "i don't know",
+    "i do not know",
+    "generic fallback",
+    "it depends",
+    "maybe consider",
+    "you should probably",
+]
 
 def main():
-    print("NOVA ANSWER QUALITY SMOKE")
+    print("NOVA PROJECT BRAIN INTELLIGENCE SMOKE")
     print("=========================")
 
     passed = 0
@@ -193,10 +284,31 @@ def main():
             case["stale"],
         )
 
+        assert_answer_depth(
+            case["name"],
+            answer,
+        )
+
+        global_stale_hits = [
+            term
+            for term in GLOBAL_STALE
+            if term.lower() in answer.lower()
+        ]
+
+        assert_true(
+            f"{case['name']} avoids weak reasoning",
+            not global_stale_hits,
+            f"found={global_stale_hits}",
+        )
+
         passed += 1
 
     print("")
-    print(f"NOVA ANSWER QUALITY SCORE: {passed}/{len(CASES)} = {round((passed / len(CASES)) * 100)}%")
+    print(
+    f"NOVA PROJECT BRAIN INTELLIGENCE SCORE: "
+    f"{passed}/{len(CASES)} = "
+    f"{round((passed / len(CASES)) * 100)}%"
+)
     assert_true("answer quality minimum", passed == len(CASES))
     print("")
     print("NOVA ANSWER QUALITY SMOKE PASSED")

@@ -22,10 +22,18 @@ def _has_any(text: str, terms: tuple[str, ...]) -> bool:
     return any(term in text for term in terms)
 
 
-def _current_project_answer() -> str:
-    from nova_backend.services.project_brain_live_answer_selector import build_project_brain_live_answer
+def _current_project_answer(
+    user_text=""
+) -> str:
+    from nova_backend.services.project_brain_live_answer_selector import (
+        build_project_brain_live_answer
+    )
 
-    return build_project_brain_live_answer(user_text=user_text).text
+    return build_project_brain_live_answer(
+        user_text=user_text
+    ).text
+
+
 
 def _safe_next_answer() -> str:
     from nova_backend.services.project_brain_context_builder import build_safe_next_answer
@@ -47,10 +55,34 @@ def _practical_project_answer() -> str:
 
     return build_practical_project_answer()
 
+def _append_behavior_context(answer: str) -> str:
+    behavior_context = _behavior_context_answer()
 
-# NOVA_PROJECT_BRAIN_MISSION_CONTROL_GENERAL_20260702
-# Service-only Mission Control answer bridge.
-# No Flask wiring and no app.py dependency.
+    if not behavior_context:
+        return answer
+
+    return (
+        answer
+        + "\n\nBehavior guidance:\n"
+        + behavior_context
+    )
+
+def _behavior_context_answer() -> str:
+    from nova_backend.services.nova_behavior_context_service import (
+        build_behavior_context,
+    )
+
+    patterns = build_behavior_context()
+
+    if not patterns:
+        return ""
+
+    return "\n".join(
+        f"- {item}"
+        for item in patterns
+    )
+
+
 def _mission_control_answer(user_text: object) -> str:
     from nova_backend.services.project_brain_mission_control import (
         build_project_brain_mission_control_answer,
@@ -254,12 +286,6 @@ def classify_project_brain_intent(user_text: object) -> Optional[str]:
         return "current_project_state"
 
     if (
-        _has_any(text, next_terms)
-        and _has_any(text, project_terms + ("code", "work"))
-    ):
-        return "practical_project_answer"
-
-    if (
         _has_any(text, status_terms)
         and _has_any(text, project_terms)
     ):
@@ -267,30 +293,99 @@ def classify_project_brain_intent(user_text: object) -> Optional[str]:
 
     return None
 
+def _observe_project_brain_answer(
+    user_text,
+    answer_text,
+):
+
+    print(
+        "[NOVA BEHAVIOR OBSERVE HIT]",
+        user_text,
+    )
+
+    try:
+        from nova_backend.services.nova_behavior_signal_builder import (
+            behavior_signal_builder,
+        )
+
+        from nova_backend.services.nova_behavior_observer import (
+            behavior_observer,
+        )
+
+        evaluation = behavior_signal_builder.build(
+            user_text=str(user_text or ""),
+            assistant_text=str(answer_text or ""),
+            context="project_brain",
+        )
+
+        behavior_observer.observe(
+            evaluation
+        )
+
+    except Exception as exc:
+        print(
+            "[NOVA_PROJECT_BRAIN_BEHAVIOR_FAILED]",
+            exc,
+        )
 
 def build_project_brain_general_answer(user_text: object) -> Optional[ProjectBrainAnswer]:
     intent = classify_project_brain_intent(user_text)
 
     if intent == "mission_control":
-        return ProjectBrainAnswer(intent=intent, text=_mission_control_answer(user_text))
+        answer = _current_project_answer()
+
+        answer = _append_behavior_context(answer)
+
+        _observe_project_brain_answer(
+            user_text,
+            answer,
+        )
+
+        return ProjectBrainAnswer(
+            intent=intent,
+            text=answer,
+        )
 
     if intent == "current_project_state":
-        return ProjectBrainAnswer(intent=intent, text=_current_project_answer())
+        answer = _current_project_answer()
+
+        answer = _append_behavior_context(answer)
+
+        _observe_project_brain_answer(
+            user_text,
+            answer,
+        )
+
+        return ProjectBrainAnswer(
+            intent=intent,
+            text=answer,
+        )
 
     if intent == "safe_next_action":
-        return ProjectBrainAnswer(intent=intent, text=_safe_next_answer())
+        return ProjectBrainAnswer(
+            intent=intent,
+            text=_safe_next_answer(),
+        )
 
     if intent == "memory_execution_distinction":
-        return ProjectBrainAnswer(intent=intent, text=_memory_execution_answer())
+        return ProjectBrainAnswer(
+            intent=intent,
+            text=_memory_execution_answer(),
+        )
 
     if intent == "app_py_risk":
-        return ProjectBrainAnswer(intent=intent, text=_app_py_risk_answer())
+        return ProjectBrainAnswer(
+            intent=intent,
+            text=_app_py_risk_answer(),
+        )
 
     if intent == "practical_project_answer":
-        return ProjectBrainAnswer(intent=intent, text=_practical_project_answer())
+        return ProjectBrainAnswer(
+            intent=intent,
+            text=_practical_project_answer(),
+        )
 
     return None
-
 # NOVA_PROJECT_BRAIN_GENERAL_LIVE_SELECTOR_CLASSIFIER_20260702
 # Broadens Project Brain general question detection so live selector can win
 # before stale compact project_state_context fallback handles paraphrases.
@@ -559,11 +654,51 @@ try:
 
         return any(needle in text for needle in needles)
 
+    def _nova_observe_project_brain_behavior_20260701(
+        user_text,
+        answer_text,
+    ):
+        try:
+            from nova_backend.services.nova_behavior_signal_builder import (
+                behavior_signal_builder,
+            )
+
+            from nova_backend.services.nova_behavior_observer import (
+                behavior_observer,
+            )
+
+            evaluation = (
+                behavior_signal_builder.build(
+                    user_text=user_text,
+                    assistant_text=answer_text,
+                    context="project_brain",
+                )
+            )
+
+            behavior_observer.observe(
+                evaluation
+            )
+
+        except Exception as exc:
+            print(
+                "[NOVA_BEHAVIOR_OBSERVER_PROJECT_BRAIN_FAILED]",
+                exc,
+            )
+
+
     def _current_project_answer(*args, **kwargs):
-        user_text = _nova_decision_log_user_text_20260701(*args, **kwargs)
+        user_text = _nova_decision_log_user_text_20260701(
+            *args,
+            **kwargs
+        )
+
+        print(
+            "[NOVA CURRENT PROJECT ANSWER CALLED]",
+            user_text,
+        )
 
         if _nova_is_decision_log_question_20260701(user_text):
-            return {
+            result = {
                 "intent": "decision_log",
                 "answer": _nova_decision_log_answer_20260701(limit=8),
                 "route": "project_brain_general_intelligence",
@@ -571,7 +706,27 @@ try:
                 "confidence": 0.91,
             }
 
-        return _NOVA_DECISION_LOG_PREVIOUS__CURRENT_PROJECT_ANSWER_20260701(*args, **kwargs)
+            _nova_observe_project_brain_behavior_20260701(
+                user_text,
+                result["answer"],
+            )
+
+            return result
+
+
+        answer = (
+            _NOVA_DECISION_LOG_PREVIOUS__CURRENT_PROJECT_ANSWER_20260701(
+                *args,
+                **kwargs
+            )
+        )
+
+        _nova_observe_project_brain_behavior_20260701(
+            user_text,
+            str(answer),
+        )
+
+        return answer
 
     print("[NOVA_PROJECT_BRAIN_DECISION_LOG_GENERAL_WIRE_20260701] installed on _current_project_answer")
 except Exception as _nova_decision_log_wire_error_20260701:

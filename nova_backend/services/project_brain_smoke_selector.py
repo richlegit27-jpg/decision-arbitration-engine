@@ -91,6 +91,17 @@ def select_smokes(
         reason = "Changed Python files require py_compile before behavior smokes."
 
     if (
+        "cleanup_strategy" in intent
+        or "cleanup" in intent
+        or "finalizer" in intent
+    ):
+        commands.append(
+            r"python .\tools\nova_finalizer_pipeline_audit.py"
+        )
+        reason = "Cleanup changes require the focused finalizer audit smoke."
+
+
+    if (
         "route_contract" in failure
         or "api_route" in layer
         or "route" in intent
@@ -122,6 +133,7 @@ def select_smokes(
     elif "upgrade_radar" in layer or "next upgrade" in intent:
         commands.append(r"python .\tools\nova_project_brain_upgrade_radar_smoke.py")
         reason = "Upgrade ranking changes require the focused Upgrade Radar smoke."
+
 
     if not commands:
         commands.append(r"python .\tools\nova_regression_smoke.py")

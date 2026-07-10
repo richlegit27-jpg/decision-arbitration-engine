@@ -858,7 +858,7 @@ body {
      CHAT RENDERING LAYER
 ========================= -->
 
-<script src="/static/js/mobile/nova-mobile-chat-ui.js?v=chat-ui-smff-clean-20260709"></script>
+<script src="/static/js/mobile/nova-mobile-chat-ui.js?v=mobile-modular-001"></script>
 
 <script src="/static/js/mobile/nova-mobile-message-actions.js?v=mobile-actions-fix-007"></script>
 
@@ -3162,14 +3162,6 @@ console.log("[" + MARK + "] ready");
 </script>
 <!-- /NOVA_MOBILE_MENU_MEMORY_COLOR_MATCH_20260624 -->
 
-<!-- NOVA_MOBILE_REMOVE_REMAINING_RAW_TAIL_MARKERS_20260703_FIXED: removed malformed leftover mobile raw block -->
-
-</script>
-
-})();
-</script>
--->
-
 <!-- NOVA_MOBILE_ATTACHMENT_PREVIEW_MENU_TEXT_POLISH_V1_20260624 -->
 <style>
 
@@ -3879,7 +3871,7 @@ composer.style.setProperty("overflow", "visible", "important");
 <!-- DISABLED_DUPLICATE_SEND_OWNER_20260706 -->
 <!-- <script src="/static/js/mobile/nova-mobile-send-dedupe-guard-v1.js?v=send-dedupe-v1-20260703"></script> -->
 <!-- DISABLED_CHAT_VISIBLE_RECOVERY_AFTER_SESSION_CLEAN_20260706 -->
-<!-- <script src="/static/js/mobile/nova-mobile-chat-visible-recovery-v1.js?v=chat-visible-recovery-dedupe-final-20260703c"></script> -->>
+<!-- <script src="/static/js/mobile/nova-mobile-chat-visible-recovery-v1.js?v=chat-visible-recovery-dedupe-final-20260703c"></script> -->
 <!-- NOVA_SESSION_OWNER_CLEANUP_20260703: disabled duplicate sessions rescue-final loader -->
 <!-- NOVA_SESSION_OWNER_CLEANUP_20260703: disabled duplicate session fallback renderer loader -->
 
@@ -3950,7 +3942,7 @@ composer.style.setProperty("overflow", "visible", "important");
 <!-- <script src="/static/js/mobile/nova-mobile-session-clean-owner-v1.js?v=session-clean-owner-v1-20260705"></script> -->
 <!-- DISABLED DUPLICATE SESSION OWNER -->
 <!-- <script src="/static/js/mobile/nova-mobile-session-drawer-owner-v1.js?v=session-drawer-owner-v1-20260706"></script> -->
-<script src="/static/js/mobile/nova-mobile-sessions.js?v=sessions-original-lifecycle-clean-20260709f"></script>
+<script src="/static/js/mobile/nova-mobile-sessions.js?v=sessions-reopen-guard-20260709c"></script>
 
 <script>
 (function () {
@@ -4137,188 +4129,3 @@ if (settings) {
 </script>
 
 </html>
-
-
-
-
-
-
-
-<!-- NOVA_MOBILE_VOICE_TTS_ROOM_GLOW_20260709 -->
-<style>
-@media (max-width: 900px) {
-    .nova-voice-tts-glow-target {
-        position: relative !important;
-        isolation: isolate !important;
-        transition:
-            transform 140ms ease,
-            box-shadow 180ms ease,
-            border-color 180ms ease,
-            background 180ms ease,
-            color 180ms ease,
-            filter 180ms ease !important;
-    }
-
-    .nova-voice-tts-glow-target::after {
-        content: "" !important;
-        position: absolute !important;
-        inset: -7px !important;
-        border-radius: 999px !important;
-        pointer-events: none !important;
-        opacity: 0 !important;
-        transform: scale(.82) !important;
-        background:
-            radial-gradient(circle, rgba(185, 128, 255, .48), rgba(185, 128, 255, 0) 68%) !important;
-        filter: blur(7px) !important;
-        z-index: -1 !important;
-        transition:
-            opacity 180ms ease,
-            transform 180ms ease !important;
-    }
-
-    .nova-voice-tts-glow-target:active,
-    .nova-voice-tts-glow-target:focus-visible,
-    .nova-voice-tts-glow-target.nova-voice-tts-glow-on {
-        transform: translateY(-1px) scale(1.035) !important;
-        border-color: rgba(210, 170, 255, .95) !important;
-        background:
-            linear-gradient(135deg, rgba(128, 90, 213, .95), rgba(86, 67, 168, .95)) !important;
-        color: #ffffff !important;
-        box-shadow:
-            0 0 0 1px rgba(230, 210, 255, .34),
-            0 0 22px rgba(160, 110, 255, .78),
-            0 0 46px rgba(128, 90, 213, .55),
-            0 10px 28px rgba(0, 0, 0, .38) !important;
-        filter: saturate(1.2) brightness(1.08) !important;
-    }
-
-    .nova-voice-tts-glow-target:active::after,
-    .nova-voice-tts-glow-target:focus-visible::after,
-    .nova-voice-tts-glow-target.nova-voice-tts-glow-on::after {
-        opacity: 1 !important;
-        transform: scale(1.12) !important;
-    }
-
-    .nova-voice-tts-glow-target.nova-voice-tts-listening,
-    .nova-voice-tts-glow-target[aria-pressed="true"] {
-        animation: novaVoiceTtsRoomPulse20260709 1.25s ease-in-out infinite !important;
-    }
-
-    @keyframes novaVoiceTtsRoomPulse20260709 {
-        0% {
-            box-shadow:
-                0 0 0 1px rgba(230, 210, 255, .28),
-                0 0 18px rgba(160, 110, 255, .55),
-                0 0 34px rgba(128, 90, 213, .38);
-        }
-        50% {
-            box-shadow:
-                0 0 0 1px rgba(245, 235, 255, .42),
-                0 0 30px rgba(185, 128, 255, .9),
-                0 0 62px rgba(128, 90, 213, .66);
-        }
-        100% {
-            box-shadow:
-                0 0 0 1px rgba(230, 210, 255, .28),
-                0 0 18px rgba(160, 110, 255, .55),
-                0 0 34px rgba(128, 90, 213, .38);
-        }
-    }
-}
-</style>
-
-<script>
-(function () {
-    "use strict";
-
-    if (window.__NOVA_MOBILE_VOICE_TTS_ROOM_GLOW_20260709__) {
-        return;
-    }
-
-    window.__NOVA_MOBILE_VOICE_TTS_ROOM_GLOW_20260709__ = true;
-
-    function isVoiceOrTtsButton(el) {
-        if (!el || !el.matches || !el.matches("button,[role='button']")) {
-            return false;
-        }
-
-        const haystack = [
-            el.id || "",
-            el.className || "",
-            el.textContent || "",
-            el.getAttribute("aria-label") || "",
-            el.getAttribute("title") || "",
-            el.getAttribute("data-nova-action") || "",
-            el.getAttribute("data-action") || ""
-        ].join(" ").toLowerCase();
-
-        return (
-            haystack.includes("mic") ||
-            haystack.includes("microphone") ||
-            haystack.includes("voice") ||
-            haystack.includes("tts") ||
-            haystack.includes("speak") ||
-            haystack.includes("speaker") ||
-            haystack.includes("read aloud") ||
-            haystack.includes("listen")
-        );
-    }
-
-    function markTargets() {
-        document.querySelectorAll("button,[role='button']").forEach(function (button) {
-            if (isVoiceOrTtsButton(button)) {
-                button.classList.add("nova-voice-tts-glow-target");
-            }
-        });
-    }
-
-    function pulse(button) {
-        if (!button || !button.classList) {
-            return;
-        }
-
-        button.classList.add("nova-voice-tts-glow-target");
-        button.classList.add("nova-voice-tts-glow-on");
-
-        clearTimeout(button.__novaVoiceTtsGlowTimer);
-
-        button.__novaVoiceTtsGlowTimer = setTimeout(function () {
-            button.classList.remove("nova-voice-tts-glow-on");
-        }, 700);
-    }
-
-    document.addEventListener("pointerdown", function (event) {
-        const button = event.target && event.target.closest
-            ? event.target.closest("button,[role='button']")
-            : null;
-
-        if (isVoiceOrTtsButton(button)) {
-            pulse(button);
-        }
-    }, true);
-
-    document.addEventListener("click", function (event) {
-        const button = event.target && event.target.closest
-            ? event.target.closest("button,[role='button']")
-            : null;
-
-        if (isVoiceOrTtsButton(button)) {
-            pulse(button);
-        }
-    }, true);
-
-    markTargets();
-
-    const observer = new MutationObserver(function () {
-        markTargets();
-    });
-
-    observer.observe(document.documentElement, {
-        childList: true,
-        subtree: true
-    });
-
-    console.log("[NOVA VOICE/TTS ROOM GLOW] installed");
-})();
-</script>
-<!-- /NOVA_MOBILE_VOICE_TTS_ROOM_GLOW_20260709 -->
