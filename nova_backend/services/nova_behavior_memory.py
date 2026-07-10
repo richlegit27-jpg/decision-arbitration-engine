@@ -166,44 +166,104 @@ class NovaBehaviorMemory:
 
     def rank_behavior_problems(self):
 
-        counts = self.get_behavior_counts()
-
-        ranked = sorted(
-            counts.items(),
-            key=lambda item: item[1],
-            reverse=True
+        problem_scores = defaultdict(
+            lambda: {
+                "occurrences": 0,
+                "severity_score": 0
+            }
         )
 
 
-        results = []
+        severity_weights = {
+            "critical": 5,
+            "high": 3,
+            "medium": 2,
+            "low": 1,
+        }
 
 
-        for problem, count in ranked:
+        ignored_problems = {
+            "no_major_behavior_issue",
+            "none",
+            "unknown",
+            "",
+        }
 
-            if count >= 5:
+
+        for event in self.events:
+
+            problem = event.get(
+                "behavior_problem",
+                "unknown"
+            )
+
+
+            if problem in ignored_problems:
+                continue
+
+
+            severity = event.get(
+                "severity",
+                "low"
+            )
+
+
+            problem_scores[problem][
+                "occurrences"
+            ] += 1
+
+
+            problem_scores[problem][
+                "severity_score"
+            ] += severity_weights.get(
+                severity,
+                0
+            )
+
+
+        ranked = []
+
+
+        for problem, data in problem_scores.items():
+
+            total_score = (
+                data["occurrences"]
+                +
+                data["severity_score"]
+            )
+
+
+            if total_score >= 10:
                 priority = "critical"
 
-            elif count >= 3:
+            elif total_score >= 6:
                 priority = "high"
 
-            elif count >= 2:
+            elif total_score >= 3:
                 priority = "medium"
 
             else:
                 priority = "low"
 
 
-            results.append(
+            ranked.append(
                 {
                     "problem": problem,
-                    "occurrences": count,
+                    "occurrences": data["occurrences"],
+                    "severity_score": data["severity_score"],
+                    "score": total_score,
                     "priority": priority,
                 }
             )
 
 
-        return results
+        ranked.sort(
+            key=lambda item: item["score"],
+            reverse=True
+        )
 
+
+        return ranked
 
 
     def create_improvement_priority(self):
