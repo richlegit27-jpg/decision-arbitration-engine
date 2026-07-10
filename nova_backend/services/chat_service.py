@@ -115,6 +115,13 @@ from nova_backend.services.autonomy_service import AutonomyService
 from nova_backend.services.memory_ranker_service import MemoryRankerService
 from nova_backend.services.memory_service import MemoryService
 from nova_backend.services.response_rewrite_service import ResponseRewriteService
+from nova_backend.services.nova_behavior_signal_builder import (
+    behavior_signal_builder,
+)
+
+from nova_backend.services.nova_behavior_observer import (
+    behavior_observer,
+)
 from nova_backend.services.recon_service import ReconService
 from nova_backend.services.session_service import SessionService
 from nova_backend.services.web_service import WebService
@@ -129,6 +136,8 @@ from nova_backend.services.execution.executor import Executor
 from nova_backend.services.python_runner_service import PythonRunnerService
 from nova_backend.services.runtime_bootstrap import (
     RuntimeBootstrap,
+
+
 )
 from nova_backend.services.runtime_cognitive_injection_service import (
     RuntimeCognitiveInjectionService,
@@ -148,6 +157,59 @@ def exec_debug(*args):
 
 
 class ChatService:
+    def _observe_response_behavior(
+        self,
+        user_text="",
+        assistant_text="",
+        context=""
+    ):
+        """
+        Observe completed response behavior.
+
+        Learning failures must never affect chat.
+        """
+
+        try:
+
+            evaluation = (
+                behavior_signal_builder.build(
+                    user_text=user_text,
+                    assistant_text=assistant_text,
+                    context=context,
+                )
+            )
+
+            print(
+                "[NOVA BEHAVIOR EVALUATION DEBUG]",
+                evaluation
+            )
+
+            result = (
+                behavior_observer.observe(
+                    evaluation
+                )
+            )
+
+            print(
+                "[NOVA BEHAVIOR OBSERVER RESULT]",
+                result
+            )
+
+            return result
+
+        except Exception as exc:
+
+            print(
+                "[NOVA BEHAVIOR OBSERVER FAILED]",
+                type(exc).__name__,
+                str(exc)
+            )
+
+            return {
+                "observed": False,
+                "reason": "behavior_observer_failed",
+                "error_type": type(exc).__name__,
+            }
 
     def _nova_use_chat_turn_messages_enabled(self):
         # NOVA_CHAT_TURN_FEATURE_FLAG_ADAPTER_20260705
@@ -1501,7 +1563,15 @@ Current step:
         if not isinstance(mission, dict):
             mission = {}
 
-        execution_state = self._load_execution_state(session_id) or {}
+        execution_state = (
+            self._load_execution_state(session_id)
+            or (
+                working_state.get("execution_state")
+                if isinstance(working_state.get("execution_state"), dict)
+                else {}
+            )
+            or {}
+        )
 
         if not isinstance(
             execution_state,
@@ -1668,6 +1738,16 @@ Current step:
                 "execution": execution_state,
             }
 
+        print(
+            "MISSION COMMAND DEBUG FINAL =",
+            {
+                "text": text,
+                "steps": execution_state.get("steps"),
+                "current_step": execution_state.get("current_step"),
+                "status": execution_state.get("status"),
+            },
+        )
+
         return {
             "ok": True,
             "is_mission": False,
@@ -1759,9 +1839,42 @@ Current step:
             {},
         )
 
-        fallback_state = cache.get(session_id) or {}
+        cached_state = cache.get(session_id)
 
-        return fallback_state if isinstance(fallback_state, dict) else {}
+        if isinstance(cached_state, dict) and cached_state:
+            return cached_state
+
+        try:
+            session = self._get_session_payload(session_id)
+
+            if isinstance(session, dict):
+
+                execution_state = session.get("execution_state")
+
+                if isinstance(execution_state, dict) and execution_state:
+                    return execution_state
+
+                active_execution = session.get("active_execution")
+
+                if isinstance(active_execution, dict) and active_execution:
+                    return active_execution
+
+        except Exception as e:
+            exec_debug(
+                "LOAD EXECUTION STATE FAILED:",
+                e,
+            )
+
+        working_state = self._get_working_state(session_id) or {}
+
+        if isinstance(working_state, dict):
+
+            execution_state = working_state.get("execution_state")
+
+            if isinstance(execution_state, dict) and execution_state:
+                return execution_state
+
+        return {}
 
     def _save_execution_state(
         self,
@@ -2034,6 +2147,19 @@ Current step:
 
         if hasattr(self.sessions, "get_session"):
             found = self.sessions.get_session(sid)
+
+            print(
+                "[NOVA CONTINUITY DEBUG]",
+                "sid=",
+                sid,
+                "found_type=",
+                type(found),
+                "messages=",
+                len(found.get("messages", []))
+                if isinstance(found, dict)
+                else "NO_DICT",
+            )
+
             if isinstance(found, dict):
                 payload = found
 
@@ -4864,6 +4990,34 @@ if (not attachments) and (__name__ == "__main__"):
         except Exception as e:
             exec_debug("AUTO_TRACK_WORKING_STATE_ERROR:", e)
 
+        print(
+            "[NOVA FINALIZE BEHAVIOR TEST]",
+            user_text,
+        )
+
+
+        try:
+            self._observe_response_behavior(
+                user_text=user_text,
+                assistant_text=(
+                    assistant_msg.get("content")
+                    if isinstance(
+                        assistant_msg,
+                        dict
+                    )
+                    else str(
+                        assistant_msg
+                    )
+                ),
+                context="",          
+            )
+
+        except Exception as e:
+            exec_debug(
+                "BEHAVIOR_OBSERVER_FAILED:",
+                e
+            )
+
         return {
             "ok": True,
             "assistant_message": assistant_msg,
@@ -4871,6 +5025,7 @@ if (not attachments) and (__name__ == "__main__"):
                 **session,
                 "id": session_id,
             },
+
             "active_session_id": session_id,
             "session_id": session_id,
             "saved_artifact": saved_artifact,
@@ -4878,7 +5033,9 @@ if (not attachments) and (__name__ == "__main__"):
                 "decision": decision,
                 "route": "chat_service.handle",
                 "route_taken": (
-                    decision.get("route") if isinstance(decision, dict) else ""
+                    decision.get("route")
+                    if isinstance(decision, dict)
+                    else ""
                 ),
             },
         }
@@ -11054,6 +11211,14 @@ if (not attachments) and (__name__ == "__main__"):
                 session_id,
                 "active_execution",
             )
+            or (
+                self._get_working_state(session_id).get("execution_state")
+                if isinstance(
+                    self._get_working_state(session_id),
+                    dict,
+                )
+                else {}
+            )
             or {}
         )
         # =========================
@@ -12639,10 +12804,40 @@ if (not attachments) and (__name__ == "__main__"):
                 "ENTERING _process_goal_AND_PLAN",
             )
 
-            execution_state = self._process_goal_and_plan(
-                user_text,
-                session_id,
-            )
+            # NOVA_MISSION_ENGINE_BRIDGE_20260710
+            # Route planner requests into the mission system.
+
+            try:
+                from nova_backend.services.planner_service import planner_service
+                from nova_backend.services.chat_execution_service import chat_execution_service
+
+                goal = user_text.strip()
+
+                mission = planner_service.create_mission(goal)
+
+                execution_state = chat_execution_service.start(
+                    session_id=session_id,
+                    goal=mission.get("goal", goal),
+                    steps=[
+                        step.get("title", "")
+                        for step in mission.get("steps", [])
+                        if isinstance(step, dict)
+                    ],
+                )
+
+                execution_state["mission_id"] = mission.get("id")
+                execution_state["mission"] = mission
+
+            except Exception as e:
+                exec_debug(
+                    "MISSION ENGINE BRIDGE FAILED:",
+                    e,
+                )
+
+                execution_state = self._process_goal_and_plan(
+                    user_text,
+                    session_id,
+                )
 
             exec_debug(
                 "PLAN RESULT =",
@@ -12700,8 +12895,22 @@ if (not attachments) and (__name__ == "__main__"):
                 return {
                     "ok": True,
                     "assistant_message": self._build_assistant_message(
-                        "Execution plan created. Send `next` to run the first step, or `run all` for autonomous execution."
+                        (
+                            "Mission created.\n\n"
+                            f"Goal: {execution_state.get('goal', user_text)}\n\n"
+                            "Steps:\n"
+                            + "\n".join(
+                                [
+                                    f"{i + 1}. {step}"
+                                    for i, step in enumerate(
+                                        execution_state.get("steps", [])
+                                    )
+                                ]
+                            )
+                            + "\n\nSend `next` to run the first step, or `run all` for autonomous execution."
+                        )
                     ),
+
                     "session": session_payload,
                     "debug": {
                         "route": "execution_plan_created",
@@ -16282,7 +16491,17 @@ Auto-fix result:
 
                 if age_seconds <= 600:
                     has_working_mission = bool(
-                        ws.get("active_task") and ws.get("next_move")
+                        (
+                            ws.get("active_task")
+                            and ws.get("next_move")
+                        )
+                        or (
+                            isinstance(ws.get("execution_state"), dict)
+                            and (
+                                ws.get("execution_state", {}).get("mission_id")
+                                or ws.get("execution_state", {}).get("current_step")
+                            )
+                        )
                     )
 
             except Exception:
@@ -22497,7 +22716,6 @@ for name in CHAT_SERVICE_METHODS:
 
 
 
-
 # NOVA_PLANNER_SERVICE_WIRING_20260609
 # Safe planner_service wiring layer.
 # This does NOT delete the existing _process_goal_and_plan.
@@ -25997,6 +26215,25 @@ def _nova_token_usage_wrap_finalize_response_20260705():
 
                 except Exception:
                     pass
+
+            session_id = kwargs.get("session_id", "")
+
+            user_text = kwargs.get("user_text", "")
+
+            assistant_text = (
+                _nova_token_usage_extract_result_text_20260705(
+                    result
+                )
+            )
+
+            model_name = kwargs.get(
+                "model_name",
+                getattr(
+                    self,
+                    "chat_model",
+                    "unknown"
+                )
+            )
 
             record_model_usage(
                 session_id=str(session_id or ""),
