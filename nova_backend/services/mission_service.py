@@ -245,9 +245,53 @@ class MissionService:
             )
 
 
+        previous_status = (
+            mission.get(
+                "status"
+            )
+        )
+
         mission["status"] = status
 
         self._touch(mission)
+
+
+        if (
+            status
+            ==
+            "failed"
+            and
+            previous_status
+            !=
+            "failed"
+        ):
+
+            metadata = (
+                mission.get(
+                    "metadata",
+                    {}
+                )
+            )
+
+
+            if (
+                metadata.get(
+                    "mission_type"
+                )
+                ==
+                "self_improvement"
+            ):
+
+                from nova_backend.services.nova_improvement_outcome_recorder import (
+                    improvement_outcome_recorder,
+                )
+
+
+                improvement_outcome_recorder.record_outcome(
+                    mission,
+                    "failed",
+                )
+
 
         return mission
 

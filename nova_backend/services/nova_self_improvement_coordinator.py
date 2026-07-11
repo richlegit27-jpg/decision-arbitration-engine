@@ -159,13 +159,13 @@ def process_behavior_observation(
             if (
                 attempt.get(
                     "outcome"
-                ) != "completed"
+                ) == "failed"
 
                 or
 
                 attempt.get(
                     "judgment"
-                ) != "successful"
+                ) == "unsuccessful"
             )
 
         ]

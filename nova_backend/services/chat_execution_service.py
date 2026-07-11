@@ -58,17 +58,12 @@ class ChatExecutionService:
         session_id: str,
         mission_id: str,
     ):
-        state = self.states.get(session_id)
+        state = self._states.get(session_id)
 
         if not state:
             return None
 
         state["mission_id"] = mission_id
-
-        mission_service.attach_execution(
-            mission_id,
-            session_id,
-        )
 
         return state
 
@@ -142,6 +137,12 @@ class ChatExecutionService:
                 "error": "No active execution mission. Start one with auto-plan <goal>.",
             }
 
+        if state.get("status") == "failed":
+            state["waiting"] = False
+            state["complete"] = False
+            self._save_states()
+            return self._copy_state(state)
+
         if state.get("complete") or state.get("status") == "complete":
             state["status"] = "complete"
             state["waiting"] = False
@@ -191,9 +192,8 @@ class ChatExecutionService:
         mission_id = state.get("mission_id")
 
         if mission_id:
-            mission_service.update_progress(
+            mission_service.advance_step(
                 mission_id,
-                next_index,
                 {
                     "step": state.get("current_step"),
                     "status": "advanced",
@@ -224,6 +224,15 @@ class ChatExecutionService:
         state["error"] = "Execution stopped because max_steps was reached."
         self._states[safe_session_id] = state
         self._save_states()
+
+        mission_id = state.get("mission_id")
+
+        if mission_id:
+            mission_service.update_status(
+                mission_id,
+                "failed",
+            )
+
         return self._copy_state(state)
 
     def reset(self, session_id: str) -> Dict[str, Any]:
@@ -336,6 +345,7 @@ class ChatExecutionService:
             "history": list(state.get("history") or []),
             "waiting": bool(state.get("waiting")),
             "complete": bool(state.get("complete")),
+	    "mission_id": state.get("mission_id"),
             "error": state.get("error"),
         }
 
@@ -650,6 +660,7 @@ try:
         print("[NOVA_EXECUTION_EMPTY_COMPLETE_NORMALIZER_20260630] skipped: ChatExecutionService not found")
 except Exception as _nova_execution_empty_complete_error_20260630:
     print("[NOVA_EXECUTION_EMPTY_COMPLETE_NORMALIZER_20260630] failed:", _nova_execution_empty_complete_error_20260630)
+
 # NOVA_CHAT_EXECUTION_SINGLETON_20260710
 # Shared execution service instance for imports across Nova.
 chat_execution_service = ChatExecutionService()

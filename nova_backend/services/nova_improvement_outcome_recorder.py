@@ -90,7 +90,7 @@ class NovaImprovementOutcomeRecorder:
                 outcome,
 
             "status":
-                "completed",
+                outcome,
 
         }
 
