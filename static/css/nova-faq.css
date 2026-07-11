@@ -1,4 +1,4 @@
-﻿:root {
+:root {
     color-scheme: dark;
     --bg: #07060c;
     --line: rgba(226, 214, 255, .16);
@@ -333,3 +333,515 @@ a {
         width: 100%;
     }
 }
+
+/* NOVA_FAQ_ENDGAME_20260711 */
+
+:root {
+    --faq-bg: #070711;
+    --faq-panel: rgba(12, 10, 25, .74);
+    --faq-line: rgba(226, 214, 255, .14);
+    --faq-text: #f8fafc;
+    --faq-muted: rgba(226, 232, 240, .72);
+    --faq-purple: #8b5cf6;
+    --faq-pink: #ec4899;
+}
+
+html {
+    min-height: 100%;
+    background: var(--faq-bg);
+    scroll-behavior: smooth;
+}
+
+body {
+    position: relative;
+    min-height: 100vh;
+    margin: 0;
+    overflow-x: hidden;
+    color: var(--faq-text);
+    background:
+        radial-gradient(circle at 9% 5%, rgba(139, 92, 246, .31), transparent 31rem),
+        radial-gradient(circle at 88% 16%, rgba(236, 72, 153, .15), transparent 27rem),
+        radial-gradient(circle at 50% 74%, rgba(91, 33, 182, .12), transparent 35rem),
+        linear-gradient(180deg, #070711 0%, #0a0815 48%, #070711 100%);
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: .18;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, .035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, .035) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: linear-gradient(to bottom, black, transparent 78%);
+    -webkit-mask-image: linear-gradient(to bottom, black, transparent 78%);
+}
+
+.nova-faq-shell {
+    width: min(1180px, calc(100% - 28px));
+    margin: 0 auto;
+    padding: 14px 0 42px;
+}
+
+.nova-faq-nav {
+    position: sticky;
+    top: 12px;
+    z-index: 50;
+    min-height: 68px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 11px 13px;
+    border: 1px solid var(--faq-line);
+    border-radius: 26px;
+    background:
+        linear-gradient(135deg, rgba(13, 10, 25, .86), rgba(27, 17, 48, .78)),
+        rgba(8, 7, 16, .78);
+    box-shadow: 0 18px 55px rgba(0, 0, 0, .28);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+.nova-faq-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    color: inherit;
+    text-decoration: none;
+}
+
+.nova-faq-brand > span {
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    border-radius: 15px;
+    font-weight: 950;
+    background:
+        radial-gradient(circle at 28% 20%, rgba(255, 255, 255, .32), transparent 35%),
+        linear-gradient(135deg, var(--faq-purple), #5b3bd3);
+    box-shadow:
+        0 0 0 1px rgba(255, 255, 255, .10),
+        0 0 25px rgba(139, 92, 246, .32);
+}
+
+.nova-faq-brand strong,
+.nova-faq-brand em {
+    display: block;
+}
+
+.nova-faq-brand em {
+    color: var(--faq-muted);
+    font-size: 12px;
+    font-style: normal;
+}
+
+.nova-faq-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.nova-faq-actions a {
+    padding: 10px 11px;
+    border-radius: 999px;
+    color: var(--faq-muted);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 800;
+    transition:
+        color .18s ease,
+        background .18s ease,
+        transform .18s ease;
+}
+
+.nova-faq-actions a:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, .07);
+    transform: translateY(-1px);
+}
+
+.nova-faq-actions .nova-faq-access {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 18px;
+    color: #ffffff;
+    background:
+        radial-gradient(circle at 28% 20%, rgba(255, 255, 255, .24), transparent 35%),
+        linear-gradient(135deg, #8b5cf6, #5136cc);
+    box-shadow:
+        0 0 28px rgba(139, 92, 246, .30),
+        0 12px 28px rgba(0, 0, 0, .24);
+}
+
+.nova-faq-hero {
+    min-height: 560px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    margin-top: 34px;
+    padding: clamp(42px, 7vw, 76px);
+    border: 1px solid rgba(226, 214, 255, .16);
+    border-radius: 38px;
+    background:
+        radial-gradient(circle at 7% 3%, rgba(139, 92, 246, .32), transparent 39%),
+        radial-gradient(circle at 93% 20%, rgba(236, 72, 153, .11), transparent 34%),
+        linear-gradient(135deg, rgba(15, 10, 30, .93), rgba(11, 11, 25, .79));
+    box-shadow:
+        0 34px 110px rgba(0, 0, 0, .42),
+        inset 0 1px 0 rgba(255, 255, 255, .04);
+}
+
+.nova-faq-hero > p,
+.nova-faq-support p,
+.nova-faq-cta p {
+    margin: 0 0 10px;
+    color: rgba(196, 181, 253, .94);
+    font-size: 12px;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+}
+
+.nova-faq-hero h1 {
+    max-width: 980px;
+    margin: 0;
+    font-size: clamp(52px, 8.2vw, 104px);
+    line-height: .90;
+    letter-spacing: -.075em;
+    text-wrap: balance;
+}
+
+.nova-faq-hero > span {
+    display: block;
+    max-width: 790px;
+    margin-top: 22px;
+    color: var(--faq-muted);
+    font-size: clamp(17px, 1.7vw, 21px);
+    line-height: 1.62;
+    text-wrap: pretty;
+}
+
+.nova-faq-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    margin: 28px 0;
+}
+
+.nova-faq-grid article {
+    position: relative;
+    min-height: 260px;
+    padding: 29px;
+    overflow: hidden;
+    border: 1px solid rgba(226, 214, 255, .13);
+    border-radius: 28px;
+    background:
+        linear-gradient(145deg, rgba(255, 255, 255, .065), rgba(255, 255, 255, .025)),
+        rgba(10, 8, 20, .60);
+    box-shadow:
+        0 20px 60px rgba(0, 0, 0, .20),
+        inset 0 1px 0 rgba(255, 255, 255, .035);
+    transition:
+        transform .20s ease,
+        border-color .20s ease,
+        background .20s ease;
+}
+
+.nova-faq-grid article::after {
+    content: "";
+    position: absolute;
+    width: 170px;
+    height: 170px;
+    right: -78px;
+    bottom: -102px;
+    border-radius: 999px;
+    background: rgba(139, 92, 246, .13);
+    filter: blur(5px);
+}
+
+.nova-faq-grid article:hover {
+    transform: translateY(-4px);
+    border-color: rgba(167, 139, 250, .28);
+    background:
+        linear-gradient(145deg, rgba(139, 92, 246, .09), rgba(255, 255, 255, .035)),
+        rgba(10, 8, 20, .68);
+}
+
+.nova-faq-grid article > strong {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    margin-bottom: 28px;
+    color: rgba(196, 181, 253, .86);
+    font-size: 12px;
+    letter-spacing: .16em;
+}
+
+.nova-faq-grid h2 {
+    position: relative;
+    z-index: 1;
+    margin: 0;
+    max-width: 520px;
+    font-size: clamp(27px, 3vw, 39px);
+    line-height: 1;
+    letter-spacing: -.06em;
+    text-wrap: balance;
+}
+
+.nova-faq-grid p {
+    position: relative;
+    z-index: 1;
+    max-width: 58ch;
+    margin: 17px 0 0;
+    color: var(--faq-muted);
+    font-size: 16px;
+    line-height: 1.65;
+}
+
+.nova-faq-support,
+.nova-faq-cta {
+    border: 1px solid rgba(167, 139, 250, .20);
+    box-shadow:
+        0 26px 80px rgba(0, 0, 0, .28),
+        inset 0 1px 0 rgba(255, 255, 255, .04);
+}
+
+.nova-faq-support {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr);
+    gap: 28px;
+    align-items: center;
+    margin: 30px 0;
+    padding: clamp(28px, 4vw, 42px);
+    border-radius: 34px;
+    background:
+        radial-gradient(circle at 0% 0%, rgba(139, 92, 246, .28), transparent 40%),
+        rgba(14, 10, 28, .82);
+}
+
+.nova-faq-support h2,
+.nova-faq-cta h2 {
+    margin: 0;
+    line-height: .98;
+    letter-spacing: -.06em;
+    text-wrap: balance;
+}
+
+.nova-faq-support h2 {
+    max-width: 700px;
+    font-size: clamp(31px, 4vw, 52px);
+}
+
+.nova-faq-support span {
+    display: block;
+    max-width: 720px;
+    margin-top: 16px;
+    color: var(--faq-muted);
+    line-height: 1.62;
+}
+
+.nova-faq-links {
+    display: grid;
+    gap: 10px;
+}
+
+.nova-faq-links a {
+    min-height: 50px;
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    border: 1px solid rgba(226, 214, 255, .13);
+    border-radius: 16px;
+    color: rgba(248, 250, 252, .92);
+    text-decoration: none;
+    font-weight: 850;
+    background: rgba(255, 255, 255, .05);
+    transition:
+        transform .18s ease,
+        border-color .18s ease,
+        background .18s ease;
+}
+
+.nova-faq-links a:hover {
+    transform: translateX(4px);
+    border-color: rgba(167, 139, 250, .30);
+    background: rgba(139, 92, 246, .10);
+}
+
+.nova-faq-cta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    margin: 30px 0 38px;
+    padding: clamp(28px, 4vw, 42px);
+    border-radius: 34px;
+    background:
+        radial-gradient(circle at 100% 100%, rgba(236, 72, 153, .13), transparent 40%),
+        rgba(14, 10, 28, .82);
+}
+
+.nova-faq-cta h2 {
+    max-width: 720px;
+    font-size: clamp(31px, 4vw, 52px);
+}
+
+.nova-faq-cta > a {
+    min-height: 50px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 23px;
+    border-radius: 999px;
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: 950;
+    background: linear-gradient(135deg, var(--faq-purple), var(--faq-pink));
+    box-shadow:
+        0 0 36px rgba(139, 92, 246, .30),
+        0 18px 44px rgba(0, 0, 0, .28);
+    transition:
+        transform .18s ease,
+        filter .18s ease;
+}
+
+.nova-faq-cta > a:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.06);
+}
+
+.nova-faq-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    flex-wrap: wrap;
+    padding: 24px 0 4px;
+    color: var(--faq-muted);
+    border-top: 1px solid rgba(226, 214, 255, .12);
+}
+
+.nova-faq-footer div {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.nova-faq-footer a {
+    color: var(--faq-muted);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.nova-faq-footer a:hover {
+    color: #ffffff;
+}
+
+.nova-faq-actions a:focus-visible,
+.nova-faq-brand:focus-visible,
+.nova-faq-links a:focus-visible,
+.nova-faq-cta > a:focus-visible,
+.nova-faq-footer a:focus-visible {
+    outline: 3px solid rgba(216, 180, 254, .82);
+    outline-offset: 3px;
+}
+
+@media (max-width: 840px) {
+    .nova-faq-nav {
+        position: relative;
+        top: 0;
+        align-items: stretch;
+        flex-direction: column;
+        border-radius: 22px;
+    }
+
+    .nova-faq-actions {
+        justify-content: flex-start;
+    }
+
+    .nova-faq-hero {
+        min-height: auto;
+        padding: 44px 28px;
+        border-radius: 30px;
+    }
+
+    .nova-faq-hero h1 {
+        font-size: clamp(48px, 13vw, 78px);
+    }
+
+    .nova-faq-grid,
+    .nova-faq-support {
+        grid-template-columns: 1fr;
+    }
+
+    .nova-faq-grid article {
+        min-height: auto;
+    }
+
+    .nova-faq-cta {
+        align-items: stretch;
+        flex-direction: column;
+        border-radius: 28px;
+    }
+
+    .nova-faq-cta > a {
+        width: 100%;
+    }
+}
+
+@media (max-width: 560px) {
+    .nova-faq-shell {
+        width: min(100% - 20px, 1180px);
+    }
+
+    .nova-faq-actions a:not(.nova-faq-access) {
+        display: none;
+    }
+
+    .nova-faq-hero {
+        padding: 39px 22px;
+    }
+
+    .nova-faq-hero h1 {
+        font-size: clamp(43px, 14vw, 64px);
+        line-height: .91;
+    }
+
+    .nova-faq-grid article,
+    .nova-faq-support,
+    .nova-faq-cta {
+        padding: 23px;
+    }
+
+    .nova-faq-links a {
+        min-height: 54px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+
+    .nova-faq-actions a,
+    .nova-faq-grid article,
+    .nova-faq-links a,
+    .nova-faq-cta > a {
+        transition: none;
+    }
+}
+
+/* /NOVA_FAQ_ENDGAME_20260711 */
+
