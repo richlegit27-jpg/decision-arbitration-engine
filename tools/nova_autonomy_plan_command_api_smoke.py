@@ -39,8 +39,8 @@ def main() -> int:
         response = client.post(
             "/api/chat",
             json={
-                "user_text": "autonomy-plan: make Nova better at image descriptions",
-                "session_id": "autonomy_plan_command_smoke_001",
+                "user_text": "autonomy-plan improve Nova memory recall",
+                "session_id": "autonomy_plan_command_space_smoke_001",
                 "attachments": [],
             },
         )
@@ -59,7 +59,7 @@ def main() -> int:
         text,
         [
             "Nova supervised patch proposal",
-            "Goal: make Nova better at image descriptions",
+            "Goal: improve Nova memory recall",
             "Mode: proposal_only",
             "Likely files:",
             "Risks:",

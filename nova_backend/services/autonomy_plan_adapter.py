@@ -62,6 +62,31 @@ def build_autonomy_plan_response(
 ) -> Optional[Dict[str, Any]]:
     data = payload if isinstance(payload, dict) else {}
     user_text = _payload_user_text(data)
+
+    # NOVA_AUTONOMY_PLAN_SPACE_COMMAND_COMPAT_20260711
+    # Accept the natural "autonomy-plan goal" spelling by normalizing it
+    # into the adapter's existing canonical "autonomy-plan: goal" contract.
+    if (
+        isinstance(
+            user_text,
+            str,
+        )
+        and
+        user_text.strip().lower().startswith(
+            "autonomy-plan "
+        )
+    ):
+        user_text = (
+            "autonomy-plan:"
+            +
+            user_text.strip()[
+                len(
+                    "autonomy-plan"
+                )
+                :
+            ]
+        )
+
     goal = extract_autonomy_plan_input(user_text)
 
     if goal is None:

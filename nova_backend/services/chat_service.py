@@ -25210,6 +25210,24 @@ try:
         def _nova_project_state_recall_handle_20260630(self, *args, **kwargs):
             try:
                 user_text = _nova_project_state_extract_text_20260630(args, kwargs)
+
+                # NOVA_PROJECT_STATE_RECALL_CLASSIFICATION_DIRECT_TEXT_20260711
+                # Project-state classification must inspect the direct user portion only.
+                # Preserve the original enriched args for downstream general chat.
+                if isinstance(user_text, str):
+                    _nova_project_state_context_marker_20260711 = (
+                        "\n\nProject-aware context for Nova:"
+                    )
+
+                    if (
+                        _nova_project_state_context_marker_20260711
+                        in
+                        user_text
+                    ):
+                        user_text = user_text.split(
+                            _nova_project_state_context_marker_20260711,
+                            1,
+                        )[0].strip()
                 runtime_execution_state = _nova_project_state_runtime_state_20260630(self)
 
                 reply = answer_project_state_question(

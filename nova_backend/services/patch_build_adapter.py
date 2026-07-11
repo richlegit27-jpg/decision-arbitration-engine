@@ -62,6 +62,31 @@ def build_patch_build_response(
 ) -> Optional[Dict[str, Any]]:
     data = payload if isinstance(payload, dict) else {}
     user_text = _payload_user_text(data)
+
+    # NOVA_PATCH_BUILD_SPACE_COMMAND_COMPAT_20260711
+    # Accept the natural "patch-build goal" spelling by normalizing it
+    # into the adapter's existing canonical "patch-build: goal" contract.
+    if (
+        isinstance(
+            user_text,
+            str,
+        )
+        and
+        user_text.strip().lower().startswith(
+            "patch-build "
+        )
+    ):
+        user_text = (
+            "patch-build:"
+            +
+            user_text.strip()[
+                len(
+                    "patch-build"
+                )
+                :
+            ]
+        )
+
     goal = extract_patch_build_input(user_text)
 
     if goal is None:

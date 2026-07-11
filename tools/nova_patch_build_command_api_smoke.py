@@ -39,7 +39,7 @@ def main() -> int:
         response = client.post(
             "/api/chat",
             json={
-                "user_text": "patch-build: make Nova better at image descriptions",
+                "user_text": "patch-build make Nova better at image descriptions",
                 "session_id": "patch_build_command_smoke_001",
                 "attachments": [],
             },
