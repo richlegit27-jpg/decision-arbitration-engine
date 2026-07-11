@@ -63,7 +63,6 @@ class NovaImprovementHistoryService:
 
         }
 
-
         optional_fields = [
 
             "mission_id",
@@ -75,6 +74,10 @@ class NovaImprovementHistoryService:
             "engine",
 
             "recorded_at",
+
+            "judgment",
+
+            "confidence",
 
         ]
 

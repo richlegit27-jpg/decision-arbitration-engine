@@ -16,7 +16,9 @@ from nova_backend.services.nova_improvement_history_service import (
     improvement_history,
 )
 
-
+from nova_backend.services.nova_improvement_outcome_judge import (
+    improvement_outcome_judge,
+)
 class NovaImprovementOutcomeRecorder:
 
 
@@ -92,6 +94,38 @@ class NovaImprovementOutcomeRecorder:
 
         }
 
+
+        judgment = (
+            improvement_outcome_judge.evaluate(
+                {
+                    "status":
+                        outcome,
+
+                    "results":
+                        mission.get(
+                            "results",
+                            []
+                        ),
+                }
+            )
+        )
+
+
+        entry.update(
+            {
+
+                "judgment":
+                    judgment.get(
+                        "judgment"
+                    ),
+
+                "confidence":
+                    judgment.get(
+                        "confidence"
+                    ),
+
+            }
+        )
 
         improvement_history.record(
             entry
