@@ -12,6 +12,10 @@ from nova_backend.services.mission_service import (
     mission_service,
 )
 
+from nova_backend.services.nova_upgrade_mission_bridge import (
+    create_upgrade_mission_proposal,
+)
+
 
 print(
     "NOVA SELF IMPROVEMENT COMPLETION HOOK SMOKE"
@@ -22,24 +26,35 @@ print(
 )
 
 
-mission = (
-mission_service.create_mission(
-    {
-        "goal":
-            "Test self improvement completion hook",
+proposal = (
+    create_upgrade_mission_proposal(
+        {
 
-        "metadata": {
+            "decision":
+                "consider_upgrade",
 
-            "mission_type":
-                "self_improvement",
+            "recommended_upgrade":
+                "Test completion hook",
 
-            "source":
-                "nova_self_improvement_loop",
+            "priority":
+                "critical",
+
+            "target_system":
+                "general intelligence layer",
 
         }
-
-    }
+    )
 )
+
+
+mission = (
+    mission_service.create_mission(
+        proposal.get(
+            "goal",
+            "Test completion hook"
+        ),
+        metadata=proposal
+    )
 )
 
 
