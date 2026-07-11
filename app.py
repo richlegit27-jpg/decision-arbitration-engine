@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 
 def _nova_boot_log_20260701(*args, **kwargs):
@@ -87,11 +87,21 @@ from nova_backend.services.runtime_response_sanitizer_service import (
 
 # NOVA_EXECUTION_SERVICE_SINGLETON_20260607
 chat_execution_service = ChatExecutionService()
+
 app = Flask(
     __name__,
     template_folder=str(BASE_DIR / "templates"),
     static_folder=str(BASE_DIR / "static"),
 )
+# NOVA_SELF_IMPROVEMENT_REPORT_ROUTES_20260710
+try:
+    register_improvement_routes(app)
+    print("[NOVA_SELF_IMPROVEMENT_REPORT_ROUTES_20260710] installed")
+except Exception as exc:
+    print(
+        "[NOVA_SELF_IMPROVEMENT_REPORT_ROUTES_20260710] failed:",
+        exc,
+    )
 
 # NOVA_PROJECT_BRAIN_GENERAL_INTELLIGENCE_PRIORITY_20260701
 # Priority project-brain intelligence adapter.
@@ -104,28 +114,192 @@ try:
             from flask import jsonify as _nova_gi_jsonify
             from flask import request as _nova_gi_request
 
-            if _nova_gi_request.path != "/api/chat" or _nova_gi_request.method != "POST":
+            if (
+                _nova_gi_request.path != "/api/chat"
+                or _nova_gi_request.method != "POST"
+            ):
                 return None
 
-            payload = _nova_gi_request.get_json(silent=True) or {}
+            payload = (
+                _nova_gi_request.get_json(
+                    silent=True
+                )
+                or {}
+            )
 
-            attachments = payload.get("attachments") or []
+            if not isinstance(
+                payload,
+                dict,
+            ):
+                return None
+
+            attachments = (
+                payload.get(
+                    "attachments"
+                )
+                or []
+            )
+
             if attachments:
                 return None
 
-            user_text = (
-                payload.get("message")
-                or payload.get("text")
-                or payload.get("content")
-                or payload.get("user_text")
+            user_text = str(
+                payload.get(
+                    "message"
+                )
+                or payload.get(
+                    "text"
+                )
+                or payload.get(
+                    "content"
+                )
+                or payload.get(
+                    "user_text"
+                )
                 or ""
+            ).strip()
+
+            # -------------------------------------------------
+            # EXPLICIT COMMAND REGISTRY OWNS ITS COMMAND PREFIX.
+            #
+            # This Project Brain priority guard runs before the
+            # command-registry before_request guard. Explicit
+            # command-registry requests must pass through to the
+            # adapter-owned command registry route.
+            # -------------------------------------------------
+
+            explicit_command_prefixes = (
+                "command-registry:",
+                "workflow-catalog:",
             )
+
+            if (
+                user_text
+                .strip()
+                .lower()
+                .startswith(
+                    explicit_command_prefixes
+                )
+            ):
+                return None
+
+            normalized_user_text = (
+                " ".join(
+                    user_text
+                    .lower()
+                    .split()
+                )
+                .strip(" .!?")
+            )
+
+            session_id = str(
+                payload.get(
+                    "session_id"
+                )
+                or payload.get(
+                    "active_session_id"
+                )
+                or payload.get(
+                    "requested_session_id"
+                )
+                or ""
+            ).strip()
+
+            # -------------------------------------------------
+            # ACTIVE EXECUTION OWNS EXECUTION CONTROL WORDS.
+            #
+            # Project Brain general intelligence is a broad
+            # before_request interceptor. It must yield the
+            # exact execution controls Nova advertises when an
+            # active mission exists.
+            # -------------------------------------------------
+
+            execution_controls = {
+                "k",
+                "next",
+                "continue",
+                "run it",
+            }
+
+            if (
+                normalized_user_text
+                in execution_controls
+            ):
+
+                active_execution_getter = (
+                    globals().get(
+                        "_nova_phase4a_get_active_execution_20260701"
+                    )
+                )
+
+                execution_is_active = (
+                    globals().get(
+                        "_nova_phase4a_execution_is_active_20260701"
+                    )
+                )
+
+                if (
+                    callable(
+                        active_execution_getter
+                    )
+                    and callable(
+                        execution_is_active
+                    )
+                ):
+
+                    try:
+
+                        active_execution = (
+                            active_execution_getter(
+                                session_id
+                            )
+                        )
+
+                    except Exception as exc:
+
+                        active_execution = None
+
+                        try:
+                            print(
+                                "[NOVA_PROJECT_BRAIN_GENERAL_INTELLIGENCE_PRIORITY_20260701] "
+                                "active execution control priority bypass:",
+                                exc,
+                            )
+                        except Exception:
+                            pass
+
+                    if (
+                        isinstance(
+                            active_execution,
+                            dict,
+                        )
+                        and execution_is_active(
+                            active_execution
+                        )
+                    ):
+                        return None
+
+            exact_project_state_recall = {
+                "what are we working on",
+                "what did we just fix",
+                "what is left",
+            }
+
+            if (
+                normalized_user_text
+                in exact_project_state_recall
+            ):
+                return None
 
             from nova_backend.services.project_brain_general_intelligence import (
                 build_project_brain_general_answer,
             )
 
-            answer = build_project_brain_general_answer(user_text)
+            answer = (
+                build_project_brain_general_answer(
+                    user_text
+                )
+            )
 
             if not answer:
                 return None
@@ -140,20 +314,30 @@ try:
                     "content": answer.text,
                 },
                 "debug": {
-                    "route": "project_brain_general_intelligence",
-                    "route_taken": "project_brain_general_intelligence",
-                    "intent": answer.intent,
-                    "priority_project_brain_general_intelligence": True,
+                    "route":
+                        "project_brain_general_intelligence",
+                    "route_taken":
+                        "project_brain_general_intelligence",
+                    "intent":
+                        answer.intent,
+                    "priority_project_brain_general_intelligence":
+                        True,
                 },
             }
 
-            return _nova_gi_jsonify(data)
+            return _nova_gi_jsonify(
+                data
+            )
 
         except Exception as exc:
             try:
-                print("[NOVA_PROJECT_BRAIN_GENERAL_INTELLIGENCE_PRIORITY_20260701] failed:", exc)
+                print(
+                    "[NOVA_PROJECT_BRAIN_GENERAL_INTELLIGENCE_PRIORITY_20260701] failed:",
+                    exc,
+                )
             except Exception:
                 pass
+
             return None
 
     print("[NOVA_PROJECT_BRAIN_GENERAL_INTELLIGENCE_PRIORITY_20260701] installed")
@@ -2683,29 +2867,131 @@ try:
     @app.before_request
     def _nova_project_state_direct_freshness_bridge_20260702():
         try:
-            if _nova_project_state_direct_fresh_request_20260702.path != "/api/chat":
+            if (
+                _nova_project_state_direct_fresh_request_20260702.path
+                != "/api/chat"
+            ):
                 return None
 
-            if _nova_project_state_direct_fresh_request_20260702.method != "POST":
+            if (
+                _nova_project_state_direct_fresh_request_20260702.method
+                != "POST"
+            ):
                 return None
 
-            payload = _nova_project_state_direct_fresh_request_20260702.get_json(silent=True) or {}
+            payload = (
+                _nova_project_state_direct_fresh_request_20260702
+                .get_json(
+                    silent=True
+                )
+                or {}
+            )
+
+            if not isinstance(
+                payload,
+                dict,
+            ):
+                return None
+
+            session_id = str(
+                payload.get(
+                    "session_id"
+                )
+                or payload.get(
+                    "active_session_id"
+                )
+                or payload.get(
+                    "requested_session_id"
+                )
+                or ""
+            ).strip()
+
+            # -------------------------------------------------
+            # ACTIVE EXECUTION OWNS STATUS CONTINUITY.
+            #
+            # This before_request bridge runs before /api/chat
+            # endpoint wrappers. Without this priority check,
+            # exact project-state prompts return here before
+            # NOVA_PROJECT_STATE_DIRECT_FRESHNESS_ACTIVE_EXECUTION_BYPASS_20260701
+            # can answer.
+            # -------------------------------------------------
+
+            active_execution_getter = globals().get(
+                "_nova_phase4a_get_active_execution_20260701"
+            )
+
+            if callable(
+                active_execution_getter
+            ):
+
+                try:
+
+                    active_execution = (
+                        active_execution_getter(
+                            session_id
+                        )
+                    )
+
+                except Exception as exc:
+
+                    active_execution = None
+
+                    try:
+                        print(
+                            "[NOVA_PROJECT_STATE_DIRECT_FRESHNESS_BRIDGE_20260702] "
+                            "active execution priority bypass:",
+                            exc,
+                        )
+                    except Exception:
+                        pass
+
+                if isinstance(
+                    active_execution,
+                    dict,
+                ):
+
+                    execution_is_active = globals().get(
+                        "_nova_phase4a_execution_is_active_20260701"
+                    )
+
+                    if (
+                        callable(
+                            execution_is_active
+                        )
+                        and execution_is_active(
+                            active_execution
+                        )
+                    ):
+                        return None
 
             from nova_backend.services.project_state_direct_freshness_bridge import (
                 build_project_state_direct_fresh_response,
             )
 
-            response_json = build_project_state_direct_fresh_response(payload)
+            response_json = (
+                build_project_state_direct_fresh_response(
+                    payload
+                )
+            )
+
             if not response_json:
                 return None
 
-            return _nova_project_state_direct_fresh_jsonify_20260702(response_json)
+            return (
+                _nova_project_state_direct_fresh_jsonify_20260702(
+                    response_json
+                )
+            )
 
         except Exception as exc:
             try:
-                print("[NOVA_PROJECT_STATE_DIRECT_FRESHNESS_BRIDGE_20260702] failed:", exc)
+                print(
+                    "[NOVA_PROJECT_STATE_DIRECT_FRESHNESS_BRIDGE_20260702] failed:",
+                    exc,
+                )
             except Exception:
                 pass
+
             return None
 
     print("[NOVA_PROJECT_STATE_DIRECT_FRESHNESS_BRIDGE_20260702] installed")
@@ -5103,8 +5389,17 @@ def api_chat():
                 "session_attachments": [],
                 "skip_post_processing": True,
                 "skip_rewrite": True,
+                "route": "hard_bypass_casual_greeting",
+                "route_taken": "hard_bypass_casual_greeting",
+                "debug": {
+                    "route": "hard_bypass_casual_greeting",
+                    "route_taken": "hard_bypass_casual_greeting",
+                    "strategy": "hard_bypass_casual_greeting",
+                    "hard_bypass_casual_greeting": True,
+                },
                 "meta": {
                     "strategy": "hard_bypass_casual_greeting",
+                    "route": "hard_bypass_casual_greeting",
                 },
             })
 
@@ -11464,7 +11759,7 @@ def _nova_install_empty_session_spam_pruner_20260610():
                 if old_id and old_id != str(newest.get("id") or ""):
                     remove_ids.add(old_id)
 
-        # NOVA_SESSION_NEW_PRUNER_GHOST_ACTIVE_FIX_20260703
+        # NOVA_SESSION_NEW_PRUNER_GHOST_ACTIVE_REPAIR_20260703
         # Always repair a ghost active_session_id, even when nothing was pruned.
         valid_ids = [
             str(item.get("id") or "")
@@ -11504,7 +11799,7 @@ def _nova_install_empty_session_spam_pruner_20260610():
     def nova_prune_empty_session_spam_after_request_20260610(response):
         path = str(request.path or "")
 
-        # NOVA_SESSION_NEW_PRUNER_GHOST_ACTIVE_FIX_20260703
+        # NOVA_SESSION_NEW_PRUNER_MUTATION_ROUTE_SKIP_20260703
         # Do not prune immediately after session mutation routes.
         # These routes already changed the store; pruning after them can make
         # new/rename/delete/pin look flaky or leave active_session_id as a ghost.
@@ -12563,96 +12858,6 @@ def _nova_direct_clean_attachment_text_response_20260611(text_value):
         return final.strip()
     except Exception:
         return text_value
-
-
-
-# NOVA_ATTACHMENT_FINAL_JSON_RESPONSE_SYNC_20260611
-@app.after_request
-def nova_attachment_final_json_response_sync_20260611(response):
-    try:
-        if request.path != "/api/chat":
-            return response
-
-        if not response.is_json:
-            return response
-
-        data = response.get_json(silent=True)
-        if not isinstance(data, dict):
-            return response
-
-        assistant_message = data.get("assistant_message")
-        if not isinstance(assistant_message, dict):
-            return response
-
-        content = str(assistant_message.get("content") or "").strip()
-        text_value = str(assistant_message.get("text") or "").strip()
-
-        if (
-            content.startswith("Attachment analysis:")
-            and "Attachment " in content
-            and " content:" in content
-            and (
-                "This uploaded attachment contains readable text about:" in text_value
-                or "Key points:" in text_value
-                or "Preview:" in text_value
-            )
-        ):
-            assistant_message["text"] = content
-            assistant_message["content"] = content
-            data["assistant_message"] = assistant_message
-
-            import json
-            response.set_data(json.dumps(data, ensure_ascii=False))
-            response.headers["Content-Type"] = "application/json; charset=utf-8"
-
-        return response
-    except Exception:
-        return response
-
-
-
-
-# NOVA_ATTACHMENT_FINAL_RAW_JSON_RESPONSE_SYNC_20260611
-@app.after_request
-def nova_attachment_final_raw_json_response_sync_20260611(response):
-    try:
-        if request.path != "/api/chat":
-            return response
-
-        raw_body = response.get_data(as_text=True)
-        if not raw_body or "assistant_message" not in raw_body or "Attachment analysis:" not in raw_body:
-            return response
-
-        import json
-        data = json.loads(raw_body)
-        if not isinstance(data, dict):
-            return response
-
-        assistant_message = data.get("assistant_message")
-        if not isinstance(assistant_message, dict):
-            return response
-
-        content = str(assistant_message.get("content") or "").strip()
-        text_value = str(assistant_message.get("text") or "").strip()
-
-        if (
-            content.startswith("Attachment analysis:")
-            and "Attachment " in content
-            and " content:" in content
-            and content != text_value
-        ):
-            assistant_message["text"] = content
-            assistant_message["content"] = content
-            data["assistant_message"] = assistant_message
-
-            response.set_data(json.dumps(data, ensure_ascii=False))
-            response.headers["Content-Type"] = "application/json; charset=utf-8"
-            response.headers["X-Nova-Attachment-Sync"] = "raw-json-fixed"
-
-        return response
-    except Exception:
-        return response
-
 
 
 
@@ -16384,11 +16589,109 @@ try:
                 return value.strip()
         return ""
 
-    def _nova_compact_project_brain_response_20260701(user_text):
+    def _nova_compact_project_brain_response_20260701(
+        user_text,
+    ):
         # NOVA_COMPACT_PROJECT_CONTEXT_DELEGATE_TO_PROJECT_BRAIN_20260701
-        # Broad Nova project paraphrases belong to Project Brain general intelligence.
+        # Broad Nova project paraphrases belong to Project Brain
+        # general intelligence.
         try:
-            normalized = _nova_compact_project_normalize_20260701(user_text)
+            normalized = (
+                _nova_compact_project_normalize_20260701(
+                    user_text
+                )
+            )
+
+            # -------------------------------------------------
+            # EXPLICIT COMMAND REGISTRY OWNS ITS COMMAND PREFIX.
+            # -------------------------------------------------
+
+            if normalized.startswith(
+                "command-registry:"
+            ):
+                return None
+
+            # -------------------------------------------------
+            # ACTIVE EXECUTION OWNS EXECUTION CONTROL WORDS.
+            #
+            # This compact Project Brain delegate is a second
+            # Project Brain interception path. It must yield the
+            # exact execution-control words Nova advertises when
+            # an active mission exists.
+            # -------------------------------------------------
+
+            execution_controls = {
+                "k",
+                "next",
+                "continue",
+                "run it",
+            }
+
+            if normalized in execution_controls:
+
+                request_data = (
+                    _nova_compact_project_request_json_20260701()
+                )
+
+                session_id = str(
+                    request_data.get(
+                        "session_id"
+                    )
+                    or request_data.get(
+                        "active_session_id"
+                    )
+                    or request_data.get(
+                        "requested_session_id"
+                    )
+                    or ""
+                ).strip()
+
+                active_execution_getter = globals().get(
+                    "_nova_phase4a_get_active_execution_20260701"
+                )
+
+                execution_is_active = globals().get(
+                    "_nova_phase4a_execution_is_active_20260701"
+                )
+
+                if (
+                    callable(
+                        active_execution_getter
+                    )
+                    and callable(
+                        execution_is_active
+                    )
+                ):
+
+                    try:
+                        active_execution = (
+                            active_execution_getter(
+                                session_id
+                            )
+                        )
+
+                    except Exception as exc:
+                        active_execution = None
+
+                        try:
+                            print(
+                                "[NOVA_COMPACT_PROJECT_CONTEXT_DELEGATE_TO_PROJECT_BRAIN_20260701] "
+                                "active execution control bypass:",
+                                exc,
+                            )
+                        except Exception:
+                            pass
+
+                    if (
+                        isinstance(
+                            active_execution,
+                            dict,
+                        )
+                        and execution_is_active(
+                            active_execution
+                        )
+                    ):
+                        return None
 
             direct_recall_prompts = {
                 "what are we working on",
@@ -16406,14 +16709,30 @@ try:
                 build_project_brain_general_answer,
             )
 
-            answer = build_project_brain_general_answer(user_text)
+            answer = (
+                build_project_brain_general_answer(
+                    user_text
+                )
+            )
 
             if not answer:
                 return None
 
-            answer_text = str(getattr(answer, "text", answer) or "").strip()
+            answer_text = str(
+                getattr(
+                    answer,
+                    "text",
+                    answer,
+                )
+                or ""
+            ).strip()
+
             answer_intent = str(
-                getattr(answer, "intent", "general_project_answer")
+                getattr(
+                    answer,
+                    "intent",
+                    "general_project_answer",
+                )
                 or "general_project_answer"
             ).strip()
 
@@ -16431,17 +16750,25 @@ try:
                             "text": answer_text,
                             "attachments": [],
                         },
-                        "route": "project_brain_general_intelligence",
-                        "route_taken": "project_brain_general_intelligence",
+                        "route":
+                            "project_brain_general_intelligence",
+                        "route_taken":
+                            "project_brain_general_intelligence",
                         "debug": {
-                            "route": "project_brain_general_intelligence",
-                            "route_taken": "project_brain_general_intelligence",
-                            "intent": answer_intent,
-                            "compact_project_context_delegated": True,
+                            "route":
+                                "project_brain_general_intelligence",
+                            "route_taken":
+                                "project_brain_general_intelligence",
+                            "intent":
+                                answer_intent,
+                            "compact_project_context_delegated":
+                                True,
                         },
                         "meta": {
-                            "route": "project_brain_general_intelligence",
-                            "strategy": "project_brain_general_intelligence",
+                            "route":
+                                "project_brain_general_intelligence",
+                            "strategy":
+                                "project_brain_general_intelligence",
                         },
                     },
                     ensure_ascii=False,
@@ -16457,8 +16784,8 @@ try:
                 )
             except Exception:
                 pass
-            return None
 
+            return None
     def _nova_compact_project_load_context_20260701():
         service_path = (
             _NovaCompactProjectPath20260701(__file__)
@@ -16777,7 +17104,7 @@ except Exception as _nova_autonomy_install_error_20260701:
 
 # NOVA_AUTONOMY_PLAN_ADAPTER_GUARD_20260701
 # One-command adapter migration for autonomy-plan.
-# Keeps old guard below as fallback while adapter owns matching command requests.
+# Adapter owns matching command requests; legacy fallback guard has been removed.
 try:
     @app.before_request
     def nova_autonomy_plan_adapter_guard_20260701():
@@ -16811,7 +17138,7 @@ except Exception as _nova_autonomy_plan_adapter_install_error_20260701:
 
 # NOVA_PATCH_BUILD_ADAPTER_GUARD_20260701
 # One-command adapter migration for patch-build.
-# Keeps old guard below as fallback while adapter owns matching command requests.
+# Adapter owns matching command requests; legacy fallback guard has been removed.
 try:
     @app.before_request
     def nova_patch_build_adapter_guard_20260701():
@@ -17195,39 +17522,176 @@ try:
 
         return None
 
-    def _nova_phase4a_get_working_state_20260701(session_id):
-        session_id = str(session_id or "").strip()
+    def _nova_phase4a_get_working_state_20260701(
+        session_id,
+    ):
+        session_id = str(
+            session_id
+            or ""
+        ).strip()
+
         if not session_id:
             return {}
 
-        svc = _nova_phase4a_session_service_20260701()
+        merged_state = {}
 
-        for method_name in ("get_working_state",):
-            method = getattr(svc, method_name, None)
-            if callable(method):
-                try:
-                    state = method(session_id)
-                    if isinstance(state, dict):
-                        return dict(state)
-                except Exception:
-                    pass
+        svc = (
+            _nova_phase4a_session_service_20260701()
+        )
 
-        for method_name in ("get_session", "get"):
-            method = getattr(svc, method_name, None)
-            if callable(method):
-                try:
-                    session = method(session_id)
-                    if isinstance(session, dict) and isinstance(session.get("working_state"), dict):
-                        return dict(session.get("working_state"))
-                except Exception:
-                    pass
+        # -------------------------------------------------
+        # 1. Read service working state.
+        #
+        # Some service implementations normalize/filter
+        # working_state keys, so this source is useful but
+        # must not be treated as the only source.
+        # -------------------------------------------------
 
-        data, _ = _nova_phase4a_read_sessions_file_20260701()
-        session = _nova_phase4a_find_session_20260701(data, session_id)
-        if isinstance(session, dict) and isinstance(session.get("working_state"), dict):
-            return dict(session.get("working_state"))
+        method = getattr(
+            svc,
+            "get_working_state",
+            None,
+        )
 
-        return {}
+        if callable(method):
+
+            try:
+
+                state = method(
+                    session_id
+                )
+
+                if isinstance(
+                    state,
+                    dict,
+                ):
+                    merged_state.update(
+                        state
+                    )
+
+            except Exception:
+                pass
+
+        # -------------------------------------------------
+        # 2. Read the full service session.
+        #
+        # Execution is intentionally persisted at the
+        # session top level for restart recovery.
+        # -------------------------------------------------
+
+        for method_name in (
+            "get_session",
+            "get",
+        ):
+
+            method = getattr(
+                svc,
+                method_name,
+                None,
+            )
+
+            if not callable(method):
+                continue
+
+            try:
+
+                session = method(
+                    session_id
+                )
+
+            except Exception:
+                session = None
+
+            if not isinstance(
+                session,
+                dict,
+            ):
+                continue
+
+            working_state = session.get(
+                "working_state"
+            )
+
+            if isinstance(
+                working_state,
+                dict,
+            ):
+                merged_state.update(
+                    working_state
+                )
+
+            for key in (
+                "active_execution",
+                "execution_state",
+                "execution",
+            ):
+
+                execution = session.get(
+                    key
+                )
+
+                if isinstance(
+                    execution,
+                    dict,
+                ):
+                    merged_state[key] = (
+                        execution
+                    )
+
+        # -------------------------------------------------
+        # 3. Read durable session storage.
+        #
+        # This is the restart/recovery authority when the
+        # in-memory service state is incomplete.
+        # -------------------------------------------------
+
+        data, _ = (
+            _nova_phase4a_read_sessions_file_20260701()
+        )
+
+        session = (
+            _nova_phase4a_find_session_20260701(
+                data,
+                session_id,
+            )
+        )
+
+        if isinstance(
+            session,
+            dict,
+        ):
+
+            working_state = session.get(
+                "working_state"
+            )
+
+            if isinstance(
+                working_state,
+                dict,
+            ):
+                merged_state.update(
+                    working_state
+                )
+
+            for key in (
+                "active_execution",
+                "execution_state",
+                "execution",
+            ):
+
+                execution = session.get(
+                    key
+                )
+
+                if isinstance(
+                    execution,
+                    dict,
+                ):
+                    merged_state[key] = (
+                        execution
+                    )
+
+        return merged_state
 
     def _nova_phase4a_persist_working_state_20260701(session_id, patch):
         session_id = str(session_id or "").strip()
@@ -18046,399 +18510,9 @@ except Exception as _nova_phase4g_chat_guard_error_20260701:
 # NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701
 # Must be above
 
-# NOVA_FINAL_RESPONSE_SHAPE_CONTENT_DEBUG_20260701
-# Final payload polish: preserve assistant_message.content and debug fields
-# even when later response-cache wrappers rebuild JSON from assistant_message.text.
-try:
-    import json as _nova_final_shape_json_20260701
-
-    @app.after_request
-    def _nova_final_response_shape_content_debug_20260701(response):
-        try:
-            content_type = str(response.headers.get("Content-Type") or "").lower()
-            if "application/json" not in content_type:
-                return response
-
-            raw = response.get_data(as_text=True)
-            if not raw:
-                return response
-
-            data = _nova_final_shape_json_20260701.loads(raw)
-            if not isinstance(data, dict):
-                return response
-
-            changed = False
-
-            assistant = data.get("assistant_message")
-            if isinstance(assistant, dict):
-                text_value = str(
-                    assistant.get("text")
-                    or assistant.get("content")
-                    or data.get("text")
-                    or ""
-                )
-
-                if text_value:
-                    if not assistant.get("text"):
-                        assistant["text"] = text_value
-                        changed = True
-
-                    if not assistant.get("content"):
-                        assistant["content"] = text_value
-                        changed = True
-
-                    data["assistant_message"] = assistant
-
-                    if not data.get("text"):
-                        data["text"] = text_value
-                        changed = True
-
-            route_value = str(data.get("route") or "").strip()
-            route_taken_value = str(data.get("route_taken") or route_value or "").strip()
-
-            if route_value or route_taken_value:
-                debug = data.get("debug")
-                if not isinstance(debug, dict):
-                    debug = {}
-                    changed = True
-
-                if route_value and not debug.get("route"):
-                    debug["route"] = route_value
-                    changed = True
-
-                if route_taken_value and not debug.get("route_taken"):
-                    debug["route_taken"] = route_taken_value
-                    changed = True
-
-                data["debug"] = debug
-
-            if changed:
-                response.set_data(
-                    _nova_final_shape_json_20260701.dumps(
-                        data,
-                        ensure_ascii=False,
-                    )
-                )
-                response.headers["Content-Type"] = "application/json"
-                response.headers["Content-Length"] = str(len(response.get_data()))
-
-        except Exception as exc:
-            try:
-                app.logger.warning(
-                    "[NOVA_FINAL_RESPONSE_SHAPE_CONTENT_DEBUG_20260701] failed: %s",
-                    exc,
-                )
-            except Exception:
-                pass
-
-        return response
-
-    print("[NOVA_FINAL_RESPONSE_SHAPE_CONTENT_DEBUG_20260701] installed")
-except Exception as _nova_final_shape_error_20260701:
-    print("[NOVA_FINAL_RESPONSE_SHAPE_CONTENT_DEBUG_20260701] failed:", _nova_final_shape_error_20260701)
-
 # NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611
 
 
-# NOVA_API_CHAT_PROJECT_NEXT_FINAL_OVERRIDE_20260701
-# Final API response override for exact project-brain "what's next?" questions.
-# This catches generic chat fallback after chat_service.handle and before UI/PowerShell see it.
-try:
-    import json as _nova_project_next_json_20260701
-    from flask import request as _nova_project_next_request_20260701
-
-    def _nova_project_next_is_question_20260701(text):
-        normalized = (
-            str(text or "")
-            .strip()
-            .lower()
-            .replace("?", "'")
-            .rstrip("?!.")
-        )
-        return normalized in {
-            "what's next",
-            "whats next",
-            "what is next",
-            "what should we do next",
-            "next move",
-        }
-
-    def _nova_project_next_is_bad_answer_20260701(text):
-        lowered = str(text or "").strip().lower()
-        if not lowered:
-            return True
-
-        bad_bits = [
-            "tell me the immediate context",
-            "need the current target",
-            "send the file path",
-            "file path + goal",
-            "paste the current file",
-            "paste the current file/error",
-            "give me the immediate context",
-            "pick one and i'll give",
-            "current target to answer",
-            "debug/fix a bug",
-            "project planning",
-            "conversation/doc draft",
-            "general priority help",
-        ]
-
-        return any(bit in lowered for bit in bad_bits)
-
-    def _nova_project_next_answer_20260701():
-        return (
-            "Current Nova project context:\n"
-            "Current task: Project Brain cleanup and consolidation. Core decision, routing, "
-            "failure interpretation, and decision logging systems remain protected.\n"
-            "Next move: start Project Brain cleanup/consolidation while preserving direct recall, "
-            "broad Project Brain routing, and avoiding another app.py guard."
-        )
-
-    @app.after_request
-    def _nova_api_chat_project_next_final_override_20260701(response):
-        try:
-            if not _nova_project_next_request_20260701.path.endswith("/api/chat"):
-                return response
-
-            payload = _nova_project_next_request_20260701.get_json(silent=True) or {}
-            user_text = (
-                payload.get("message")
-                or payload.get("user_text")
-                or payload.get("text")
-                or payload.get("prompt")
-                or ""
-            )
-
-            if not _nova_project_next_is_question_20260701(user_text):
-                return response
-
-            raw = response.get_data(as_text=True)
-            if not raw:
-                return response
-
-            data = _nova_project_next_json_20260701.loads(raw)
-
-            assistant_message = data.get("assistant_message")
-            if not isinstance(assistant_message, dict):
-                assistant_message = {}
-
-            assistant_text = (
-                assistant_message.get("content")
-                or assistant_message.get("text")
-                or data.get("assistant_text")
-                or data.get("text")
-                or ""
-            )
-
-            if str(assistant_text or "").strip().lower().startswith("current nova project context:"):
-                return response
-
-            fixed_text = _nova_project_next_answer_20260701()
-
-            meta = data.get("meta")
-            if not isinstance(meta, dict):
-                meta = {}
-            meta["route"] = "api_chat_project_next_final_override"
-            meta["strategy"] = "api_chat_project_next_final_override"
-
-            debug = data.get("debug")
-            if not isinstance(debug, dict):
-                debug = {}
-            debug["route"] = "api_chat_project_next_final_override"
-            debug["route_taken"] = "api_chat_project_next_final_override"
-
-            assistant_message["role"] = "assistant"
-            assistant_message["content"] = fixed_text
-            assistant_message["text"] = fixed_text
-            assistant_message["meta"] = meta
-
-            data["assistant_message"] = assistant_message
-            data["assistant_text"] = fixed_text
-            data["text"] = fixed_text
-            data["route"] = "api_chat_project_next_final_override"
-            data["route_taken"] = "api_chat_project_next_final_override"
-            data["meta"] = meta
-            data["debug"] = debug
-
-            session_obj = data.get("session")
-            if isinstance(session_obj, dict):
-                session_obj["meta"] = meta
-                messages = session_obj.get("messages")
-                if isinstance(messages, list):
-                    for msg in reversed(messages):
-                        if isinstance(msg, dict) and str(msg.get("role") or "").lower() == "assistant":
-                            msg["content"] = fixed_text
-                            msg["text"] = fixed_text
-                            msg["meta"] = meta
-                            break
-
-            response.set_data(_nova_project_next_json_20260701.dumps(data, ensure_ascii=False))
-            response.headers["Content-Type"] = "application/json"
-            response.headers["Content-Length"] = str(len(response.get_data()))
-            return response
-
-        except Exception as _nova_project_next_override_error_20260701:
-            try:
-                print(
-                    "[NOVA_API_CHAT_PROJECT_NEXT_FINAL_OVERRIDE_20260701] bypass:",
-                    _nova_project_next_override_error_20260701,
-                )
-            except Exception:
-                pass
-            return response
-
-    print("[NOVA_API_CHAT_PROJECT_NEXT_FINAL_OVERRIDE_20260701] installed")
-
-except Exception as _nova_project_next_final_install_error_20260701:
-    try:
-        print(
-            "[NOVA_API_CHAT_PROJECT_NEXT_FINAL_OVERRIDE_20260701] failed:",
-            _nova_project_next_final_install_error_20260701,
-        )
-    except Exception:
-        pass
-
-
-# NOVA_API_CHAT_PROJECT_NEXT_BEFORE_REQUEST_PRIORITY_20260701
-# Hard priority intercept for exact project-brain "what's next?" before chat_service.handle.
-# This avoids generic chat/model fallback and avoids after_request ordering issues.
-try:
-    import json as _nova_project_next_before_json_20260701
-    from flask import request as _nova_project_next_before_request_20260701
-    from flask import Response as _nova_project_next_before_response_20260701
-
-    def _nova_project_next_before_norm_20260701(value):
-        return (
-            str(value or "")
-            .strip()
-            .lower()
-            .replace("?", "'")
-            .rstrip("?!.")
-        )
-
-    def _nova_project_next_before_is_question_20260701(value):
-        return _nova_project_next_before_norm_20260701(value) in {
-            "what's next",
-            "whats next",
-            "what is next",
-            "what should we do next",
-            "next move",
-        }
-
-    def _nova_project_next_before_answer_20260701():
-        return (
-            "Current Nova project context:\n"
-            "Current task: Decision Engine v1, broad Project Brain routing, Mission Control v1.2 / Failure Interpreter API, and Decision Log API route are locked.\n"
-            "Next move: start Project Brain cleanup/consolidation while preserving direct recall, "
-            "broad Project Brain routing, and avoiding another app.py guard."
-        )
-
-    @app.before_request
-    def _nova_api_chat_project_next_before_request_priority_20260701():
-        try:
-            if not _nova_project_next_before_request_20260701.path.endswith("/api/chat"):
-                return None
-
-            payload = _nova_project_next_before_request_20260701.get_json(silent=True) or {}
-            if not isinstance(payload, dict):
-                return None
-
-            user_text = (
-                payload.get("message")
-                or payload.get("user_text")
-                or payload.get("text")
-                or payload.get("prompt")
-                or ""
-            )
-
-            if not _nova_project_next_before_is_question_20260701(user_text):
-                return None
-
-            session_id = str(
-                payload.get("session_id")
-                or payload.get("active_session_id")
-                or payload.get("requested_session_id")
-                or ""
-            ).strip()
-
-            fixed_text = _nova_project_next_before_answer_20260701()
-
-            meta = {
-                "route": "api_chat_project_next_before_request_priority",
-                "strategy": "api_chat_project_next_before_request_priority",
-                "session_id": session_id,
-                "source_urls": [],
-                "sources": [],
-            }
-
-            assistant_message = {
-                "role": "assistant",
-                "content": fixed_text,
-                "text": fixed_text,
-                "attachments": [],
-                "meta": meta,
-            }
-
-            data = {
-                "ok": True,
-                "success": True,
-                "assistant_message": assistant_message,
-                "assistant_text": fixed_text,
-                "text": fixed_text,
-                "saved_artifact": None,
-                "session": {
-                    "id": session_id,
-                    "session_id": session_id,
-                    "messages": [assistant_message],
-                    "attachments": [],
-                    "meta": meta,
-                },
-                "route": "api_chat_project_next_before_request_priority",
-                "route_taken": "api_chat_project_next_before_request_priority",
-                "debug": {
-                    "route": "api_chat_project_next_before_request_priority",
-                    "route_taken": "api_chat_project_next_before_request_priority",
-                },
-                "meta": meta,
-                "session_id": session_id,
-                "active_session_id": session_id,
-            }
-
-            try:
-                print(
-                    "[NOVA_API_CHAT_PROJECT_NEXT_BEFORE_REQUEST_PRIORITY_20260701] intercepted",
-                    "session_id=" + session_id,
-                )
-            except Exception:
-                pass
-
-            return _nova_project_next_before_response_20260701(
-                _nova_project_next_before_json_20260701.dumps(data, ensure_ascii=False),
-                status=200,
-                mimetype="application/json",
-            )
-
-        except Exception as _nova_project_next_before_error_20260701:
-            try:
-                print(
-                    "[NOVA_API_CHAT_PROJECT_NEXT_BEFORE_REQUEST_PRIORITY_20260701] bypass:",
-                    _nova_project_next_before_error_20260701,
-                )
-            except Exception:
-                pass
-            return None
-
-    print("[NOVA_API_CHAT_PROJECT_NEXT_BEFORE_REQUEST_PRIORITY_20260701] installed")
-
-except Exception as _nova_project_next_before_install_error_20260701:
-    try:
-        print(
-            "[NOVA_API_CHAT_PROJECT_NEXT_BEFORE_REQUEST_PRIORITY_20260701] failed:",
-            _nova_project_next_before_install_error_20260701,
-        )
-    except Exception:
-        pass
 
 # Must be above app.run(). Keeps normal chat from being overwritten by stale project/autonomy state.
 try:
@@ -18947,191 +19021,6 @@ try:
 except Exception as _nova_repair_plan_api_before_request_error_20260701:
     print("[NOVA_REPAIR_PLAN_API_BEFORE_REQUEST_PRIORITY_20260701] failed:", _nova_repair_plan_api_before_request_error_20260701)
 
-# NOVA_API_CHAT_PROJECT_NEXT_ENDPOINT_WRAPPER_20260701
-# Final route-table wrapper for exact project-brain "what's next?"
-# Installed immediately before app.run so it wraps the current /api/chat view.
-try:
-    import json as _nova_project_next_wrap_json_20260701
-    from flask import request as _nova_project_next_wrap_request_20260701
-    from flask import Response as _nova_project_next_wrap_response_20260701
-
-    def _nova_project_next_wrap_norm_20260701(value):
-        return (
-            str(value or "")
-            .strip()
-            .lower()
-            .replace("?", "'")
-            .rstrip("?!.")
-        )
-
-    def _nova_project_next_wrap_is_question_20260701(value):
-        return _nova_project_next_wrap_norm_20260701(value) in {
-            "what's next",
-            "whats next",
-            "what is next",
-            "what should we do next",
-            "next move",
-        }
-
-    def _nova_project_next_wrap_answer_20260701():
-        return (
-            "Current Nova project context:\n"
-            "Current task: Project Brain cleanup and consolidation. Core decision, routing, "
-            "failure interpretation, and decision logging systems remain protected.\n"
-            "Next move: start Project Brain cleanup/consolidation while preserving direct recall, "
-            "broad Project Brain routing, and avoiding another app.py guard."
-        )
-
-    def _nova_project_next_wrap_response_20260701(session_id):
-        fixed_text = _nova_project_next_wrap_answer_20260701()
-
-        meta = {
-            "route": "api_chat_project_next_endpoint_wrapper",
-            "strategy": "api_chat_project_next_endpoint_wrapper",
-            "session_id": session_id,
-            "source_urls": [],
-            "sources": [],
-        }
-
-        assistant_message = {
-            "role": "assistant",
-            "content": fixed_text,
-            "text": fixed_text,
-            "attachments": [],
-            "meta": meta,
-        }
-
-        data = {
-            "ok": True,
-            "success": True,
-            "assistant_message": assistant_message,
-            "assistant_text": fixed_text,
-            "text": fixed_text,
-            "saved_artifact": None,
-            "session": {
-                "id": session_id,
-                "session_id": session_id,
-                "messages": [assistant_message],
-                "attachments": [],
-                "meta": meta,
-            },
-            "route": "api_chat_project_next_endpoint_wrapper",
-            "route_taken": "api_chat_project_next_endpoint_wrapper",
-            "debug": {
-                "route": "api_chat_project_next_endpoint_wrapper",
-                "route_taken": "api_chat_project_next_endpoint_wrapper",
-            },
-            "meta": meta,
-            "session_id": session_id,
-            "active_session_id": session_id,
-        }
-
-        return _nova_project_next_wrap_response_20260701(
-            _nova_project_next_wrap_json_20260701.dumps(data, ensure_ascii=False),
-            status=200,
-            mimetype="application/json",
-        )
-
-    def _nova_project_next_wrap_endpoint_20260701(endpoint_name, original_view):
-        if not callable(original_view):
-            return False
-
-        if getattr(original_view, "_nova_project_next_endpoint_wrapper_20260701", False):
-            return False
-
-        def _nova_project_next_wrapped_view_20260701(*args, **kwargs):
-            try:
-                if (
-                    str(getattr(_nova_project_next_wrap_request_20260701, "path", "") or "") == "/api/chat"
-                    and str(getattr(_nova_project_next_wrap_request_20260701, "method", "") or "").upper() == "POST"
-                ):
-                    payload = _nova_project_next_wrap_request_20260701.get_json(silent=True) or {}
-                    if isinstance(payload, dict):
-                        user_text = (
-                            payload.get("message")
-                            or payload.get("user_text")
-                            or payload.get("text")
-                            or payload.get("prompt")
-                            or ""
-                        )
-
-                        if _nova_project_next_wrap_is_question_20260701(user_text):
-                            session_id = str(
-                                payload.get("session_id")
-                                or payload.get("active_session_id")
-                                or payload.get("requested_session_id")
-                                or ""
-                            ).strip()
-
-                            try:
-                                print(
-                                    "[NOVA_API_CHAT_PROJECT_NEXT_ENDPOINT_WRAPPER_20260701] intercepted",
-                                    "session_id=" + session_id,
-                                )
-                            except Exception:
-                                pass
-
-                            return _nova_project_next_wrap_response_20260701(session_id)
-
-            except Exception as _nova_project_next_wrap_request_error_20260701:
-                try:
-                    print(
-                        "[NOVA_API_CHAT_PROJECT_NEXT_ENDPOINT_WRAPPER_20260701] bypass:",
-                        _nova_project_next_wrap_request_error_20260701,
-                    )
-                except Exception:
-                    pass
-
-            return original_view(*args, **kwargs)
-
-        _nova_project_next_wrapped_view_20260701.__name__ = getattr(
-            original_view,
-            "__name__",
-            "nova_project_next_wrapped_api_chat",
-        )
-        _nova_project_next_wrapped_view_20260701.__doc__ = getattr(original_view, "__doc__", None)
-        _nova_project_next_wrapped_view_20260701._nova_project_next_endpoint_wrapper_20260701 = True
-
-        app.view_functions[endpoint_name] = _nova_project_next_wrapped_view_20260701
-        return True
-
-    _nova_project_next_wrapped_count_20260701 = 0
-
-    for _nova_project_next_rule_20260701 in list(app.url_map.iter_rules()):
-        try:
-            if getattr(_nova_project_next_rule_20260701, "rule", "") != "/api/chat":
-                continue
-
-            _nova_project_next_endpoint_name_20260701 = getattr(
-                _nova_project_next_rule_20260701,
-                "endpoint",
-                "",
-            )
-            _nova_project_next_original_view_20260701 = app.view_functions.get(
-                _nova_project_next_endpoint_name_20260701
-            )
-
-            if _nova_project_next_wrap_endpoint_20260701(
-                _nova_project_next_endpoint_name_20260701,
-                _nova_project_next_original_view_20260701,
-            ):
-                _nova_project_next_wrapped_count_20260701 += 1
-        except Exception:
-            pass
-
-    print(
-        "[NOVA_API_CHAT_PROJECT_NEXT_ENDPOINT_WRAPPER_20260701] wrapped endpoints:",
-        _nova_project_next_wrapped_count_20260701,
-    )
-
-except Exception as _nova_project_next_endpoint_wrapper_error_20260701:
-    try:
-        print(
-            "[NOVA_API_CHAT_PROJECT_NEXT_ENDPOINT_WRAPPER_20260701] failed:",
-            _nova_project_next_endpoint_wrapper_error_20260701,
-        )
-    except Exception:
-        pass
 
 # NOVA_API_CHAT_PROJECT_NEXT_ENDPOINT_WRAPPER_FIXED_20260701
 # Corrected route-table wrapper for exact project-brain "what's next?"
@@ -19156,17 +19045,75 @@ try:
             "whats next",
             "what is next",
             "what should we do next",
-            "next move",
         }
 
     def _nova_next_fixed_answer_20260701():
-        return (
-            "Current Nova project context:\n"
-            "Current task: Project Brain cleanup and consolidation. Core decision, routing, "
-"failure interpretation, and decision logging systems remain protected.\n"
-            "Next move: start Project Brain cleanup/consolidation while preserving direct recall, "
-            "broad Project Brain routing, and avoiding another app.py guard."
+        from flask import (
+            request as _nova_next_fixed_request_20260711,
         )
+
+        from nova_backend.services.project_brain_general_intelligence import (
+            build_project_brain_general_answer as
+            _nova_next_fixed_build_general_answer_20260711,
+        )
+
+        payload = (
+            _nova_next_fixed_request_20260711.get_json(
+                silent=True
+            )
+            or {}
+        )
+
+        user_text = str(
+            payload.get(
+                "message"
+            )
+            or payload.get(
+                "text"
+            )
+            or payload.get(
+                "content"
+            )
+            or payload.get(
+                "user_text"
+            )
+            or ""
+        ).strip()
+
+        general_answer = (
+            _nova_next_fixed_build_general_answer_20260711(
+                user_text
+            )
+        )
+
+        if isinstance(
+            general_answer,
+            dict,
+        ):
+            answer = str(
+                general_answer.get(
+                    "content"
+                )
+                or general_answer.get(
+                    "text"
+                )
+                or general_answer.get(
+                    "answer"
+                )
+                or ""
+            ).strip()
+
+        else:
+            answer = str(
+                getattr(
+                    general_answer,
+                    "text",
+                    general_answer,
+                )
+                or ""
+            ).strip()
+
+        return answer
 
     def _nova_next_fixed_make_response_20260701(session_id):
         fixed_text = _nova_next_fixed_answer_20260701()
@@ -20598,13 +20545,35 @@ def api_attachment_status():
             details["intent_guard_error"] = str(exc)
 
         try:
-            from nova_backend.services.chat_service import ChatService
+            from nova_backend.services import chat_service
 
-            modules["web_guard"] = bool(
-                getattr(ChatService, "_nova_attachment_guard_web_suppression_installed", False)
-                or getattr(ChatService, "_nova_attachment_guard_web_routing_suppression_installed", False)
+            web_guard_ready = all(
+                hasattr(chat_service, name)
+                for name in (
+                    "_nova_attachment_guard_should_suppress_current_web_call",
+                    "_nova_attachment_guard_install_web_routing_suppression",
+                    "_nova_install_attachment_guard_web_suppression",
+                )
             )
+
+            installer = getattr(
+                chat_service,
+                "_nova_attachment_guard_install_web_routing_suppression",
+                None,
+            )
+
+            if callable(installer):
+                install_result = installer()
+
+                if (
+                    isinstance(install_result, dict)
+                    and install_result.get("ok") is False
+                ):
+                    web_guard_ready = False
+
+            modules["web_guard"] = web_guard_ready
         except Exception as exc:
+            modules["web_guard"] = False
             details["web_guard_error"] = str(exc)
 
         ready = all(modules.values())
@@ -21672,16 +21641,6 @@ except Exception as _nova_payments_readiness_routes_error_20260709:
     print("[NOVA_PAYMENTS_READINESS_ROUTES_20260709] install failed:", _nova_payments_readiness_routes_error_20260709)
 # /NOVA_PAYMENTS_READINESS_ROUTES_20260709
 
-if __name__ == "__main__":
-    create_startup_backup()
-    app.run(
-        host="0.0.0.0",
-        port=5001,
-        debug=True,
-    )
-
-
-
 # --- NOVA_MOBILE_CHAT_VISIBLE_RECOVERY_INJECT_20260703 ---
 try:
     from flask import request as _nvcvr_request
@@ -22086,81 +22045,10 @@ def _nova_upload_attachment_summary_after_request_v2(response):
 
     return response
 
-# NOVA_ATTACHMENT_STATUS_RESPONSE_SHAPE_V2_20260705
-@app.after_request
-def _nova_attachment_status_response_shape_v2(response):
-    try:
-        from flask import request
-        import json as _json
-
-        if request.path.rstrip("/") not in {
-            "/api/attachment/status",
-            "/api/attachments/status",
-            "/api/status/attachment",
-        }:
-            return response
-
-        if not getattr(response, "is_json", False):
-            return response
-
-        data = response.get_json(silent=True)
-
-        if not isinstance(data, dict):
-            return response
-
-        try:
-            from nova_backend.services import chat_service
-
-            web_guard_ready = all(
-                hasattr(chat_service, name)
-                for name in (
-                    "_nova_attachment_guard_should_suppress_current_web_call",
-                    "_nova_attachment_guard_install_web_routing_suppression",
-                    "_nova_install_attachment_guard_web_suppression",
-                )
-            )
-
-            installer = getattr(
-                chat_service,
-                "_nova_attachment_guard_install_web_routing_suppression",
-                None,
-            )
-
-            if callable(installer):
-                install_result = installer()
-
-                if isinstance(install_result, dict) and install_result.get("ok") is False:
-                    web_guard_ready = False
-        except Exception:
-            web_guard_ready = False
-
-        for key in ("attachment_pipeline", "capabilities"):
-            flags = data.get(key)
-
-            if isinstance(flags, dict):
-                flags["web_guard"] = web_guard_ready
-                data[key] = flags
-                data["ready"] = all(bool(value) for value in flags.values())
-
-        response.set_data(_json.dumps(data))
-        response.content_type = "application/json"
-    except Exception:
-        return response
-
-    return response
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+if __name__ == "__main__":
+    create_startup_backup()
+    app.run(
+        host="0.0.0.0",
+        port=5001,
+        debug=True,
+    )

@@ -1,4 +1,4 @@
-﻿:root {
+:root {
     color-scheme: dark;
     --bg: #07060c;
     --panel: rgba(20, 18, 31, .78);
@@ -1002,3 +1002,109 @@ a {
     }
 }
 /* /NOVA_LANDING_CONVERSION_POLISH_20260709 */
+
+/* NOVA_LANDING_HOME_ENDGAME_20260711 */
+
+.nova-home-nav {
+    padding: 10px 12px;
+}
+
+.nova-home-nav-links {
+    gap: 4px;
+}
+
+.nova-home-nav-actions {
+    margin-left: auto;
+}
+
+.nova-home-open {
+    min-width: 132px;
+}
+
+.nova-hero {
+    min-height: calc(100vh - 110px);
+    padding-top: 54px;
+    padding-bottom: 54px;
+}
+
+.nova-hero-copy {
+    position: relative;
+    z-index: 2;
+}
+
+.nova-hero h1 {
+    max-width: 820px;
+    text-wrap: balance;
+}
+
+.nova-hero-lede {
+    max-width: 680px;
+    text-wrap: pretty;
+}
+
+.nova-home-primary,
+.nova-home-open {
+    transition:
+        transform .18s ease,
+        box-shadow .18s ease,
+        filter .18s ease;
+}
+
+.nova-home-primary:hover,
+.nova-home-open:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.06);
+    box-shadow:
+        0 0 0 1px rgba(255, 255, 255, .14),
+        0 0 38px rgba(139, 92, 246, .50),
+        0 18px 38px rgba(0, 0, 0, .36);
+}
+
+.nova-home-primary:focus-visible,
+.nova-home-secondary:focus-visible,
+.nova-home-open:focus-visible,
+.nova-home-ghost:focus-visible,
+.nova-home-nav-links a:focus-visible {
+    outline: 3px solid rgba(216, 180, 254, .82);
+    outline-offset: 3px;
+}
+
+@media (max-width: 960px) {
+    .nova-hero {
+        min-height: auto;
+    }
+
+    .nova-home-nav-actions {
+        margin-left: auto;
+    }
+}
+
+@media (max-width: 520px) {
+    .nova-home-brand-mark {
+        width: 38px;
+        height: 38px;
+        border-radius: 14px;
+    }
+
+    .nova-home-open {
+        min-width: 0;
+        padding: 0 13px;
+    }
+
+    .nova-hero {
+        padding-top: 34px;
+    }
+
+    .nova-hero h1 {
+        font-size: clamp(42px, 14vw, 66px);
+        line-height: .94;
+        letter-spacing: -.07em;
+    }
+
+    .nova-hero-lede {
+        font-size: 17px;
+    }
+}
+
+/* /NOVA_LANDING_HOME_ENDGAME_20260711 */
+

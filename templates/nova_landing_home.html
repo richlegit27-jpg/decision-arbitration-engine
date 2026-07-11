@@ -1,11 +1,11 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Nova — AI command center for real projects</title>
     <meta name="description" content="Nova is an early-access AI project command center for builders who need long-running memory, sessions, uploads, billing controls, and a stable workspace for real work.">
-    <link rel="stylesheet" href="/static/css/nova-landing-home.css?v=landing-home-conversion-polish-20260709">
+    <link rel="stylesheet" href="/static/css/nova-landing-home.css?v=landing-home-endgame-20260711">
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
     <link rel="manifest" href="/static/site.webmanifest">
     <meta name="theme-color" content="#8b5cf6">
@@ -15,7 +15,7 @@
     <meta property="og:type" content="website">
     <meta property="og:title" content="Nova — AI project command center">
     <meta property="og:description" content="Nova is an early-access AI workspace for long-running project work: sessions, uploads, memory, billing credits, and a stable builder workflow.">
-    <meta property="og:url" content="{{ request.url_root.rstrip('/') }}/nova-home-preview">
+    <meta property="og:url" content="{{ request.url_root.rstrip('/') }}/">
     <meta property="og:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
     <meta property="og:image:type" content="image/svg+xml">
     <meta name="twitter:card" content="summary_large_image">
@@ -72,25 +72,7 @@
 </head>
 <body>
 
-<!-- NOVA_PUBLIC_CHROME_CONSISTENCY_20260709_TOP -->
-<div class="nova-public-consistency-bar" aria-label="Nova public navigation">
-    <a class="nova-public-consistency-brand" href="/" aria-label="Nova home">
-        <span>Nova</span>
-    </a>
-
-    <nav class="nova-public-consistency-nav" aria-label="Primary public navigation">
-        <a href="/">Home</a>
-        <a href="/faq">FAQ</a>
-        <a href="/billing">Billing</a>
-        <a href="/roadmap">Roadmap</a>
-        <a href="/blog">Blog</a>
-        <a href="/contact">Early Access</a>
-    </nav>
-</div>
-
-
-
-    <!-- NOVA_PUBLIC_HOME_ADMIN_LINK_20260709 -->
+<!-- NOVA_PUBLIC_HOME_ADMIN_LINK_20260709 -->
     {% if nova_show_admin_link %}
     <a class="nova-admin-home-pill-20260709" href="/admin" aria-label="Open Nova admin dashboard">Admin</a>
     {% endif %}
@@ -118,13 +100,11 @@
                 <a href="#builder">Builder</a>
                 <a href="/blog">Blog</a>
                 <a href="/contact">Contact</a>
-                <a href="/contact#nova-contact-form-title">Early Access</a>
             </div>
 
             <div class="nova-home-nav-actions">
                 <a class="nova-home-ghost" href="/billing">Billing</a>
-                <a class="nova-home-ghost" href="/contact#nova-contact-form-title">Early Access</a>
-                <a class="nova-home-open" href="/richard-login">Open Nova</a>
+                <a class="nova-home-open" href="/contact#nova-contact-form-title">Request Access</a>
             </div>
         </nav>
 
@@ -132,22 +112,21 @@
             <div class="nova-hero-copy">
                 <div class="nova-home-pill">
                     <span></span>
-                    Desktop-first. Project-aware. Built to finish.
+                    Project-aware AI for work that keeps moving.
                 </div>
 
                 <h1>
-                    The AI workspace for projects that take more than one chat.
+                    Your project should not forget what happened yesterday.
                 </h1>
 
                 <p class="nova-hero-lede">
-                    Nova keeps the mission together: long-running conversations, project memory,
-                    file uploads, sessions, voice tools, usage credits, and a stable desktop workspace
-                    for actually getting work done.
+                    Nova keeps the project together across conversations, files, sessions, and decisions.
+                    Stop rebuilding context every time you open a new chat. Keep working from where the real project left off.
                 </p>
 
                 <div class="nova-hero-actions">
-                    <a class="nova-home-primary" href="/contact#nova-contact-form-title">Request Early Access</a>
-                    <a class="nova-home-secondary" href="#system">See the system</a>
+                    <a class="nova-home-primary" href="/contact#nova-contact-form-title">Request Access</a>
+                    <a class="nova-home-secondary" href="#system">See how Nova works</a>
                 </div>
 
                 <div class="nova-signal-row" aria-label="Nova status highlights">
@@ -339,7 +318,7 @@
                 </span>
 
                 <div class="nova-builder-actions">
-                    <a class="nova-home-primary" href="/richard-login">Open Nova</a>
+                    <a class="nova-home-primary" href="/contact#nova-contact-form-title">Request Access</a>
                     <a class="nova-home-secondary" href="/billing">View Billing</a>
                     <a class="nova-home-secondary" href="/blog">Read Blog</a>
                 </div>
@@ -425,7 +404,6 @@
 
             <div>
                 <a href="/">Home</a>
-                <a href="/richard-login">Owner Login</a>
                 <a href="/billing">Billing</a>
                 <a href="/blog">Blog</a>
                 <a href="/contact">Contact</a>
