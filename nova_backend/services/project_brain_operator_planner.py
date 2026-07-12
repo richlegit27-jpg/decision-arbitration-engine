@@ -111,48 +111,23 @@ def select_smokes(work_type: str, changed_files: list[str] | None = None) -> lis
 
 
 def choose_recommended_move(work_type: str) -> tuple[str, str, str, list[str]]:
-    if work_type == "failure_repair":
-        return (
-            "Failure Interpreter v2",
-            "A failing smoke should be turned into a precise repair plan before any new feature work.",
-            "medium",
-            [
-                "nova_backend/services/project_brain_failure_interpreter.py",
-                "tools/nova_project_brain_failure_interpreter_api_smoke.py",
-            ],
-        )
+    ranked = rank_moves(work_type)
 
-    if work_type == "smoke_selection":
-        return (
-            "Smoke Selector v1",
-            "This kills repetitive command spam by mapping file changes to the smallest useful smoke set.",
-            "low",
-            [
-                "nova_backend/services/project_brain_operator_planner.py",
-                "tools/nova_project_brain_operator_planner_smoke.py",
-            ],
-        )
+    if ranked:
+        best = ranked[0]
 
-    if work_type in ("cleanup_strategy", "route_cleanup", "app_cleanup"):
         return (
-            "Cleanup Strategy Engine v1",
-            "Cleanup should be ranked and bounded so Nova stops doing tiny lock-the-lock commits.",
-            "medium",
-            [
-                "nova_backend/services/project_brain_operator_planner.py",
-                "tools/nova_project_brain_route_patch_audit_smoke.py",
-            ],
+            str(best.get("name") or ""),
+            str(best.get("why") or ""),
+            str(best.get("risk") or "low"),
+            list(best.get("target_files") or []),
         )
 
     return (
-        "Operator Plan Quality v2",
-        "Nova already has an operator plan; the next jump is ranking moves, rejecting weaker moves, and giving one exact next command.",
-        "low",
-        [
-            "nova_backend/services/project_brain_operator_planner.py",
-            "nova_backend/services/project_brain_mission_control.py",
-            "tools/nova_project_brain_operator_planner_smoke.py",
-        ],
+        "Cleanup Strategy Engine v1",
+        "Fallback bounded cleanup recommendation.",
+        "medium",
+        [],
     )
 
 
