@@ -394,6 +394,44 @@ def answer_project_state_question(
     user_text: Any,
     runtime_execution_state: Optional[Any] = None,
 ) -> Optional[str]:
+    # NOVA_LOCAL_CONVERSATION_RECALL_NOT_PROJECT_STATE_20260711
+    local_recall_text = " ".join(
+        str(user_text or "")
+        .strip()
+        .lower()
+        .replace("?", "'")
+        .split()
+    )
+
+    local_recall_exact = {
+        "what was the other thing we still needed to do",
+        "what was the other thing we needed to do",
+        "what was the other thing",
+        "what did we say we would do later",
+        "what did we say we'd do later",
+        "what were we going to come back to",
+        "what did we leave for later",
+    }
+
+    local_recall_markers = (
+        "the other thing",
+        "we said we'd",
+        "we said we would",
+        "come back to",
+        "left for later",
+        "put off until later",
+        "deferred earlier",
+    )
+
+    if (
+        local_recall_text in local_recall_exact
+        or any(
+            marker in local_recall_text
+            for marker in local_recall_markers
+        )
+    ):
+        return None
+
     kind = _question_kind(user_text)
 
     if not kind:

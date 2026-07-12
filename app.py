@@ -492,6 +492,22 @@ try:
                 if (
                     _nova_7a_state
                     .suppress_project_brain_contract
+                    or (
+                        getattr(
+                            _nova_7a_state,
+                            "current_intent",
+                            "",
+                        )
+                        ==
+                        "resume_unresolved_thread"
+                        and bool(
+                            getattr(
+                                _nova_7a_state,
+                                "unresolved_threads",
+                                (),
+                            )
+                        )
+                    )
                 ):
                     return None
 
@@ -4591,7 +4607,40 @@ def api_chat():
             "this file",
         ]
 
-        if any(_word in _nova_exec_clean for _word in _nova_attachment_words):
+        # NOVA_ATTACHMENT_CONVERSATION_STATE_PRIORITY_20260711
+        # Deferring or completing attachment work is conversation state,
+        # not a request to analyze a currently uploaded file.
+        _nova_attachment_state_phrases = (
+            "after this",
+            "come back to attachment",
+            "later let's fix attachment",
+            "later we should fix attachment",
+            "done with attachment",
+            "finished with attachment",
+            "closed attachment",
+            "close attachment",
+            "attachment is done",
+            "attachment is closed",
+            "attachment is complete",
+            "attachment is resolved",
+            "attachments are done",
+            "attachments are closed",
+            "attachments are complete",
+            "attachments are resolved",
+        )
+
+        _nova_attachment_is_state_message = any(
+            _phrase in _nova_exec_clean
+            for _phrase in _nova_attachment_state_phrases
+        )
+
+        if (
+            any(
+                _word in _nova_exec_clean
+                for _word in _nova_attachment_words
+            )
+            and not _nova_attachment_is_state_message
+        ):
             _nova_current_attachments = _nova_exec_payload.get("attachments") or []
             if not isinstance(_nova_current_attachments, list):
                 _nova_current_attachments = []
@@ -16847,6 +16896,48 @@ except Exception as _nova_api_project_state_install_error_20260630:
     except Exception:
         pass
 
+# NOVA_PHASE_7B_LOCAL_UNRESOLVED_RECALL_ROUTE_PRIORITY_20260711
+def _nova_phase7b_is_local_unresolved_recall_20260711(value):
+    text = " ".join(
+        str(value or "")
+        .strip()
+        .lower()
+        .replace("?", "'")
+        .split()
+    )
+
+    if not text:
+        return False
+
+    exact_prompts = {
+        "what was the other thing we still needed to do",
+        "what was the other thing we needed to do",
+        "what was the other thing",
+        "what did we say we would do later",
+        "what did we say we'd do later",
+        "what were we going to come back to",
+        "what did we leave for later",
+    }
+
+    if text in exact_prompts:
+        return True
+
+    local_recall_markers = (
+        "the other thing",
+        "we said we'd",
+        "we said we would",
+        "come back to",
+        "left for later",
+        "put off until later",
+        "deferred earlier",
+    )
+
+    return any(
+        marker in text
+        for marker in local_recall_markers
+    )
+
+
 # NOVA_API_CHAT_NATURAL_PROJECT_RECALL_20260701
 # Route-level natural project-state recall.
 # This intentionally does not modify project_state_service.py.
@@ -17040,6 +17131,14 @@ try:
             try:
                 data = _nova_natural_project_request_json_20260701()
                 user_text = _nova_natural_project_request_text_20260701(data)
+
+                if _nova_phase7b_is_local_unresolved_recall_20260711(
+                    user_text
+                ):
+                    return view(
+                        *args,
+                        **kwargs,
+                    )
                 mapped_prompt = _nova_natural_project_prompt_map_20260701(user_text)
 
                 if mapped_prompt:
@@ -17477,6 +17576,14 @@ try:
             try:
                 data = _nova_compact_project_request_json_20260701()
                 user_text = _nova_compact_project_request_text_20260701(data)
+
+                if _nova_phase7b_is_local_unresolved_recall_20260711(
+                    user_text
+                ):
+                    return view(
+                        *args,
+                        **kwargs,
+                    )
 
                 project_brain_response = _nova_compact_project_brain_response_20260701(user_text)
                 if project_brain_response is not None:

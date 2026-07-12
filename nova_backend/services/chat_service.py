@@ -15630,6 +15630,7 @@ Auto-fix result:
         )
 
         conversation_state_context = ""
+        conversation_state = None
 
         try:
             from nova_backend.services.conversation_state_brain import (
@@ -15668,6 +15669,94 @@ Auto-fix result:
             )
 
             conversation_state_context = ""
+
+        try:
+            if (
+                continuity_context
+                and conversation_state is not None
+                and getattr(
+                    conversation_state,
+                    "unresolved_threads",
+                    (),
+                )
+                and getattr(
+                    conversation_state,
+                    "current_intent",
+                    "",
+                )
+                !=
+                "resume_unresolved_thread"
+            ):
+                import re
+
+                redaction_terms = []
+
+                for thread in (
+                    getattr(
+                        conversation_state,
+                        "unresolved_threads",
+                        (),
+                    )
+                    or ()
+                ):
+                    thread_text = self._safe_str(
+                        thread
+                    ).strip()
+
+                    if not thread_text:
+                        continue
+
+                    redaction_terms.append(
+                        thread_text
+                    )
+
+                    for token in re.findall(
+                        r"[A-Za-z0-9_]+",
+                        thread_text,
+                    ):
+                        if len(
+                            token
+                        ) < 5:
+                            continue
+
+                        redaction_terms.append(
+                            token
+                        )
+
+                        if token.endswith(
+                            "s"
+                        ):
+                            redaction_terms.append(
+                                token[:-1]
+                            )
+                        else:
+                            redaction_terms.append(
+                                token
+                                +
+                                "s"
+                            )
+
+                for term in sorted(
+                    set(
+                        redaction_terms
+                    ),
+                    key=len,
+                    reverse=True,
+                ):
+                    continuity_context = re.sub(
+                        re.escape(
+                            term
+                        ),
+                        "[deferred thread hidden]",
+                        continuity_context,
+                        flags=re.IGNORECASE,
+                    )
+
+        except Exception as exc:
+            exec_debug(
+                "REDACT DEFERRED THREADS FROM CONTINUITY FAILED:",
+                exc,
+            )
 
         execution_text = ""
 
@@ -15717,6 +15806,24 @@ Auto-fix result:
                     "content": continuity_context,
                 }
             )
+
+        if (
+            conversation_state is not None
+            and getattr(
+                conversation_state,
+                "current_intent",
+                "",
+            )
+            ==
+            "resume_unresolved_thread"
+            and getattr(
+                conversation_state,
+                "unresolved_threads",
+                (),
+            )
+        ):
+            execution_text = ""
+            memory_context = ""
 
         if execution_text:
             messages.append(
