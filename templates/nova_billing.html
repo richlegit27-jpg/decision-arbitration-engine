@@ -1,318 +1,436 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Nova Billing — Credits and Plan</title>
-    <meta name="description" content="Nova billing dashboard for plan, credits, monthly allowance, usage status, and model tier readiness.">
-    <link rel="stylesheet" href="/static/css/nova-billing.css?v=billing-clarity-polish-20260709">
-    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-    <link rel="manifest" href="/static/site.webmanifest">
-    <meta name="theme-color" content="#8b5cf6">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <title>Nova Billing | Plans, credits, and payment status</title>
+
+    <meta
+        name="description"
+        content="Understand Nova plans, credits, usage, and payment status. Live paid upgrades and model-tier purchasing are not active yet."
+    >
+
+    <link
+        rel="stylesheet"
+        href="/static/css/nova-billing.css?v=billing-endgame-20260711"
+    >
+
+    <link
+        rel="icon"
+        href="/static/favicon.svg"
+        type="image/svg+xml"
+    >
+
+    <link
+        rel="manifest"
+        href="/static/site.webmanifest"
+    >
+
+    <meta
+        name="theme-color"
+        content="#8b5cf6"
+    >
+
+
     <!-- NOVA_SOCIAL_META_20260709 -->
-    <link rel="canonical" href="{{ request.url_root.rstrip('/') }}/billing">
-    <meta property="og:site_name" content="Nova">
-    <meta property="og:type" content="website">
-    <meta property="og:title" content="Billing — Nova">
-    <meta property="og:description" content="Nova billing dashboard for credits, plan readiness, usage visibility, and model-tier preparation.">
-    <meta property="og:url" content="{{ request.url_root.rstrip('/') }}/billing">
-    <meta property="og:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
-    <meta property="og:image:type" content="image/svg+xml">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Billing — Nova">
-    <meta name="twitter:description" content="Nova billing dashboard for credits, plan readiness, usage visibility, and model-tier preparation.">
-    <meta name="twitter:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
+
+    <meta
+        property="og:site_name"
+        content="Nova"
+    >
+
+    <meta
+        property="og:type"
+        content="website"
+    >
+
+    <meta
+        property="og:title"
+        content="Nova Billing"
+    >
+
+    <meta
+        property="og:description"
+        content="Nova plans, credits, usage, and clear payment status."
+    >
+
+    <meta
+        property="og:url"
+        content="{{ request.url_root.rstrip('/') }}/billing"
+    >
+
+    <meta
+        property="og:image"
+        content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg"
+    >
+
+    <meta
+        property="og:image:type"
+        content="image/svg+xml"
+    >
+
+    <meta
+        name="twitter:card"
+        content="summary_large_image"
+    >
+
+    <meta
+        name="twitter:title"
+        content="Nova Billing"
+    >
+
+    <meta
+        name="twitter:description"
+        content="Nova plans, credits, usage, and clear payment status."
+    >
+
+    <meta
+        name="twitter:image"
+        content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg"
+    >
+
     <!-- /NOVA_SOCIAL_META_20260709 -->
-    <link rel="stylesheet" href="/static/css/nova-public-trust.css">
+
 
     <!-- NOVA_PUBLIC_SEO_CANONICAL_CLEANUP_20260709 -->
-    <link rel="canonical" href="{{ request.url_root.rstrip('/') }}/billing">
+
+    <link
+        rel="canonical"
+        href="{{ request.url_root.rstrip('/') }}/billing"
+    >
+
     <!-- /NOVA_PUBLIC_SEO_CANONICAL_CLEANUP_20260709 -->
 </head>
+
 <body>
-
-<!-- NOVA_PUBLIC_CHROME_CONSISTENCY_20260709_TOP -->
-<div class="nova-public-consistency-bar" aria-label="Nova public navigation">
-    <a class="nova-public-consistency-brand" href="/" aria-label="Nova home">
-        <span>Nova</span>
-    </a>
-
-    <nav class="nova-public-consistency-nav" aria-label="Primary public navigation">
-        <a href="/">Home</a>
-        <a href="/faq">FAQ</a>
-        <a href="/billing">Billing</a>
-        <a href="/roadmap">Roadmap</a>
-        <a href="/blog">Blog</a>
-        <a href="/contact">Early Access</a>
-    </nav>
-</div>
-
-
-    <div class="nova-billing-bg" aria-hidden="true">
-        <span></span>
-        <span></span>
-    </div>
-
     <main class="nova-billing-shell">
-        <nav class="nova-billing-nav" aria-label="Nova billing navigation">
-            <a class="nova-billing-brand" href="/">
+        <nav
+            class="nova-billing-nav"
+            aria-label="Nova billing navigation"
+        >
+            <a
+                class="nova-billing-brand"
+                href="/"
+                aria-label="Nova home"
+            >
                 <span>N</span>
+
                 <div>
-                    <strong>Nova Billing</strong>
-                    <em>Credits, plans, and model access</em>
+                    <strong>Nova</strong>
+                    <em>Billing</em>
                 </div>
             </a>
 
-<div class="nova-billing-actions">
-    <a href="/">Home</a>
-    <a href="/about">About</a>
-    <a href="/features">Features</a>
-    <a href="/faq">FAQ</a>
-    <a href="/contact#nova-contact-form-title">Early Access</a>
-</div>
+
+            <div class="nova-billing-actions">
+                <a href="/">Home</a>
+                <a href="/about">About</a>
+                <a href="/features">Features</a>
+                <a href="/roadmap">Roadmap</a>
+                <a href="/faq">FAQ</a>
+
+                <a
+                    href="/contact#nova-contact-form-title"
+                >
+                    Request Access
+                </a>
+            </div>
         </nav>
+
 
         <section class="nova-billing-hero">
             <div>
-                <p class="nova-billing-kicker">Account overview</p>
-                <h1>Your Nova usage command center.</h1>
+                <p class="nova-billing-kicker">
+                    Plans and usage
+                </p>
+
+                <h1>
+                    Clear usage now. Paid billing later.
+                </h1>
+
                 <span>
-                    Track plan status, available credits, monthly allowance, usage direction, and model-tier readiness.
-                    This page explains the account system clearly while keeping enforcement safely backend-controlled.
+                    Nova can show plan, credit, and usage information today.
+                    Live payment collection, paid upgrades, and user-selectable
+                    model billing are not active yet.
                 </span>
             </div>
 
+
             <aside class="nova-billing-status-card">
-                <p>Status</p>
-                <strong>{{ status_label }}</strong>
-                <span>{{ username_label }} · {{ plan_label }}</span>
+                <p>Account status</p>
+
+                <strong>
+                    {{ status_label }}
+                </strong>
+
+                <span>
+                    {{ plan_label }} plan
+                </span>
             </aside>
         </section>
 
-        <section class="nova-billing-grid">
+
+        <section
+            class="nova-billing-grid"
+            aria-label="Nova account usage"
+        >
             <article class="nova-billing-card primary">
                 <p>Current plan</p>
-                <h2>{{ plan_label }}</h2>
-                <span>Developer account mode is active for owner testing, release checks, product polish, and early-access validation.</span>
+
+                <h2>
+                    {{ plan_label }}
+                </h2>
+
+                <span>
+                    The current account plan label used by Nova.
+                </span>
             </article>
 
+
             <article class="nova-billing-card">
-                <p>Credit balance</p>
-                <h2>{{ credits_label }}</h2>
-                <span>Available credits remaining in the current local billing ledger. This is the number Nova can use for future account limits and model access.</span>
+                <p>Credits remaining</p>
+
+                <h2>
+                    {{ credits_label }}
+                </h2>
+
+                <span>
+                    Available usage credits shown for the current account.
+                </span>
             </article>
+
 
             <article class="nova-billing-card">
                 <p>Monthly allowance</p>
-                <h2>{{ monthly_credits_label }}</h2>
-                <span>Configured monthly credits for this account. Later, this can become the visible monthly allowance for each plan tier.</span>
+
+                <h2>
+                    {{ monthly_credits_label }}
+                </h2>
+
+                <span>
+                    The monthly credit allowance currently associated with the account.
+                </span>
             </article>
         </section>
+
 
         <section class="nova-usage-panel">
             <div class="nova-usage-head">
                 <div>
                     <p>Usage</p>
-                    <h2>{{ used_credits_label }} used</h2>
-                    <span>{{ credits_label }} remaining from {{ monthly_credits_label }} monthly credits.</span>
+
+                    <h2>
+                        {{ used_credits_label }} credits used
+                    </h2>
+
+                    <span>
+                        {{ credits_label }} credits remain from the current
+                        {{ monthly_credits_label }} credit allowance.
+                    </span>
                 </div>
 
-                <strong>{{ usage_percent_label }}</strong>
+
+                <strong>
+                    {{ usage_percent_raw }}%
+                </strong>
             </div>
 
-            <div class="nova-usage-bar" aria-label="Billing usage progress">
-                <span style="width: {{ usage_percent_raw }}%;"></span>
+
+            <div
+                class="nova-usage-bar"
+                aria-label="Nova usage progress"
+            >
+                <span
+                    style="width: {{ usage_percent_raw }}%;"
+                ></span>
             </div>
+
 
             <div class="nova-usage-meta">
-                <span>Credits used</span>
+                <span>Usage consumed</span>
                 <span>Credits remaining</span>
             </div>
         </section>
 
-        <!-- NOVA_BILLING_CLARITY_POLISH_20260709 -->
 
-        <section class="nova-billing-clarity">
-            <div class="nova-section-head">
-                <p>How credits work</p>
-                <h2>Simple account rules before real payments.</h2>
+        <section class="nova-billing-truth">
+            <div>
+                <p>Payment status</p>
+
+                <h2>
+                    Billing is staged, not live payment collection.
+                </h2>
+
                 <span>
-                    Nova is keeping billing understandable first: credits show available usage,
-                    monthly allowance shows the planned budget, and model tiers stay marked as planned
-                    until backend enforcement is complete.
+                    There is no live checkout, customer payment portal,
+                    invoice purchasing flow, or paid plan upgrade on Nova today.
+                    Request Access does not charge a card.
                 </span>
             </div>
 
-            <div class="nova-clarity-grid">
+
+            <div class="nova-billing-truth-grid">
                 <article>
-                    <strong>01</strong>
-                    <h3>Credits are the usage budget</h3>
-                    <p>Credits represent how much Nova usage the account has available. The current page reads that balance from the local billing ledger.</p>
+                    <strong>Active now</strong>
+
+                    <h3>
+                        Usage visibility
+                    </h3>
+
+                    <p>
+                        Nova can display plan labels, credit balances,
+                        monthly allowances, and current usage.
+                    </p>
                 </article>
 
-                <article>
-                    <strong>02</strong>
-                    <h3>Plans explain access level</h3>
-                    <p>The plan label explains account mode today. Later, plans can control monthly credits, feature access, and model availability.</p>
-                </article>
 
                 <article>
-                    <strong>03</strong>
-                    <h3>Model tiers stay backend-owned</h3>
-                    <p>Mini, Standard, and Pro should eventually be enforced by backend allowlists and credit costs, not just frontend buttons.</p>
+                    <strong>Not active</strong>
+
+                    <h3>
+                        Paid upgrades
+                    </h3>
+
+                    <p>
+                        Nova is not currently selling paid plan upgrades
+                        through this page.
+                    </p>
+                </article>
+
+
+                <article>
+                    <strong>Not active</strong>
+
+                    <h3>
+                        Live payment collection
+                    </h3>
+
+                    <p>
+                        Checkout and customer payment management remain unavailable
+                        until the payment system is intentionally launched.
+                    </p>
                 </article>
             </div>
         </section>
 
-
-        <!-- NOVA_BILLING_STAGED_PAYMENT_CLARITY_20260710 -->
-        <section class="nova-plan-section" aria-labelledby="nova-billing-staged-title">
-            <div class="nova-section-head compact">
-                <p>Payment safety</p>
-                <h2 id="nova-billing-staged-title">Billing is staged, not live payment collection.</h2>
-                <span>
-                    Nova can display plans, local credits, and billing readiness today. Real Stripe checkout,
-                    invoices, customer portal sessions, paid upgrades, and payment collection remain disabled
-                    until live Stripe keys, price IDs, webhook verification, and the payments-live flag are configured.
-                </span>
-            </div>
-
-            <div class="nova-plan-grid">
-                <article class="nova-plan-card">
-                    <span>Active now</span>
-                    <h3>Local billing visibility</h3>
-                    <ul>
-                        <li>Current plan label</li>
-                        <li>Local credit balance</li>
-                        <li>Backend readiness checks</li>
-                    </ul>
-                </article>
-
-                <article class="nova-plan-card">
-                    <span>Not live yet</span>
-                    <h3>Real payment collection</h3>
-                    <ul>
-                        <li>No live Stripe checkout yet</li>
-                        <li>No live customer portal yet</li>
-                        <li>No real paid upgrades yet</li>
-                    </ul>
-                </article>
-            </div>
-        </section>
-        <!-- /NOVA_BILLING_STAGED_PAYMENT_CLARITY_20260710 -->
-
-        <section class="nova-plan-section">
-            <div class="nova-section-head">
-                <p>Plan clarity</p>
-                <h2>What is active now vs. planned next.</h2>
-            </div>
-
-            <div class="nova-plan-grid">
-                <article>
-                    <span>Active now</span>
-                    <ul>
-                        <li>Local credit balance display</li>
-                        <li>Monthly allowance display</li>
-                        <li>Usage percentage meter</li>
-                        <li>Developer account status</li>
-                    </ul>
-                </article>
-
-                <article>
-                    <span>Planned later</span>
-                    <ul>
-                        <li>Stripe checkout and invoices</li>
-                        <li>Real plan upgrades</li>
-                        <li>Per-model credit costs</li>
-                        <li>Backend-enforced model access</li>
-                    </ul>
-                </article>
-            </div>
-        </section>
 
         <section class="nova-tier-section">
             <div class="nova-section-head">
-                <p>Model tiers</p>
-                <h2>Prepared for future model-based pricing.</h2>
+                <p>Model choices</p>
+
+                <h2>
+                    Different model options are planned, not active billing tiers.
+                </h2>
+
                 <span>
-                    The dashboard can explain model tiers now, but actual model access, credit cost, and allowlists should stay backend-controlled later.
+                    Nova may later offer different model choices with different usage
+                    costs. Model selection, pricing rules, and account access are still
+                    planned work and are not being sold on this page today.
                 </span>
             </div>
+
 
             <div class="nova-tier-grid">
                 <article>
-                    <strong>Mini</strong>
-                    <h3>Low-cost fast replies</h3>
-                    <p>Good for quick chat, summaries, simple coding help, and low-credit usage.</p>
+                    <strong>Fast</strong>
+
+                    <h3>
+                        Lighter everyday work
+                    </h3>
+
+                    <p>
+                        A future lower-cost option for quicker conversations
+                        and simpler tasks.
+                    </p>
+
                     <em>Planned</em>
                 </article>
 
+
                 <article class="featured">
-                    <strong>Standard</strong>
-                    <h3>Balanced project work</h3>
-                    <p>Best default for project-aware conversations, file work, and normal building.</p>
-                    <em>Current target</em>
+                    <strong>Balanced</strong>
+
+                    <h3>
+                        General project work
+                    </h3>
+
+                    <p>
+                        A future middle option for project conversations,
+                        files, planning, and normal building.
+                    </p>
+
+                    <em>Planned</em>
                 </article>
 
+
                 <article>
-                    <strong>Pro</strong>
-                    <h3>High-power reasoning</h3>
-                    <p>Reserved for deeper planning, hard debugging, larger files, and premium credits.</p>
+                    <strong>Advanced</strong>
+
+                    <h3>
+                        Heavier reasoning
+                    </h3>
+
+                    <p>
+                        A future higher-cost option for more demanding
+                        reasoning and complex project work.
+                    </p>
+
                     <em>Planned</em>
                 </article>
             </div>
         </section>
 
-        <section class="nova-billing-ledger">
+
+        <section class="nova-billing-cta">
             <div>
-                <p>Billing source</p>
-                <h2>Local data file connected.</h2>
+                <p>Early access</p>
+
+                <h2>
+                    Interested in Nova before paid plans go live?
+                </h2>
+
                 <span>
-                    This page reads account status from <code>data/nova_billing.json</code>.
-                    Stripe, invoices, payment methods, model enforcement, and user-facing upgrades can be added later without changing this stable display contract.
+                    Request access and tell us what kind of project
+                    you want Nova to help keep together.
                 </span>
             </div>
 
-            <div class="nova-ledger-box">
-                <span>Billing file</span>
-                <strong>{{ billing_file_label }}</strong>
-            </div>
+
+            <a
+                href="/contact#nova-contact-form-title"
+            >
+                Request Access
+            </a>
         </section>
 
+
         <footer class="nova-billing-footer">
-            <span>Nova billing dashboard · Phase 1</span>
+            <span>
+                Nova Billing ? Payments are not live
+            </span>
+
             <div>
-                <a href="/api/health">Health</a>
-                <a href="/">Landing</a>             
-            </div>
-        
+                <a href="/">Home</a>
+                <a href="/about">About</a>
+                <a href="/features">Features</a>
+                <a href="/roadmap">Roadmap</a>
+                <a href="/faq">FAQ</a>
+                <a href="/blog">Blog</a>
+                <a href="/contact">Contact</a>
                 <a href="/privacy">Privacy</a>
                 <a href="/terms">Terms</a>
+            </div>
         </footer>
     </main>
 
-    <script src="/static/js/nova-billing.js?v=billing-clarity-polish-20260709"></script>
 
-
-<!-- NOVA_PUBLIC_CHROME_CONSISTENCY_20260709_BOTTOM -->
-<footer class="nova-public-consistency-footer" aria-label="Nova public footer">
-    <div>
-        <strong>Nova</strong>
-        <span>AI workspace in public-site polish and Early Access preparation.</span>
-    </div>
-
-    <nav aria-label="Footer navigation">
-        <a href="/privacy">Privacy</a>
-        <a href="/terms">Terms</a>
-        <a href="/billing">Billing</a>
-        <a href="/contact">Contact</a>
-    </nav>
-</footer>
-
-<!-- NOVA_PUBLIC_HOME_CANONICAL_LINKS_20260709 -->
+    <script
+        src="/static/js/nova-billing.js?v=billing-endgame-20260711"
+    ></script>
 </body>
 </html>
-
-
-
-

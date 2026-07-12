@@ -21,8 +21,8 @@ REQUIRED_TERMS = [
     "Project Brain",
     "context builder",
     "Current blocker",
-    "answer freshness",
-    "Next concrete move",
+    "Current checkpoint",
+    "Next move",
 ]
 
 

@@ -1,235 +1,382 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Nova Help</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        :root {
-            color-scheme: dark;
-            --bg: #0b0f19;
-            --panel: #111827;
-            --panel2: #172033;
-            --text: #f8fafc;
-            --muted: #94a3b8;
-            --line: rgba(255,255,255,.12);
-            --accent: #8b5cf6;
-        }
 
-        body {
-            margin: 0;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            line-height: 1.45;
-        }
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
 
-        header {
-            position: sticky;
-            top: 0;
-            z-index: 20;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            padding: 14px 16px;
-            background: rgba(11, 15, 25, .94);
-            border-bottom: 1px solid var(--line);
-            backdrop-filter: blur(12px);
-        }
+    <title>Nova Help | Project-aware AI work</title>
 
-        header h1 {
-            margin: 0;
-            font-size: 18px;
-        }
+    <meta
+        name="description"
+        content="Learn how to use Nova for project context, memory, sessions, files, planning, and practical next steps."
+    >
 
-        header a {
-            color: var(--text);
-            text-decoration: none;
-            border: 1px solid var(--line);
-            border-radius: 999px;
-            padding: 8px 11px;
-            background: rgba(255,255,255,.06);
-            font-size: 13px;
-        }
+    <link
+        rel="stylesheet"
+        href="/static/css/nova-help.css?v=help-route-endgame-20260711"
+    >
 
-        main {
-            max-width: 920px;
-            margin: 0 auto;
-            padding: 18px 14px 80px;
-        }
+    <link
+        rel="icon"
+        href="/static/favicon.svg"
+        type="image/svg+xml"
+    >
 
-        .card {
-            background: var(--panel);
-            border: 1px solid var(--line);
-            border-radius: 18px;
-            padding: 16px;
-            margin: 12px 0;
-        }
+    <link
+        rel="manifest"
+        href="/static/site.webmanifest"
+    >
 
-        h2 {
-            margin: 0 0 10px;
-            font-size: 17px;
-            color: #ffffff;
-        }
+    <meta
+        name="theme-color"
+        content="#8b5cf6"
+    >
 
-        p {
-            margin: 8px 0;
-            color: var(--muted);
-        }
+    <meta
+        property="og:site_name"
+        content="Nova"
+    >
 
-        code, .cmd {
-            display: inline-block;
-            font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-            background: var(--panel2);
-            color: #e9d5ff;
-            border: 1px solid var(--line);
-            border-radius: 8px;
-            padding: 2px 6px;
-            margin: 2px 0;
-        }
+    <meta
+        property="og:type"
+        content="website"
+    >
 
-        ul {
-            margin: 8px 0 0;
-            padding-left: 20px;
-        }
+    <meta
+        property="og:title"
+        content="Nova Help"
+    >
 
-        li {
-            margin: 6px 0;
-            color: var(--muted);
-        }
+    <meta
+        property="og:description"
+        content="Get started with project context, memory, sessions, files, and planning in Nova."
+    >
 
-        strong {
-            color: var(--text);
-        }
+    <meta
+        property="og:url"
+        content="{{ request.url_root.rstrip('/') }}/help"
+    >
 
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 12px;
-        }
+    <meta
+        property="og:image"
+        content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg"
+    >
 
-        .pill {
-            display: inline-block;
-            margin: 3px 4px 3px 0;
-            padding: 5px 8px;
-            border-radius: 999px;
-            background: rgba(139, 92, 246, .16);
-            border: 1px solid rgba(139, 92, 246, .35);
-            color: #ddd6fe;
-            font-size: 12px;
-        }
+    <meta
+        name="twitter:card"
+        content="summary_large_image"
+    >
 
-        .warning {
-            border-color: rgba(251, 191, 36, .35);
-            background: rgba(251, 191, 36, .08);
-        }
-    </style>
+    <meta
+        name="twitter:title"
+        content="Nova Help"
+    >
+
+    <meta
+        name="twitter:description"
+        content="Get started with project-aware AI work in Nova."
+    >
+
+    <meta
+        name="twitter:image"
+        content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg"
+    >
+
+    <link
+        rel="canonical"
+        href="{{ request.url_root.rstrip('/') }}/help"
+    >
 </head>
+
 <body>
-<header>
-    <h1>Nova Help</h1>
-    <nav>
-        <a href="/mobile">Mobile</a>
-        <a href="/">Desktop</a>
-        <a href="/logout">Logout</a>
-    </nav>
-</header>
+    <main class="nova-help-shell">
+        <nav
+            class="nova-help-nav"
+            aria-label="Nova help navigation"
+        >
+            <a
+                class="nova-help-brand"
+                href="/"
+                aria-label="Nova home"
+            >
+                <span>N</span>
 
-<main>
-    <div class="card">
-        <h2>What Nova is</h2>
-        <p>Nova is your local AI workspace. It can chat, remember project context, manage sessions, analyze uploads, help with coding, and run simple execution missions through auto-plan.</p>
-    </div>
+                <div>
+                    <strong>Nova</strong>
+                    <em>Help</em>
+                </div>
+            </a>
 
-    <div class="grid">
-        <section class="card">
-            <h2>Chat</h2>
-            <ul>
-                <li>Type a message and press <strong>Enter</strong> or tap <strong>Send</strong>.</li>
-                <li>Use <span class="cmd">k</span>, <span class="cmd">ok</span>, <span class="cmd">next</span>, or <span class="cmd">continue</span> when Nova is waiting for the next step.</li>
-                <li>Use <span class="cmd">summarize this</span> to get a short summary of the current context.</li>
-            </ul>
+
+            <div class="nova-help-actions">
+                <a href="/">Home</a>
+                <a href="/about">About</a>
+                <a href="/features">Features</a>
+                <a href="/roadmap">Roadmap</a>
+                <a href="/faq">FAQ</a>
+                <a href="/blog">Blog</a>
+                <a href="/billing">Billing</a>
+
+                <a href="/app">
+                    Open Nova
+                </a>
+            </div>
+        </nav>
+
+
+        <section class="nova-help-hero">
+            <p class="nova-help-kicker">
+                Nova Help
+            </p>
+
+            <h1>
+                Give Nova the thread. Then keep moving.
+            </h1>
+
+            <span>
+                Nova works best when it understands the project, the current
+                state, and what matters next. Start with the real work, add
+                useful context, and continue the conversation.
+            </span>
+
+
+            <div class="nova-help-buttons">
+                <a href="/app">
+                    Open Nova
+                </a>
+
+                <a href="/contact#nova-contact-form-title">
+                    Contact Nova
+                </a>
+            </div>
         </section>
 
-        <section class="card">
-            <h2>Uploads / Images</h2>
-            <ul>
-                <li>Tap <strong>Attach</strong> to upload an image or file.</li>
-                <li>Ask <span class="cmd">what is this image</span> after attaching an image.</li>
-                <li>Ask <span class="cmd">summarize this file</span> after attaching a document.</li>
-                <li>If the answer says only â€œAttachment received,â€ the attachment reached the chat but analysis routing may need checking.</li>
-            </ul>
+
+        <section
+            class="nova-help-grid"
+            aria-label="Nova help topics"
+        >
+            <article class="nova-help-card">
+                <p>01 ? Start with the project</p>
+
+                <h2>
+                    Tell Nova what you are working on.
+                </h2>
+
+                <span>
+                    Explain the real project, the current problem, or the result
+                    you are trying to reach. Useful project details beat a giant
+                    ceremonial prompt.
+                </span>
+
+                <div class="nova-help-command">
+                    I'm building a project and the current problem is...
+                </div>
+            </article>
+
+
+            <article class="nova-help-card">
+                <p>02 ? Keep useful context</p>
+
+                <h2>
+                    Say what should remain important.
+                </h2>
+
+                <span>
+                    Tell Nova when a decision, preference, constraint, or project
+                    fact should continue to matter across the work.
+                </span>
+
+                <div class="nova-help-command">
+                    Remember that this is the direction we chose.
+                </div>
+            </article>
+
+
+            <article class="nova-help-card">
+                <p>03 ? Work with files</p>
+
+                <h2>
+                    Attach the material the task depends on.
+                </h2>
+
+                <span>
+                    Add a file or image when the answer depends on its contents.
+                    Ask Nova directly to summarize, inspect, explain, compare, or
+                    use it as project context.
+                </span>
+
+                <div class="nova-help-command">
+                    Summarize this file and tell me what matters for the project.
+                </div>
+            </article>
+
+
+            <article class="nova-help-card">
+                <p>04 ? Continue across sessions</p>
+
+                <h2>
+                    Keep related work in a connected thread.
+                </h2>
+
+                <span>
+                    Stay in the same conversation when continuity matters.
+                    Start a new session when the project or purpose genuinely changes.
+                </span>
+
+                <div class="nova-help-command">
+                    What were we working on, and what is the next move?
+                </div>
+            </article>
+
+
+            <article class="nova-help-card">
+                <p>05 ? Ask for a plan</p>
+
+                <h2>
+                    Turn a larger goal into practical steps.
+                </h2>
+
+                <span>
+                    Ask Nova to plan, build, fix, or repair a goal when the work
+                    has multiple steps. Review the direction and keep moving
+                    through the same project thread.
+                </span>
+
+                <div class="nova-help-command">
+                    Auto-plan the safest way to finish this feature.
+                </div>
+            </article>
+
+
+            <article class="nova-help-card">
+                <p>06 ? Continue naturally</p>
+
+                <h2>
+                    Short continuation commands are enough.
+                </h2>
+
+                <span>
+                    When Nova already understands the active task, short commands
+                    can continue the work without repeating the full goal.
+                </span>
+
+                <div class="nova-help-pills">
+                    <span>k</span>
+                    <span>ok</span>
+                    <span>next</span>
+                    <span>continue</span>
+                    <span>run step</span>
+                </div>
+            </article>
         </section>
 
-        <section class="card">
-            <h2>Sessions</h2>
-            <ul>
-                <li><strong>New</strong> starts a fresh chat.</li>
-                <li><strong>Sessions</strong> opens saved chats.</li>
-                <li>Sessions are scoped to the logged-in local user.</li>
-                <li>Duplicate empty sessions are pruned automatically.</li>
-            </ul>
+
+        <section class="nova-help-flow">
+            <div>
+                <p>
+                    A simple working rhythm
+                </p>
+
+                <h2>
+                    Context first. Judgment second. Action third.
+                </h2>
+
+                <span>
+                    Nova is most useful when the conversation stays connected
+                    to the project instead of becoming a pile of isolated prompts.
+                </span>
+            </div>
+
+
+            <div class="nova-help-flow-steps">
+                <div>
+                    <strong>1</strong>
+
+                    <span>
+                        Describe the project and current problem.
+                    </span>
+                </div>
+
+                <div>
+                    <strong>2</strong>
+
+                    <span>
+                        Add the decision, file, or constraint that matters.
+                    </span>
+                </div>
+
+                <div>
+                    <strong>3</strong>
+
+                    <span>
+                        Ask for the next move, plan, fix, or explanation.
+                    </span>
+                </div>
+
+                <div>
+                    <strong>4</strong>
+
+                    <span>
+                        Continue the thread and correct Nova when project reality changes.
+                    </span>
+                </div>
+            </div>
         </section>
 
-        <section class="card">
-            <h2>Memory</h2>
-            <ul>
-                <li><strong>Memory</strong> shows saved project/context items.</li>
-                <li>Memory is used to remember project focus, blockers, active files, and recent state.</li>
-                <li>Direct endpoint: <span class="cmd">/api/memory</span></li>
-            </ul>
+
+        <section class="nova-help-support">
+            <div>
+                <p>
+                    Still stuck?
+                </p>
+
+                <h2>
+                    Describe what you expected and what happened instead.
+                </h2>
+
+                <span>
+                    Include the feature you were using, the task you gave Nova,
+                    and the result that felt wrong. A clear example makes the
+                    problem much easier to understand.
+                </span>
+            </div>
+
+
+            <div class="nova-help-buttons">
+                <a href="/contact#nova-contact-form-title">
+                    Contact Nova
+                </a>
+
+                <a href="/faq">
+                    Read FAQ
+                </a>
+            </div>
         </section>
 
-        <section class="card">
-            <h2>Tools / Execution</h2>
-            <ul>
-                <li>Start a mission with <span class="cmd">auto-plan &lt;goal&gt;</span>.</li>
-                <li>Example: <span class="cmd">auto-plan build a simple password generator</span></li>
-                <li>Advance one step with <span class="cmd">next</span> or <span class="cmd">run step</span>.</li>
-                <li>Run the whole mission with <span class="cmd">run all</span>.</li>
-                <li>Cancel with <span class="cmd">cancel</span> or <span class="cmd">stop</span>.</li>
-            </ul>
-        </section>
 
-        <section class="card">
-            <h2>Quick buttons</h2>
-            <ul>
-                <li><strong>Go</strong> means continue from where we left off.</li>
-                <li><strong>Sum</strong> means summarize the current situation.</li>
-                <li><strong>Fix</strong> means improve/clean up the current thing.</li>
-                <li><strong>Next</strong> means move to the next step.</li>
-            </ul>
-        </section>
+        <footer class="nova-help-footer">
+            <span>
+                Nova Help ? Keep the project thread connected
+            </span>
 
-        <section class="card">
-            <h2>Login</h2>
-            <ul>
-                <li>Local username: <span class="cmd">richard</span></li>
-                <li>Use <span class="cmd">/login</span> to sign in.</li>
-                <li>Use <span class="cmd">/logout</span> to sign out.</li>
-            </ul>
-        </section>
-
-        <section class="card">
-            <h2>Useful URLs</h2>
-            <ul>
-                <li><span class="cmd">/</span> desktop page</li>
-                <li><span class="cmd">/mobile</span> phone/mobile page</li>
-                <li><span class="cmd">/help</span> this help page</li>
-                <li><span class="cmd">/api/health</span> backend health</li>
-                <li><span class="cmd">/api/backend/readiness</span> readiness score</li>
-            </ul>
-        </section>
-    </div>
-
-    <div class="card warning">
-        <h2>Known note</h2>
-        <p>If <span class="cmd">run all</span> returns web/news results, execution command routing is being stolen by the web route. That is a routing priority bug, not a user error.</p>
-    </div>
-</main>
+            <div>
+                <a href="/">Home</a>
+                <a href="/about">About</a>
+                <a href="/features">Features</a>
+                <a href="/roadmap">Roadmap</a>
+                <a href="/faq">FAQ</a>
+                <a href="/blog">Blog</a>
+                <a href="/contact">Contact</a>
+                <a href="/billing">Billing</a>
+                <a href="/privacy">Privacy</a>
+                <a href="/terms">Terms</a>
+            </div>
+        </footer>
+    </main>
 </body>
 </html>
-
-
-

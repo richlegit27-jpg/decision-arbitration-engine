@@ -83,9 +83,10 @@ CASES = [
         "question": "what are we working on now",
         "required": [
             "Project Brain",
-            "context builder",
-            "freshness",
-            "answer-quality",
+            "Command Center",
+            "Upgrade Radar",
+            "Self-Test Selector",
+            "Operator Memory Writer",
         ],
         "stale": [
             "launch about a month",
@@ -100,12 +101,12 @@ CASES = [
     "slug": "next_move",
     "question": "what should we do next",
     "required": [
-        "Project Brain",
-        "cleanup/consolidation",
-        "direct recall",
-        "broad Project Brain routing",
-        "avoiding another app.py guard",
-    ],
+                    "Project Brain Command Center",
+                    "Command intent: next_move",
+                    "Best Move:",
+                    "Exact Next Command",
+                    "Target Files:",
+                ],
     "preferred": [
         "Decision Engine v1",
         "Mission Control",
@@ -125,12 +126,10 @@ CASES = [
         "question": "what is the current blocker",
         "required": [
             "Project Brain",
-            "Decision Engine v1",
-            "No active Decision Engine blocker",
-            "Mission Control blocker",
-            "Failure Interpreter blocker",
-            "cleanup/consolidation",
-            "move intelligence into services",
+            "Command Center",
+            "Upgrade Radar",
+            "Operator Memory Writer",
+            "No active Project Brain intelligence blocker",
         ],
         "stale": [
             "larger Nova answer-quality 95 smoke now passes 20/20",
@@ -303,13 +302,21 @@ def main():
 
         passed += 1
 
+    run_continuity_test()
+    passed += 1
+
     print("")
     print(
-    f"NOVA PROJECT BRAIN INTELLIGENCE SCORE: "
-    f"{passed}/{len(CASES)} = "
-    f"{round((passed / len(CASES)) * 100)}%"
-)
-    assert_true("answer quality minimum", passed == len(CASES))
+        f"NOVA PROJECT BRAIN INTELLIGENCE SCORE: "
+        f"{passed}/{len(CASES) + 1} = "
+        f"{round((passed / (len(CASES) + 1)) * 100)}%"
+    )
+
+    assert_true(
+        "answer quality minimum",
+        passed == len(CASES) + 1,
+    )
+
     print("")
     print("NOVA ANSWER QUALITY SMOKE PASSED")
     return 0

@@ -1,0 +1,492 @@
+/* NOVA_HELP_ROUTE_COLLISION_ENDGAME_20260711 */
+
+:root {
+    --nova-help-bg: #070812;
+    --nova-help-panel: rgba(15, 23, 42, 0.76);
+    --nova-help-soft: rgba(255, 255, 255, 0.05);
+    --nova-help-line: rgba(226, 232, 240, 0.12);
+    --nova-help-text: #f8fafc;
+    --nova-help-muted: rgba(226, 232, 240, 0.70);
+    --nova-help-purple: #8b5cf6;
+    --nova-help-pink: #ec4899;
+}
+
+
+* {
+    box-sizing: border-box;
+}
+
+
+html {
+    background: var(--nova-help-bg);
+}
+
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--nova-help-text);
+    font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+    background:
+        radial-gradient(
+            circle at 16% 8%,
+            rgba(139, 92, 246, 0.24),
+            transparent 32%
+        ),
+        radial-gradient(
+            circle at 82% 18%,
+            rgba(236, 72, 153, 0.15),
+            transparent 28%
+        ),
+        linear-gradient(
+            180deg,
+            #070812,
+            #0f172a
+        );
+}
+
+
+a {
+    color: inherit;
+}
+
+
+.nova-help-shell {
+    width: min(
+        1180px,
+        calc(100% - 40px)
+    );
+    margin-inline: auto;
+    padding: 26px 0 42px;
+}
+
+
+.nova-help-nav {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 1fr)
+        auto;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 48px;
+}
+
+
+.nova-help-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    width: fit-content;
+    text-decoration: none;
+}
+
+
+.nova-help-brand > span {
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border-radius: 16px;
+    background:
+        linear-gradient(
+            135deg,
+            var(--nova-help-purple),
+            var(--nova-help-pink)
+        );
+    box-shadow:
+        0 18px 44px
+        rgba(139, 92, 246, 0.28);
+    font-weight: 950;
+}
+
+
+.nova-help-brand strong,
+.nova-help-brand em {
+    display: block;
+}
+
+
+.nova-help-brand em {
+    margin-top: 2px;
+    color: var(--nova-help-muted);
+    font-size: 12px;
+    font-style: normal;
+}
+
+
+.nova-help-actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+
+.nova-help-actions a,
+.nova-help-footer a {
+    color: var(--nova-help-muted);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+
+.nova-help-actions a:hover,
+.nova-help-footer a:hover {
+    color: #ffffff;
+}
+
+
+.nova-help-actions a:last-child {
+    padding: 10px 15px;
+    color: #ffffff;
+    border: 1px solid
+        rgba(167, 139, 250, 0.28);
+    border-radius: 999px;
+    background:
+        rgba(139, 92, 246, 0.22);
+}
+
+
+.nova-help-hero {
+    padding: 58px;
+    border: 1px solid var(--nova-help-line);
+    border-radius: 38px;
+    background:
+        radial-gradient(
+            circle at 0% 0%,
+            rgba(139, 92, 246, 0.22),
+            transparent 38%
+        ),
+        radial-gradient(
+            circle at 94% 28%,
+            rgba(236, 72, 153, 0.13),
+            transparent 30%
+        ),
+        var(--nova-help-panel);
+    box-shadow:
+        0 28px 100px
+        rgba(0, 0, 0, 0.36);
+}
+
+
+.nova-help-kicker,
+.nova-help-card > p,
+.nova-help-flow > div:first-child > p,
+.nova-help-support > div:first-child > p {
+    margin: 0 0 12px;
+    color:
+        rgba(196, 181, 253, 0.94);
+    font-size: 12px;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: 0.13em;
+}
+
+
+.nova-help-hero h1 {
+    max-width: 940px;
+    margin: 0;
+    font-size:
+        clamp(
+            48px,
+            7.2vw,
+            88px
+        );
+    line-height: 0.93;
+    letter-spacing: -0.072em;
+    text-wrap: balance;
+}
+
+
+.nova-help-hero > span,
+.nova-help-card > span,
+.nova-help-flow > div:first-child > span,
+.nova-help-support > div:first-child > span {
+    display: block;
+    margin-top: 18px;
+    color: var(--nova-help-muted);
+    line-height: 1.72;
+}
+
+
+.nova-help-hero > span {
+    max-width: 830px;
+    margin-top: 24px;
+    font-size: 18px;
+}
+
+
+.nova-help-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 26px;
+}
+
+
+.nova-help-buttons a {
+    display: inline-flex;
+    min-height: 48px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 20px;
+    border: 1px solid var(--nova-help-line);
+    border-radius: 999px;
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: 950;
+    background:
+        rgba(255, 255, 255, 0.055);
+}
+
+
+.nova-help-buttons a:first-child {
+    border-color:
+        rgba(167, 139, 250, 0.28);
+    background:
+        linear-gradient(
+            135deg,
+            var(--nova-help-purple),
+            var(--nova-help-pink)
+        );
+    box-shadow:
+        0 18px 44px
+        rgba(139, 92, 246, 0.28);
+}
+
+
+.nova-help-grid {
+    display: grid;
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(0, 1fr)
+        );
+    gap: 16px;
+    margin: 24px 0;
+}
+
+
+.nova-help-card {
+    padding: 30px;
+    border: 1px solid var(--nova-help-line);
+    border-radius: 30px;
+    background: var(--nova-help-soft);
+}
+
+
+.nova-help-card h2,
+.nova-help-flow h2,
+.nova-help-support h2 {
+    margin: 0;
+    font-size:
+        clamp(
+            30px,
+            4vw,
+            50px
+        );
+    line-height: 0.99;
+    letter-spacing: -0.058em;
+    text-wrap: balance;
+}
+
+
+.nova-help-command {
+    margin-top: 24px;
+    padding: 16px 18px;
+    border: 1px solid
+        rgba(167, 139, 250, 0.22);
+    border-radius: 18px;
+    color:
+        rgba(233, 213, 255, 0.96);
+    background:
+        rgba(139, 92, 246, 0.10);
+    font-family:
+        Consolas,
+        "Liberation Mono",
+        monospace;
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+
+.nova-help-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 24px;
+}
+
+
+.nova-help-pills span {
+    padding: 8px 11px;
+    border: 1px solid
+        rgba(167, 139, 250, 0.22);
+    border-radius: 999px;
+    color:
+        rgba(233, 213, 255, 0.96);
+    background:
+        rgba(139, 92, 246, 0.10);
+    font-size: 12px;
+    font-weight: 900;
+}
+
+
+.nova-help-flow {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 1fr)
+        minmax(320px, 0.9fr);
+    gap: 28px;
+    align-items: center;
+    margin: 24px 0;
+    padding: 42px;
+    border: 1px solid var(--nova-help-line);
+    border-radius: 34px;
+    background:
+        rgba(15, 23, 42, 0.66);
+}
+
+
+.nova-help-flow-steps {
+    display: grid;
+    gap: 10px;
+}
+
+
+.nova-help-flow-steps > div {
+    display: grid;
+    grid-template-columns:
+        42px
+        minmax(0, 1fr);
+    gap: 14px;
+    align-items: center;
+    padding: 18px;
+    border: 1px solid var(--nova-help-line);
+    border-radius: 20px;
+    background:
+        rgba(255, 255, 255, 0.04);
+}
+
+
+.nova-help-flow-steps strong {
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    border-radius: 14px;
+    color:
+        rgba(233, 213, 255, 0.98);
+    background:
+        rgba(139, 92, 246, 0.16);
+}
+
+
+.nova-help-flow-steps span {
+    color: var(--nova-help-muted);
+    line-height: 1.55;
+}
+
+
+.nova-help-support {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 1fr)
+        auto;
+    gap: 26px;
+    align-items: center;
+    margin: 24px 0 38px;
+    padding: 38px;
+    border: 1px solid
+        rgba(52, 211, 153, 0.20);
+    border-radius: 32px;
+    background:
+        rgba(6, 78, 59, 0.18);
+}
+
+
+.nova-help-support .nova-help-buttons {
+    margin-top: 0;
+}
+
+
+.nova-help-footer {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 18px;
+    color: var(--nova-help-muted);
+}
+
+
+.nova-help-footer > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+}
+
+
+@media (
+    max-width: 900px
+) {
+    .nova-help-nav,
+    .nova-help-flow,
+    .nova-help-support {
+        grid-template-columns: 1fr;
+    }
+
+
+    .nova-help-actions {
+        justify-content: flex-start;
+    }
+}
+
+
+@media (
+    max-width: 720px
+) {
+    .nova-help-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+@media (
+    max-width: 620px
+) {
+    .nova-help-shell {
+        width:
+            min(
+                100% - 28px,
+                1180px
+            );
+        padding-top: 18px;
+    }
+
+
+    .nova-help-hero,
+    .nova-help-card,
+    .nova-help-flow,
+    .nova-help-support {
+        padding: 28px 24px;
+        border-radius: 28px;
+    }
+
+
+    .nova-help-hero h1 {
+        font-size:
+            clamp(
+                43px,
+                15vw,
+                66px
+            );
+    }
+}

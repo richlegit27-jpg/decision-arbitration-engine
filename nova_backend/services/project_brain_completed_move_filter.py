@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -150,3 +150,100 @@ __all__ = [
     "filter_completed_moves",
     "is_move_completed",
 ]
+
+
+
+# NOVA_PROJECT_BRAIN_OPERATOR_MEMORY_COMPLETION_BRIDGE_20260711
+# Lets completed-move filtering consume durable Operator Memory smoke evidence.
+# Service-only. No Flask wiring and no app.py guard.
+_NOVA_PRE_OPERATOR_MEMORY_COMPLETION_DETECT_20260711 = detect_completed_move
+
+
+def _nova_operator_memory_completion_blob_20260711():
+    try:
+        from nova_backend.services.project_brain_operator_memory_writer import (
+            load_operator_memory,
+        )
+
+        memory = load_operator_memory()
+    except Exception:
+        return ""
+
+    if not isinstance(
+        memory,
+        dict,
+    ):
+        return ""
+
+    milestones = list(
+        memory.get(
+            "milestones",
+            [],
+        )
+        or []
+    )
+
+    latest = memory.get(
+        "latest"
+    )
+
+    if isinstance(
+        latest,
+        dict,
+    ):
+        milestones.append(
+            latest
+        )
+
+    return repr(
+        milestones
+    ).lower()
+
+
+def detect_completed_move(move_name: str) -> CompletedMoveSignal:
+    base_signal = (
+        _NOVA_PRE_OPERATOR_MEMORY_COMPLETION_DETECT_20260711(
+            move_name
+        )
+    )
+
+    if base_signal.completed:
+        return base_signal
+
+    clean_name = str(
+        move_name
+        or ""
+    ).strip()
+
+    normalized_name = clean_name.lower()
+
+    if normalized_name == (
+        "nova conversation quality field test v1"
+    ):
+        memory_blob = (
+            _nova_operator_memory_completion_blob_20260711()
+        )
+
+        completion_signals = (
+            "nova conversation quality field test smoke passed",
+            "nova_conversation_quality_field_test_smoke.py",
+        )
+
+        if any(
+            signal in memory_blob
+            for signal in completion_signals
+        ):
+            return CompletedMoveSignal(
+                move_name=clean_name,
+                completed=True,
+                evidence=(
+                    "Operator Memory records the Nova Conversation "
+                    "Quality Field Test smoke as passed"
+                ),
+                replacement_hint=(
+                    "Re-rank unfinished Project Brain moves instead "
+                    "of recommending the completed field test again."
+                ),
+            )
+
+    return base_signal

@@ -1,57 +1,61 @@
-﻿param(
-    [switch]$SkipGit
-)
-
 $ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
 
 $Root = "C:\Users\Owner\nova"
-$Smoke = Join-Path $Root "tools\nova_public_smoke.py"
+$SurfaceSmoke = Join-Path $Root "tools\nova_public_surface_lock_smoke.py"
 
 Write-Host ""
-Write-Host "NOVA PUBLIC RELEASE CHECK" -ForegroundColor Cyan
+Write-Host "NOVA PUBLIC RELEASE CHECK"
 Write-Host "Root: $Root"
 Write-Host ""
 
-if (!(Test-Path $Smoke)) {
-    Write-Host "Missing smoke script: $Smoke" -ForegroundColor Red
-    exit 1
+if (-not (Test-Path $SurfaceSmoke)) {
+    throw "Missing public surface smoke: $SurfaceSmoke"
 }
 
-Push-Location $Root
+Write-Host "Running locked public surface smoke."
+Write-Host ""
 
-try {
-    Write-Host "Running public smoke test..." -ForegroundColor Cyan
-    python $Smoke
+& python $SurfaceSmoke
 
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host ""
-        Write-Host "Public smoke failed." -ForegroundColor Red
-        exit $LASTEXITCODE
-    }
+if ($LASTEXITCODE -ne 0) {
+    throw "Public surface smoke failed."
+}
 
-    if (!$SkipGit) {
-        Write-Host ""
-        Write-Host "Checking staged files for accidental mobile changes..." -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Checking working tree for accidental mobile changes."
+Write-Host ""
 
-        $cached = git diff --cached --name-only
-        $mobileCached = $cached | Select-String -Pattern "mobile"
+$statusLines = @(
+    git -C $Root status --short
+)
 
-        if ($mobileCached) {
-            Write-Host ""
-            Write-Host "Blocked: staged mobile files detected." -ForegroundColor Red
-            $mobileCached
-            exit 1
+$mobileChanges = @(
+    $statusLines |
+        Where-Object {
+            $_ -match "static[\\/]js[\\/]mobile[\\/]" -or
+            $_ -match "static[\\/]css[\\/]nova-mobile\.css" -or
+            $_ -match "templates[\\/]mobile\.html" -or
+            $_ -match "templates[\\/]index-mobile\.html"
         }
+)
 
-        Write-Host ""
-        Write-Host "Current git status:" -ForegroundColor Cyan
-        git status --short
+Write-Host "Current git status:"
+
+foreach ($line in $statusLines) {
+    Write-Host $line
+}
+
+if ($mobileChanges.Count -gt 0) {
+    Write-Host ""
+    Write-Host "ACCIDENTAL MOBILE CHANGES DETECTED:"
+
+    foreach ($line in $mobileChanges) {
+        Write-Host $line
     }
 
-    Write-Host ""
-    Write-Host "NOVA PUBLIC RELEASE CHECK PASSED" -ForegroundColor Green
-    exit 0
+    throw "Public release check blocked by mobile file changes."
 }
-finally {
-    Pop-Location
-}
+
+Write-Host ""
+Write-Host "NOVA PUBLIC RELEASE CHECK PASSED"

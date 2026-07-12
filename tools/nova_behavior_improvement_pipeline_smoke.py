@@ -68,7 +68,6 @@ decision = decide_project_brain_next_move(
     pasted_output="",
 )
 
-
 assert decision is not None
 
 print(

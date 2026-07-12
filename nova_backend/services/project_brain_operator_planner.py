@@ -300,7 +300,122 @@ def build_operator_plan(
 ) -> OperatorPlan:
     work_type = classify_work_type(user_text=user_text, changed_files=changed_files)
     recommended_move, why, risk, target_files = choose_recommended_move(work_type)
-    smokes = select_smokes(work_type, changed_files=changed_files)
+    ranked_for_plan = rank_moves(
+        work_type,
+        changed_files=changed_files,
+    )
+
+    recommended_ranked_move = None
+
+    for move in ranked_for_plan:
+        if isinstance(
+            move,
+            dict,
+        ):
+            move_name = str(
+                move.get(
+                    "name"
+                )
+                or ""
+            ).strip()
+
+        else:
+            move_name = str(
+                getattr(
+                    move,
+                    "name",
+                    "",
+                )
+                or ""
+            ).strip()
+
+        if move_name == recommended_move:
+            recommended_ranked_move = move
+            break
+
+    if isinstance(
+        recommended_ranked_move,
+        dict,
+    ):
+        smokes = list(
+            recommended_ranked_move.get(
+                "focused_smokes",
+                [],
+            )
+            or []
+        )
+
+    else:
+        smokes = list(
+            getattr(
+                recommended_ranked_move,
+                "focused_smokes",
+                [],
+            )
+            or []
+        )
+
+    if not smokes:
+        ranked_for_plan = rank_moves(
+            work_type,
+            changed_files=changed_files,
+        )
+
+        recommended_ranked_move = None
+
+        for move in ranked_for_plan:
+            if isinstance(
+                move,
+                dict,
+            ):
+                move_name = str(
+                    move.get(
+                        "name"
+                    )
+                    or ""
+                ).strip()
+
+            else:
+                move_name = str(
+                    getattr(
+                        move,
+                        "name",
+                        "",
+                    )
+                    or ""
+                ).strip()
+
+            if move_name == recommended_move:
+                recommended_ranked_move = move
+                break
+
+        if isinstance(
+            recommended_ranked_move,
+            dict,
+        ):
+            smokes = list(
+                recommended_ranked_move.get(
+                    "focused_smokes",
+                    [],
+                )
+                or []
+            )
+
+        else:
+            smokes = list(
+                getattr(
+                    recommended_ranked_move,
+                    "focused_smokes",
+                    [],
+                )
+                or []
+            )
+
+        if not smokes:
+            smokes = select_smokes(
+                work_type,
+                changed_files=changed_files,
+            )
     moves = rank_moves(work_type, changed_files=changed_files)
 
     avoid_rules = list(PROJECT_BRAIN_SAFE_AVOID_RULES)
@@ -330,7 +445,7 @@ def build_operator_plan(
         rollback_point=rollback_point,
         commit_rule=DEFAULT_COMMIT_RULE,
         stop_rule=DEFAULT_STOP_RULE,
-        exact_next_command=exact_next_command_for(work_type),
+        exact_next_command=smokes[0] if smokes else "",
         loop_guard=DEFAULT_LOOP_GUARD,
         ranked_moves=moves,
         rejected_moves=rejected_moves,
@@ -1234,6 +1349,45 @@ def _nova_upgrade_radar_normalize_move_20260702(move, rank):
     )
 
 
+def _nova_upgrade_radar_completed_20260711(move):
+    name = _nova_upgrade_radar_name_20260702(
+        move
+    )
+
+    if not name:
+        return False
+
+    try:
+        from nova_backend.services.project_brain_completed_move_filter import (
+            detect_completed_move,
+        )
+
+        signal = detect_completed_move(
+            name
+        )
+
+    except Exception:
+        return False
+
+    if isinstance(
+        signal,
+        dict,
+    ):
+        return bool(
+            signal.get(
+                "completed"
+            )
+        )
+
+    return bool(
+        getattr(
+            signal,
+            "completed",
+            False,
+        )
+    )
+
+
 def rank_moves(work_type: str, changed_files=None, **kwargs):
     try:
         base_moves = _NOVA_PRE_UPGRADE_RADAR_RANK_MOVES_20260702(
@@ -1241,31 +1395,86 @@ def rank_moves(work_type: str, changed_files=None, **kwargs):
             changed_files=changed_files,
             **kwargs,
         )
+
     except TypeError:
-        base_moves = _NOVA_PRE_UPGRADE_RADAR_RANK_MOVES_20260702(work_type)
+        base_moves = (
+            _NOVA_PRE_UPGRADE_RADAR_RANK_MOVES_20260702(
+                work_type
+            )
+        )
+
     except Exception:
         base_moves = []
 
-    radar = _nova_upgrade_radar_move_20260702(rank=1)
+    radar = _nova_upgrade_radar_move_20260702(
+        rank=1
+    )
 
-    combined = [radar]
-    seen = {_nova_upgrade_radar_name_20260702(radar)}
+    if _nova_upgrade_radar_completed_20260711(
+        radar
+    ):
+        remaining = list(
+            base_moves
+            or []
+        )
+
+        if not remaining:
+            remaining = [
+                _nova_dict_safe_cleanup_move_20260702()
+            ]
+
+        return [
+            _nova_upgrade_radar_normalize_move_20260702(
+                move,
+                index,
+            )
+            for index, move in enumerate(
+                remaining,
+                start=1,
+            )
+        ]
+
+    combined = [
+        radar
+    ]
+
+    seen = {
+        _nova_upgrade_radar_name_20260702(
+            radar
+        )
+    }
 
     for move in base_moves or []:
-        name = _nova_upgrade_radar_name_20260702(move)
+        name = _nova_upgrade_radar_name_20260702(
+            move
+        )
 
-        if not name or name in seen:
+        if (
+            not name
+            or name in seen
+        ):
             continue
 
         if name == "Cleanup Strategy Engine v1":
             continue
 
-        seen.add(name)
-        combined.append(move)
+        seen.add(
+            name
+        )
+
+        combined.append(
+            move
+        )
 
     return [
-        _nova_upgrade_radar_normalize_move_20260702(move, index)
-        for index, move in enumerate(combined, start=1)
+        _nova_upgrade_radar_normalize_move_20260702(
+            move,
+            index,
+        )
+        for index, move in enumerate(
+            combined,
+            start=1,
+        )
     ]
 
 

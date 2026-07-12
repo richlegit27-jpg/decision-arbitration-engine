@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import time
@@ -65,17 +65,17 @@ def main() -> int:
         (
             "nova status summary",
             "give me a quick Nova status summary",
-            ["current nova project context", "nova checkpoint", "focus", "next", "locked"],
+            ["current nova project state", "current checkpoint", "focus", "next", "locked"],
         ),
         (
             "current checkpoint summary",
             "summarize our current Nova project checkpoint",
-            ["current nova project context", "nova checkpoint", "locked"],
+            ["current nova project state", "current checkpoint", "locked"],
         ),
         (
             "project context",
             "what is the current Nova project context?",
-            ["current nova project context", "focus", "next"],
+            ["current nova project state", "focus", "next"],
         ),
     ]
 

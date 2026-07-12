@@ -25,8 +25,8 @@ behavior_report = {
 
     "recommended_focus": {
 
-        "focus":
-            "weak_memory_recall",
+"focus":
+    "weak_memory_recall",
 
         "priority":
             "critical",

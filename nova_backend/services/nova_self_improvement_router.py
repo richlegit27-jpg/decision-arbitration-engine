@@ -52,7 +52,6 @@ class NovaSelfImprovementRouter:
         return False
 
 
-
     def build_signal(
         self,
         behavior_report
@@ -60,28 +59,53 @@ class NovaSelfImprovementRouter:
 
         return {
 
-            "engine":
-                self.version,
+        "engine":
+            self.version,
 
-            "analyze":
-                self.should_analyze(
-                    behavior_report
-                ),
+        "analyze":
+            self.should_analyze(
+                behavior_report
+            ),
 
-            "reason":
-                (
-                    behavior_report
-                    .get(
-                        "recommended_focus",
-                        {}
-                    )
-                    .get(
-                        "reason",
-                        ""
-                    )
+        "focus":
+            (
+                behavior_report
+                .get(
+                    "recommended_focus",
+                    {}
                 )
-        }
+                .get(
+                    "focus",
+                    "unknown"
+                )
+            ),
 
+        "priority":
+            (
+                behavior_report
+                .get(
+                    "recommended_focus",
+                    {}
+                )
+                .get(
+                    "priority",
+                    "low"
+                )
+            ),
+
+        "reason":
+            (
+                behavior_report
+                .get(
+                    "recommended_focus",
+                    {}
+                )
+                .get(
+                    "reason",
+                    ""
+                )
+            ),
+    }
 
 
 self_improvement_router = (

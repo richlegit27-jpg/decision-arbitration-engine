@@ -1,5 +1,97 @@
 from __future__ import annotations
 
+# NOVA_DURABLE_DATA_BOOTSTRAP_20260703
+def _nova_durable_data_bootstrap_20260703():
+    try:
+        import os
+        import shutil
+        import time
+        from pathlib import Path
+
+        base_dir = Path(__file__).resolve().parent
+        app_data = base_dir / "data"
+
+        candidates = []
+
+        explicit = os.environ.get("NOVA_DATA_DIR", "").strip()
+        if explicit:
+            candidates.append(Path(explicit))
+
+        # Only use /data when it already exists, which indicates a real mounted
+        # Railway volume. Do not create fake /data on local Windows or ephemeral
+        # containers, because that can move repo-local data unexpectedly.
+        volume_data = Path("/data")
+        if os.name != "nt" and volume_data.exists():
+            candidates.append(volume_data)
+
+        candidates.append(app_data)
+
+        chosen = None
+
+        for candidate in candidates:
+            try:
+                candidate.mkdir(parents=True, exist_ok=True)
+                probe = candidate / ".nova_write_probe"
+                probe.write_text("ok", encoding="utf-8")
+                probe.unlink(missing_ok=True)
+                chosen = candidate
+                break
+            except Exception:
+                continue
+
+        if chosen is None:
+            chosen = app_data
+            chosen.mkdir(parents=True, exist_ok=True)
+
+        os.environ["NOVA_DATA_DIR"] = str(chosen)
+
+        should_bridge_app_data = False
+        try:
+            should_bridge_app_data = chosen.resolve() != app_data.resolve()
+        except Exception:
+            should_bridge_app_data = str(chosen) != str(app_data)
+
+        if should_bridge_app_data:
+            chosen.mkdir(parents=True, exist_ok=True)
+
+            if app_data.exists() and not app_data.is_symlink():
+                for item in app_data.iterdir():
+                    target = chosen / item.name
+                    if target.exists():
+                        continue
+                    try:
+                        if item.is_dir():
+                            shutil.copytree(item, target)
+                        else:
+                            shutil.copy2(item, target)
+                    except Exception:
+                        pass
+
+                try:
+                    app_data.rename(base_dir / ("data_ephemeral_backup_" + time.strftime("%Y%m%d_%H%M%S")))
+                except Exception:
+                    pass
+
+            if not app_data.exists():
+                try:
+                    app_data.symlink_to(chosen, target_is_directory=True)
+                except Exception:
+                    pass
+
+        print("[NOVA_DURABLE_DATA_BOOTSTRAP_20260703] NOVA_DATA_DIR=", os.environ.get("NOVA_DATA_DIR"))
+        print("[NOVA_DURABLE_DATA_BOOTSTRAP_20260703] app_data=", str(app_data), "real=", str(app_data.resolve()))
+
+    except Exception as exc:
+        try:
+            print("[NOVA_DURABLE_DATA_BOOTSTRAP_20260703] failed:", exc)
+        except Exception:
+            pass
+
+
+_nova_durable_data_bootstrap_20260703()
+# /NOVA_DURABLE_DATA_BOOTSTRAP_20260703
+
+
 
 def _nova_boot_log_20260701(*args, **kwargs):
     import os as _nova_boot_log_os_20260701
@@ -290,6 +382,68 @@ try:
                 in exact_project_state_recall
             ):
                 return None
+
+            # NOVA_PROJECT_BRAIN_REPAIR_PLAN_COMMAND_YIELD_20260711
+            #
+            # Explicit repair-plan commands belong to the locked
+            # repair-plan command owner. Project Brain is broad and
+            # must yield before classifying repair failure text as
+            # next_move_judgment.
+            #
+            # Use the canonical adapter extractor instead of copying
+            # command prefixes into this route owner.
+            try:
+                from nova_backend.services.repair_plan_adapter import (
+                    extract_repair_plan_input as _nova_gi_extract_repair_plan_input_20260711,
+                )
+
+                if (
+                    _nova_gi_extract_repair_plan_input_20260711(
+                        user_text
+                    )
+                    is not None
+                ):
+                    return None
+
+            except Exception as exc:
+                try:
+                    print(
+                        "[NOVA_PROJECT_BRAIN_REPAIR_PLAN_COMMAND_YIELD_20260711] "
+                        "canonical command detection bypass:",
+                        exc,
+                    )
+                except Exception:
+                    pass
+
+            # NOVA_PROJECT_BRAIN_REPAIR_BUILD_COMMAND_YIELD_20260711
+            #
+            # Explicit repair-build commands belong to the locked
+            # repair-build adapter and command owner.
+            #
+            # Project Brain must yield before broad failure or
+            # next-move judgment classification can hijack them.
+            try:
+                from nova_backend.services.repair_build_adapter import (
+                    extract_repair_build_input as _nova_gi_extract_repair_build_input_20260711,
+                )
+
+                if (
+                    _nova_gi_extract_repair_build_input_20260711(
+                        user_text
+                    )
+                    is not None
+                ):
+                    return None
+
+            except Exception as exc:
+                try:
+                    print(
+                        "[NOVA_PROJECT_BRAIN_REPAIR_BUILD_COMMAND_YIELD_20260711] "
+                        "canonical command detection bypass:",
+                        exc,
+                    )
+                except Exception:
+                    pass
 
             from nova_backend.services.project_brain_general_intelligence import (
                 build_project_brain_general_answer,
@@ -12047,6 +12201,414 @@ def nova_blog_page_20260611():
     return render_template("blog.html")
 
 
+# NOVA_BLOG_WRITABLE_ROUTE_FAMILY_RESTORED_20260711
+def _nova_blog_posts_path_20260711():
+    from pathlib import Path
+
+    path = (
+        Path(__file__).resolve().parent
+        /
+        "data"
+        /
+        "blog_posts.json"
+    )
+
+    path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    return path
+
+
+def _nova_blog_read_posts_20260711():
+    import json
+
+    path = _nova_blog_posts_path_20260711()
+
+    if not path.exists():
+        return []
+
+    try:
+        payload = json.loads(
+            path.read_text(
+                encoding="utf-8"
+            )
+        )
+    except Exception:
+        return []
+
+    if isinstance(
+        payload,
+        list,
+    ):
+        return [
+            item
+            for item in payload
+            if isinstance(
+                item,
+                dict,
+            )
+        ]
+
+    if isinstance(
+        payload,
+        dict,
+    ):
+        posts = payload.get(
+            "posts"
+        )
+
+        if isinstance(
+            posts,
+            list,
+        ):
+            return [
+                item
+                for item in posts
+                if isinstance(
+                    item,
+                    dict,
+                )
+            ]
+
+    return []
+
+
+def _nova_blog_write_posts_20260711(
+    posts,
+):
+    import json
+
+    path = _nova_blog_posts_path_20260711()
+
+    path.write_text(
+        json.dumps(
+            posts,
+            ensure_ascii=False,
+            indent=2,
+        )
+        +
+        "\n",
+        encoding="utf-8",
+    )
+
+
+def _nova_blog_slugify_20260711(
+    value,
+):
+    import re
+
+    value = str(
+        value
+        or
+        ""
+    ).strip().lower()
+
+    value = re.sub(
+        r"[^a-z0-9]+",
+        "-",
+        value,
+    )
+
+    value = value.strip(
+        "-"
+    )
+
+    return (
+        value
+        or
+        "post"
+    )
+
+
+@app.route("/blog/write")
+def nova_blog_write_page_restored_20260711():
+    from flask import render_template
+
+    return render_template(
+        "blog_write.html"
+    )
+
+
+@app.route("/blog/<slug>")
+def nova_blog_post_page_restored_20260711(
+    slug,
+):
+    from flask import render_template
+
+    return render_template(
+        "blog_post.html",
+        slug=slug,
+    )
+
+
+@app.route(
+    "/api/blog/posts",
+    methods=[
+        "GET",
+        "POST",
+    ],
+)
+def nova_blog_posts_api_restored_20260711():
+    from datetime import datetime, timezone
+    from flask import jsonify, request
+
+    posts = _nova_blog_read_posts_20260711()
+
+
+    if request.method == "GET":
+
+        posts = sorted(
+            posts,
+            key=lambda item: (
+                item.get(
+                    "updated_at"
+                )
+                or item.get(
+                    "created_at"
+                )
+                or ""
+            ),
+            reverse=True,
+        )
+
+        return jsonify(
+            {
+                "ok": True,
+                "posts": posts,
+            }
+        )
+
+
+    payload = (
+        request.get_json(
+            silent=True
+        )
+        or {}
+    )
+
+
+    title = str(
+        payload.get(
+            "title"
+        )
+        or
+        ""
+    ).strip()
+
+
+    body = str(
+        payload.get(
+            "body"
+        )
+        or
+        ""
+    ).strip()
+
+
+    excerpt = str(
+        payload.get(
+            "excerpt"
+        )
+        or
+        ""
+    ).strip()
+
+
+    tags = payload.get(
+        "tags"
+    )
+
+
+    if isinstance(
+        tags,
+        str,
+    ):
+
+        tags = [
+            part.strip()
+            for part in tags.split(
+                ","
+            )
+            if part.strip()
+        ]
+
+
+    elif isinstance(
+        tags,
+        list,
+    ):
+
+        tags = [
+            str(
+                part
+            ).strip()
+            for part in tags
+            if str(
+                part
+            ).strip()
+        ]
+
+
+    else:
+
+        tags = []
+
+
+    tags = list(
+        dict.fromkeys(
+            tags
+        )
+    )
+
+
+    if not title:
+
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Title is required.",
+            }
+        ), 400
+
+
+    if not body:
+
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Body is required.",
+            }
+        ), 400
+
+
+    base_slug = _nova_blog_slugify_20260711(
+        payload.get(
+            "slug"
+        )
+        or title
+    )
+
+
+    slug = base_slug
+
+
+    existing_slugs = {
+        str(
+            post.get(
+                "slug"
+            )
+            or
+            ""
+        )
+        for post in posts
+    }
+
+
+    suffix = 2
+
+
+    while slug in existing_slugs:
+
+        slug = (
+            base_slug
+            +
+            "-"
+            +
+            str(
+                suffix
+            )
+        )
+
+        suffix += 1
+
+
+    now = datetime.now(
+        timezone.utc
+    ).isoformat()
+
+
+    if not excerpt:
+
+        excerpt = body[:220].strip()
+
+
+    post = {
+        "slug": slug,
+        "title": title,
+        "excerpt": excerpt,
+        "body": body,
+        "tags": tags,
+        "created_at": now,
+        "updated_at": now,
+    }
+
+
+    posts.append(
+        post
+    )
+
+
+    _nova_blog_write_posts_20260711(
+        posts
+    )
+
+
+    return jsonify(
+        {
+            "ok": True,
+            "post": post,
+        }
+    )
+
+
+@app.route(
+    "/api/blog/posts/<slug>",
+    methods=[
+        "GET",
+    ],
+)
+def nova_blog_single_post_api_restored_20260711(
+    slug,
+):
+    from flask import jsonify
+
+    posts = _nova_blog_read_posts_20260711()
+
+
+    for post in posts:
+
+        if str(
+            post.get(
+                "slug"
+            )
+            or
+            ""
+        ) == str(
+            slug
+            or
+            ""
+        ):
+
+            return jsonify(
+                {
+                    "ok": True,
+                    "post": post,
+                }
+            )
+
+
+    return jsonify(
+        {
+            "ok": False,
+            "error": "Post not found.",
+        }
+    ), 404
+
+# /NOVA_BLOG_WRITABLE_ROUTE_FAMILY_RESTORED_20260711
+
+
 # NOVA_BEFORE_REQUEST_EXPLICIT_MEMORY_GUARD_20260611
 @app.before_request
 def nova_before_request_explicit_memory_guard_20260611():
@@ -20761,10 +21323,6 @@ def nova_billing_status_api_20260709():
 
 
 # NOVA_BLOG_PAGE_ROUTES_20260709
-@app.get("/blog")
-def nova_blog_page_20260709():
-    from flask import render_template
-    return render_template("nova_blog.html")
 # /NOVA_BLOG_PAGE_ROUTES_20260709
 
 
@@ -20793,7 +21351,6 @@ def nova_roadmap_page_20260709():
 
 # NOVA_FAQ_PAGE_ROUTES_20260709
 @app.get("/faq")
-@app.get("/help")
 def nova_faq_page_20260709():
     from flask import render_template
     return render_template("nova_faq.html")
@@ -22044,6 +22601,62 @@ def _nova_upload_attachment_summary_after_request_v2(response):
         return response
 
     return response
+
+# NOVA_DURABLE_DATA_HEALTH_ROUTE_20260703
+try:
+    @app.get("/api/storage/health")
+    def _nova_storage_health_20260703():
+        import os
+        from pathlib import Path
+
+        base_dir = Path(__file__).resolve().parent
+        app_data = base_dir / "data"
+        env_data = Path(os.environ.get("NOVA_DATA_DIR", str(app_data)))
+
+        names = [
+            "nova_auth_users.json",
+            "nova_sessions.json",
+            "nova_memory.json",
+            "nova_artifacts.json",
+            "nova_flask_secret.key",
+        ]
+
+        def info(path):
+            try:
+                return {
+                    "path": str(path),
+                    "exists": path.exists(),
+                    "is_file": path.is_file(),
+                    "is_dir": path.is_dir(),
+                    "is_symlink": path.is_symlink(),
+                    "realpath": str(path.resolve()) if path.exists() or path.is_symlink() else None,
+                }
+            except Exception as exc:
+                return {"path": str(path), "error": str(exc)}
+
+        return {
+            "ok": True,
+            "marker": "NOVA_DURABLE_DATA_HEALTH_ROUTE_20260703",
+            "cwd": os.getcwd(),
+            "base_dir": str(base_dir),
+            "nova_data_dir_env": os.environ.get("NOVA_DATA_DIR"),
+            "app_data": info(app_data),
+            "env_data": info(env_data),
+            "files": {
+                name: {
+                    "app_data": info(app_data / name),
+                    "env_data": info(env_data / name),
+                }
+                for name in names
+            },
+        }
+except Exception as exc:
+    try:
+        print("[NOVA_DURABLE_DATA_HEALTH_ROUTE_20260703] failed:", exc)
+    except Exception:
+        pass
+# /NOVA_DURABLE_DATA_HEALTH_ROUTE_20260703
+
 
 if __name__ == "__main__":
     create_startup_backup()

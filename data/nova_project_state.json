@@ -1,7 +1,7 @@
 {
   "project": "Nova",
-  "checkpoint": "Fallback guard cleanup plan locked",
-  "current_focus": "Nova autonomy cleanup Phase 3H locked: no-delete fallback guard cleanup plan identifies autonomy-plan and patch-build fallback guards as cleanup candidates while preserving adapter routes and project-state recall.",
+  "checkpoint": "Phase 4I guard stack audit passed",
+  "current_focus": "Project-state freshness and answer-quality alignment: direct project-state recall is being aligned with the Project Brain context builder and freshness snapshot after the Phase 4I structural cleanup.",
   "last_completed": [
     "Router cleanup locked",
     "Web/live price routing locked",
@@ -48,7 +48,10 @@
     "Final locked smoke set passed",
     "Autonomy cleanup review wording locked",
     "One-command adapter migration complete",
-    "Fallback guard cleanup plan locked"
+    "Fallback guard cleanup plan locked",
+    "Project-next wrapper classifier no longer claims next move; Project Brain decision routing is preserved.",
+    "July 5 route and hook family moved above app.run; no late executable hooks remain.",
+    "Duplicate NOVA marker identities resolved and Phase 4I guard stack audit passed."
   ],
   "locked": [
     "Memory quality smoke",
@@ -88,10 +91,16 @@
     "Release checkpoint",
     "Autonomy command smoke",
     "Autonomy Phase 1C autonomy-plan command",
-    "Autonomy Phase 1D Patch Builder service"
+    "Autonomy Phase 1D Patch Builder service",
+    "Project Brain context builder",
+    "Project Brain freshness snapshot",
+    "Answer-quality 95 policy",
+    "Phase 4I guard stack audit"
   ],
-  "remaining": "Do not delete fallback guards yet. Next step is one-guard removal planning for autonomy-plan only, with full API and memory smokes before any app.py cleanup commit.",
-  "next_move": "Plan autonomy-plan fallback guard removal only, preserving project-state recall, adapter route behavior, command modes, API smokes, guard cleanup review smoke, and memory quality smoke.",
+  "remaining": [
+    "Direct current-state answers must stop reporting the stale Phase 3H fallback cleanup checkpoint and expose the protected Project Brain context builder, freshness, and answer-quality baseline."
+  ],
+  "next_move": "Align direct project-state recall with the Project Brain context builder, freshness snapshot, and answer-quality contract, then rerun the focused answer-quality and Project Brain smokes.",
   "git": {
     "branch": "post-frontend-polish-phase",
     "head": "e84977f",
@@ -146,5 +155,6 @@
     "Autonomy Phase 1D Patch Builder service"
   ],
   "memory_status": "Memory quality smoke locked and passing as safety baseline.",
-  "safety_baseline": "Memory quality smoke, regression smoke, autonomy command smoke, patch planner smoke, and patch builder smoke."
+  "safety_baseline": "Memory quality smoke, regression smoke, autonomy command smoke, patch planner smoke, and patch builder smoke.",
+  "updated_at": "2026-07-11T21:40:16.929745+00:00"
 }

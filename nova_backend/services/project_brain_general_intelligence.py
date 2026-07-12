@@ -545,6 +545,8 @@ def _nova_project_brain_command_center_question_20260702(user_text):
         "what are we working on",
         "what are we working on now",
         "what are we working on right now",
+        "next move",
+        "current status",
     }
     if q in exact_direct_project_state:
         return False
@@ -584,6 +586,11 @@ def _nova_project_brain_command_center_question_20260702(user_text):
         "current blocker",
         "next",
         "next move",
+        "what next",
+        "what's next",
+        "whats next",
+        "what is next",
+        "what should we do next",
     }:
         return True
 
@@ -619,7 +626,43 @@ def build_project_brain_general_answer(user_text=""):
             build_project_brain_live_answer,
         )
 
-        return build_project_brain_live_answer(user_text=user_text).text
+        live_answer = build_project_brain_live_answer(
+            user_text=user_text,
+        )
+
+        if not live_answer:
+            return None
+
+        live_text = str(
+            getattr(
+                live_answer,
+                "text",
+                "",
+            )
+            or ""
+        ).strip()
+
+        if not live_text:
+            return None
+
+        live_intent = str(
+            getattr(
+                live_answer,
+                "intent",
+                "",
+            )
+            or getattr(
+                live_answer,
+                "reason",
+                "",
+            )
+            or "project_brain_general"
+        ).strip()
+
+        return ProjectBrainAnswer(
+            intent=live_intent,
+            text=live_text,
+        )
 
     if callable(_NOVA_PRE_LIVE_SELECTOR_PROJECT_BRAIN_GENERAL_BUILD_20260702):
         return _NOVA_PRE_LIVE_SELECTOR_PROJECT_BRAIN_GENERAL_BUILD_20260702(user_text)

@@ -75,11 +75,64 @@ def build_project_state_direct_fresh_response(payload):
     if not intent:
         return None
 
-    from nova_backend.services.project_brain_context_builder import (
-        build_current_project_answer,
-    )
+    answer_source = SOURCE
 
-    answer = build_current_project_answer()
+    if intent == "next_move":
+        from nova_backend.services.project_brain_general_intelligence import (
+            build_project_brain_general_answer,
+        )
+
+        general_answer = build_project_brain_general_answer(
+            user_text
+        )
+
+        if not general_answer:
+            return None
+
+        answer = str(
+            getattr(
+                general_answer,
+                "text",
+                general_answer,
+            )
+            or ""
+        ).strip()
+
+        answer_source = (
+            "project_brain_general_intelligence"
+        )
+
+    else:
+        answer = ""
+
+        if intent == "direct_project_state":
+            from nova_backend.services.project_brain_state_recall_refresh import (
+                load_state_bridge_text,
+            )
+
+            answer = str(
+                load_state_bridge_text()
+                or ""
+            ).strip()
+
+            if answer:
+                answer_source = (
+                    "project_brain_state_bridge"
+                )
+
+        if not answer:
+            from nova_backend.services.project_brain_context_builder import (
+                build_current_project_answer,
+            )
+
+            answer = str(
+                build_current_project_answer()
+                or ""
+            ).strip()
+
+    if not answer:
+        return None
+
     session_id = payload.get("session_id") or payload.get("active_session_id") or ""
     route = _route_for_intent(intent)
 
@@ -88,7 +141,7 @@ def build_project_state_direct_fresh_response(payload):
         "route_taken": route,
         "project_state_direct_freshness_bridge": True,
         "project_state_freshness_intent": intent,
-        "source": SOURCE,
+        "source": answer_source,
     }
 
     return {

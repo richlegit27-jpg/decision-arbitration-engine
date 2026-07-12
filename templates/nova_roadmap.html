@@ -1,163 +1,298 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Nova Roadmap — From prototype to project command center</title>
-    <meta name="description" content="Nova roadmap: desktop workspace, public pages, memory, sessions, billing credits, model tiers, uploads, and future mobile rebuild.">
-    <link rel="stylesheet" href="/static/css/nova-roadmap.css?v=roadmap-page-phase1-20260709">
-    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-    <link rel="manifest" href="/static/site.webmanifest">
-    <meta name="theme-color" content="#8b5cf6">
-    
-    <meta property="og:site_name" content="Nova">
-    <meta property="og:type" content="website">
-    <meta property="og:title" content="Nova Roadmap">
-    <meta property="og:description" content="Nova roadmap from early access prototype to full AI project workspace.">
-    <meta property="og:url" content="{{ request.url_root.rstrip('/') }}/roadmap">
-    <meta property="og:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
-    <meta property="og:image:type" content="image/svg+xml">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Nova Roadmap">
-    <meta name="twitter:description" content="Nova roadmap from early access prototype to full AI project workspace.">
-    <meta name="twitter:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
+
+    <title>Nova Roadmap | Project continuity and execution</title>
+
+    <meta
+        name="description"
+        content="See where Nova is heading: stronger project continuity, clearer next actions, deeper workspace control, and better long-running collaboration."
+    >
+
+    <link
+        rel="stylesheet"
+        href="/static/css/nova-roadmap.css?v=roadmap-endgame-20260711"
+    >
+
+    <link
+        rel="icon"
+        href="/static/favicon.svg"
+        type="image/svg+xml"
+    >
+
+    <link
+        rel="manifest"
+        href="/static/site.webmanifest"
+    >
+
+    <meta
+        name="theme-color"
+        content="#8b5cf6"
+    >
+
+    <!-- NOVA_SOCIAL_META_20260709 -->
+
+    <meta
+        property="og:site_name"
+        content="Nova"
+    >
+
+    <meta
+        property="og:type"
+        content="website"
+    >
+
+    <meta
+        property="og:title"
+        content="Nova Roadmap"
+    >
+
+    <meta
+        property="og:description"
+        content="The direction for stronger project continuity, execution, and workspace control in Nova."
+    >
+
+    <meta
+        property="og:url"
+        content="{{ request.url_root.rstrip('/') }}/roadmap"
+    >
+
+    <meta
+        property="og:image"
+        content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg"
+    >
+
+    <meta
+        property="og:image:type"
+        content="image/svg+xml"
+    >
+
+    <meta
+        name="twitter:card"
+        content="summary_large_image"
+    >
+
+    <meta
+        name="twitter:title"
+        content="Nova Roadmap"
+    >
+
+    <meta
+        name="twitter:description"
+        content="The direction for stronger project continuity, execution, and workspace control in Nova."
+    >
+
+    <meta
+        name="twitter:image"
+        content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg"
+    >
+
     <!-- /NOVA_SOCIAL_META_20260709 -->
-    <link rel="stylesheet" href="/static/css/nova-public-trust.css">
+
 
     <!-- NOVA_PUBLIC_SEO_CANONICAL_CLEANUP_20260709 -->
-    <link rel="canonical" href="{{ request.url_root.rstrip('/') }}/roadmap">
+
+    <link
+        rel="canonical"
+        href="{{ request.url_root.rstrip('/') }}/roadmap"
+    >
+
     <!-- /NOVA_PUBLIC_SEO_CANONICAL_CLEANUP_20260709 -->
 </head>
+
 <body>
-
-<!-- NOVA_PUBLIC_CHROME_CONSISTENCY_20260709_TOP -->
-<div class="nova-public-consistency-bar" aria-label="Nova public navigation">
-    <a class="nova-public-consistency-brand" href="/" aria-label="Nova home">
-        <span>Nova</span>
-    </a>
-
-    <nav class="nova-public-consistency-nav" aria-label="Primary public navigation">
-        <a href="/">Home</a>
-        <a href="/faq">FAQ</a>
-        <a href="/billing">Billing</a>
-        <a href="/roadmap">Roadmap</a>
-        <a href="/blog">Blog</a>
-        <a href="/contact">Early Access</a>
-    </nav>
-</div>
-
     <main class="nova-roadmap-shell">
-        <nav class="nova-roadmap-nav" aria-label="Nova roadmap navigation">
-            <a class="nova-roadmap-brand" href="/">
+        <nav
+            class="nova-roadmap-nav"
+            aria-label="Nova roadmap navigation"
+        >
+            <a
+                class="nova-roadmap-brand"
+                href="/"
+                aria-label="Nova home"
+            >
                 <span>N</span>
+
                 <div>
                     <strong>Nova</strong>
                     <em>Roadmap</em>
                 </div>
             </a>
 
-            <a href="/contact#nova-contact-form-title">Early Access</a>
+
+            <div class="nova-roadmap-actions">
                 <a href="/">Home</a>
                 <a href="/about">About</a>
                 <a href="/features">Features</a>
                 <a href="/blog">Blog</a>
-<a href="/contact#nova-contact-form-title">Early Access</a>
-<a href="/billing">Billing</a>
+                <a href="/billing">Billing</a>
+
+                <a
+                    href="/contact#nova-contact-form-title"
+                >
+                    Request Access
+                </a>
             </div>
         </nav>
 
+
         <section class="nova-roadmap-hero">
             <p>Nova Roadmap</p>
-            <h1>Turning a working prototype into a real AI workspace.</h1>
+
+            <h1>Nova is moving toward a more continuous AI workspace.</h1>
+
             <span>
-                Nova is being built in layers: stabilize the desktop workspace, polish the public product,
-                strengthen billing and memory, then rebuild mobile cleanly instead of dragging old frontend debt forward.
+                Nova is moving toward a workspace that carries the thread of a project forward,
+                understands what matters now, and helps turn long conversations into useful next actions.
             </span>
         </section>
+
 
         <section class="nova-roadmap-lanes">
             <article>
                 <strong>Now</strong>
-                <h2>Stabilize and present</h2>
-                <p>The current focus is making Nova feel like a real product: public pages, stable desktop entry, billing dashboard, and clear positioning.</p>
+
+                <h2>
+                    Hold the working thread
+                </h2>
+
+                <p>
+                    Strengthen the connection between conversation, project state, memory, files,
+                    and the work a user is actively trying to move forward.
+                </p>
 
                 <ul>
-                    <li>Desktop workspace stays protected</li>
-                    <li>Landing, About, Features, Blog, Billing</li>
-                    <li>Project memory and sessions stay core</li>
-                    <li>Railway preview routes stay clean</li>
+                    <li>Sharper project-state recall</li>
+                    <li>Cleaner continuity across sessions</li>
+                    <li>Better file and attachment understanding</li>
+                    <li>More useful next-action judgment</li>
                 </ul>
             </article>
+
 
             <article>
                 <strong>Next</strong>
-                <h2>Make account controls real</h2>
-                <p>The next layer is making billing, credits, user plans, usage, and model access easier to understand and safer to enforce.</p>
+
+                <h2>
+                    Turn context into momentum
+                </h2>
+
+                <p>
+                    Make Nova better at recognizing the current objective, separating signal from noise,
+                    and helping a user move from discussion into organized execution.
+                </p>
 
                 <ul>
-                    <li>Cleaner billing dashboard</li>
-                    <li>Usage ledger visibility</li>
-                    <li>Plan tiers and credit costs</li>
-                    <li>Backend-enforced model allowlist</li>
+                    <li>Clearer project priorities</li>
+                    <li>Stronger planning and execution flow</li>
+                    <li>Better progress and decision visibility</li>
+                    <li>Safer model and usage controls</li>
                 </ul>
             </article>
+
 
             <article>
                 <strong>Later</strong>
-                <h2>Rebuild mobile cleanly</h2>
-                <p>Mobile should become a simpler shell based on the stable product, not a pile of old experimental scripts fighting each other.</p>
+
+                <h2>
+                    Deepen project control
+                </h2>
+
+                <p>
+                    Expand the workspace around long-running work so important decisions, artifacts,
+                    actions, and project history stay easier to find and use.
+                </p>
 
                 <ul>
-                    <li>Separate mobile branch</li>
-                    <li>Minimal script stack</li>
-                    <li>Desktop feature parity where useful</li>
-                    <li>Reliable upload/session flow</li>
+                    <li>Richer project command views</li>
+                    <li>Deeper artifact organization</li>
+                    <li>More capable tool-driven actions</li>
+                    <li>Stronger continuity across devices</li>
                 </ul>
             </article>
         </section>
+
 
         <section class="nova-roadmap-board">
             <div>
                 <p>Product direction</p>
-                <h2>The foundation is already there.</h2>
+
+                <h2>
+                    The goal is not more noise. It is more continuity.
+                </h2>
+
                 <span>
-                    Nova already has the pieces of a serious AI workspace: chat, memory, sessions,
-                    uploads, voice tools, billing credits, deployment, and a stable desktop lane.
-                    The roadmap is about shaping those pieces into a clean product.
+                    Nova is being shaped around the parts of serious work that usually get scattered:
+                    the goal, the current state, the decisions already made, the files involved,
+                    and the next useful move.
                 </span>
             </div>
 
+
             <div class="nova-roadmap-stack">
                 <div>
-                    <strong>Product site</strong>
-                    <span>Home, About, Features, Blog, Roadmap, Billing</span>
+                    <strong>Conversation</strong>
+
+                    <span>
+                        Keep the current objective and important context in view.
+                    </span>
                 </div>
+
+
+                <div>
+                    <strong>Project state</strong>
+
+                    <span>
+                        Understand what changed, what is protected, and what still needs work.
+                    </span>
+                </div>
+
+
+                <div>
+                    <strong>Execution</strong>
+
+                    <span>
+                        Move from goals to plans, actions, results, and clearer follow-through.
+                    </span>
+                </div>
+
+
                 <div>
                     <strong>Workspace</strong>
-                    <span>Desktop-first app, project-aware chat, uploads, sessions</span>
-                </div>
-                <div>
-                    <strong>Account</strong>
-                    <span>Credits, plans, model tiers, usage ledger</span>
-                </div>
-                <div>
-                    <strong>Mobile</strong>
-                    <span>Future clean rebuild after desktop and public site are stable</span>
+
+                    <span>
+                        Bring sessions, files, memory, and project history into one useful thread.
+                    </span>
                 </div>
             </div>
         </section>
+
 
         <section class="nova-roadmap-cta">
             <div>
-                <p>Keep building</p>
-                <h2>Request early access and follow the build.</h2>
+                <p>Keep the thread</p>
+
+                <h2>
+                    Have a project that keeps losing context?
+                </h2>
             </div>
 
-            <a href="/contact#nova-contact-form-title">Request Early Access</a>
+
+            <a
+                href="/contact#nova-contact-form-title"
+            >
+                Request Access
+            </a>
         </section>
 
+
         <footer class="nova-roadmap-footer">
-            <span>Nova Roadmap · Product direction</span>
+            <span>
+                Nova Roadmap ? Product direction
+            </span>
+
             <div>
                 <a href="/">Home</a>
                 <a href="/about">About</a>
@@ -165,35 +300,15 @@
                 <a href="/blog">Blog</a>
                 <a href="/contact">Contact</a>
                 <a href="/billing">Billing</a>
-            </div>
-        
                 <a href="/privacy">Privacy</a>
                 <a href="/terms">Terms</a>
+            </div>
         </footer>
     </main>
 
-    <script src="/static/js/nova-roadmap.js?v=roadmap-page-phase1-20260709"></script>
 
-
-<!-- NOVA_PUBLIC_CHROME_CONSISTENCY_20260709_BOTTOM -->
-<footer class="nova-public-consistency-footer" aria-label="Nova public footer">
-    <div>
-        <strong>Nova</strong>
-        <span>AI workspace in public-site polish and Early Access preparation.</span>
-    </div>
-
-    <nav aria-label="Footer navigation">
-        <a href="/privacy">Privacy</a>
-        <a href="/terms">Terms</a>
-        <a href="/billing">Billing</a>
-        <a href="/contact">Contact</a>
-    </nav>
-</footer>
-
-<!-- NOVA_PUBLIC_HOME_CANONICAL_LINKS_20260709 -->
+    <script
+        src="/static/js/nova-roadmap.js?v=roadmap-page-phase1-20260709"
+    ></script>
 </body>
 </html>
-
-
-
-

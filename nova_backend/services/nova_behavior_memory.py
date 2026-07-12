@@ -45,9 +45,22 @@ class NovaBehaviorMemory:
 
                     data = json.load(file)
 
+
                 if isinstance(data, list):
 
                     self.events = data
+
+
+                elif isinstance(data, dict):
+
+                    events = data.get(
+                        "events",
+                        []
+                    )
+
+                    if isinstance(events, list):
+
+                        self.events = events
 
 
         except Exception as exc:

@@ -87,9 +87,24 @@ def main():
         get_route(direct) == "project_state_current_memory_direct_recall",
         json.dumps(direct.get("debug", {}), indent=2),
     )
+    from nova_backend.services.project_brain_upgrade_radar import (
+        select_best_upgrade,
+    )
+
+    current_best_move = (
+        select_best_upgrade().name
+    )
+
     assert_true(
-        "direct recall uses state bridge",
-        "Project Brain State Recall Refresh v1" in get_text(direct),
+        "direct recall uses canonical state bridge move",
+        current_best_move in get_text(direct),
+        get_text(direct),
+    )
+
+    assert_true(
+        "direct recall excludes stale cleanup move",
+        "Start Project Brain cleanup/consolidation"
+        not in get_text(direct),
         get_text(direct),
     )
 

@@ -121,7 +121,7 @@ def build_state_bridge_record(
     )
 
     blocker = (
-        "No active Project Brain intelligence blocker is open. Remaining cleanup/consolidation is a known risk, "
+        "No active Project Brain intelligence blocker is open. Protected baseline: Project Brain context builder, freshness snapshot, and answer-quality policy are locked. Remaining cleanup/consolidation is a known risk, "
         "but it is not the active next move while State Bridge is syncing the operator milestone state."
     )
 

@@ -1,328 +1,509 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Nova Blog</title>
-    <meta name="description" content="Nova product updates, build notes, experiments, and public launch progress.">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <style>
-        :root {
-            --bg: #070712;
-            --card: rgba(15, 23, 42, 0.84);
-            --card2: rgba(30, 41, 59, 0.72);
-            --text: #f8fafc;
-            --muted: rgba(226, 232, 240, 0.68);
-            --line: rgba(216, 180, 254, 0.22);
-            --purple: #a855f7;
-            --purple2: #7c3aed;
-        }
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
 
-        * {
-            box-sizing: border-box;
-        }
+    <title>Nova Blog | Project continuity, context, and AI work</title>
 
-        body {
-            margin: 0;
-            min-height: 100vh;
-            background:
-                radial-gradient(circle at top left, rgba(168, 85, 247, 0.22), transparent 34%),
-                radial-gradient(circle at bottom right, rgba(124, 58, 237, 0.15), transparent 32%),
-                var(--bg);
-            color: var(--text);
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        }
+    <meta
+        name="description"
+        content="Ideas and updates from Nova about project continuity, useful memory, files, planning, and long-running AI work."
+    >
 
-        a {
-            color: inherit;
-        }
+    <link
+        rel="stylesheet"
+        href="/static/css/nova-blog.css?v=blog-route-family-endgame-20260711"
+    >
 
-        .page {
-            width: min(1120px, calc(100% - 28px));
-            margin: 0 auto;
-            padding: 22px 0 46px;
-        }
+    <link
+        rel="icon"
+        href="/static/favicon.svg"
+        type="image/svg+xml"
+    >
 
-        .topbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 14px;
-            margin-bottom: 24px;
-        }
+    <link
+        rel="manifest"
+        href="/static/site.webmanifest"
+    >
 
-        .brand {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
+    <meta
+        name="theme-color"
+        content="#8b5cf6"
+    >
 
-        .brand strong {
-            font-size: 18px;
-            letter-spacing: -0.04em;
-        }
+    <meta
+        property="og:site_name"
+        content="Nova"
+    >
 
-        .brand span {
-            color: var(--muted);
-            font-size: 12px;
-            font-weight: 750;
-        }
+    <meta
+        property="og:type"
+        content="website"
+    >
 
-        .nav {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-        }
+    <meta
+        property="og:title"
+        content="Nova Blog"
+    >
 
-        .nav a {
-            text-decoration: none;
-            font-size: 12px;
-            font-weight: 900;
-            padding: 8px 12px;
-            border-radius: 999px;
-            border: 1px solid var(--line);
-            background: rgba(168, 85, 247, 0.12);
-        }
+    <meta
+        property="og:description"
+        content="Ideas about project continuity, context, and long-running AI work."
+    >
 
-        .nav a.primary {
-            background: linear-gradient(135deg, rgba(168, 85, 247, 0.38), rgba(124, 58, 237, 0.22));
-        }
+    <meta
+        property="og:url"
+        content="{{ request.url_root.rstrip('/') }}/blog"
+    >
 
-        .hero {
-            padding: 30px;
-            border: 1px solid var(--line);
-            border-radius: 28px;
-            background:
-                linear-gradient(135deg, rgba(168, 85, 247, 0.22), rgba(15, 23, 42, 0.72)),
-                var(--card);
-            box-shadow: 0 24px 65px rgba(0, 0, 0, 0.34);
-            margin-bottom: 18px;
-        }
+    <meta
+        property="og:image"
+        content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg"
+    >
 
-        .eyebrow {
-            color: #d8b4fe;
-            font-size: 12px;
-            font-weight: 950;
-            text-transform: uppercase;
-            letter-spacing: 0.12em;
-            margin-bottom: 10px;
-        }
+    <meta
+        name="twitter:card"
+        content="summary_large_image"
+    >
 
-        h1 {
-            margin: 0;
-            max-width: 760px;
-            font-size: clamp(34px, 7vw, 68px);
-            line-height: 0.94;
-            letter-spacing: -0.07em;
-        }
+    <meta
+        name="twitter:title"
+        content="Nova Blog"
+    >
 
-        .hero p {
-            max-width: 660px;
-            color: var(--muted);
-            margin: 16px 0 0;
-            font-size: 15px;
-            line-height: 1.65;
-            font-weight: 650;
-        }
+    <meta
+        name="twitter:description"
+        content="Ideas about project continuity, context, and long-running AI work."
+    >
 
-        .posts {
-            display: grid;
-            gap: 14px;
-        }
+    <meta
+        name="twitter:image"
+        content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg"
+    >
 
-        .post {
-            display: block;
-            text-decoration: none;
-            padding: 18px;
-            border: 1px solid var(--line);
-            border-radius: 22px;
-            background: var(--card);
-            transition: transform 0.16s ease, border-color 0.16s ease;
-        }
-
-        .post:hover {
-            transform: translateY(-2px);
-            border-color: rgba(216, 180, 254, 0.36);
-        }
-
-        .post h2 {
-            margin: 0 0 8px;
-            font-size: 24px;
-            line-height: 1.05;
-            letter-spacing: -0.045em;
-        }
-
-        .post p {
-            margin: 0;
-            color: var(--muted);
-            font-size: 14px;
-            line-height: 1.55;
-            font-weight: 600;
-        }
-
-        .meta {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-top: 14px;
-        }
-
-        .pill {
-            padding: 6px 9px;
-            border-radius: 999px;
-            background: rgba(168, 85, 247, 0.13);
-            border: 1px solid rgba(216, 180, 254, 0.18);
-            color: #f8fafc;
-            font-size: 11px;
-            font-weight: 900;
-        }
-
-        .empty {
-            padding: 22px;
-            border: 1px dashed rgba(216, 180, 254, 0.30);
-            border-radius: 22px;
-            color: var(--muted);
-            background: rgba(15, 23, 42, 0.48);
-            font-weight: 700;
-        }
-
-        @media (max-width: 820px) {
-            .topbar {
-                align-items: flex-start;
-                flex-direction: column;
-            }
-
-            .nav {
-                justify-content: flex-start;
-            }
-
-            .hero {
-                padding: 22px;
-            }
-        }
-    </style>
-    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-    <link rel="manifest" href="/static/site.webmanifest">
-    <meta name="theme-color" content="#8b5cf6">
-    <!-- NOVA_SOCIAL_META_20260709 -->
-    <link rel="canonical" href="{{ request.url_root.rstrip('/') }}/blog">
-    <meta property="og:site_name" content="Nova">
-    <meta property="og:type" content="website">
-    <meta property="og:title" content="Nova Blog">
-    <meta property="og:description" content="Nova product updates, build notes, and public launch progress.">
-    <meta property="og:url" content="{{ request.url_root.rstrip('/') }}/blog">
-    <meta property="og:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
-    <meta property="og:image:type" content="image/svg+xml">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Nova Blog">
-    <meta name="twitter:description" content="Nova product updates, build notes, and public launch progress.">
-    <meta name="twitter:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
-    <!-- /NOVA_SOCIAL_META_20260709 -->
+    <link
+        rel="canonical"
+        href="{{ request.url_root.rstrip('/') }}/blog"
+    >
 </head>
 
 <body>
-    <main class="page">
-        <header class="topbar">
-            <div class="brand">
-                <strong>Nova Blog</strong>
-                <span>updates, notes, experiments</span>
+    <main class="nova-blog-shell">
+        <nav
+            class="nova-blog-nav"
+            aria-label="Nova blog navigation"
+        >
+            <a
+                class="nova-blog-brand"
+                href="/"
+                aria-label="Nova home"
+            >
+                <span>N</span>
+
+                <div>
+                    <strong>Nova</strong>
+                    <em>Blog</em>
+                </div>
+            </a>
+
+
+            <div class="nova-blog-actions">
+                <a href="/">Home</a>
+                <a href="/about">About</a>
+                <a href="/features">Features</a>
+                <a href="/roadmap">Roadmap</a>
+                <a href="/faq">FAQ</a>
+                <a href="/billing">Billing</a>
+
+                <a
+                    href="/contact#nova-contact-form-title"
+                >
+                    Request Access
+                </a>
+            </div>
+        </nav>
+
+
+        <section class="nova-blog-hero">
+            <p class="nova-blog-kicker">
+                Nova Blog
+            </p>
+
+            <h1>
+                Ideas for work that lasts longer than one chat.
+            </h1>
+
+            <span>
+                Notes and thinking about project continuity, useful memory,
+                working context, files, planning, and the problem of keeping
+                long-running AI work connected.
+            </span>
+        </section>
+
+
+        <section class="nova-blog-intro">
+            <div>
+                <p>
+                    The working thread
+                </p>
+
+                <h2>
+                    Context matters when it helps the project move.
+                </h2>
+
+                <span>
+                    Nova is being shaped around projects that accumulate decisions,
+                    files, history, changing priorities, and unfinished work.
+                    The Blog is where the ideas behind that direction can be explored.
+                </span>
             </div>
 
-<nav class="nav">
-    <a href="/">Home</a>
-    <a href="/mobile">Mobile</a>
-    <a href="/blog">Blog</a>
-    <a href="/faq">FAQ</a>
-    <a href="/billing">Billing</a>
-    <a href="/roadmap">Roadmap</a>
-    <a href="/contact">Contact</a>
-    <a class="primary" href="/blog/write">Write</a>
-</nav>
-        </header>
 
-        <section class="hero">
-            <div class="eyebrow">Nova Journal</div>
-            <h1>Build notes, updates, and thoughts.</h1>
-            <p>
-                Write posts from the editor, save them locally to Nova, and read them here.
-            </p>
+            <div class="nova-blog-thread">
+                <div>
+                    <strong>Remember</strong>
+                    <span>Protect the durable project details.</span>
+                </div>
+
+                <div>
+                    <strong>Understand</strong>
+                    <span>Keep the current project state visible.</span>
+                </div>
+
+                <div>
+                    <strong>Move</strong>
+                    <span>Use context to improve the next action.</span>
+                </div>
+            </div>
         </section>
 
-        <section class="posts" id="posts">
-            <div class="empty">Loading posts...</div>
+
+        <section
+            class="nova-blog-post-section"
+            aria-labelledby="nova-blog-post-title"
+        >
+            <div class="nova-blog-section-head">
+                <p>
+                    Latest writing
+                </p>
+
+                <h2 id="nova-blog-post-title">
+                    Notes from the Nova project.
+                </h2>
+
+                <span>
+                    Published posts appear here from Nova's Blog system.
+                </span>
+            </div>
+
+
+            <div
+                id="nova-blog-posts"
+                class="nova-blog-posts"
+                aria-live="polite"
+            >
+                <div class="nova-blog-empty">
+                    Loading posts.
+                </div>
+            </div>
         </section>
+
+
+        <section class="nova-blog-cta">
+            <div>
+                <p>
+                    Keep the thread
+                </p>
+
+                <h2>
+                    Working on a project that keeps scattering itself?
+                </h2>
+
+                <span>
+                    Request access and tell us where the context
+                    usually disappears.
+                </span>
+            </div>
+
+
+            <a
+                href="/contact#nova-contact-form-title"
+            >
+                Request Access
+            </a>
+        </section>
+
+
+        <footer class="nova-blog-footer">
+            <span>
+                Nova Blog ? Ideas about long-running AI work
+            </span>
+
+            <div>
+                <a href="/">Home</a>
+                <a href="/about">About</a>
+                <a href="/features">Features</a>
+                <a href="/roadmap">Roadmap</a>
+                <a href="/faq">FAQ</a>
+                <a href="/contact">Contact</a>
+                <a href="/billing">Billing</a>
+                <a href="/privacy">Privacy</a>
+                <a href="/terms">Terms</a>
+            </div>
+        </footer>
     </main>
 
+
     <script>
-        function escapeHtml(value) {
-            return String(value || "").replace(/[&<>"']/g, function (char) {
-                return {
-                    "&": "&amp;",
-                    "<": "&lt;",
-                    ">": "&gt;",
-                    '"': "&quot;",
-                    "'": "&#039;"
-                }[char];
-            });
-        }
+        (function () {
+            "use strict";
 
-        function formatDate(value) {
-            if (!value) return "Draft";
-            try {
-                return new Date(value).toLocaleString();
-            } catch (_) {
-                return value;
+
+            const root = document.getElementById(
+                "nova-blog-posts"
+            );
+
+
+            function escapeHtml(
+                value
+            ) {
+
+                return String(
+                    value
+                    ||
+                    ""
+                ).replace(
+                    /[&<>"']/g,
+                    function (
+                        character
+                    ) {
+
+                        return {
+                            "&": "&amp;",
+                            "<": "&lt;",
+                            ">": "&gt;",
+                            '"': "&quot;",
+                            "'": "&#039;"
+                        }[
+                            character
+                        ];
+                    }
+                );
             }
-        }
 
-        async function loadPosts() {
-            const root = document.getElementById("posts");
 
-            try {
-                const data = await fetch("/api/blog/posts").then(function (res) {
-                    return res.json();
-                });
+            function formatDate(
+                value
+            ) {
 
-                const posts = Array.isArray(data.posts) ? data.posts : [];
+                if (!value) {
 
-                if (!posts.length) {
-                    root.innerHTML = '<div class="empty">No posts yet. Click Write to make your first one.</div>';
+                    return "Nova";
+                }
+
+
+                try {
+
+                    return new Date(
+                        value
+                    ).toLocaleDateString(
+                        undefined,
+                        {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric"
+                        }
+                    );
+
+                } catch (
+                    error
+                ) {
+
+                    return String(
+                        value
+                    );
+                }
+            }
+
+
+            function postMarkup(
+                post
+            ) {
+
+                const tags = Array.isArray(
+                    post.tags
+                )
+                    ?
+                    post.tags
+                    :
+                    [];
+
+
+                const tagMarkup = tags.map(
+                    function (
+                        tag
+                    ) {
+
+                        return (
+                            '<span class="nova-blog-tag">'
+                            +
+                            escapeHtml(
+                                tag
+                            )
+                            +
+                            "</span>"
+                        );
+                    }
+                ).join(
+                    ""
+                );
+
+
+                return [
+                    '<a class="nova-blog-post" href="/blog/'
+                    +
+                    encodeURIComponent(
+                        post.slug
+                        ||
+                        ""
+                    )
+                    +
+                    '">',
+
+                    '    <div class="nova-blog-post-meta">',
+
+                    "        <time>",
+                    escapeHtml(
+                        formatDate(
+                            post.created_at
+                            ||
+                            post.updated_at
+                        )
+                    ),
+                    "        </time>",
+
+                    '        <div class="nova-blog-tags">',
+                    tagMarkup,
+                    "        </div>",
+
+                    "    </div>",
+
+                    "    <h3>",
+                    escapeHtml(
+                        post.title
+                        ||
+                        "Untitled post"
+                    ),
+                    "    </h3>",
+
+                    "    <p>",
+                    escapeHtml(
+                        post.excerpt
+                        ||
+                        ""
+                    ),
+                    "    </p>",
+
+                    "    <strong>",
+                    "Read post",
+                    "    </strong>",
+
+                    "</a>"
+                ].join(
+                    "\n"
+                );
+            }
+
+
+            async function loadPosts() {
+
+                if (!root) {
+
                     return;
                 }
 
-                root.innerHTML = posts.map(function (post) {
-                    const tags = Array.isArray(post.tags) ? post.tags : [];
 
-                    return [
-                        '<a class="post" href="/blog/' + encodeURIComponent(post.slug) + '">',
-                            '<h2>' + escapeHtml(post.title) + '</h2>',
-                            '<p>' + escapeHtml(post.excerpt || "") + '</p>',
-                            '<div class="meta">',
-                                '<span class="pill">' + escapeHtml(formatDate(post.created_at)) + '</span>',
-                                tags.map(function (tag) {
-                                    return '<span class="pill">' + escapeHtml(tag) + '</span>';
-                                }).join(""),
-                            '</div>',
-                        '</a>'
-                    ].join("");
-                }).join("");
-            } catch (error) {
-                root.innerHTML = '<div class="empty">Could not load posts.</div>';
+                try {
+
+                    const response = await fetch(
+                        "/api/blog/posts",
+                        {
+                            method: "GET",
+                            headers: {
+                                "Accept": "application/json"
+                            }
+                        }
+                    );
+
+
+                    const data = await response.json();
+
+
+                    if (
+                        !response.ok
+                        ||
+                        !data
+                        ||
+                        data.ok === false
+                    ) {
+
+                        throw new Error(
+                            "Posts could not be loaded."
+                        );
+                    }
+
+
+                    const posts = Array.isArray(
+                        data.posts
+                    )
+                        ?
+                        data.posts
+                        :
+                        [];
+
+
+                    if (!posts.length) {
+
+                        root.innerHTML = [
+                            '<div class="nova-blog-empty">',
+                            "No public posts have been published yet.",
+                            "</div>"
+                        ].join(
+                            ""
+                        );
+
+                        return;
+                    }
+
+
+                    root.innerHTML = posts.map(
+                        postMarkup
+                    ).join(
+                        ""
+                    );
+
+                } catch (
+                    error
+                ) {
+
+                    root.innerHTML = [
+                        '<div class="nova-blog-empty nova-blog-empty-error">',
+                        "Blog posts are temporarily unavailable.",
+                        "</div>"
+                    ].join(
+                        ""
+                    );
+                }
             }
-        }
 
-        loadPosts();
+
+            loadPosts();
+        }());
     </script>
-
-        <footer class="nova-public-legal-strip" aria-label="Nova legal links">
-            <a href="/privacy">Privacy</a>
-            <a href="/terms">Terms</a>
-        </footer>
 </body>
 </html>
-
-
-
-
-

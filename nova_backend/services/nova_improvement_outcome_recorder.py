@@ -19,6 +19,7 @@ from nova_backend.services.nova_improvement_history_service import (
 from nova_backend.services.nova_improvement_outcome_judge import (
     improvement_outcome_judge,
 )
+
 class NovaImprovementOutcomeRecorder:
 
 
@@ -90,7 +91,7 @@ class NovaImprovementOutcomeRecorder:
                 outcome,
 
             "status":
-                outcome,
+                "completed",
 
         }
 

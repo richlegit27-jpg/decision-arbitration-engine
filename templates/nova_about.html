@@ -2,38 +2,130 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>About Nova — AI project command center</title>
-    <meta name="description" content="About Nova: an early-access AI project command center for long-running work, memory, sessions, uploads, billing controls, and practical execution.">
-    <link rel="stylesheet" href="/static/css/nova-about.css?v=about-endgame-20260711">
-    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-    <link rel="manifest" href="/static/site.webmanifest">
-    <meta name="theme-color" content="#8b5cf6">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <title>About Nova | AI workspace for long-running project work</title>
+
+    <meta
+        name="description"
+        content="Nova is an AI workspace built around project continuity, durable context, files, sessions, planning, and clearer next actions."
+    >
+
+    <link
+        rel="stylesheet"
+        href="/static/css/nova-about.css?v=about-endgame-20260711"
+    >
+
+    <link
+        rel="icon"
+        href="/static/favicon.svg"
+        type="image/svg+xml"
+    >
+
+    <link
+        rel="manifest"
+        href="/static/site.webmanifest"
+    >
+
+    <meta
+        name="theme-color"
+        content="#8b5cf6"
+    >
+
+
     <!-- NOVA_SOCIAL_META_20260709 -->
-    <link rel="canonical" href="{{ request.url_root.rstrip('/') }}/about">
-    <meta property="og:site_name" content="Nova">
-    <meta property="og:type" content="website">
-    <meta property="og:title" content="About Nova">
-    <meta property="og:description" content="Nova is an early-access AI project command center for builders doing long-running work.">
-    <meta property="og:url" content="{{ request.url_root.rstrip('/') }}/about">
-    <meta property="og:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
-    <meta property="og:image:type" content="image/svg+xml">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="About Nova">
-    <meta name="twitter:description" content="Nova is an early-access AI project command center for builders doing long-running work.">
-    <meta name="twitter:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
+
+    <meta
+        property="og:site_name"
+        content="Nova"
+    >
+
+    <meta
+        property="og:type"
+        content="website"
+    >
+
+    <meta
+        property="og:title"
+        content="About Nova"
+    >
+
+    <meta
+        property="og:description"
+        content="Nova is an AI workspace built for projects that continue beyond one conversation."
+    >
+
+    <meta
+        property="og:url"
+        content="{{ request.url_root.rstrip('/') }}/about"
+    >
+
+    <meta
+        property="og:image"
+        content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg"
+    >
+
+    <meta
+        property="og:image:type"
+        content="image/svg+xml"
+    >
+
+    <meta
+        name="twitter:card"
+        content="summary_large_image"
+    >
+
+    <meta
+        name="twitter:title"
+        content="About Nova"
+    >
+
+    <meta
+        name="twitter:description"
+        content="Nova is an AI workspace built for projects that continue beyond one conversation."
+    >
+
+    <meta
+        name="twitter:image"
+        content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg"
+    >
+
     <!-- /NOVA_SOCIAL_META_20260709 -->
+
+
+    <!-- NOVA_PUBLIC_SEO_CANONICAL_CLEANUP_20260709 -->
+
+    <link
+        rel="canonical"
+        href="{{ request.url_root.rstrip('/') }}/about"
+    >
+
+    <!-- /NOVA_PUBLIC_SEO_CANONICAL_CLEANUP_20260709 -->
 </head>
+
 <body>
     <main class="nova-public-shell">
-        <nav class="nova-public-nav" aria-label="Nova about navigation">
-            <a class="nova-public-brand" href="/">
+        <nav
+            class="nova-public-nav"
+            aria-label="Nova about navigation"
+        >
+            <a
+                class="nova-public-brand"
+                href="/"
+                aria-label="Nova home"
+            >
                 <span>N</span>
+
                 <div>
                     <strong>Nova</strong>
                     <em>About</em>
                 </div>
             </a>
+
 
             <div class="nova-public-actions">
                 <a href="/">Home</a>
@@ -41,66 +133,194 @@
                 <a href="/roadmap">Roadmap</a>
                 <a href="/faq">FAQ</a>
                 <a href="/billing">Billing</a>
-                <a href="/contact#nova-contact-form-title">Early Access</a>
+
+                <a
+                    href="/contact#nova-contact-form-title"
+                >
+                    Request Access
+                </a>
             </div>
         </nav>
 
+
         <section class="nova-public-hero">
-            <p class="nova-public-kicker">About Nova</p>
-            <h1>Nova is a command center for real project work.</h1>
+            <p class="nova-public-kicker">
+                About Nova
+            </p>
+
+            <h1>Nova exists because long-running work deserves continuity.</h1>
+
             <span>
-                Nova is being built for builders who need more than a single prompt box:
-                project memory, sessions, uploads, continuity, and a focused workspace built around the work
-                for moving a project forward without losing context.
+                Nova is being built around a simple problem: serious work keeps moving,
+                but the context around that work is constantly being scattered across
+                conversations, files, decisions, notes, and half-finished next steps.
             </span>
 
+
             <div class="nova-public-buttons">
-                <a href="/contact#nova-contact-form-title">Request early access</a>
-                <a href="/features">See features</a>
+                <a
+                    href="/contact#nova-contact-form-title"
+                >
+                    Request Access
+                </a>
+
+                <a href="/features">
+                    Explore Features
+                </a>
             </div>
         </section>
 
-        <section class="nova-public-grid">
+
+        <section
+            class="nova-public-grid"
+            aria-label="What Nova is built around"
+        >
             <article class="nova-public-card">
-                <p>Purpose</p>
-                <h2>Keep the project brain together.</h2>
-                <span>Nova is shaped around ongoing work: plans, fixes, files, decisions, and release checks.</span>
+                <p>The problem</p>
+
+                <h2>
+                    Good work loses its thread.
+                </h2>
+
+                <span>
+                    A project may last weeks or months while important context gets split
+                    between chats, files, old decisions, changing priorities, and the
+                    question of what should happen next.
+                </span>
             </article>
 
-            <article class="nova-public-card">
-                <p>Direction</p>
-                <h2>Build for continuity, not novelty.</h2>
-                <span>Nova is focused on helping long-running work stay coherent: clear context, stable workflows, and fewer restarts.</span>
-            </article>
 
             <article class="nova-public-card">
-                <p>Access</p>
-                <h2>Early access is intentional.</h2>
-                <span>Early Access requests help shape Nova around real project workflows and the places current AI tools lose context.</span>
+                <p>The idea</p>
+
+                <h2>
+                    Keep the project closer to the conversation.
+                </h2>
+
+                <span>
+                    Nova connects ongoing conversation with project state, durable memory,
+                    sessions, and working material so more of the actual project can remain
+                    useful as the work changes.
+                </span>
+            </article>
+
+
+            <article class="nova-public-card">
+                <p>The direction</p>
+
+                <h2>
+                    Context should improve the next move.
+                </h2>
+
+                <span>
+                    Remembering information is only part of the goal. Nova is being shaped
+                    to use that context to help clarify priorities, organize work, and
+                    surface a more useful next action.
+                </span>
             </article>
         </section>
+
+
+        <section class="nova-about-story">
+            <div>
+                <p>
+                    Why Nova
+                </p>
+
+                <h2>
+                    Built for work that is still becoming something.
+                </h2>
+
+                <span>
+                    Nova is not centered on producing one isolated answer and forgetting
+                    the path that led there. The product direction is focused on projects
+                    where ideas change, files matter, decisions accumulate, and yesterday's
+                    progress should still mean something tomorrow.
+                </span>
+            </div>
+
+
+            <div class="nova-about-principles">
+                <article>
+                    <strong>Continuity</strong>
+
+                    <span>
+                        Keep the active project thread easier to continue.
+                    </span>
+                </article>
+
+
+                <article>
+                    <strong>Clarity</strong>
+
+                    <span>
+                        Separate the current objective from old noise.
+                    </span>
+                </article>
+
+
+                <article>
+                    <strong>Judgment</strong>
+
+                    <span>
+                        Use project context to make the next action more useful.
+                    </span>
+                </article>
+
+
+                <article>
+                    <strong>Control</strong>
+
+                    <span>
+                        Keep project information, files, and work easier to inspect.
+                    </span>
+                </article>
+            </div>
+        </section>
+
 
         <section class="nova-public-cta">
             <div>
-                <p>Early access</p>
-                <h2>Building something that should not lose the thread?</h2>
-                <span>Tell us about the project and where your current AI workflow keeps making you repeat yourself. Early Access requests help shape what Nova improves next.</span>
+                <p>Keep the thread</p>
+
+                <h2>
+                    Building something that keeps outgrowing the chat?
+                </h2>
+
+                <span>
+                    Tell us what kind of project you are working on and where its context
+                    usually gets lost.
+                </span>
             </div>
 
+
             <div class="nova-public-buttons">
-                <a href="/contact#nova-contact-form-title">Request Access</a>
-                <a href="/billing">View billing</a>
+                <a
+                    href="/contact#nova-contact-form-title"
+                >
+                    Request Access
+                </a>
+
+                <a href="/roadmap">
+                    View Roadmap
+                </a>
             </div>
         </section>
 
+
         <footer class="nova-public-footer">
-            <span>Nova About · Early-access product story</span>
+            <span>
+                Nova About ? Built around project continuity
+            </span>
+
             <div>
                 <a href="/">Home</a>
                 <a href="/features">Features</a>
                 <a href="/roadmap">Roadmap</a>
                 <a href="/faq">FAQ</a>
+                <a href="/blog">Blog</a>
                 <a href="/contact">Contact</a>
+                <a href="/billing">Billing</a>
                 <a href="/privacy">Privacy</a>
                 <a href="/terms">Terms</a>
             </div>

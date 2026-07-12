@@ -146,6 +146,9 @@ from nova_backend.services.runtime_cognitive_injection_service import (
 from nova_backend.services.runtime_cognitive_firewall import (
     RuntimeCognitiveFirewall,
 )
+from nova_backend.services.nova_self_improvement_coordinator import (
+    process_behavior_observation,
+)
 
 logger = logging.getLogger("nova.execution")
 DEBUG_EXECUTION = False
@@ -190,10 +193,35 @@ class ChatService:
                 )
             )
 
+
             print(
                 "[NOVA BEHAVIOR OBSERVER RESULT]",
                 result
             )
+
+
+            try:
+
+                improvement = (
+                    process_behavior_observation(
+                        result
+                    )
+                )
+
+
+                print(
+                    "[NOVA SELF IMPROVEMENT RESULT]",
+                    improvement
+                )
+
+
+            except Exception as exc:
+
+                print(
+                    "[NOVA SELF IMPROVEMENT FAILED]",
+                    type(exc).__name__,
+                    str(exc)
+                )
 
             return result
 
@@ -25269,7 +25297,7 @@ try:
     if not getattr(ChatService, "_NOVA_PROJECT_STATE_RECALL_FINAL_20260630", False):
         _NOVA_PRE_PROJECT_STATE_RECALL_FINAL_HANDLE_20260630 = ChatService.handle
 
-        def _nova_project_state_extract_text_final_20260630(args, kwargs):
+        def _nova_project_state_extract_text_final_raw_20260711(args, kwargs):
             for key in ("user_text", "message", "text", "prompt"):
                 value = kwargs.get(key)
                 if isinstance(value, str) and value.strip():
@@ -25286,6 +25314,23 @@ try:
                             return nested
 
             return ""
+
+        def _nova_project_state_extract_text_final_20260630(args, kwargs):
+            text = _nova_project_state_extract_text_final_raw_20260711(args, kwargs)
+
+            text = str(text or "")
+
+            marker = (
+                "\n\nProject-aware context for Nova:"
+            )
+
+            if marker in text:
+                text = text.split(
+                    marker,
+                    1,
+                )[0]
+
+            return text.strip()
 
         def _nova_project_state_runtime_state_final_20260630(self):
             candidates = [
@@ -25401,7 +25446,7 @@ try:
     if not getattr(ChatService, "_NOVA_PROJECT_STATE_IDLE_NEXT_FALLBACK_REPAIR_20260630", False):
         _NOVA_PRE_PROJECT_STATE_IDLE_NEXT_HANDLE_20260630 = ChatService.handle
 
-        def _nova_project_state_idle_extract_text_20260630(args, kwargs):
+        def _nova_project_state_idle_extract_text_raw_20260711(args, kwargs):
             for key in ("user_text", "message", "text", "prompt"):
                 value = kwargs.get(key)
                 if isinstance(value, str) and value.strip():
@@ -25418,6 +25463,23 @@ try:
                             return nested
 
             return ""
+
+        def _nova_project_state_idle_extract_text_20260630(args, kwargs):
+            text = _nova_project_state_idle_extract_text_raw_20260711(args, kwargs)
+
+            text = str(text or "")
+
+            marker = (
+                "\n\nProject-aware context for Nova:"
+            )
+
+            if marker in text:
+                text = text.split(
+                    marker,
+                    1,
+                )[0]
+
+            return text.strip()
 
         def _nova_project_state_idle_get_content_20260630(payload):
             if isinstance(payload, dict):
@@ -25572,7 +25634,7 @@ try:
     if not getattr(ChatService, "_NOVA_PROJECT_STATE_IDLE_NEXT_RESPONSE_REPAIR_FINAL_20260630", False):
         _NOVA_PRE_PROJECT_STATE_IDLE_NEXT_RESPONSE_HANDLE_20260630 = ChatService.handle
 
-        def _nova_project_state_idle_response_extract_text_20260630(args, kwargs):
+        def _nova_project_state_idle_response_extract_text_raw_20260711(args, kwargs):
             for key in ("user_text", "message", "text", "prompt"):
                 value = kwargs.get(key)
                 if isinstance(value, str) and value.strip():
@@ -25589,6 +25651,23 @@ try:
                             return nested
 
             return ""
+
+        def _nova_project_state_idle_response_extract_text_20260630(args, kwargs):
+            text = _nova_project_state_idle_response_extract_text_raw_20260711(args, kwargs)
+
+            text = str(text or "")
+
+            marker = (
+                "\n\nProject-aware context for Nova:"
+            )
+
+            if marker in text:
+                text = text.split(
+                    marker,
+                    1,
+                )[0]
+
+            return text.strip()
 
         def _nova_project_state_idle_response_load_answer_20260630(user_text):
             service_path = (
@@ -25836,6 +25915,11 @@ try:
                 "what are we working on",
                 "what are we doing",
                 "what are we working on now",
+                "what did we just fix",
+                "what was just fixed",
+                "what did we fix",
+                "last fix",
+                "what got fixed",
                 "what's next",
                 "whats next",
                 "what is next",
@@ -25963,6 +26047,122 @@ try:
 
         return ""
 
+    def _nova_project_brain_has_active_execution_20260711(
+        self,
+        session_id,
+    ):
+        try:
+            session_obj = (
+                self._get_session_payload(session_id)
+                or self._get_session(session_id)
+                or {}
+            )
+
+            if not isinstance(session_obj, dict):
+                return False
+
+            working_state = (
+                session_obj.get("working_state")
+                or {}
+            )
+
+            if not isinstance(
+                working_state,
+                dict,
+            ):
+                working_state = {}
+
+            execution_candidates = [
+                session_obj.get(
+                    "active_execution"
+                ),
+                session_obj.get(
+                    "execution_state"
+                ),
+                working_state.get(
+                    "active_execution"
+                ),
+                working_state.get(
+                    "execution_state"
+                ),
+            ]
+
+            terminal_statuses = {
+                "",
+                "idle",
+                "complete",
+                "completed",
+                "cancelled",
+                "canceled",
+                "stopped",
+                "failed",
+            }
+
+            for execution_state in execution_candidates:
+
+                if not isinstance(
+                    execution_state,
+                    dict,
+                ):
+                    continue
+
+                if bool(
+                    execution_state.get(
+                        "complete"
+                    )
+                ):
+                    continue
+
+                status = str(
+                    execution_state.get(
+                        "status"
+                    )
+                    or ""
+                ).strip().lower()
+
+                if status in terminal_statuses:
+                    continue
+
+                goal = str(
+                    execution_state.get(
+                        "goal"
+                    )
+                    or ""
+                ).strip()
+
+                current_step = str(
+                    execution_state.get(
+                        "current_step"
+                    )
+                    or ""
+                ).strip()
+
+                steps = (
+                    execution_state.get(
+                        "steps"
+                    )
+                    or []
+                )
+
+                if (
+                    goal
+                    or current_step
+                    or steps
+                ):
+                    return True
+
+        except Exception as exc:
+            try:
+                print(
+                    "[NOVA_ACTIVE_EXECUTION_PROJECT_BRAIN_PRIORITY_20260711] "
+                    "detection bypass:",
+                    exc,
+                )
+            except Exception:
+                pass
+
+        return False
+
     def _nova_project_brain_question_kind_20260701(user_text):
         text = str(user_text or "").strip().lower()
         text = text.replace("?", "'").replace("`", "")
@@ -26088,14 +26288,104 @@ try:
             "active_session_id": session_id,
         }
 
-    def _nova_project_brain_question_top_priority_handle_20260701(self, *args, **kwargs):
-        user_text = _nova_project_brain_question_text_20260701(args, kwargs)
-        kind = _nova_project_brain_question_kind_20260701(user_text)
+    def _nova_project_brain_question_top_priority_handle_20260701(
+        self,
+        *args,
+        **kwargs,
+    ):
+        user_text = (
+            _nova_project_brain_question_text_20260701(
+                args,
+                kwargs,
+            )
+        )
+
+        kind = (
+            _nova_project_brain_question_kind_20260701(
+                user_text
+            )
+        )
 
         if kind:
-            session_id = _nova_project_brain_question_session_20260701(args, kwargs)
-            answer = _nova_project_brain_answer_20260701(kind, session_id)
-            return _nova_project_brain_response_20260701(answer, session_id)
+
+            session_id = (
+                _nova_project_brain_question_session_20260701(
+                    args,
+                    kwargs,
+                )
+            )
+
+            if (
+                _nova_project_brain_has_active_execution_20260711(
+                    self,
+                    session_id,
+                )
+            ):
+                pre_project_state_handle = globals().get(
+                    "_NOVA_PRE_PROJECT_STATE_FRESH_PRIORITY_HANDLE_20260701"
+                )
+
+                if callable(
+                    pre_project_state_handle
+                ):
+                    return pre_project_state_handle(
+                        self,
+                        *args,
+                        **kwargs,
+                    )
+
+            fresh_priority_predicate = globals().get(
+                "_nova_ps_fresh_priority_should_handle_20260701"
+            )
+
+            if (
+                callable(
+                    fresh_priority_predicate
+                )
+                and fresh_priority_predicate(
+                    user_text
+                )
+            ):
+                from nova_backend.services.project_state_service import (
+                    answer_project_state_question,
+                )
+
+                answer = (
+                    answer_project_state_question(
+                        user_text,
+                        session_id=session_id,
+                    )
+                )
+
+                if answer:
+                    return (
+                        _nova_project_brain_response_20260701(
+                            answer,
+                            session_id,
+                        )
+                    )
+
+            answer = (
+                _nova_project_brain_answer_20260701(
+                    kind,
+                    session_id,
+                )
+            )
+
+            return (
+                _nova_project_brain_response_20260701(
+                    answer,
+                    session_id,
+                )
+            )
+
+        return (
+            _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701(
+                self,
+                *args,
+                **kwargs,
+            )
+        )
 
         return _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701(self, *args, **kwargs)
 

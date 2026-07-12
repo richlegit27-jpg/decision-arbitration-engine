@@ -84,7 +84,24 @@ def main():
     direct = post_chat("what are we working on now", session_id)
     assert_usable_answer("direct project recall", direct)
     assert_true("direct recall route", get_route(direct) == "project_state_current_memory_direct_recall", direct)
-    assert_true("direct recall fresh next move", "Project Brain State Recall Refresh v1" in get_text(direct), get_text(direct))
+    from nova_backend.services.project_brain_upgrade_radar import (
+        select_best_upgrade,
+    )
+
+    current_best_move = select_best_upgrade().name
+
+    assert_true(
+        "direct recall has canonical current best move",
+        current_best_move in get_text(direct),
+        get_text(direct),
+    )
+
+    assert_true(
+        "direct recall excludes stale cleanup move",
+        "Start Project Brain cleanup/consolidation"
+        not in get_text(direct),
+        get_text(direct),
+    )
 
     general = post_chat("what changed recently in the Nova project", session_id)
     assert_usable_answer("general project answer", general)

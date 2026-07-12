@@ -1,4 +1,4 @@
-﻿:root {
+:root {
     color-scheme: dark;
     --bg: #07060c;
     --line: rgba(226, 214, 255, .16);
@@ -362,5 +362,105 @@ a {
 
     .nova-roadmap-cta a {
         width: 100%;
+    }
+}
+
+/* NOVA_ROADMAP_ENDGAME_20260711 */
+
+.nova-roadmap-shell {
+    width: min(1180px, calc(100% - 40px));
+    margin-inline: auto;
+}
+
+.nova-roadmap-nav {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 24px;
+}
+
+.nova-roadmap-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.nova-roadmap-hero {
+    max-width: 920px;
+}
+
+.nova-roadmap-hero h1 {
+    max-width: 860px;
+    text-wrap: balance;
+}
+
+.nova-roadmap-hero > span {
+    display: block;
+    max-width: 780px;
+}
+
+.nova-roadmap-lanes > article {
+    min-width: 0;
+}
+
+.nova-roadmap-lanes h2 {
+    text-wrap: balance;
+}
+
+.nova-roadmap-board > div:first-child {
+    max-width: 720px;
+}
+
+.nova-roadmap-board h2 {
+    text-wrap: balance;
+}
+
+.nova-roadmap-stack > div {
+    min-width: 0;
+}
+
+.nova-roadmap-cta h2 {
+    text-wrap: balance;
+}
+
+.nova-roadmap-footer {
+    align-items: center;
+}
+
+.nova-roadmap-footer > div {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+}
+
+@media (max-width: 860px) {
+    .nova-roadmap-nav {
+        grid-template-columns: 1fr;
+    }
+
+    .nova-roadmap-actions {
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 620px) {
+    .nova-roadmap-shell {
+        width: min(100% - 28px, 1180px);
+    }
+
+    .nova-roadmap-actions {
+        gap: 6px;
+    }
+
+    .nova-roadmap-footer {
+        align-items: flex-start;
+    }
+
+    .nova-roadmap-footer > div {
+        justify-content: flex-start;
     }
 }
