@@ -299,11 +299,57 @@ def build_operator_plan(
     project_state: str = "",
 ) -> OperatorPlan:
     work_type = classify_work_type(user_text=user_text, changed_files=changed_files)
-    recommended_move, why, risk, target_files = choose_recommended_move(work_type)
     ranked_for_plan = rank_moves(
-        work_type,
-        changed_files=changed_files,
+    work_type,
+    changed_files=changed_files,
     )
+
+    top_move = ranked_for_plan[0] if ranked_for_plan else None
+
+    if top_move:
+        if isinstance(top_move, dict):
+            recommended_move = str(
+                top_move.get("name") or ""
+            ).strip()
+
+            why = str(
+                top_move.get("why") or ""
+            ).strip()
+
+            risk = str(
+                top_move.get("risk") or "low"
+            ).strip()
+
+            target_files = list(
+                top_move.get("target_files", [])
+                or []
+            )
+
+        else:
+            recommended_move = str(
+                getattr(top_move, "name", "")
+                or ""
+            ).strip()
+
+            why = str(
+                getattr(top_move, "why", "")
+                or ""
+            ).strip()
+
+            risk = str(
+                getattr(top_move, "risk", "low")
+                or "low"
+            ).strip()
+
+            target_files = list(
+                getattr(top_move, "target_files", [])
+                or []
+            )
+
+    else:
+        recommended_move, why, risk, target_files = choose_recommended_move(
+            work_type
+        )
 
     recommended_ranked_move = None
 
@@ -333,6 +379,8 @@ def build_operator_plan(
             recommended_ranked_move = move
             break
 
+    smokes = []
+
     if isinstance(
         recommended_ranked_move,
         dict,
@@ -356,61 +404,10 @@ def build_operator_plan(
         )
 
     if not smokes:
-        ranked_for_plan = rank_moves(
+        smokes = select_smokes(
             work_type,
             changed_files=changed_files,
         )
-
-        recommended_ranked_move = None
-
-        for move in ranked_for_plan:
-            if isinstance(
-                move,
-                dict,
-            ):
-                move_name = str(
-                    move.get(
-                        "name"
-                    )
-                    or ""
-                ).strip()
-
-            else:
-                move_name = str(
-                    getattr(
-                        move,
-                        "name",
-                        "",
-                    )
-                    or ""
-                ).strip()
-
-            if move_name == recommended_move:
-                recommended_ranked_move = move
-                break
-
-        if isinstance(
-            recommended_ranked_move,
-            dict,
-        ):
-            smokes = list(
-                recommended_ranked_move.get(
-                    "focused_smokes",
-                    [],
-                )
-                or []
-            )
-
-        else:
-            smokes = list(
-                getattr(
-                    recommended_ranked_move,
-                    "focused_smokes",
-                    [],
-                )
-                or []
-            )
-
         if not smokes:
             smokes = select_smokes(
                 work_type,
@@ -639,13 +636,13 @@ def _nova_completed_move_filter_ranked_moves_20260702(moves: list[OperatorMove])
         return moves
 
 
-def rank_moves(work_type: str) -> list[OperatorMove]:
+def _rank_moves_completed_wrapper_20260712(work_type: str) -> list[OperatorMove]:
     return _nova_completed_move_filter_ranked_moves_20260702(
         _NOVA_PRE_COMPLETED_MOVE_FILTER_RANK_MOVES_20260702(work_type)
     )
 
 
-def choose_recommended_move(work_type: str):
+def _choose_recommended_move_wrapper_20260712(work_type: str):
     base = _NOVA_PRE_COMPLETED_MOVE_FILTER_CHOOSE_RECOMMENDED_MOVE_20260702(work_type)
     ranked = rank_moves(work_type)
 
@@ -675,7 +672,7 @@ def choose_recommended_move(work_type: str):
 # NOVA_PROJECT_BRAIN_COMPLETED_MOVE_FILTER_MOVE_NORMALIZER_20260702
 # Normalizes ranked moves after completed-move filtering so downstream callers
 # always receive OperatorMove objects, even if an older wrapper returns dicts.
-_NOVA_PRE_COMPLETED_MOVE_FILTER_NORMALIZED_RANK_MOVES_20260702 = rank_moves
+_NOVA_PRE_COMPLETED_MOVE_FILTER_NORMALIZED_RANK_MOVES_20260702 = _rank_moves_completed_wrapper_20260712
 
 
 def _nova_move_value_20260702(move, key, default=None):
@@ -736,7 +733,7 @@ def _nova_normalize_operator_move_20260702(move, rank):
     )
 
 
-def rank_moves(work_type: str) -> list[OperatorMove]:
+def _rank_moves_completed_wrapper_20260712(work_type: str) -> list[OperatorMove]:
     raw_moves = _NOVA_PRE_COMPLETED_MOVE_FILTER_NORMALIZED_RANK_MOVES_20260702(work_type)
 
     normalized = []
@@ -779,7 +776,7 @@ def rank_moves(work_type: str) -> list[OperatorMove]:
     ]
 
 
-def choose_recommended_move(work_type: str):
+def _choose_recommended_move_wrapper_20260712(work_type: str):
     try:
         base = _NOVA_PRE_COMPLETED_MOVE_FILTER_CHOOSE_RECOMMENDED_MOVE_20260702(work_type)
     except Exception:
@@ -904,7 +901,7 @@ def _nova_keyword_safe_normalize_move_20260702(move, rank):
     )
 
 
-def rank_moves(work_type: str) -> list[OperatorMove]:
+def _rank_moves_completed_wrapper_20260712(work_type: str) -> list[OperatorMove]:
     raw_ranker = globals().get("_NOVA_PRE_COMPLETED_MOVE_FILTER_RANK_MOVES_20260702")
 
     try:
@@ -1014,7 +1011,7 @@ def rank_moves(work_type: str) -> list[OperatorMove]:
     ]
 
 
-def choose_recommended_move(work_type: str):
+def _choose_recommended_move_wrapper_20260712(work_type: str):
     base_chooser = globals().get("_NOVA_PRE_COMPLETED_MOVE_FILTER_CHOOSE_RECOMMENDED_MOVE_20260702")
 
     try:
@@ -1256,7 +1253,7 @@ def rank_moves(work_type: str):
     ]
 
 
-def choose_recommended_move(work_type: str):
+def _choose_recommended_move_wrapper_20260712(work_type: str):
     ranked = rank_moves(work_type)
     best = ranked[0] if ranked else _nova_dict_safe_cleanup_move_20260702()
 
@@ -1280,13 +1277,21 @@ def choose_recommended_move(work_type: str):
 # Keeps the completed-move filter override service-only.
 _NOVA_PRE_RANK_MOVES_CHANGED_FILES_SAFE_20260702 = rank_moves
 
-def rank_moves(work_type: str, changed_files=None, **kwargs):
-    return _NOVA_PRE_RANK_MOVES_CHANGED_FILES_SAFE_20260702(work_type)
+def _nova_rank_moves_changed_files_safe_20260702(
+    work_type: str,
+    changed_files=None,
+    **kwargs,
+):
+    return _NOVA_PRE_RANK_MOVES_CHANGED_FILES_SAFE_20260702(
+        work_type
+    )
 
+
+rank_moves = _nova_rank_moves_changed_files_safe_20260702
 
 # NOVA_PROJECT_BRAIN_UPGRADE_RADAR_V1_20260702
 # Service-only upgrade ranking. No app.py route guard.
-_NOVA_PRE_UPGRADE_RADAR_RANK_MOVES_20260702 = rank_moves
+_NOVA_PRE_UPGRADE_RADAR_RANK_MOVES_20260702 = _nova_rank_moves_changed_files_safe_20260702
 
 def _nova_upgrade_radar_value_20260702(move, key, default=None):
     if isinstance(move, dict):
@@ -1413,35 +1418,29 @@ def rank_moves(work_type: str, changed_files=None, **kwargs):
     if _nova_upgrade_radar_completed_20260711(
         radar
     ):
-        remaining = list(
-            base_moves
-            or []
-        )
-
-        if not remaining:
-            remaining = [
+        if not base_moves:
+            base_moves = [
                 _nova_dict_safe_cleanup_move_20260702()
             ]
 
-        return [
-            _nova_upgrade_radar_normalize_move_20260702(
-                move,
-                index,
-            )
-            for index, move in enumerate(
-                remaining,
-                start=1,
-            )
-        ]
+    combined = list(
+        base_moves
+        or []
+    )
 
-    combined = [
+    if not _nova_upgrade_radar_completed_20260711(
         radar
-    ]
+    ):
+        combined.insert(
+            0,
+            radar,
+        )
 
     seen = {
         _nova_upgrade_radar_name_20260702(
-            radar
+            move
         )
+        for move in combined
     }
 
     for move in base_moves or []:
@@ -1453,9 +1452,6 @@ def rank_moves(work_type: str, changed_files=None, **kwargs):
             not name
             or name in seen
         ):
-            continue
-
-        if name == "Cleanup Strategy Engine v1":
             continue
 
         seen.add(
@@ -1478,7 +1474,7 @@ def rank_moves(work_type: str, changed_files=None, **kwargs):
     ]
 
 
-def choose_recommended_move(work_type: str):
+def _choose_recommended_move_wrapper_20260712(work_type: str):
     ranked = rank_moves(work_type)
     best = ranked[0] if ranked else _nova_upgrade_radar_move_20260702(rank=1)
 
