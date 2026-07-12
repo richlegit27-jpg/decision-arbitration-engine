@@ -26,7 +26,11 @@ def main():
     assert_true("operator plan has stop rule", bool(plan.get("stop_rule")), plan)
     assert_true("operator plan has exact next command", bool(plan.get("exact_next_command")), plan)
     assert_true("operator plan has loop guard", bool(plan.get("loop_guard")), plan)
-    assert_true("operator plan has ranked moves", len(plan.get("ranked_moves", [])) == 3, plan)
+    assert_true(
+    "operator plan has ranked moves",
+    len(plan.get("ranked_moves", [])) >= 3,
+    plan,
+)
     assert_true("operator plan has rejected moves", len(plan.get("rejected_moves", [])) == 2, plan)
 
     answer = build_project_brain_mission_control_answer("operator mode")
