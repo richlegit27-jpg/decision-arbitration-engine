@@ -12268,6 +12268,21 @@ if (not attachments) and (__name__ == "__main__"):
 
         original_user_text = user_text
 
+        # NOVA_PHASE_7C_ORDERED_CANDIDATE_WEB_HIJACK_GUARD_20260712
+        # Ordered choices established for this conversation are project/chat
+        # instructions, not requests for fresh information from the web.
+        _nova_ordered_candidate_instruction_20260712 = (
+            not attachments
+            and "during this conversation" in original_user_text.lower()
+            and "first:" in original_user_text.lower()
+            and "second:" in original_user_text.lower()
+            and "third:" in original_user_text.lower()
+            and (
+                "candidate" in original_user_text.lower()
+                or "candidates" in original_user_text.lower()
+            )
+        )
+
         # CHAT_SERVICE_HARD_ATTACHMENT_FINAL_LOCK
         try:
             if not attachments:
@@ -12714,6 +12729,7 @@ if (not attachments) and (__name__ == "__main__"):
         # source cards, and response shape.
         if (
             not attachments
+            and not _nova_ordered_candidate_instruction_20260712
             and isinstance(interpretation, dict)
             and interpretation.get("route_hint") == "web"
             and self._safe_str(interpretation.get("rewritten_text") or original_user_text).strip()
@@ -13176,7 +13192,10 @@ if (not attachments) and (__name__ == "__main__"):
                 session_id=session_id
             )
 
-        elif route == "web":
+        elif (
+            route == "web"
+            and not _nova_ordered_candidate_instruction_20260712
+        ):
             return self._execute_web_fetch(
                 user_text=user_text,
                 session_id=session_id,
