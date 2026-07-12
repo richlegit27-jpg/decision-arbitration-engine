@@ -9575,11 +9575,51 @@ if (not attachments) and (__name__ == "__main__"):
 
         # OPEN_WEB_SOURCE_FOLLOWUP_HANDLER_LOCK
         # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
-        if (not attachments) and (
-            self._safe_str(decision.get("strategy")).strip().lower()
-            == "open_web_source_followup"
+        import re
+
+        _nova_source_followup_prompt_20260712 = self._safe_str(
+            user_text
+        ).lower().strip()
+
+        _nova_explicit_source_followup_20260712 = (
+            any(
+                marker in _nova_source_followup_prompt_20260712
+                for marker in (
+                    "source",
+                    "article",
+                    "search result",
+                    "web result",
+                    "link",
+                    "web page",
+                )
+            )
+            or bool(
+                re.search(
+                    r"\b(?:open|read|visit|load|show)\b.{0,40}"
+                    r"\b(?:first|second|third|fourth|fifth|"
+                    r"one|two|three|four|five|it)\b",
+                    _nova_source_followup_prompt_20260712,
+                )
+            )
+        )
+
+        if (
+            not attachments
+            and self._safe_str(
+                decision.get("strategy")
+            ).strip().lower() == "open_web_source_followup"
+            and not _nova_explicit_source_followup_20260712
         ):
-            import re
+            decision["strategy"] = "general_chat"
+            decision["route"] = "chat"
+
+        if (
+            not attachments
+            and self._safe_str(
+                decision.get("strategy")
+            ).strip().lower() == "open_web_source_followup"
+            and _nova_explicit_source_followup_20260712
+        ):
 
             source_index = 0
             lowered = text.lower()
@@ -9641,59 +9681,10 @@ if (not attachments) and (__name__ == "__main__"):
             except Exception as exc:
                 exec_debug("OPEN_WEB_SOURCE_FOLLOWUP_LOOKUP_FAILED:", exc)
 
-            # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
-            if (not attachments) and (
-                (not prior_urls or source_index >= len(prior_urls))
-                and isinstance(getattr(self, "_last_web_source_urls", None), list)
-            ):
-                cached_urls = [
-                    self._safe_str(url).strip()
-                    for url in getattr(self, "_last_web_source_urls", [])
-                    if self._safe_str(url).strip()
-                ]
-
-                # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
-                if (not attachments) and (cached_urls):
-                    prior_urls = cached_urls
-                    cached_sources = getattr(self, "_last_web_sources", [])
-                    prior_sources = (
-                        cached_sources if isinstance(cached_sources, list) else []
-                    )
-
-            # WEB_FOLLOWUP_DURABLE_SOURCE_CACHE_LOCK
-            # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
-            if (not attachments) and (
-                not prior_urls or source_index >= len(prior_urls)
-            ):
-                try:
-                    import json
-                    from pathlib import Path
-
-                    cache_path = Path(
-                        r"C:\Users\Owner\nova\data\nova_last_web_sources.json"
-                    )
-
-                    if cache_path.exists():
-                        cache_data = json.loads(
-                            cache_path.read_text(encoding="utf-8") or "{}"
-                        )
-                        cached_urls = cache_data.get("source_urls")
-                        cached_sources = cache_data.get("sources")
-
-                        if isinstance(cached_urls, list) and cached_urls:
-                            prior_urls = [
-                                self._safe_str(url).strip()
-                                for url in cached_urls
-                                if self._safe_str(url).strip()
-                            ]
-                            prior_sources = (
-                                cached_sources
-                                if isinstance(cached_sources, list)
-                                else []
-                            )
-                except Exception as exc:
-                    exec_debug("WEB_FOLLOWUP_DURABLE_SOURCE_CACHE_READ_FAILED:", exc)
-
+            # NOVA_WEB_SOURCE_SESSION_ISOLATION_LOCK_20260712
+            # Web-source follow-ups may use source metadata from this session
+            # only. Global instance state and durable last-source caches can
+            # belong to another user/session and must never be restored here.
             # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
             # CHAT_SERVICE_ATTACHMENT_SOURCE_GUARD_LOCK
             attachment_language = any(
@@ -12269,18 +12260,51 @@ if (not attachments) and (__name__ == "__main__"):
         original_user_text = user_text
 
         # NOVA_PHASE_7C_ORDERED_CANDIDATE_WEB_HIJACK_GUARD_20260712
-        # Ordered choices established for this conversation are project/chat
-        # instructions, not requests for fresh information from the web.
+        # Enumerated options/candidates established for the conversation are
+        # chat/reference instructions, never web-source selection requests.
+        _nova_reference_setup_text_20260712 = (
+            original_user_text.lower()
+        )
+
+        _nova_has_reference_pair_20260712 = (
+            (
+                "first:" in _nova_reference_setup_text_20260712
+                and "second:" in _nova_reference_setup_text_20260712
+            )
+            or (
+                "first option is" in _nova_reference_setup_text_20260712
+                and "second option is" in _nova_reference_setup_text_20260712
+            )
+            or (
+                "first candidate is" in _nova_reference_setup_text_20260712
+                and "second candidate is" in _nova_reference_setup_text_20260712
+            )
+            or (
+                "first choice is" in _nova_reference_setup_text_20260712
+                and "second choice is" in _nova_reference_setup_text_20260712
+            )
+        )
+
+        _nova_has_reference_setup_language_20260712 = any(
+            phrase in _nova_reference_setup_text_20260712
+            for phrase in (
+                "during this conversation",
+                "we are comparing",
+                "we're comparing",
+                "do not choose",
+                "don't choose",
+                "keep both",
+                "keep these",
+                "use three candidates",
+                "use three launch candidates",
+                "in this exact order",
+            )
+        )
+
         _nova_ordered_candidate_instruction_20260712 = (
             not attachments
-            and "during this conversation" in original_user_text.lower()
-            and "first:" in original_user_text.lower()
-            and "second:" in original_user_text.lower()
-            and "third:" in original_user_text.lower()
-            and (
-                "candidate" in original_user_text.lower()
-                or "candidates" in original_user_text.lower()
-            )
+            and _nova_has_reference_pair_20260712
+            and _nova_has_reference_setup_language_20260712
         )
 
         # CHAT_SERVICE_HARD_ATTACHMENT_FINAL_LOCK
