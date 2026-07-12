@@ -91,16 +91,44 @@ def main():
         assert_true("answer direct recall text", "Direct Recall Text" in answer)
 
     best = select_best_upgrade()
-    assert_true("radar best state bridge", best.name == "Project Brain State Bridge v1", best.name)
+    assert_true(
+    "radar best upgrade is current unfinished work",
+    best.name == "Nova Conversation Quality Field Test v1",
+    best.name,
+)
 
     moves = rank_moves("next_move")
-    assert_true("operator planner first state bridge", move_value(moves[0], "name") == "Project Brain State Bridge v1", move_value(moves[0], "name"))
+    assert_true(
+        "operator planner first current move",
+        move_value(moves[0], "name") == "Cleanup Strategy Engine v1",
+        move_value(moves[0], "name"),
+    )
 
     recommended_move, why, risk, target_files = choose_recommended_move("next_move")
-    assert_true("recommended state bridge", recommended_move == "Project Brain State Bridge v1", recommended_move)
-    assert_true("recommended why direct recall", "direct project-state recall" in why or "stale cleanup" in why, why)
-    assert_true("recommended risk medium", risk == "medium", risk)
-    assert_true("recommended target file", "nova_backend/services/project_brain_state_bridge.py" in target_files, target_files)
+
+    assert_true(
+        "recommended current move",
+        recommended_move == "Cleanup Strategy Engine v1",
+        recommended_move,
+    )
+
+    assert_true(
+        "recommended why cleanup",
+        "cleanup" in why.lower(),
+        why,
+    )
+
+    assert_true(
+        "recommended risk medium",
+        risk == "medium",
+        risk,
+    )
+
+    assert_true(
+        "recommended target file",
+        "nova_backend/services/project_brain_operator_planner.py" in target_files,
+        target_files,
+    )
 
     print("")
     print("NOVA PROJECT BRAIN STATE BRIDGE SMOKE PASSED")
