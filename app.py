@@ -445,6 +445,65 @@ try:
                 except Exception:
                     pass
 
+            # NOVA_PHASE_7A_CONVERSATION_STATE_PROJECT_BRAIN_BYPASS_20260711
+            # Existing owner only. No new route or before_request hook.
+            try:
+                from nova_backend.services.conversation_state_brain import (
+                    conversation_state_brain,
+                )
+
+                _nova_7a_session_id = str(
+                    payload.get(
+                        "session_id"
+                    )
+                    or payload.get(
+                        "active_session_id"
+                    )
+                    or ""
+                ).strip()
+
+                _nova_7a_session = (
+                    chat_service._get_session_payload(
+                        _nova_7a_session_id
+                    )
+                    if _nova_7a_session_id
+                    else {}
+                )
+
+                _nova_7a_messages = (
+                    _nova_7a_session.get(
+                        "messages",
+                        [],
+                    )
+                    if isinstance(
+                        _nova_7a_session,
+                        dict,
+                    )
+                    else []
+                )
+
+                _nova_7a_state = (
+                    conversation_state_brain.build_state(
+                        _nova_7a_messages,
+                        current_user_text=user_text,
+                    )
+                )
+
+                if (
+                    _nova_7a_state
+                    .suppress_project_brain_contract
+                ):
+                    return None
+
+            except Exception as _nova_7a_state_error:
+                try:
+                    print(
+                        "[NOVA_PHASE_7A_CONVERSATION_STATE_PROJECT_BRAIN_BYPASS_20260711] bypass failed:",
+                        _nova_7a_state_error,
+                    )
+                except Exception:
+                    pass
+
             from nova_backend.services.project_brain_general_intelligence import (
                 build_project_brain_general_answer,
             )

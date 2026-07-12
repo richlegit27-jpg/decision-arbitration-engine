@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 from nova_backend.services.chat_turn_pipeline import build_chat_turn_from_request, build_model_messages
 def _nova_boot_log_20260701(*args, **kwargs):
     import os as _nova_boot_log_os_20260701
@@ -15609,34 +15609,124 @@ Auto-fix result:
         )
 
     def _compose_model_messages(
-        self, user_text, session=None, decision=None, memory_context=None
+        self,
+        user_text,
+        session=None,
+        decision=None,
+        memory_context=None,
     ):
         session = session or {}
-        memory_context = self._safe_str(memory_context).strip()
 
-        system_prompt = self._build_system_prompt(decision=decision)
-        continuity_context = self._build_continuity_context(session=session)
+        memory_context = self._safe_str(
+            memory_context
+        ).strip()
+
+        system_prompt = self._build_system_prompt(
+            decision=decision
+        )
+
+        continuity_context = self._build_continuity_context(
+            session=session
+        )
+
+        conversation_state_context = ""
+
+        try:
+            from nova_backend.services.conversation_state_brain import (
+                conversation_state_brain,
+            )
+
+            session_messages = (
+                session.get(
+                    "messages",
+                    [],
+                )
+                if isinstance(
+                    session,
+                    dict,
+                )
+                else []
+            )
+
+            conversation_state = (
+                conversation_state_brain.build_state(
+                    session_messages,
+                    current_user_text=self._safe_str(
+                        user_text
+                    ),
+                )
+            )
+
+            conversation_state_context = (
+                conversation_state.build_context_block()
+            )
+
+        except Exception as exc:
+            exec_debug(
+                "BUILD CONVERSATION STATE CONTEXT FAILED:",
+                exc,
+            )
+
+            conversation_state_context = ""
 
         execution_text = ""
+
         try:
             latest = self._find_latest_execution_artifact(
-                session_id=session.get("id", "")
+                session_id=session.get(
+                    "id",
+                    "",
+                )
             )
+
             if latest:
-                execution = latest.get("execution") or {}
+                execution = (
+                    latest.get(
+                        "execution"
+                    )
+                    or {}
+                )
+
                 if execution:
-                    execution_text = self._render_execution(execution)
+                    execution_text = self._render_execution(
+                        execution
+                    )
+
         except Exception:
             execution_text = ""
 
-        messages = [{"role": "system", "content": system_prompt}]
+        messages = [
+            {
+                "role": "system",
+                "content": system_prompt,
+            }
+        ]
+
+        if conversation_state_context:
+            messages.append(
+                {
+                    "role": "system",
+                    "content": conversation_state_context,
+                }
+            )
 
         if continuity_context:
-            messages.append({"role": "system", "content": continuity_context})
+            messages.append(
+                {
+                    "role": "system",
+                    "content": continuity_context,
+                }
+            )
 
         if execution_text:
             messages.append(
-                {"role": "system", "content": f"Current execution:\n{execution_text}"}
+                {
+                    "role": "system",
+                    "content": (
+                        "Current execution:\n"
+                        + execution_text
+                    ),
+                }
             )
 
         if memory_context:
@@ -15644,14 +15734,21 @@ Auto-fix result:
                 {
                     "role": "system",
                     "content": (
-                        "Older saved memory. Lower priority than the current user message and recent conversation. "
-                        "Use only when relevant and not contradicted by the latest context:\n"
-                        f"{memory_context}"
+                        "Older saved memory. "
+                        "Lower priority than the current user message, "
+                        "live conversation state, and recent conversation. "
+                        "Use as ground truth only when still relevant:\n"
+                        + memory_context
                     ),
                 }
             )
 
-        messages.append({"role": "user", "content": user_text or ""})
+        messages.append(
+            {
+                "role": "user",
+                "content": user_text or "",
+            }
+        )
 
         return messages
 
