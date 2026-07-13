@@ -5362,47 +5362,24 @@ def api_chat():
             source_type="regenerated",
         )
 
-        # NOVA_INLINE_API_CHAT_FINAL_WEAK_GUARD_LOCK
-        try:
-            assistant = result.get("assistant_message") if isinstance(result, dict) else None
-            current_text = str(
-                (assistant or {}).get("text")
-                or (assistant or {}).get("content")
-                or ""
-            ).strip()
-            current_compact = " ".join(
-                current_text
-                .lower()
-                .replace("â€™", "'")
-                .replace("Ã¢â‚¬â„¢", "'")
-                .replace("Ã£Â¢Ã¢â€šÂ¬Ã¢â€žÂ¢", "'")
-                .replace("iÃ£Â¢Ã¢â€šÂ¬Ã¢â€žÂ¢m", "i'm")
-                .replace("iÃ¢â‚¬â„¢m", "i'm")
-                .split()
-            )
-            if (
-                isinstance(result, dict)
-                and isinstance(assistant, dict)
-                and "ready" in current_compact
-                and "what are we working on" in current_compact
-            ):
-                replacement = (
-                    "I do not have a personal life story like a human. "
-                    "I was built to help you think, build, debug, write, learn, and move faster. "
-                    "For Nova, the active phase is frontend polish: clean the mobile UI, remove weak fallback behavior, "
-                    "and make the live app match the backend tests that are already passing."
-                )
-                assistant["text"] = replacement
-                assistant["content"] = replacement
-                meta = assistant.get("meta") if isinstance(assistant.get("meta"), dict) else {}
-                meta["weak_response_guarded"] = True
-                meta["weak_response_original"] = current_text
-                assistant["meta"] = meta
-                result["assistant_message"] = assistant
-        except Exception:
-            pass
+    # NOVA_CHAT_RESPONSE_FINALIZER_BOUNDARY_20260713
+    try:
+        from nova_backend.services.chat_response_finalizer_service import (
+            finalize_chat_response,
+        )
 
-        return jsonify(_nova_replace_weak_backend_reply(user_text, result))
+        result = finalize_chat_response(
+            user_text,
+            result,
+        )
+
+    except Exception as error:
+        print(
+            "[NOVA_CHAT_RESPONSE_FINALIZER_BOUNDARY_20260713] skipped:",
+            error,
+        )
+
+    return jsonify(_nova_replace_weak_backend_reply(user_text, result))
 
     force_new_session = bool(data.get("force_new_session") or data.get("new_session"))
 
@@ -14855,85 +14832,22 @@ def nova_final_session_detail_response_cache_20260612(response):
                 # Clean stale direct-recall answers inside returned session.messages.
                 # This prevents the UI from rendering old "No active..." text when
                 # working_state already has the truth.
+ 
                 try:
-                    if isinstance(response_session, dict):
-                        working_state = response_session.get("working_state")
-                        if not isinstance(working_state, dict):
-                            working_state = {}
+                    from nova_backend.services.stale_working_state_history_service import (
+                        clean_stale_working_state_history,
+                    )
 
-                        current_file = str(
-                            working_state.get("current_file")
-                            or ""
-                        ).strip()
+                    response_json = clean_stale_working_state_history(
+                        response_json,
+                        session_id,
+                    )
 
-                        active_task = str(
-                            working_state.get("active_task")
-                            or ""
-                        ).strip()
-
-                        returned_messages = response_session.get("messages")
-                        if isinstance(returned_messages, list):
-                            for msg in returned_messages:
-                                if not isinstance(msg, dict):
-                                    continue
-
-                                if str(msg.get("role") or "").lower() != "assistant":
-                                    continue
-
-                                msg_text = str(
-                                    msg.get("text")
-                                    or msg.get("content")
-                                    or ""
-                                ).strip()
-
-                                fixed_text = ""
-
-                                if (
-                                    current_file
-                                    and msg_text in {
-                                        "Current file:\nNo active file is currently tracked.",
-                                        "No active file is currently tracked.",
-                                        "No active file is currently tracked",
-                                    }
-                                ):
-                                    fixed_text = f"Current file:\n{current_file}"
-
-                                if (
-                                    active_task
-                                    and msg_text in {
-                                        "Active task:\nNo active task is currently tracked.",
-                                        "Active task:\nNo active task is currently tracked yet.",
-                                        "No active task is currently tracked.",
-                                        "No active task is currently tracked",
-                                        "No active task is currently tracked yet.",
-                                    }
-                                ):
-                                    fixed_text = f"Active task:\n{active_task}"
-
-                                if not fixed_text:
-                                    continue
-
-                                msg["text"] = fixed_text
-                                msg["content"] = fixed_text
-                                msg["attachments"] = msg.get("attachments") or []
-                                msg["session_id"] = session_id
-                                msg["active_session_id"] = session_id
-
-                                msg_meta = msg.get("meta")
-                                if not isinstance(msg_meta, dict):
-                                    msg_meta = {}
-
-                                msg_meta["route"] = "final_cache_stale_working_state_history_cleanup"
-                                msg_meta["session_id"] = session_id
-                                msg_meta["render_source"] = "assistant_message_only"
-                                msg_meta["stale_working_state_history_cleaned"] = True
-
-                                msg["meta"] = msg_meta
-
-                            response_session["messages"] = returned_messages
-
-                except Exception:
-                    pass
+                except Exception as error:
+                    print(
+                        "[NOVA_FINAL_CACHE_STALE_WORKING_STATE_HISTORY_CLEANUP_20260630] skipped:",
+                        error,
+                    )
 
                 response_json["session"] = response_session
                 response_json["session_id"] = session_id
@@ -15816,264 +15730,26 @@ def nova_history_direct_send_20260622(session_id):
     return redirect("/history/" + sid)
 # END_NOVA_HISTORY_DIRECT_SEND_20260622
 
+
 # NOVA_FINAL_TITLE_GUARD_20260630
-# Last response/disk cleanup for accidental-input and stale Web Fetch session titles.
-try:
-    import json as _nova_title_guard_json_20260630
-    import re as _nova_title_guard_re_20260630
-    from collections import Counter as _nova_title_guard_counter_20260630
-    from pathlib import Path as _nova_title_guard_Path_20260630
-    from flask import request as _nova_title_guard_request_20260630
-
-    def _nova_title_guard_is_garbage_20260630(value) -> bool:
-        text = str(value or "")
-        compact = "".join(text.split())
-
-        if not compact:
-            return False
-
-        lower = compact.lower()
-
-        if lower in {
-            "k",
-            "ok",
-            "okay",
-            "next",
-            "continue",
-            "run",
-            "runit",
-            "stop",
-            "cancel",
-            "yes",
-            "no",
-            "hello",
-            "hi",
-            "hey",
-        }:
-            return False
-
-        if len(compact) < 8:
-            return False
-
-        counts = _nova_title_guard_counter_20260630(compact)
-        most_common_ratio = counts.most_common(1)[0][1] / max(len(compact), 1)
-
-        alpha_count = sum(1 for ch in compact if ch.isalpha())
-        digit_count = sum(1 for ch in compact if ch.isdigit())
-        symbol_count = sum(1 for ch in compact if not ch.isalnum())
-        symbol_digit_ratio = (digit_count + symbol_count) / max(len(compact), 1)
-
-        if len(compact) >= 12 and most_common_ratio >= 0.75:
-            return True
-
-        if len(compact) >= 20 and alpha_count == 0 and symbol_digit_ratio >= 0.90:
-            return True
-
-        if len(compact) >= 24 and alpha_count <= 2 and symbol_digit_ratio >= 0.80:
-            return True
-
-        if _nova_title_guard_re_20260630.search(r"(.)\1{9,}", compact):
-            return True
-
-        if (
-            _nova_title_guard_re_20260630.search(r"([\[\]\(\)\{\}=\\\/\|'\-]){8,}", compact)
-            and alpha_count <= 3
-        ):
-            return True
-
-        return False
-
-    def _nova_title_guard_clean_title_20260630(title, user_text, route, source):
-        current = str(title or "").strip()
-        lowered = current.lower().strip()
-
-        web_like = lowered in {
-            "",
-            "web fetch",
-            "source preview",
-            "generated image",
-        }
-
-        guard_like = (
-            str(route or "").strip().lower() == "accidental_input_guard"
-            or str(source or "").strip().lower() == "accidental_input_guard"
-            or _nova_title_guard_is_garbage_20260630(current)
-            or _nova_title_guard_is_garbage_20260630(user_text)
-        )
-
-        if guard_like:
-            return "New Chat"
-
-        if web_like:
-            candidate = str(user_text or "").replace("\n", " ").strip()
-            if candidate and not _nova_title_guard_is_garbage_20260630(candidate):
-                return candidate[:60]
-            return "New Chat"
-
-        return current or "New Chat"
-
-    def _nova_title_guard_persist_20260630(session_id, clean_title):
-        try:
-            sid = str(session_id or "").strip()
-            if not sid:
-                return
-
-            data_path = _nova_title_guard_Path_20260630(__file__).resolve().parent / "data" / "nova_sessions.json"
-
-            if not data_path.exists():
-                return
-
-            store = _nova_title_guard_json_20260630.loads(data_path.read_text(encoding="utf-8"))
-
-            sessions = store.get("sessions")
-            if not isinstance(sessions, list):
-                return
-
-            changed = False
-
-            for item in sessions:
-                if not isinstance(item, dict):
-                    continue
-
-                item_id = str(item.get("id") or item.get("session_id") or "").strip()
-                if item_id != sid:
-                    continue
-
-                old_title = str(item.get("title") or "").strip()
-
-                if (
-                    old_title.lower() in {"", "web fetch", "source preview", "generated image"}
-                    or _nova_title_guard_is_garbage_20260630(old_title)
-                ):
-                    item["title"] = clean_title
-                    changed = True
-
-            if changed:
-                tmp = data_path.with_suffix(data_path.suffix + ".tmp")
-                tmp.write_text(
-                    _nova_title_guard_json_20260630.dumps(store, indent=2, ensure_ascii=False),
-                    encoding="utf-8",
-                )
-                tmp.replace(data_path)
-
-        except Exception as _nova_title_guard_persist_error_20260630:
-            print(
-                "[NOVA_FINAL_TITLE_GUARD_20260630] persist skipped:",
-                _nova_title_guard_persist_error_20260630,
-            )
-
-    @app.after_request
-    def nova_final_title_guard_20260630(response):
-        try:
-            request_path = str(getattr(_nova_title_guard_request_20260630, "path", "") or "")
-            request_method = str(getattr(_nova_title_guard_request_20260630, "method", "") or "").upper()
-
-            if request_method != "POST" or request_path != "/api/chat":
-                return response
-
-            data = response.get_json(silent=True) or {}
-            if not isinstance(data, dict):
-                return response
-
-            session = data.get("session")
-            if not isinstance(session, dict):
-                return response
-
-            assistant_message = data.get("assistant_message")
-            if not isinstance(assistant_message, dict):
-                assistant_message = {}
-
-            assistant_meta = assistant_message.get("meta")
-            if not isinstance(assistant_meta, dict):
-                assistant_meta = {}
-
-            route = (
-                data.get("route")
-                or data.get("mode")
-                or assistant_meta.get("route")
-                or assistant_meta.get("source")
-                or ""
-            )
-
-            source = assistant_meta.get("source") or data.get("source") or ""
-
-            user_text = ""
-            messages = session.get("messages")
-            if isinstance(messages, list):
-                for msg in messages:
-                    if not isinstance(msg, dict):
-                        continue
-                    if str(msg.get("role") or "").strip().lower() == "user":
-                        user_text = str(msg.get("text") or msg.get("content") or "").strip()
-                        break
-
-            if not user_text:
-                user_text = str(data.get("user_text") or data.get("message") or "").strip()
-
-            old_title = str(session.get("title") or "").strip()
-
-            new_raw = _nova_title_guard_json_20260630.dumps(data, ensure_ascii=False)
-            response.set_data(new_raw)
-            response.headers["Content-Length"] = str(len(response.get_data()))
-            response.headers["Content-Type"] = "application/json"
-
-        except Exception as _nova_title_guard_error_20260630:
-            print(
-                "[NOVA_FINAL_TITLE_GUARD_20260630] skipped:",
-                _nova_title_guard_error_20260630,
-            )
-
-        return response
-
-    try:
-        _nova_title_guard_hooks_20260630 = app.after_request_funcs.get(None, [])
-        _nova_title_guard_func_20260630 = None
-
-        for _nova_title_guard_hook_20260630 in list(_nova_title_guard_hooks_20260630):
-            if getattr(_nova_title_guard_hook_20260630, "__name__", "") == "nova_final_title_guard_20260630":
-                _nova_title_guard_func_20260630 = _nova_title_guard_hook_20260630
-                _nova_title_guard_hooks_20260630.remove(_nova_title_guard_hook_20260630)
-                break
-
-        if _nova_title_guard_func_20260630 is not None:
-            _nova_title_guard_hooks_20260630.insert(0, _nova_title_guard_func_20260630)
-
-    except Exception as _nova_title_guard_order_error_20260630:
-        print(
-            "[NOVA_FINAL_TITLE_GUARD_20260630] hook order skipped:",
-            _nova_title_guard_order_error_20260630,
-        )
-
-    _nova_boot_log_20260701("[NOVA_FINAL_TITLE_GUARD_20260630] installed")
-
-except Exception as _nova_final_title_guard_install_error_20260630:
-    print(
-        "[NOVA_FINAL_TITLE_GUARD_20260630] failed:",
-        _nova_final_title_guard_install_error_20260630,
-    )
-
-
-# NOVA_FINAL_IMAGE_RESPONSE_CACHE_TEXT_GUARD_20260630
-# Final visible-response guard for image generation.
+# Delegated to session_title_guard_service.
 
 @app.after_request
-def _nova_final_image_response_cache_text_guard_20260630(response):
+def nova_final_title_guard_20260630(response):
     try:
-        guard = globals().get(
-            "_nova_image_response_cache_guard_apply_20260630"
+        from nova_backend.services.session_title_guard_service import (
+            apply_response_title_guard,
         )
 
-        if callable(guard):
-            return guard(response)
+        return apply_response_title_guard(response)
 
-    except Exception as _nova_image_response_cache_guard_error_20260630:
+    except Exception as error:
         print(
-            "[NOVA_FINAL_IMAGE_RESPONSE_CACHE_TEXT_GUARD_20260630] bypass:",
-            _nova_image_response_cache_guard_error_20260630,
+            "[NOVA_FINAL_TITLE_GUARD_20260630] skipped:",
+            error,
         )
 
     return response
-
 
 # NOVA_API_CHAT_PROJECT_STATE_IDLE_NEXT_FINAL_20260630
 # Final /api/chat response repair for idle next/k project-state recall.
@@ -18933,6 +18609,30 @@ try:
 
             if not _nova_phase4f_prerun_is_normal_chat_20260701(user_text):
                 return response
+
+            # NOVA_PROJECT_BRAIN_ROUTE_PROTECTION_20260712
+            # Do not overwrite Project Brain ownership metadata.
+            try:
+                existing_payload = json.loads(
+                    response.get_data(as_text=True)
+                )
+
+                existing_debug = (
+                    existing_payload.get("debug")
+                    or {}
+                )
+
+                existing_route = str(
+                    existing_debug.get("route")
+                    or existing_debug.get("route_taken")
+                    or ""
+                ).strip()
+
+                if existing_route == "project_brain_general_intelligence":
+                    return response
+
+            except Exception:
+                pass
 
             if not _nova_phase4f_prerun_is_safe_probe_20260701(user_text):
                 return response
