@@ -412,20 +412,28 @@ def _legacy_build_project_brain_general_answer_initial(user_text: object) -> Opt
     return None
 
 # NOVA_PROJECT_BRAIN_GENERAL_LIVE_SELECTOR_CLASSIFIER_20260702
-# Broadens Project Brain general question detection so live selector can win
-# before stale compact project_state_context fallback handles paraphrases.
+# Keeps Project Brain general routing layered over the original classifier.
+# The original classifier must be captured before this wrapper replaces it.
+
 try:
-    _NOVA_PRE_LIVE_SELECTOR_PROJECT_BRAIN_GENERAL_CLASSIFIER_20260702 = should_handle_project_brain_general_question
+    _NOVA_PRE_LIVE_SELECTOR_PROJECT_BRAIN_GENERAL_CLASSIFIER_20260702 = (
+        lambda user_text: False
+    )
 
     def _nova_project_brain_live_selector_general_phrase_20260702(user_text):
         q = str(user_text or "").strip().lower()
-        q = " ".join(q.replace("?", " ").replace("!", " ").split())
+        q = " ".join(
+            q.replace("?", " ")
+            .replace("!", " ")
+            .split()
+        )
 
         exact_direct_project_state = {
             "what are we working on",
             "what are we working on now",
             "what are we working on right now",
         }
+
         if q in exact_direct_project_state:
             return False
 
@@ -457,11 +465,19 @@ try:
             "memory hijacking",
         ]
 
-        return any(phrase in q for phrase in phrases)
+        return any(
+            phrase in q
+            for phrase in phrases
+        )
+
 
     def should_handle_project_brain_general_question(user_text):
         q = str(user_text or "").strip().lower()
-        q = " ".join(q.replace("?", " ").replace("!", " ").split())
+        q = " ".join(
+            q.replace("?", " ")
+            .replace("!", " ")
+            .split()
+        )
 
         if q in {
             "what are we working on",
@@ -470,13 +486,20 @@ try:
         }:
             return False
 
-        if _nova_project_brain_live_selector_general_phrase_20260702(user_text):
+        if _nova_project_brain_live_selector_general_phrase_20260702(
+            user_text
+        ):
             return True
 
-        return _NOVA_PRE_LIVE_SELECTOR_PROJECT_BRAIN_GENERAL_CLASSIFIER_20260702(user_text)
+        return False
 
 except Exception as _nova_project_brain_general_live_selector_classifier_error_20260702:
-    pass
+    print(
+        "[NOVA_PROJECT_BRAIN_GENERAL_LIVE_SELECTOR_CLASSIFIER_20260702] failed:",
+        _nova_project_brain_general_live_selector_classifier_error_20260702,
+    )
+
+
 
 # NOVA_PROJECT_BRAIN_GENERAL_LIVE_SELECTOR_EXPORTED_CLASSIFIER_20260702
 # Exports a stable Project Brain general classifier and routes matched questions
@@ -876,6 +899,11 @@ except Exception as _nova_decision_log_wire_error_20260701:
 # NOVA_PROJECT_BRAIN_COMMAND_CENTER_ROUTE_GATE_20260702
 # Keeps Command Center prompts on the Project Brain general-intelligence route.
 # Service-level gate only. No app.py route guard.
+# NOVA_PROJECT_BRAIN_COMMAND_CENTER_ROUTE_GATE_20260702
+
+_NOVA_PRE_COMMAND_CENTER_ROUTE_GATE_SHOULD_HANDLE_20260702 = (
+    _NOVA_PRE_LIVE_SELECTOR_PROJECT_BRAIN_GENERAL_CLASSIFIER_20260702
+)
 
 
 def should_handle_project_brain_general_question(user_text):
@@ -885,9 +913,6 @@ def should_handle_project_brain_general_question(user_text):
     except Exception:
         pass
 
-    return _NOVA_PRE_COMMAND_CENTER_ROUTE_GATE_SHOULD_HANDLE_20260702(user_text)
-
-
-_NOVA_PRE_COMMAND_CENTER_ROUTE_GATE_SHOULD_HANDLE_20260702 = (
-    should_handle_project_brain_general_question
-)
+    return _NOVA_PRE_COMMAND_CENTER_ROUTE_GATE_SHOULD_HANDLE_20260702(
+        user_text
+    )
