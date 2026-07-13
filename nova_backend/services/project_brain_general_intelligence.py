@@ -352,11 +352,11 @@ def _observe_project_brain_answer(
             exc,
         )
 
-def build_project_brain_general_answer(user_text: object) -> Optional[ProjectBrainAnswer]:
+def _legacy_build_project_brain_general_answer_initial(user_text: object) -> Optional[ProjectBrainAnswer]:
     intent = classify_project_brain_intent(user_text)
 
     if intent == "mission_control":
-        answer = _current_project_answer()
+        answer = _mission_control_answer(user_text)
 
         answer = _append_behavior_context(answer)
 
@@ -494,7 +494,34 @@ def _nova_project_brain_general_live_selector_normalize_20260702(user_text):
     return q
 
 
-def should_handle_project_brain_general_question(user_text):
+def _legacy_build_project_brain_general_answer_497(user_text=""):
+    print(
+        "[DEBUG_PROJECT_BRAIN_GENERAL_CALLED]",
+        user_text,
+    )
+    intent = classify_project_brain_intent(user_text)
+
+    if intent == "mission_control":
+        from nova_backend.services.project_brain_mission_control import (
+            build_project_brain_mission_card,
+        )
+
+        card = build_project_brain_mission_card(
+            user_text=str(user_text or ""),
+        )
+
+        return ProjectBrainAnswer(
+            intent="mission_control",
+            text=format_project_brain_mission_card(card),
+        )
+
+    q = _nova_project_brain_general_live_selector_normalize_20260702(user_text)
+    if intent == "mission_control":
+        return ProjectBrainAnswer(
+            intent="mission_control",
+            text=_mission_control_answer(user_text),
+        )
+
     q = _nova_project_brain_general_live_selector_normalize_20260702(user_text)
 
     exact_direct_project_state = {
@@ -596,9 +623,54 @@ def _nova_project_brain_command_center_question_20260702(user_text):
 
     return False
 
-
 def build_project_brain_general_answer(user_text=""):
+    intent = classify_project_brain_intent(user_text)
+
+    if intent == "mission_control":
+        from nova_backend.services.project_brain_mission_control import (
+            build_project_brain_mission_card,
+            format_project_brain_mission_card,
+        )
+
+        card = build_project_brain_mission_card(
+            user_text=str(user_text or ""),
+        )
+
+        return ProjectBrainAnswer(
+            intent="mission_control",
+            text=format_project_brain_mission_card(card),
+        )
+
     q = _nova_project_brain_general_live_selector_normalize_20260702(user_text)
+    intent = classify_project_brain_intent(user_text)
+
+    if intent == "mission_control":
+        from nova_backend.services.project_brain_mission_control import (
+            build_project_brain_mission_card,
+            format_project_brain_mission_card,
+        )
+
+        card = build_project_brain_mission_card(
+            user_text=str(user_text or ""),
+        )
+
+        return ProjectBrainAnswer(
+            intent="mission_control",
+            text=format_project_brain_mission_card(card),
+        )
+    intent = classify_project_brain_intent(user_text)
+
+    if intent == "mission_control":
+        from nova_backend.services.project_brain_mission_control import (
+            format_project_brain_mission_control_answer,
+        )
+
+        return ProjectBrainAnswer(
+            intent="mission_control",
+            text=format_project_brain_mission_control_answer(
+                user_text=user_text,
+            ),
+        )
 
     if q in {
         "what are we working on",

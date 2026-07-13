@@ -31,11 +31,7 @@ def main():
     len(plan.get("ranked_moves", [])) >= 3,
     plan,
 )
-    assert_true(
-        "operator plan has rejected moves",
-        len(plan.get("rejected_moves", [])) >= 2,
-        plan,
-    )
+    assert_true("operator plan has rejected moves", len(plan.get("rejected_moves", [])) >= 2, plan)
 
     answer = build_project_brain_mission_control_answer("operator mode")
 

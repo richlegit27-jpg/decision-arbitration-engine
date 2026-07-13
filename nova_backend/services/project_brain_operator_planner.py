@@ -111,23 +111,48 @@ def select_smokes(work_type: str, changed_files: list[str] | None = None) -> lis
 
 
 def choose_recommended_move(work_type: str) -> tuple[str, str, str, list[str]]:
-    ranked = rank_moves(work_type)
-
-    if ranked:
-        best = ranked[0]
-
+    if work_type == "failure_repair":
         return (
-            str(best.get("name") or ""),
-            str(best.get("why") or ""),
-            str(best.get("risk") or "low"),
-            list(best.get("target_files") or []),
+            "Failure Interpreter v2",
+            "A failing smoke should be turned into a precise repair plan before any new feature work.",
+            "medium",
+            [
+                "nova_backend/services/project_brain_failure_interpreter.py",
+                "tools/nova_project_brain_failure_interpreter_api_smoke.py",
+            ],
+        )
+
+    if work_type == "smoke_selection":
+        return (
+            "Smoke Selector v1",
+            "This kills repetitive command spam by mapping file changes to the smallest useful smoke set.",
+            "low",
+            [
+                "nova_backend/services/project_brain_operator_planner.py",
+                "tools/nova_project_brain_operator_planner_smoke.py",
+            ],
+        )
+
+    if work_type in ("cleanup_strategy", "route_cleanup", "app_cleanup"):
+        return (
+            "Cleanup Strategy Engine v1",
+            "Cleanup should be ranked and bounded so Nova stops doing tiny lock-the-lock commits.",
+            "medium",
+            [
+                "nova_backend/services/project_brain_operator_planner.py",
+                "tools/nova_project_brain_route_patch_audit_smoke.py",
+            ],
         )
 
     return (
-        "Cleanup Strategy Engine v1",
-        "Fallback bounded cleanup recommendation.",
-        "medium",
-        [],
+        "Operator Plan Quality v2",
+        "Nova already has an operator plan; the next jump is ranking moves, rejecting weaker moves, and giving one exact next command.",
+        "low",
+        [
+            "nova_backend/services/project_brain_operator_planner.py",
+            "nova_backend/services/project_brain_mission_control.py",
+            "tools/nova_project_brain_operator_planner_smoke.py",
+        ],
     )
 
 
@@ -383,20 +408,25 @@ def build_operator_plan(
             work_type,
             changed_files=changed_files,
         )
-        if not smokes:
-            smokes = select_smokes(
-                work_type,
-                changed_files=changed_files,
-            )
-    moves = rank_moves(work_type, changed_files=changed_files)
+
+    moves = rank_moves(
+        work_type,
+        changed_files=changed_files,
+    )
 
     avoid_rules = list(PROJECT_BRAIN_SAFE_AVOID_RULES)
 
     if work_type in ("cleanup_strategy", "route_cleanup", "app_cleanup"):
-        avoid_rules.insert(0, "Do not clean up more than one route/guard family in the same commit.")
+        avoid_rules.insert(
+            0,
+            "Do not clean up more than one route/guard family in the same commit.",
+        )
 
     if work_type == "failure_repair":
-        avoid_rules.insert(0, "Do not add new behavior until the failing contract is reproduced.")
+        avoid_rules.insert(
+            0,
+            "Do not add new behavior until the failing contract is reproduced.",
+        )
 
     rollback_point = (
         "Use the latest clean commit before this operator plan."
@@ -404,7 +434,10 @@ def build_operator_plan(
         else "Use current HEAD as rollback point before patching."
     )
 
-    rejected_moves = [move for move in moves if int(move.get("rank", 0)) > 1]
+    rejected_moves = [
+        move for move in moves
+        if int(move.get("rank", 0)) > 1
+    ]
 
     return OperatorPlan(
         recommended_move=recommended_move,
@@ -424,18 +457,20 @@ def build_operator_plan(
     )
 
 
+
+
 def build_operator_plan_dict(
     user_text: str = "",
     changed_files: list[str] | None = None,
     project_state: str = "",
 ) -> dict[str, Any]:
-    return asdict(
-        build_operator_plan(
-            user_text=user_text,
-            changed_files=changed_files,
-            project_state=project_state,
-        )
+    plan = build_operator_plan(
+        user_text=user_text,
+        changed_files=changed_files,
+        project_state=project_state,
     )
+
+    return asdict(plan) if isinstance(plan, OperatorPlan) else dict(plan)
 
 
 def format_operator_plan(plan: OperatorPlan | dict[str, Any]) -> str:

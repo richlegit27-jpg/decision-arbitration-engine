@@ -122,13 +122,13 @@ def _validation_commands(available_smokes: List[str]) -> List[str]:
 def build_project_brain_freshness_snapshot() -> ProjectBrainFreshnessSnapshot:
     available_smokes = _available_smoke_files()
 
-    checkpoint = (
-        "Protected systems: Decision Engine v1, Project Brain routing, "
-        "Mission Control, Failure Interpreter API, and Decision Log API route remain locked: "
-        "exact project-state recall stays on direct recall, broad Nova project paraphrases route through "
-        "Project Brain general intelligence, explicit operator prompts route to Mission Control, answer "
-        "quality is 100%, and regression now protects the route contracts."
+    from nova_backend.services.project_brain_state_bridge import (
+        build_state_bridge_record,
     )
+
+    state_bridge = build_state_bridge_record()
+
+    checkpoint = state_bridge.current_checkpoint
 
     blocker = (
         "No active Decision Engine blocker is open, no active Mission Control blocker is open, no active Failure Interpreter blocker is open, and no active Decision Log blocker is open. "

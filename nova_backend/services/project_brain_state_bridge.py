@@ -117,7 +117,9 @@ def build_state_bridge_record(
         "Project Brain gangster intelligence stack is locked through "
         + ", ".join(locked)
         + ". Command Center can rank upgrades, classify failures, plan patches, select smokes, "
-        + "launch command blocks, run safe mission logic, coach runtime output, and write operator milestones."
+        + "launch command blocks, run safe mission logic, coach runtime output, "
+        + "and write operator milestones. "
+        + "Decision Engine can classify failures, rank moves, and choose the next safe operator action."
     )
 
     blocker = (

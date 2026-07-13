@@ -160,6 +160,9 @@ def format_project_brain_mission_card(card: ProjectBrainMissionCard) -> str:
         "Project Brain Mission Control:\n"
         "Mission Control v1.4 Operator Console\n"
         f"State: {card.current_state}\n"
+"Decision Engine: Active. Classifies failures, ranks moves, and chooses the next safe operator action.\n"
+f"Blocker/Risk: {card.current_blocker}\n"
+
         f"Blocker/Risk: {card.current_blocker}\n"
         f"Best Move: {operator.get('recommended_move') or card.recommended_move}\n"
         f"Why: {operator.get('why') or card.rationale}\n"
