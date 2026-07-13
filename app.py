@@ -16003,25 +16003,11 @@ try:
                 user_text = str(data.get("user_text") or data.get("message") or "").strip()
 
             old_title = str(session.get("title") or "").strip()
-            clean_title = _nova_title_guard_clean_title_20260630(
-                old_title,
-                user_text,
-                route,
-                source,
-            )
 
-            if clean_title != old_title:
-                session["title"] = clean_title
-                data["session"] = session
-                _nova_title_guard_persist_20260630(
-                    data.get("session_id") or data.get("active_session_id") or session.get("id"),
-                    clean_title,
-                )
-
-                new_raw = _nova_title_guard_json_20260630.dumps(data, ensure_ascii=False)
-                response.set_data(new_raw)
-                response.headers["Content-Length"] = str(len(response.get_data()))
-                response.headers["Content-Type"] = "application/json"
+            new_raw = _nova_title_guard_json_20260630.dumps(data, ensure_ascii=False)
+            response.set_data(new_raw)
+            response.headers["Content-Length"] = str(len(response.get_data()))
+            response.headers["Content-Type"] = "application/json"
 
         except Exception as _nova_title_guard_error_20260630:
             print(
@@ -16682,10 +16668,15 @@ try:
             fixed = _nova_img_cache_fix_image_response_20260630(data)
 
             if fixed is data:
-                new_raw = _nova_img_cache_json_20260630.dumps(fixed, ensure_ascii=False)
-                response.set_data(new_raw)
-                response.headers["Content-Length"] = str(len(response.get_data()))
-                response.headers["Content-Type"] = "application/json"
+                return response
+
+            new_raw = _nova_img_cache_json_20260630.dumps(
+                fixed,
+                ensure_ascii=False,
+            )
+            response.set_data(new_raw)
+            response.headers["Content-Length"] = str(len(response.get_data()))
+            response.headers["Content-Type"] = "application/json"
 
             return response
         except Exception as _nova_img_cache_guard_error_20260630:
@@ -19199,33 +19190,17 @@ try:
             if not isinstance(assistant, dict):
                 assistant = {"role": "assistant"}
 
-            assistant["text"] = fixed_text
-            assistant["content"] = fixed_text
-            assistant["role"] = "assistant"
-            if session_id:
-                assistant["session_id"] = session_id
-                assistant["active_session_id"] = session_id
 
-            meta = assistant.get("meta")
-            if not isinstance(meta, dict):
-                meta = {}
-            meta["render_source"] = "normal_chat_autonomy_carryover_guard"
-            meta["normal_chat_priority"] = True
-            assistant["meta"] = meta
+            data = repair_normal_chat_carryover(
+                data,
+                request_data,
+            )
 
-            data["assistant_message"] = assistant
-            data["ok"] = True
-            if session_id:
-                data["session_id"] = session_id
-                data["active_session_id"] = session_id
+            return _nova_phase4g_chat_write_json_20260701(
+                response,
+                data,
+            )
 
-            debug = data.get("debug")
-            if not isinstance(debug, dict):
-                debug = {}
-            debug["route"] = "chat"
-            debug["route_taken"] = "chat"
-            debug["normal_chat_priority"] = True
-            debug["suppressed_autonomy_carryover"] = True
             data["debug"] = debug
 
             return _nova_phase4g_chat_write_json_20260701(response, data)
