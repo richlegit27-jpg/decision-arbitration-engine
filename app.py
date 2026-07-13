@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 # NOVA_DURABLE_DATA_BOOTSTRAP_20260703
 def _nova_durable_data_bootstrap_20260703():
@@ -174,6 +174,11 @@ from nova_backend.services.runtime_response_sanitizer_service import (
 
 from nova_backend.services.session_response_cleanup import (
     cleanup_session_response,
+)
+
+from nova_backend.services.title_guard_service import (
+    clean_title,
+    persist_title,
 )
 
 # -----------------------
