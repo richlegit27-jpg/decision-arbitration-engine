@@ -172,6 +172,10 @@ from nova_backend.services.runtime_response_sanitizer_service import (
     RuntimeResponseSanitizerService,
 )
 
+from nova_backend.services.session_response_cleanup import (
+    cleanup_session_response,
+)
+
 # -----------------------
 # APP SETUP
 # -----------------------
