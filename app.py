@@ -181,6 +181,11 @@ from nova_backend.services.title_guard_service import (
     persist_title,
 )
 
+
+from nova_backend.services.project_chat_response_router_service import (
+    install_project_chat_response_router,
+)
+
 # -----------------------
 # APP SETUP
 # -----------------------
@@ -606,6 +611,7 @@ intent_router = IntentRouterService()
 runtime_brain = SafeUnifiedRuntime()
 runtime_response_sanitizer = RuntimeResponseSanitizerService()
 
+install_project_chat_response_router(app)
 restored_runtime = getattr(
     runtime_brain,
     "restored_runtime_state",
@@ -666,6 +672,8 @@ chat_service.runtime_brain = runtime_brain
 
 app.runtime_brain = runtime_brain
 app.config["runtime_brain"] = runtime_brain
+
+install_project_chat_response_router(app)
 
 RuntimeBootstrap.save(
     runtime_brain
@@ -16161,7 +16169,7 @@ try:
 
         return ""
 
-    def _nova_api_project_state_wrap_endpoint_20260630(endpoint_name):
+    def _nova_api_project_state_wrap_endpoint_20260630(app, endpoint_name):
         view = app.view_functions.get(endpoint_name)
         if not callable(view):
             return False
@@ -16233,7 +16241,7 @@ try:
             ]
 
             if "/api/chat" in rule_matches:
-                if _nova_api_project_state_wrap_endpoint_20260630(_endpoint_name_20260630):
+                if _nova_api_project_state_wrap_endpoint_20260630(app, _endpoint_name_20260630)
                     _nova_api_project_state_wrapped_count_20260630 += 1
         except Exception:
             pass
@@ -16242,6 +16250,10 @@ try:
         "[NOVA_API_CHAT_PROJECT_STATE_IDLE_NEXT_FINAL_20260630] wrapped endpoints:",
         _nova_api_project_state_wrapped_count_20260630,
     )
+
+app.view_functions[endpoint_name] = _nova_api_project_state_wrapped_view_20260630
+return True
+
 except Exception as _nova_api_project_state_install_error_20260630:
     try:
         print(
@@ -16251,8 +16263,9 @@ except Exception as _nova_api_project_state_install_error_20260630:
     except Exception:
         pass
 
-# NOVA_PHASE_7B_LOCAL_UNRESOLVED_RECALL_ROUTE_PRIORITY_20260711
+
 def _nova_phase7b_is_local_unresolved_recall_20260711(value):
+
     text = " ".join(
         str(value or "")
         .strip()
@@ -16474,7 +16487,7 @@ try:
 
         return payload
 
-    def _nova_natural_project_wrap_endpoint_20260701(endpoint_name):
+    def _nova_natural_project_wrap_endpoint_20260701(app, endpoint_name):
         view = app.view_functions.get(endpoint_name)
         if not callable(view):
             return False
@@ -16537,7 +16550,7 @@ try:
             ]
 
             if "/api/chat" in rule_matches:
-                if _nova_natural_project_wrap_endpoint_20260701(_endpoint_name_20260701):
+                if _nova_natural_project_wrap_endpoint_20260701(app, _endpoint_name_20260701):
                     _nova_natural_project_wrapped_count_20260701 += 1
         except Exception:
             pass
@@ -16919,7 +16932,7 @@ try:
             },
         }
 
-    def _nova_compact_project_wrap_endpoint_20260701(endpoint_name):
+    def _nova_compact_project_wrap_endpoint_20260701(app, endpoint_name):
         view = app.view_functions.get(endpoint_name)
         if not callable(view):
             return False
@@ -16992,7 +17005,7 @@ try:
             ]
 
             if "/api/chat" in rule_matches:
-                if _nova_compact_project_wrap_endpoint_20260701(_endpoint_name_20260701):
+                if _nova_compact_project_wrap_endpoint_20260701(app, _endpoint_name_20260701):
                     _nova_compact_project_wrapped_count_20260701 += 1
         except Exception:
             pass
@@ -17107,7 +17120,7 @@ try:
             },
         }
 
-    def _nova_autonomy_wrap_endpoint_20260701(endpoint_name):
+    def _nova_autonomy_wrap_endpoint_20260701(app, endpoint_name):
         view = app.view_functions.get(endpoint_name)
         if not callable(view):
             return False
@@ -17164,7 +17177,7 @@ try:
             ]
 
             if "/api/chat" in rule_matches:
-                if _nova_autonomy_wrap_endpoint_20260701(_endpoint_name_20260701):
+                if _nova_autonomy_wrap_endpoint_20260701(app, _endpoint_name_20260701):
                     _nova_autonomy_wrapped_count_20260701 += 1
         except Exception:
             pass
