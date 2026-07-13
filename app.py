@@ -16058,7 +16058,21 @@ except Exception as _nova_final_title_guard_install_error_20260630:
 
 @app.after_request
 def _nova_final_image_response_cache_text_guard_20260630(response):
-    return _nova_image_response_cache_guard_apply_20260630(response)
+    try:
+        guard = globals().get(
+            "_nova_image_response_cache_guard_apply_20260630"
+        )
+
+        if callable(guard):
+            return guard(response)
+
+    except Exception as _nova_image_response_cache_guard_error_20260630:
+        print(
+            "[NOVA_FINAL_IMAGE_RESPONSE_CACHE_TEXT_GUARD_20260630] bypass:",
+            _nova_image_response_cache_guard_error_20260630,
+        )
+
+    return response
 
 
 # NOVA_API_CHAT_PROJECT_STATE_IDLE_NEXT_FINAL_20260630
@@ -16241,7 +16255,7 @@ try:
             ]
 
             if "/api/chat" in rule_matches:
-                if _nova_api_project_state_wrap_endpoint_20260630(app, _endpoint_name_20260630)
+                if _nova_api_project_state_wrap_endpoint_20260630(app, _endpoint_name_20260630):
                     _nova_api_project_state_wrapped_count_20260630 += 1
         except Exception:
             pass
@@ -16250,9 +16264,6 @@ try:
         "[NOVA_API_CHAT_PROJECT_STATE_IDLE_NEXT_FINAL_20260630] wrapped endpoints:",
         _nova_api_project_state_wrapped_count_20260630,
     )
-
-app.view_functions[endpoint_name] = _nova_api_project_state_wrapped_view_20260630
-return True
 
 except Exception as _nova_api_project_state_install_error_20260630:
     try:
@@ -16550,8 +16561,8 @@ try:
             ]
 
             if "/api/chat" in rule_matches:
-                if _nova_natural_project_wrap_endpoint_20260701(app, _endpoint_name_20260701):
-                    _nova_natural_project_wrapped_count_20260701 += 1
+                if _nova_api_project_state_wrap_endpoint_20260630(app, _endpoint_name_20260630):
+                    _nova_api_project_state_wrapped_count_20260630 += 1
         except Exception:
             pass
 
@@ -18905,11 +18916,6 @@ try:
         data["debug"] = debug
 
         return data
-
-
-
-
-
 
 
 
