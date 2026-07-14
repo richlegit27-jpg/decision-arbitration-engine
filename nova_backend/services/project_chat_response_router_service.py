@@ -403,7 +403,7 @@ try:
 
         return payload
 
-    def _nova_natural_project_wrap_endpoint_20260701(endpoint_name):
+    def _nova_natural_project_wrap_endpoint_20260701(app, endpoint_name):
         view = app.view_functions.get(endpoint_name)
         if not callable(view):
             return False
@@ -829,7 +829,7 @@ try:
             },
         }
 
-    def _nova_compact_project_wrap_endpoint_20260701(endpoint_name):
+    def _nova_compact_project_wrap_endpoint_20260701(app, endpoint_name):
         view = app.view_functions.get(endpoint_name)
         if not callable(view):
             return False
@@ -998,7 +998,7 @@ try:
             },
         }
 
-    def _nova_autonomy_wrap_endpoint_20260701(endpoint_name):
+    def _nova_autonomy_wrap_endpoint_20260701(app, endpoint_name):
         view = app.view_functions.get(endpoint_name)
         if not callable(view):
             return False
