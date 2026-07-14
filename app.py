@@ -13740,30 +13740,6 @@ def nova_web_fetch_requested_session_bridge_safe_20260612(response):
             "meta": bridge_meta,
         }
 
-        # Best-effort persistence.
-        try:
-            existing = session_service.get_session(target_session_id)
-        except Exception:
-            existing = None
-
-        existing_blob = str(existing or "")
-
-        try:
-            if user_text not in existing_blob:
-                # Disabled 20260622: target-session bridge/chat service handles user persistence.
-                pass
-
-            if assistant_text not in existing_blob:
-                # Disabled 20260622: prevent duplicate assistant persistence from web_fetch_requested_session_bridge_safe.
-                pass
-        except Exception as persist_error:
-            try:
-                app.logger.warning(
-                    "[WebFetchRequestedSessionBridgeSafe] persistence failed: %s",
-                    persist_error,
-                )
-            except Exception:
-                pass
 
         try:
             final_session = session_service.get_session(target_session_id)
