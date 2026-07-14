@@ -13539,48 +13539,6 @@ def _nova_direct_clean_attachment_text_response_20260611(text_value):
     except Exception:
         return text_value
 
-
-
-# NOVA_ATTACHMENT_API_CHAT_VIEW_WRAPPER_SYNC_20260611
-def _nova_sync_attachment_text_response_20260611(response):
-    try:
-        flask_response = app.make_response(response)
-        raw_body = flask_response.get_data(as_text=True)
-
-        if not raw_body or "assistant_message" not in raw_body or "Attachment analysis:" not in raw_body:
-            return flask_response
-
-        import json
-        data = json.loads(raw_body)
-        if not isinstance(data, dict):
-            return flask_response
-
-        assistant_message = data.get("assistant_message")
-        if not isinstance(assistant_message, dict):
-            return flask_response
-
-        content = str(assistant_message.get("content") or "").strip()
-        text_value = str(assistant_message.get("text") or "").strip()
-
-        if (
-            content.startswith("Attachment analysis:")
-            and "Attachment " in content
-            and " content:" in content
-            and content != text_value
-        ):
-            assistant_message["text"] = content
-            assistant_message["content"] = content
-            data["assistant_message"] = assistant_message
-
-            flask_response.set_data(json.dumps(data, ensure_ascii=False))
-            flask_response.headers["Content-Type"] = "application/json; charset=utf-8"
-            flask_response.headers["X-Nova-Attachment-Sync"] = "view-wrapper-fixed"
-
-        return flask_response
-    except Exception:
-        return response
-
-
 def _nova_install_api_chat_attachment_view_wrapper_20260611():
     try:
         wrapped = 0
