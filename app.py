@@ -19754,45 +19754,6 @@ def api_attachment_status():
                 "error": str(exc),
             }, 500
 
-# NOVA_ATTACHMENT_STATUS_HEALTH_HOOK_20260705
-try:
-    @app.after_request
-    def _nova_attachment_status_health_hook(response):
-        try:
-            from flask import request
-            import json
-            from nova_backend.services.attachment_pipeline_status import (
-                get_attachment_pipeline_status,
-            )
-
-            if request.path != "/api/health":
-                return response
-
-            if not getattr(response, "is_json", False):
-                return response
-
-            payload = response.get_json(silent=True)
-
-            if not isinstance(payload, dict):
-                return response
-
-            status = get_attachment_pipeline_status()
-
-            payload.setdefault("attachment_pipeline_ready", status.get("ready"))
-            payload.setdefault("attachment_pipeline", status.get("attachment_pipeline"))
-            payload.setdefault("attachment_debug_routes_require_env", True)
-
-            response.set_data(json.dumps(payload, ensure_ascii=False))
-            response.content_type = "application/json"
-
-            return response
-        except Exception:
-            return response
-except Exception:
-    pass
-
-
-
 
 # NOVA_PUBLIC_HOME_PREVIEW_ROUTES_20260709
 @app.get("/nova-home-preview")
