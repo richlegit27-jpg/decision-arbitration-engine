@@ -7351,18 +7351,6 @@ def api_chat():
 
         assistant_message["text"] = assistant_text
         assistant_message["content"] = assistant_text
-        # NOVA_ATTACHMENT_SYNC_TEXT_AFTER_CONTENT_ASSIGN_20260611
-        try:
-            _nova_attachment_content_sync = str(assistant_message.get("content") or "").strip()
-            if (
-                _nova_attachment_content_sync.startswith("Attachment analysis:")
-                and "Attachment " in _nova_attachment_content_sync
-                and " content:" in _nova_attachment_content_sync
-            ):
-                assistant_message["text"] = _nova_attachment_content_sync
-                assistant_text = _nova_attachment_content_sync
-        except Exception:
-            pass
 
         payload = {
             "ok": result.get("ok", True),
