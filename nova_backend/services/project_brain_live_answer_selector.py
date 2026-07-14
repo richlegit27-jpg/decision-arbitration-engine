@@ -49,16 +49,16 @@ def should_use_project_brain_decision_context(user_text: str = "", pasted_output
     combined = f"{user}\n{output}"
 
     if _contains_any(combined, [
-        "traceback",
-        "assertionerror",
-        "smoke failed",
-        "failed missing=",
-        "failed bad=",
-        "why did this fail",
-        "what does this failure mean",
-        "error and paste",
+        "make nova smarter",
+        "decision engine",
+        "intelligence upgrade",
+        "behavior upgrade",
+        "real behavior upgrade",
+        "judgment layer",
+        "improve nova decision making",
+        "choose a better move",
     ]):
-        return True, "failure_or_log_diagnosis"
+        return True, "intelligence_upgrade"
 
     if _contains_any(combined, [
         "app.py dangerous",
@@ -171,10 +171,11 @@ def build_project_brain_live_answer(user_text: str = "", pasted_output: str = ""
                 build_project_brain_decision_context_answer,
             )
 
-            text = build_project_brain_decision_context_answer(
-                user_text=user_text,
-                pasted_output=pasted_output,
-            )
+text = build_project_brain_decision_context_answer(
+    user_text=user_text,
+    pasted_output=pasted_output,
+    intent=reason,
+)
 
             return ProjectBrainLiveAnswer(
                 text=text,

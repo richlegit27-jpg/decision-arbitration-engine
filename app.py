@@ -19165,7 +19165,7 @@ except Exception as _nova_aq95_error_20260701:
     print("[NOVA_ANSWER_QUALITY_95_DIRECT_POLICY_20260701] failed:", _nova_aq95_error_20260701)
 
 
-# NOVA_PROJECT_BRAIN_DECISION_LOG_API_ROUTE_CONTRACT_20260701
+# 
 # Thin Flask wrapper for the service-owned Decision Log route contract.
 # Keeps current-state/project-state recall separate.
 try:
@@ -19176,30 +19176,6 @@ try:
         is_decision_log_question as _nova_is_decision_log_api_question_20260701,
     )
 
-    @app.before_request
-    def _nova_project_brain_decision_log_api_route_contract_20260701():
-        try:
-            if request.path != "/api/chat" or request.method != "POST":
-                return None
-
-            try:
-                payload = request.get_json(silent=True) or {}
-            except Exception:
-                payload = {}
-
-            user_text = _nova_decision_log_extract_user_text_20260701(payload)
-            if not _nova_is_decision_log_api_question_20260701(user_text):
-                return None
-
-            return jsonify(_nova_build_decision_log_api_payload_20260701(limit=8))
-        except Exception as exc:
-            try:
-                print("[NOVA_PROJECT_BRAIN_DECISION_LOG_API_ROUTE_CONTRACT_20260701] failed:", exc)
-            except Exception:
-                pass
-            return None
-
-    print("[NOVA_PROJECT_BRAIN_DECISION_LOG_API_ROUTE_CONTRACT_20260701] installed service wrapper")
 except Exception as _nova_decision_log_api_route_error_20260701:
     print("[NOVA_PROJECT_BRAIN_DECISION_LOG_API_ROUTE_CONTRACT_20260701] failed:", _nova_decision_log_api_route_error_20260701)
 

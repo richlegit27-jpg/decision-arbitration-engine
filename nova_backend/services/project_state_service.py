@@ -520,6 +520,7 @@ def _has_active_execution(runtime_execution_state: Optional[Any] = None) -> bool
 # NOVA_PROJECT_STATE_COMPACT_CONTEXT_20260701
 # Compact formatter for safe project-state injection.
 # This does not change routing. It only exposes a short, bounded context line.
+
 def compact_project_state_context(max_locked: int = 6) -> str:
     state = get_project_state()
 
