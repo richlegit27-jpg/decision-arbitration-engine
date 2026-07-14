@@ -7343,11 +7343,6 @@ def api_chat():
             user_text,
         )
 
-        # NOVA_ATTACHMENT_DIRECT_TEXT_CLEAN_WIRED_20260611
-        if isinstance(assistant_text, str) and "Attachment analysis:" in assistant_text:
-            cleaner = globals().get("_nova_direct_clean_attachment_text_response_20260611")
-            if callable(cleaner):
-                assistant_text = cleaner(assistant_text)
 
         assistant_message["text"] = assistant_text
         assistant_message["content"] = assistant_text
