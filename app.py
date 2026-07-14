@@ -13922,21 +13922,6 @@ def nova_api_chat_target_session_append_bridge_20260611(response):
             pass
 
 
-            response_json["session_id"] = target_session_id
-            response_json["active_session_id"] = target_session_id
-            response_json["target_session_append_bridge"] = True
-
-            try:
-                response.set_data(
-                    json.dumps(
-                        response_json,
-                        ensure_ascii=False,
-                    )
-                )
-                response.mimetype = "application/json"
-            except Exception:
-                pass
-
         except Exception as exc:
             try:
                 app.logger.warning(
