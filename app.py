@@ -13539,41 +13539,6 @@ def _nova_direct_clean_attachment_text_response_20260611(text_value):
     except Exception:
         return text_value
 
-def _nova_install_api_chat_attachment_view_wrapper_20260611():
-    try:
-        wrapped = 0
-
-        for rule in list(app.url_map.iter_rules()):
-            if getattr(rule, "rule", "") != "/api/chat":
-                continue
-
-            endpoint = getattr(rule, "endpoint", "")
-            original_view = app.view_functions.get(endpoint)
-
-            if not callable(original_view):
-                continue
-
-            if getattr(original_view, "_nova_attachment_view_wrapper_20260611", False):
-                continue
-
-            def _wrapped_api_chat_view(*args, __original_view=original_view, **kwargs):
-                response = __original_view(*args, **kwargs)
-                return _nova_sync_attachment_text_response_20260611(response)
-
-            _wrapped_api_chat_view.__name__ = getattr(original_view, "__name__", "nova_wrapped_api_chat")
-            _wrapped_api_chat_view.__doc__ = getattr(original_view, "__doc__", None)
-            _wrapped_api_chat_view._nova_attachment_view_wrapper_20260611 = True
-
-            app.view_functions[endpoint] = _wrapped_api_chat_view
-            wrapped += 1
-
-        _nova_boot_log_20260701("[NOVA ATTACHMENT SYNC] wrapped /api/chat endpoints:", wrapped)
-    except Exception as exc:
-        print("[NOVA ATTACHMENT SYNC] wrapper install failed:", exc)
-
-
-_nova_install_api_chat_attachment_view_wrapper_20260611()
-
 
 # NOVA_WEB_FETCH_BRIDGE_JSON_IMPORT_FIX_20260612
 # Ensure this late bridge can rewrite Flask response JSON even if json was not imported globally.
@@ -20221,10 +20186,6 @@ def api_attachment_status():
                 "ready": False,
                 "error": str(exc),
             }, 500
-
-
-
-
 
 # NOVA_ATTACHMENT_STATUS_HEALTH_HOOK_20260705
 try:
