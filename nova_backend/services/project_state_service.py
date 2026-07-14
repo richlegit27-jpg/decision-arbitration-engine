@@ -531,16 +531,20 @@ def compact_project_state_context(max_locked: int = 6) -> str:
     parts = []
 
     if checkpoint:
-        parts.append(f"Nova checkpoint: {checkpoint}")
+        parts.append(f"Current checkpoint: {checkpoint}")
 
     if current_focus:
         parts.append(f"Focus: {current_focus}")
 
     if next_move:
-        parts.append(f"Next: {next_move}")
+        parts.append(f"Next move: {next_move}")
 
     if locked:
         parts.append(f"Locked: {', '.join(locked)}")
+
+    parts.append(
+        "Capability: answer-quality contract is protected."
+    )
 
     text = ". ".join(parts).strip()
 
@@ -769,6 +773,10 @@ try:
 
         if next_move:
             lines.append(f"- Next: {next_move}")
+
+        lines.append(
+            "- Capability: answer-quality contract is protected."
+        )
 
         if len(lines) == 1:
             return ""

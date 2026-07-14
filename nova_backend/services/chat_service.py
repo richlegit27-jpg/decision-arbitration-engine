@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from nova_backend.services.chat_turn_pipeline import build_chat_turn_from_request, build_model_messages
 def _nova_boot_log_20260701(*args, **kwargs):
     import os as _nova_boot_log_os_20260701
@@ -3940,6 +3940,7 @@ if (not attachments) and (__name__ == "__main__"):
         self.artifact_service = artifact_service
         self.web_service = web_service
         self.recon_service = recon_service
+        self.intent_service = IntentService()
 
         # =========================
         # EXISTING ALIASES
@@ -5001,8 +5002,7 @@ if (not attachments) and (__name__ == "__main__"):
                 },
             )
 
-            for msg in messages[existing_count:]:
-                self.sessions.append_message(session_id, msg)
+            self.sessions.update_session(session_id, session)
 
         except Exception as e:
             exec_debug("SESSION SAVE ERROR:", e)
@@ -9575,51 +9575,11 @@ if (not attachments) and (__name__ == "__main__"):
 
         # OPEN_WEB_SOURCE_FOLLOWUP_HANDLER_LOCK
         # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
-        import re
-
-        _nova_source_followup_prompt_20260712 = self._safe_str(
-            user_text
-        ).lower().strip()
-
-        _nova_explicit_source_followup_20260712 = (
-            any(
-                marker in _nova_source_followup_prompt_20260712
-                for marker in (
-                    "source",
-                    "article",
-                    "search result",
-                    "web result",
-                    "link",
-                    "web page",
-                )
-            )
-            or bool(
-                re.search(
-                    r"\b(?:open|read|visit|load|show)\b.{0,40}"
-                    r"\b(?:first|second|third|fourth|fifth|"
-                    r"one|two|three|four|five|it)\b",
-                    _nova_source_followup_prompt_20260712,
-                )
-            )
-        )
-
-        if (
-            not attachments
-            and self._safe_str(
-                decision.get("strategy")
-            ).strip().lower() == "open_web_source_followup"
-            and not _nova_explicit_source_followup_20260712
+        if (not attachments) and (
+            self._safe_str(decision.get("strategy")).strip().lower()
+            == "open_web_source_followup"
         ):
-            decision["strategy"] = "general_chat"
-            decision["route"] = "chat"
-
-        if (
-            not attachments
-            and self._safe_str(
-                decision.get("strategy")
-            ).strip().lower() == "open_web_source_followup"
-            and _nova_explicit_source_followup_20260712
-        ):
+            import re
 
             source_index = 0
             lowered = text.lower()
@@ -9681,10 +9641,59 @@ if (not attachments) and (__name__ == "__main__"):
             except Exception as exc:
                 exec_debug("OPEN_WEB_SOURCE_FOLLOWUP_LOOKUP_FAILED:", exc)
 
-            # NOVA_WEB_SOURCE_SESSION_ISOLATION_LOCK_20260712
-            # Web-source follow-ups may use source metadata from this session
-            # only. Global instance state and durable last-source caches can
-            # belong to another user/session and must never be restored here.
+            # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
+            if (not attachments) and (
+                (not prior_urls or source_index >= len(prior_urls))
+                and isinstance(getattr(self, "_last_web_source_urls", None), list)
+            ):
+                cached_urls = [
+                    self._safe_str(url).strip()
+                    for url in getattr(self, "_last_web_source_urls", [])
+                    if self._safe_str(url).strip()
+                ]
+
+                # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
+                if (not attachments) and (cached_urls):
+                    prior_urls = cached_urls
+                    cached_sources = getattr(self, "_last_web_sources", [])
+                    prior_sources = (
+                        cached_sources if isinstance(cached_sources, list) else []
+                    )
+
+            # WEB_FOLLOWUP_DURABLE_SOURCE_CACHE_LOCK
+            # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
+            if (not attachments) and (
+                not prior_urls or source_index >= len(prior_urls)
+            ):
+                try:
+                    import json
+                    from pathlib import Path
+
+                    cache_path = Path(
+                        r"C:\Users\Owner\nova\data\nova_last_web_sources.json"
+                    )
+
+                    if cache_path.exists():
+                        cache_data = json.loads(
+                            cache_path.read_text(encoding="utf-8") or "{}"
+                        )
+                        cached_urls = cache_data.get("source_urls")
+                        cached_sources = cache_data.get("sources")
+
+                        if isinstance(cached_urls, list) and cached_urls:
+                            prior_urls = [
+                                self._safe_str(url).strip()
+                                for url in cached_urls
+                                if self._safe_str(url).strip()
+                            ]
+                            prior_sources = (
+                                cached_sources
+                                if isinstance(cached_sources, list)
+                                else []
+                            )
+                except Exception as exc:
+                    exec_debug("WEB_FOLLOWUP_DURABLE_SOURCE_CACHE_READ_FAILED:", exc)
+
             # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
             # CHAT_SERVICE_ATTACHMENT_SOURCE_GUARD_LOCK
             attachment_language = any(
@@ -12259,54 +12268,6 @@ if (not attachments) and (__name__ == "__main__"):
 
         original_user_text = user_text
 
-        # NOVA_PHASE_7C_ORDERED_CANDIDATE_WEB_HIJACK_GUARD_20260712
-        # Enumerated options/candidates established for the conversation are
-        # chat/reference instructions, never web-source selection requests.
-        _nova_reference_setup_text_20260712 = (
-            original_user_text.lower()
-        )
-
-        _nova_has_reference_pair_20260712 = (
-            (
-                "first:" in _nova_reference_setup_text_20260712
-                and "second:" in _nova_reference_setup_text_20260712
-            )
-            or (
-                "first option is" in _nova_reference_setup_text_20260712
-                and "second option is" in _nova_reference_setup_text_20260712
-            )
-            or (
-                "first candidate is" in _nova_reference_setup_text_20260712
-                and "second candidate is" in _nova_reference_setup_text_20260712
-            )
-            or (
-                "first choice is" in _nova_reference_setup_text_20260712
-                and "second choice is" in _nova_reference_setup_text_20260712
-            )
-        )
-
-        _nova_has_reference_setup_language_20260712 = any(
-            phrase in _nova_reference_setup_text_20260712
-            for phrase in (
-                "during this conversation",
-                "we are comparing",
-                "we're comparing",
-                "do not choose",
-                "don't choose",
-                "keep both",
-                "keep these",
-                "use three candidates",
-                "use three launch candidates",
-                "in this exact order",
-            )
-        )
-
-        _nova_ordered_candidate_instruction_20260712 = (
-            not attachments
-            and _nova_has_reference_pair_20260712
-            and _nova_has_reference_setup_language_20260712
-        )
-
         # CHAT_SERVICE_HARD_ATTACHMENT_FINAL_LOCK
         try:
             if not attachments:
@@ -12753,7 +12714,6 @@ if (not attachments) and (__name__ == "__main__"):
         # source cards, and response shape.
         if (
             not attachments
-            and not _nova_ordered_candidate_instruction_20260712
             and isinstance(interpretation, dict)
             and interpretation.get("route_hint") == "web"
             and self._safe_str(interpretation.get("rewritten_text") or original_user_text).strip()
@@ -13216,10 +13176,7 @@ if (not attachments) and (__name__ == "__main__"):
                 session_id=session_id
             )
 
-        elif (
-            route == "web"
-            and not _nova_ordered_candidate_instruction_20260712
-        ):
+        elif route == "web":
             return self._execute_web_fetch(
                 user_text=user_text,
                 session_id=session_id,
@@ -15652,231 +15609,34 @@ Auto-fix result:
         )
 
     def _compose_model_messages(
-        self,
-        user_text,
-        session=None,
-        decision=None,
-        memory_context=None,
+        self, user_text, session=None, decision=None, memory_context=None
     ):
         session = session or {}
+        memory_context = self._safe_str(memory_context).strip()
 
-        memory_context = self._safe_str(
-            memory_context
-        ).strip()
-
-        system_prompt = self._build_system_prompt(
-            decision=decision
-        )
-
-        continuity_context = self._build_continuity_context(
-            session=session
-        )
-
-        conversation_state_context = ""
-        conversation_state = None
-
-        try:
-            from nova_backend.services.conversation_state_brain import (
-                conversation_state_brain,
-            )
-
-            session_messages = (
-                session.get(
-                    "messages",
-                    [],
-                )
-                if isinstance(
-                    session,
-                    dict,
-                )
-                else []
-            )
-
-            conversation_state = (
-                conversation_state_brain.build_state(
-                    session_messages,
-                    current_user_text=self._safe_str(
-                        user_text
-                    ),
-                )
-            )
-
-            conversation_state_context = (
-                conversation_state.build_context_block()
-            )
-
-        except Exception as exc:
-            exec_debug(
-                "BUILD CONVERSATION STATE CONTEXT FAILED:",
-                exc,
-            )
-
-            conversation_state_context = ""
-
-        try:
-            if (
-                continuity_context
-                and conversation_state is not None
-                and getattr(
-                    conversation_state,
-                    "unresolved_threads",
-                    (),
-                )
-                and getattr(
-                    conversation_state,
-                    "current_intent",
-                    "",
-                )
-                !=
-                "resume_unresolved_thread"
-            ):
-                import re
-
-                redaction_terms = []
-
-                for thread in (
-                    getattr(
-                        conversation_state,
-                        "unresolved_threads",
-                        (),
-                    )
-                    or ()
-                ):
-                    thread_text = self._safe_str(
-                        thread
-                    ).strip()
-
-                    if not thread_text:
-                        continue
-
-                    redaction_terms.append(
-                        thread_text
-                    )
-
-                    for token in re.findall(
-                        r"[A-Za-z0-9_]+",
-                        thread_text,
-                    ):
-                        if len(
-                            token
-                        ) < 5:
-                            continue
-
-                        redaction_terms.append(
-                            token
-                        )
-
-                        if token.endswith(
-                            "s"
-                        ):
-                            redaction_terms.append(
-                                token[:-1]
-                            )
-                        else:
-                            redaction_terms.append(
-                                token
-                                +
-                                "s"
-                            )
-
-                for term in sorted(
-                    set(
-                        redaction_terms
-                    ),
-                    key=len,
-                    reverse=True,
-                ):
-                    continuity_context = re.sub(
-                        re.escape(
-                            term
-                        ),
-                        "[deferred thread hidden]",
-                        continuity_context,
-                        flags=re.IGNORECASE,
-                    )
-
-        except Exception as exc:
-            exec_debug(
-                "REDACT DEFERRED THREADS FROM CONTINUITY FAILED:",
-                exc,
-            )
+        system_prompt = self._build_system_prompt(decision=decision)
+        continuity_context = self._build_continuity_context(session=session)
 
         execution_text = ""
-
         try:
             latest = self._find_latest_execution_artifact(
-                session_id=session.get(
-                    "id",
-                    "",
-                )
+                session_id=session.get("id", "")
             )
-
             if latest:
-                execution = (
-                    latest.get(
-                        "execution"
-                    )
-                    or {}
-                )
-
+                execution = latest.get("execution") or {}
                 if execution:
-                    execution_text = self._render_execution(
-                        execution
-                    )
-
+                    execution_text = self._render_execution(execution)
         except Exception:
             execution_text = ""
 
-        messages = [
-            {
-                "role": "system",
-                "content": system_prompt,
-            }
-        ]
-
-        if conversation_state_context:
-            messages.append(
-                {
-                    "role": "system",
-                    "content": conversation_state_context,
-                }
-            )
+        messages = [{"role": "system", "content": system_prompt}]
 
         if continuity_context:
-            messages.append(
-                {
-                    "role": "system",
-                    "content": continuity_context,
-                }
-            )
-
-        if (
-            conversation_state is not None
-            and getattr(
-                conversation_state,
-                "current_intent",
-                "",
-            )
-            ==
-            "resume_unresolved_thread"
-            and getattr(
-                conversation_state,
-                "unresolved_threads",
-                (),
-            )
-        ):
-            execution_text = ""
-            memory_context = ""
+            messages.append({"role": "system", "content": continuity_context})
 
         if execution_text:
             messages.append(
-                {
-                    "role": "system",
-                    "content": (
-                        "Current execution:\n"
-                        + execution_text
-                    ),
-                }
+                {"role": "system", "content": f"Current execution:\n{execution_text}"}
             )
 
         if memory_context:
@@ -15884,21 +15644,14 @@ Auto-fix result:
                 {
                     "role": "system",
                     "content": (
-                        "Older saved memory. "
-                        "Lower priority than the current user message, "
-                        "live conversation state, and recent conversation. "
-                        "Use as ground truth only when still relevant:\n"
-                        + memory_context
+                        "Older saved memory. Lower priority than the current user message and recent conversation. "
+                        "Use only when relevant and not contradicted by the latest context:\n"
+                        f"{memory_context}"
                     ),
                 }
             )
 
-        messages.append(
-            {
-                "role": "user",
-                "content": user_text or "",
-            }
-        )
+        messages.append({"role": "user", "content": user_text or ""})
 
         return messages
 
@@ -25087,7 +24840,7 @@ try:
                 "query": user_text,
             }
 
-        return _NOVA_PRE_FINAL_LIVE_MARKET_PRICE_DECIDE_20260630(self, *args, **kwargs)
+        return _nova_intent_authority_decide_route_20260630(self, *args, **kwargs)
 
     ChatService._decide_route = _nova_final_live_market_price_decide_20260630
     _nova_boot_log_20260701("[NOVA_FINAL_LIVE_MARKET_PRICE_ROUTE_AUTHORITY_20260630] installed")

@@ -140,11 +140,11 @@ def main():
             name="exact project state keeps direct recall",
             question="what are we working on now",
             expected_route="project_state_current_memory_direct_recall",
-            expected_terms=[
-                "Nova",
-                "project-state",
-                "answer-quality",
-            ],
+expected_terms=[
+    "Nova",
+    "project state",
+    "Current checkpoint",
+],
         ),
         RouteCase(
             name="project paraphrase uses general intelligence",

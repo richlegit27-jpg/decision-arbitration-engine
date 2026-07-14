@@ -21,6 +21,7 @@ class IntentService:
     ROUTE_PLANNING = "planning"
     ROUTE_MEMORY_RECALL = "memory_recall"
     ROUTE_WORKING_STATE_RECALL = "working_state_recall"
+    ROUTE_PROJECT_BRAIN = "project_brain_general_intelligence"
 
     def detect(self, user_text: str = "", route: str = "", mode: str = "") -> dict:
         text = str(user_text or "").strip()
@@ -59,6 +60,27 @@ class IntentService:
                 ["direct_working_state_recall", "project_state_memory_recall"],
                 memory_limit=5,
             )
+
+        # 2. Project Brain questions beat normal chat.
+        if self._has_any(lower, [
+            "actual blocker",
+            "real blocker",
+            "what's the blocker",
+            "whats the blocker",
+            "blocker on nova",
+            "blocking nova",
+            "where's the project",
+            "where is the project",
+            "current project",
+        ]):
+            return self._result(
+                "project_brain_general_intelligence",
+                "project_brain_general_intelligence",
+                "project_brain_general_intelligence",
+                0.95,
+                ["project_brain_trigger"],
+            )
+
 
         # 2. Attachment/file requests must beat web.
         attachment_markers = [

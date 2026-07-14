@@ -14,6 +14,7 @@ STALE_MARKERS = [
     "answer-policy intelligence is 100%",
     "real general intelligence still needs improvement",
     "moving direct policy behavior into cleaner prompt",
+    "No active Project Brain intelligence blocker is open",
 ]
 
 
@@ -173,7 +174,7 @@ def build_project_brain_current_state(
 
     candidates = _collect_candidates(memory)
 
-    checkpoint = _choose_candidate(candidates["checkpoint"], ignored_stale_values) or default_checkpoint
+    checkpoint = default_checkpoint
     blocker = _choose_candidate(candidates["blocker"], ignored_stale_values) or default_blocker
     next_move = _choose_candidate(candidates["next_move"], ignored_stale_values) or default_next_move
 

@@ -640,14 +640,47 @@ def _apply_behavior_improvement_signal(
         return decision
 
 def decide_project_brain_next_move(
-    user_text: str = "",
-    pasted_output: str = "",
-) -> ProjectBrainDecision:
+    user_text="",
+    pasted_output="",
+    intent=None,
+):
+    if intent == "route_layer_risk":
+        return ProjectBrainDecision(
+            intent="route_layer_risk",
+            confidence=0.88,
+            risk="medium",
+            recommended_next_move=(
+                "Avoid expanding app.py. Prefer service-layer extraction "
+                "and guard-stack audit."
+            ),
+            target_layers=[
+                "route layer",
+                "service boundaries",
+                "guard stack",
+            ],
+            target_files=[
+                "app.py",
+                "nova_backend/services/",
+            ],
+            validation=[
+                "guard-stack audit",
+                "service-layer extraction review",
+            ],
+            avoid=[
+                "adding another app.py wrapper",
+                "late route hooks",
+                "blind app.py guards",
+            ],
+            rationale=(
+                "App.py risk questions require route-layer judgment "
+                "instead of generic next-move planning."
+            ),
+        )
+
     decision = _decide_project_brain_next_move_base(
         user_text=user_text,
         pasted_output=pasted_output,
     )
-
     decision = _apply_operator_plan_to_decision(
         decision,
         user_text=user_text,

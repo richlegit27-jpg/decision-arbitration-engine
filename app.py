@@ -186,9 +186,14 @@ from nova_backend.services.project_chat_response_router_service import (
     install_project_chat_response_router,
 )
 
+from nova_backend.services.session_response_finalizer_service import (
+    assistant_message_already_saved,
+    assistant_same_text_already_saved,
+    user_message_already_saved,
+)
+
 # -----------------------
 # APP SETUP
-# -----------------------
 
 
 # NOVA_EXECUTION_SERVICE_SINGLETON_20260607
@@ -503,22 +508,41 @@ try:
                     )
                 )
 
+                normalized_project_brain_question = " ".join(
+                    user_text.lower().split()
+                )
+
+                explicit_project_brain_question = any(
+                    marker in normalized_project_brain_question
+                    for marker in (
+                        "actual blocker",
+                        "blocker on nova",
+                        "what is blocking nova",
+                        "what's blocking nova",
+                        "where's the project at",
+                        "where is the project at",
+                    )
+                )
+
                 if (
-                    _nova_7a_state
-                    .suppress_project_brain_contract
-                    or (
-                        getattr(
-                            _nova_7a_state,
-                            "current_intent",
-                            "",
-                        )
-                        ==
-                        "resume_unresolved_thread"
-                        and bool(
+                    not explicit_project_brain_question
+                    and (
+                        _nova_7a_state
+                        .suppress_project_brain_contract
+                        or (
                             getattr(
                                 _nova_7a_state,
-                                "unresolved_threads",
-                                (),
+                                "current_intent",
+                                "",
+                            )
+                            ==
+                            "resume_unresolved_thread"
+                            and bool(
+                                getattr(
+                                    _nova_7a_state,
+                                    "unresolved_threads",
+                                    (),
+                                )
                             )
                         )
                     )
@@ -5362,24 +5386,6 @@ def api_chat():
             source_type="regenerated",
         )
 
-    # NOVA_CHAT_RESPONSE_FINALIZER_BOUNDARY_20260713
-    try:
-        from nova_backend.services.chat_response_finalizer_service import (
-            finalize_chat_response,
-        )
-
-        result = finalize_chat_response(
-            user_text,
-            result,
-        )
-
-    except Exception as error:
-        print(
-            "[NOVA_CHAT_RESPONSE_FINALIZER_BOUNDARY_20260713] skipped:",
-            error,
-        )
-
-    return jsonify(_nova_replace_weak_backend_reply(user_text, result))
 
     force_new_session = bool(data.get("force_new_session") or data.get("new_session"))
 
@@ -13908,52 +13914,53 @@ def nova_api_chat_target_session_append_bridge_20260611(response):
         }
 
         try:
-            session_service.append_message(target_session_id, {
-                "role": "user",
-                "text": visible_user_text,
-                "attachments": payload.get("attachments") if isinstance(payload.get("attachments"), list) else [],
-                "meta": request_meta,
-            })
+            # NOVA_API_CHAT_TARGET_SESSION_APPEND_BRIDGE_SAVE_DISABLED_20260713
+            # Normal /api/chat persistence already owns user+assistant storage.
+            # Keep response metadata repair below.
+            pass
 
             assistant_meta = {}
             assistant_attachments = []
 
             if isinstance(assistant_message, dict):
                 if isinstance(assistant_message.get("meta"), dict):
-                    assistant_meta.update(assistant_message.get("meta") or {})
+                    assistant_meta.update(
+                        assistant_message.get("meta") or {}
+                    )
+
                 if isinstance(assistant_message.get("attachments"), list):
-                    assistant_attachments = assistant_message.get("attachments") or []
+                    assistant_attachments = (
+                        assistant_message.get("attachments") or []
+                    )
 
             assistant_meta.update(request_meta)
-
-            session_service.append_message(target_session_id, {
-                "role": "assistant",
-                "text": assistant_text,
-                "attachments": assistant_attachments,
-                "meta": assistant_meta,
-            })
 
             response_json["session_id"] = target_session_id
             response_json["active_session_id"] = target_session_id
             response_json["target_session_append_bridge"] = True
 
             try:
-                response.set_data(json.dumps(response_json, ensure_ascii=False))
+                response.set_data(
+                    json.dumps(
+                        response_json,
+                        ensure_ascii=False,
+                    )
+                )
                 response.mimetype = "application/json"
             except Exception:
                 pass
 
         except Exception as exc:
             try:
-                app.logger.warning("[Nova API Chat Target Session Append Bridge] skipped: %s", exc)
+                app.logger.warning(
+                    "[Nova API Chat Target Session Append Bridge] skipped: %s",
+                    exc,
+                )
             except Exception:
                 pass
 
-        return response
-
     except Exception:
         return response
-
 
 
 # NOVA_FINAL_SESSION_DETAIL_RESPONSE_CACHE_20260612
@@ -14395,7 +14402,10 @@ def nova_final_session_detail_response_cache_20260612(response):
             except Exception:
                 pass
 
-            if user_text and user_text not in json.dumps(messages, ensure_ascii=False):
+            if user_text and not user_message_already_saved(
+                messages,
+                user_text,
+            ):
                 messages.append({
                     "role": "user",
                     "text": user_text,
@@ -14413,17 +14423,14 @@ def nova_final_session_detail_response_cache_20260612(response):
 
             existing_messages_blob = json.dumps(messages, ensure_ascii=False)
 
-            assistant_already_saved = False
+            assistant_already_saved = assistant_message_already_saved(
+                messages,
+                assistant_text=assistant_text,
+                assistant_id=assistant_id,
+            )
 
-            if assistant_id and assistant_id in existing_messages_blob:
-                assistant_already_saved = True
-
-            if assistant_text and assistant_text in existing_messages_blob:
-                assistant_already_saved = True
-
-            # NOVA_FINAL_CACHE_SKIP_DOUBLE_ASSISTANT_20260630
-            # If chat_service.handle or another bridge already saved an assistant turn,
-            # do not let the final session-detail cache append another assistant variant.
+            # NOVA_SESSION_FINALIZER_DUPLICATE_CHECK_20260713
+            # Delegated duplicate detection to session_response_finalizer_service.
             try:
                 last_saved_role = ""
 
@@ -14454,40 +14461,14 @@ def nova_final_session_detail_response_cache_20260612(response):
             except Exception:
                 pass
 
-            # NOVA_FINAL_SESSION_CACHE_SAME_TEXT_DEDUPE_20260622
-            # If another bridge already placed the same assistant text in session.messages,
-            # do not append the top-level assistant_message again.
+            # NOVA_FINALIZER_SAME_TEXT_GUARD_20260713
+            # Delegated same-text detection to session_response_finalizer_service.
+
             if assistant_text and not assistant_already_saved:
-                try:
-                    _assistant_text_norm = str(assistant_text or "").strip()
-
-                    for _existing_msg in messages:
-                        if not isinstance(_existing_msg, dict):
-                            continue
-
-                        _existing_role = str(
-                            _existing_msg.get("role")
-                            or _existing_msg.get("sender")
-                            or ""
-                        ).strip().lower()
-
-                        _existing_text = str(
-                            _existing_msg.get("text")
-                            or _existing_msg.get("content")
-                            or _existing_msg.get("message")
-                            or ""
-                        ).strip()
-
-                        if (
-                            _existing_role == "assistant"
-                            and _assistant_text_norm
-                            and _existing_text == _assistant_text_norm
-                        ):
-                            assistant_already_saved = True
-                            break
-
-                except Exception:
-                    pass
+                assistant_already_saved = assistant_same_text_already_saved(
+                    messages,
+                    assistant_text=assistant_text,
+                )
 
             if assistant_text and not assistant_already_saved:
                 saved_assistant = assistant_message if isinstance(assistant_message, dict) else {}
@@ -16478,7 +16459,7 @@ try:
             }
 
             if normalized in direct_recall_prompts:
-                return None
+                pass
 
             from nova_backend.services.project_brain_general_intelligence import (
                 build_project_brain_general_answer,
@@ -16591,7 +16572,11 @@ try:
     def _nova_compact_project_payload_20260701(reply, data):
         session_id = ""
         if isinstance(data, dict):
-            session_id = str(data.get("session_id") or data.get("active_session_id") or "").strip()
+            session_id = str(
+                data.get("session_id")
+                or data.get("active_session_id")
+                or ""
+            ).strip()
 
         return {
             "ok": True,
@@ -16606,16 +16591,16 @@ try:
                 "content": reply,
                 "attachments": [],
             },
-            "route": "project_state_context",
-            "route_taken": "project_state_context",
+            "route": "project_brain_general_intelligence",
+            "route_taken": "project_brain_general_intelligence",
             "debug": {
-                "route": "project_state_context",
-                "route_taken": "project_state_context",
-                "compact_project_context": True,
+                "route": "project_brain_general_intelligence",
+                "route_taken": "project_brain_general_intelligence",
+                "compact_project_context": False,
             },
             "meta": {
-                "route": "project_state_context",
-                "strategy": "compact_project_context",
+                "route": "project_brain_general_intelligence",
+                "strategy": "project_brain_general_intelligence",
             },
         }
 
@@ -18584,11 +18569,24 @@ try:
         if not isinstance(debug, dict):
             debug = {}
 
-        debug["route"] = "chat"
-        debug["route_taken"] = "chat"
-        debug["normal_chat_priority"] = True
-        debug["suppressed_project_state_bleed"] = True
+        existing_route = str(
+            debug.get("route")
+            or data.get("route")
+            or data.get("route_taken")
+            or ""
+        ).strip()
+
+        if existing_route != "project_brain_general_intelligence":
+            debug["route"] = "chat"
+            debug["route_taken"] = "chat"
+            debug["normal_chat_priority"] = True
+            debug["suppressed_project_state_bleed"] = True
+        else:
+            debug["route"] = "project_brain_general_intelligence"
+            debug["route_taken"] = "project_brain_general_intelligence"
+
         debug["phase4f_prerun_final_guard"] = True
+
         data["debug"] = debug
 
         return data
@@ -19763,19 +19761,6 @@ except Exception as _nasf_error_20260703:
     except Exception:
         pass
 
-
-
-# --- NOVA_MOBILE_SESSION_DRAWER_V2_INJECT_20260703 ---
-# NOVA_DISABLE_DRAWER_V2_INJECT_20260703_FINAL_PURGE
-# Disabled. The only allowed mobile sessions owner is:
-# static/js/mobile/nova-mobile-sessions.js
-try:
-    print("[NOVA_MOBILE_SESSION_DRAWER_V2_INJECT_20260703] disabled final purge")
-except Exception:
-    pass
-
-
-
 # --- NOVA_MOBILE_SEND_STABLE_V1_INJECT_20260703 ---
 try:
     from flask import request as _nmssv1_request
@@ -20195,42 +20180,6 @@ def api_debug_attachment_web_guard_dry_run():
                 "reason": "error",
                 "error": str(error),
             }, 500
-# NOVA_UPLOAD_ATTACHMENT_RESPONSE_NORMALIZER_HOOK_20260705
-try:
-    @app.after_request
-    def _nova_upload_attachment_response_normalizer_hook(response):
-        try:
-            from flask import request
-            import json
-            from nova_backend.services.upload_attachment_response_normalizer import (
-                normalize_upload_response_payload,
-            )
-
-            if request.path != "/api/upload":
-                return response
-
-            if not getattr(response, "is_json", False):
-                return response
-
-            payload = response.get_json(silent=True)
-
-            if not isinstance(payload, dict):
-                return response
-
-            normalized = normalize_upload_response_payload(payload)
-
-            if normalized != payload:
-                response.set_data(json.dumps(normalized, ensure_ascii=False))
-                response.content_type = "application/json"
-
-            return response
-        except Exception:
-            return response
-except Exception:
-    pass
-
-
-
 
 
 # NOVA_UPLOAD_ATTACHMENT_SUMMARY_HOOK_20260705

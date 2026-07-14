@@ -131,30 +131,18 @@ def build_project_brain_freshness_snapshot() -> ProjectBrainFreshnessSnapshot:
     checkpoint = state_bridge.current_checkpoint
 
     blocker = (
-        "No active Decision Engine blocker is open, no active Mission Control blocker is open, no active Failure Interpreter blocker is open, and no active Decision Log blocker is open. "
+        "No active Decision Engine blocker is open, no active Mission Control blocker is open, "
+        "no active Failure Interpreter blocker is open, and no active Decision Log blocker is open. "
         "The remaining risk is cleanup/consolidation: app.py still has many historical guards and wrappers, "
         "so future work should avoid new route-layer patches and move intelligence into services."
     )
 
     next_move = (
-        "Start Project Brain cleanup/consolidation: keep the locked Decision Engine v1 and Mission Control "
-        "v1.1 behavior, preserve direct recall, broad Project Brain routing, and explicit operator Mission "
-        "Control prompts, and consolidate stale route/context wording without adding another app.py guard."
+        "Start Project Brain cleanup/consolidation: keep the locked Decision Engine v1 and "
+        "Mission Control v1.2 / Failure Interpreter API behavior, preserve direct recall, "
+        "broad Project Brain routing, and explicit operator prompts, and consolidate stale "
+        "route/context wording without adding another app.py guard."
     )
-
-    from nova_backend.services.project_brain_current_state_adapter import (
-        build_project_brain_current_state,
-    )
-
-    current_state = build_project_brain_current_state(
-        default_checkpoint=checkpoint,
-        default_blocker=blocker,
-        default_next_move=next_move,
-    )
-
-    checkpoint = current_state.checkpoint
-    blocker = current_state.blocker
-    next_move = current_state.next_move
 
     return ProjectBrainFreshnessSnapshot(
         version=SNAPSHOT_VERSION,

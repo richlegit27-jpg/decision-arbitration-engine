@@ -61,17 +61,6 @@ def should_use_project_brain_decision_context(user_text: str = "", pasted_output
         return True, "failure_or_log_diagnosis"
 
     if _contains_any(combined, [
-        "should we patch",
-        "should we test",
-        "test first",
-        "safe to code",
-        "safest next move",
-        "before touching code",
-        "what test should we run",
-    ]):
-        return True, "safety_or_validation_judgment"
-
-    if _contains_any(combined, [
         "app.py dangerous",
         "touch app.py",
         "patch app.py",
@@ -83,6 +72,18 @@ def should_use_project_brain_decision_context(user_text: str = "", pasted_output
         "wrapper",
     ]):
         return True, "route_layer_risk"
+
+    if _contains_any(combined, [
+        "should we patch",
+        "should we test",
+        "test first",
+        "safe to code",
+        "safest next move",
+        "before touching code",
+        "what test should we run",
+    ]):
+        return True, "safety_or_validation_judgment"
+
 
     if _contains_any(combined, [
         "stale memory",
@@ -112,8 +113,16 @@ def should_use_project_brain_decision_context(user_text: str = "", pasted_output
     ]):
         return True, "next_move_judgment"
 
-    return False, "plain_project_context"
+    if _contains_any(user, [
+        "where are we at",
+        "where is nova at",
+        "where is the project at",
+        "nova status",
+        "project status",
+    ]):
+        return False, "plain_project_status_general_intelligence"
 
+    return False, "plain_project_context"
 
 def build_project_brain_live_answer(user_text: str = "", pasted_output: str = "") -> ProjectBrainLiveAnswer:
     """Build the selected Project Brain answer without touching Flask or app.py."""
@@ -122,6 +131,39 @@ def build_project_brain_live_answer(user_text: str = "", pasted_output: str = ""
         user_text=user_text,
         pasted_output=pasted_output,
     )
+
+    if reason == "project_status_general_intelligence":
+        try:
+            from nova_backend.services.project_brain_general_intelligence import (
+                build_project_brain_general_answer,
+            )
+
+            answer = build_project_brain_general_answer(
+                user_text
+            )
+
+            if answer:
+                return ProjectBrainLiveAnswer(
+                    text=str(
+                        getattr(answer, "text", answer)
+                    ),
+                    route="project_brain_general_intelligence",
+                    source="project_brain_general_intelligence",
+                    used_decision_engine=False,
+                    reason=reason,
+                )
+
+        except Exception as exc:
+            return ProjectBrainLiveAnswer(
+                text=(
+                    "Project Brain general intelligence unavailable. "
+                    f"Reason: {type(exc).__name__}: {exc}"
+                ),
+                route="project_brain_general_intelligence_error",
+                source="project_brain_live_answer_selector",
+                used_decision_engine=False,
+                reason=reason,
+            )
 
     if use_decision:
         try:

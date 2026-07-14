@@ -79,7 +79,9 @@ def build_project_brain_command_center_card(
     user_text: str = "",
     pasted_output: str = "",
     changed_files: list[str] | None = None,
+    intent: str | None = None,
 ) -> ProjectBrainCommandCenterCard:
+
     from nova_backend.services.project_brain_decision_engine import (
         decide_project_brain_next_move,
     )
@@ -99,21 +101,29 @@ def build_project_brain_command_center_card(
         build_smoke_selection_dict,
     )
 
-    command_intent = classify_command_center_intent(
-        user_text=user_text,
-        pasted_output=pasted_output,
+    command_intent = (
+        intent
+        if intent
+        else classify_command_center_intent(
+            user_text=user_text,
+            pasted_output=pasted_output,
+        )
     )
 
     snapshot = build_project_brain_freshness_snapshot()
+
     decision = decide_project_brain_next_move(
         user_text=user_text,
         pasted_output=pasted_output,
+        intent=intent,
     )
+
     operator_plan = build_operator_plan_dict(
         user_text=user_text,
         changed_files=changed_files or list(decision.target_files),
         project_state=str(snapshot.checkpoint or ""),
     )
+
     failure = interpret_project_brain_failure(
         user_text=user_text,
         pasted_output=pasted_output,
@@ -166,11 +176,14 @@ def build_project_brain_command_center_dict(
     user_text: str = "",
     pasted_output: str = "",
     changed_files: list[str] | None = None,
+    intent: str | None = None,
 ) -> dict[str, Any]:
+
     return build_project_brain_command_center_card(
         user_text=user_text,
         pasted_output=pasted_output,
         changed_files=changed_files,
+        intent=intent,
     ).to_dict()
 
 

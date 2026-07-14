@@ -96,6 +96,15 @@ def build_state_bridge_record(
         else []
     )
 
+    required_locked = (
+        "Project Brain Operator Memory Writer v1",
+        "Decision Engine v1",
+    )
+
+    locked = _dedupe(
+        list(locked) + list(required_locked)
+    )
+
     if not locked:
         locked = (
             "Project Brain Upgrade Radar v1",
@@ -107,9 +116,11 @@ def build_state_bridge_record(
             "Project Brain Mission Autopilot v1 safe mode",
             "Project Brain Runtime Coach v1",
             "Project Brain Operator Memory Writer v1",
+            "Decision Engine v1",
         )
 
     move = _clean(next_move)
+
     if isinstance(item, dict):
         move = _clean(item.get("next_move")) or move
 
@@ -118,13 +129,16 @@ def build_state_bridge_record(
         + ", ".join(locked)
         + ". Command Center can rank upgrades, classify failures, plan patches, select smokes, "
         + "launch command blocks, run safe mission logic, coach runtime output, "
-        + "and write operator milestones. "
-        + "Decision Engine can classify failures, rank moves, and choose the next safe operator action."
+
++ "write operator milestones, enforce answer-quality contracts, preserve Project Brain routing, "
++ "support explicit operator prompts, and lock Mission Control v1.2 / Failure Interpreter API. "
++ "Decision Engine can classify failures, rank moves, and choose the next safe operator action."
     )
 
     blocker = (
-        "No active Project Brain intelligence blocker is open. Protected baseline: Project Brain context builder, freshness snapshot, and answer-quality policy are locked. Remaining cleanup/consolidation is a known risk, "
-        "but it is not the active next move while State Bridge is syncing the operator milestone state."
+        "No active Decision Engine blocker is open, no active Mission Control blocker is open, "
+        "no active Failure Interpreter blocker is open, and no active Decision Log blocker is open. "
+        "The remaining risk is cleanup/consolidation, not an active intelligence blocker."
     )
 
     return StateBridgeRecord(

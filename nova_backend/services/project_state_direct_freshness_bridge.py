@@ -11,6 +11,14 @@ SOURCE = "project_brain_context_builder"
 DIRECT_PROJECT_STATE_PROMPTS = {
     "what are we working on now",
     "what are we working on",
+    "what are we working on right now",
+    "what are we doing now",
+    "what is nova working on",
+    "what is nova working on now",
+    "where are we at",
+    "where are we at with nova",
+    "what is the current nova state",
+    "what is the current project state",
 }
 
 NEXT_MOVE_PROMPTS = {

@@ -83,6 +83,7 @@ def build_current_project_answer() -> str:
     context = build_project_brain_context()
 
     return (
+        "Source: Project Brain freshness snapshot. "
         f"Current {context.project_name} project state: Richard is working on the "
         f"{context.local_app} with Joe. Completed/protected pieces: {_completed_text(context)}. "
         f"Current checkpoint: {context.active_checkpoint} "
@@ -93,17 +94,9 @@ def build_current_project_answer() -> str:
 
 
 def build_safe_next_answer() -> str:
-    context = build_project_brain_context()
-
-    return (
-        "Safest next move before changing more code: verify the working tree, compile only the files "
-        "being touched, then run the smallest targeted smoke before the full board. Use `git status --short`, "
-        "`python -m py_compile`, and the focused smoke first. For this checkpoint, run: "
-        + "; ".join(context.validation[:5])
-        + ". If those pass, run the remaining project-brain, answer-quality, and guard-stack smokes. "
-        "Keep the patch small and targeted; commit only after the board is green."
+    return build_project_brain_decision_context_answer(
+        user_text="what should we do next"
     )
-
 
 def build_memory_execution_answer() -> str:
     return (
@@ -133,47 +126,53 @@ def build_practical_project_answer() -> str:
     context = build_project_brain_context()
 
     return (
+        "Project Brain context builder: "
         f"Practical {context.project_name} project answer: the project-state route, answer-quality board, "
         "route contract, and classifier broadening are green. "
+        f"Current checkpoint: {context.active_checkpoint} "
         f"Current blocker: {context.blocker} "
-        f"Next concrete move / safe move: {context.next_move} "
+        f"Next move: {context.next_move} "
         "Safe validation: run the context-builder smoke, project-state memory API smoke, general-intelligence smoke, "
         "route-contract smoke, classifier-broadening smoke, answer-quality smoke, and guard-stack audit. "
         "Then check `git status --short` and commit only after the board is green."
     )
-
 # NOVA_PROJECT_BRAIN_DECISION_CONTEXT_BUILDER_20260702
 # Service-only bridge from Project Brain context builder to Decision Engine.
 # No Flask wiring, no app.py dependency, no runtime mutation.
-def build_project_brain_decision_context_answer(user_text="", pasted_output=""):
+
+def build_project_brain_decision_context_answer(
+    user_text="",
+    pasted_output="",
+    intent=None,
+):
     """Build a compact Project Brain decision answer from the Decision Engine."""
 
     try:
         from nova_backend.services.project_brain_decision_engine import (
             decide_project_brain_next_move,
+            format_project_brain_decision,
+        )
+
+        from nova_backend.services.project_brain_command_center import (
+            build_project_brain_command_center_answer,
         )
 
         decision = decide_project_brain_next_move(
             user_text=user_text,
             pasted_output=pasted_output,
+            intent=intent,
         )
 
-        validation = "; ".join(decision.validation)
-        avoid = "; ".join(decision.avoid)
-        target_layers = ", ".join(decision.target_layers)
-        target_files = ", ".join(decision.target_files)
+        command_answer = build_project_brain_command_center_answer(
+            user_text=user_text,
+            pasted_output=pasted_output,
+        )
 
         return (
             "Project Brain decision context:\n"
-            f"Intent: {decision.intent}\n"
-            f"Risk: {decision.risk}\n"
-            f"Confidence: {decision.confidence:.2f}\n"
-            f"Recommended next move: {decision.recommended_next_move}\n"
-            f"Target layers: {target_layers}\n"
-            f"Target files: {target_files}\n"
-            f"Validation: {validation}\n"
-            f"Avoid: {avoid}\n"
-            f"Rationale: {decision.rationale}"
+            + command_answer
+            + "\n\nDecision Engine recommendation:\n"
+            + format_project_brain_decision(decision)
         )
 
     except Exception as exc:
