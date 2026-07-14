@@ -34,6 +34,10 @@ CURRENT_BLOCKER_PROMPTS = {
     "what's the current blocker",
     "whats the current blocker",
     "current blocker",
+    "actual blocker",
+    "what's the actual blocker on nova",
+    "whats the actual blocker on nova",
+    "actual blocker on nova",
 }
 
 

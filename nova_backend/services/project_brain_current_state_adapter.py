@@ -14,7 +14,7 @@ STALE_MARKERS = [
     "answer-policy intelligence is 100%",
     "real general intelligence still needs improvement",
     "moving direct policy behavior into cleaner prompt",
-    "No active Project Brain intelligence blocker is open",
+    "no active project brain intelligence blocker is open",
 ]
 
 

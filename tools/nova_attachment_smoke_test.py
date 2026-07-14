@@ -84,6 +84,9 @@ try:
         raise SystemExit(1)
 
     data = r.json()
+
+    print("SYNC HEADER:", r.headers.get("X-Nova-Attachment-Sync"))
+
     text = (
         data.get("assistant_message", {}).get("text")
         or data.get("assistant_message", {}).get("content")
