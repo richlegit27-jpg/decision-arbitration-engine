@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 # NOVA_DURABLE_DATA_BOOTSTRAP_20260703
 def _nova_durable_data_bootstrap_20260703():
