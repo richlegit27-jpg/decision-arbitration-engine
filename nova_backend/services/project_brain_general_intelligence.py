@@ -903,6 +903,8 @@ def _nova_is_decision_log_question_20260701(user_text):
             for needle in needles
         )
 
+_NOVA_DECISION_LOG_PREVIOUS__CURRENT_PROJECT_ANSWER_20260701 = _current_project_answer
+
 
 def _current_project_answer(*args, **kwargs):
     user_text = _nova_decision_log_user_text_20260701(
@@ -931,19 +933,10 @@ def _current_project_answer(*args, **kwargs):
 
         return result
 
-    answer = (
-        _NOVA_DECISION_LOG_PREVIOUS__CURRENT_PROJECT_ANSWER_20260701(
-            *args,
-            **kwargs
-        )
+    return _NOVA_DECISION_LOG_PREVIOUS__CURRENT_PROJECT_ANSWER_20260701(
+        *args,
+        **kwargs
     )
-
-    _nova_observe_project_brain_behavior_20260701(
-        user_text,
-        str(answer),
-    )
-
-    return answer
 
 
 print("[NOVA_PROJECT_BRAIN_DECISION_LOG_GENERAL_WIRE_20260701] installed on _current_project_answer")
