@@ -17984,6 +17984,10 @@ try:
     import json as _nova_phase4g_chat_json
     from flask import request as _nova_phase4g_chat_request
 
+    from nova_backend.services.normal_chat_carryover_guard_service import (
+        repair_normal_chat_carryover,
+    )
+
     def _nova_phase4g_chat_text_20260701(value):
         try:
             return str(value or "").strip()
