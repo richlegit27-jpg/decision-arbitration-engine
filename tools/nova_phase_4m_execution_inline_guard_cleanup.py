@@ -1,4 +1,6 @@
-﻿from pathlib import Path
+﻿from __future__ import annotations
+
+from pathlib import Path
 import ast
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -7,12 +9,7 @@ APP = ROOT / "app.py"
 OWNER_FUNCTION = "api_chat"
 
 REMOVE_FROM_FUNCTIONS = {
-    "api_sessions_new",
-    "api_sessions_switch",
-    "api_sessions_rename",
-    "api_sessions_pin",
-    "api_sessions_delete",
-    "api_recon_analyze",
+    "api_chat",
 }
 
 COMMAND_MARKER = "NOVA_EXECUTION_COMMAND_TOP_GUARD_20260611"
@@ -57,7 +54,7 @@ def first_real_stmt(fn):
 def marker_start_line(lines, fn, stmt):
     start = stmt.lineno
 
-    for line_no in range(start - 1, fn.lineno - 1, -1):
+    for line_no in range(fn.lineno, fn.end_lineno + 1):
         if COMMAND_MARKER in lines[line_no - 1]:
             return line_no
 
@@ -97,10 +94,12 @@ def main():
             f"first={type(stmt).__name__}",
         )
 
-        source = ast.get_source_segment(text, stmt) or ""
+        source = function_source(lines, fn)
+
         assert_true(
-            f"{fn_name} guard try uses execution command variables",
-            "_nova_exec_payload2" in source and "_nova_exec_commands2" in source,
+            f"{fn_name} contains execution command variables",
+            "_nova_exec_payload2" in source
+            and "_nova_exec_commands2" in source,
         )
 
         start_line = marker_start_line(lines, fn, stmt)
@@ -110,6 +109,7 @@ def main():
         assert_true(f"{fn_name} end line found", end_line is not None)
 
         removals.append((start_line, end_line, fn_name))
+
 
     assert_true("removals found", len(removals) == len(REMOVE_FROM_FUNCTIONS), removals)
 
