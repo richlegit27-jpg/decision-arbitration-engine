@@ -416,6 +416,7 @@ class ChatService:
             if not isinstance(item, dict):
                 continue
 
+
             name = self._safe_str(
                 item.get("filename")
                 or item.get("original_filename")
@@ -9543,11 +9544,14 @@ if (not attachments) and (__name__ == "__main__"):
 
                 if _top:
                     _topic = "; ".join(_top[:3])
-                    _reply = "Attachment received:\n"
-                    _reply += f"The uploaded attachment content appears related to: {_topic}.\n\n"
-                    _reply += "Key points:\n"
+
+                    _reply = "Attachment summary:\n"
+                    _reply += f"{_topic}\n\n"
+
+                    _reply += "Extracted highlights:\n"
                     for _i, _item in enumerate(_top, start=1):
                         _reply += f"{_i}. {_item}\n"
+
                     _reply += "\nPreview:\n" + "\n".join(_top[:6])
                 else:
                     _reply = (
@@ -12329,8 +12333,8 @@ if (not attachments) and (__name__ == "__main__"):
                 if top:
                     topic = "; ".join(top[:3])
                     reply = "Attachment received:\\n"
-                    reply += f"The uploaded attachment content appears related to: {topic}.\\n\\n"
-                    reply += "Key points:\\n"
+                    reply += f"Summary: The attachment appears related to: {topic}.\\n\\n"
+                    reply += "Topics detected:\\n"
                     for i, l in enumerate(top, start=1):
                         reply += f"{i}. {l}\\n"
                     reply += "\\nPreview:\\n" + "\\n".join(top[:6])
@@ -12502,8 +12506,8 @@ if (not attachments) and (__name__ == "__main__"):
                 if _nova_top:
                     _nova_topic = "; ".join(_nova_top[:3])
                     _nova_reply = "Attachment received:\n"
-                    _nova_reply += f"The uploaded attachment content appears related to: {_nova_topic}.\n\n"
-                    _nova_reply += "Key points:\n"
+                    _nova_reply += f"Summary: The attachment appears related to: {_nova_topic}.\n\n"
+                    _nova_reply += "Topics detected:\n"
                     for _nova_index, _nova_item in enumerate(_nova_top, start=1):
                         _nova_reply += f"{_nova_index}. {_nova_item}\n"
                     _nova_reply += "\nPreview:\n" + "\n".join(_nova_top[:6])
@@ -20943,6 +20947,46 @@ def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict
     for item in attachments:
         if not isinstance(item, dict):
             continue
+
+        existing_summary = self._safe_str(
+            item.get("attachment_summary")
+            or item.get("extracted_text")
+            or item.get("text")
+        )
+
+        # NOVA_ATTACHMENT_BINARY_SUMMARY_GUARD_20260714
+        # Prevent raw DOCX zip/XML from reaching attachment summaries.
+        if (
+            existing_summary.startswith("PK\x03\x04")
+            or "[Content_Types].xml" in existing_summary[:500]
+        ):
+            existing_summary = ""
+
+        if existing_summary and "PK" not in existing_summary[:20]:
+            preview = existing_summary[:6000].strip()
+
+            return {
+                "ok": True,
+                "text": (
+                    "Attachment analysis:\n"
+                    f"Attachment {name} content:\n"
+                    f"{preview}"
+                ),
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": (
+                        "Attachment analysis:\n"
+                        f"Attachment {name} content:\n"
+                        f"{preview}"
+                    ),
+                },
+                "attachment_analysis": True,
+                "vision_used": False,
+                "ocr_used": False,
+                "source_urls": [],
+                "sources": [],
+                "saved_artifact": None,
+            }
 
         att_type = self._safe_str(item.get("type")).lower()
         mime_type = self._safe_str(item.get("mime_type") or item.get("content_type")).lower()

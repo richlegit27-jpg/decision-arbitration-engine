@@ -208,6 +208,29 @@ def classify_project_brain_intent(user_text: object) -> Optional[str]:
         "wrong",
     )
 
+    app_py_risk_terms = (
+        "app.py",
+        "before_request",
+        "after_request",
+        "app py",
+    )
+
+    if _has_any(text, app_py_risk_terms) and _has_any(
+        text,
+        (
+            "danger",
+            "dangerous",
+            "risk",
+            "risky",
+            "safe",
+            "change",
+            "modify",
+            "touch",
+        ),
+    ):
+        return "app_py_risk"
+
+
     if (
         _has_any(text, blocker_terms)
         and (

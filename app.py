@@ -6425,7 +6425,7 @@ def api_chat():
                 if _top:
                     _topic = "; ".join(_top[:3])
                     _reply = "Attachment analysis:\n"
-                    _reply += f"This uploaded attachment contains readable text about: {_topic}.\n\n"
+                    _reply += f"{_topic}\n\n"
                     _reply += "Key points:\n"
                     for _i, _item in enumerate(_top, start=1):
                         _reply += f"{_i}. {_item}\n"
@@ -9433,10 +9433,10 @@ def _nova_local_summary_from_text(text):
             break
 
     first_lines = lines[:8]
-    summary = "This attachment appears to contain text extracted from a web/search/image results page or document capture."
+    summary = "This attachment contains extracted text."
 
     if title_candidates:
-        summary = "This uploaded attachment appears to be about: " + "; ".join(title_candidates[:5]) + "."
+        summary = "; ".join(title_candidates[:5])
 
     return {
         "summary": summary,
@@ -10090,6 +10090,14 @@ def _nova_clean_attachment_analysis_response(response):
             line = re.sub(r"^\s*\d+\.\s*", "", str(line or "")).strip()
             line = line.replace("Attachment <unknown>", "uploaded attachment")
             line = line.replace("Attachment content:", "").strip()
+
+            line = re.sub(
+                r"^Attachment\s+.*?\s+content:\s*",
+                "",
+                line,
+                flags=re.IGNORECASE,
+            ).strip()
+
             line = re.sub(r"\s+", " ", line).strip()
             return line
 
@@ -10139,8 +10147,10 @@ def _nova_clean_attachment_analysis_response(response):
             top = useful[:8]
             topic = "; ".join(top[:3])
             cleaned_text = "Attachment analysis:\n"
-            cleaned_text += f"This uploaded attachment contains readable text about: {topic}.\n\n"
+            cleaned_text += f"{topic}\n\n"
+
             cleaned_text += "Key points:\n"
+
             for index, item in enumerate(top, start=1):
                 cleaned_text += f"{index}. {item}\n"
 
@@ -13919,21 +13929,6 @@ def nova_api_chat_target_session_append_bridge_20260611(response):
             # Keep response metadata repair below.
             pass
 
-            assistant_meta = {}
-            assistant_attachments = []
-
-            if isinstance(assistant_message, dict):
-                if isinstance(assistant_message.get("meta"), dict):
-                    assistant_meta.update(
-                        assistant_message.get("meta") or {}
-                    )
-
-                if isinstance(assistant_message.get("attachments"), list):
-                    assistant_attachments = (
-                        assistant_message.get("attachments") or []
-                    )
-
-            assistant_meta.update(request_meta)
 
             response_json["session_id"] = target_session_id
             response_json["active_session_id"] = target_session_id
@@ -14428,38 +14423,6 @@ def nova_final_session_detail_response_cache_20260612(response):
                 assistant_text=assistant_text,
                 assistant_id=assistant_id,
             )
-
-            # NOVA_SESSION_FINALIZER_DUPLICATE_CHECK_20260713
-            # Delegated duplicate detection to session_response_finalizer_service.
-            try:
-                last_saved_role = ""
-
-                for existing_msg in reversed(messages):
-                    if not isinstance(existing_msg, dict):
-                        continue
-
-                    existing_role = str(
-                        existing_msg.get("role")
-                        or existing_msg.get("sender")
-                        or ""
-                    ).strip().lower()
-
-                    existing_text = str(
-                        existing_msg.get("text")
-                        or existing_msg.get("content")
-                        or existing_msg.get("message")
-                        or ""
-                    ).strip()
-
-                    if existing_role and existing_text:
-                        last_saved_role = existing_role
-                        break
-
-                if last_saved_role == "assistant":
-                    assistant_already_saved = True
-
-            except Exception:
-                pass
 
             # NOVA_FINALIZER_SAME_TEXT_GUARD_20260713
             # Delegated same-text detection to session_response_finalizer_service.

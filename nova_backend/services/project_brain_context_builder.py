@@ -132,6 +132,7 @@ def build_practical_project_answer() -> str:
         f"Current checkpoint: {context.active_checkpoint} "
         f"Current blocker: {context.blocker} "
         f"Next move: {context.next_move} "
+        "Safe move: continue focused cleanup, validation, and bounded changes through the existing Project Brain smoke stack. "
         "Safe validation: run the context-builder smoke, project-state memory API smoke, general-intelligence smoke, "
         "route-contract smoke, classifier-broadening smoke, answer-quality smoke, and guard-stack audit. "
         "Then check `git status --short` and commit only after the board is green."
