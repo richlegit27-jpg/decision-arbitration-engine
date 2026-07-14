@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 # NOVA_DURABLE_DATA_BOOTSTRAP_20260703
 def _nova_durable_data_bootstrap_20260703():
@@ -13894,14 +13894,6 @@ def nova_api_chat_target_session_append_bridge_20260611(response):
             ).strip()
 
         if not assistant_text:
-            return response
-
-        try:
-            target_session = session_service.get_session(target_session_id)
-        except Exception:
-            target_session = None
-
-        if not target_session:
             return response
 
         try:
