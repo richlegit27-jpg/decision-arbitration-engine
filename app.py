@@ -18529,66 +18529,6 @@ try:
                 or ""
             ).strip()
 
-            answers = {
-                "what is the difference between memory and execution in nova": (
-                    "Memory is what Nova knows and retains: project facts, Richard's preferences, current checkpoint, and durable decisions. "
-                    "Execution is what Nova does right now: run commands, patch files, call /api/chat, test behavior, or return an output. "
-                    "Simple split: memory = what Nova knows; execution = what Nova does. "
-                    "Memory should guide answers, but execution is the live action path."
-                ),
-                "why should we not patch blindly right now": (
-                    "Do not patch blindly because app.py has many guard layers and a blind edit can hide the real failure. "
-                    "Read the failure first, identify the exact route/file, make one small change, then run py_compile and the relevant smoke test. "
-                    "Blind patching creates noisy diffs; smoke-backed patches keep the project stable."
-                ),
-                "when should we commit this change": (
-                    "Commit only after a verified checkpoint: run python -m py_compile on touched Python files, run the relevant smoke test, "
-                    "then run git status --short. If the diff is focused and the checks pass, commit. If any check fails, fix the failure first."
-                ),
-                "which smoke should we run for memory recall": (
-                    "Run tools/nova_project_state_memory_api_smoke.py. It verifies /api/chat answers `what are we working on now` from project_state memory, "
-                    "and checks assistant_message.text, assistant_message.content, top-level text, and debug.route_taken."
-                ),
-                "what is risky about app.py right now": (
-                    "The risk in app.py is the guard stack: many before_request, after_request, wrapper, fallback, and final-cache layers can fight each other. "
-                    "The current safety net is tools/nova_phase_4i_guard_stack_audit_smoke.py, which checks app.run ordering, duplicate NOVA markers, and hook counts."
-                ),
-                "what was the duplicate web attachment marker about": (
-                    "The duplicate web attachment marker was about two related attachment/web routing guards sharing the same NOVA marker. "
-                    "One was in the image gate for stale attachments, and one was in the main /api/chat attachment path. "
-                    "We clarified the markers instead of deleting behavior."
-                ),
-                "summarize the current nova checkpoint": (
-                    "Current Nova checkpoint: the project-state memory recall fix is complete, the guard-stack audit smoke is installed, "
-                    "the small Nova answer-quality smoke passes 5/5, and the larger Nova answer-quality 95 smoke passes 20/20. "
-                    "Measured answer-policy intelligence is 100% on the current 20-case board. "
-                    "Next useful direction: generalize the answer-quality 95 policy into cleaner prompt, intent, and project-brain layers, "
-                    "then reduce reliance on direct app.py before_request guards."
-                ),
-                "if a smoke fails, what should we do first": (
-                    "First read the smoke failure carefully and identify the first real failure line. "
-                    "Then rerun once to confirm it is reproducible, inspect the last touched file, fix the smallest cause, and rerun the same smoke. "
-                    "Do not broaden into unrelated cleanup from one failure."
-                ),
-                "when should nova not save something to memory": (
-                    "Nova should not save temporary task chatter, debug logs, pasted traceback noise, one-off patch details, secrets, or volatile session-only facts to memory. "
-                    "Save durable preferences, project facts, current blocker, and major decisions. Temporary debug details belong in session history, not long-term memory."
-                ),
-                "when should we ask a question versus proceed with a safe patch": (
-                    "Ask when the request is ambiguous and different choices would change behavior, data, UX, or architecture. "
-                    "Proceed with a safe patch when the fix is narrow, reversible, obvious, and testable. "
-                    "For Nova, prefer the smallest safe patch plus py_compile and smoke verification."
-                ),
-                "why do debug.route and route_taken matter": (
-                    "debug.route and route_taken matter because they prove which route handled the answer. "
-                    "They let us verify whether Nova used project-state memory, a before_request guard, normal chat, web routing, or another fallback. "
-                    "Without route/debug fields, a correct-looking answer can still come from the wrong path."
-                ),
-                "what should we do if a patch breaks py_compile": (
-                    "Fix or revert the syntax-breaking change immediately. Run python -m py_compile on the touched file, inspect the first compile error, "
-                    "repair the smallest bad hunk, and rerun py_compile before any smoke tests. Keep the diff small until compile is clean."
-                ),
-            }
 
             answer = get_answer_quality_policy_answer(user_text)
             if not answer:
@@ -18600,6 +18540,7 @@ try:
                 route="answer_quality_95_direct_policy",
                 slim_payload_builder=_nova_slim_assistant_payload,
             )
+
         except Exception as exc:
             try:
                 app.logger.warning(
