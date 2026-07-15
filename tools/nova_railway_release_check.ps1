@@ -117,7 +117,7 @@ Write-Host "Checking owner/admin pages..."
 
 $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
 
-$loginResponse = Invoke-WebRequest -Uri "$BaseUrl/richard-login" -WebSession $session -UseBasicParsing -MaximumRedirection 5
+$loginResponse = Invoke-WebRequest -Uri "$BaseUrl/api/auth/richard-login" -WebSession $session -UseBasicParsing -MaximumRedirection 5
 Write-Host "/richard-login -> $($loginResponse.StatusCode) | $($loginResponse.BaseResponse.ResponseUri)"
 
 $admin = Get-Text -Path "/admin" -Session $session
