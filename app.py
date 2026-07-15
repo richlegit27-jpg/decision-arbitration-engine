@@ -192,6 +192,10 @@ from nova_backend.services.session_response_finalizer_service import (
     user_message_already_saved,
 )
 
+from nova_backend.services.answer_quality_policy_service import (
+    get_answer_quality_policy_answer,
+)
+
 # -----------------------
 # APP SETUP
 
@@ -566,6 +570,11 @@ try:
                 build_project_brain_general_answer(
                     user_text
                 )
+            )
+
+            print(
+                "[NOVA COMPACT BRAIN ANSWER]",
+                answer,
             )
 
             if not answer:
@@ -15817,20 +15826,26 @@ try:
             "what we are doing",
         ]
 
-        status_terms = [
-            "status",
-            "summary",
-            "context",
-            "checkpoint",
-            "progress",
-            "where",
-            "current",
-            "working on",
+        exact_owned_elsewhere = {
+            "what are we working on",
+            "what are we working on?",
+            "what did we just fix",
+            "what did we just fix?",
+            "what is left",
+            "what is left?",
             "next",
-            "left",
-            "locked",
-            "phase",
-        ]
+            "k",
+            "are we good",
+            "are we good?",
+            "what is locked",
+            "what is locked?",
+            "how far are we now",
+            "how far are we now?",
+            "what should we do now",
+            "what should we do now?",
+            "can we move on",
+            "can we move on?",
+        }
 
         has_project_term = any(term in text for term in project_terms)
         has_status_term = any(term in text for term in status_terms)
@@ -15875,10 +15890,18 @@ try:
         # Broad Nova project paraphrases belong to Project Brain
         # general intelligence.
         try:
+            print(
+                "[NOVA COMPACT BRAIN ENTER]",
+                repr(user_text),
+            )
             normalized = (
                 _nova_compact_project_normalize_20260701(
                     user_text
                 )
+            )
+            print(
+                "[NOVA COMPACT NORMALIZED]",
+                repr(normalized),
             )
 
             # -------------------------------------------------
@@ -16139,6 +16162,15 @@ try:
             try:
                 data = _nova_compact_project_request_json_20260701()
                 user_text = _nova_compact_project_request_text_20260701(data)
+                print(
+                    "[NOVA COMPACT REQUEST DATA]",
+                    data,
+                )
+
+                print(
+                    "[NOVA COMPACT USER TEXT]",
+                    repr(user_text),
+                )
 
                 if _nova_phase7b_is_local_unresolved_recall_20260711(
                     user_text
@@ -16147,12 +16179,23 @@ try:
                         *args,
                         **kwargs,
                     )
-
                 project_brain_response = _nova_compact_project_brain_response_20260701(user_text)
-                if project_brain_response is not None:
-                    return project_brain_response
 
-                if _nova_compact_project_should_answer_20260701(user_text):
+                print(
+                    "[NOVA COMPACT PROJECT BRAIN RESULT]",
+                    user_text,
+                    project_brain_response,
+                )
+
+                if project_brain_response is not None:
+                    return project_brain_response      
+                    project_brain_response = _nova_compact_project_brain_response_20260701(
+                        user_text
+                    )
+
+                    if project_brain_response is not None:
+                        return project_brain_response
+
                     context = _nova_compact_project_load_context_20260701()
 
                     if context:

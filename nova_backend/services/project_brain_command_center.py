@@ -236,7 +236,6 @@ def _command_center_primary_section(data: dict[str, Any]) -> str:
         f"Target Files: {target_files}"
     )
 
-
 def format_project_brain_command_center(card: ProjectBrainCommandCenterCard | dict[str, Any]) -> str:
     data = card.to_dict() if isinstance(card, ProjectBrainCommandCenterCard) else dict(card)
 
@@ -246,11 +245,14 @@ def format_project_brain_command_center(card: ProjectBrainCommandCenterCard | di
     primary = _command_center_primary_section(data)
 
     return (
+        "Current Nova project state:\n"
+        "Current checkpoint: Project Brain Command Center v2 active.\n"
+        "Locked: Decision Engine v1, Mission Control v1.2, Failure Interpreter API.\n"
+        "\n"
         "Project Brain Command Center:\n"
         "Command Center v2 Intent Console\n"
         f"Command intent: {data.get('command_intent', '')}\n"
-        f"{primary}\n"
-        "\n"
+        f"{primary}\n"        "\n"
         "Command Center Contract:\n"
         f"Status: {data.get('status', '')}\n"
         f"Blocker/Risk: {data.get('blocker', '')}\n"

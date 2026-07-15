@@ -15595,6 +15595,32 @@ Auto-fix result:
             role = str(msg.get("role") or "").strip().lower()
             text = str(msg.get("text") or msg.get("content") or "").strip()
 
+            stale_context_markers = (
+                "Current checkpoint:",
+                "Nova is tuned for",
+                "Nova should act like",
+                "continuity-aware workspace assistant",
+                "continuity-aware AI workspace assistant",
+                "Active behavior constraints:",
+                "Pinned constraints in the workspace:",
+                "Known user test context:",
+                "Active validation:",
+                "Memory rule:",
+                "Project behavior:",
+            )
+
+            if any(
+                marker.lower() in text.lower()
+                for marker in stale_context_markers
+            ):
+                continue
+
+            if any(
+                marker.lower() in text.lower()
+                for marker in stale_context_markers
+            ):
+                continue
+
             if not text:
                 continue
 
@@ -16242,19 +16268,24 @@ Auto-fix result:
             confidence = 0.9
             reasons.append("full_file_request")
 
+        elif (
+            "current checkpoint" in text_lc
+            or "checkpoint" == text_lc
+            or "what is the checkpoint" in text_lc
+            or "what's the checkpoint" in text_lc
+        ):
+            intent = "current_project_state"
+            route = "project_brain_general_intelligence"
+            strategy = "fresh_project_state"
+            priority = "high"
+            confidence = 0.95
+            reasons.append("checkpoint_project_state_query")
+
         elif text_lc in {
-            "where are we",
-            "where are we now",
-            "what are we doing",
-            "what are we working on",
-            "what were we working on",
-            "what are we working on?",
-            "what were we working on?",
             "what now",
             "status",
             "recap",
         }:
-
             intent = "continuity"
             route = "continuity"
             strategy = "summarize_state"
@@ -16267,9 +16298,17 @@ Auto-fix result:
                 {
                     "active_task": "",
                     "next_move": "",
-                    "checkpoint": "",
                 },
             )
+
+        print(
+            "[NOVA INTENT DEBUG]",
+            text_lc,
+            "intent=",
+            intent,
+            "route=",
+            route,
+        )
 
         mission_state = self._build_mission_state(
             working_state=working_state,
@@ -26243,6 +26282,8 @@ try:
 
         if bare in {
             "what are we working on",
+            "what are we working on now",
+            "what are we working on right now",
             "what are we doing",
             "what am i working on",
             "what is the current task",
@@ -26298,6 +26339,11 @@ try:
             fresh_answer = globals().get("_nova_answer_project_state_question_fresh_priority_20260701")
             if callable(fresh_answer):
                 answer = str(fresh_answer(question, session_id=session_id) or "").strip()
+
+                print(
+                    "[NOVA FRESH PROJECT STATE ANSWER]",
+                    repr(answer),
+                )
         except Exception as exc:
             try:
                 print("[NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701] fresh answer bypass:", exc)

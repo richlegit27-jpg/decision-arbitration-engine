@@ -30,6 +30,44 @@ def classify_project_brain_intent(user_text: object) -> Optional[str]:
     if _has_any(
         text,
         (
+            "nova status",
+            "nova status summary",
+            "give me a quick nova status summary",
+            "quick nova status",
+            "project status summary",
+            "quick project status",
+        ),
+    ):
+        return "current_project_state"
+
+    if _has_any(
+        text,
+        (
+            "current checkpoint",
+            "what is the current checkpoint",
+            "show me the current checkpoint",
+            "nova checkpoint",
+            "project checkpoint",
+            "checkpoint summary",
+            "summarize our current nova project checkpoint",
+            "summarize our current project checkpoint",
+        ),
+    ):
+        return "current_project_state"
+
+    if _has_any(
+        text,
+        (
+            "what are we working on",
+            "what are we working on now",
+            "what are we working on right now",
+        ),
+    ):
+        return "current_project_state"
+
+    if _has_any(
+        text,
+        (
             "memory",
             "execution",
             "difference between memory and execution",
@@ -51,6 +89,8 @@ def classify_project_brain_intent(user_text: object) -> Optional[str]:
             "where is nova at",
             "current project",
             "project status",
+            "project context",
+            "nova context",
         ),
     ):
         return "current_project_state"
@@ -114,13 +154,14 @@ def classify_project_brain_intent(user_text: object) -> Optional[str]:
 def _current_project_answer(
     user_text=""
 ) -> str:
-    from nova_backend.services.project_brain_live_answer_selector import (
-        build_project_brain_live_answer
+    from nova_backend.services.project_brain_context_builder import (
+        build_project_brain_decision_context_answer,
     )
 
-    return build_project_brain_live_answer(
-        user_text=user_text
-    ).text
+    return build_project_brain_decision_context_answer(
+        user_text=str(user_text or ""),
+        intent="current_project_state",
+    )
 
 
 
@@ -307,26 +348,38 @@ def _legacy_build_project_brain_general_answer_initial(user_text: object) -> Opt
             text=answer,
         )
 
-
     if intent == "current_project_state":
-        answer = _current_project_answer()
-
-        answer = _append_behavior_context(answer)
-
-        _observe_project_brain_answer(
-            user_text,
-            answer,
+        q = _nova_project_brain_general_live_selector_normalize_20260702(
+            user_text
         )
 
-        return ProjectBrainAnswer(
-            intent=intent,
-            text=answer,
+        broad_project_status = (
+            "where are we at" in q
+            or "where is nova at" in q
+            or "nova status" in q
+            or "project status" in q
         )
+
+        if broad_project_status:
+            answer = _current_project_answer(
+                user_text
+            )
+
+            return ProjectBrainAnswer(
+                intent="current_project_state",
+                text=str(answer),
+            )
 
     if intent == "safe_next_action":
         return ProjectBrainAnswer(
             intent=intent,
             text=_safe_next_answer(),
+        )
+
+    if intent == "autonomy_task":
+        return ProjectBrainAnswer(
+            intent=intent,
+            text=_autonomy_task_answer(),
         )
 
     if intent == "memory_execution_distinction":
@@ -652,18 +705,13 @@ def build_project_brain_general_answer(user_text=""):
         )
 
         if broad_project_status:
+            answer = _current_project_answer(
+                user_text
+            )
+
             return ProjectBrainAnswer(
-                intent="project_brain_general_intelligence",
-                text=(
-                    "Source: Project Brain freshness snapshot.\n\n"
-                    "Current Nova project state:\n"
-                    "Current project: local Nova Flask app.\n\n"
-                    "Project Brain is the general intelligence layer coordinating "
-                    "memory, execution, routing, safety checks, and upgrades.\n\n"
-                    "Current blocker: No active Project Brain intelligence blocker is open.\n\n"
-                    "Next move: continue cleanup and validation through focused "
-                    "smokes before expanding changes."
-                ),
+                intent="current_project_state",
+                text=str(answer),
             )
 
         answer = _current_project_answer()
@@ -707,20 +755,14 @@ def build_project_brain_general_answer(user_text=""):
     )
 ):
 
-        from nova_backend.services.project_brain_command_center import (
-            build_project_brain_command_center_answer,
+        from nova_backend.services.project_state_service import (
+            answer_project_state_question,
         )
 
         return ProjectBrainAnswer(
-            intent="project_brain_general_status",
-            text=(
-                "Nova general intelligence project status:\n"
-                "Working on the local Nova Flask app with Joe.\n"
-                "Project Brain general intelligence layer is active.\n"
-                "Next move: continue answer-quality alignment and Project Brain cleanup."
-            ),
+            intent="current_project_state",
+            text=answer_project_state_question(user_text),
         )
-
 
     if should_handle_project_brain_general_question(user_text):
         from nova_backend.services.project_brain_live_answer_selector import (
