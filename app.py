@@ -11458,7 +11458,7 @@ def _nova_install_session_auth_scope_20260610():
         item_username = str(item.get("username") or "").strip().lower()
 
         if not item_user_id and not item_username:
-            return True
+            return False
 
         if item_user_id and item_user_id == str(user.get("id") or ""):
             return True
@@ -11505,11 +11505,6 @@ def _nova_install_session_auth_scope_20260610():
             sessions = []
 
         changed = False
-
-        if user:
-            for item in sessions:
-                if is_unowned(item):
-                    changed = claim_session(item, user) or changed
 
         visible = [item for item in sessions if is_visible_to_user(item, user)]
 
@@ -18502,37 +18497,12 @@ except Exception as _nova_coding_judgment_error_20260701:
 try:
     from flask import request as _nova_aq95_request_20260701
     from flask import jsonify as _nova_aq95_jsonify_20260701
+    from nova_backend.services.chat_response_finalizer_service import (
+        build_answer_quality_95_payload as _nova_build_answer_quality_95_payload_20260715,
+    )
 
     def _nova_aq95_clean_20260701(value):
         return " ".join(str(value or "").lower().strip().split())
-
-    def _nova_aq95_payload_20260701(answer, session_id, route):
-        try:
-            return _nova_slim_assistant_payload(
-                answer,
-                session_id=session_id,
-                route=route,
-                route_taken=route,
-                answer_quality_95_policy=True,
-            )
-        except Exception:
-            return _nova_aq95_jsonify_20260701({
-                "ok": True,
-                "session_id": session_id,
-                "active_session_id": session_id,
-                "text": answer,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": answer,
-                    "content": answer,
-                },
-                "debug": {
-                    "route": route,
-                    "route_taken": route,
-                },
-                "route": route,
-                "route_taken": route,
-            })
 
     @app.before_request
     def _nova_answer_quality_95_direct_policy_20260701():
@@ -18620,16 +18590,16 @@ try:
                 ),
             }
 
-            answer = answers.get(clean)
+            answer = get_answer_quality_policy_answer(user_text)
             if not answer:
                 return None
 
-            return _nova_aq95_payload_20260701(
+            return _nova_build_answer_quality_95_payload_20260715(
                 answer,
                 session_id=session_id,
                 route="answer_quality_95_direct_policy",
+                slim_payload_builder=_nova_slim_assistant_payload,
             )
-
         except Exception as exc:
             try:
                 app.logger.warning(
@@ -18866,41 +18836,11 @@ try:
             },
         }
 
-    @app.get("/richard-login")
-    def nova_richard_login_restore_page_20260703():
-        response = _nrla_make_response(_nrla_redirect("/mobile"))
-        return _nrla_set_richard_auth_20260703(response)
-
     @app.get("/api/auth/richard-login")
     @app.post("/api/auth/richard-login")
     def nova_richard_login_restore_api_20260703():
-        response = _nrla_jsonify(_nrla_richard_payload_20260703())
+        response = _nrla_make_response(_nrla_redirect("/mobile"))
         return _nrla_set_richard_auth_20260703(response)
-
-    for _nrla_rule_20260703 in list(app.url_map.iter_rules()):
-        if str(_nrla_rule_20260703) == "/api/auth/status":
-            _nrla_endpoint_20260703 = _nrla_rule_20260703.endpoint
-            _nrla_original_status_20260703 = app.view_functions.get(_nrla_endpoint_20260703)
-
-            def _nrla_status_bridge_20260703(*args, **kwargs):
-                try:
-                    if str(_nrla_request.cookies.get("nova_richard_login") or "") == "1":
-                        response = _nrla_jsonify(_nrla_richard_payload_20260703())
-                        return _nrla_set_richard_auth_20260703(response)
-
-                    if (
-                        _nrla_session.get("authenticated")
-                        and str(_nrla_session.get("username") or "").lower() == "richard"
-                    ):
-                        response = _nrla_jsonify(_nrla_richard_payload_20260703())
-                        return _nrla_set_richard_auth_20260703(response)
-                except Exception:
-                    pass
-
-                return _nrla_original_status_20260703(*args, **kwargs)
-
-            app.view_functions[_nrla_endpoint_20260703] = _nrla_status_bridge_20260703
-            break
 
     print("[NOVA_RICHARD_LOGIN_AND_STATUS_RESTORE_20260703] installed")
 except Exception as _nrla_error_20260703:
@@ -18909,75 +18849,14 @@ except Exception as _nrla_error_20260703:
     except Exception:
         pass
 
-# --- NOVA_MOBILE_OWNER_AUTO_AUTH_20260703 ---
-try:
-    from flask import request as _nmoa_request
-    from flask import session as _nmoa_session
-
-    def _nmoa_should_auto_auth_20260703():
-        try:
-            path = str(_nmoa_request.path or "")
-
-            if path in ("/mobile", "/mobile/"):
-                return True
-
-            if path.startswith("/api/auth/status"):
-                return True
-
-            if path.startswith("/api/sessions"):
-                return True
-
-            return False
-        except Exception:
-            return False
-
-    def _nmoa_set_richard_session_20260703():
-        try:
-            _nmoa_session.permanent = True
-            _nmoa_session["authenticated"] = True
-            _nmoa_session["auth_mode"] = "local"
-            _nmoa_session["username"] = "richard"
-            _nmoa_session["user_id"] = "user_richard_stable_local_login"
-        except Exception:
-            pass
-
-    @app.before_request
-    def _nmoa_before_request_20260703():
-        try:
-            if _nmoa_should_auto_auth_20260703():
-                _nmoa_set_richard_session_20260703()
-        except Exception:
-            pass
-
-        return None
-
-    @app.after_request
-    def _nmoa_after_request_20260703(response):
-        try:
-            if (
-                _nmoa_session.get("authenticated")
-                and str(_nmoa_session.get("username") or "").lower() == "richard"
-            ):
-                response.set_cookie(
-                    "nova_richard_login",
-                    "1",
-                    max_age=60 * 60 * 24 * 365,
-                    httponly=True,
-                    secure=True,
-                    samesite="Lax",
-                    path="/",
-                )
-        except Exception:
-            pass
-
-        return response
-
-    print("[NOVA_MOBILE_OWNER_AUTO_AUTH_20260703] installed")
-except Exception as _nmoa_error_20260703:
-    try:
-        print("[NOVA_MOBILE_OWNER_AUTO_AUTH_20260703] failed:", _nmoa_error_20260703)
-    except Exception:
-        pass
+# --- NOVA_MOBILE_OWNER_AUTO_AUTH_20260703_DISABLED ---
+# Disabled for multi-user launch.
+# This legacy development shortcut forced every mobile/session request
+# into the Richard owner account.
+#
+# Real authentication now comes from:
+# session["nova_user_id"]
+# via the normal login/register flow
 
 # --- NOVA_AUTH_STATUS_FIRST_OWNER_FIX_20260703 ---
 try:
