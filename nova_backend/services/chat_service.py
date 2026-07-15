@@ -15831,7 +15831,8 @@ Auto-fix result:
         weak_signals = (
             "i prefer",
             "user preference",
-            "remember",
+            "remember this",
+            "remember that",
             "from now on",
             "going forward",
 
@@ -15844,6 +15845,24 @@ Auto-fix result:
             "favorite animal",
             "favourite animal",
         )
+
+        # NOVA_PROJECT_BRAIN_MEMORY_CONCEPT_BYPASS_20260714
+        # Architecture questions about memory are not memory-save requests.
+        memory_concept_questions = (
+            "what nova remembers",
+            "what nova is actively doing",
+            "separate what",
+            "separate memory",
+            "memory from execution",
+            "remembered from active",
+        )
+
+        if any(
+            marker in lowered
+            for marker in memory_concept_questions
+        ):
+            return False
+
 
         return any(s in lowered for s in weak_signals)
 

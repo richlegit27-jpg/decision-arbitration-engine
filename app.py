@@ -1280,12 +1280,27 @@ def api_state():
     )
 
 
-
-
 # NOVA_API_CHAT_EARLY_EXPLICIT_MEMORY_GUARD_LIVE_ANCHOR_20260611
 def _nova_api_chat_extract_explicit_memory_live_20260611(user_text):
     raw = str(user_text or "").strip()
     lowered = raw.lower().strip()
+
+    # NOVA_PROJECT_BRAIN_MEMORY_CONCEPT_BYPASS_20260714
+    # Architecture questions about memory vs execution are not save commands.
+    project_brain_memory_concept_markers = (
+        "what nova remembers",
+        "what nova is actively doing",
+        "separate what",
+        "separate memory",
+        "memory from execution",
+        "remembered from active",
+    )
+
+    if any(
+        marker in lowered
+        for marker in project_brain_memory_concept_markers
+    ):
+        return ""
 
     prefixes = (
         "remember that ",
@@ -12431,7 +12446,31 @@ def nova_before_request_explicit_memory_guard_20260611():
             or ""
         ).strip()
 
+
         lowered = raw_user_text.lower().strip()
+
+        # NOVA_PROJECT_BRAIN_MEMORY_CONCEPT_BYPASS_20260714
+        # Memory architecture questions are reasoning requests, not saved memories.
+        project_brain_memory_concept = any(
+            marker in clean_memory_lc
+            for marker in (
+                "what nova remembers",
+                "what nova is actively doing",
+                "separate what",
+                "separate memory",
+                "memory from execution",
+                "remembered from active",
+            )
+        )
+
+        if project_brain_memory_concept:
+            memory_written = False
+
+        if any(
+            marker in lowered
+            for marker in project_brain_memory_concept_markers
+        ):
+            return None
 
         prefixes = (
             "remember that ",
@@ -15443,14 +15482,6 @@ try:
         }
 
         fixed_exact = {
-            "what is locked",
-            "what is locked?",
-            "what's locked",
-            "what's locked?",
-            "what got locked",
-            "what got locked?",
-            "what did we lock",
-            "what did we lock?",
             "what passed",
             "what passed?",
             "what is green",
@@ -17556,133 +17587,6 @@ try:
     _nova_boot_log_20260701("[NOVA_PHASE4G_SESSION_HISTORY_RENAME_PERSISTENCE_20260701] installed")
 except Exception as _nova_phase4g_error_20260701:
     print("[NOVA_PHASE4G_SESSION_HISTORY_RENAME_PERSISTENCE_20260701] failed:", _nova_phase4g_error_20260701)
-
-
-
-# NOVA_PHASE4G_NORMAL_CHAT_AUTONOMY_CARRYOVER_GUARD_20260701
-# Prevent short normal-chat messages from inheriting the prior autonomy command
-# response in the same session.
-try:
-    import json as _nova_phase4g_chat_json
-    from flask import request as _nova_phase4g_chat_request
-
-    from nova_backend.services.normal_chat_carryover_guard_service import (
-        repair_normal_chat_carryover,
-    )
-
-    def _nova_phase4g_chat_text_20260701(value):
-        try:
-            return str(value or "").strip()
-        except Exception:
-            return ""
-
-    def _nova_phase4g_chat_request_json_20260701():
-        try:
-            data = _nova_phase4g_chat_request.get_json(silent=True)
-            return data if isinstance(data, dict) else {}
-        except Exception:
-            return {}
-
-    def _nova_phase4g_chat_response_json_20260701(response):
-        try:
-            data = _nova_phase4g_chat_json.loads(response.get_data(as_text=True))
-            return data if isinstance(data, dict) else None
-        except Exception:
-            return None
-
-    def _nova_phase4g_chat_assistant_text_20260701(data):
-        if not isinstance(data, dict):
-            return ""
-
-        assistant = data.get("assistant_message")
-        if isinstance(assistant, dict):
-            return _nova_phase4g_chat_text_20260701(
-                assistant.get("text")
-                or assistant.get("content")
-                or assistant.get("message")
-            )
-
-        return _nova_phase4g_chat_text_20260701(
-            data.get("text")
-            or data.get("content")
-            or data.get("message")
-        )
-
-    def _nova_phase4g_chat_write_json_20260701(response, data):
-        try:
-            payload = _nova_phase4g_chat_json.dumps(data, ensure_ascii=False)
-            response.set_data(payload)
-            response.headers["Content-Length"] = str(len(response.get_data()))
-            response.headers["Content-Type"] = "application/json"
-        except Exception:
-            pass
-        return response
-
-    def _nova_phase4g_normal_chat_carryover_guard_20260701(response):
-        try:
-            path = _nova_phase4g_chat_text_20260701(_nova_phase4g_chat_request.path).lower()
-            if not (path.endswith("/api/chat") or "/api/chat" in path):
-                return response
-
-            request_data = _nova_phase4g_chat_request_json_20260701()
-            user_text = _nova_phase4g_chat_text_20260701(
-                request_data.get("message")
-                or request_data.get("text")
-                or request_data.get("content")
-            )
-            normalized = user_text.lower().strip(" .!?")
-
-            if normalized not in {"hi", "hello", "hey", "yo"}:
-                return response
-
-            data = _nova_phase4g_chat_response_json_20260701(response)
-            if not isinstance(data, dict):
-                return response
-
-            assistant_text = _nova_phase4g_chat_assistant_text_20260701(data)
-            if "nova autonomy task brief" not in assistant_text.lower():
-                return response
-
-            session_id = _nova_phase4g_chat_text_20260701(
-                data.get("session_id")
-                or data.get("active_session_id")
-                or request_data.get("session_id")
-            )
-
-            fixed_text = "Hey Richard - normal chat is still active."
-
-            assistant = data.get("assistant_message")
-            if not isinstance(assistant, dict):
-                assistant = {"role": "assistant"}
-
-
-            data = repair_normal_chat_carryover(
-                data,
-                request_data,
-            )
-
-            return _nova_phase4g_chat_write_json_20260701(
-                response,
-                data,
-            )
-
-            data["debug"] = debug
-
-            return _nova_phase4g_chat_write_json_20260701(response, data)
-
-        except Exception as exc:
-            try:
-                print("[NOVA_PHASE4G_NORMAL_CHAT_AUTONOMY_CARRYOVER_GUARD_20260701] failed:", exc)
-            except Exception:
-                pass
-            return response
-
-    app.after_request(_nova_phase4g_normal_chat_carryover_guard_20260701)
-
-    _nova_boot_log_20260701("[NOVA_PHASE4G_NORMAL_CHAT_AUTONOMY_CARRYOVER_GUARD_20260701] installed")
-except Exception as _nova_phase4g_chat_guard_error_20260701:
-    print("[NOVA_PHASE4G_NORMAL_CHAT_AUTONOMY_CARRYOVER_GUARD_20260701] failed:", _nova_phase4g_chat_guard_error_20260701)
-
 
 # NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701
 # Must be above

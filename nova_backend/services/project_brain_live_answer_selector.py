@@ -171,12 +171,11 @@ def build_project_brain_live_answer(user_text: str = "", pasted_output: str = ""
                 build_project_brain_decision_context_answer,
             )
 
-text = build_project_brain_decision_context_answer(
-    user_text=user_text,
-    pasted_output=pasted_output,
-    intent=reason,
-)
-
+            text = build_project_brain_decision_context_answer(
+                user_text=user_text,
+                pasted_output=pasted_output,
+                intent=reason,
+            )
             return ProjectBrainLiveAnswer(
                 text=text,
                 route="project_brain_decision_context",

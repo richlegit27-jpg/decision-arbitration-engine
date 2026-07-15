@@ -21,6 +21,64 @@ def _lower(value: object) -> str:
 def _has_any(text: str, terms: tuple[str, ...]) -> bool:
     return any(term in text for term in terms)
 
+def classify_project_brain_intent(user_text: object) -> Optional[str]:
+    text = _lower(user_text)
+
+    if not text:
+        return None
+
+    if _has_any(
+        text,
+        (
+            "memory",
+            "execution",
+            "difference between memory and execution",
+            "memory vs execution",
+            "what nova remembers",
+            "what nova is actively doing",
+            "separate what nova remembers",
+            "remembered from active",
+        ),
+    ):
+        return "memory_execution_distinction"
+
+    if _has_any(
+        text,
+        (
+            "where are we at",
+            "where are we at with nova",
+            "where are we at with nova right now",
+            "where is nova at",
+            "current project",
+            "project status",
+        ),
+    ):
+        return "current_project_state"
+
+    if _has_any(
+        text,
+        (
+            "what should we do next",
+            "what do we do next",
+            "next move",
+            "safest next",
+            "safe next",
+        ),
+    ):
+        return "safe_next_action"
+
+    if _has_any(
+        text,
+        (
+            "blocker",
+            "blocking",
+            "stuck",
+            "current blocker",
+        ),
+    ):
+        return "actual_blocker"
+
+    return None
 
 def _current_project_answer(
     user_text=""
@@ -133,236 +191,26 @@ def _is_direct_project_state_recall_prompt(text: str) -> bool:
     return normalized in direct_prompts
 
 
-def classify_project_brain_intent(user_text: object) -> Optional[str]:
-    text = _lower(user_text)
-
-    if not text:
-        return None
-
-    mission_terms = (
-        "mission control",
-        "mission card",
-        "operator mode",
-        "operator card",
-        "mission brief",
-        "mission plan",
-        "give me mission",
-        "show mission",
-        "show me the mission",
-    )
-
-    if _has_any(text, mission_terms):
-        return "mission_control"
-
     if _is_direct_project_state_recall_prompt(text):
         return "current_project_state"
 
+    locked_terms = (
+        "what is locked",
+        "what's locked",
+        "what got locked",
+        "what did we lock",
+        "locked stack",
+        "locked upgrades",
+        "what passed",
+        "what is green",
+        "what's green",
+    )
+
+    if _has_any(text, locked_terms):
+        return "locked_state"
+
     if _has_any(text, ("attached", "image", "photo", "picture", "upload", "summarize this file")):
         return None
-
-    project_terms = (
-        "nova",
-        "project",
-        "app.py",
-        "local app",
-        "flask app",
-        "codebase",
-        "we",
-    )
-
-    status_terms = (
-        "where are we",
-        "where are we at",
-        "where do we stand",
-        "where's the project",
-        "project at",
-        "status",
-        "state",
-        "checkpoint",
-        "current",
-        "right now",
-    )
-
-    next_terms = (
-        "next",
-        "next move",
-        "concrete move",
-        "what now",
-        "what should we do",
-        "what do we do",
-        "what should we work on",
-        "what should we work on next",
-        "safe move",
-        "practical move",
-    )
-
-    blocker_terms = (
-        "blocker",
-        "blocking",
-        "stuck",
-        "risk",
-        "risky",
-        "danger",
-        "dangerous",
-        "problem",
-        "wrong",
-    )
-
-    app_py_risk_terms = (
-        "app.py",
-        "before_request",
-        "after_request",
-        "app py",
-    )
-
-    if _has_any(text, app_py_risk_terms) and _has_any(
-        text,
-        (
-            "danger",
-            "dangerous",
-            "risk",
-            "risky",
-            "safe",
-            "change",
-            "modify",
-            "touch",
-        ),
-    ):
-        return "app_py_risk"
-
-
-    if (
-        _has_any(text, blocker_terms)
-        and (
-            _has_any(text, project_terms)
-            or "nova" in text
-            or "project" in text
-        )
-    ):
-        return "actual_blocker"
-
-    safe_code_terms = (
-        "safe to code",
-        "safe to change",
-        "before coding",
-        "before we code",
-        "before changing",
-        "before we change",
-        "before touching",
-        "touch code",
-        "change more code",
-        "test first",
-        "should we test",
-        "safest next",
-        "safest move",
-        "safe next",
-    )
-
-    practical_terms = (
-        "practical",
-        "no hype",
-        "without hype",
-        "not a pep talk",
-        "no pep talk",
-        "straight answer",
-        "real answer",
-        "actual answer",
-        "concrete",
-    )
-
-    memory_terms = (
-        "memory",
-        "remember",
-        "remembers",
-        "remembering",
-        "retains",
-        "stored",
-        "knows",
-        "know",
-    )
-
-    execution_terms = (
-        "execution",
-        "execute",
-        "doing",
-        "actively doing",
-        "does",
-        "do",
-        "runs",
-        "running",
-        "actions",
-        "commands",
-        "patch",
-        "live",
-    )
-
-    if "app.py" in text and _has_any(text, blocker_terms + ("architecture", "guard", "hooks", "route")):
-        return "app_py_risk"
-
-    if (
-        _has_any(text, memory_terms)
-        and _has_any(text, execution_terms)
-        and _has_any(
-            text,
-            (
-                "nova",
-                "separate",
-                "difference",
-                "distinction",
-                "versus",
-                "vs",
-                "what should",
-                "what is",
-                "problem",
-                "issue",
-                "this a",
-                "is this",
-            ),
-        )
-    ):
-        return "memory_execution_distinction"
-
-    if (
-        _has_any(text, ("memory or execution", "remembering or doing", "know vs do", "knows vs does"))
-        or (
-            _has_any(text, ("what should nova know", "what nova should know", "what should nova remember"))
-            and _has_any(text, ("do", "doing", "execute", "execution"))
-        )
-    ):
-        return "memory_execution_distinction"
-
-    if _has_any(text, safe_code_terms):
-        return "safe_next_action"
-
-    if (
-        _has_any(text, practical_terms)
-        and _has_any(text, project_terms + status_terms + next_terms)
-    ):
-        return "practical_project_answer"
-
-    if (
-        _has_any(text, blocker_terms)
-        and (
-            _has_any(text, project_terms)
-            or "nova" in text
-            or "project" in text
-            or "current blocker" in text
-        )
-    ):
-
-        if "app.py" in text:
-            return "app_py_risk"
-
-        return "actual_blocker"
-
-    if (
-        _has_any(text, next_terms)
-        and _has_any(text, project_terms)
-    ):
-        return "safe_next_action"
-
-
-    return None
 
 def _observe_project_brain_answer(
     user_text,
@@ -401,6 +249,12 @@ def _observe_project_brain_answer(
 
 def _legacy_build_project_brain_general_answer_initial(user_text: object) -> Optional[ProjectBrainAnswer]:
     intent = classify_project_brain_intent(user_text)
+
+    if intent == "locked_state":
+        return ProjectBrainAnswer(
+            intent="locked_state",
+            text=_current_project_answer(user_text),
+        )
 
     if intent == "mission_control":
         answer = _mission_control_answer(user_text)
@@ -511,6 +365,13 @@ try:
             "why did this fail",
             "stale memory",
             "memory hijacking",
+        "what did we lock recently",
+        "what got locked recently",
+        "what is locked",
+        "what's locked",
+        "what got locked",
+        "what did we lock",
+        "next upgrade",
         ]
 
         return any(
@@ -699,27 +560,34 @@ def _nova_project_brain_command_center_question_20260702(user_text):
 def build_project_brain_general_answer(user_text=""):
     intent = classify_project_brain_intent(user_text)
 
+    if intent == "locked_state":
+        return ProjectBrainAnswer(
+            intent="locked_state",
+            text=_current_project_answer(user_text),
+        )
+
     if intent == "actual_blocker":
         return ProjectBrainAnswer(
             intent="actual_blocker",
-text=(
-    "Nova general intelligence blocker analysis:\n"
-    "Current blocker: "
-    "No active Project Brain intelligence blocker is open.\n"
-    "Current checkpoint: "
-    "Project Brain state is loaded from the freshness snapshot.\n"
-    "Protected capabilities: "
-    "Command Center, Project Brain Upgrade Radar, and "
-    "Project Brain Operator Memory Writer are locked.\n"
-    "Next move: "
-    "continue focused validation through the Project Brain smoke stack.\n"
-    "Fallback: "
-    "If the blocker changes, return to the latest failing command, "
-    "file path, error output, or smoke result and reclassify from "
-    "the current project state."
-),
-
+            text=(
+                "Nova general intelligence blocker analysis:\n"
+                "Current blocker: "
+                "No active Project Brain intelligence blocker is open.\n"
+                "Current checkpoint: "
+                "Project Brain state is loaded from the freshness snapshot.\n"
+                "Protected capabilities: "
+                "Command Center, Project Brain Upgrade Radar, and "
+                "Project Brain Operator Memory Writer are locked.\n"
+                "Next move: "
+                "continue focused validation through the Project Brain smoke stack.\n"
+                "Fallback: "
+                "If the blocker changes, return to the latest failing command, "
+                "file path, error output, or smoke result and reclassify from "
+                "the current project state."
+            ),
         )
+
+
     if intent == "mission_control":
         from nova_backend.services.project_brain_mission_control import (
             build_project_brain_mission_card,

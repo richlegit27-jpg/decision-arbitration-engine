@@ -323,7 +323,7 @@ try:
             return "what did we just fix?"
 
         if text in remaining_exact:
-            return "what is left?"
+            return ""
 
         if text in next_exact:
             return "next"
@@ -345,29 +345,31 @@ try:
         return ""
 
     def _nova_natural_project_load_answer_20260701(mapped_prompt):
-        service_path = (
-            _NovaNaturalProjectPath20260701(__file__)
-            .resolve()
-            .parent
-            / "project_state_service.py"
-        )
+        try:
+            from nova_backend.services.project_brain_general_intelligence import (
+                build_project_brain_general_answer,
+            )
 
-        spec = _nova_natural_project_importlib_util_20260701.spec_from_file_location(
-            "_nova_natural_project_state_service_direct_20260701",
-            str(service_path),
-        )
+            answer = build_project_brain_general_answer(
+                mapped_prompt
+            )
 
-        if not spec or not spec.loader:
-            return None
+            if hasattr(answer, "text"):
+                return answer.text
 
-        module = _nova_natural_project_importlib_util_20260701.module_from_spec(spec)
-        spec.loader.exec_module(module)
+            if isinstance(answer, str):
+                return answer
 
-        answer_fn = getattr(module, "answer_project_state_question", None)
-        if not callable(answer_fn):
-            return None
+        except Exception as error:
+            try:
+                print(
+                    "[NOVA_NATURAL_PROJECT_LOAD_GENERAL_BRAIN_FAILED]",
+                    error,
+                )
+            except Exception:
+                pass
 
-        return answer_fn(mapped_prompt, runtime_execution_state=None)
+        return None
 
     def _nova_natural_project_payload_20260701(reply, data):
         session_id = ""
@@ -388,19 +390,18 @@ try:
                 "text": reply,
                 "attachments": [],
             },
-            "route": "project_state_router",
-            "route_taken": "project_state_router",
+            "route": "project_brain_general_intelligence",
+            "route_taken": "project_brain_general_intelligence",
             "debug": {
-                "route": "project_state_router",
-                "route_taken": "project_state_recall",
+                "route": "project_brain_general_intelligence",
+                "route_taken": "project_brain_general_intelligence",
                 "natural_project_recall": True,
             },
             "meta": {
-                "route": "project_state_recall",
-                "strategy": "project_state_router",
+                "route": "project_brain_general_intelligence",
+                "strategy": "project_brain_general_intelligence",
             },
         }
-
         return payload
 
     def _nova_natural_project_wrap_endpoint_20260701(app, endpoint_name):
@@ -523,6 +524,11 @@ try:
             "our work",
             "what we're doing",
             "what we are doing",
+            "what nova remembers",
+            "what nova is actively doing",
+            "separate what nova remembers",
+            "memory from execution",
+            "remembered from active",
         ]
 
         status_terms = [
@@ -538,6 +544,9 @@ try:
             "left",
             "locked",
             "phase",
+            "actively doing",
+            "execution",
+            "memory",
         ]
 
         has_project_term = any(term in text for term in project_terms)

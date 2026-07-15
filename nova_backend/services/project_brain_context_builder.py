@@ -100,12 +100,14 @@ def build_safe_next_answer() -> str:
 
 def build_memory_execution_answer() -> str:
     return (
-        "Memory is what Nova remembers, knows, retains, and uses as durable project context: "
-        "Richard's preferences, the current Nova checkpoint, project-state facts, blockers, and decisions. "
-        "Execution is what Nova is actively doing live: running commands, patching files, calling `/api/chat`, "
-        "testing behavior, building a plan, or returning an output. Simple split: memory = what Nova knows; "
-        "execution = what Nova does. Memory should guide execution, but it should not hijack a concept question "
-        "and turn it into a memory-save response."
+        "Memory is what Nova remembers: durable facts, preferences, "
+        "project context, decisions, and stable information Nova keeps. "
+        "Execution is what Nova is actively doing: running commands, "
+        "patching files, testing behavior, building plans, and completing "
+        "the current live task. Simple split: memory = what Nova knows; "
+        "Execution = what Nova does. "
+        "Memory should guide Execution, but memory and active work must stay "
+        "separate so a concept question does not become a memory-save action."
     )
 
 

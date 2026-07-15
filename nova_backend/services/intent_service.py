@@ -72,6 +72,12 @@ class IntentService:
             "where's the project",
             "where is the project",
             "current project",
+            "what is locked",
+            "what's locked",
+            "what got locked",
+            "what did we lock",
+            "what did we lock recently",
+            "what got locked recently",
         ]):
             return self._result(
                 "project_brain_general_intelligence",
