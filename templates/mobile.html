@@ -318,9 +318,9 @@
     <button
         id="nova-mobile-memory-toggle"
         type="button"
-        onclick="
-            const toolsPanel = document.getElementById('nova-mobile-tools-panel');
-            const memoryPanel = document.getElementById('nova-mobile-memory-panel');
+onclick="
+    const toolsPanel = document.getElementById('nova-mobile-tools-panel');
+    const memoryPanel = document.getElementById('nova-mobile-memory-panel');
 
             if (toolsPanel) {
                 toolsPanel.classList.add('hidden');
@@ -360,28 +360,11 @@
         Export
     </button>
 
-    <button
-        type="button"
-        onclick=""
-            const panel = document.getElementById('nova-mobile-tools-panel');
-
-            if (panel) {
-                panel.classList.add('hidden');
-                panel.style.cssText = 'display:none !important;';
-            }
-        "
-    >Close</button>
-</section>
-
-<section id="nova-mobile-account-panel" class="mobile-panel hidden" aria-label="Mobile account">
-
-<section id="nova-mobile-billing-panel" class="mobile-panel hidden" aria-label="Mobile billing">
-
 <button
-    id="nova-mobile-billing-close"
+    id="nova-mobile-tools-close"
     type="button"
     onclick="
-        const panel = document.getElementById('nova-mobile-billing-panel');
+        const panel = document.getElementById('nova-mobile-tools-panel');
 
         if (panel) {
             panel.classList.add('hidden');
@@ -389,41 +372,8 @@
         }
     "
 >
-Close Billing
+    Close
 </button>
-
-<div class="mobile-panel-title">
-    Billing
-</div>
-
-<div
-    id="nova-mobile-billing-status"
-    class="mobile-panel-text"
->
-    Loading billing...
-</div>
-
-</section>
-
-<button
-    id="nova-mobile-account-close"
-    type="button"
-    onclick="
-        const panel = document.getElementById('nova-mobile-account-panel');
-        if (panel) {
-            panel.classList.add('hidden');
-            panel.style.cssText = 'display:none !important;';
-        }
-    "
->
-Close Account
-</button>
-
-<div class="mobile-panel-title">Account</div>
-
-<div id="nova-mobile-account-status" class="mobile-panel-text">
-    Loading account...
-</div>
 
 </section>
 
@@ -566,7 +516,7 @@ Close Account
     type="button"
     title="Send"
 >
-    <span class="mobile-action-icon">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¾ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¤</span>
+    <span class="mobile-action-icon">➤</span>
 </button>
 
 <!-- DISABLED: merged into nova-mobile-send stop mode -->
@@ -588,7 +538,7 @@ Close Account
     type="button"
     title="Voice input"
 >
-    <span class="mobile-action-icon">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢</span>
+    <span class="mobile-action-icon">🎤</span>
 </button>
 
 <button
@@ -598,7 +548,7 @@ Close Account
     title="Stop speech"
     data-active="false"
 >
-    <span class="mobile-action-icon">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¡</span>
+    <span class="mobile-action-icon">🔊</span>
 </button>
 
 <button
@@ -607,7 +557,7 @@ Close Account
     type="button"
     title="Read aloud"
 >
-    <span class="mobile-action-icon">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â </span>
+    <span class="mobile-action-icon">📎</span>
 </button>
 
 <label
@@ -639,7 +589,7 @@ Close Account
         }
     "
 >
-    <span class="mobile-action-icon">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¯</span>
+    <span class="mobile-action-icon">☰</span>
 </button>
     </div>
 
@@ -888,22 +838,8 @@ body {
      ATTACHMENTS / ADVANCED UI40
 ========================= -->
 
-<!-- DISABLED - handled by nova-mobile-app.js
-<!-- DISABLED 2026-07-05 duplicate mobile attachment owner: <script src="/static/js/mobile/nova-mobile-attachment-payload.js?v=attachment-revert-clean-20260609-001"></script> -->
--->
-
-<!-- DISABLED - duplicate attachment preview owner
-<!-- DISABLED 2026-07-05 duplicate mobile attachment owner: <script src="/static/js/mobile/nova-mobile-attachment-preview.js?v=legacy-preview-disabled-20260630-001"></script> -->
--->
 
 <script src="/static/js/mobile/nova-mobile-execution-panel.js?v=execution-panel-cache-state-20260623"></script>
-
-<!-- DISABLED - causes session Copy/Regen nesting loop
-<script src="/static/js/mobile/nova-mobile-assistant-actions.js?v=assistant-actions-retry-20260623"></script>
--->
-<!-- DISABLED - risky broad mobile render guard, not committed
-<script src="/static/js/mobile/nova-mobile-render-guard.js?v=render-guard-20260630-0010"></script>
--->
 <script src="/static/js/mobile/nova-mobile-artifacts-panel.js"></script>
 
 <!-- NOVA_BACKEND_READINESS_PILL_FINAL_20260608 -->
@@ -3887,7 +3823,7 @@ composer.style.setProperty("overflow", "visible", "important");
 
 <script src="/static/js/mobile/nova-mobile-attachment-boot-reset-v1.js?v=attachment-boot-reset-v1-20260705"></script>
 <!-- NOVA_CLEANUP_DISABLED_20260705: disabled plus-menu attach experiment :: <script src="/static/js/mobile/nova-mobile-plus-menu-reliability-v1.js?v=plus-menu-reliability-v1-20260705"></script> -->
-<script src="/static/js/mobile/nova-mobile-upload-change-authority-v1.js?v=upload-single-owner-20260705"></script>
+<script src="/static/js/mobile/nova-mobile-upload-change-authority-v1.js?v=upload-single-owner-20260714h"></script>
 <script src="/static/js/mobile/nova-mobile-runtime.js?v=runtime-stop-wire-20260706"></script>
 <script src="/static/js/mobile/nova-mobile-send-stable-v1.js?v=send-single-upload-owner-20260705"></script>
 <script src="/static/js/mobile/nova-mobile-attachment-send-cleanup-v1.js?v=attachment-send-cleanup-v2-20260706"></script>

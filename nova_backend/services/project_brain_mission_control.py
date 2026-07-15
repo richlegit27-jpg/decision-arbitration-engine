@@ -157,11 +157,18 @@ def format_project_brain_mission_card(card: ProjectBrainMissionCard) -> str:
     operator = _operator_plan_summary(card.operator_plan)
 
     return (
-        "Project Brain Mission Control:\n"
-        "Mission Control v1.4 Operator Console\n"
-        f"State: {card.current_state}\n"
-"Decision Engine: Active. Classifies failures, ranks moves, and chooses the next safe operator action.\n"
-f"Blocker/Risk: {card.current_blocker}\n"
+    "Project Brain Mission Control:\n"
+    "Mission Control v1.4 Operator Console\n"
+    "\n"
+    "COMMAND CENTER SUMMARY:\n"
+    f"Current State: {card.current_state}\n"
+    f"Current Risk: {card.current_blocker}\n"
+    f"Recommended Move: {operator.get('recommended_move') or card.recommended_move}\n"
+    f"Next Command: {operator.get('exact_next_command') or card.focused_smoke}\n"
+    "\n"
+    f"State: {card.current_state}\n"
+    "Decision Engine: Active. Classifies failures, ranks moves, and chooses the next safe operator action.\n"
+    f"Blocker/Risk: {card.current_blocker}\n"
 
         f"Blocker/Risk: {card.current_blocker}\n"
         f"Best Move: {operator.get('recommended_move') or card.recommended_move}\n"

@@ -101,6 +101,10 @@ def apply_response_title_guard(response):
         if not isinstance(session, dict):
             return response
 
+        old_title = str(
+            session.get("title") or ""
+        ).strip()
+
         ...
         
         cleaned = clean_title(
