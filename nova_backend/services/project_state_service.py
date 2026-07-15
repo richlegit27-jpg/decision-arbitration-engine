@@ -67,8 +67,8 @@ DEFAULT_PROJECT_STATE: Dict[str, Any] = {
         "Move to memory quality upgrade phase two",
     ],
     "next_move": "Repair project-state service export, then run both smoke tests.",
+    "blocker": "No active Project Brain intelligence blocker is open.",
 }
-
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
@@ -527,6 +527,7 @@ def compact_project_state_context(max_locked: int = 6) -> str:
     checkpoint = str(state.get("checkpoint") or "").strip()
     current_focus = str(state.get("current_focus") or "").strip()
     next_move = str(state.get("next_move") or "").strip()
+    blocker = str(state.get("blocker") or "").strip()
     locked = _as_list(state.get("locked"))[:max_locked]
 
     parts = []
@@ -539,6 +540,9 @@ def compact_project_state_context(max_locked: int = 6) -> str:
 
     if next_move:
         parts.append(f"Next move: {next_move}")
+
+    if blocker:
+        parts.append(f"Current blocker: {blocker}")
 
     if locked:
         parts.append(f"Locked: {', '.join(locked)}")
