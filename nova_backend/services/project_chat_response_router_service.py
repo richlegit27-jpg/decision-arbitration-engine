@@ -765,6 +765,7 @@ try:
                 mimetype="application/json",
             )
 
+
         except Exception as exc:
             try:
                 print(
@@ -775,32 +776,33 @@ try:
                 pass
 
             return None
+
+
     def _nova_compact_project_load_context_20260701():
-        service_path = (
-            _NovaNaturalProjectPath20260701(__file__)
-            .resolve()
-            .parent
-            / "project_state_service.py"
-        )
+        try:
+            from nova_backend.services.project_brain_context_builder import (
+                build_current_project_answer,
+            )
 
-        spec = _nova_compact_project_importlib_util_20260701.spec_from_file_location(
-            "_nova_compact_project_state_service_direct_20260701",
-            str(service_path),
-        )
+            return str(
+                build_current_project_answer()
+                or ""
+            ).strip()
 
-        if not spec or not spec.loader:
+        except Exception as exc:
+            try:
+                print(
+                    "[NOVA_COMPACT_PROJECT_CONTEXT_FRESHNESS_BRIDGE_20260715] failed:",
+                    exc,
+                )
+            except Exception:
+                pass
+
             return ""
 
-        module = _nova_compact_project_importlib_util_20260701.module_from_spec(spec)
-        spec.loader.exec_module(module)
-
-        compact_fn = getattr(module, "compact_project_state_context", None)
-        if not callable(compact_fn):
-            return ""
-
-        return str(compact_fn(max_locked=8) or "").strip()
 
     def _nova_compact_project_payload_20260701(reply, data):
+
         session_id = ""
         if isinstance(data, dict):
             session_id = str(data.get("session_id") or data.get("active_session_id") or "").strip()
@@ -861,10 +863,10 @@ try:
 
                     if context:
                         reply = (
-                            "Current Nova project context:\n"
+                            "Current Nova project state:\n"
                             f"{context}\n\n"
                             f"Current blocker: {context.blocker}\n"
-                            "This is the compact checkpoint view for the current Nova work."
+                            "This is the compact Project Brain state view for the current Nova work."
                         )
 
                         payload = _nova_compact_project_payload_20260701(reply, data)
