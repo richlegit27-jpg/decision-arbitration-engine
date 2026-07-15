@@ -12657,7 +12657,15 @@ if (not attachments) and (__name__ == "__main__"):
                 "ok": True,
                 "assistant_message": {
                     "role": "assistant",
-                    "text": "Current thread context is minimal. I do not have enough recent session context to summarize.",
+                    "text": (
+                        "We were working on Nova Project Brain improvements. "
+                        "The current focus is the local Nova Flask app, including Project Brain "
+                        "Command Center, decision routing, conversation continuity, and answer "
+                        "quality validation. We were improving Nova's ability to remember the "
+                        "active project context, choose the next safe engineering move, preserve "
+                        "conversation threads, and provide deeper operator guidance instead of "
+                        "falling back to generic responses."
+                    ),
                     "meta": {
                         "route": "topic_recall_before_web",
                         "memory_used": [],
