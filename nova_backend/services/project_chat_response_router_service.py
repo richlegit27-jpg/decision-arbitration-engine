@@ -537,14 +537,7 @@ try:
             "context",
             "checkpoint",
             "progress",
-            "where",
-            "current",
-            "working on",
-            "next",
-            "left",
-            "locked",
             "phase",
-            "actively doing",
             "execution",
             "memory",
         ]
@@ -870,6 +863,7 @@ try:
                         reply = (
                             "Current Nova project context:\n"
                             f"{context}\n\n"
+                            f"Current blocker: {context.blocker}\n"
                             "This is the compact checkpoint view for the current Nova work."
                         )
 

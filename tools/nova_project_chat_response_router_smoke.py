@@ -40,7 +40,7 @@ require(
 
 require(
     fixed["route"]
-    == "project_state_router",
+    == "project_brain_general_intelligence",
     "route metadata applied",
 )
 
