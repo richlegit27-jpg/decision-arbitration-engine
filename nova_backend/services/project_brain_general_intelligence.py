@@ -63,6 +63,12 @@ def classify_project_brain_intent(user_text: object) -> Optional[str]:
             "next move",
             "safest next",
             "safe next",
+            "what test should we run",
+            "which test should we run",
+            "should we test first",
+            "test first",
+            "safe to code",
+            "should we patch or test",
         ),
     ):
         return "safe_next_action"
@@ -94,9 +100,14 @@ def _current_project_answer(
 
 
 def _safe_next_answer() -> str:
-    from nova_backend.services.project_brain_context_builder import build_safe_next_answer
+    from nova_backend.services.project_brain_context_builder import (
+        build_project_brain_decision_context_answer,
+    )
 
-    return build_safe_next_answer()
+    return build_project_brain_decision_context_answer(
+        user_text="what should we do next",
+        intent="next_move",
+    )
 
 def _memory_execution_answer() -> str:
     from nova_backend.services.project_brain_context_builder import build_memory_execution_answer
@@ -624,6 +635,7 @@ def build_project_brain_general_answer(user_text=""):
                     "Current project: local Nova Flask app.\n\n"
                     "Project Brain is the general intelligence layer coordinating "
                     "memory, execution, routing, safety checks, and upgrades.\n\n"
+                    "Current blocker: No active Project Brain intelligence blocker is open.\n\n"
                     "Next move: continue cleanup and validation through focused "
                     "smokes before expanding changes."
                 ),
