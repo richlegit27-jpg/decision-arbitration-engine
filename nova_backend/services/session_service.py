@@ -66,6 +66,9 @@ def _normalize_session(session: Dict[str, Any]) -> Dict[str, Any]:
     now = iso_now()
     data = dict(session or {})
     data.setdefault("id", f"session_{uuid.uuid4().hex}")
+
+    data["user_id"] = str(data.get("user_id") or "").strip()
+
     data["title"] = str(data.get("title") or "New Chat").strip() or "New Chat"
     data["messages"] = [
         _normalize_message(m) for m in (data.get("messages") or []) if isinstance(m, dict)
@@ -77,11 +80,15 @@ def _normalize_session(session: Dict[str, Any]) -> Dict[str, Any]:
     return data
 
 
-def new_session(title: str = "New Chat") -> Dict[str, Any]:
+def new_session(
+    title: str = "New Chat",
+    user_id: str = "",
+) -> Dict[str, Any]:
     now = iso_now()
     return {
         "id": f"session_{uuid.uuid4().hex}",
         "title": str(title or "New Chat").strip() or "New Chat",
+        "user_id": str(user_id or "").strip(),
         "messages": [],
         "pinned": False,
         "created_at": now,
@@ -487,6 +494,16 @@ class SessionService:
         return -1
 
     # SESSION_SERVICE_LOAD_SAVE_COMPAT_LOCK
+
+    def _belongs_to_user(self, session, user_id=""):
+        if not user_id:
+            return False
+
+        return (
+            str(session.get("user_id") or "").strip()
+            ==
+            str(user_id or "").strip()
+        )
     def load(self):
         """
         Compatibility bridge for older ChatService code that expects
@@ -641,10 +658,20 @@ class SessionService:
             return str(sessions[0].get("id") or "").strip()
         return ""
 
-    def get_session(self, session_id):
+    def get_session(self, session_id, user_id=""):
         sessions = self._load_sessions()
+
         i = self._find(sessions, session_id)
-        return sessions[i] if i >= 0 else None
+
+        if i < 0:
+            return None
+
+        session = sessions[i]
+
+        if not self._belongs_to_user(session, user_id):
+            return None
+
+        return session
 
     def get_active_session(self):
         active_id = self.get_active_session_id()
@@ -655,9 +682,39 @@ class SessionService:
     def get_active(self):
         return self.get_active_session()
 
-    def create_session(self, title="New Chat"):
+    def create_session(
+        self,
+        title="New Chat",
+        user_id="",
+    ):
         sessions = self._load_sessions()
-        s = new_session(title)
+        s = new_session(
+            title,
+            user_id=user_id,
+        )
+        sessions.insert(0, s)
+        self._save_sessions(sessions, s["id"])
+        return s
+
+    def get_active_session(self):
+        active_id = self.get_active_session_id()
+        if not active_id:
+            return None
+        return self.get_session(active_id)
+
+    def get_active(self):
+        return self.get_active_session()
+
+    def create_session(
+        self,
+        title="New Chat",
+        user_id="",
+    ):
+        sessions = self._load_sessions()
+        s = new_session(
+            title,
+            user_id=user_id,
+        )
         sessions.insert(0, s)
         self._save_sessions(sessions, s["id"])
         return s
@@ -696,17 +753,29 @@ class SessionService:
     # COMPATIBILITY
     # -----------------------
 
-    def get_all(self):
-        return self._load_sessions()
+    def get_all(self, user_id=""):
+        return [
+            s for s in self._load_sessions()
+            if self._belongs_to_user(s, user_id)
+        ]
 
-    def list_sessions(self):
-        return self._load_sessions()
+    def list_sessions(self, user_id=""):
+        return [
+            s for s in self._load_sessions()
+            if self._belongs_to_user(s, user_id)
+        ]
 
-    def list(self):
-        return self._load_sessions()
+    def list(self, user_id=""):
+        return [
+            s for s in self._load_sessions()
+            if self._belongs_to_user(s, user_id)
+        ]
 
-    def all(self):
-        return self._load_sessions()
+    def all(self, user_id=""):
+        return [
+            s for s in self._load_sessions()
+            if self._belongs_to_user(s, user_id)
+        ]
 
     def create(self, title="New Chat"):
         return self.create_session(title)

@@ -107,7 +107,7 @@ from datetime import datetime
 from pathlib import Path
 
 
-from flask import Flask, Response, jsonify, render_template, request, send_from_directory
+from flask import Flask, Response, jsonify, render_template, request, send_from_directory, session
 from flask_cors import CORS
 from bs4 import BeautifulSoup
 import uuid
@@ -2050,14 +2050,31 @@ def api_fetch():
 # NOVA_RESTORE_API_SESSIONS_ROUTE_20260609
 @app.get("/api/sessions")
 def api_sessions():
+    sessions = session_service.get_all()
+
+    try:
+        flask_session = globals().get("session")
+        current_user_id = str(
+            flask_session.get("nova_user_id") or ""
+        ).strip()
+    except Exception:
+        current_user_id = ""
+
+    if current_user_id:
+        sessions = [
+            item
+            for item in sessions
+            if isinstance(item, dict)
+            and str(item.get("user_id") or "").strip() == current_user_id
+        ]
+
     return json_ok(
-        sessions=session_service.get_all(),
+        sessions=sessions,
         active_session_id=session_service.active_session_id,
         session=session_service.get_active(),
         artifacts=artifact_service.build_list_payload(),
         memory=memory_service.build_list_payload(),
     )
-
 
 # PROJECT_AWARE_MEMORY_CONTEXT_LOCK
 def _nova_pa_read_json_file(path):
@@ -7532,42 +7549,77 @@ def api_session_by_id(session_id: str):
     found = None
     active_session_id = ""
 
+    auth_user_id = ""
     try:
-        active_session_id = str(getattr(session_service, "active_session_id", "") or "").strip()
+        flask_session = globals().get("session")
+        auth_user_id = str(
+            flask_session.get("nova_user_id") or ""
+        ).strip()
+
     except Exception:
-        active_session_id = ""
+        auth_user_id = ""
 
     try:
-        candidate = session_service.get_session(sid)
+        candidate = session_service.get_session(
+            sid,
+            user_id=auth_user_id,
+        )
+
         if isinstance(candidate, dict):
             found = candidate
+
     except Exception:
         found = None
 
     if found is None:
         try:
-            sessions = session_service.get_all()
+            sessions = session_service.get_all(
+                user_id=auth_user_id,
+            )
+
             if isinstance(sessions, list):
                 for item in sessions:
-                    if isinstance(item, dict) and str(item.get("id") or "").strip() == sid:
-                        found = item
-                        break
+                    if not isinstance(item, dict):
+                        continue
+
+                    if str(item.get("id") or "").strip() != sid:
+                        continue
+
+                    if not session_service._belongs_to_user(
+                        item,
+                        auth_user_id,
+                    ):
+                        continue
+
+                    found = item
+                    break
+
         except Exception:
             found = None
 
-    # Last-resort raw store fallback, still using the service's configured file.
+    # Last-resort raw store fallback with owner enforcement.
     if found is None:
         try:
             store = session_service._read_store()
             items = store.get("sessions") if isinstance(store, dict) else []
+
             if isinstance(items, list):
                 for item in items:
-                    if isinstance(item, dict) and str(item.get("id") or "").strip() == sid:
-                        found = item
-                        break
+                    if not isinstance(item, dict):
+                        continue
 
-            if isinstance(store, dict):
-                active_session_id = str(store.get("active_session_id") or active_session_id or "").strip()
+                    if str(item.get("id") or "").strip() != sid:
+                        continue
+
+                    if not session_service._belongs_to_user(
+                        item,
+                        auth_user_id,
+                    ):
+                        continue
+
+                    found = item
+                    break
+
         except Exception:
             found = None
 
@@ -7586,10 +7638,8 @@ def api_session_by_id(session_id: str):
         "session": found,
         "active_session_id": active_session_id or sid,
         "session_id": sid,
-        "skip_session_auth_scope_filter": True,
         "detail_service_first": True,
     })
-
 
 @app.post("/api/sessions/new")
 def api_sessions_new():
@@ -7597,26 +7647,37 @@ def api_sessions_new():
     # Create a real durable session, stamp current local-auth owner fields,
     # force-write it into the canonical session store, then return only the
     # saved/readable version. This prevents ghost active_session_id values.
+
     data = request_json()
     title = str(data.get("title") or "New Chat").strip() or "New Chat"
 
-    created = session_service.create_session(title)
+    # Resolve owner from Flask session before creating the session.
+    auth_user_id = ""
+    auth_username = ""
+
+    try:
+        flask_session = globals().get("session")
+        auth_user_id = str(
+            flask_session.get("nova_user_id") or ""
+        ).strip()
+    except Exception:
+        auth_user_id = ""
+
+    created = session_service.create_session(
+        title,
+        user_id=auth_user_id,
+    )
+
     session_id = ""
 
     if isinstance(created, dict):
         session_id = str(created.get("id") or "").strip()
 
     if not session_id:
-        session_id = str(getattr(session_service, "active_session_id", "") or "").strip()
+        session_id = str(
+            getattr(session_service, "active_session_id", "") or ""
+        ).strip()
 
-    # Resolve owner from Flask session without relying on the nested auth helper.
-    auth_user_id = ""
-    auth_username = ""
-    try:
-        flask_session = globals().get("session")
-        auth_user_id = str(flask_session.get("nova_user_id") or "").strip()
-    except Exception:
-        auth_user_id = ""
 
     try:
         users_path = DATA_DIR / "nova_auth_users.json"
@@ -14317,6 +14378,21 @@ def nova_final_session_detail_response_cache_20260612(response):
                 session_obj = _nova_final_find_session_in_store_20260612(store, session_id)
 
             if not isinstance(session_obj, dict):
+                return response
+
+            auth_user_id = ""
+            try:
+                flask_session = globals().get("session")
+                auth_user_id = str(
+                    flask_session.get("nova_user_id") or ""
+                ).strip()
+            except Exception:
+                auth_user_id = ""
+
+            if not session_service._belongs_to_user(
+                session_obj,
+                auth_user_id,
+            ):
                 return response
 
             messages = session_obj.get("messages")
