@@ -24,43 +24,11 @@
     <meta name="twitter:image" content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg">
     <!-- /NOVA_SOCIAL_META_20260709 -->
 
-    <!-- NOVA_PUBLIC_HOME_ADMIN_LINK_STYLE_20260709 -->
-    <style>
-        .nova-admin-home-pill-20260709 {
-            position: fixed;
-            top: max(16px, env(safe-area-inset-top));
-            right: 16px;
-            z-index: 2147483000;
-            min-height: 38px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0 14px;
-            border: 1px solid rgba(226,214,255,.22);
-            border-radius: 999px;
-            background: rgba(184,255,122,.94);
-            color: #101014;
-            box-shadow: 0 18px 54px rgba(0,0,0,.32);
-            font: 850 13px/1 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            text-decoration: none;
-            backdrop-filter: blur(18px);
-        }
-
-        .nova-admin-home-pill-20260709:hover {
-            transform: translateY(-1px);
-        }
-
-        @media (max-width: 700px) {
-            .nova-admin-home-pill-20260709 {
-                top: max(10px, env(safe-area-inset-top));
-                right: 10px;
-                min-height: 34px;
-                padding: 0 11px;
-                font-size: 12px;
-            }
-        }
-    </style>
-    <!-- /NOVA_PUBLIC_HOME_ADMIN_LINK_STYLE_20260709 -->
+{% if nova_show_admin_link %}
+<a href="/admin" aria-label="Open Nova admin dashboard">
+    Admin
+</a>
+{% endif %}
     <link rel="stylesheet" href="/static/css/nova-public-trust.css">
 
     <!-- NOVA_PUBLIC_SEO_CANONICAL_CLEANUP_20260709 -->
@@ -72,11 +40,6 @@
 </head>
 <body>
 
-<!-- NOVA_PUBLIC_HOME_ADMIN_LINK_20260709 -->
-    {% if nova_show_admin_link %}
-    <a class="nova-admin-home-pill-20260709" href="/admin" aria-label="Open Nova admin dashboard">Admin</a>
-    {% endif %}
-    <!-- /NOVA_PUBLIC_HOME_ADMIN_LINK_20260709 -->
     <div class="nova-home-bg" aria-hidden="true">
         <span class="nova-orb nova-orb-one"></span>
         <span class="nova-orb nova-orb-two"></span>
@@ -424,12 +387,18 @@
         <span>AI workspace for long-running projects, context, files, and focused execution.</span>
     </div>
 
-    <nav aria-label="Footer navigation">
-        <a href="/privacy">Privacy</a>
-        <a href="/terms">Terms</a>
-        <a href="/billing">Billing</a>
-        <a href="/contact">Contact</a>
-    </nav>
+<nav aria-label="Footer navigation">
+    <a href="/privacy">Privacy</a>
+    <a href="/terms">Terms</a>
+    <a href="/billing">Billing</a>
+
+    {% if nova_show_admin_link %}
+    <a href="/admin" aria-label="Open Nova admin dashboard">Admin</a>
+    {% endif %}
+
+    <a href="/contact">Contact</a>
+</nav>
+</nav>
 </footer>
 
 <!-- NOVA_PUBLIC_HOME_CANONICAL_LINKS_20260709 -->
