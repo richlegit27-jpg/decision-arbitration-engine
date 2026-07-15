@@ -5825,6 +5825,7 @@ if (not attachments) and (__name__ == "__main__"):
                         "Current Nova project context:\n"
                         "Current task: fix Nova project brain answer quality.\n"
                         "Focus: `what are we working on?` is still hitting the old direct working-on fallback in "
+                        "Current blocker: old direct working-on fallback is still being reached instead of fresh project-state context.\n"
                         "`nova_backend/services/chat_service.py` instead of fresh project-state context.\n"
                         "Next move: run `python .\\tools\\nova_project_brain_live_answer_sample.py` and confirm this replaces "
                         "`No active task is currently tracked yet.`"
