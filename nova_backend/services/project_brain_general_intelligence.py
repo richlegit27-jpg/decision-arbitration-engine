@@ -84,6 +84,31 @@ def classify_project_brain_intent(user_text: object) -> Optional[str]:
     ):
         return "actual_blocker"
 
+    if _has_any(
+        text,
+        (
+            "what is risky about app.py",
+            "what's risky about app.py",
+            "risk about app.py",
+            "should we patch app.py",
+            "app.py risk",
+            "app py risk",
+        ),
+    ):
+        return "app_py_risk"
+
+    if _has_any(
+        text,
+        (
+            "give me the project answer",
+            "practical project answer",
+            "not a pep talk",
+            "project answer in practical terms",
+            "practical terms",
+        ),
+    ):
+        return "practical_project_answer"
+
     return None
 
 def _current_project_answer(
@@ -831,6 +856,14 @@ _NOVA_PRE_COMMAND_CENTER_ROUTE_GATE_SHOULD_HANDLE_20260702 = (
 
 
 def should_handle_project_brain_general_question(user_text):
+    try:
+        if _nova_project_brain_live_selector_general_phrase_20260702(
+            user_text
+        ):
+            return True
+    except Exception:
+        pass
+
     try:
         if _nova_project_brain_command_center_question_20260702(user_text):
             return True
