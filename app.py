@@ -14234,11 +14234,6 @@ def nova_final_session_detail_response_cache_20260612(response):
 
                 except Exception:
                     response_session = dict(cached)
-
-                # NOVA_FINAL_CACHE_STALE_WORKING_STATE_HISTORY_CLEANUP_20260630
-                # Clean stale direct-recall answers inside returned session.messages.
-                # This prevents the UI from rendering old "No active..." text when
-                # working_state already has the truth.
  
                 try:
                     from nova_backend.services.stale_working_state_history_service import (
