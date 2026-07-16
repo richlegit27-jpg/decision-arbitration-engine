@@ -499,11 +499,19 @@ class SessionService:
         if not user_id:
             return False
 
-        return (
-            str(session.get("user_id") or "").strip()
-            ==
-            str(user_id or "").strip()
-        )
+        session_user_id = str(
+            session.get("user_id") or ""
+        ).strip()
+
+        current_user_id = str(
+            user_id or ""
+        ).strip()
+
+        if session_user_id == current_user_id:
+            return True
+
+        return False
+
     def load(self):
         """
         Compatibility bridge for older ChatService code that expects
@@ -545,52 +553,84 @@ class SessionService:
 
         return found
 
-    def delete(self, session_id: str):
-        data = self._read_store()
-
-        sessions = data.get("sessions", [])
-        new_sessions = [s for s in sessions if s.get("id") != session_id]
-
-        if len(new_sessions) == len(sessions):
-            return False
-
-        data["sessions"] = new_sessions
-
-        if data.get("active_session_id") == session_id:
-            data["active_session_id"] = new_sessions[0]["id"] if new_sessions else ""
-
-        self._write_store(data)
-
-        return True
-
-    def rename(self, session_id: str, title: str):
+    def rename(self, session_id: str, title: str, user_id=""):
         data = self._read_store()
         sessions = data.get("sessions", [])
 
         clean_title = str(title or "").strip() or "New Chat"
 
         for session in sessions:
-            if str(session.get("id") or "") == str(session_id or ""):
-                session["title"] = clean_title
-                session["updated_at"] = iso_now()
-                self._write_store(data)
-                return session
+            if str(session.get("id") or "") != str(session_id or ""):
+                continue
+
+            if user_id and not self._belongs_to_user(session, user_id):
+                return None
+
+            session["title"] = clean_title
+            session["updated_at"] = iso_now()
+
+            self._write_store(data)
+            return session
 
         return None
 
 
-    def pin(self, session_id: str, pinned: bool):
+    def pin(self, session_id: str, pinned: bool, user_id=""):
         data = self._read_store()
         sessions = data.get("sessions", [])
 
         for session in sessions:
-            if str(session.get("id") or "") == str(session_id or ""):
-                session["pinned"] = bool(pinned)
-                session["updated_at"] = iso_now()
-                self._write_store(data)
-                return session
+            if str(session.get("id") or "") != str(session_id or ""):
+                continue
+
+            if user_id and not self._belongs_to_user(session, user_id):
+                return None
+
+            session["pinned"] = bool(pinned)
+            session["updated_at"] = iso_now()
+
+            self._write_store(data)
+            return session
 
         return None
+    def delete(self, session_id: str, user_id=""):
+        data = self._read_store()
+        sessions = data.get("sessions", [])
+
+        remaining = []
+        deleted = False
+
+        for session in sessions:
+            if str(session.get("id") or "") != str(session_id or ""):
+                remaining.append(session)
+                continue
+
+            if user_id and not self._belongs_to_user(session, user_id):
+                remaining.append(session)
+                continue
+
+            deleted = True
+
+        if not deleted:
+            return False
+
+        data["sessions"] = remaining
+
+        active_id = str(
+            data.get("active_session_id") or ""
+        ).strip()
+
+        if active_id == str(session_id or "").strip():
+            data["active_session_id"] = (
+                remaining[0].get("id")
+                if remaining
+                else ""
+            )
+
+        self._write_store(data)
+
+        return True
+
 
     # -----------------------
     # WORKING STATE
@@ -671,7 +711,26 @@ class SessionService:
         if not self._belongs_to_user(session, user_id):
             return None
 
+        if (
+            user_id
+            and not str(session.get("user_id") or "").strip()
+        ):
+            session["user_id"] = str(user_id).strip()
+            self._save_sessions(
+                sessions,
+                self.get_active_session_id(),
+            )
+
         return session
+
+    def get_active_session(self):
+        active_id = self.get_active_session_id()
+        if not active_id:
+            return None
+        return self.get_session(active_id)
+
+    def get_active(self):
+        return self.get_active_session()
 
     def get_active_session(self):
         active_id = self.get_active_session_id()

@@ -2169,6 +2169,27 @@ Current step:
             exec_debug("GET ARTIFACTS LIST FAILED:", e)
             return []
 
+    def _ensure_session_id(self, session_id):
+        sid = str(session_id or "").strip()
+
+        if sid:
+            return sid
+
+        try:
+            created = self.session_service.create_session()
+
+            if isinstance(created, dict):
+                return str(
+                    created.get("id")
+                    or created.get("session_id")
+                    or ""
+                ).strip()
+
+        except Exception:
+            pass
+
+        return ""
+
     def _get_session_payload(self, session_id: str = "") -> dict:
         sid = self._ensure_session_id(session_id)
 
@@ -2267,27 +2288,63 @@ Current step:
 
         return payload
 
-    def _ensure_session_id(self, session_id: str = "") -> str:
+    def _create_session(self, session_id: str = "") -> str:
         sid = self._safe_str(session_id).strip()
+
+        auth_user_id = ""
+
+        try:
+            from flask import g
+
+            user = getattr(g, "nova_auth_user", None) or {}
+
+            auth_user_id = str(
+                user.get("id") or ""
+            ).strip()
+
+        except Exception:
+            auth_user_id = ""
+
+        if not auth_user_id:
+            try:
+                from flask import session as flask_session
+
+                auth_user_id = str(
+                    flask_session.get("nova_user_id") or ""
+                ).strip()
+
+            except Exception:
+                auth_user_id = ""
 
         if (
             sid
             and " " not in sid
             and len(sid) >= 8
         ):
-            return sid
+            existing = self.sessions.get_session(
+                sid,
+                user_id=auth_user_id,
+            )
+
+            if existing:
+                return sid
 
         created = None
 
         if hasattr(self.sessions, "create_session"):
-            created = self.sessions.create_session()
+            created = self.sessions.create_session(
+                user_id=auth_user_id,
+            )
 
         elif hasattr(self.sessions, "new_session"):
-            created = self.sessions.new_session()
+            created = self.sessions.new_session(
+                user_id=auth_user_id,
+            )
 
         if isinstance(created, dict):
-
-            created_id = self._safe_str(created.get("id")).strip()
+            created_id = self._safe_str(
+                created.get("id")
+            ).strip()
 
             if (
                 created_id.startswith("session_")

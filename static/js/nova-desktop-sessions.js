@@ -11,31 +11,56 @@ window.__NOVA_SESSION_STATE = {
   currentRequest: null
 };
 
-  function getSessionId() {
-    const el = $("sid");
-return (
-  (el && el.value) ||
-  localStorage.getItem("nova_active_session_id") ||
-  localStorage.getItem("nova_session_id") ||
-  ""
-).trim();
+function getSessionId() {
+  const el = $("sid");
+
+  let value = "";
+
+  if (el && typeof el === "object" && "value" in el) {
+    value = el.value;
   }
 
-  function setSessionId(id) {
-    const sid = String(id || "").trim();
-
-    const el = $("sid");
-    if (el) el.value = sid;
-
-    try {
-      if (sid) {
-        localStorage.setItem("nova_session_id", sid);
-        localStorage.setItem("nova_active_session_id", sid);
-      }
-    } catch (e) {}
-
-    return sid;
+  if (!value) {
+    value = localStorage.getItem("nova_active_session_id") || "";
   }
+
+  if (!value) {
+    value = localStorage.getItem("nova.session_id") || "";
+  }
+
+  if (!value) {
+    value = localStorage.getItem("nova_session_id") || "";
+  }
+
+  return String(value || "").trim();
+}
+
+function setSessionId(id) {
+  let sid = "";
+
+  if (typeof id === "string") {
+    sid = id.trim();
+  } else if (id && typeof id === "object" && "value" in id) {
+    sid = String(id.value || "").trim();
+  }
+
+  if (!sid || sid === "[object HTMLInputElement]") {
+    return "";
+  }
+
+  const el = $("sid");
+  if (el && "value" in el) {
+    el.value = sid;
+  }
+
+  try {
+    localStorage.setItem("nova_session_id", sid);
+    localStorage.setItem("nova_active_session_id", sid);
+    localStorage.setItem("nova.session_id", sid);
+  } catch (e) {}
+
+  return sid;
+}
 
   async function fetchJson(url, options) {
     const response = await fetch(url, options || {});
@@ -48,64 +73,100 @@ return (
       throw new Error("Non-JSON response from " + url + ": " + text.slice(0, 160));
     }
 
-    if (!response.ok || data.ok === false) {
-      throw new Error(data.error || data.message || ("Request failed: " + response.status));
-    }
+if (!response.ok || data.ok === false) {
+
+  if (response.status === 404 && url.includes("/api/sessions/")) {
+    try {
+      localStorage.removeItem("nova.session_id");
+      localStorage.removeItem("nova_session_id");
+      localStorage.removeItem("nova_active_session_id");
+      sessionStorage.removeItem("nova_session_id");
+      sessionStorage.removeItem("nova_active_session_id");
+    } catch (e) {}
+  }
+
+  throw new Error(
+    data.error ||
+    data.message ||
+    ("Request failed: " + response.status)
+  );
+}
 
     return data;
   }
 
 async function openSession(sessionId) {
-  const sid = setSessionId(sessionId);
+  let sid = "";
 
-  if (!sid) return;
+  if (typeof sessionId === "string") {
+    sid = sessionId.trim();
+  } else if (sessionId && typeof sessionId === "object" && "value" in sessionId) {
+    sid = String(sessionId.value || "").trim();
+  }
+
+  if (!sid || sid === "[object HTMLInputElement]") {
+    console.warn(
+      "[Nova Desktop Sessions External] rejected invalid session id",
+      sessionId
+    );
+    return;
+  }
 
   console.log("[Nova Desktop Sessions External] open session", sid);
-
-  try {
-    window.NOVA_FORCE_NEW_SESSION_ON_NEXT_SEND = false;
-    window.NOVA_PENDING_NEW_SESSION_ID = "";
-
-    localStorage.setItem("nova.session_id", sid);
-    localStorage.setItem("nova_session_id", sid);
-    localStorage.setItem("nova_active_session_id", sid);
-    sessionStorage.setItem("nova_session_id", sid);
-    sessionStorage.setItem("nova_active_session_id", sid);
-
-    window.__NOVA_ACTIVE_SESSION_ID = sid;
-    window.currentSessionId = sid;
-    window.activeSessionId = sid;
-    window.novaCurrentSessionId = sid;
-  } catch (e) {}
 
   window.setStatus?.("loading session...");
 
   try {
+    try {
+      localStorage.setItem("nova.session_id", sid);
+      localStorage.setItem("nova_session_id", sid);
+      localStorage.setItem("nova_active_session_id", sid);
+      sessionStorage.setItem("nova_session_id", sid);
+      sessionStorage.setItem("nova_active_session_id", sid);
+
+      window.__NOVA_ACTIVE_SESSION_ID = sid;
+      window.currentSessionId = sid;
+      window.activeSessionId = sid;
+      window.novaCurrentSessionId = sid;
+    } catch (e) {}
+
     if (typeof window.NovaDesktopFetchSession === "function") {
       await window.NovaDesktopFetchSession(sid);
     } else {
-      const data = await fetchJson("/api/sessions/" + encodeURIComponent(sid), {
-        cache: "no-store"
-      });
+      const data = await fetchJson(
+        "/api/sessions/" + encodeURIComponent(sid),
+        {
+          cache: "no-store"
+        }
+      );
 
       const session = data.session || data;
 
       if (session && Array.isArray(session.messages)) {
         if (typeof window.renderDesktopChatMessages === "function") {
           window.renderDesktopChatMessages(session.messages);
-        } else if (typeof window.renderDesktopChatMessagesRescue === "function") {
+        } else if (
+          typeof window.renderDesktopChatMessagesRescue === "function"
+        ) {
           window.renderDesktopChatMessagesRescue(session.messages);
         }
       }
     }
 
     document.querySelectorAll(".desktop-session-item").forEach(function (item) {
-      item.classList.toggle("is-active", item.dataset.sessionId === sid);
+      item.classList.toggle(
+        "is-active",
+        item.dataset.sessionId === sid
+      );
     });
 
     window.setStatus?.("session selected");
+
   } catch (error) {
-    console.warn("[Nova Desktop Sessions External] open session failed", error);
+    console.warn(
+      "[Nova Desktop Sessions External] open session failed",
+      error
+    );
     window.setStatus?.("session load failed");
   }
 }
@@ -131,25 +192,115 @@ async function loadDesktopSessionsExternal() {
     const sid = session.id || session.session_id;
     if (!sid) return;
 
-    const btn = document.createElement("button");
-    btn.type = "button";
+    const btn = document.createElement("div");
     btn.className = "desktop-session-item" + (sid === active ? " is-active" : "");
     btn.dataset.sessionId = sid;
 
+btn.setAttribute("role", "button");
+btn.tabIndex = 0;
+
+btn.addEventListener("mouseenter", function () {
+  const actions = btn.querySelector(".desktop-session-actions");
+  if (actions) actions.style.display = "flex";
+});
+
+btn.addEventListener("mouseleave", function () {
+  const actions = btn.querySelector(".desktop-session-actions");
+  if (actions) actions.style.display = "none";
+});
+
     btn.innerHTML = `
-      <div class="desktop-session-title">${session.title || "Untitled"}</div>
-      <div class="desktop-session-meta">${sid}</div>
+      <div class="desktop-session-title">
+        ${session.title || "Untitled"}
+      </div>
+
+      <div class="desktop-session-meta">
+        ${sid}
+      </div>
+
+      <div class="desktop-session-actions" style="display:none;">
+        <button type="button" data-action="rename">Rename</button>
+        <button type="button" data-action="pin">
+          ${session.pinned ? "Unpin" : "Pin"}
+        </button>
+        <button type="button" data-action="delete">Delete</button>
+      </div>
     `;
 
-btn.onclick = () => {
+btn.onclick = (event) => {
+  if (event.target.closest("[data-action]")) {
+    return;
+  }
+
   openSession(sid);
 };
 
-list.appendChild(btn);
-  });
+    btn.querySelector('[data-action="rename"]').onclick = async (event) => {
+      event.stopPropagation();
 
-  console.log("[Nova Sessions External] rendered", sessions.length);
+      const title = prompt(
+        "Rename session:",
+        session.title || "Untitled"
+      );
+
+      if (!title || !title.trim()) return;
+
+      await fetch("/api/sessions/rename", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          session_id: sid,
+          title: title.trim()
+        })
+      });
+
+      await loadDesktopSessionsExternal();
+    };
+
+
+    btn.querySelector('[data-action="pin"]').onclick = async (event) => {
+      event.stopPropagation();
+
+      await fetch("/api/sessions/pin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          session_id: sid,
+          pinned: !session.pinned
+        })
+      });
+
+      await loadDesktopSessionsExternal();
+    };
+
+
+    btn.querySelector('[data-action="delete"]').onclick = async (event) => {
+      event.stopPropagation();
+
+      if (!confirm("Delete this session?")) {
+        return;
+      }
+
+const response = await fetch("/api/sessions/delete", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    session_id: sid
+  })
+});
+
+if (!response.ok) {
+  console.warn("delete failed", await response.text());
+  return;
 }
+
+await loadDesktopSessionsExternal();
 
 async function newSessionExternal() {
 
@@ -221,8 +372,7 @@ function wireButtons() {
   window.NovaDesktopOpenSession = openSession;
   window.loadDesktopSessions = loadDesktopSessionsExternal;
   window.NovaDesktopLoadSessions = loadDesktopSessionsExternal;
-  window.newSession = newSessionExternal;
-  window.NovaDesktopNewSession = newSessionExternal;
+window.NovaDesktopNewSession = newSessionExternal;
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", wireButtons);

@@ -584,16 +584,26 @@ try:
                     "text": answer.text,
                     "content": answer.text,
                 },
+
+
                 "debug": {
                     "route": (
                         "autonomy_plan_command"
                         if answer.intent == "autonomy_plan"
-                        else "project_brain_general_intelligence"
+                        else (
+                            "project_state_current_memory_direct_recall"
+                            if answer.intent == "current_project_state"
+                            else "project_brain_general_intelligence"
+                        )
                     ),
                     "route_taken": (
                         "autonomy_plan_command"
                         if answer.intent == "autonomy_plan"
-                        else "project_brain_general_intelligence"
+                        else (
+                            "project_state_current_memory_direct_recall"
+                            if answer.intent == "current_project_state"
+                            else "project_brain_general_intelligence"
+                        )
                     ),
                     "intent": answer.intent,
                     "priority_project_brain_general_intelligence": True,
@@ -2063,23 +2073,19 @@ def api_fetch():
 # NOVA_RESTORE_API_SESSIONS_ROUTE_20260609
 @app.get("/api/sessions")
 def api_sessions():
-    sessions = session_service.get_all()
-
     try:
         flask_session = globals().get("session")
         current_user_id = str(
-            flask_session.get("nova_user_id") or ""
+            flask_session.get("nova_user_id")
+            or flask_session.get("user_id")
+            or ""
         ).strip()
     except Exception:
         current_user_id = ""
 
-    if current_user_id:
-        sessions = [
-            item
-            for item in sessions
-            if isinstance(item, dict)
-            and str(item.get("user_id") or "").strip() == current_user_id
-        ]
+    sessions = session_service.get_all(
+        user_id=current_user_id,
+    )
 
     return json_ok(
         sessions=sessions,
@@ -7565,8 +7571,11 @@ def api_session_by_id(session_id: str):
     auth_user_id = ""
     try:
         flask_session = globals().get("session")
+
         auth_user_id = str(
-            flask_session.get("nova_user_id") or ""
+            flask_session.get("nova_user_id")
+            or flask_session.get("user_id")
+            or ""
         ).strip()
 
     except Exception:
@@ -7669,17 +7678,27 @@ def api_sessions_new():
     auth_username = ""
 
     try:
-        flask_session = globals().get("session")
         auth_user_id = str(
-            flask_session.get("nova_user_id") or ""
+            session.get("nova_user_id") or ""
         ).strip()
+
     except Exception:
         auth_user_id = ""
 
-    created = session_service.create_session(
-        title,
-        user_id=auth_user_id,
-    )
+    if hasattr(session_service, "create_session"):
+        created = session_service.create_session(
+            title,
+            user_id=auth_user_id,
+        )
+    elif hasattr(session_service, "new_session"):
+        created = session_service.new_session(
+            title,
+            user_id=auth_user_id,
+        )
+    else:
+        raise AttributeError(
+            "SessionService has no create_session/new_session method"
+        )
 
     session_id = ""
 
@@ -7761,12 +7780,21 @@ def api_sessions_new():
             except Exception:
                 pass
 
-    saved = session_service.get_session(session_id) if session_id else None
+    saved = (
+    session_service.get_session(
+        session_id,
+        user_id=auth_user_id,
+    )
+    if session_id
+    else None
+)
 
     if isinstance(saved, dict):
         created = saved
 
-    sessions = session_service.get_all()
+    sessions = session_service.get_all(
+        user_id=auth_user_id,
+    )
 
     # Ensure the response list includes the created active session, even if a
     # list cap/filter elsewhere has not refreshed yet.
@@ -7819,7 +7847,26 @@ def api_sessions_rename():
     if not session_id:
         return json_error("Missing session_id", 400)
 
-    session = session_service.rename(session_id, title or "New Chat")
+    auth_user_id = ""
+
+    try:
+        flask_session = globals().get("session")
+
+        auth_user_id = str(
+            flask_session.get("nova_user_id")
+            or flask_session.get("user_id")
+            or ""
+        ).strip()
+
+    except Exception:
+        auth_user_id = ""
+
+    session = session_service.rename(
+        session_id,
+        title or "New Chat",
+        user_id=auth_user_id,
+    )
+
     if not session:
         return json_error("Session not found", 404)
 
@@ -7840,7 +7887,26 @@ def api_sessions_pin():
     if not session_id:
         return json_error("Missing session_id", 400)
 
-    session = session_service.pin(session_id, pinned)
+    auth_user_id = ""
+
+    try:
+        flask_session = globals().get("session")
+
+        auth_user_id = str(
+            flask_session.get("nova_user_id")
+            or flask_session.get("user_id")
+            or ""
+        ).strip()
+
+    except Exception:
+        auth_user_id = ""
+
+    session = session_service.pin(
+        session_id,
+        pinned,
+        user_id=auth_user_id,
+    )
+
     if not session:
         return json_error("Session not found", 404)
 
@@ -7860,7 +7926,24 @@ def api_sessions_delete():
     if not session_id:
         return json_error("Missing session_id", 400)
 
-    if not session_service.delete(session_id):
+    auth_user_id = ""
+
+    try:
+        flask_session = globals().get("session")
+
+        auth_user_id = str(
+            flask_session.get("nova_user_id")
+            or flask_session.get("user_id")
+            or ""
+        ).strip()
+
+    except Exception:
+        auth_user_id = ""
+
+    if not session_service.delete(
+        session_id,
+        user_id=auth_user_id,
+    ):
         return json_error("Session not found", 404)
 
     active_id = session_service.active_session_id
@@ -10861,20 +10944,48 @@ def nova_mobile_direct_session_persist_20260609():
 @app.get("/app")
 def nova_desktop_app_fixed_20260610():
     return render_template("app.html")
-
 # NOVA_ACCOUNT_PROFILE_ROUTE_20260708
 @app.get("/api/account")
 def nova_account_profile_20260708():
     from flask import jsonify, session
 
+    print("[ACCOUNT DEBUG SESSION]", dict(session))
+
     username = ""
 
     try:
+        user_id = session.get("nova_user_id")
+
+        print("[ACCOUNT USER ID]", user_id)
+
+        if user_id:
+            from pathlib import Path
+            import json
+
+            users_path = Path("data") / "nova_auth_users.json"
+            print("[ACCOUNT USERS FILE]", users_path, users_path.exists())
+
+            if users_path.exists():
+                users_data = json.loads(
+                    users_path.read_text(encoding="utf-8")
+                )
+
+                for user in users_data.get("users", []):
+                    if user.get("id") == user_id:
+                        username = str(
+                            user.get("username") or ""
+                        ).strip()
+                        break
+
+    except Exception as exc:
+        print("[ACCOUNT USER LOOKUP ERROR]", exc)
+
+    if not username:
         username = str(
             session.get("username") or ""
         ).strip()
-    except Exception:
-        pass
+
+    print("[ACCOUNT FINAL USERNAME]", username)
 
     if not username:
         username = "richard"
@@ -10900,6 +11011,7 @@ def nova_account_profile_20260708():
         "monthly_credits": billing.get("monthly_credits", 0),
         "created_at": billing.get("created_at", ""),
     })
+
 
 # NOVA_LOCAL_AUTH_ROUTES_20260610
 # Local dev auth API...
@@ -11017,6 +11129,10 @@ def _nova_install_local_auth_routes_20260610():
         save_users(data)
 
         session["nova_user_id"] = user["id"]
+        session.pop("user_id", None)
+        session.pop("username", None)
+        session["authenticated"] = True
+        session["auth_mode"] = "local"
 
         return jsonify({
             "ok": True,
@@ -11040,8 +11156,12 @@ def _nova_install_local_auth_routes_20260610():
             return jsonify({"ok": False, "error": "Invalid username or password."}), 401
 
         session["nova_user_id"] = user["id"]
-
+        session.pop("user_id", None)
+        session.pop("username", None)
+        session["authenticated"] = True
+        session["auth_mode"] = "local"
         return jsonify({
+
             "ok": True,
             "authenticated": True,
             "user": public_user(user),
@@ -11331,13 +11451,14 @@ def nova_slim_api_sessions_payload_20260611(response):
         return response
 
 
-
-
 # NOVA_BEFORE_REQUEST_SLIM_API_SESSIONS_20260611
 @app.before_request
 def nova_before_request_slim_api_sessions_20260611():
     try:
         if request.path != "/api/sessions" or request.method != "GET":
+            return None
+
+        if not session.get("nova_user_id"):
             return None
 
         raw_sessions = []
@@ -11349,10 +11470,16 @@ def nova_before_request_slim_api_sessions_20260611():
             "load_sessions",
             "all",
         ):
+
+
             try:
                 method = getattr(session_service, method_name, None)
                 if callable(method):
-                    candidate = method()
+                    candidate = method(
+                        user_id=str(
+                            session.get("nova_user_id") or ""
+                        ).strip()
+                    )
                     if isinstance(candidate, list):
                         raw_sessions = candidate
                         break
@@ -11366,30 +11493,29 @@ def nova_before_request_slim_api_sessions_20260611():
             except Exception:
                 pass
 
-        # NOVA_SLIM_SESSIONS_DIRECT_JSON_FALLBACK_20260611
-        if not raw_sessions:
-            try:
-                sessions_path = os.path.join(app.root_path, "data", "nova_sessions.json")
-                with open(sessions_path, "r", encoding="utf-8") as handle:
-                    sessions_payload = json.load(handle)
+        # NOVA_SLIM_SESSION_OWNER_FILTER_20260715
+        try:
+            current_user_id = str(
+                session.get("nova_user_id") or ""
+            ).strip()
 
-                if isinstance(sessions_payload, dict):
-                    active_session_id = str(sessions_payload.get("active_session_id") or "").strip()
+            raw_sessions = [
+                item
+                for item in raw_sessions
+                if (
+                    isinstance(item, dict)
+                    and str(item.get("user_id") or "").strip()
+                    == current_user_id
+                )
+            ]
 
-                    if isinstance(sessions_payload.get("sessions"), list):
-                        raw_sessions = sessions_payload.get("sessions") or []
-                    elif isinstance(sessions_payload.get("data"), dict) and isinstance(sessions_payload["data"].get("sessions"), list):
-                        raw_sessions = sessions_payload["data"].get("sessions") or []
-                elif isinstance(sessions_payload, list):
-                    raw_sessions = sessions_payload
-            except Exception as exc:
-                try:
-                    app.logger.warning("[Nova Slim Sessions Direct JSON Fallback] failed: %s", exc)
-                except Exception:
-                    pass
+        except Exception as exc:
+            app.logger.warning(
+                "[Nova Slim Session Owner Filter] failed: %s",
+                exc,
+            )
 
         slim_sessions = []
-
         for item in raw_sessions:
             if not isinstance(item, dict):
                 continue
@@ -11428,8 +11554,13 @@ def nova_before_request_slim_api_sessions_20260611():
             active_session_id = ""
 
         if not active_session_id and slim_sessions:
-            active_session_id = str(slim_sessions[0].get("id") or "")
+            for candidate in slim_sessions:
+                if int(candidate.get("message_count") or 0) > 0:
+                    active_session_id = str(candidate.get("id") or "")
+                    break
 
+            if not active_session_id:
+                active_session_id = str(slim_sessions[0].get("id") or "")
         returned_sessions = slim_sessions[:50]
 
         slim_response = jsonify({
@@ -14371,10 +14502,14 @@ def nova_final_session_detail_response_cache_20260612(response):
                 response_json["session"] = response_session
                 response_json["session_id"] = session_id
                 response_json["active_session_id"] = session_id
-            try:
-                session_service.active_session_id = session_id
-            except Exception:
-                pass
+
+                session_obj = session_service.get_session(
+                    session_id,
+                )
+
+                if session_obj:
+                    session_service.active_session_id = session_id
+
                 response_json["final_session_detail_response_cache"] = True
                 response.set_data(json.dumps(response_json, ensure_ascii=False))
                 response.headers["Content-Length"] = str(len(response.get_data()))
@@ -14401,15 +14536,6 @@ def nova_final_session_detail_response_cache_20260612(response):
 
             if not isinstance(session_obj, dict):
                 return response
-
-            auth_user_id = ""
-            try:
-                flask_session = globals().get("session")
-                auth_user_id = str(
-                    flask_session.get("nova_user_id") or ""
-                ).strip()
-            except Exception:
-                auth_user_id = ""
 
             if not session_service._belongs_to_user(
                 session_obj,
@@ -17428,9 +17554,14 @@ try:
         return None
 
     def _nova_phase4g_create_session_20260701(data, session_id, title=""):
+        owner_id = str(
+            session.get("nova_user_id") or ""
+        ).strip()
+
         session = {
             "id": session_id,
             "title": title or session_id,
+            "user_id": owner_id,
             "messages": [],
             "session_attachments": [],
             "working_state": {},
@@ -17458,6 +17589,7 @@ try:
             return session
 
         return session
+
 
     def _nova_phase4g_get_or_create_session_20260701(data, session_id, title=""):
         session = _nova_phase4g_find_session_20260701(data, session_id)
@@ -17533,9 +17665,9 @@ try:
                 if value:
                     return value
 
-            session = source.get("session")
+            session_obj = source.get("session")
             if isinstance(session, dict):
-                value = _nova_phase4g_text_20260701(session.get("id"))
+                value = _nova_phase4g_text_20260701(session_obj.get("id"))
                 if value:
                     return value
 
@@ -18066,27 +18198,12 @@ try:
 
             # NOVA_PROJECT_BRAIN_ROUTE_PROTECTION_20260712
             # Do not overwrite Project Brain ownership metadata.
-            try:
-                existing_payload = json.loads(
-                    response.get_data(as_text=True)
-                )
+            from nova_backend.services.project_brain_route_protection_service import (
+                response_owned_by_project_brain,
+            )
 
-                existing_debug = (
-                    existing_payload.get("debug")
-                    or {}
-                )
-
-                existing_route = str(
-                    existing_debug.get("route")
-                    or existing_debug.get("route_taken")
-                    or ""
-                ).strip()
-
-                if existing_route == "project_brain_general_intelligence":
-                    return response
-
-            except Exception:
-                pass
+            if response_owned_by_project_brain(response):
+                return response
 
             if not _nova_phase4f_prerun_is_safe_probe_20260701(user_text):
                 return response
@@ -18942,10 +19059,19 @@ try:
             _nasf_session.permanent = True
             _nasf_session["authenticated"] = True
             _nasf_session["auth_mode"] = "local"
-            _nasf_session["username"] = "richard"
-            _nasf_session["user_id"] = "user_richard_stable_local_login"
-        except Exception:
-            pass
+
+            print("[RICHARD RESTORE FIRED]")
+            print("[SESSION BEFORE RICHARD]", dict(_nasf_session))
+
+            if not _nasf_session.get("nova_user_id"):
+                _nasf_session["username"] = "richard"
+                _nasf_session["user_id"] = "user_9cf403c995b3cf8d36a461e9"
+                _nasf_session["nova_user_id"] = "user_9cf403c995b3cf8d36a461e9"
+
+            print("[SESSION AFTER RICHARD]", dict(_nasf_session))
+
+        except Exception as exc:
+            print("[RICHARD RESTORE FAILED]", repr(exc))
 
     def _nasf_payload_20260703():
         return {
@@ -18984,10 +19110,15 @@ try:
                 or path.startswith("/api/sessions")
                 or path.startswith("/api/chat")
             ):
-                _nasf_set_owner_session_20260703()
+                if not _nasf_session.get("nova_user_id"):
+                    _nasf_set_owner_session_20260703()
 
             if path == "/api/auth/status":
-                return _nasf_cookie_20260703(_nasf_jsonify(_nasf_payload_20260703()))
+                if _nasf_session.get("user_id") == "user_richard_stable_local_login":
+                    return _nasf_cookie_20260703(
+                        _nasf_jsonify(_nasf_payload_20260703())
+                    )
+
         except Exception:
             pass
 
