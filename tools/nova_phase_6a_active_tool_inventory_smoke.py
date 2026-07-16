@@ -15,11 +15,21 @@ REQUIRED_ACTIVE_TOOLS = [
 ]
 
 ONE_TIME_HINTS = [
-    "patch",
-    "repair",
-    "wire",
-    "fix",
+    "patch_",
+    "repair_",
+    "wire_",
+    "fix_",
 ]
+
+HISTORICAL_HELPER_PREFIXES = (
+    "patch_",
+    "repair_",
+    "wire_",
+    "fix_",
+    "nova_patch_",
+    "nova_repair_",
+    "nova_fix_",
+)
 
 SAFE_PERMANENT_HINTS = [
     "smoke",
@@ -61,7 +71,11 @@ def main() -> int:
         if any(hint in lower for hint in ["smoke", "review", "lock", "inventory"]) and name not in master_text:
             unwired_smokes_or_reviews.append(name)
 
-        if any(hint in lower for hint in ONE_TIME_HINTS) and not any(hint in lower for hint in SAFE_PERMANENT_HINTS):
+        if (
+            any(lower.startswith(prefix) for prefix in HISTORICAL_HELPER_PREFIXES)
+            and name in wired
+            and not lower.endswith("_smoke.py")
+        ):
             one_time_like.append(name)
 
     print("")

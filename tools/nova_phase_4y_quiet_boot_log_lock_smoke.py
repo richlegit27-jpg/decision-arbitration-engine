@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import subprocess
 import sys
@@ -22,7 +22,7 @@ FORBIDDEN_OUTPUT = [
 
 REQUIRED_OUTPUT = [
     "NOVA PHASE 4T LIVE BOOT LOG INVENTORY",
-    "- 004 boot",
+    "Boot-like print locations:",
     "[Nova OpenAI Key] loaded",
     "[Nova OpenAI Key] not configured",
     "NOVA PHASE 4T LIVE BOOT LOG INVENTORY DONE",

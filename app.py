@@ -19446,11 +19446,9 @@ try:
         try:
             from flask import request
             import json
-            from nova_backend.services.upload_attachment_response_normalizer import (
-                normalize_upload_response_payload,
-            )
-            from nova_backend.services.chat_turn_attachment_hydrator import (
-                hydrate_attachment_for_context,
+
+            from nova_backend.services.upload_attachment_response_service import (
+                finalize_upload_attachment_response,
             )
 
             if request.path != "/api/upload":
@@ -19464,8 +19462,7 @@ try:
             if not isinstance(payload, dict):
                 return response
 
-            normalized = normalize_upload_response_payload(payload)
-            hydrated = hydrate_attachment_for_context(normalized)
+            hydrated = finalize_upload_attachment_response(payload)
 
             if isinstance(hydrated, dict) and hydrated != payload:
                 response.set_data(json.dumps(hydrated, ensure_ascii=False))
@@ -19476,10 +19473,6 @@ try:
             return response
 except Exception:
     pass
-
-
-
-
 
 # NOVA_ATTACHMENT_CAPABILITY_STATUS_ROUTE_20260705
 @app.route("/api/attachment/status", methods=["GET"])

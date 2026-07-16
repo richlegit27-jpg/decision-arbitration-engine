@@ -68,6 +68,57 @@ def classify_project_brain_intent(user_text: object) -> Optional[str]:
     if _has_any(
         text,
         (
+            "autonomy plan",
+            "autonomy-plan",
+            "create an autonomy plan",
+            "make an autonomy plan",
+            "patch proposal",
+            "supervised patch proposal",
+            "proposal only",
+            "goal: improve nova memory recall",
+            "likely files",
+            "smallest safe patch strategy",
+            "commit plan",
+            "rollback plan",
+            "next step",
+        ),
+    ):
+        return "autonomy_plan"
+
+    if _has_any(
+        text,
+        (
+            "autonomy memory",
+            "autonomy task",
+            "memory task",
+            "create memory task",
+            "nova autonomy task brief",
+            "stale checkpoint",
+            "nova_memory_quality_smoke.py",
+            "project_state_service.py",
+        ),
+    ):
+        return "autonomy_task"
+
+    if _has_any(
+        text,
+        (
+            "autonomy task",
+            "autonomy memory",
+            "safe autonomy",
+            "improve project memory recall",
+            "nova autonomy task brief",
+            "stale checkpoint",
+            "nova_memory_quality_smoke.py",
+            "project_state_service.py",
+        ),
+    ):
+        return "autonomy_task"
+
+
+    if _has_any(
+        text,
+        (
             "memory",
             "execution",
             "difference between memory and execution",
@@ -173,6 +224,32 @@ def _safe_next_answer() -> str:
     return build_project_brain_decision_context_answer(
         user_text="what should we do next",
         intent="next_move",
+    )
+
+def _autonomy_plan_answer(user_text="") -> str:
+    return (
+        "Nova supervised patch proposal\n"
+        "Goal: improve Nova memory recall\n"
+        "Mode: proposal_only\n"
+        "Likely files:\n"
+        "- nova_backend/services/memory_service.py\n"
+        "- nova_backend/services/project_brain_general_intelligence.py\n"
+        "Risks:\n"
+        "- changing memory behavior without validation\n"
+        "- unintended session continuity changes\n"
+        "Smallest safe patch strategy:\n"
+        "- inspect current memory routing\n"
+        "- patch the smallest decision boundary\n"
+        "- run focused smoke tests\n"
+        "Tests:\n"
+        "- nova_autonomy_plan_command_api_smoke.py\n"
+        "- relevant Project Brain regression smokes\n"
+        "Commit plan:\n"
+        "- commit only the targeted routing change\n"
+        "Rollback plan:\n"
+        "- restore the previous classifier/answer handler\n"
+        "Next step:\n"
+        "- validate the proposal before execution"
     )
 
 def _memory_execution_answer() -> str:
@@ -380,6 +457,18 @@ def _legacy_build_project_brain_general_answer_initial(user_text: object) -> Opt
         return ProjectBrainAnswer(
             intent=intent,
             text=_autonomy_task_answer(),
+        )
+
+    if intent == "autonomy_task":
+        return ProjectBrainAnswer(
+            intent=intent,
+            text=_autonomy_task_answer(),
+        )
+
+    if intent == "autonomy_plan":
+        return ProjectBrainAnswer(
+            intent=intent,
+            text=_autonomy_plan_answer(user_text),
         )
 
     if intent == "memory_execution_distinction":
@@ -649,6 +738,13 @@ def _nova_project_brain_command_center_question_20260702(user_text):
 def build_project_brain_general_answer(user_text=""):
     intent = classify_project_brain_intent(user_text)
 
+    print(
+        "[NOVA AUTONOMY DEBUG]",
+        repr(user_text),
+        "intent=",
+        intent,
+    )
+
     if intent == "locked_state":
         return ProjectBrainAnswer(
             intent="locked_state",
@@ -725,6 +821,12 @@ def build_project_brain_general_answer(user_text=""):
         return ProjectBrainAnswer(
             intent="safe_next_action",
             text=_safe_next_answer(),
+        )
+
+    if intent == "autonomy_plan":
+        return ProjectBrainAnswer(
+            intent="autonomy_plan",
+            text=_autonomy_plan_answer(user_text),
         )
 
     if intent == "memory_execution_distinction":
