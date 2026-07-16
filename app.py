@@ -5446,7 +5446,10 @@ def api_chat():
             session_id = str(active.get("id") or "").strip()
 
     if not session_id:
-        created = session_service.create("New Chat")
+        created = session_service.create(
+            "New Chat",
+            user_id=auth_user_id,
+        )
         session_id = created["id"]
 
     if not user_text and not attachments:

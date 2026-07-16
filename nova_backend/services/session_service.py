@@ -836,8 +836,11 @@ class SessionService:
             if self._belongs_to_user(s, user_id)
         ]
 
-    def create(self, title="New Chat"):
-        return self.create_session(title)
+def create(self, title="New Chat", user_id=""):
+    return self.create_session(
+        title,
+        user_id=user_id,
+    )
 
     def get(self, session_id):
         return self.get_session(session_id)
