@@ -2219,10 +2219,36 @@ Current step:
                 payload = found
 
         if not payload:
+            auth_user_id = ""
+
+            try:
+                from flask import g
+
+                user = getattr(g, "nova_auth_user", None) or {}
+
+                auth_user_id = str(
+                    user.get("id") or ""
+                ).strip()
+
+            except Exception:
+                auth_user_id = ""
+
+            if not auth_user_id:
+                try:
+                    from flask import session as flask_session
+
+                    auth_user_id = str(
+                        flask_session.get("nova_user_id") or ""
+                    ).strip()
+
+                except Exception:
+                    auth_user_id = ""
+
             payload = {
                 "id": sid,
                 "messages": [],
                 "meta": {},
+                "user_id": auth_user_id,
             }
 
         meta = payload.get("meta")
@@ -5005,6 +5031,24 @@ if (not attachments) and (__name__ == "__main__"):
             assistant_msg["meta"] = meta
 
         session = self._get_session_payload(session_id) or {}
+
+        if not session.get("user_id"):
+            try:
+                from flask import g, session as flask_session
+
+                auth_user = getattr(g, "nova_auth_user", None) or {}
+
+                auth_user_id = str(
+                    auth_user.get("id")
+                    or flask_session.get("nova_user_id")
+                    or ""
+                ).strip()
+
+                if auth_user_id:
+                    session["user_id"] = auth_user_id
+
+            except Exception:
+                pass
         messages = session.get("messages")
 
         if not isinstance(messages, list):
@@ -5037,11 +5081,43 @@ if (not attachments) and (__name__ == "__main__"):
             if not already_has_assistant:
                 messages.append(assistant_msg)
 
+
         session["id"] = session_id
         session["messages"] = messages
 
         try:
-            existing = self.sessions.get_session(session_id)
+            from flask import g, session as flask_session
+
+            auth_user_id = ""
+
+            user = getattr(g, "nova_auth_user", None) or {}
+
+            auth_user_id = str(
+                user.get("id") or ""
+            ).strip()
+
+            if not auth_user_id:
+                auth_user_id = str(
+                    flask_session.get("nova_user_id") or ""
+                ).strip()
+
+            existing = self.sessions.get_session(
+                session_id,
+                user_id=auth_user_id,
+            )
+
+            print(
+                "[OWNERSHIP CHECK]",
+                {
+                    "session_id": session_id,
+                    "auth_user_id": auth_user_id,
+                    "existing_user_id": (
+                        existing.get("user_id")
+                        if isinstance(existing, dict)
+                        else None
+                    ),
+                },
+            )
 
             existing_messages = (
                 existing.get("messages", []) if isinstance(existing, dict) else []
@@ -5060,8 +5136,45 @@ if (not attachments) and (__name__ == "__main__"):
                 },
             )
 
-            self.sessions.update_session(session_id, session)
+            if auth_user_id:
+                session["user_id"] = str(auth_user_id)
 
+            print(
+                "[SESSION OWNERSHIP FINAL]",
+                {
+                    "session_id": session_id,
+                    "auth_user_id": auth_user_id,
+                    "session_user_id": session.get("user_id"),
+                },
+            )
+
+            print(
+                "[SESSION OBJECT DEBUG]",
+                {
+                    "type": str(type(self.sessions)),
+                    "module": getattr(type(self.sessions), "__module__", ""),
+                    "has_update": hasattr(self.sessions, "update_session"),
+                    "methods": [
+                        x for x in dir(self.sessions)
+                        if "update" in x.lower()
+                    ],
+                },
+            )
+
+
+            sessions = self.sessions._load_sessions()
+
+            index = self.sessions._find(
+                sessions,
+                session_id,
+            )
+
+            if index >= 0:
+                sessions[index] = session
+                self.sessions._save_sessions(
+                    sessions,
+                    self.sessions.get_active_session_id(),
+                )
         except Exception as e:
             exec_debug("SESSION SAVE ERROR:", e)
 
