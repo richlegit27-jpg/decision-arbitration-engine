@@ -96,6 +96,13 @@ def apply_response_title_guard(response):
         if not isinstance(data, dict):
             return response
 
+        user_text = str(
+            data.get("user_text")
+            or data.get("text")
+            or data.get("message")
+            or ""
+        ).strip()
+
         session = data.get("session")
 
         if not isinstance(session, dict):
@@ -105,7 +112,15 @@ def apply_response_title_guard(response):
             session.get("title") or ""
         ).strip()
 
-        ...
+        route = str(
+            data.get("route")
+            or ""
+        ).strip()
+
+        source = str(
+            data.get("source")
+            or ""
+        ).strip()
         
         cleaned = clean_title(
             old_title,

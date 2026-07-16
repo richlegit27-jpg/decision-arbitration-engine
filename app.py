@@ -572,11 +572,6 @@ try:
                 )
             )
 
-            print(
-                "[NOVA COMPACT BRAIN ANSWER]",
-                answer,
-            )
-
             if not answer:
                 return None
 
@@ -590,14 +585,23 @@ try:
                     "content": answer.text,
                 },
                 "debug": {
-                    "route":
-                        "project_brain_general_intelligence",
-                    "route_taken":
-                        "project_brain_general_intelligence",
-                    "intent":
-                        answer.intent,
-                    "priority_project_brain_general_intelligence":
-                        True,
+                    "route": (
+                        "autonomy_plan_command"
+                        if answer.intent == "autonomy_plan"
+                        else "project_brain_general_intelligence"
+                    ),
+                    "route_taken": (
+                        "autonomy_plan_command"
+                        if answer.intent == "autonomy_plan"
+                        else "project_brain_general_intelligence"
+                    ),
+                    "intent": answer.intent,
+                    "priority_project_brain_general_intelligence": True,
+                    "mode": (
+                        "proposal_only"
+                        if answer.intent == "autonomy_plan"
+                        else None
+                    ),
                 },
             }
 
@@ -12514,10 +12518,19 @@ def nova_before_request_explicit_memory_guard_20260611():
 
         lowered = raw_user_text.lower().strip()
 
+        project_brain_memory_concept_markers = (
+            "what nova remembers",
+            "what nova is actively doing",
+            "separate what",
+            "separate memory",
+            "memory from execution",
+            "remembered from active",
+        )
+
         # NOVA_PROJECT_BRAIN_MEMORY_CONCEPT_BYPASS_20260714
         # Memory architecture questions are reasoning requests, not saved memories.
         project_brain_memory_concept = any(
-            marker in clean_memory_lc
+            marker in lowered
             for marker in (
                 "what nova remembers",
                 "what nova is actively doing",
