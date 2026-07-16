@@ -13789,6 +13789,19 @@ def _nova_final_upsert_session_in_store_20260612(session_id, session_obj):
 
 @app.after_request
 def nova_final_session_detail_response_cache_20260612(response):
+
+    auth_user_id = ""
+
+    try:
+        flask_session = globals().get("session")
+        auth_user_id = str(
+            flask_session.get("nova_user_id")
+            or flask_session.get("user_id")
+            or ""
+        ).strip()
+    except Exception:
+        auth_user_id = ""
+
     try:
         request_path = str(getattr(request, "path", "") or "")
         request_method = str(getattr(request, "method", "") or "").upper()
