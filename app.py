@@ -11014,8 +11014,7 @@ def nova_account_profile_20260708():
 
 
 # NOVA_LOCAL_AUTH_ROUTES_20260610
-# Local dev auth API...
-def _nova_install_local_auth_routes_20260610():  
+def _nova_install_local_auth_routes_20260610():
     import os
     import json
     import secrets
@@ -11023,10 +11022,20 @@ def _nova_install_local_auth_routes_20260610():
     from pathlib import Path
     from flask import request, jsonify, session
 
+    from nova_backend.services.mfa_service import (
+        generate_secret,
+        build_provisioning_uri,
+        verify_code,
+    )
+
+    from nova_backend.services.mfa_account_service import (
+        enable_mfa,
+    )
+
     data_dir = Path(__file__).resolve().parent / "data"
-    data_dir.mkdir(parents=True, exist_ok=True)
 
     secret_path = data_dir / "nova_flask_secret.key"
+
     if not getattr(app, "secret_key", None):
         if secret_path.exists():
             app.secret_key = secret_path.read_text(encoding="utf-8").strip()
@@ -11175,6 +11184,35 @@ def _nova_install_local_auth_routes_20260610():
             "user": None,
         })
 
+    def auth_mfa_setup():
+        user_id = session.get("nova_user_id")
+
+        if not user_id:
+            return jsonify({
+                "ok": False,
+                "error": "Not authenticated",
+            }), 401
+
+        data = load_users()
+
+        for user in data.get("users", []):
+            if user.get("id") == user_id:
+                secret = generate_secret()
+
+                return jsonify({
+                    "ok": True,
+                    "secret": secret,
+                    "uri": build_provisioning_uri(
+                        user.get("username", "Nova"),
+                        secret,
+                    ),
+                })
+
+        return jsonify({
+            "ok": False,
+            "error": "User not found",
+        }), 404
+
     if not route_exists("/api/auth/status"):
         app.add_url_rule("/api/auth/status", "nova_auth_status_20260610", auth_status, methods=["GET"])
 
@@ -11186,6 +11224,14 @@ def _nova_install_local_auth_routes_20260610():
 
     if not route_exists("/api/auth/logout"):
         app.add_url_rule("/api/auth/logout", "nova_auth_logout_20260610", auth_logout, methods=["POST"])
+
+    if not route_exists("/api/auth/mfa/setup"):
+        app.add_url_rule(
+            "/api/auth/mfa/setup",
+            "nova_auth_mfa_setup_20260716",
+            auth_mfa_setup,
+            methods=["GET"],
+        )
 
     # Compatibility aliases in case the frontend calls the shorter paths.
     if not route_exists("/api/login"):
