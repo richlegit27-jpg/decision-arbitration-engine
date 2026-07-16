@@ -13,16 +13,17 @@
     Accept: "application/json",
   };
 
-  const ROUTES = {
-    state: "/api/state",
-    memory: "/api/memory",
-    addMemory: "/api/memory",
-    deleteMemory: "/api/memory/delete",
-    newSession: "/api/session/new",
-    renameSession: "/api/session/rename",
-    deleteSession: "/api/session/delete",
-    duplicateSession: "/api/session/duplicate",
-    pinSession: "/api/session/pin",
+const ROUTES = {
+  state: "/api/state",
+  memory: "/api/memory",
+  addMemory: "/api/memory",
+  deleteMemory: "/api/memory/delete",
+  newSession: "/api/sessions/new",
+  renameSession: "/api/sessions/rename",
+  deleteSession: "/api/sessions/delete",
+  duplicateSession: "/api/sessions/duplicate",
+  pinSession: "/api/sessions/pin",
+
     getChat(sessionId) {
       return `/api/chat/${encodeURIComponent(sessionId)}`;
     },

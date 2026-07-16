@@ -2915,14 +2915,15 @@ function renderDesktopChatMessagesRescue(messages) {
 
   // NOVA_MANAGE_CURRENT_SESSION_PANEL_20260610
 
-  function getCurrentSessionId() {
-    return (
-      localStorage.getItem("nova_desktop_session_id") ||
-      localStorage.getItem("nova_session_id") ||
-      localStorage.getItem("session_id") ||
-      ""
-    ).trim();
-  }
+function getCurrentSessionId() {
+  return (
+    localStorage.getItem("nova_active_session_id") ||
+    localStorage.getItem("nova.session_id") ||
+    localStorage.getItem("nova_session_id") ||
+    localStorage.getItem("nova_desktop_active_session_id") ||
+    ""
+  ).trim();
+}
 
   function setStatus(text) {
     var status = document.getElementById("nova-current-session-manager-status");
@@ -3051,8 +3052,10 @@ try {
 
       var nextId = result && result.active_session_id ? result.active_session_id : "";
 
-      localStorage.removeItem("nova_desktop_session_id");
-      localStorage.removeItem("session_id");
+localStorage.removeItem("nova_desktop_session_id");
+localStorage.removeItem("nova_desktop_active_session_id");
+localStorage.removeItem("session_id");
+localStorage.removeItem("active_session_id");
 
       if (nextId) {
         localStorage.setItem("nova.session_id", nextId);

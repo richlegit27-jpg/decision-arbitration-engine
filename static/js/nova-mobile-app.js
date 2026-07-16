@@ -3839,7 +3839,6 @@ function styleDock(dock) {
             return (
                 localStorage.getItem("nova_mobile_active_session_id") ||
                 localStorage.getItem("nova_active_session_id") ||
-                localStorage.getItem("nova_current_session_id") ||
                 ""
             );
         } catch (e) {

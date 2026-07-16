@@ -122,15 +122,15 @@
         }
     }
 
-    function activeIdFromStorage() {
-        return (
-            localStorage.getItem("nova_mobile_active_session_id") ||
-            localStorage.getItem("nova_active_session_id") ||
-            window.novaActiveSessionId ||
-            window.NOVA_ACTIVE_SESSION_ID ||
-            ""
-        );
-    }
+function activeIdFromStorage() {
+    return (
+        localStorage.getItem("nova_mobile_active_session_id") ||
+        localStorage.getItem("nova_active_session_id") ||
+        window.novaActiveSessionId ||
+        window.NOVA_ACTIVE_SESSION_ID ||
+        ""
+    );
+}
 
     function sessionIdFromUrl() {
         try {
@@ -444,7 +444,7 @@ sessions.sort(function (a, b) {
         String(a.updated_at || a.created_at || "")
     );
 });
-        const activeId = data.active_session_id || activeIdFromStorage();
+        const activeId = activeIdFromStorage() || data.active_session_id || "";
 
         window.NOVA_SESSION_CORE.sessions = sessions;
 
@@ -770,9 +770,13 @@ function closePanel() {
             setStatus("Error: " + (error && error.message ? error.message : String(error)));
         });
 
-        const bootSessionId =
-            sessionIdFromUrl() ||
-            activeIdFromStorage();
+ const authReady =
+    window.NovaAuthState &&
+    window.NovaAuthState.authenticated === true;
+
+const bootSessionId =
+    sessionIdFromUrl() ||
+    (authReady ? activeIdFromStorage() : "");
 
         if (bootSessionId) {
             setTimeout(function () {

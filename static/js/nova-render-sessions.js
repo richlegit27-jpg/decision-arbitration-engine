@@ -9,9 +9,9 @@
 
   const API = {
     state: "/api/state",
-    newSession: "/api/session/new",
-    renameSession: "/api/session/rename",
-    deleteSession: "/api/session/delete",
+newSession: "/api/sessions/new",
+renameSession: "/api/sessions/rename",
+deleteSession: "/api/sessions/delete",
   };
 
   function byId(id) {

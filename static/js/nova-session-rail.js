@@ -236,7 +236,8 @@
   function wireNewButton() {
     if (!els.newBtn) return;
 
-    els.newBtn.onclick = () => createSession();
+    // NOVA_SESSION_RAIL_NEW_BUTTON_OWNER_DISABLED_20260716
+els.newBtn.onclick = null;
   }
 
   function wireList() {

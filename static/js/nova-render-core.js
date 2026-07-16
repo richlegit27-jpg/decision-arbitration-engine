@@ -9,11 +9,11 @@
 
   const API = {
     state: "/api/state",
-    newSession: "/api/session/new",
-    renameSession: "/api/session/rename",
-    deleteSession: "/api/session/delete",
-    duplicateSession: "/api/session/duplicate",
-    pinSession: "/api/session/pin",
+newSession: "/api/sessions/new",
+renameSession: "/api/sessions/rename",
+deleteSession: "/api/sessions/delete",
+duplicateSession: "/api/sessions/duplicate",
+pinSession: "/api/sessions/pin",
     memory: "/api/memory",
     addMemory: "/api/memory/add",
     deleteMemory: "/api/memory/delete",

@@ -1,6 +1,11 @@
 ﻿(function () {
     "use strict";
 
+if (window.__NOVA_MOBILE_UPLOAD_CHANGE_AUTHORITY_SINGLE_OWNER_20260705__) {
+    console.log("[Nova Mobile Upload Legacy] skipped - authority owner active");
+    return;
+}
+
     if (window.__NOVA_MOBILE_UPLOAD_NO_LAYOUT_OWNER_20260705__) {
         return;
     }

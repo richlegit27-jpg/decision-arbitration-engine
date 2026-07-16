@@ -264,10 +264,9 @@
       memoryToggle.dataset.boundNovaClick = "true";
     }
 
-    if (newSessionBtn && !newSessionBtn.dataset.boundNovaClick) {
-      newSessionBtn.dataset.action = newSessionBtn.dataset.action || "new-session";
-      newSessionBtn.dataset.boundNovaClick = "true";
-    }
+if (newSessionBtn && !newSessionBtn.dataset.boundNovaClick) {
+  newSessionBtn.dataset.boundNovaClick = "true";
+}
 
     if (themeBtn && !themeBtn.dataset.boundNovaClick) {
       themeBtn.dataset.action = themeBtn.dataset.action || "toggle-theme";
