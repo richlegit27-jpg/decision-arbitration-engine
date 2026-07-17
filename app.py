@@ -3697,7 +3697,9 @@ def _nova_ensure_requested_session(session_id, title="Mobile Chat"):
         return None
 
     try:
-        existing = session_service.get_session(target_session_id)
+        existing = session_service.get_session(
+            target_session_id,
+    )
         if existing:
             sessions = session_service.get_all()
             session_service.save(sessions, active=target_session_id)
@@ -3707,9 +3709,26 @@ def _nova_ensure_requested_session(session_id, title="Mobile Chat"):
 
     now = _nova_mobile_now_iso()
 
+    owner_id = ""
+
+    try:
+        from flask import g, session as flask_session
+
+        auth_user = getattr(g, "nova_auth_user", None) or {}
+
+        owner_id = str(
+            auth_user.get("id")
+            or flask_session.get("nova_user_id")
+            or ""
+        ).strip()
+
+    except Exception:
+        owner_id = ""
+
     session = {
         "id": target_session_id,
         "title": str(title or "Mobile Chat").strip()[:80] or "Mobile Chat",
+        "user_id": owner_id,
         "messages": [],
         "pinned": False,
         "created_at": now,
@@ -4234,6 +4253,7 @@ def _nova_strip_project_context_from_visible_text(text):
     return clean
 
 def api_chat():
+    from flask import session as flask_session
     # NOVA_API_CHAT_IMAGE_VISION_GATE_20260607
     try:
         from pathlib import Path as _NovaPath
@@ -4242,8 +4262,6 @@ def api_chat():
         import os as _nova_os
 
         _nova_payload = request.get_json(silent=True) or {}
-
-
 
         _nova_user_text = str(
             _nova_payload.get("user_text")
@@ -5445,11 +5463,24 @@ def api_chat():
         if active:
             session_id = str(active.get("id") or "").strip()
 
+    auth_user_id = (
+        flask_session.get("nova_user_id")
+        or flask_session.get("user_id")
+        or ""
+    )
+
     if not session_id:
-        created = session_service.create(
+        created = session_service.create_session(
             "New Chat",
             user_id=auth_user_id,
         )
+
+    if not session_id:
+        created = session_service.create_session(
+            "New Chat",
+            user_id=auth_user_id,
+        )
+
         session_id = created["id"]
 
     if not user_text and not attachments:
@@ -17616,9 +17647,17 @@ try:
         return None
 
     def _nova_phase4g_create_session_20260701(data, session_id, title=""):
-        owner_id = str(
-            session.get("nova_user_id") or ""
-        ).strip()
+        owner_id = ""
+
+        try:
+            from flask import session as flask_session
+
+            owner_id = str(
+                flask_session.get("nova_user_id") or ""
+            ).strip()
+
+        except Exception:
+            owner_id = ""
 
         session = {
             "id": session_id,
@@ -17638,12 +17677,16 @@ try:
 
         if isinstance(data, dict):
             sessions = data.get("sessions")
+
             if isinstance(sessions, list):
                 sessions.append(session)
+
             elif isinstance(sessions, dict):
                 sessions[session_id] = session
+
             else:
                 data["sessions"] = [session]
+
             return session
 
         if isinstance(data, list):
@@ -19125,7 +19168,7 @@ try:
             print("[RICHARD RESTORE FIRED]")
             print("[SESSION BEFORE RICHARD]", dict(_nasf_session))
 
-            if not _nasf_session.get("nova_user_id"):
+            if False:
                 _nasf_session["username"] = "richard"
                 _nasf_session["user_id"] = "user_9cf403c995b3cf8d36a461e9"
                 _nasf_session["nova_user_id"] = "user_9cf403c995b3cf8d36a461e9"
