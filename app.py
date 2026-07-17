@@ -220,6 +220,10 @@ from nova_backend.services.attachment_context_service import (
     AttachmentContextService,
 )
 
+from nova_backend.services.attachment_keypoints_service import (
+    AttachmentKeypointsService,
+)
+
 # -----------------------
 # APP SETUP
 
@@ -674,7 +678,6 @@ app.config["UPLOAD_FOLDER"] = str(UPLOADS_DIR)
 # -----------------------
 
 
-
 session_service = SessionService(
     DATA_DIR / "nova_sessions.json"
 )
@@ -718,7 +721,7 @@ recon_service = ReconService(timeout=RECON_TIMEOUT)
 intent_router = IntentRouterService()
 runtime_brain = SafeUnifiedRuntime()
 runtime_response_sanitizer = RuntimeResponseSanitizerService()
-
+attachment_keypoints_service = AttachmentKeypointsService()
 install_project_chat_response_router(app)
 restored_runtime = getattr(
     runtime_brain,
@@ -8899,8 +8902,10 @@ def api_attachment_keypoints():
             mime_type,
         )
 
-        key_points = _nova_attachment_keypoints_from_text(extracted_text, max_points=10)
-
+        key_points = attachment_keypoints_service.attachment_keypoints_from_text(
+            extracted_text,
+            max_points=10,
+        )
         summary = "No readable key points found."
         if key_points:
             summary = "Top attachment point: " + key_points[0]
