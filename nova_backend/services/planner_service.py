@@ -13,6 +13,9 @@ from __future__ import annotations
 import time
 from typing import Any, Dict, List
 from nova_backend.services.mission_service import mission_service
+from nova_backend.services.project_brain_operator_planner import (
+    build_operator_plan_dict,
+)
 
 class PlannerService:
     def __init__(self) -> None:
@@ -36,13 +39,23 @@ class PlannerService:
         ]
 
         mission = mission_service.create_mission(
-            goal=plan.get("goal", mission_name),
+            goal=plan.get(
+                "goal",
+                mission_name,
+            ),
             steps=steps,
             metadata={
                 "source": "planner_service",
-                "planner_status": plan.get("status"),
+                "planner_status": plan.get(
+                    "status",
+                ),
+                "project_brain_decision": plan.get(
+                    "project_brain_decision",
+                    {},
+                ),
             },
         )
+        
 
         return mission
 
@@ -67,6 +80,12 @@ class PlannerService:
             },
         ]
 
+        project_brain_decision = (
+            build_operator_plan_dict(
+                user_text=safe_mission,
+            )
+        )
+
         plan = {
             "mission": safe_mission,
             "goal": safe_mission,
@@ -74,6 +93,7 @@ class PlannerService:
             "current_index": 0,
             "status": "pending",
             "created_at": time.time(),
+            "project_brain_decision": project_brain_decision,
         }
 
         self.plans[safe_mission] = plan

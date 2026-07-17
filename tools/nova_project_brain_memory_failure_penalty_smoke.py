@@ -1,0 +1,119 @@
+
+from nova_backend.services.project_brain_decision_memory import (
+    project_brain_decision_memory,
+)
+
+from nova_backend.services.project_brain_decision_outcome_recorder import (
+    project_brain_decision_outcome_recorder,
+)
+
+from nova_backend.services.project_brain_operator_planner import (
+    build_operator_plan_dict,
+)
+
+
+TEST_MOVE = "Failure Interpreter v2"
+
+
+def reset_memory():
+
+    project_brain_decision_memory.store.save(
+        {
+            "events": []
+        }
+    )
+
+def get_move(plan):
+
+    for move in plan.get(
+        "ranked_moves",
+        [],
+    ):
+        if move.get(
+            "name"
+        ) == TEST_MOVE:
+            return move
+
+    return None
+
+
+def main():
+
+    reset_memory()
+
+
+    baseline = build_operator_plan_dict(
+        user_text="fix the latest failure",
+    )
+
+    baseline_move = get_move(
+        baseline
+    )
+
+    assert baseline_move is not None
+
+
+    baseline_rank = baseline_move.get(
+        "adjusted_rank"
+    )
+
+
+    print(
+        "BASELINE MOVE:",
+        baseline_move,
+    )
+
+
+    project_brain_decision_outcome_recorder.record_outcome(
+        decision={
+            "recommended_move": TEST_MOVE,
+        },
+        outcome="failed",
+        evidence=[
+            "failure penalty smoke"
+        ],
+    )
+
+
+    learned = build_operator_plan_dict(
+        user_text="fix the latest failure",
+    )
+
+    learned_move = get_move(
+        learned
+    )
+
+    assert learned_move is not None
+
+
+    learned_rank = learned_move.get(
+        "adjusted_rank"
+    )
+
+
+    print(
+        "FAILED HISTORY MOVE:",
+        learned_move,
+    )
+
+
+    assert learned_move.get(
+        "memory_rank_penalty"
+    ) == 1
+
+
+    assert learned_rank > baseline_rank
+
+
+    assert learned_move.get(
+        "memory_influence"
+    )
+
+
+    print(
+        "PROJECT BRAIN MEMORY FAILURE PENALTY SMOKE PASS"
+    )
+
+
+if __name__ == "__main__":
+    main()

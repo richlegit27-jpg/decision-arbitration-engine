@@ -50,10 +50,14 @@ class ProjectBrainDecisionOutcomeRecorder:
 
         }
 
-        stored = (
-            project_brain_decision_memory.add_outcome(
-                entry
-            )
+        stored = project_brain_decision_memory.record_outcome(
+            recommended_move=(
+                decision.get(
+                    "recommended_move",
+                    "",
+                )
+            ),
+            outcome=outcome,
         )
 
         return {

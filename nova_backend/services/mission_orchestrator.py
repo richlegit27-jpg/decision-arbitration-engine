@@ -102,8 +102,10 @@
                     return {
                         "ok": False,
                         "history": history,
+                        "project_brain_decisions": history,
                         "failed_step": step,
                     }
+
 
                 write_result = (
                     self.tool_registry.execute(
@@ -111,6 +113,7 @@
                         path=generation.get(
                             "target_file"
                         ),
+
                         content=generation.get(
                             "code"
                         ),
@@ -168,6 +171,7 @@
         return {
             "ok": True,
             "history": history,
+            "project_brain_decisions": history,
             "execution_state": (
                 execution_state
             ),

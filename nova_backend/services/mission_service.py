@@ -205,6 +205,25 @@ class MissionService:
                     "completed",
                 )
 
+                from nova_backend.services.project_brain_decision_outcome_recorder import (
+                    project_brain_decision_outcome_recorder,
+                )
+
+                project_brain_decision_outcome_recorder.record_outcome(
+                    mission.get(
+                        "metadata",
+                        {},
+                    ).get(
+                        "project_brain_decision",
+                        {},
+                    ),
+                    "completed",
+                    evidence=mission.get(
+                        "results",
+                        [],
+                    ),
+                )
+
         else:
 
             mission["progress"] = int(
@@ -292,6 +311,24 @@ class MissionService:
                     "failed",
                 )
 
+                from nova_backend.services.project_brain_decision_outcome_recorder import (
+                    project_brain_decision_outcome_recorder,
+                )
+
+                project_brain_decision_outcome_recorder.record_outcome(
+                    mission.get(
+                        "metadata",
+                        {},
+                    ).get(
+                        "project_brain_decision",
+                        {},
+                    ),
+                    "failed",
+                    evidence=mission.get(
+                        "results",
+                        [],
+                    ),
+                )
 
         return mission
 

@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from nova_backend.services.project_brain_decision_ranker import (
+    score_decision_memory,
+)
 
 @dataclass(frozen=True)
 class OperatorMove:
@@ -178,18 +181,107 @@ def _move(
         )
     )
 
+def apply_decision_memory_signal(
+    moves: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    from nova_backend.services.project_brain_decision_ranker import (
+        score_decision_memory,
+    )
+
+    updated = []
+
+    for move in moves:
+        item = dict(move)
+
+        signal = score_decision_memory(
+            str(
+                item.get("name")
+                or ""
+            )
+        )
+
+        item["memory_signal"] = signal.get(
+            "memory_signal",
+            0,
+        )
+
+        item["memory_reason"] = signal.get(
+            "reason",
+            "",
+        )
+
+        updated.append(item)
+
+    return updated
+
+def apply_decision_memory_ranking(
+    moves: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    updated = []
+
+    for move in moves:
+        item = dict(move)
+
+        signal = int(
+            item.get("memory_signal", 0)
+            or 0
+        )
+
+        rank = int(
+            item.get("rank", 0)
+            or 0
+        )
+
+        if signal > 0:
+            item["memory_rank_bonus"] = 1
+            item["memory_influence"] = {
+                "signal": signal,
+                "effect": "rank_bonus",
+                "reason": "previous successful outcome",
+            }
+
+        elif signal < 0:
+            item["memory_rank_penalty"] = 1
+            item["memory_influence"] = {
+                "signal": signal,
+                "effect": "rank_penalty",
+                "reason": "previous failed outcome",
+            }
+
+        else:
+            item["memory_rank_bonus"] = 0
+            item["memory_influence"] = {
+                "signal": signal,
+                "effect": "none",
+                "reason": "no decision history",
+            }
+
+        item["adjusted_rank"] = (
+            rank
+            - item.get("memory_rank_bonus", 0)
+            + item.get("memory_rank_penalty", 0)
+        )
+
+        updated.append(item)
+
+    return sorted(
+        updated,
+        key=lambda x: x.get("adjusted_rank", 999),
+    )
 
 def rank_moves(work_type: str, changed_files: list[str] | None = None) -> list[dict[str, Any]]:
     if work_type == "failure_repair":
-        return [
-            _move(
-                rank=1,
-                name="Failure Interpreter v2",
-                why="A failure must become a focused repair plan before new work continues.",
-                risk="medium",
-                target_files=["nova_backend/services/project_brain_failure_interpreter.py"],
-                focused_smokes=select_smokes("failure_repair", changed_files),
-            ),
+        return apply_decision_memory_signal(
+            [
+                _move(
+                    rank=1,
+                    name="Failure Interpreter v2",
+                    why="A failure must become a focused repair plan before new work continues.",
+                    risk="medium",
+                    target_files=["nova_backend/services/project_brain_failure_interpreter.py"],
+                    focused_smokes=select_smokes("failure_repair", changed_files),
+                ),
+
             _move(
                 rank=2,
                 name="Smoke Selector v1",
@@ -209,52 +301,69 @@ def rank_moves(work_type: str, changed_files: list[str] | None = None) -> list[d
                 loses_to_best_because="Cleanup during a failure increases risk.",
             ),
         ]
+    )
 
     if work_type in ("cleanup_strategy", "route_cleanup", "app_cleanup"):
-        return [
+        return apply_decision_memory_signal(
+            [
+                _move(
+                    rank=1,
+                    name="Cleanup Strategy Engine v1",
+                    why="Cleanup needs boundaries, one target family, and a stop rule.",
+                    risk="medium",
+                    target_files=[
+                        "nova_backend/services/project_brain_operator_planner.py"
+                    ],
+                    focused_smokes=select_smokes(
+                        work_type,
+                        changed_files,
+                    ),
+                ),
+                _move(
+                    rank=2,
+                    name="Smoke Selector v1",
+                    why="It reduces repetitive validation but does not pick the cleanup target by itself.",
+                    risk="low",
+                    target_files=[
+                        "nova_backend/services/project_brain_operator_planner.py"
+                    ],
+                    focused_smokes=[
+                        "python .\\tools\\nova_project_brain_operator_planner_smoke.py"
+                    ],
+                    loses_to_best_because="The immediate need is cleanup ranking, not just smoke choice.",
+                ),
+                _move(
+                    rank=3,
+                    name="New app.py route guard",
+                    why="Only valid when no service-level path exists.",
+                    risk="high",
+                    target_files=[
+                        "app.py"
+                    ],
+                    focused_smokes=[
+                        "python .\\tools\\nova_regression_smoke.py"
+                    ],
+                    loses_to_best_because="It violates the current avoid-rule and can recreate guard stack debt.",
+                ),
+            ]
+        )
+
+    return apply_decision_memory_signal(
+        [
             _move(
                 rank=1,
-                name="Cleanup Strategy Engine v1",
-                why="Cleanup needs boundaries, one target family, and a stop rule.",
-                risk="medium",
-                target_files=["nova_backend/services/project_brain_operator_planner.py"],
-                focused_smokes=select_smokes(work_type, changed_files),
-            ),
-            _move(
-                rank=2,
-                name="Smoke Selector v1",
-                why="It reduces repetitive validation but does not pick the cleanup target by itself.",
+                name="Operator Plan Quality v2",
+                why="This makes Mission Control choose, rank, reject, and stop instead of repeating commands.",
                 risk="low",
-                target_files=["nova_backend/services/project_brain_operator_planner.py"],
-                focused_smokes=["python .\\tools\\nova_project_brain_operator_planner_smoke.py"],
-                loses_to_best_because="The immediate need is cleanup ranking, not just smoke choice.",
-            ),
-            _move(
-                rank=3,
-                name="New app.py route guard",
-                why="Only valid when no service-level path exists.",
-                risk="high",
-                target_files=["app.py"],
-                focused_smokes=["python .\\tools\\nova_regression_smoke.py"],
-                loses_to_best_because="It violates the current avoid-rule and can recreate guard stack debt.",
-            ),
-        ]
-
-    return [
-        _move(
-            rank=1,
-            name="Operator Plan Quality v2",
-            why="This makes Mission Control choose, rank, reject, and stop instead of repeating commands.",
-            risk="low",
-            target_files=[
-                "nova_backend/services/project_brain_operator_planner.py",
-                "nova_backend/services/project_brain_mission_control.py",
-                "tools/nova_project_brain_operator_planner_smoke.py",
-            ],
-            focused_smokes=[
-                "python .\\tools\\nova_project_brain_operator_planner_smoke.py",
-                "python .\\tools\\nova_project_brain_mission_control_api_smoke.py",
-            ],
+                target_files=[
+                    "nova_backend/services/project_brain_operator_planner.py",
+                    "nova_backend/services/project_brain_mission_control.py",
+                    "tools/nova_project_brain_operator_planner_smoke.py",
+                ],
+                focused_smokes=[
+                    "python .\\tools\\nova_project_brain_operator_planner_smoke.py",
+                    "python .\\tools\\nova_project_brain_mission_control_api_smoke.py",
+                ],
         ),
         _move(
             rank=2,
@@ -278,7 +387,7 @@ def rank_moves(work_type: str, changed_files: list[str] | None = None) -> list[d
             loses_to_best_because="Cleanup can continue after the operator brain is sharper.",
         ),
     ]
-
+)
 
 def exact_next_command_for(work_type: str) -> str:
     if work_type == "failure_repair":
@@ -300,11 +409,38 @@ def build_operator_plan(
 ) -> OperatorPlan:
     work_type = classify_work_type(user_text=user_text, changed_files=changed_files)
     ranked_for_plan = rank_moves(
-    work_type,
-    changed_files=changed_files,
+        work_type,
+        changed_files=changed_files,
     )
 
     top_move = ranked_for_plan[0] if ranked_for_plan else None
+
+    memory_signal = {
+        "memory_signal": 0,
+        "reason": "no_candidate",
+    }
+
+    if top_move:
+        candidate_name = (
+            str(
+                top_move.get("name")
+                if isinstance(
+                    top_move,
+                    dict,
+                )
+                else getattr(
+                    top_move,
+                    "name",
+                    "",
+                )
+            )
+            .strip()
+        )
+
+        if candidate_name:
+            memory_signal = score_decision_memory(
+                candidate_name
+            )
 
     if top_move:
         if isinstance(top_move, dict):
@@ -315,6 +451,14 @@ def build_operator_plan(
             why = str(
                 top_move.get("why") or ""
             ).strip()
+
+            if memory_signal.get(
+                "memory_signal"
+            ) > 0:
+                why = (
+                    why
+                    + " Previous decision history shows this move succeeded."
+                )
 
             risk = str(
                 top_move.get("risk") or "low"
@@ -335,6 +479,14 @@ def build_operator_plan(
                 getattr(top_move, "why", "")
                 or ""
             ).strip()
+
+            if memory_signal.get(
+                "memory_signal"
+            ) > 0:
+                why = (
+                    why
+                    + " Previous decision history shows this move succeeded."
+                )
 
             risk = str(
                 getattr(top_move, "risk", "low")
@@ -1472,7 +1624,7 @@ def rank_moves(work_type: str, changed_files=None, **kwargs):
             move
         )
 
-    return [
+    normalized_moves = [
         _nova_upgrade_radar_normalize_move_20260702(
             move,
             index,
@@ -1482,6 +1634,16 @@ def rank_moves(work_type: str, changed_files=None, **kwargs):
             start=1,
         )
     ]
+
+    normalized_moves = apply_decision_memory_signal(
+        normalized_moves
+    )
+
+    normalized_moves = apply_decision_memory_ranking(
+        normalized_moves
+    )
+
+    return normalized_moves
 
 
 def _choose_recommended_move_wrapper_20260712(work_type: str):
