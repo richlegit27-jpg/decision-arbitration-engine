@@ -204,6 +204,10 @@ from nova_backend.services.memory_context_service import (
     MemoryContextService,
 )
 
+from nova_backend.services.project_focus_memory_service import (
+    ProjectFocusMemoryService,
+)
+
 # -----------------------
 # APP SETUP
 
@@ -677,6 +681,11 @@ artifact_service = ArtifactService(
 upload_ownership_service = UploadOwnershipService(
     "data/nova_upload_ownership.json"
 )
+project_focus_memory_service = ProjectFocusMemoryService(
+    memory_service,
+    session_service,
+)
+
 web_service = WebService(timeout=WEB_TIMEOUT)
 recon_service = ReconService(timeout=RECON_TIMEOUT)
 intent_router = IntentRouterService()
@@ -2231,231 +2240,20 @@ def _nova_build_project_aware_context(
     ]).strip()
 
 
-# PROJECT_FOCUS_MEMORY_SAVE_RECALL_LOCK
-def _nova_project_focus_memory_text(focus):
-    focus_value = str(focus or "").strip()
-
-    if not focus_value:
-        return ""
-
-    return f"Current project focus: {focus_value}"
-
-
-def _nova_extract_project_focus_from_text(text_value):
-    raw = str(text_value or "").strip()
-
-    if not raw:
-        return ""
-
-    patterns = [
-        r"\bmy\s+current\s+project\s+focus\s+is\s+(.+?)(?:[.!?\n]|$)",
-        r"\bcurrent\s+project\s+focus\s+is\s+(.+?)(?:[.!?\n]|$)",
-        r"\bproject\s+focus\s+is\s+(.+?)(?:[.!?\n]|$)",
-        r"\bfocus\s+is\s+(.+?)(?:[.!?\n]|$)",
-    ]
-
-    for pattern in patterns:
-        match = re.search(pattern, raw, re.IGNORECASE)
-
-        if not match:
-            continue
-
-        focus = str(match.group(1) or "").strip()
-        focus = re.sub(r"\s+", " ", focus).strip(" .!?")
-
-        if focus:
-            return focus
-
-    return ""
-
-
-def _nova_save_project_focus_memory(user_text, session_id):
-    focus = _nova_extract_project_focus_from_text(user_text)
-
-    if not focus:
-        return None
-
-    memory_text = _nova_project_focus_memory_text(focus)
-
-    if not memory_text:
-        return None
-
-    target_session_id = str(session_id or "").strip()
-
-    try:
-        for item in memory_service.all() or []:
-            if not isinstance(item, dict):
-                continue
-
-            item_text = str(item.get("text") or "").strip().lower()
-            item_session = str(item.get("session_id") or "").strip()
-
-            if (
-                item_text == memory_text.lower()
-                and item_session == target_session_id
-            ):
-                return item
-    except Exception:
-        app.logger.exception("[project-focus-memory] failed duplicate scan")
-
-    try:
-        item = memory_service.add_memory(
-            {
-                "text": memory_text,
-                "kind": "project_focus",
-                "source": "project_focus_direct",
-                "session_id": target_session_id,
-            }
-        )
-
-        app.logger.info(
-            "[project-focus-memory] saved focus session_id=%s focus=%s",
-            target_session_id,
-            focus,
-        )
-
-        return item
-
-    except Exception:
-        app.logger.exception("[project-focus-memory] failed saving focus")
-        return None
-
-
-def _nova_find_project_focus_memory(session_id):
-    target_session_id = str(session_id or "").strip()
-    candidates = []
-
-    try:
-        items = memory_service.all() or []
-    except Exception:
-        items = []
-
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-
-        item_text = str(item.get("text") or "").strip()
-        item_session = str(item.get("session_id") or "").strip()
-        item_kind = str(item.get("kind") or "").strip().lower()
-        item_updated = str(item.get("updated_at") or item.get("created_at") or "")
-
-        if not item_text.lower().startswith("current project focus:"):
-            continue
-
-        if target_session_id and item_session and item_session != target_session_id:
-            continue
-
-        focus = item_text.split(":", 1)[1].strip() if ":" in item_text else ""
-
-        if not focus:
-            continue
-
-        score = 0
-
-        if item_session == target_session_id:
-            score += 100
-
-        if item_kind == "project_focus":
-            score += 25
-
-        candidates.append(
-            {
-                "score": score,
-                "updated_at": item_updated,
-                "focus": focus,
-                "item": item,
-            }
-        )
-
-    if not candidates:
-        return ""
-
-    candidates.sort(
-        key=lambda row: (
-            row.get("score", 0),
-            str(row.get("updated_at") or ""),
-        ),
-        reverse=True,
-    )
-
-    return str(candidates[0].get("focus") or "").strip()
-
-
-def _nova_find_recent_project_focus(session_id):
-    target_session_id = str(session_id or "").strip()
-
-    if not target_session_id:
-        return ""
-
-    try:
-        session = session_service.get_session(target_session_id)
-    except Exception:
-        session = None
-
-    if not isinstance(session, dict):
-        return ""
-
-    messages = session.get("messages") or []
-
-    if not isinstance(messages, list):
-        return ""
-
-    for message in reversed(messages):
-        if not isinstance(message, dict):
-            continue
-
-        role = str(message.get("role") or "").strip().lower()
-
-        if role not in {"user", "message"}:
-            continue
-
-        message_text = _nova_pa_message_text(message)
-        focus = _nova_extract_project_focus_from_text(message_text)
-
-        if focus:
-            return focus
-
-    return ""
-
-
-def _nova_is_project_focus_recall_question(user_text):
-    text_value = str(user_text or "").strip().lower()
-
-    if not text_value:
-        return False
-
-    project_terms = (
-        "project focus",
-        "current focus",
-        "focus right now",
-        "what was my focus",
-        "what is my focus",
-        "what's my focus",
-    )
-
-    personal_terms = (
-        "my ",
-        "i ",
-        "me",
-        "our ",
-        "nova",
-        "current",
-    )
-
-    return (
-        any(term in text_value for term in project_terms)
-        and any(term in text_value for term in personal_terms)
-    )
-
-
 def _nova_try_project_focus_direct_recall(user_text, session_id):
-    if not _nova_is_project_focus_recall_question(user_text):
+    if not project_focus_memory_service.is_project_focus_recall_question(
+        user_text
+    ):
         return None
 
-    focus = _nova_find_recent_project_focus(session_id)
+    focus = project_focus_memory_service.find_recent_project_focus(
+        session_id
+    )
 
     if not focus:
-        focus = _nova_find_project_focus_memory(session_id)
+        focus = project_focus_memory_service.find_project_focus_memory(
+            session_id
+        )
 
     if not focus:
         return None
@@ -5432,7 +5230,7 @@ def api_chat():
             early_image_error,
         )
 
-    _nova_save_project_focus_memory(
+    project_focus_memory_service.save_project_focus_memory(
         user_text,
         session_id,
     )
