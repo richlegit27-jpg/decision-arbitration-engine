@@ -177,3 +177,78 @@ class AttachmentAnalysisService:
         response,
     ):
         return response
+
+
+    def strip_urls_from_extracted_attachment_text(
+        self,
+        value,
+    ):
+        text_value = str(value or "")
+
+        text_value = re.sub(
+            r"https?://\S+",
+            "[URL removed from extracted attachment text]",
+            text_value,
+        )
+
+        text_value = re.sub(
+            r"www\.\S+",
+            "[URL removed from extracted attachment text]",
+            text_value,
+        )
+
+        return self.clean_extracted_attachment_text(
+            text_value
+        )
+
+    def analyze_binary_attachment_for_prompt(
+        self,
+        attachment_path,
+        mime_type,
+    ):
+        try:
+            from pathlib import Path
+
+            path_obj = Path(
+                str(attachment_path or "")
+            )
+
+            if not path_obj.exists():
+                return ""
+
+            mime = str(
+                mime_type or ""
+            ).lower()
+
+            if (
+                "pdf" in mime
+                or path_obj.suffix.lower() == ".pdf"
+            ):
+                try:
+                    import fitz
+
+                    document = fitz.open(
+                        str(path_obj)
+                    )
+
+                    pieces = []
+
+                    for page in document:
+                        text = page.get_text(
+                            "text"
+                        )
+
+                        if text:
+                            pieces.append(text)
+
+                    return "\n\n".join(
+                        pieces
+                    ).strip()
+
+                except Exception:
+                    return ""
+
+            return ""
+
+        except Exception:
+            return ""
