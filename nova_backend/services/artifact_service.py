@@ -11,7 +11,7 @@ def _nova_boot_log_20260701(*args, **kwargs):
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-
+from nova_backend.services.auth_context import get_current_user_id
 from nova_backend.config import UPLOADS_DIR
 from nova_backend.services.artifact_media_service import ArtifactMediaService
 from nova_backend.utils.file_utils import load_json_file, save_json_file
@@ -25,6 +25,19 @@ class ArtifactService:
 
         self.media = ArtifactMediaService(UPLOADS_DIR)
         self._ensure_store()
+
+    def _current_owner_id(self) -> str:
+        return get_current_user_id()
+
+    def _same_artifact_owner(self, item: Dict[str, Any]) -> bool:
+        owner_id = self._current_owner_id()
+
+        if not owner_id:
+            return False
+
+        return str(
+            (item or {}).get("owner_id") or ""
+        ).strip() == owner_id
 
     def _ensure_store(self) -> None:
         if not self.artifacts_file.exists():
@@ -44,7 +57,7 @@ class ArtifactService:
 
     def list_by_session(self, session_id: str):
         session_id = str(session_id or "").strip()
-        artifacts = self.list_all() if hasattr(self, "list_all") else []
+        artifacts = self.all()
         if not session_id:
             return artifacts
         return [
@@ -159,7 +172,18 @@ class ArtifactService:
     # CORE API
     # =========================
     def all(self) -> List[Dict[str, Any]]:
-        return self._read_store().get("artifacts", [])
+        items = self._read_store().get("artifacts", [])
+
+        owner_id = self._current_owner_id()
+
+        if not owner_id:
+            return []
+
+        return [
+            item
+            for item in items
+            if item.get("owner_id") == owner_id
+        ]
 
     def build_list_payload(self) -> List[Dict[str, Any]]:
         items = [self._normalize_artifact(x) for x in self.all()]
@@ -175,6 +199,10 @@ class ArtifactService:
     def save_artifact(self, artifact: Dict[str, Any]) -> Dict[str, Any]:
         data = self._read_store()
         items = data.get("artifacts", [])
+        owner_id = self._current_owner_id()
+
+        if owner_id:
+            artifact["owner_id"] = owner_id
 
         # =========================
         # ENSURE ARTIFACT ID FIRST
@@ -182,6 +210,17 @@ class ArtifactService:
         if not artifact.get("id"):
             import uuid
             artifact["id"] = f"artifact_{uuid.uuid4().hex}"
+
+        else:
+            existing_ids = {
+                str(x.get("id") or "").strip()
+                for x in items
+                if x.get("id")
+            }
+
+            if artifact["id"] in existing_ids:
+                import uuid
+                artifact["id"] = f"artifact_{uuid.uuid4().hex}"
 
         # =========================
         # VERSIONING CORE
@@ -191,7 +230,10 @@ class ArtifactService:
 
         if parent_id:
             for existing in items:
-                if existing.get("id") == parent_id:
+                if (
+                    self._same_artifact_owner(existing)
+                    and existing.get("id") == parent_id
+                ):
                     parent_version = existing.get("version", 0)
                     break
 
@@ -205,9 +247,13 @@ class ArtifactService:
 
         if parent_id:
             for existing in items:
-                if existing.get("id") == parent_id:
+                if (
+                    self._same_artifact_owner(existing)
+                    and existing.get("id") == parent_id
+                ):
                     root_id = existing.get("root_id") or parent_id
                     break
+
         else:
             root_id = artifact["id"]
 
@@ -221,7 +267,10 @@ class ArtifactService:
 
         replaced = False
         for i, existing in enumerate(items):
-            if existing.get("id") == artifact["id"]:
+            if (
+                self._same_artifact_owner(existing)
+                and existing.get("id") == artifact["id"]
+            ):
                 items[i] = artifact
                 replaced = True
                 break
@@ -238,6 +287,30 @@ class ArtifactService:
         self._write_store(data)
 
         return self._normalize_artifact(artifact)
+
+    def delete_artifact(self, artifact_id: str) -> bool:
+        data = self._read_store()
+        items = data.get("artifacts", [])
+
+        owner_id = self._current_owner_id()
+
+        new_items = [
+            item
+            for item in items
+            if not (
+                str(item.get("id")) == str(artifact_id)
+                and str(item.get("owner_id") or "") == str(owner_id)
+            )
+        ]
+
+        if len(new_items) == len(items):
+            return False
+
+        data["artifacts"] = new_items
+
+        self._write_store(data)
+
+        return True
 
     def create(self, artifact: Dict[str, Any]) -> Dict[str, Any]:
         return self.save_artifact(artifact)

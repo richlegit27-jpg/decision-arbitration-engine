@@ -774,20 +774,57 @@ function closePanel() {
     window.NovaAuthState &&
     window.NovaAuthState.authenticated === true;
 
-const bootSessionId =
-    sessionIdFromUrl() ||
-    (authReady ? activeIdFromStorage() : "");
+let bootSessionId =
+    authReady ? activeIdFromStorage() : "";
+
+async function restoreBootSession() {
+    try {
+        if (!bootSessionId && authReady) {
+            const data = await jsonFetch(
+                API.list + "?boot_restore=" + Date.now(),
+                {
+                    method: "GET"
+                }
+            );
+
+            const sessions = getSessions(data);
+
+            if (sessions.length) {
+                bootSessionId =
+                    data.active_session_id ||
+                    sessions[0].id ||
+                    sessions[0].session_id ||
+                    "";
+            }
+        }
 
         if (bootSessionId) {
-            setTimeout(function () {
-                console.log("[NOVA BOOT RESTORE SESSION]", bootSessionId);
+            console.log(
+                "[NOVA BOOT RESTORE SESSION]",
+                bootSessionId
+            );
 
-                openSession(bootSessionId).catch(function (error) {
-                    console.warn("[NOVA BOOT RESTORE FAILED]", error);
-                    setStatus("Restore failed: " + (error && error.message ? error.message : String(error)));
-                });
-            }, 200);
+            setActiveId(bootSessionId);
+
+            await openSession(bootSessionId);
         }
+
+    } catch (error) {
+        console.warn(
+            "[NOVA BOOT RESTORE FAILED]",
+            error
+        );
+
+        setStatus(
+            "Restore failed: " +
+            (error && error.message ? error.message : String(error))
+        );
+    }
+}
+
+setTimeout(function () {
+    restoreBootSession();
+}, 200);
 
         setTimeout(bindHeaderButton, 250);
         setTimeout(bindHeaderButton, 800);

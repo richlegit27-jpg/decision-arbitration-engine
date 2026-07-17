@@ -134,6 +134,8 @@ from nova_backend.services.brain.strategy import StrategyEngine
 from nova_backend.services.memory.memory_core import MemoryCore
 from nova_backend.services.execution.executor import Executor
 from nova_backend.services.python_runner_service import PythonRunnerService
+from nova_backend.services.auth_context import get_current_user_id
+from nova_backend.services.upload_ownership_service import UploadOwnershipService
 from nova_backend.services.runtime_bootstrap import (
     RuntimeBootstrap,
 
@@ -20802,6 +20804,16 @@ def _save_artifact_fallback(self, artifact: dict):
                 with open(save_path, "wb") as f:
                     f.write(image_bytes)
 
+                try:
+                    owner_id = get_current_user_id()
+                    if owner_id:
+                        UploadOwnershipService().register_upload(
+                            filename,
+                            owner_id,
+                        )
+                except Exception:
+                    pass
+
                 image_url = f"/api/uploads/{filename}"
 
             saved_artifact = None
@@ -22918,11 +22930,18 @@ def _nova_runtime_handle_image_generation(
         filepath = uploads_dir / filename
         print("[NOVA_RAILWAY_UPLOAD_DIR_FIX_20260702] uploads_dir", str(uploads_dir))
 
-        with open(filepath, "wb") as f:
-            f.write(image_bytes)
-
         if not filepath.exists() or filepath.stat().st_size <= 0:
             raise ValueError(f"Generated image file was not saved: {filepath}")
+
+        try:
+            owner_id = get_current_user_id()
+            if owner_id:
+                UploadOwnershipService().register_upload(
+                    filename,
+                    owner_id,
+                )
+        except Exception:
+            pass
 
         print(
             "[NOVA_RAILWAY_IMAGE_SAVE_BYTES_20260702] saved",

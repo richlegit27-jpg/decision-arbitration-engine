@@ -7,6 +7,7 @@ import uuid
 
 from nova_backend.utils.file_utils import load_json_file, save_json_file
 from nova_backend.utils.time_utils import iso_now
+from nova_backend.services.auth_context import get_current_user_id
 
 
 WORKING_STATE_KEYS = (
@@ -495,6 +496,9 @@ class SessionService:
 
     # SESSION_SERVICE_LOAD_SAVE_COMPAT_LOCK
 
+    def _current_owner_id(self) -> str:
+        return get_current_user_id()
+
     def _belongs_to_user(self, session, user_id=""):
         if not user_id:
             return False
@@ -521,29 +525,55 @@ class SessionService:
 
     def save(self, sessions, active=None):
         """
-        Compatibility bridge for older ChatService code that expects
-        SessionService.save(sessions). Current storage also tracks
-        active_session_id, so preserve the current active id when one
-        is not explicitly provided.
+        Compatibility bridge.
+        Merge incoming sessions into the full store instead of replacing
+        other users' sessions.
         """
         if active is None:
             active = self.get_active_session_id()
-        return self._save_sessions(sessions, active)
 
+        existing = self._load_sessions()
+
+        incoming = {
+            str(s.get("id") or "")
+            for s in sessions
+            if isinstance(s, dict)
+        }
+
+        merged = [
+            s
+            for s in existing
+            if str(s.get("id") or "") not in incoming
+        ]
+
+        merged.extend(sessions)
+
+        return self._save_sessions(merged, active)
     # -----------------------
     # SESSION CONTROL (FIXED)
     # -----------------------
 
-    def set_active(self, session_id: str):
+    def set_active(self, session_id: str, user_id=""):
+        if not user_id:
+            user_id = self._current_owner_id()
+
         data = self._read_store()
 
         sessions = data.get("sessions", [])
         found = None
 
         for s in sessions:
-            if s.get("id") == session_id:
-                found = s
-                break
+            if str(s.get("id") or "") != str(session_id or ""):
+                continue
+
+            if not self._belongs_to_user(
+                s,
+                user_id,
+            ):
+                return None
+
+            found = s
+            break
 
         if not found:
             return None
@@ -594,6 +624,9 @@ class SessionService:
 
         return None
     def delete(self, session_id: str, user_id=""):
+        if not user_id:
+            user_id = self._current_owner_id()
+
         data = self._read_store()
         sessions = data.get("sessions", [])
 
@@ -605,7 +638,7 @@ class SessionService:
                 remaining.append(session)
                 continue
 
-            if user_id and not self._belongs_to_user(session, user_id):
+            if not self._belongs_to_user(session, user_id):
                 remaining.append(session)
                 continue
 
@@ -631,7 +664,6 @@ class SessionService:
 
         return True
 
-
     # -----------------------
     # WORKING STATE
     # -----------------------
@@ -639,13 +671,17 @@ class SessionService:
     def get_working_state(self, session_id: str) -> Dict[str, str]:
         sessions = self._load_sessions()
         i = self._find(sessions, session_id)
+
         if i < 0:
             return _new_working_state()
 
+        if not self._belongs_to_user(
+            sessions[i],
+            self._current_owner_id(),
+        ):
+            return _new_working_state()
+
         state = _normalize_working_state(sessions[i].get("working_state"))
-        sessions[i]["working_state"] = state
-        self._save_sessions(sessions, session_id)
-        return state
 
     def update_working_state(self, session_id: str, patch: Dict[str, Any]):
         sessions = self._load_sessions()
@@ -671,7 +707,14 @@ class SessionService:
     def clear_working_state(self, session_id: str):
         sessions = self._load_sessions()
         i = self._find(sessions, session_id)
+
         if i < 0:
+            return _new_working_state()
+
+        if not self._belongs_to_user(
+            sessions[i],
+            self._current_owner_id(),
+        ):
             return _new_working_state()
 
         state = _new_working_state()
@@ -699,6 +742,9 @@ class SessionService:
         return ""
 
     def get_session(self, session_id, user_id=""):
+        if not user_id:
+            user_id = self._current_owner_id()
+
         sessions = self._load_sessions()
 
         i = self._find(sessions, session_id)
@@ -786,6 +832,12 @@ class SessionService:
         if i < 0:
             return None
 
+        if not self._belongs_to_user(
+            sessions[i],
+            self._current_owner_id(),
+        ):
+            return None
+
         normalized = _normalize_message(message)
 
         sessions[i]["messages"].append(normalized)
@@ -813,18 +865,27 @@ class SessionService:
     # -----------------------
 
     def get_all(self, user_id=""):
+        if not user_id:
+            user_id = self._current_owner_id()
+
         return [
             s for s in self._load_sessions()
             if self._belongs_to_user(s, user_id)
         ]
 
     def list_sessions(self, user_id=""):
+        if not user_id:
+            user_id = self._current_owner_id()
+
         return [
             s for s in self._load_sessions()
             if self._belongs_to_user(s, user_id)
         ]
 
     def list(self, user_id=""):
+        if not user_id:
+            user_id = self._current_owner_id()
+
         return [
             s for s in self._load_sessions()
             if self._belongs_to_user(s, user_id)
@@ -837,6 +898,9 @@ class SessionService:
         ]
 
     def create(self, title="New Chat", user_id=""):
+        if not user_id:
+            user_id = self._current_owner_id()
+
         return self.create_session(
             title,
             user_id=user_id,

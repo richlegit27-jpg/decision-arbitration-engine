@@ -132,10 +132,6 @@ from nova_backend.routes.improvement_routes import (
     register_improvement_routes,
 )
 
-from nova_backend.services.upload_ownership_service import (
-    UploadOwnershipService,
-)
-
 from nova_backend.utils.api_response import ok_response, error_response
 from nova_backend.utils.request_utils import get_json_body, get_str, get_list, normalize_attachments
 from nova_backend.services.attachment_memory_service import (
@@ -653,21 +649,9 @@ app.config["UPLOAD_FOLDER"] = str(UPLOADS_DIR)
 # SERVICES
 # -----------------------
 
-session_service = SessionService(
-    DATA_DIR / "nova_sessions.json"
-)
-
-memory_service = MemoryService(
-    str(DATA_DIR / "nova_memory.json")
-)
-
-artifact_service = ArtifactService(
-    str(DATA_DIR / "nova_artifacts.json")
-)
-
-upload_ownership_service = UploadOwnershipService(
-    "data/nova_upload_ownership.json"
-)
+session_service = SessionService(str(SESSIONS_FILE))
+artifact_service = ArtifactService(str(ARTIFACTS_FILE))
+memory_service = MemoryService(str(MEMORY_FILE))
 web_service = WebService(timeout=WEB_TIMEOUT)
 recon_service = ReconService(timeout=RECON_TIMEOUT)
 intent_router = IntentRouterService()
@@ -3715,32 +3699,12 @@ def _nova_ensure_requested_session(session_id, title="Mobile Chat"):
         existing = session_service.get_session(
             target_session_id,
         )
-
         if existing:
-            try:
-                store = session_service._read_store()
-
-                if not isinstance(store, dict):
-                    store = {
-                        "active_session_id": "",
-                        "sessions": [],
-                    }
-
-                store["active_session_id"] = target_session_id
-
-                session_service._write_store(store)
-
-            except Exception:
-                app.logger.exception(
-                    "[mobile-session-save] failed preserving existing session"
-                )
-
+            sessions = session_service.get_all()
+            session_service.save(sessions, active=target_session_id)
             return existing
-
     except Exception:
-        app.logger.exception(
-            "[mobile-session-save] failed checking existing session"
-        )
+        app.logger.exception("[mobile-session-save] failed checking existing session")
 
     now = _nova_mobile_now_iso()
 
@@ -3781,39 +3745,22 @@ def _nova_ensure_requested_session(session_id, title="Mobile Chat"):
     }
 
     try:
-        store = session_service._read_store()
-
-        if not isinstance(store, dict):
-            store = {
-                "active_session_id": "",
-                "sessions": [],
-            }
-
-        sessions = store.get("sessions")
-
+        sessions = session_service.get_all()
+        if isinstance(sessions, dict):
+            sessions = sessions.get("sessions") or []
         if not isinstance(sessions, list):
             sessions = []
 
         sessions = [
-            s
-            for s in sessions
-            if isinstance(s, dict)
-            and str(s.get("id") or "").strip() != target_session_id
+            s for s in sessions
+            if isinstance(s, dict) and str(s.get("id") or "").strip() != target_session_id
         ]
-
         sessions.insert(0, session)
 
-        store["sessions"] = sessions
-        store["active_session_id"] = target_session_id
-
-        session_service._write_store(store)
-
+        session_service.save(sessions, active=target_session_id)
         return session
-
     except Exception:
-        app.logger.exception(
-            "[mobile-session-save] failed creating requested mobile session"
-        )
+        app.logger.exception("[mobile-session-save] failed creating requested mobile session")
         return session
 
 
@@ -6976,25 +6923,16 @@ def api_chat():
 
                 if not image_url and result_text_for_image.startswith("Generated image for:"):
                     try:
-                        owner_id = get_current_user_id()
-
                         generated_files = sorted(
                             Path(UPLOADS_DIR).glob("generated_*.png"),
                             key=lambda item: item.stat().st_mtime,
                             reverse=True,
                         )
-
-                        for item in generated_files:
-                            if UploadOwnershipService().belongs_to_user(
-                                item.name,
-                                owner_id,
-                            ):
-                                image_url = f"/api/uploads/{item.name}"
-                                break
-
+                        if generated_files:
+                            image_url = f"/api/uploads/{generated_files[0].name}"
                     except Exception as image_file_error:
                         app.logger.warning(
-                            "[MobileImageUrlForce] owned generated file lookup failed: %s",
+                            "[MobileImageUrlForce] newest generated file lookup failed: %s",
                             image_file_error,
                         )
 
@@ -7921,10 +7859,7 @@ def api_sessions_switch():
     if not session_id:
         return json_error("Missing session_id", 400)
 
-    session = session_service.set_active(
-        session_id,
-        user_id=auth_user_id,
-    )
+    session = session_service.set_active(session_id)
     if not session:
         return json_error("Session not found", 404)
 
@@ -8089,21 +8024,14 @@ def api_delete_artifact(artifact_id: str):
         return json_error(f"Failed to delete artifact: {e}", 500)
 
 def delete_artifact(self, artifact_id: str) -> bool:
-    from nova_backend.services.auth_context import get_current_user_id
-
     try:
         data = self._load()
 
         artifacts = data.get("artifacts", [])
 
-        owner_id = get_current_user_id()
-
         new_artifacts = [
             a for a in artifacts
-            if not (
-                str(a.get("id")) == str(artifact_id)
-                and str(a.get("owner_id") or "") == str(owner_id)
-            )
+            if str(a.get("id")) != str(artifact_id)
         ]
 
         if len(new_artifacts) == len(artifacts):
@@ -8385,7 +8313,6 @@ def api_recon_analyze():
 
 @app.post("/api/upload")
 def api_upload():
-
     try:
         if "file" not in request.files:
             return jsonify({
@@ -8409,34 +8336,6 @@ def api_upload():
 
         save_path = UPLOADS_DIR / final_name
         file.save(str(save_path))
-
-        auth_user_id = ""
-
-        try:
-            auth_user_id = str(
-                session.get("nova_user_id")
-                or session.get("user_id")
-                or ""
-            ).strip()
-
-        except Exception:
-            auth_user_id = ""
-
-        if auth_user_id:
-            app.logger.info(
-                "[UPLOAD OWNERSHIP DEBUG] registering %s owner=%s",
-                final_name,
-                auth_user_id,
-            )
-
-            upload_ownership_service.register_upload(
-                final_name,
-                auth_user_id,
-            )
-        else:
-            app.logger.warning(
-                "[UPLOAD OWNERSHIP DEBUG] NO AUTH USER"
-            )
 
         mime_type = getattr(file, "mimetype", None) or "application/octet-stream"
         size = save_path.stat().st_size if save_path.exists() else 0
@@ -8473,34 +8372,6 @@ def api_upload():
 def api_uploads(filename: str):
     try:
         raw_name = str(filename or "").strip().lstrip("/\\")
-        auth_user_id = ""
-
-        try:
-            auth_user_id = str(
-                session.get("nova_user_id")
-                or session.get("user_id")
-                or ""
-            ).strip()
-
-        except Exception:
-            auth_user_id = ""
-
-        if not auth_user_id:
-            return jsonify({
-                "ok": False,
-                "error": "Upload owner required",
-                "filename": raw_name,
-            }), 403
-
-        if not upload_ownership_service.belongs_to_user(
-            raw_name,
-            auth_user_id,
-        ):
-            return jsonify({
-                "ok": False,
-                "error": "Upload not found",
-                "filename": raw_name,
-            }), 404
         full_path = (UPLOADS_DIR / raw_name).resolve()
         uploads_root = UPLOADS_DIR.resolve()
 
@@ -11865,7 +11736,7 @@ def _nova_install_session_auth_scope_20260610():
             return False
 
         if not user:
-            return False
+            return is_unowned(item)
 
         item_user_id = str(item.get("user_id") or "").strip()
         item_username = str(item.get("username") or "").strip().lower()

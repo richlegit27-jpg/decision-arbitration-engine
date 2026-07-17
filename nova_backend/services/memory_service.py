@@ -1,11 +1,12 @@
 ﻿from __future__ import annotations
 
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from nova_backend.utils.file_utils import load_json_file, save_json_file
 from nova_backend.utils.time_utils import iso_now
-
+from nova_backend.services.auth_context import get_current_user_id
 
 
 # NOVA_BAD_MEMORY_SAVE_GUARD_SAFE_20260610
@@ -104,6 +105,22 @@ def _nova_memory_semantic_key_20260618(text: str) -> str:
     return " ".join(words)
 
 class MemoryService:
+
+    def _current_owner_id(self) -> str:
+        return get_current_user_id()
+
+    def _same_memory_owner(self, item: Dict[str, Any]) -> bool:
+        owner_id = self._current_owner_id()
+
+        if not owner_id:
+            return False
+
+        item_owner = str(
+            (item or {}).get("owner_id") or ""
+        ).strip()
+
+        return item_owner == owner_id
+
     def __init__(self, memory_file: str):
         self.memory_file = Path(memory_file)
         self._ensure_store()
@@ -175,6 +192,18 @@ class MemoryService:
 
     def all(self) -> List[Dict[str, Any]]:
         items = self._read_store().get("memory", [])
+
+        owner_id = self._current_owner_id()
+
+        if not owner_id:
+            return []
+
+        items = [
+            item
+            for item in items
+            if item.get("owner_id") == owner_id
+        ]
+
         if not isinstance(items, list):
             return []
 
@@ -313,7 +342,11 @@ class MemoryService:
                     existing_text = str(existing.get("text") or "").strip().lower()
                     existing_kind = str(existing.get("kind") or "note").strip().lower()
 
-                    if key in existing_text and existing_kind == new_kind:
+                    if (
+                        self._same_memory_owner(existing)
+                        and key in existing_text
+                        and existing_kind == new_kind
+                    ):
                         existing.update(item)
                         existing["updated_at"] = now
                         existing["created_at"] = existing.get("created_at") or now
@@ -323,13 +356,17 @@ class MemoryService:
                         self._write_store(data)
                         return existing
 
-        # ðŸ”¥ DUPLICATE REINFORCEMENT
+        # DUPLICATE REINFORCEMENT
         for i, existing in enumerate(memory):
             existing = dict(existing or {})
             existing_text = str(existing.get("text") or "").strip().lower()
             existing_kind = str(existing.get("kind") or "note").strip().lower()
 
-            if existing_text == new_text_key and existing_kind == new_kind:
+            if (
+                self._same_memory_owner(existing)
+                and existing_text == new_text_key
+                and existing_kind == new_kind
+            ):
                 count = int(existing.get("count") or 1) + 1
                 existing_weight = float(existing.get("weight") or item.get("weight") or 1.0)
 
@@ -371,10 +408,13 @@ class MemoryService:
                 self._write_store(data)
                 return existing
 
-        # ðŸ”¥ NEW MEMORY
+        # 🔥 NEW MEMORY
         if not item.get("id"):
-            import uuid
             item["id"] = f"memory_{uuid.uuid4().hex}"
+
+        owner_id = self._current_owner_id()
+        if owner_id:
+            item["owner_id"] = owner_id
 
         item["updated_at"] = now
         item["created_at"] = item.get("created_at") or now
@@ -389,7 +429,13 @@ class MemoryService:
             existing_text = str(existing.get("text") or "").strip().lower()
             existing_semantic_text = _nova_memory_semantic_key_20260618(existing_text)
 
-            if existing_text == normalized_text or existing_semantic_text == semantic_text:
+            if (
+                self._same_memory_owner(existing)
+                and (
+                    existing_text == normalized_text
+                    or existing_semantic_text == semantic_text
+                )
+            ):
 
                 existing["updated_at"] = now
                 existing["last_seen_at"] = now
@@ -445,6 +491,10 @@ class MemoryService:
             import uuid
             item["id"] = f"memory_{uuid.uuid4().hex}"
 
+        owner_id = self._current_owner_id()
+        if owner_id:
+            item["owner_id"] = owner_id
+
         kind = str(item.get("kind") or "note").strip().lower()
         item["kind"] = kind
         item["updated_at"] = now
@@ -492,8 +542,19 @@ class MemoryService:
         data = self._read_store()
         memory = data.get("memory", [])
 
+        owner_id = self._current_owner_id()
+
+        data = self._read_store()
+        memory = data.get("memory", [])
+
+        owner_id = self._current_owner_id()
+
         for i, item in enumerate(memory):
             item = dict(item or {})
+
+            if owner_id:
+                if item.get("owner_id") and item.get("owner_id") != owner_id:
+                    continue
 
             if str(item.get("id") or "").strip() == target:
                 item["pinned"] = bool(pinned)
@@ -515,9 +576,17 @@ class MemoryService:
         data = self._read_store()
         memory = data.get("memory", [])
 
+        owner_id = self._current_owner_id()
+
+        if not owner_id:
+            return False
+
         kept = [
             item for item in memory
-            if str((item or {}).get("id") or "").strip() != target
+            if not (
+                str(item.get("id") or "").strip() == target
+                and item.get("owner_id") == owner_id
+            )
         ]
 
         if len(kept) == len(memory):
