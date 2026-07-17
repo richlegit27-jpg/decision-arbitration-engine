@@ -2233,76 +2233,6 @@ def _nova_casual_chat_guard():
 @app.post("/api/chat")
 
 
-# ACTUAL_BINARY_ATTACHMENT_ANALYZER_BLOCK_LOCK
-
-
-# STRIP_URLS_FROM_EXTRACTED_ATTACHMENT_CHAT_TEXT_LOCK
-def _nova_strip_urls_from_extracted_attachment_text(value):
-    try:
-        import re
-        text_value = str(value or "")
-        text_value = re.sub(r"https?://\S+", "[URL removed from extracted attachment text]", text_value)
-        text_value = re.sub(r"www\.\S+", "[URL removed from extracted attachment text]", text_value)
-        return _nova_safe_clean_attachment_text(text_value)
-    except Exception:
-        return str(value or "")
-
-def _nova_analyze_binary_attachment_for_prompt(attachment_path, mime_type):
-    try:
-        from pathlib import Path as _NovaPath
-
-        path_obj = _NovaPath(str(attachment_path or ""))
-        mime = str(mime_type or "").lower().strip()
-
-        if not path_obj.exists():
-            return ""
-
-        if mime == "application/pdf" or path_obj.suffix.lower() == ".pdf":
-            try:
-                import fitz
-            except Exception:
-                return "[PDF received, but PyMuPDF/fitz is not installed for text extraction.]"
-
-            pieces = []
-            doc = fitz.open(str(path_obj))
-            try:
-                max_pages = min(len(doc), 5)
-                for page_index in range(max_pages):
-                    page_text = doc[page_index].get_text("text") or ""
-                    page_text = page_text.strip()
-                    if page_text:
-                        pieces.append(f"[PDF page {page_index + 1}]\n{page_text[:2000]}")
-            finally:
-                doc.close()
-
-            extracted = "\n\n".join(pieces).strip()
-            if extracted:
-                return extracted
-
-            return "[PDF received, but no selectable text was found. It may be scanned/image-based.]"
-
-        if mime.startswith("image/") or path_obj.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp", ".bmp"}:
-            try:
-                from PIL import Image
-                import pytesseract
-            except Exception:
-                return "[Image received, but OCR dependencies are not installed. Install pillow and pytesseract for text OCR.]"
-
-            image = Image.open(str(path_obj))
-            ocr_text = pytesseract.image_to_string(image) or ""
-            ocr_text = ocr_text.strip()
-
-            if ocr_text:
-                return f"[Image OCR text]\n{ocr_text[:3000]}"
-
-            return "[Image received. No readable OCR text was found.]"
-
-    except Exception as error:
-        return f"[Attachment analysis failed: {error}]"
-
-    return ""
-
-
 def _nova_mobile_now_iso():
     try:
         from datetime import datetime, timezone
@@ -4552,14 +4482,28 @@ def api_chat():
                         # FIX_ATTACHMENT_ANALYZER_ROUTE_AND_CALL_LOCK
                         attachment_path = str(file_path)
                         mime_type = str(mime_type or "")
-                        extracted_attachment_text = _nova_analyze_binary_attachment_for_prompt(
+                        extracted_attachment_text = attachment_analysis_service.analyze_binary_attachment_for_prompt(
                             attachment_path,
                             mime_type,
                         )
+
                         if extracted_attachment_text:
                             # STRIP_URLS_FROM_EXTRACTED_ATTACHMENT_CHAT_TEXT_LOCK
-                            extracted_attachment_text = _nova_strip_urls_from_extracted_attachment_text(extracted_attachment_text)
+                            extracted_attachment_text = (
+                                attachment_analysis_service.strip_urls_from_extracted_attachment_text(
+                                    extracted_attachment_text
+                                )
+                            )
+
                             content_snippet = extracted_attachment_text[:4000]
+                            app.logger.info(
+                                "[AttachmentAnalyzer] extracted binary attachment content path=%s chars=%s mime_type=%s",
+                                attachment_path,
+                                len(content_snippet),
+                                mime_type,
+                            )
+
+
                             app.logger.info(
                                 "[AttachmentAnalyzer] extracted binary attachment content path=%s chars=%s mime_type=%s",
                                 attachment_path,
@@ -8255,7 +8199,7 @@ def api_attachment_extract():
             else:
                 mime_type = "application/octet-stream"
 
-        extracted_text = _nova_analyze_binary_attachment_for_prompt(
+        extracted_text = attachment_analysis_service.analyze_binary_attachment_for_prompt(
             str(file_path),
             mime_type,
         )
@@ -8337,7 +8281,7 @@ def api_attachment_summarize():
             else:
                 mime_type = "application/octet-stream"
 
-        extracted_text = _nova_analyze_binary_attachment_for_prompt(
+        extracted_text = attachment_analysis_service.analyze_binary_attachment_for_prompt(
             str(file_path),
             mime_type,
         )
@@ -8622,7 +8566,7 @@ def api_attachment_keypoints():
             else:
                 mime_type = "application/octet-stream"
 
-        extracted_text = _nova_analyze_binary_attachment_for_prompt(
+        extracted_text = attachment_analysis_service.analyze_binary_attachment_for_prompt(
             str(file_path),
             mime_type,
         )
@@ -8885,178 +8829,6 @@ def _nova_session_attachment_memory_path_20260611():
     except Exception:
         return Path("data") / "nova_session_attachments.json"
 
-
-def _nova_load_session_attachment_memory_20260611():
-    try:
-        import json
-        path = _nova_session_attachment_memory_path_20260611()
-        if not path.exists():
-            return {}
-        data = json.loads(path.read_text(encoding="utf-8-sig") or "{}")
-        return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
-
-
-def _nova_save_session_attachment_memory_20260611(data):
-    try:
-        import json
-        path = _nova_session_attachment_memory_path_20260611()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(data if isinstance(data, dict) else {}, indent=2, ensure_ascii=False), encoding="utf-8")
-        return True
-    except Exception:
-        return False
-
-
-def _nova_normalize_attachment_item_for_session_20260611(item):
-    try:
-        if not isinstance(item, dict):
-            return None
-
-        normalized = {}
-
-        for key in (
-            "filename",
-            "original_filename",
-            "file_url",
-            "url",
-            "path",
-            "local_path",
-            "mime_type",
-            "type",
-            "size",
-        ):
-            value = item.get(key)
-            if value is not None and str(value).strip():
-                normalized[key] = value
-
-        if not normalized.get("filename"):
-            normalized["filename"] = (
-                normalized.get("original_filename")
-                or str(normalized.get("file_url") or normalized.get("url") or normalized.get("path") or "attachment").replace("\\", "/").split("/")[-1]
-            )
-
-        return normalized if normalized else None
-    except Exception:
-        return None
-
-
-def _nova_resolve_saved_attachment_path_20260611(item):
-    try:
-        from pathlib import Path
-
-        if not isinstance(item, dict):
-            return None
-
-        candidates = [
-            item.get("local_path"),
-            item.get("path"),
-        ]
-
-        for url_key in ("file_url", "url"):
-            raw_url = str(item.get(url_key) or "").strip()
-            if raw_url:
-                filename = raw_url.replace("\\", "/").split("/")[-1].strip()
-                if filename:
-                    candidates.append(str(Path(UPLOADS_DIR) / filename))
-
-        filename = str(item.get("filename") or item.get("original_filename") or "").strip()
-        if filename:
-            candidates.append(str(Path(UPLOADS_DIR) / filename))
-
-        for candidate in candidates:
-            if not candidate:
-                continue
-            candidate_path = Path(str(candidate))
-            if not candidate_path.is_absolute():
-                candidate_path = Path(__file__).resolve().parent / candidate_path
-            if candidate_path.exists() and candidate_path.is_file():
-                return candidate_path
-
-        return None
-    except Exception:
-        return None
-
-
-def _nova_read_saved_attachment_text_20260611(item, limit=4000):
-    try:
-        path = _nova_resolve_saved_attachment_path_20260611(item)
-        if not path:
-            return ""
-
-        suffix = path.suffix.lower()
-        if suffix in (".txt", ".md", ".csv", ".json", ".py", ".js", ".html", ".css", ".xml", ".log"):
-            for encoding in ("utf-8-sig", "utf-8", "cp1252", "latin-1"):
-                try:
-                    return path.read_text(encoding=encoding, errors="replace")[:limit].strip()
-                except Exception:
-                    continue
-
-        return f"[Saved attachment exists but is not plain readable text: {path.name}]"
-    except Exception:
-        return ""
-
-
-def _nova_build_saved_attachment_reply_20260611(user_text, saved_attachments):
-    try:
-        clean_user = str(user_text or "").lower()
-        lines = ["Attachment analysis:"]
-
-        matched_any = False
-
-        for item in saved_attachments:
-            if not isinstance(item, dict):
-                continue
-
-            name = str(
-                item.get("filename")
-                or item.get("original_filename")
-                or item.get("file_url")
-                or "attachment"
-            ).replace("\\", "/").split("/")[-1]
-
-            # If the user names a specific file, prefer that file.
-            if ".txt" in clean_user or "attachment" in clean_user or "file" in clean_user:
-                raw_names = [
-                    str(item.get("filename") or "").lower(),
-                    str(item.get("original_filename") or "").lower(),
-                    name.lower(),
-                ]
-                mentioned_specific_other = any(part.endswith(".txt") for part in clean_user.split())
-                if mentioned_specific_other and not any(raw_name and raw_name in clean_user for raw_name in raw_names):
-                    continue
-
-            content = _nova_read_saved_attachment_text_20260611(item)
-            if not content:
-                continue
-
-            matched_any = True
-            lines.append(f"Attachment {name} content:")
-            lines.append(content)
-
-        if not matched_any:
-            for item in saved_attachments:
-                name = str(
-                    item.get("filename")
-                    or item.get("original_filename")
-                    or item.get("file_url")
-                    or "attachment"
-                ).replace("\\", "/").split("/")[-1]
-                content = _nova_read_saved_attachment_text_20260611(item)
-                if content:
-                    lines.append(f"Attachment {name} content:")
-                    lines.append(content)
-                    matched_any = True
-
-        if not matched_any:
-            return ""
-
-        return "\n".join(lines).strip()
-    except Exception:
-        return ""
-
-
 @app.before_request
 def nova_session_attachment_memory_gate_20260611():
     try:
@@ -9090,59 +8862,12 @@ def nova_session_attachment_memory_gate_20260611():
         if not isinstance(attachments, list):
             attachments = []
 
-        memory = _nova_load_session_attachment_memory_20260611()
-        saved = memory.get(session_id) if isinstance(memory, dict) else None
-        saved = saved if isinstance(saved, list) else []
+        saved = attachment_memory_service.get_or_create_session_attachments(
+            session_id,
+            attachments,
+        )
 
-        # Save current request attachments for later follow-ups.
         if attachments:
-            normalized = []
-            for item in attachments:
-                normalized_item = _nova_normalize_attachment_item_for_session_20260611(item)
-                if normalized_item:
-                    normalized.append(normalized_item)
-
-            if normalized:
-                existing_keys = {
-                    str(x.get("file_url") or x.get("url") or x.get("path") or x.get("filename") or "")
-                    for x in saved
-                    if isinstance(x, dict)
-                }
-
-                for item in normalized:
-                    key = str(item.get("file_url") or item.get("url") or item.get("path") or item.get("filename") or "")
-                    if key and key not in existing_keys:
-                        saved.append(item)
-                        existing_keys.add(key)
-
-                # NOVA_SESSION_ATTACHMENT_MEMORY_DEDUPE_AND_TEXT_LOCK_20260611
-                _nova_deduped_saved_by_name = {}
-                for _nova_saved_item in saved:
-                    if not isinstance(_nova_saved_item, dict):
-                        continue
-                    _nova_saved_name = str(
-                        _nova_saved_item.get("filename")
-                        or _nova_saved_item.get("original_filename")
-                        or _nova_saved_item.get("file_url")
-                        or _nova_saved_item.get("url")
-                        or ""
-                    ).replace("\\", "/").split("/")[-1].strip().lower()
-
-                    if not _nova_saved_name:
-                        _nova_saved_name = str(
-                            _nova_saved_item.get("file_url")
-                            or _nova_saved_item.get("url")
-                            or _nova_saved_item.get("path")
-                            or ""
-                        ).strip().lower()
-
-                    if _nova_saved_name:
-                        _nova_deduped_saved_by_name[_nova_saved_name] = _nova_saved_item
-
-                saved = list(_nova_deduped_saved_by_name.values())[-20:]
-                memory[session_id] = saved
-                _nova_save_session_attachment_memory_20260611(memory)
-
             return None
 
         clean = " ".join(user_text.lower().split())
@@ -9161,7 +8886,10 @@ def nova_session_attachment_memory_gate_20260611():
         if not wants_saved_attachment or not saved:
             return None
 
-        assistant_text = _nova_build_saved_attachment_reply_20260611(user_text, saved)
+        assistant_text = attachment_memory_service.build_saved_attachment_reply(
+            user_text,
+            saved,
+        )
         if not assistant_text:
             return None
 

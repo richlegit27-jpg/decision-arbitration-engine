@@ -213,10 +213,190 @@ def summarize_attachments_for_session(
 
     return summary
 
-# ATTACHMENT_MEMORY_SESSION_ALIAS_FIX_LOCK
-# ATTACHMENT_FILENAME_FIX_LOCK
-# ATTACHMENT_FILENAME_FROM_URL_LOCK
 
-# ATTACHMENT_FORCE_FILENAME_FIX_LOCK
+def resolve_saved_attachment_path(
+    item,
+):
+    try:
+        if not isinstance(item, dict):
+            return None
+
+        candidates = [
+            item.get("local_path"),
+            item.get("path"),
+        ]
+
+        for key in (
+            "file_url",
+            "url",
+        ):
+            raw_url = str(
+                item.get(key) or ""
+            ).strip()
+
+            if raw_url:
+                filename = (
+                    raw_url
+                    .replace("\\", "/")
+                    .split("/")[-1]
+                    .strip()
+                )
+
+                if filename:
+                    candidates.append(
+                        str(
+                            Path("uploads")
+                            / filename
+                        )
+                    )
+
+        filename = str(
+            item.get("filename")
+            or item.get("original_filename")
+            or ""
+        ).strip()
+
+        if filename:
+            candidates.append(
+                str(
+                    Path("uploads")
+                    / filename
+                )
+            )
+
+        for candidate in candidates:
+            if not candidate:
+                continue
+
+            candidate_path = Path(
+                str(candidate)
+            )
+
+            if not candidate_path.is_absolute():
+                candidate_path = ROOT_DIR / candidate_path
+
+            if (
+                candidate_path.exists()
+                and candidate_path.is_file()
+            ):
+                return candidate_path
+
+        return None
+
+    except Exception:
+        return None
 
 
+def read_saved_attachment_text(
+    item,
+    limit=4000,
+):
+    try:
+        path = resolve_saved_attachment_path(
+            item
+        )
+
+        if not path:
+            return ""
+
+        suffix = path.suffix.lower()
+
+        if suffix in (
+            ".txt",
+            ".md",
+            ".csv",
+            ".json",
+            ".py",
+            ".js",
+            ".html",
+            ".css",
+            ".xml",
+            ".log",
+        ):
+            for encoding in (
+                "utf-8-sig",
+                "utf-8",
+                "cp1252",
+                "latin-1",
+            ):
+                try:
+                    return (
+                        path.read_text(
+                            encoding=encoding,
+                            errors="replace",
+                        )[:limit]
+                        .strip()
+                    )
+                except Exception:
+                    continue
+
+        return ""
+
+    except Exception:
+        return ""
+
+def build_saved_attachment_reply(
+    user_text,
+    saved_attachments,
+):
+    try:
+        clean_user = str(
+            user_text or ""
+        ).lower()
+
+        lines = [
+            "Attachment analysis:"
+        ]
+
+        matched_any = False
+
+        for item in saved_attachments or []:
+            if not isinstance(item, dict):
+                continue
+
+            name = str(
+                item.get("filename")
+                or item.get("original_filename")
+                or item.get("file_url")
+                or "attachment"
+            ).replace("\\", "/").split("/")[-1]
+
+            content = read_saved_attachment_text(
+                item
+            )
+
+            if not content:
+                continue
+
+            matched_any = True
+            lines.append(
+                f"Attachment {name} content:"
+            )
+            lines.append(content)
+
+        if not matched_any:
+            return ""
+
+        return "\n".join(
+            lines
+        ).strip()
+
+    except Exception:
+        return ""
+def get_or_create_session_attachments(
+    session_id,
+    attachments,
+):
+    existing = get_attachments_for_session(
+        session_id,
+    )
+
+    if attachments:
+        persist_attachments_for_session(
+            attachments,
+            session_id=session_id,
+        )
+
+    return get_attachments_for_session(
+        session_id,
+    )
