@@ -208,6 +208,10 @@ from nova_backend.services.project_focus_memory_service import (
     ProjectFocusMemoryService,
 )
 
+from nova_backend.services.project_aware_context_service import (
+    ProjectAwareContextService,
+)
+
 from nova_backend.services.project_state_memory_service import (
     ProjectStateMemoryService,
 )
@@ -665,13 +669,7 @@ app.config["UPLOAD_FOLDER"] = str(UPLOADS_DIR)
 # SERVICES
 # -----------------------
 
-session_service = SessionService(
-    DATA_DIR / "nova_sessions.json"
-)
 
-memory_service = MemoryService(
-    str(DATA_DIR / "nova_memory.json")
-)
 
 session_service = SessionService(
     DATA_DIR / "nova_sessions.json"
@@ -683,10 +681,6 @@ memory_service = MemoryService(
 
 project_state_memory_service = ProjectStateMemoryService(
     DATA_DIR / "nova_project_state.json"
-)
-
-artifact_service = ArtifactService(
-    str(DATA_DIR / "nova_artifacts.json")
 )
 
 memory_context_service = MemoryContextService(
@@ -703,6 +697,11 @@ upload_ownership_service = UploadOwnershipService(
 )
 project_focus_memory_service = ProjectFocusMemoryService(
     memory_service,
+    session_service,
+)
+
+project_aware_context_service = ProjectAwareContextService(
+    memory_context_service,
     session_service,
 )
 
@@ -2071,111 +2070,6 @@ def api_sessions():
 
 
 
-
-
-def _nova_pa_memory_text(item):
-    if isinstance(item, str):
-        return item.strip()
-
-    if not isinstance(item, dict):
-        return ""
-
-    for key in (
-        "text",
-        "content",
-        "memory",
-        "summary",
-        "value",
-        "note",
-        "description",
-    ):
-        value = item.get(key)
-
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-
-    return ""
-
-
-
-def _nova_pa_message_text(message):
-    if isinstance(message, str):
-        return message.strip()
-
-    if not isinstance(message, dict):
-        return ""
-
-    for key in (
-        "text",
-        "content",
-        "message",
-        "body",
-    ):
-        value = message.get(key)
-
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-
-    return ""
-
-def _nova_build_project_aware_context(
-    user_text,
-    *,
-    session_id="",
-    requested_session_id="",
-):
-    context_lines = []
-
-    try:
-        memory_lines = memory_context_service.get_memory_context(
-            user_text
-        )
-    except Exception:
-        memory_lines = []
-        app.logger.exception(
-            "[project-aware] failed loading persistent memory context"
-        )
-
-    if memory_lines:
-        context_lines.append("Relevant persistent memory:")
-        context_lines.extend(memory_lines)
-
-    session_context_id = str(session_id or requested_session_id or "").strip()
-
-    try:
-        recent_lines = memory_context_service.get_recent_session_context(
-            session_context_id
-        )
-    except Exception:
-        recent_lines = []
-        app.logger.exception(
-            "[project-aware] failed loading recent session context"
-        )
-
-    if recent_lines:
-        if context_lines:
-            context_lines.append("")
-
-        context_lines.append("Recent session context:")
-        context_lines.extend(recent_lines)
-
-    app.logger.info(
-        "[project-aware] built context session_id=%s requested_session_id=%s memory_lines=%s recent_lines=%s total_lines=%s",
-        session_id,
-        requested_session_id,
-        len(memory_lines or []),
-        len(recent_lines or []),
-        len(context_lines or []),
-    )
-
-    if not context_lines:
-        return ""
-
-    return "\n".join([
-        "",
-        "Project-aware context for Nova:",
-        *context_lines,
-    ]).strip()
 
 
 def _nova_try_project_focus_direct_recall(user_text, session_id):
@@ -5215,7 +5109,7 @@ def api_chat():
             if _nova_skip_project_context:
                 project_aware_context = ""
             else:
-                project_aware_context = _nova_build_project_aware_context(
+                project_aware_context = project_aware_context_service.build_project_aware_context(
                     user_text,
                     session_id=session_id,
                     requested_session_id=requested_session_id,
