@@ -155,6 +155,9 @@ from nova_backend.config import (
 )
 
 from nova_backend.services.session_service import SessionService
+from nova_backend.services.session_history_service import (
+    SessionHistoryService,
+)
 from nova_backend.services.artifact_service import ArtifactService
 from nova_backend.services.memory_service import MemoryService
 from nova_backend.services.web_service import WebService
@@ -683,6 +686,10 @@ app.config["UPLOAD_FOLDER"] = str(UPLOADS_DIR)
 
 session_service = SessionService(
     DATA_DIR / "nova_sessions.json"
+)
+
+session_history_service = SessionHistoryService(
+    BASE_DIR
 )
 
 memory_service = MemoryService(
@@ -11950,105 +11957,32 @@ def _nova_final_session_detail_cache_path_20260612():
 
 
 def _nova_final_load_sessions_store_20260612():
-    try:
-        path_value = _nova_final_session_detail_cache_path_20260612()
-        if os.path.exists(path_value):
-            with open(path_value, "r", encoding="utf-8") as handle:
-                data = json.load(handle) or {}
-                if isinstance(data, dict):
-                    return data
-    except Exception:
-        pass
-    return {}
+    return session_history_service.load_sessions_store()
 
 
 def _nova_final_save_sessions_store_20260612(store):
-    try:
-        path_value = _nova_final_session_detail_cache_path_20260612()
-        os.makedirs(os.path.dirname(path_value), exist_ok=True)
-        with open(path_value, "w", encoding="utf-8") as handle:
-            json.dump(store, handle, ensure_ascii=False, indent=2)
-        return True
-    except Exception as error:
-        try:
-            app.logger.warning("[FinalSessionDetailCache] save failed: %s", error)
-        except Exception:
-            pass
-    return False
+    return session_history_service.save_sessions_store(
+        store
+    )
+
+def _nova_final_find_session_in_store_20260612(
+    store,
+    session_id,
+):
+    return session_history_service.find_session_in_store(
+        store,
+        session_id,
+    )
 
 
-def _nova_final_find_session_in_store_20260612(store, session_id):
-    sessions = store.get("sessions")
-    if isinstance(sessions, dict):
-        item = sessions.get(session_id)
-        return item if isinstance(item, dict) else None
-
-    if isinstance(sessions, list):
-        for item in sessions:
-            if isinstance(item, dict) and str(item.get("id") or "") == session_id:
-                return item
-
-    return None
-
-
-def _nova_final_upsert_session_in_store_20260612(session_id, session_obj):
-    if not session_id or not isinstance(session_obj, dict):
-        return None
-
-    store = _nova_final_load_sessions_store_20260612()
-
-    sessions = store.get("sessions")
-    if not isinstance(sessions, list):
-        sessions = []
-
-    existing = None
-    for item in sessions:
-        if isinstance(item, dict) and str(item.get("id") or "") == session_id:
-            existing = item
-            break
-
-    if existing is None:
-        existing = {
-            "id": session_id,
-            "title": str(session_obj.get("title") or "Web Fetch")[:80],
-            "messages": [],
-            "session_attachments": [],
-            "meta": {},
-        }
-        sessions.insert(0, existing)
-
-    for key, value in session_obj.items():
-        if key == "messages":
-            continue
-        existing[key] = value
-
-    messages = session_obj.get("messages")
-    if not isinstance(messages, list):
-        messages = existing.get("messages") if isinstance(existing.get("messages"), list) else []
-
-    existing["messages"] = messages
-    existing["message_count"] = len(messages)
-    existing["active_session_id"] = session_id
-
-    try:
-        existing["updated_at"] = datetime.utcnow().isoformat() + "Z"
-    except Exception:
-        pass
-
-    meta = existing.get("meta")
-    if not isinstance(meta, dict):
-        meta = {}
-        existing["meta"] = meta
-
-    meta["final_session_detail_response_cache"] = True
-
-    store["sessions"] = sessions
-    store["active_session_id"] = session_id
-
-    _nova_final_save_sessions_store_20260612(store)
-    _NOVA_FINAL_SESSION_DETAIL_CACHE_20260612[session_id] = existing
-
-    return existing
+def _nova_final_upsert_session_in_store_20260612(
+    session_id,
+    session_obj,
+):
+    return session_history_service.upsert_session_in_store(
+        session_id,
+        session_obj,
+    )
 
 
 @app.after_request
@@ -12902,32 +12836,17 @@ except Exception:
 
 # NOVA_HISTORY_LIST_AND_DETAIL_20260621
 def nova_history_load_sessions_20260621():
-    import json
-    from pathlib import Path
+    store = session_history_service.load_sessions_store()
 
-    base = Path(__file__).resolve().parent
-    data_path = base / "data" / "nova_sessions.json"
+    sessions = store.get(
+        "sessions",
+        [],
+    )
 
-    try:
-        payload = json.loads(data_path.read_text(encoding="utf-8"))
-    except Exception:
-        return []
-
-    if isinstance(payload, list):
-        return payload
-
-    if isinstance(payload, dict):
-        for key in ("sessions", "items", "data"):
-            value = payload.get(key)
-            if isinstance(value, list):
-                return value
-
-        values = list(payload.values())
-        if values and all(isinstance(v, dict) for v in values):
-            return values
+    if isinstance(sessions, list):
+        return sessions
 
     return []
-
 
 def nova_history_sid_20260621(session):
     if not isinstance(session, dict):
