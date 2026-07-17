@@ -3320,7 +3320,9 @@ def api_chat():
 
                     _nova_file_path = _nova_find_uploaded_file_path_20260607(_nova_attachment)
                     # NOVA_USE_PHASE2_DOCX_EXTRACTOR_DIRECT_20260609
-                    _nova_docx_text = _nova_phase2_extract_docx_text(_nova_file_path)
+                    _nova_docx_text = attachment_context_service.extract_docx_text(
+                        _nova_file_path
+                    )
 
                     if _nova_docx_text:
                         _nova_preview = _nova_docx_text[:1200].strip()
