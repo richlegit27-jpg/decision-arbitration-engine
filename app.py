@@ -8799,54 +8799,6 @@ def api_attachment_summarize():
             "error": str(error),
         }), 500
 
-
-
-
-# ATTACHMENT_KEYPOINTS_ENDPOINT_LOCK
-def _nova_attachment_keypoints_from_text(text, max_points=10):
-    raw = str(text or "")
-    points = []
-    seen = set()
-
-    skip_fragments = (
-        "sponsored",
-        "safesearch",
-        "create a new collection",
-        "saved images",
-        "saved to collections",
-        "related searches",
-        "more images on this site",
-        "go to site",
-        "http://",
-        "https://",
-        "www.",
-    )
-
-    for line in raw.splitlines():
-        cleaned = " ".join(str(line or "").strip().split())
-
-        if not cleaned:
-            continue
-
-        lowered = cleaned.lower()
-
-        if lowered in seen:
-            continue
-
-        if any(fragment in lowered for fragment in skip_fragments):
-            continue
-
-        if len(cleaned) < 8:
-            continue
-
-        seen.add(lowered)
-        points.append(cleaned)
-
-        if len(points) >= max_points:
-            break
-
-    return points
-
 @app.route("/api/attachment/keypoints", methods=["POST"])
 def api_attachment_keypoints():
     """
