@@ -22829,7 +22829,7 @@ def _nova_runtime_handle_image_generation(
 ) -> dict:
     # IMAGE_GENERATION_PROMPT_ATTACHMENT_GUARD_LOCK
     try:
-        _nova_image_prompt_text = str(user_text or prompt or text or "").lower()
+        _nova_image_prompt_text = str(prompt or "").lower()
     except Exception:
         _nova_image_prompt_text = ""
 
@@ -22928,6 +22928,9 @@ def _nova_runtime_handle_image_generation(
 
         uploads_dir.mkdir(parents=True, exist_ok=True)
         filepath = uploads_dir / filename
+
+        filepath.write_bytes(image_bytes)
+
         print("[NOVA_RAILWAY_UPLOAD_DIR_FIX_20260702] uploads_dir", str(uploads_dir))
 
         if not filepath.exists() or filepath.stat().st_size <= 0:
@@ -22993,9 +22996,6 @@ def _nova_runtime_handle_image_generation(
         except Exception as e:
             exec_debug("IMAGE ARTIFACT SAVE FAILED:", e)
             exec_debug("IMAGE ARTIFACT RESULT:", saved_artifact)
-
-        except Exception as e:
-            exec_debug("IMAGE ARTIFACT SAVE FAILED:", e)
 
         return {
             "ok": True,
