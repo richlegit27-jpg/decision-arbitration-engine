@@ -216,6 +216,10 @@ from nova_backend.services.project_state_memory_service import (
     ProjectStateMemoryService,
 )
 
+from nova_backend.services.attachment_context_service import (
+    AttachmentContextService,
+)
+
 # -----------------------
 # APP SETUP
 
@@ -703,6 +707,10 @@ project_focus_memory_service = ProjectFocusMemoryService(
 project_aware_context_service = ProjectAwareContextService(
     memory_context_service,
     session_service,
+)
+
+attachment_context_service = AttachmentContextService(
+    UPLOADS_DIR,
 )
 
 web_service = WebService(timeout=WEB_TIMEOUT)
@@ -1492,116 +1500,6 @@ def _nova_replace_weak_backend_reply(user_text, result):
         return result
 
 
-
-
-# SAFE_ATTACHMENT_TEXT_CLEANUP_LOCK
-def _nova_safe_clean_attachment_text(raw_text, max_chars=6000):
-    """Clean noisy PDF/OCR/browser extraction before Nova summarizes it."""
-    text_value = str(raw_text or "").replace("\r\n", "\n").replace("\r", "\n")
-
-    noisy_exact = {
-        "search",
-        "images",
-        "videos",
-        "shopping",
-        "news",
-        "maps",
-        "books",
-        "flights",
-        "finance",
-        "all",
-        "create",
-        "inspiration",
-        "keypoints",
-            "copy",
-            "regen",
-            "regenerate",
-        "continue",
-        "summarize",
-        "improve",
-        "next",
-        "menu",
-        "home",
-        "sign in",
-        "login",
-        "privacy",
-        "terms",
-        "settings",
-        "tools",
-        "feedback",
-        "cached",
-        "similar",
-        "share",
-        "save",
-        "more",
-        "view all",
-    }
-
-    noisy_contains = (
-        "url removed from extracted attachment text",
-        "wayfair.ca",
-        "sponsored",
-        "ad Â·",
-        "ads Â·",
-        "shop â€º",
-        "wall art â€º",
-        "free_shipping",
-        "furniture & dÃ©cor",
-        "kitchen appliances",
-        "prices you'll love",
-        "eye-catching prints",
-        "google",
-        "bing",
-        "search images",
-    )
-
-    cleaned_lines = []
-    seen = set()
-
-    for raw_line in text_value.split("\n"):
-        line = re.sub(r"\s+", " ", str(raw_line or "")).strip()
-        if not line:
-            continue
-
-        low = line.lower().strip(" :;-â€¢*|")
-        low_compact = re.sub(r"[^a-z0-9]+", " ", low).strip()
-
-        if low_compact in noisy_exact:
-            continue
-
-        if any(bad in low for bad in noisy_contains):
-            continue
-
-        if low.startswith("[pdf page") and len(line) < 25:
-            continue
-
-        if low.startswith("attachment <unknown> content"):
-            continue
-
-        if low.startswith("attachment content:"):
-            continue
-
-        if line.startswith("http://") or line.startswith("https://"):
-            continue
-
-        if len(line) <= 2:
-            continue
-
-        dedupe_key = low_compact[:180]
-        if dedupe_key in seen:
-            continue
-
-        seen.add(dedupe_key)
-        cleaned_lines.append(line)
-
-    cleaned = "\n".join(cleaned_lines).strip()
-
-    if not cleaned:
-        cleaned = text_value.strip()
-
-    return cleaned[:max_chars].strip()
-
-
 def _nova_safe_attachment_name(attachment, fallback="uploaded attachment"):
     """Return a readable attachment name instead of <unknown>."""
     if isinstance(attachment, dict):
@@ -1619,80 +1517,7 @@ def _nova_safe_attachment_name(attachment, fallback="uploaded attachment"):
 
 
 
-# NOVA_PHASE1_TEXT_ATTACHMENT_READER_20260607
-def _nova_phase1_is_text_attachment(item):
-    try:
-        if not isinstance(item, dict):
-            return False
 
-        mime = str(item.get("mime_type") or item.get("type") or item.get("content_type") or "").lower()
-        name = str(
-            item.get("filename")
-            or item.get("original_filename")
-            or item.get("name")
-            or item.get("url")
-            or item.get("file_url")
-            or ""
-        ).lower()
-
-        text_exts = (
-            ".txt", ".md", ".markdown", ".json", ".jsonl",
-            ".py", ".js", ".css", ".html", ".htm",
-            ".csv", ".tsv", ".log", ".xml", ".yaml", ".yml", ".docx"
-        )
-
-        if mime.startswith("text/"):
-            return True
-
-        if mime in {
-            "application/json",
-            "application/javascript",
-            "application/x-javascript",
-            "application/xml",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "text/csv"
-        }:
-            return True
-
-        return name.endswith(text_exts)
-    except Exception:
-        return False
-
-
-def _nova_phase1_upload_path_from_attachment(item):
-    try:
-        import os
-
-        raw = str(
-            item.get("path")
-            or item.get("local_path")
-            or item.get("file_path")
-            or item.get("url")
-            or item.get("file_url")
-            or ""
-        ).strip()
-
-        if not raw:
-            return None
-
-        if raw.startswith("/api/uploads/"):
-            filename = raw.split("/api/uploads/", 1)[1].split("?", 1)[0].strip("/\\")
-            base = globals().get("UPLOADS_DIR") or globals().get("UPLOAD_FOLDER")
-            if base:
-                return os.path.join(str(base), filename)
-            return os.path.join(os.path.dirname(__file__), "uploads", filename)
-
-        if os.path.isabs(raw):
-            return raw
-
-        filename = raw.split("/")[-1].split("\\")[-1].split("?", 1)[0]
-        base = globals().get("UPLOADS_DIR") or globals().get("UPLOAD_FOLDER")
-        if base:
-            return os.path.join(str(base), filename)
-
-        return os.path.join(os.path.dirname(__file__), "uploads", filename)
-    except Exception:
-        return None
 
 
 
@@ -1760,195 +1585,7 @@ def _nova_filter_raw_injection_attachments(attachments, logger=None):
     return kept
 
 
-def _nova_phase2_extract_docx_text(path):
-    try:
-        import zipfile
-        import xml.etree.ElementTree as ET
 
-        chunks = []
-
-        with zipfile.ZipFile(path, "r") as archive:
-            targets = [
-                "word/document.xml",
-                "word/footnotes.xml",
-                "word/endnotes.xml",
-                "word/comments.xml",
-            ]
-
-            for target in targets:
-                if target not in archive.namelist():
-                    continue
-
-                xml_bytes = archive.read(target)
-                root = ET.fromstring(xml_bytes)
-
-                namespace = {
-                    "w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-                }
-
-                paragraphs = []
-
-                for paragraph in root.findall(".//w:p", namespace):
-                    texts = []
-
-                    for node in paragraph.findall(".//w:t", namespace):
-                        if node.text:
-                            texts.append(node.text)
-
-                    line = "".join(texts).strip()
-
-                    if line:
-                        paragraphs.append(line)
-
-                if paragraphs:
-                    chunks.append("\n".join(paragraphs))
-
-        return "\n\n".join(chunks).strip()
-    except Exception:
-        return ""
-
-def _nova_phase1_read_text_attachments(attachments, logger=None):
-    sections = []
-
-    for item in attachments or []:
-        try:
-            if not _nova_phase1_is_text_attachment(item):
-                continue
-
-            path = _nova_phase1_upload_path_from_attachment(item)
-            if not path:
-                continue
-
-            import os
-
-            if not os.path.exists(path) or not os.path.isfile(path):
-                if logger:
-                    logger.warning("[Phase1TextAttachmentReader] missing file path=%s", path)
-                continue
-
-            size = os.path.getsize(path)
-            max_bytes = 120000
-
-            lower_path = str(path or "").lower()
-            lower_name = str(item.get("filename") or item.get("original_filename") or item.get("name") or "").lower()
-            mime = str(item.get("mime_type") or item.get("type") or item.get("content_type") or "").lower()
-
-            if (
-                lower_path.endswith(".docx")
-                or lower_name.endswith(".docx")
-                or mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            ):
-                text = _nova_phase2_extract_docx_text(path)
-
-                if not text:
-                    if logger:
-                        logger.warning("[Phase2DocxAttachmentReader] no readable docx text path=%s", path)
-                    continue
-
-                if len(text) > 50000:
-                    text = text[:50000] + "\n\n[TRUNCATED: attachment text was longer than 50,000 characters]"
-
-                name = (
-                    item.get("original_filename")
-                    or item.get("filename")
-                    or item.get("name")
-                    or os.path.basename(path)
-                    or "attachment"
-                )
-
-                sections.append(
-                    "Attachment file content: {name}\n"
-                    "Path: {path}\n"
-                    "Size: {size} bytes\n"
-                    "Content:\n{text}".format(
-                        name=name,
-                        path=path,
-                        size=size,
-                        text=text
-                    )
-                )
-
-                if logger:
-                    logger.info(
-                        "[Phase2DocxAttachmentReader] loaded docx attachment name=%s chars=%s",
-                        name,
-                        len(text)
-                    )
-
-                continue
-            with open(path, "rb") as handle:
-                raw = handle.read(max_bytes)
-
-            text = None
-            for encoding in ("utf-8", "utf-8-sig", "cp1252", "latin-1"):
-                try:
-                    text = raw.decode(encoding)
-                    break
-                except Exception:
-                    continue
-
-            if text is None:
-                continue
-
-            text = text.replace("\x00", "").strip()
-
-            if not text:
-                continue
-
-            if len(text) > 50000:
-                text = text[:50000] + "\n\n[TRUNCATED: attachment text was longer than 50,000 characters]"
-
-            name = (
-                item.get("original_filename")
-                or item.get("filename")
-                or item.get("name")
-                or os.path.basename(path)
-                or "attachment"
-            )
-
-            sections.append(
-                "Attachment file content: {name}\n"
-                "Path: {path}\n"
-                "Size: {size} bytes\n"
-                "Content:\n{text}".format(
-                    name=name,
-                    path=path,
-                    size=size,
-                    text=text
-                )
-            )
-
-            if logger:
-                logger.info(
-                    "[Phase1TextAttachmentReader] loaded text attachment name=%s chars=%s",
-                    name,
-                    len(text)
-                )
-        except Exception as error:
-            if logger:
-                logger.warning("[Phase1TextAttachmentReader] failed item=%s error=%s", item, error)
-
-    return sections
-
-
-def _nova_phase1_append_text_attachments_to_user_text(user_text, attachments, logger=None):
-    try:
-        sections = _nova_phase1_read_text_attachments(attachments, logger=logger)
-        if not sections:
-            return user_text
-
-        original = str(user_text or "").strip()
-
-        return (
-            original
-            + "\n\n\n[CURRENT UPLOADED TEXT ATTACHMENTS]\n"
-            + "\n\n---\n\n".join(sections)
-            + "\n[/CURRENT UPLOADED TEXT ATTACHMENTS]\n"
-        ).strip()
-    except Exception as error:
-        if logger:
-            logger.warning("[Phase1TextAttachmentReader] append failed error=%s", error)
-        return user_text
 
 @app.route("/api/chat", methods=["POST"])
 def api_chat_route():
@@ -4692,7 +4329,7 @@ def api_chat():
                 app.logger.exception("[api_chat] failed to persist attachment memory")
 
         # NOVA_PHASE1_TEXT_ATTACHMENT_READER_INJECT_20260607
-        user_text = _nova_phase1_append_text_attachments_to_user_text(
+        user_text = attachment_context_service.append_text_attachments_to_user_text(
             user_text,
             attachments,
             logger=app.logger,
