@@ -208,6 +208,10 @@ from nova_backend.services.project_focus_memory_service import (
     ProjectFocusMemoryService,
 )
 
+from nova_backend.services.project_state_memory_service import (
+    ProjectStateMemoryService,
+)
+
 # -----------------------
 # APP SETUP
 
@@ -667,6 +671,22 @@ session_service = SessionService(
 
 memory_service = MemoryService(
     str(DATA_DIR / "nova_memory.json")
+)
+
+session_service = SessionService(
+    DATA_DIR / "nova_sessions.json"
+)
+
+memory_service = MemoryService(
+    str(DATA_DIR / "nova_memory.json")
+)
+
+project_state_memory_service = ProjectStateMemoryService(
+    DATA_DIR / "nova_project_state.json"
+)
+
+artifact_service = ArtifactService(
+    str(DATA_DIR / "nova_artifacts.json")
 )
 
 memory_context_service = MemoryContextService(
@@ -2277,430 +2297,6 @@ def _nova_try_project_focus_direct_recall(user_text, session_id):
     return json_ok(**payload)
 
 
-# PROJECT_STATE_MEMORY_LOCK
-# PROJECT_STATE_DEDICATED_STORE_LOCK
-PROJECT_STATE_FILE = DATA_DIR / "nova_project_state.json"
-
-
-def _nova_project_state_now():
-    return datetime.utcnow().isoformat(timespec="seconds") + "Z"
-
-
-def _nova_read_project_state_store():
-    try:
-        if not PROJECT_STATE_FILE.exists():
-            return {"sessions": {}}
-
-        import json
-        # PROJECT_STATE_UTF8_SIG_LOCK
-        payload = json.loads(PROJECT_STATE_FILE.read_text(encoding="utf-8-sig"))
-
-        if not isinstance(payload, dict):
-            return {"sessions": {}}
-
-        sessions = payload.get("sessions")
-
-        if not isinstance(sessions, dict):
-            payload["sessions"] = {}
-
-        return payload
-
-    except Exception:
-        app.logger.exception("[project-state-store] failed reading store")
-        return {"sessions": {}}
-
-
-def _nova_write_project_state_store(payload):
-    try:
-        import json
-
-        if not isinstance(payload, dict):
-            payload = {"sessions": {}}
-
-        if not isinstance(payload.get("sessions"), dict):
-            payload["sessions"] = {}
-
-        PROJECT_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        PROJECT_STATE_FILE.write_text(
-            json.dumps(payload, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
-
-        return True
-
-    except Exception:
-        app.logger.exception("[project-state-store] failed writing store")
-        return False
-
-
-def _nova_get_project_state_session(session_id):
-    store = _nova_read_project_state_store()
-    sessions = store.setdefault("sessions", {})
-    target_session_id = str(session_id or "").strip()
-
-    if not target_session_id:
-        return {}
-
-    session_state = sessions.get(target_session_id)
-
-    if not isinstance(session_state, dict):
-        return {}
-
-    return session_state
-
-
-def _nova_set_project_state_values(session_id, values):
-    target_session_id = str(session_id or "").strip()
-
-    if not target_session_id:
-        return {}
-
-    store = _nova_read_project_state_store()
-    sessions = store.setdefault("sessions", {})
-    session_state = sessions.get(target_session_id)
-
-    if not isinstance(session_state, dict):
-        session_state = {}
-
-    for item in values or []:
-        if not isinstance(item, dict):
-            continue
-
-        kind = str(item.get("kind") or "").strip()
-        value = _nova_clean_project_state_value(item.get("value"))
-
-        if not kind or kind not in PROJECT_STATE_MEMORY_KINDS:
-            continue
-
-        if not value:
-            continue
-
-        session_state[kind] = value
-
-    session_state["updated_at"] = _nova_project_state_now()
-    sessions[target_session_id] = session_state
-    store["sessions"] = sessions
-
-    _nova_write_project_state_store(store)
-
-    return session_state
-
-
-PROJECT_STATE_MEMORY_KINDS = {
-    "current_task": {
-        "label": "Current task",
-        "answer": "Your current task was {value}.",
-        "save_patterns": [
-            r"\bmy\s+current\s+task\s+is\s+(.+?)(?:[.!?\n]|$)",
-            r"\bcurrent\s+task\s+is\s+(.+?)(?:[.!?\n]|$)",
-            r"\btask\s*:\s*(.+?)(?:[.!?\n]|$)",
-            r"\bnext\s+move\s+is\s+(.+?)(?:[.!?\n]|$)",
-        ],
-        "recall_terms": [
-            "what is my current task",
-            "what's my current task",
-            "what was my current task",
-            "what are we doing",
-            "what are we working on",
-            "what is the next move",
-            "what's the next move",
-        ],
-    },
-    "blocker": {
-        "label": "Blocker",
-        "answer": "Your current blocker was {value}.",
-        "save_patterns": [
-            r"\bblocker\s*:\s*(.+?)(?:[.!?\n]|$)",
-            r"\bmy\s+blocker\s+is\s+(.+?)(?:[.!?\n]|$)",
-            r"\bcurrent\s+blocker\s+is\s+(.+?)(?:[.!?\n]|$)",
-            r"\bblocked\s+by\s+(.+?)(?:[.!?\n]|$)",
-        ],
-        "recall_terms": [
-            "what is blocking me",
-            "what's blocking me",
-            "what was blocking me",
-            "what is the blocker",
-            "what's the blocker",
-            "current blocker",
-        ],
-    },
-    "active_file": {
-        "label": "Active file",
-        "answer": "Your active file was {value}.",
-        "save_patterns": [
-            r"\bactive\s+file\s+is\s+(.+?)(?:[.!?\n]|$)",
-            r"\bcurrent\s+file\s+is\s+(.+?)(?:[.!?\n]|$)",
-            r"\bworking\s+on\s+file\s+(.+?)(?:[.!?\n]|$)",
-            r"\bfile\s*:\s*(.+?)(?:[.!?\n]|$)",
-        ],
-        "recall_terms": [
-            "what file am i working on",
-            "which file am i working on",
-            "what is the active file",
-            "what's the active file",
-            "current file",
-            "active file",
-        ],
-    },
-    "last_checkpoint": {
-        "label": "Last checkpoint",
-        "answer": "Your last checkpoint was {value}.",
-        "save_patterns": [
-            r"\blast\s+checkpoint\s+is\s+(.+?)(?:[.!?\n]|$)",
-            r"\bcheckpoint\s+is\s+(.+?)(?:[.!?\n]|$)",
-            r"\bcheckpointed\s+at\s+(.+?)(?:[.!?\n]|$)",
-            r"\blockpoint\s+is\s+(.+?)(?:[.!?\n]|$)",
-        ],
-        "recall_terms": [
-            "what was my last checkpoint",
-            "what is my last checkpoint",
-            "where did we checkpoint",
-            "last checkpoint",
-            "current checkpoint",
-            "lockpoint",
-        ],
-    },
-}
-
-
-def _nova_clean_project_state_value(value):
-    cleaned = str(value or "").strip()
-    cleaned = re.sub(r"\s+", " ", cleaned).strip(" .!?")
-
-    return cleaned
-
-def _nova_project_state_memory_text(kind: str, value: str) -> str:
-    """
-    Return a single line text for the project-state kind, avoiding duplicate labels.
-    """
-    config = PROJECT_STATE_MEMORY_KINDS.get(kind) or {}
-    label = str(config.get("label") or kind).strip()
-
-    # remove repeated prefix if value already starts with it
-    if value.lower().startswith(label.lower()):
-        return f"{label}: {value[len(label)+1:].strip()}"
-    return f"{label}: {value.strip()}"
-
-# PROJECT_STATE_LABEL_EXTRACTOR_LOCK
-def _nova_extract_project_state_values(user_text):
-    raw = str(user_text or "").strip()
-    found = []
-
-    if not raw:
-        return found
-
-    label_patterns = {
-        "current_task": [
-            r"current\s+task\s+is\s+",
-            r"my\s+current\s+task\s+is\s+",
-            r"task\s*:\s*",
-            r"next\s+move\s+is\s+",
-        ],
-        "blocker": [
-            r"blocker\s+is\s+",
-            r"blocker\s*:\s*",
-            r"my\s+blocker\s+is\s+",
-            r"current\s+blocker\s+is\s+",
-            r"blocked\s+by\s+",
-        ],
-        "active_file": [
-            r"active\s+file\s+is\s+",
-            r"current\s+file\s+is\s+",
-            r"working\s+on\s+file\s+",
-            r"file\s*:\s*",
-        ],
-        "last_checkpoint": [
-            r"last\s+checkpoint\s+is\s+",
-            r"checkpoint\s+is\s+",
-            r"checkpointed\s+at\s+",
-            r"lockpoint\s+is\s+",
-        ],
-    }
-
-    label_start_parts = []
-    for patterns in label_patterns.values():
-        label_start_parts.extend(patterns)
-
-    for kind, patterns in label_patterns.items():
-        for pattern in patterns:
-            combined = (
-                r"\b"
-                + pattern
-                + r"(.+?)(?=\.\s+(?:"
-                + "|".join(label_start_parts)
-                + r")|\n|$)"
-            )
-
-            match = re.search(combined, raw, re.IGNORECASE)
-
-            if not match:
-                continue
-
-            value = _nova_clean_project_state_value(match.group(1))
-
-            if value:
-                found.append(
-                    {
-                        "kind": kind,
-                        "value": value,
-                    }
-                )
-                break
-
-    return found
-
-
-def _nova_save_project_state_memories(user_text, session_id):
-    extracted = _nova_extract_project_state_values(user_text)
-
-    if not extracted:
-        return []
-
-    state = _nova_set_project_state_values(session_id, extracted)
-
-    saved = []
-
-    for item in extracted:
-        kind = str(item.get("kind") or "").strip()
-        value = _nova_clean_project_state_value(item.get("value"))
-
-        if kind and value:
-            saved.append(
-                {
-                    "kind": kind,
-                    "value": value,
-                    "session_id": str(session_id or "").strip(),
-                    "source": "project_state_dedicated_store",
-                    "state": state,
-                }
-            )
-
-    app.logger.info(
-        "[project-state-store] saved kinds=%s session_id=%s",
-        ",".join([str(item.get("kind") or "") for item in extracted if isinstance(item, dict)]),
-        session_id,
-    )
-
-    return saved
-
-
-# PROJECT_STATE_RECALL_OVERRIDE_LOCK
-def _nova_project_state_question_kinds(user_text):
-    text_value = str(user_text or "").strip().lower()
-    kinds = []
-
-    if not text_value:
-        return kinds
-
-    asks_next_or_state = any(
-        term in text_value
-        for term in (
-            "what's next",
-            "whats next",
-            "what is next",
-            "next move",
-            "current task",
-            "what are we doing",
-            "what are we working on",
-            "current project state",
-            "project state",
-            "task and blocker",
-            "current task and blocker",
-        )
-    )
-
-    if asks_next_or_state:
-        return list(PROJECT_STATE_MEMORY_KINDS.keys())
-
-    for kind, config in PROJECT_STATE_MEMORY_KINDS.items():
-        for term in config.get("recall_terms") or []:
-            if term in text_value and kind not in kinds:
-                kinds.append(kind)
-
-    if "blocker" in text_value and "blocker" not in kinds:
-        kinds.append("blocker")
-
-    if "checkpoint" in text_value and "last_checkpoint" not in kinds:
-        kinds.append("last_checkpoint")
-
-    if "active file" in text_value and "active_file" not in kinds:
-        kinds.append("active_file")
-
-    return kinds
-
-
-def _nova_question_project_state_kind(user_text):
-    kinds = _nova_project_state_question_kinds(user_text)
-    return kinds[0] if kinds else ""
-
-
-def _nova_find_project_state_memory(session_id: str, kind: str) -> str:
-    target_kind = str(kind or "").strip()
-
-    if not target_kind or target_kind not in PROJECT_STATE_MEMORY_KINDS:
-        return ""
-
-    state = _nova_get_project_state_session(session_id)
-    value = _nova_clean_project_state_value(state.get(target_kind))
-
-    if value:
-        return value
-
-    return ""
-
-
-# PROJECT_STATE_AUTO_INJECT_CONTEXT_LOCK
-def _nova_build_project_state_context(session_id):
-    state = _nova_get_project_state_session(session_id)
-
-    if not isinstance(state, dict) or not state:
-        return ""
-
-    lines = []
-
-    current_task = _nova_clean_project_state_value(state.get("current_task"))
-    blocker = _nova_clean_project_state_value(state.get("blocker"))
-    active_file = _nova_clean_project_state_value(state.get("active_file"))
-    last_checkpoint = _nova_clean_project_state_value(state.get("last_checkpoint"))
-
-    if current_task:
-        lines.append(f"Current task: {current_task}")
-
-    if blocker:
-        lines.append(f"Blocker: {blocker}")
-
-    if active_file:
-        lines.append(f"Active file: {active_file}")
-
-    if last_checkpoint:
-        lines.append(f"Last checkpoint: {last_checkpoint}")
-
-    if not lines:
-        return ""
-
-    return "\n".join(
-        [
-            "HIGH PRIORITY SESSION PROJECT STATE:",
-            *lines,
-            "",
-            "Use this session project state as the source of truth for what the user is working on.",
-            "Ignore unrelated stale persistent-memory instructions that conflict with this session project state.",
-        ]
-    )
-
-
-def _nova_inject_project_state_context(user_text, session_id):
-    context = _nova_build_project_state_context(session_id)
-
-    if not context:
-        return user_text
-
-    clean_user_text = str(user_text or "").strip()
-    if not clean_user_text:
-        return context
-
-    return f"{context}\n\nUser message:\n{clean_user_text}"
-
 
 # SLIM_DIRECT_RECALL_PAYLOAD_LOCK
 def _nova_slim_assistant_payload(text, session_id="", **extra):
@@ -2947,7 +2543,9 @@ def _nova_find_current_project_state_memory_20260701():
 
 
 def _nova_try_project_state_direct_recall(user_text, session_id):
-    kinds = _nova_project_state_question_kinds(user_text)
+    kinds = project_state_memory_service.question_project_state_kinds(
+        user_text
+    )
 
     if not kinds:
         return None
@@ -2965,7 +2563,7 @@ def _nova_try_project_state_direct_recall(user_text, session_id):
         )
 
     for kind in kinds:
-        value = _nova_find_project_state_memory(session_id, kind)
+        value = project_state_memory_service.find_project_state_memory(session_id, kind)
 
         if not value:
             continue
@@ -5235,7 +4833,7 @@ def api_chat():
         session_id,
     )
 
-    _nova_save_project_state_memories(
+    project_state_memory_service.save_project_state_memories(
         user_text,
         session_id,
     )
@@ -5690,7 +5288,7 @@ def api_chat():
                 _nova_exec_user_text,  # NOVA_FIX_DOCX_SUMMARY_USER_TEXT_ARG_20260609
             )
         else:
-            user_text = _nova_inject_project_state_context(
+            user_text = project_state_memory_service.inject_project_state_context(
                 user_text,
                 session_id,
             )
