@@ -5032,23 +5032,23 @@ if (not attachments) and (__name__ == "__main__"):
 
         session = self._get_session_payload(session_id) or {}
 
-        if not session.get("user_id"):
-            try:
-                from flask import g, session as flask_session
+        try:
+            from flask import g, session as flask_session
 
-                auth_user = getattr(g, "nova_auth_user", None) or {}
+            auth_user = getattr(g, "nova_auth_user", None) or {}
 
-                auth_user_id = str(
-                    auth_user.get("id")
-                    or flask_session.get("nova_user_id")
-                    or ""
-                ).strip()
+            auth_user_id = str(
+                auth_user.get("id")
+                or flask_session.get("nova_user_id")
+                or ""
+            ).strip()
 
-                if auth_user_id:
-                    session["user_id"] = auth_user_id
+            if auth_user_id:
+                session["user_id"] = auth_user_id
 
-            except Exception:
-                pass
+        except Exception:
+            pass
+
         messages = session.get("messages")
 
         if not isinstance(messages, list):
@@ -5175,6 +5175,7 @@ if (not attachments) and (__name__ == "__main__"):
                     sessions,
                     self.sessions.get_active_session_id(),
                 )
+
         except Exception as e:
             exec_debug("SESSION SAVE ERROR:", e)
 
