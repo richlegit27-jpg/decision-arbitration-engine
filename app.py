@@ -224,6 +224,9 @@ from nova_backend.services.attachment_keypoints_service import (
     AttachmentKeypointsService,
 )
 
+from nova_backend.services.attachment_analysis_service import (
+    AttachmentAnalysisService,
+)
 # -----------------------
 # APP SETUP
 
@@ -723,11 +726,13 @@ runtime_brain = SafeUnifiedRuntime()
 runtime_response_sanitizer = RuntimeResponseSanitizerService()
 attachment_keypoints_service = AttachmentKeypointsService()
 install_project_chat_response_router(app)
+attachment_analysis_service = AttachmentAnalysisService()
 restored_runtime = getattr(
     runtime_brain,
     "restored_runtime_state",
     {},
 )
+
 
 _nova_boot_log_20260701(
     "RESTORED RUNTIME OK",
@@ -5781,7 +5786,9 @@ def api_chat():
                             extracted_text = "\n\n".join(str(item or "") for item in attachment_content_lines).strip()
             
                             try:
-                                summary_payload = _nova_local_summary_from_text(extracted_text)
+                                summary_payload = attachment_analysis_service.local_summary_from_text(
+                                    extracted_text
+                                )
                             except Exception:
                                 summary_payload = None
             
@@ -8280,249 +8287,6 @@ def api_attachment_extract():
 
 
 
-
-# ATTACHMENT_SUMMARIZE_ENDPOINT_LOCK
-def _nova_clean_extracted_attachment_text(text, limit=6000):
-    raw = str(text or "")
-    lines = []
-
-    skip_fragments = (
-        "sponsored",
-        "safesearch",
-        "create a new collection",
-        "saved images",
-        "saved to collections",
-        "related searches",
-        "more images on this site",
-        "go to site",
-    )
-
-    for line in raw.splitlines():
-        cleaned = " ".join(str(line or "").strip().split())
-
-        if not cleaned:
-            continue
-
-        lowered = cleaned.lower()
-
-        if any(fragment in lowered for fragment in skip_fragments):
-            continue
-
-        if len(cleaned) <= 2:
-            continue
-
-        lines.append(cleaned)
-
-    joined = "\n".join(lines)
-    return joined[:limit]
-
-
-def _nova_local_summary_from_text(text):
-    cleaned = _nova_clean_extracted_attachment_text(text)
-    lines = [line for line in cleaned.splitlines() if line.strip()]
-
-    if not lines:
-        return {
-            "summary": "No clean readable text was found.",
-            "key_points": [],
-            "preview": "",
-        }
-
-    title_candidates = []
-    for line in lines[:30]:
-        if 3 <= len(line) <= 90:
-            title_candidates.append(line)
-
-    key_points = []
-    seen = set()
-
-    for line in lines:
-        lowered = line.lower()
-
-        if lowered in seen:
-            continue
-
-        seen.add(lowered)
-
-        if len(line) >= 12:
-            key_points.append(line)
-
-        if len(key_points) >= 10:
-            break
-
-    first_lines = lines[:8]
-    summary = "This attachment contains extracted text."
-
-    if title_candidates:
-        summary = "; ".join(title_candidates[:5])
-
-    return {
-        "summary": summary,
-        "key_points": key_points,
-        "preview": "\n".join(first_lines)[:1200],
-    }
-
-
-# ATTACHMENT_SUMMARY_CLEAN_RETURN_LOCK
-def _nova_clean_attachment_endpoint_text(value: object) -> str:
-    import re
-
-    text_value = str(value or "")
-    text_value = text_value.replace("\ufeff", "")
-    text_value = text_value.replace("\r\n", "\n").replace("\r", "\n")
-
-    bad_phrases = (
-        "This uploaded attachment contains readable text about:",
-        "This uploaded attachment contains readable text about:",
-        "This uploaded attachment appears to be about:",
-    )
-
-    for phrase in bad_phrases:
-        text_value = text_value.replace(phrase, "")
-
-    text_value = re.sub(
-        r"\[Attachment analysis failed:\s*tesseract is not installed[^\]]*\]\.?",
-        "",
-        text_value,
-        flags=re.IGNORECASE,
-    )
-
-    text_value = re.sub(
-        r"Attachment analysis failed:\s*tesseract is not installed[^\n.]*(\.|\n)?",
-        "",
-        text_value,
-        flags=re.IGNORECASE,
-    )
-
-    text_value = re.sub(r"\bKey points:\s*;\s*", "", text_value, flags=re.IGNORECASE)
-    text_value = re.sub(r"\bPreview:\s*;\s*", "", text_value, flags=re.IGNORECASE)
-    text_value = re.sub(r";\s*Attachment\s+", "\nAttachment ", text_value)
-    text_value = re.sub(r"\s*;\s*", "\n", text_value)
-
-    lines = []
-    seen = set()
-
-    for raw_line in text_value.splitlines():
-        line = str(raw_line or "").strip()
-        line = re.sub(r"^\s*\d+\.\s*", "", line).strip()
-        line = re.sub(r"\s+", " ", line).strip()
-
-        if not line:
-            continue
-
-        low = line.lower()
-
-        if low in {
-            "attachment analysis:",
-            "key points:",
-            "preview:",
-            "copy",
-            "regen",
-            "regenerate",
-            "summary:",
-            "attachment content:",
-            "uploaded attachment content:",
-        }:
-            continue
-
-        if low.startswith("this attachment appears"):
-            continue
-
-        if "tesseract is not installed" in low:
-            continue
-
-        if low in {"copy", "regen", "regenerate", "copied", "failed"}:
-            continue
-
-        if low.startswith("copyregen"):
-            continue
-
-        key = re.sub(r"[^a-z0-9]+", " ", low).strip()[:180]
-
-        if not key or key in seen:
-            continue
-
-        seen.add(key)
-        lines.append(line)
-
-        if len(lines) >= 12:
-            break
-
-    return "\n".join(lines).strip()
-
-
-def _nova_clean_attachment_endpoint_payload(local_summary: dict, cleaned_text: object) -> dict:
-    import re
-
-    clean_text_value = _nova_clean_attachment_endpoint_text(cleaned_text)
-
-    source_lines = []
-
-    if clean_text_value:
-        source_lines.extend(clean_text_value.splitlines())
-
-    for item in list((local_summary or {}).get("key_points") or []):
-        cleaned = _nova_clean_attachment_endpoint_text(item)
-        if cleaned:
-            source_lines.extend(cleaned.splitlines())
-
-    summary_clean = _nova_clean_attachment_endpoint_text((local_summary or {}).get("summary"))
-    preview_clean = _nova_clean_attachment_endpoint_text((local_summary or {}).get("preview"))
-
-    if summary_clean:
-        source_lines.extend(summary_clean.splitlines())
-
-    if preview_clean:
-        source_lines.extend(preview_clean.splitlines())
-
-    final_lines = []
-    seen = set()
-
-    for raw_line in source_lines:
-        line = str(raw_line or "").strip()
-        if not line:
-            continue
-
-        low = line.lower()
-        key = re.sub(r"[^a-z0-9]+", " ", low).strip()[:180]
-
-        if not key or key in seen:
-            continue
-
-        if low.startswith("this attachment appears"):
-            continue
-
-        if "tesseract is not installed" in low:
-            continue
-
-        if low in {"copy", "regen", "regenerate", "copied", "failed"}:
-            continue
-
-        if low.startswith("copyregen"):
-            continue
-
-        seen.add(key)
-        final_lines.append(line)
-
-        if len(final_lines) >= 10:
-            break
-
-    if not final_lines:
-        return {
-            "summary": "Attachment analysis:\nThe attachment was processed, but no clean readable text was found.",
-            "key_points": [],
-            "preview": "",
-        }
-
-    summary = "Attachment analysis:\n\n" + "\n".join(final_lines[:6])
-    preview = "\n".join(final_lines[:8])[:1200]
-
-    return {
-        "summary": summary.strip(),
-        "key_points": final_lines[:10],
-        "preview": preview.strip(),
-    }
-
 @app.route("/api/attachment/summarize", methods=["POST"])
 def api_attachment_summarize():
     """
@@ -8578,8 +8342,13 @@ def api_attachment_summarize():
             mime_type,
         )
 
-        cleaned_text = _nova_clean_extracted_attachment_text(extracted_text)
-        local_summary = _nova_local_summary_from_text(extracted_text)
+        cleaned_text = attachment_analysis_service.clean_extracted_attachment_text(
+            extracted_text
+        )
+
+        local_summary = attachment_analysis_service.local_summary_from_text(
+            extracted_text
+        )
 
         app.logger.info(
             "[AttachmentSummarizeEndpoint] summarized path=%s raw_chars=%s clean_chars=%s mime_type=%s",
@@ -8777,7 +8546,11 @@ def api_attachment_summarize():
                     "preview": "",
                 }
         else:
-            cleaned_endpoint_summary = _nova_clean_attachment_endpoint_payload(local_summary, cleaned_text)
+            cleaned_endpoint_summary = attachment_analysis_service.clean_attachment_endpoint_payload(
+                local_summary,
+                cleaned_text,
+            )
+
 
         return jsonify({
             "ok": True,
