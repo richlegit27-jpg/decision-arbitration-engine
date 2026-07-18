@@ -129,7 +129,12 @@ from nova_backend.routes.memory_panel_routes import (
 )
 
 from nova_backend.routes.improvement_routes import (
+
     register_improvement_routes,
+)
+
+from nova_backend.services.stale_working_state_history_service import (
+    clean_response_stale_working_state_history,
 )
 
 from nova_backend.services.upload_ownership_service import (
@@ -158,6 +163,10 @@ from nova_backend.services.chat_stream_service import (
 
 from nova_backend.services.execution_fix_service import (
     ExecutionFixService,
+)
+
+from nova_backend.services.session_detail_response_cache_service import (
+    SessionDetailResponseCacheService,
 )
 
 from nova_backend.services import session_auth_scope_service
@@ -299,6 +308,10 @@ from nova_backend.services.attachment_endpoint_service import (
 
 from nova_backend.services.web_fetch_bridge_service import (
     WebFetchBridgeService,
+)
+
+from nova_backend.services.session_detail_response_cache_service import (
+    SessionDetailResponseCacheService,
 )
 
 from nova_backend.services.blog_service import BlogService
@@ -899,6 +912,16 @@ _nova_boot_log_20260701(
             "cycle_count"
         ),
     },
+)
+
+session_detail_response_cache_service = SessionDetailResponseCacheService(
+    session_service,
+    session_detail_cache_service,
+    session_response_cache_service,
+    attachment_text_service,
+    user_message_already_saved,
+    assistant_message_already_saved,
+    assistant_same_text_already_saved,
 )
 
 chat_service = ChatService(
@@ -8599,6 +8622,10 @@ def nova_final_session_detail_response_cache_20260612(response):
     try:
         request_path = str(getattr(request, "path", "") or "")
         request_method = str(getattr(request, "method", "") or "").upper()
+
+
+
+
 
         if request_method == "POST" and request_path == "/api/chat":
             response_json = response.get_json(silent=True) or {}
