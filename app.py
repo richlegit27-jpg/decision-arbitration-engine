@@ -9804,58 +9804,6 @@ def nova_final_session_detail_response_cache_20260612(response):
             )
 
 
-            # NOVA_FINAL_CACHE_ACTIVE_TASK_RECALL_REPAIR_20260630
-            # chat_service can answer before the final requested session state is attached.
-            # At this point app.py has the correct session_obj, so repair active-task recall.
-            try:
-                active_task_question = str(user_text or "").strip().lower() in {
-                    "what is the active task",
-                    "active task",
-                    "what are we doing",
-                }
-
-                bad_active_task_answer = str(assistant_text or "").strip() in {
-                    "",
-                    "Active task:\nNo active task is currently tracked.",
-                    "Active task:\nNo active task is currently tracked yet.",
-                    "No active task is currently tracked.",
-                    "No active task is currently tracked",
-                    "No active task is currently tracked yet.",
-                }
-
-                if active_task_question and bad_active_task_answer:
-                    working_state = session_obj.get("working_state")
-                    if not isinstance(working_state, dict):
-                        working_state = {}
-
-                    active_task = str(
-                        working_state.get("active_task")
-                        or ""
-                    ).strip()
-
-                    if active_task:
-                        fixed_text = f"Active task:\n{active_task}"
-
-                        assistant_text = fixed_text
-
-                        if isinstance(assistant_message, dict):
-                            assistant_message["text"] = fixed_text
-                            assistant_message["content"] = fixed_text
-
-                            assistant_meta = assistant_message.get("meta")
-                            if not isinstance(assistant_meta, dict):
-                                assistant_meta = {}
-
-                            assistant_meta["route"] = "final_cache_active_task_recall_repair"
-                            assistant_meta["repaired_active_task_recall"] = True
-                            assistant_meta["session_id"] = session_id
-
-                            assistant_message["meta"] = assistant_meta
-                            response_json["assistant_message"] = assistant_message
-
-            except Exception:
-                pass
-
             if user_text and not user_message_already_saved(
                 messages,
                 user_text,
