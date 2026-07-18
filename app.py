@@ -199,6 +199,9 @@ from nova_backend.services.title_guard_service import (
     persist_title,
 )
 
+from nova_backend.services.project_recall_service import (
+    ProjectRecallService,
+)
 
 from nova_backend.services.project_chat_response_router_service import (
     install_project_chat_response_router,
@@ -228,6 +231,10 @@ from nova_backend.services.project_aware_context_service import (
 
 from nova_backend.services.project_state_memory_service import (
     ProjectStateMemoryService,
+)
+
+PROJECT_STATE_MEMORY_KINDS = (
+    ProjectStateMemoryService.PROJECT_STATE_MEMORY_KINDS
 )
 
 from nova_backend.services.attachment_context_service import (
@@ -747,6 +754,13 @@ upload_ownership_service = UploadOwnershipService(
 project_focus_memory_service = ProjectFocusMemoryService(
     memory_service,
     session_service,
+)
+
+project_recall_service = ProjectRecallService(
+    project_focus_memory_service,
+    project_state_memory_service,
+    PROJECT_STATE_MEMORY_KINDS,
+    DATA_DIR,
 )
 
 project_aware_context_service = ProjectAwareContextService(
@@ -3874,9 +3888,12 @@ def api_chat():
         session_id,
     )
 
-    direct_project_state_response = _nova_try_project_state_direct_recall(
-        user_text,
-        session_id,
+    direct_project_state_response = (
+        project_recall_service
+        .try_project_state_direct_recall(
+            user_text,
+            session_id,
+        )
     )
 
     if direct_project_state_response is not None:
@@ -3884,11 +3901,23 @@ def api_chat():
             "[project-state-direct-recall] answered from project state memory session_id=%s",
             session_id,
         )
-        return direct_project_state_response
 
-    direct_project_focus_response = _nova_try_project_focus_direct_recall(
-        user_text,
-        session_id,
+        return _nova_slim_assistant_payload(
+            direct_project_state_response.get("text"),
+            session_id=session_id,
+            **{
+                key: value
+                for key, value in direct_project_state_response.items()
+                if key != "text"
+            },
+        )
+
+    direct_project_focus_response = (
+        project_recall_service
+        .try_project_focus_direct_recall(
+            user_text,
+            session_id,
+        )
     )
 
     if direct_project_focus_response is not None:
@@ -3896,7 +3925,16 @@ def api_chat():
             "[project-focus-direct-recall] answered from recent session context session_id=%s",
             session_id,
         )
-        return direct_project_focus_response
+
+        return _nova_slim_assistant_payload(
+            direct_project_focus_response.get("text"),
+            session_id=session_id,
+            **{
+                key: value
+                for key, value in direct_project_focus_response.items()
+                if key != "text"
+            },
+        )
 
     try:
         # REAL_ATTACHMENT_MEMORY_BACKEND_LOCK
