@@ -1997,41 +1997,6 @@ def _nova_mobile_now_iso():
         return ""
 
 
-# NOVA_RESTORE_DOCX_EXTRACTOR_20260609
-def _nova_extract_docx_text_20260607(file_path):
-    """Extract readable text from a .docx file without calling OpenAI."""
-    from pathlib import Path
-    import zipfile
-    import xml.etree.ElementTree as ET
-
-    path = Path(str(file_path or ""))
-    if not path.exists() or not path.is_file():
-        return ""
-
-    try:
-        with zipfile.ZipFile(path) as archive:
-            try:
-                xml_data = archive.read("word/document.xml")
-            except KeyError:
-                return ""
-
-        root = ET.fromstring(xml_data)
-        namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
-
-        paragraphs = []
-        for paragraph in root.iter(namespace + "p"):
-            parts = []
-            for node in paragraph.iter(namespace + "t"):
-                if node.text:
-                    parts.append(node.text)
-            line = "".join(parts).strip()
-            if line:
-                paragraphs.append(line)
-
-        return "\n".join(paragraphs).strip()
-    except Exception:
-        return ""
-
 # NOVA_DIRECT_ATTACHMENT_TEXT_SUMMARY_20260609
 def _nova_plain_attachment_text_summary_20260609(file_name, file_path, content, user_text=""):
     import re
