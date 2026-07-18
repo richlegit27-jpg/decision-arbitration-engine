@@ -144,6 +144,10 @@ from nova_backend.services.attachment_text_service import (
     AttachmentTextService,
 )
 
+from nova_backend.services.attachment_utils_service import (
+    AttachmentUtilsService,
+)
+
 from nova_backend.services import session_auth_scope_service
 from nova_backend.services import attachment_gate_service
 from nova_backend.utils.api_response import ok_response, error_response
@@ -796,6 +800,7 @@ attachment_context_service = AttachmentContextService(
     UPLOADS_DIR,
 )
 
+attachment_utils_service = AttachmentUtilsService()
 response_quality_service = ResponseQualityService()
 admin_lead_service = AdminLeadService()
 session_detail_cache_service = SessionDetailCacheService()
@@ -1335,20 +1340,21 @@ def memory_response_live(
 # -----------------------
 
 
-def _nova_safe_attachment_name(attachment, fallback="uploaded attachment"):
-    """Return a readable attachment name instead of <unknown>."""
-    if isinstance(attachment, dict):
-        for key in ("original_filename", "filename", "name", "title", "stored", "file_name"):
-            value = str(attachment.get(key) or "").strip()
-            if value:
-                return value
 
-        for key in ("file_url", "url", "src"):
-            value = str(attachment.get(key) or "").strip()
-            if value:
-                return value.rsplit("/", 1)[-1] or fallback
 
-    return fallback
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1358,7 +1364,7 @@ def _nova_safe_attachment_name(attachment, fallback="uploaded attachment"):
 
 
 # NOVA_SKIP_RAW_BINARY_ATTACHMENT_INJECTION_20260607
-def _nova_should_skip_raw_attachment_injection(item):
+def should_skip_raw_attachment_injection(self, item):
     try:
         if not isinstance(item, dict):
             return False
@@ -1396,12 +1402,16 @@ def _nova_should_skip_raw_attachment_injection(item):
         return False
 
 
-def _nova_filter_raw_injection_attachments(attachments, logger=None):
+def filter_raw_injection_attachments(
+    self,
+    attachments,
+    logger=None,
+):
     kept = []
     skipped = []
 
     for item in attachments or []:
-        if _nova_should_skip_raw_attachment_injection(item):
+        if self.should_skip_raw_attachment_injection(item):
             skipped.append(item)
         else:
             kept.append(item)
@@ -1409,16 +1419,25 @@ def _nova_filter_raw_injection_attachments(attachments, logger=None):
     if skipped and logger:
         try:
             names = [
-                str(x.get("original_filename") or x.get("filename") or x.get("name") or x.get("url") or "attachment")
+                str(
+                    x.get("original_filename")
+                    or x.get("filename")
+                    or x.get("name")
+                    or x.get("url")
+                    or "attachment"
+                )
                 for x in skipped
                 if isinstance(x, dict)
             ]
-            logger.info("[RawAttachmentInjectionGuard] skipped raw binary injection for attachments=%s", names)
+
+            logger.info(
+                "[RawAttachmentInjectionGuard] skipped raw binary injection for attachments=%s",
+                names,
+            )
         except Exception:
             pass
 
     return kept
-
 
 
 
@@ -1681,105 +1700,6 @@ try:
 except Exception as _nova_project_state_direct_freshness_bridge_error_20260702:
     print("[NOVA_PROJECT_STATE_DIRECT_FRESHNESS_BRIDGE_20260702] failed:", _nova_project_state_direct_freshness_bridge_error_20260702)
 
-
-# ATTACHMENT_CURRENT_ONLY_BINARY_GUARD_LOCK
-def _nova_attachment_url_key(value):
-    try:
-        value = str(value or "").strip()
-    except Exception:
-        return ""
-    if not value:
-        return ""
-    value = value.replace("\\", "/")
-    if "/api/uploads/" in value:
-        return value[value.find("/api/uploads/"):]
-    return value
-
-
-def _nova_attachment_name_key(item):
-    if not isinstance(item, dict):
-        return ""
-    for key in ("url", "file_url", "path", "stored_name", "filename", "name", "original_filename"):
-        value = item.get(key)
-        cleaned = _nova_attachment_url_key(value)
-        if cleaned:
-            return cleaned
-    return ""
-
-
-def _nova_is_binary_or_container_attachment(item):
-    if not isinstance(item, dict):
-        return True
-
-    mime = str(item.get("mime_type") or item.get("mime") or "").lower()
-    name = str(
-        item.get("filename")
-        or item.get("original_filename")
-        or item.get("name")
-        or item.get("url")
-        or item.get("file_url")
-        or ""
-    ).lower()
-
-    binary_exts = (
-        ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".ico",
-        ".mp3", ".wav", ".m4a", ".mp4", ".mov", ".avi", ".webm",
-        ".pdf", ".zip", ".rar", ".7z", ".exe", ".dll",
-    )
-
-    # DOCX is a zipped Office container. Only inject it if your extractor produced readable text elsewhere.
-    container_exts = (".docx", ".pptx", ".xlsx")
-
-    if any(name.endswith(ext) for ext in binary_exts + container_exts):
-        return True
-
-    if mime.startswith("image/") or mime.startswith("audio/") or mime.startswith("video/"):
-        return True
-
-    if mime in {
-        "application/pdf",
-        "application/zip",
-        "application/octet-stream",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    }:
-        return True
-
-    return False
-
-
-def _nova_filter_current_attachments_only(candidate_attachments, current_attachments):
-    if not isinstance(candidate_attachments, list):
-        return []
-
-    if not isinstance(current_attachments, list) or not current_attachments:
-        return []
-
-    current_keys = set()
-    for item in current_attachments:
-        key = _nova_attachment_name_key(item)
-        if key:
-            current_keys.add(key)
-
-    if not current_keys:
-        return []
-
-    filtered = []
-    seen = set()
-
-    for item in candidate_attachments:
-        key = _nova_attachment_name_key(item)
-        if not key or key not in current_keys:
-            continue
-
-        if key in seen:
-            continue
-
-        seen.add(key)
-        filtered.append(item)
-
-    return filtered
 
 # CASUAL_CHAT_GUARD_20260604
 @app.before_request
@@ -2384,7 +2304,7 @@ def api_chat():
                     if ".docx" not in _nova_name:
                         continue
 
-                    _nova_file_path = _nova_find_uploaded_file_path_20260607(_nova_attachment)
+                    _nova_file_path = attachment_utils_service.find_uploaded_file_path(_nova_attachment)
                     # NOVA_USE_PHASE2_DOCX_EXTRACTOR_DIRECT_20260609
                     _nova_docx_text = attachment_context_service.extract_docx_text(
                         _nova_file_path
@@ -3441,7 +3361,7 @@ def api_chat():
             app.logger.exception("[api_chat] failed to load remembered session attachments")
 
         # NOVA_SKIP_RAW_BINARY_ATTACHMENT_INJECTION_CALL_20260607
-        raw_injection_attachments = _nova_filter_raw_injection_attachments(
+        raw_injection_attachments = attachment_utils_service.filter_raw_injection_attachments(
             attachments,
             logger=app.logger,
         )
@@ -5290,63 +5210,9 @@ def api_chat_session_compat(session_id: str):
         mobile_fallback=False,
     )
 
-
-
 # NOVA_FIX_MISSING_UPLOAD_HELPER_LOGGER_20260609
 import logging as _nova_logging_20260609
 logger = _nova_logging_20260609.getLogger(__name__)
-
-def _nova_find_uploaded_file_path_20260607(attachment):
-    """
-    Resolve a mobile upload attachment dict into a local uploads file path.
-    Safe fallback for attachment summary routes.
-    """
-    from pathlib import Path
-
-    try:
-        item = attachment if isinstance(attachment, dict) else {}
-
-        candidates = [
-            item.get("path"),
-            item.get("file_path"),
-            item.get("stored_path"),
-            item.get("local_path"),
-            item.get("filename"),
-            item.get("stored_filename"),
-            item.get("name"),
-            item.get("url"),
-            item.get("file_url"),
-        ]
-
-        base_dir = Path(__file__).resolve().parent
-        upload_dir = base_dir / "uploads"
-
-        for raw in candidates:
-            if not raw:
-                continue
-
-            value = str(raw).strip().replace("\\", "/")
-            value = value.split("?", 1)[0].split("#", 1)[0]
-
-            if "/api/uploads/" in value:
-                value = value.rsplit("/api/uploads/", 1)[-1]
-
-            if value.startswith("/api/uploads/"):
-                value = value[len("/api/uploads/"):]
-
-            direct = Path(value)
-            if direct.is_file():
-                return str(direct)
-
-            name = value.rsplit("/", 1)[-1]
-            if name:
-                candidate = upload_dir / name
-                if candidate.is_file():
-                    return str(candidate)
-
-        return None
-    except Exception:
-        return None
 
 
 @app.get("/api/sessions/<session_id>")
