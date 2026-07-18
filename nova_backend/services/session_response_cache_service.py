@@ -607,3 +607,122 @@ class SessionResponseCacheService:
             pass
 
         return session_obj
+
+    def sync_repaired_recall_session_message(
+        self,
+        response_session,
+        response_json,
+        user_text,
+        session_id,
+    ):
+        try:
+            repaired_assistant = response_json.get(
+                "assistant_message"
+            )
+
+            if not isinstance(
+                repaired_assistant,
+                dict,
+            ):
+                return response_session
+
+            repaired_meta = repaired_assistant.get(
+                "meta"
+            )
+
+            if not isinstance(
+                repaired_meta,
+                dict,
+            ):
+                repaired_meta = {}
+
+            repaired_recall = bool(
+                repaired_meta.get(
+                    "repaired_current_file_recall"
+                )
+                or repaired_meta.get(
+                    "repaired_active_task_recall"
+                )
+            )
+
+            fixed_text = str(
+                repaired_assistant.get("text")
+                or repaired_assistant.get("content")
+                or ""
+            ).strip()
+
+            if not repaired_recall:
+                return response_session
+
+            if not fixed_text:
+                return response_session
+
+            if not isinstance(
+                response_session,
+                dict,
+            ):
+                response_session = {}
+
+            response_session["active_session_id"] = session_id
+
+            working_state = response_session.get(
+                "working_state"
+            )
+
+            if not isinstance(
+                working_state,
+                dict,
+            ):
+                working_state = {}
+
+            working_state["last_user_message"] = str(
+                user_text or ""
+            )
+
+            working_state["last_assistant_message"] = fixed_text
+
+            response_session["working_state"] = working_state
+
+            messages = response_session.get(
+                "messages"
+            )
+
+            if not isinstance(
+                messages,
+                list,
+            ):
+                messages = []
+
+            assistant_id = str(
+                repaired_assistant.get("id")
+                or repaired_assistant.get("message_id")
+                or ""
+            ).strip()
+
+            for msg in reversed(messages):
+                if not isinstance(msg, dict):
+                    continue
+
+                if str(
+                    msg.get("role")
+                    or ""
+                ).lower() != "assistant":
+                    continue
+
+                msg_id = str(
+                    msg.get("id")
+                    or ""
+                ).strip()
+
+                if assistant_id and msg_id == assistant_id:
+                    msg["text"] = fixed_text
+                    msg["content"] = fixed_text
+                    msg["meta"] = repaired_meta
+                    break
+
+            response_session["messages"] = messages
+
+        except Exception:
+            pass
+
+        return response_session

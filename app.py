@@ -10066,123 +10066,12 @@ def nova_final_session_detail_response_cache_20260612(response):
                         response_json["assistant_message"]["meta"]["render_source"] = "assistant_message_only"
                         response_json["assistant_message"]["meta"]["already_saved_to_session"] = True
 
-                    # NOVA_FINAL_CACHE_REPAIRED_RECALL_SESSION_MESSAGE_SYNC_20260630
-                    # If app.py repaired the top-level assistant_message, keep the returned
-                    # session.messages payload in sync so the UI cannot render stale cache text.
-                    try:
-                        repaired_assistant = response_json.get("assistant_message")
-
-                        if isinstance(repaired_assistant, dict):
-                            repaired_meta = repaired_assistant.get("meta")
-                            if not isinstance(repaired_meta, dict):
-                                repaired_meta = {}
-
-                            repaired_recall = bool(
-                                repaired_meta.get("repaired_current_file_recall")
-                                or repaired_meta.get("repaired_active_task_recall")
-                            )
-
-                            fixed_text = str(
-                                repaired_assistant.get("text")
-                                or repaired_assistant.get("content")
-                                or ""
-                            ).strip()
-
-                            if repaired_recall and fixed_text and isinstance(response_session, dict):
-                                response_session["active_session_id"] = session_id
-
-                                working_state = response_session.get("working_state")
-                                if not isinstance(working_state, dict):
-                                    working_state = {}
-
-                                working_state["last_user_message"] = str(user_text or "")
-                                working_state["last_assistant_message"] = fixed_text
-                                response_session["working_state"] = working_state
-
-                                returned_messages = response_session.get("messages")
-                                if not isinstance(returned_messages, list):
-                                    returned_messages = []
-
-                                assistant_id = str(
-                                    repaired_assistant.get("id")
-                                    or repaired_assistant.get("message_id")
-                                    or ""
-                                ).strip()
-
-                                stale_recall_answers = {
-                                    "Current file:\nNo active file is currently tracked.",
-                                    "No active file is currently tracked.",
-                                    "No active file is currently tracked",
-                                    "Active task:\nNo active task is currently tracked.",
-                                    "Active task:\nNo active task is currently tracked yet.",
-                                    "No active task is currently tracked.",
-                                    "No active task is currently tracked",
-                                    "No active task is currently tracked yet.",
-                                }
-
-                                patched_existing_message = False
-
-                                for msg in reversed(returned_messages):
-                                    if not isinstance(msg, dict):
-                                        continue
-
-                                    if str(msg.get("role") or "").lower() != "assistant":
-                                        continue
-
-                                    msg_id = str(msg.get("id") or "").strip()
-                                    msg_text = str(
-                                        msg.get("text")
-                                        or msg.get("content")
-                                        or ""
-                                    ).strip()
-
-                                    same_message_id = bool(
-                                        assistant_id
-                                        and msg_id
-                                        and msg_id == assistant_id
-                                    )
-
-                                    stale_recall_message = msg_text in stale_recall_answers
-
-                                    if same_message_id or stale_recall_message:
-                                        msg["text"] = fixed_text
-                                        msg["content"] = fixed_text
-                                        msg["attachments"] = msg.get("attachments") or []
-
-                                        msg_meta = msg.get("meta")
-                                        if not isinstance(msg_meta, dict):
-                                            msg_meta = {}
-
-                                        msg_meta.update(repaired_meta)
-                                        msg_meta["session_id"] = session_id
-                                        msg_meta["render_source"] = "assistant_message_only"
-                                        msg_meta["already_saved_to_session"] = True
-
-                                        msg["meta"] = msg_meta
-                                        msg["session_id"] = session_id
-                                        msg["active_session_id"] = session_id
-
-                                        patched_existing_message = True
-                                        break
-
-                                if not patched_existing_message:
-                                    returned_messages.append(
-                                        {
-                                            "id": assistant_id,
-                                            "role": "assistant",
-                                            "text": fixed_text,
-                                            "content": fixed_text,
-                                            "attachments": [],
-                                            "meta": repaired_meta,
-                                            "session_id": session_id,
-                                            "active_session_id": session_id,
-                                        }
-                                    )
-
-                                response_session["messages"] = returned_messages
-
-                    except Exception:
-                        pass
+                    response_session = session_response_cache_service.sync_repaired_recall_session_message(
+                        response_session,
+                        response_json,
+                        user_text,
+                        session_id,
+                    )
 
                 except Exception:
                     response_session = dict(cached)
