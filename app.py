@@ -136,6 +136,7 @@ from nova_backend.services.upload_ownership_service import (
     UploadOwnershipService,
 )
 
+from nova_backend.services import session_auth_scope_service
 from nova_backend.services import attachment_gate_service
 from nova_backend.utils.api_response import ok_response, error_response
 from nova_backend.utils.request_utils import get_json_body, get_str, get_list, normalize_attachments
@@ -9705,9 +9706,10 @@ def _nova_install_session_auth_scope_20260610():
         ):
             return None
 
-        user = current_auth_user()
+        user = session_auth_scope_service.current_auth_user()
         g.nova_auth_user = user
-        normalize_store_for_user(user)
+        session_auth_scope_service.normalize_store_for_user(user)
+
         return None
 
     @app.after_request
@@ -9747,8 +9749,12 @@ def _nova_install_session_auth_scope_20260610():
         ):
             return response
 
-        user = getattr(g, "nova_auth_user", None) or current_auth_user()
-        store, visible = normalize_store_for_user(user)
+        user = (
+            getattr(g, "nova_auth_user", None)
+            or session_auth_scope_service.current_auth_user()
+        )
+
+        store, visible = session_auth_scope_service.normalize_store_for_user(user)
 
         try:
             payload = response.get_json(silent=True)
