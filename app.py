@@ -261,6 +261,10 @@ from nova_backend.services.response_quality_service import (
     ResponseQualityService,
 )
 
+from nova_backend.services.memory_command_service import (
+    MemoryCommandService,
+)
+
 from nova_backend.services.blog_service import BlogService
 from nova_backend.services import empty_session_pruner_service
 # -----------------------
@@ -723,6 +727,10 @@ app.config["UPLOAD_FOLDER"] = str(UPLOADS_DIR)
 
 session_service = SessionService(
     DATA_DIR / "nova_sessions.json"
+)
+
+memory_command_service = MemoryCommandService(
+    session_service=session_service,
 )
 
 session_bootstrap_service = SessionBootstrapService(
@@ -1206,7 +1214,7 @@ def api_state():
 
 
 # NOVA_API_CHAT_EARLY_EXPLICIT_MEMORY_GUARD_LIVE_ANCHOR_20260611
-def _nova_api_chat_extract_explicit_memory_live_20260611(user_text):
+def extract_explicit_memory_live(self, user_text):
     raw = str(user_text or "").strip()
     lowered = raw.lower().strip()
 
@@ -1248,7 +1256,7 @@ def _nova_api_chat_extract_explicit_memory_live_20260611(user_text):
     return ""
 
 
-def _nova_api_chat_memory_kind_live_20260611(clean):
+def memory_kind_live(self, clean):
     lowered = str(clean or "").lower()
 
     if (
@@ -1265,7 +1273,12 @@ def _nova_api_chat_memory_kind_live_20260611(clean):
     return "fact"
 
 
-def _nova_api_chat_memory_response_live_20260611(raw_user_text, session_id, clean):
+def memory_response_live(
+    self,
+    raw_user_text,
+    session_id,
+    clean,
+):
     assistant_text = f"Saved to memory: {clean}"
 
     user_msg = {
@@ -1979,7 +1992,7 @@ def api_chat():
 
         _nova_attachments = _nova_payload.get("attachments") or []
 
-        # 🚨 IMAGE FASTPATH SAFETY GUARD
+        # ?? IMAGE FASTPATH SAFETY GUARD
         if str(_nova_user_text or "").strip().lower().startswith("/image"):
             _nova_attachments = []
 
@@ -3259,7 +3272,7 @@ def api_chat():
             for index, item in enumerate(image_attachments[:5], start=1):
                 line = f"{index}. {item.get('name') or 'image attachment'} ({item.get('mime') or 'image/*'})"
                 if item.get("url"):
-                    line += f" â€” {item.get('url')}"
+                    line += f" — {item.get('url')}"
                 lines.append(line)
 
             lines.append("")
@@ -3968,7 +3981,7 @@ def api_chat():
                     "eye-catching prints",
                     "url removed from extracted attachment text",
                     "free_shipping",
-                    "furniture & dÃ©cor",
+                    "furniture & décor",
                     "kitchen appliances",
                     "love, horror and more themes",
                     "plain field in front of mountain peak",
@@ -3989,7 +4002,7 @@ def api_chat():
                     if not _nova_line:
                         continue
 
-                    _nova_low = _nova_line.lower().strip(" :;-â€¢*|")
+                    _nova_low = _nova_line.lower().strip(" :;-•*|")
                     _nova_low_compact = _nova_prehandle_re.sub(r"[^a-z0-9]+", " ", _nova_low).strip()
 
                     if _nova_low_compact in _nova_noise_exact:
@@ -4174,7 +4187,7 @@ def api_chat():
                     "eye-catching prints",
                     "url removed from extracted attachment text",
                     "free_shipping",
-                    "furniture & dÃ©cor",
+                    "furniture & décor",
                     "kitchen appliances",
                     "love, horror and more themes",
                     "plain field in front of mountain peak",
@@ -4205,7 +4218,7 @@ def api_chat():
                     if not _line:
                         continue
 
-                    _low = _line.lower().strip(" :;-â€¢*|")
+                    _low = _line.lower().strip(" :;-•*|")
                     _compact = _nova_attach_re.sub(r"[^a-z0-9]+", " ", _low).strip()
 
                     if _compact in _noise_exact:
@@ -4441,7 +4454,7 @@ def api_chat():
 
                     line = f"{index}. {label} ({mime})"
                     if url:
-                        line += f" â€” {url}"
+                        line += f" — {url}"
                     lines.append(line)
 
                 lines.append("")
@@ -4487,18 +4500,18 @@ def api_chat():
                 or user_text
                 or ""
             ).strip()
-            _nova_explicit_memory_text = _nova_api_chat_extract_explicit_memory_live_20260611(_nova_raw_user_text)
+            _nova_explicit_memory_text = memory_command_service.extract_explicit_memory_live(_nova_raw_user_text)
 
             if _nova_explicit_memory_text:
                 memory_service.add_memory({
                     "text": _nova_explicit_memory_text,
-                    "kind": _nova_api_chat_memory_kind_live_20260611(_nova_explicit_memory_text),
+                    "kind": memory_command_service.memory_kind_live(_nova_explicit_memory_text),
                     "source": "app_explicit_memory_command",
                     "session_id": session_id or "",
                 })
 
                 return jsonify(
-                    _nova_api_chat_memory_response_live_20260611(
+                    memory_command_service.memory_response_live(
                         raw_user_text=_nova_raw_user_text,
                         session_id=session_id,
                         clean=_nova_explicit_memory_text,
@@ -4906,7 +4919,7 @@ def api_chat():
                             def _nova_weak_guard_clean_line(value):
                                 line = str(value or "").strip()
                                 line = _nova_weak_guard_re.sub(r"^\\s*\\d+\\.\\s*", "", line).strip()
-                                line = line.replace("îº", "").strip()
+                                line = line.replace("", "").strip()
                                 line = line.replace("Attachment <unknown>", "uploaded attachment")
                                 line = _nova_weak_guard_re.sub(r"\\s+", " ", line).strip()
                                 return line
@@ -4948,7 +4961,7 @@ def api_chat():
                                 if not line:
                                     return ""
 
-                                low = line.lower().strip(" :;-â€¢*|")
+                                low = line.lower().strip(" :;-•*|")
                                 compact = _nova_weak_guard_re.sub(r"[^a-z0-9]+", " ", low).strip()
 
                                 if low in _nova_weak_bad_exact or compact in _nova_weak_bad_exact:
@@ -7450,14 +7463,14 @@ def api_attachment_summarize():
 
         def _nova_endpoint_keep_attachment_line(value):
             line = str(value or "").strip()
-            line = line.replace("îº", "").strip()
+            line = line.replace("", "").strip()
             line = _nova_endpoint_re.sub(r"^\\s*\\d+\\.\\s*", "", line).strip()
             line = _nova_endpoint_re.sub(r"\\s+", " ", line).strip()
 
             if not line:
                 return ""
 
-            low = line.lower().strip(" :;-â€¢*|")
+            low = line.lower().strip(" :;-•*|")
             compact = _nova_endpoint_re.sub(r"[^a-z0-9]+", " ", low).strip()
 
             bad_exact = {
@@ -7488,7 +7501,7 @@ def api_attachment_summarize():
                 "bath",
                 "amazon",
                 "related content",
-                "furniture dÃ©cor",
+                "furniture décor",
                 "kitchen appliances",
             }
 
@@ -7504,8 +7517,8 @@ def api_attachment_summarize():
                 "free stock photo",
                 "https://www.amazon.",
                 "https://www.wayfair.",
-                "â€º shop â€º",
-                "â€º wall art â€º",
+                "› shop ›",
+                "› wall art ›",
             )
 
             if low in bad_exact or compact in bad_exact:
@@ -7806,12 +7819,12 @@ def _nova_clean_attachment_analysis_response(response):
             "eye-catching prints",
             "url removed from extracted attachment text",
             "free_shipping",
-            "furniture & dÃ©cor",
+            "furniture & décor",
             "kitchen appliances",
             "love, horror and more themes",
             "plain field in front of mountain peak",
             "free stock photo",
-            "6000 Ã—",
+            "6000 ×",
             "jpeg",
         )
 
@@ -7836,7 +7849,7 @@ def _nova_clean_attachment_analysis_response(response):
             if not cleaned:
                 continue
 
-            low = cleaned.lower().strip(" :;-â€¢*|")
+            low = cleaned.lower().strip(" :;-•*|")
             low_compact = re.sub(r"[^a-z0-9]+", " ", low).strip()
 
             if low_compact in noisy_exact:
@@ -10284,7 +10297,7 @@ def nova_focus_recall_before_web_20260611():
 
             assistant_text = "Your current Nova focus is: " + focus
 
-        # 🔒 IMPORTANT: DO NOT RETURN RESPONSE
+        # ?? IMPORTANT: DO NOT RETURN RESPONSE
         # Only attach data to request for downstream handler
         request.nova_focus_recall = {
             "session_id": session_id,
@@ -12540,7 +12553,7 @@ try:
 
     def _nova_compact_project_normalize_20260701(value):
         text = str(value or "").strip().lower()
-        text = text.replace("’", "'")
+        text = text.replace(" ", "'")
         text = _nova_compact_project_re_20260701.sub(r"\s+", " ", text)
         return text
 
@@ -16581,7 +16594,7 @@ def nova_api_contact_submit_20260709():
         "ok": True,
         "lead_id": lead["id"],
         "dry_run": bool(lead.get("dry_run")),
-        "message": "Thanks — your message was received.",
+        "message": "Thanks   your message was received.",
     })
 
 
