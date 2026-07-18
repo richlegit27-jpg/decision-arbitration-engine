@@ -6166,34 +6166,14 @@ def execution_stream():
     data = request.get_json(silent=True) or {}
 
     session_id = str(data.get("session_id") or "").strip()
-    action = str(data.get("action") or "").strip()
-    action_text = str(action or "").lower().strip()
 
-    if action_text in {"fix_file", "auto_fix", "apply_fix", "apply fix"}:
-        action = "fix_file"
+    action = str(
+        data.get("action") or ""
+    ).strip()
 
-    elif action_text in {"auto", "auto mode", "autopilot"}:
-        action = "run_all"
-
-    elif action_text in {
-        "next", "nex", "continue", "continue on",
-        "keep going", "go", "run next",
-        "next step", "what next", "what now"
-    }:
-        execution_state = {}
-
-        try:
-            session = session_service.get_session(session_id) or {}
-
-            execution_state = (
-                session.get("working_state", {})
-                .get("execution", {})
-            )
-
-        except Exception:
-            execution_state = {}
-            action = "run_step"
-
+    action = execution_loop_service.command_alias(
+        action
+    )
 
     def generate():
         import time
@@ -6278,18 +6258,11 @@ def execution_stream():
 
             return
 
-
-        elif action == "stop":
-            execution["history"].append("stop")
-            execution["status"] = "stopped"
-            execution["last_action"] = action
-            execution["current_step"] = "Stopped"
-
         else:
-            execution["history"].append(f"unknown action: {action}")
-            execution["status"] = "error"
-            execution["last_action"] = action
-            execution["current_step"] = "Unknown action"
+            execution = execution_service.apply_control_action(
+                execution,
+                action,
+            )
 
             execution_stream_service.save_execution(
                 session_id,
@@ -6795,174 +6768,12 @@ def api_attachment_keypoints():
             "error": str(error),
         }), 500
 
-
 # CHAT_ATTACHMENT_RESPONSE_CLEANUP_LOCK
 @app.after_request
 def _nova_clean_attachment_analysis_response(response):
-    """Final cleanup for canned attachment-analysis replies before mobile sees them."""
-    try:
-        from flask import request
-        import json
-        import re
-
-        if request.path != "/api/chat":
-            return response
-
-        content_type = str(response.headers.get("Content-Type") or "").lower()
-        if "application/json" not in content_type:
-            return response
-
-        data = response.get_json(silent=True)
-        if not isinstance(data, dict):
-            return response
-
-        assistant_message = data.get("assistant_message")
-        if not isinstance(assistant_message, dict):
-            return response
-
-        text_value = str(assistant_message.get("text") or "")
-
-        if "Attachment analysis:" not in text_value:
-            return response
-
-        noisy_exact = {
-            "attachment <unknown> content:",
-            "attachment content:",
-            "[pdf page 1]",
-            "search",
-            "images",
-            "videos",
-            "create",
-            "inspiration",
-            "keypoints",
-            "copy",
-            "regen",
-            "regenerate",
-            "continue",
-            "cop",
-            "filt",
-            "moderate",
-            "amazon",
-            "bath",
-            "related content",
-        }
-
-        noisy_contains = (
-            "wayfair",
-            "save big",
-            "prices you'll love",
-            "eye-catching prints",
-            "url removed from extracted attachment text",
-            "free_shipping",
-            "furniture & décor",
-            "kitchen appliances",
-            "love, horror and more themes",
-            "plain field in front of mountain peak",
-            "free stock photo",
-            "6000 ×",
-            "jpeg",
-        )
-
-        def clean_line(line):
-            line = re.sub(r"^\s*\d+\.\s*", "", str(line or "")).strip()
-            line = line.replace("Attachment <unknown>", "uploaded attachment")
-            line = line.replace("Attachment content:", "").strip()
-
-            line = re.sub(
-                r"^Attachment\s+.*?\s+content:\s*",
-                "",
-                line,
-                flags=re.IGNORECASE,
-            ).strip()
-
-            line = re.sub(r"\s+", " ", line).strip()
-            return line
-
-        raw_lines = []
-        for line in text_value.splitlines():
-            cleaned = clean_line(line)
-            if not cleaned:
-                continue
-
-            low = cleaned.lower().strip(" :;-•*|")
-            low_compact = re.sub(r"[^a-z0-9]+", " ", low).strip()
-
-            if low_compact in noisy_exact:
-                continue
-
-            if any(bad in low for bad in noisy_contains):
-                continue
-
-            if len(cleaned) <= 2:
-                continue
-
-            raw_lines.append(cleaned)
-
-        useful = []
-        seen = set()
-
-        skip_prefixes = (
-            "attachment analysis",
-            "this attachment appears to be about",
-            "key points",
-            "preview",
-        )
-
-        for line in raw_lines:
-            low = line.lower()
-            if any(low.startswith(prefix) for prefix in skip_prefixes):
-                continue
-
-            key = re.sub(r"[^a-z0-9]+", " ", low).strip()[:160]
-            if not key or key in seen:
-                continue
-
-            seen.add(key)
-            useful.append(line)
-
-        if useful:
-            top = useful[:8]
-            topic = "; ".join(top[:3])
-            cleaned_text = "Attachment analysis:\n"
-            cleaned_text += f"{topic}\n\n"
-
-            cleaned_text += "Key points:\n"
-
-            for index, item in enumerate(top, start=1):
-                cleaned_text += f"{index}. {item}\n"
-
-            cleaned_text += "\nPreview:\n"
-            cleaned_text += "\n".join(top[:6])
-        else:
-            cleaned_text = (
-                "Attachment analysis:\n"
-                "The attachment was received and text was extracted, but most of the extracted text looks like noisy search-page/navigation content rather than a clean document body."
-            )
-
-        _nova_existing_content = str(assistant_message.get("content") or "").strip()
-        _nova_candidate_text = cleaned_text.strip()
-        if (
-            _nova_existing_content.startswith("Attachment analysis:")
-            and "Attachment " in _nova_existing_content
-            and " content:" in _nova_existing_content
-            and "This uploaded attachment contains readable text about:" in _nova_candidate_text
-        ):
-            assistant_message["text"] = _nova_existing_content
-            assistant_message["content"] = _nova_existing_content
-        else:
-            # DISABLED_RECURSIVE_ATTACHMENT_TEXT_REWRITE_20260615
-            # assistant_message["text"] = _nova_candidate_text
-            pass
-        data["assistant_message"] = assistant_message
-
-        payload = json.dumps(data)
-        response.set_data(payload)
-        response.headers["Content-Length"] = str(len(payload.encode("utf-8")))
-
-        return response
-
-    except Exception:
-        return response
+    return attachment_endpoint_service.clean_attachment_analysis_response(
+        response
+    )
 
 @app.before_request
 def _nova_stop_fake_attachment_chat_gate():
