@@ -959,10 +959,7 @@ def build_common_state_payload(session_id: str = "") -> dict:
     }
 
 
-def _clean_fact_value(value: str) -> str:
-    return memory_recall_service.clean_fact_value(
-        value
-    )
+
 
 def extract_memory_fact(user_text: str) -> dict | None:
     return memory_recall_service.extract_memory_fact(
@@ -976,16 +973,6 @@ def memory_exists_for_session(
     return memory_recall_service.memory_exists_for_session(
         session_id,
         fact_text,
-    )
-
-def _clean_memory_value(value: str) -> str:
-    return memory_recall_service.clean_memory_value(
-        value
-    )
-
-def _normalize_name(value: str) -> str:
-    return memory_recall_service.normalize_name(
-        value
     )
 
 def extract_name_from_memory_text(
