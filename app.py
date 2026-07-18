@@ -151,6 +151,9 @@ from nova_backend.services.attachment_utils_service import (
 from nova_backend.services.execution_stream_service import (
     ExecutionStreamService,
 )
+from nova_backend.services.execution_fix_service import (
+    ExecutionFixService,
+)
 
 from nova_backend.services import session_auth_scope_service
 from nova_backend.services import attachment_gate_service
@@ -906,6 +909,12 @@ execution_stream_service = ExecutionStreamService(
     update_execution_state_safe=update_execution_state_safe,
 )
 
+execution_fix_service = ExecutionFixService(
+    session_service=session_service,
+    default_executor=default_executor,
+    next_move_class=NextMove,
+    update_execution_state_safe=update_execution_state_safe,
+)
 # =========================
 # RUNTIME BINDING
 # =========================
@@ -6232,55 +6241,18 @@ def execution_stream():
         })
 
         if action == "fix_file":
-            execution = (session or {}).get("working_state", {}).get("execution") or {} or {
-                "status": "idle",
-                "steps": [],
-                "history": [],
-                "last_action": "",
-                "current_step": "",
-            }
 
-            pending_file = ""
-            pending_code = ""
+            result = execution_fix_service.apply_fix(
+                session_id,
+                session,
+                execution,
+                action,
+            )
 
-            try:
-                session = session_service.get_session(session_id)
-                working_state = session.get("working_state", {}) if isinstance(session, dict) else {}
-                meta = session.get("meta", {}) if isinstance(session, dict) else {}
+            execution = result["execution"]
+            step = result["step"]
+            ok = result["ok"]
 
-                pending_file = str(
-                    working_state.get("pending_fix_file_path")
-                    or meta.get("pending_fix_file_path")
-                    or ""
-                ).strip()
-
-                pending_code = str(
-                    working_state.get("pending_fix_code")
-                    or meta.get("pending_fix_code")
-                    or ""
-                )
-
-            except Exception:
-                pending_file = ""
-                pending_code = ""
-
-            step = {
-                "title": "Apply pending file fix",
-                "status": "running",
-                "move": {
-                    "id": f"fix-file-{uuid.uuid4().hex}",
-                    "type": "fix_file",
-                    "payload": {
-                        "file_path": pending_file,
-                        "code": pending_code,
-                    },
-                },
-            }
-
-            execution["status"] = "running"
-            execution["current_step"] = step["title"]
-            execution["last_action"] = action
-            execution.setdefault("steps", []).append(step)
             execution_stream_service.save_execution(
                 session_id,
                 execution,
@@ -6291,26 +6263,6 @@ def execution_stream():
                 "execution_state": execution,
                 "done": False,
             })
-
-            result = default_executor(NextMove(
-                id=step["move"]["id"],
-                type="fix_file",
-                payload=step["move"]["payload"],
-            ))
-
-            ok = str(result.status or "").lower() == "success"
-
-            step["status"] = "done" if ok else "failed"
-            step["output"] = result.output or {"error": result.error}
-            update_execution_state_safe(execution, status="complete" if ok else "error")
-            update_execution_state_safe(execution, current_step="Fix applied" if ok else "Fix failed")
-            execution.setdefault("history", []).append(
-                f"fix_file: {'success' if ok else 'failed'}"
-            )
-            execution_stream_service.save_execution(
-                session_id,
-                execution,
-            )
 
             yield execution_stream_service.send_event("step_done", {
                 "step": step,
@@ -6323,7 +6275,9 @@ def execution_stream():
                 "execution_state": execution,
                 "done": True,
             })
+
             return
+
 
         elif action == "stop":
             execution["history"].append("stop")
