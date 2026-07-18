@@ -136,6 +136,7 @@ from nova_backend.services.upload_ownership_service import (
     UploadOwnershipService,
 )
 
+from nova_backend.services import attachment_gate_service
 from nova_backend.utils.api_response import ok_response, error_response
 from nova_backend.utils.request_utils import get_json_body, get_str, get_list, normalize_attachments
 from nova_backend.services.attachment_memory_service import (
@@ -154,6 +155,7 @@ from nova_backend.config import (
     RECON_TIMEOUT,
 )
 
+from nova_backend.services import attachment_shape_service
 from nova_backend.services.admin_lead_service import AdminLeadService
 from nova_backend.services.session_detail_cache_service import SessionDetailCacheService
 from nova_backend.services.session_service import SessionService
@@ -238,6 +240,7 @@ from nova_backend.services.attachment_analysis_service import (
 )
 
 from nova_backend.services.blog_service import BlogService
+from nova_backend.services import empty_session_pruner_service
 # -----------------------
 # APP SETUP
 
@@ -8641,60 +8644,38 @@ def _nova_clean_attachment_analysis_response(response):
     except Exception:
         return response
 
-
-# ATTACHMENT_OUTPUT_NOISE_CLEANUP_LOCK
-# ATTACHMENT_FOLLOWUP_RECALL_LOCK_20260604
 @app.before_request
-def _nova_attachment_followup_recall_gate():
+def _nova_stop_fake_attachment_chat_gate():
     try:
-        from flask import request, jsonify
-        import json
-        from pathlib import Path
-
         if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
             return None
 
         payload = request.get_json(silent=True) or {}
-        user_text = str(
-            payload.get("user_text")
-            or payload.get("text")
-            or payload.get("message")
-            or ""
-        ).strip()
-        session_id = str(payload.get("session_id") or "").strip()
-        attachments = payload.get("attachments") or []
 
-        lower = user_text.lower()
-        wants_attachment = (
-            "attachment" in lower
-            and (
-                "what was in" in lower
-                or "what is in" in lower
-                or "summarize" in lower
-                or "tell me" in lower
-            )
+        return attachment_gate_service.handle_stop_fake_attachment_chat_gate(
+            payload
         )
 
-        if not wants_attachment or attachments or not session_id:
+    except Exception:
+        return None
+
+@app.before_request
+def _nova_attachment_followup_recall_gate():
+    try:
+        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
             return None
 
-        return None
+        payload = request.get_json(silent=True) or {}
+
+        return attachment_gate_service.handle_attachment_followup_recall_gate(
+            payload
+        )
 
     except Exception:
         return None
 
-# STOP_FAKE_ATTACHMENT_CHAT_20260604
 
-# NOVA_SESSION_ATTACHMENT_MEMORY_GATE_20260611
-def _nova_session_attachment_memory_path_20260611():
-    try:
-        from pathlib import Path
-        base = Path(__file__).resolve().parent
-        data_dir = base / "data"
-        data_dir.mkdir(parents=True, exist_ok=True)
-        return data_dir / "nova_session_attachments.json"
-    except Exception:
-        return Path("data") / "nova_session_attachments.json"
+
 
 @app.before_request
 def nova_session_attachment_memory_gate_20260611():
@@ -8703,161 +8684,15 @@ def nova_session_attachment_memory_gate_20260611():
             return None
 
         payload = request.get_json(silent=True) or {}
-        if not isinstance(payload, dict):
-            return None
 
-        session_id = str(
-            payload.get("session_id")
-            or payload.get("client_session_id")
-            or payload.get("active_session_id")
-            or ""
-        ).strip()
-
-        if not session_id:
-            return None
-
-        user_text = str(
-            payload.get("user_text")
-            or payload.get("text")
-            or payload.get("message")
-            or ""
-        ).strip()
-
-        attachments = payload.get("attachments") or []
-        if isinstance(attachments, dict):
-            attachments = [attachments]
-        if not isinstance(attachments, list):
-            attachments = []
-
-        saved = attachment_memory_service.get_or_create_session_attachments(
-            session_id,
-            attachments,
+        return attachment_gate_service.handle_session_attachment_memory_gate(
+            payload,
+            attachment_memory_service,
         )
-
-        if attachments:
-            return None
-
-        clean = " ".join(user_text.lower().split())
-        wants_saved_attachment = (
-            ("attachment" in clean or "file" in clean or ".txt" in clean or "secret phrase" in clean)
-            and (
-                "what" in clean
-                or "summarize" in clean
-                or "tell me" in clean
-                or "secret phrase" in clean
-                or "previous" in clean
-                or "uploaded" in clean
-            )
-        )
-
-        if not wants_saved_attachment or not saved:
-            return None
-
-        assistant_text = attachment_memory_service.build_saved_attachment_reply(
-            user_text,
-            saved,
-        )
-        if not assistant_text:
-            return None
-
-        user_msg = {
-            "role": "user",
-            "text": user_text,
-            "attachments": [],
-            "meta": {
-                "session_attachment_memory_lookup": True,
-            },
-        }
-
-        assistant_msg = {
-            "role": "assistant",
-            "text": assistant_text,
-            "content": assistant_text,
-            "attachments": saved,
-            "meta": {
-                "route_taken": "session_attachment_memory_recall",
-                "session_attachment_memory_count": len(saved),
-            },
-        }
-
-        return jsonify({
-            "ok": True,
-            "active_session_id": session_id,
-            "session_id": session_id,
-            "assistant_message": assistant_msg,
-            "text": assistant_text,
-            "attachment_debug": {
-                "requested_session_id": session_id,
-                "active_session_id": session_id,
-                "session_attachments_count": len(saved),
-                "session_attachment_memory_recall": True,
-            },
-            "debug": {
-                "route": "api_chat",
-                "route_taken": "session_attachment_memory_recall",
-            },
-            "runtime": {},
-            "session_attachments": saved,
-        })
 
     except Exception:
         return None
 
-
-
-@app.before_request
-def _nova_stop_fake_attachment_chat_gate():
-    try:
-        from flask import request, jsonify
-
-        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
-            return None
-
-        payload = request.get_json(silent=True) or {}
-        user_text = str(payload.get("user_text") or "").strip()
-        attachments = payload.get("attachments") or []
-
-        clean = " ".join(user_text.lower().split())
-
-        casual_messages = {
-            "hi",
-            "hey",
-            "hello",
-            "yo",
-            "sup",
-            "how are you",
-            "how are you?",
-            "how you doing",
-            "how are u",
-            "whats up",
-            "what's up",
-        }
-
-        if attachments:
-            return None
-
-        if clean not in casual_messages:
-            return None
-
-        return jsonify({
-            "ok": True,
-            "assistant_message": {
-                "role": "assistant",
-                "text": "I'm good. Ready when you are.",
-                "attachments": [],
-                "meta": {
-                    "route": "normal_chat_casual_gate"
-                }
-            },
-            "attachments": [],
-            "session_attachments": [],
-            "debug": {
-                "route": "normal_chat_casual_gate"
-            }
-        })
-
-    except Exception:
-        return None
 
 
 # NOVA_BACKEND_READINESS_ROUTE_20260609
@@ -9963,144 +9798,6 @@ def _nova_install_empty_session_spam_pruner_20260610():
     data_dir = Path(__file__).resolve().parent / "data"
     sessions_path = data_dir / "nova_sessions.json"
 
-    def load_store():
-        try:
-            if not sessions_path.exists():
-                return {"active_session_id": "", "sessions": []}
-            data = json.loads(sessions_path.read_text(encoding="utf-8-sig"))
-            if not isinstance(data, dict):
-                return {"active_session_id": "", "sessions": []}
-            if not isinstance(data.get("sessions"), list):
-                data["sessions"] = []
-            data.setdefault("active_session_id", "")
-            return data
-        except Exception:
-            return {"active_session_id": "", "sessions": []}
-
-    def save_store(store):
-        try:
-            data_dir.mkdir(parents=True, exist_ok=True)
-            tmp = sessions_path.with_suffix(sessions_path.suffix + ".tmp")
-            tmp.write_text(json.dumps(store, indent=2, ensure_ascii=False), encoding="utf-8")
-            tmp.replace(sessions_path)
-            return True
-        except Exception as exc:
-            try:
-                app.logger.warning("[Nova Session Spam Pruner] save failed: %s", exc)
-            except Exception:
-                pass
-            return False
-
-    def is_empty_new_chat(item):
-        if not isinstance(item, dict):
-            return False
-
-        title = str(item.get("title") or "").strip().lower()
-        messages = item.get("messages")
-
-        if title not in ("", "new chat"):
-            return False
-
-        if isinstance(messages, list) and len(messages) > 0:
-            return False
-
-        if item.get("pinned"):
-            return False
-
-        active_execution = item.get("active_execution")
-        if active_execution not in (None, {}, [], ""):
-            return False
-
-        working_state = item.get("working_state")
-        if isinstance(working_state, dict):
-            meaningful = [
-                str(working_state.get("active_task") or "").strip(),
-                str(working_state.get("checkpoint") or "").strip(),
-                str(working_state.get("current_bug") or "").strip(),
-                str(working_state.get("current_file") or "").strip(),
-                str(working_state.get("last_success") or "").strip(),
-                str(working_state.get("next_move") or "").strip(),
-            ]
-            if any(meaningful):
-                return False
-
-        return True
-
-    def owner_key(item):
-        user_id = str(item.get("user_id") or "").strip()
-        username = str(item.get("username") or "").strip().lower()
-        return user_id or username or "legacy_unowned"
-
-
-
-
-    def sort_key(item):
-        return str(item.get("updated_at") or item.get("created_at") or "")
-
-    def prune_empty_new_chat_spam():
-        store = load_store()
-        sessions = store.get("sessions", [])
-
-        if not isinstance(sessions, list):
-            return 0
-
-        empty_by_owner = {}
-        for item in sessions:
-            if is_empty_new_chat(item):
-                empty_by_owner.setdefault(owner_key(item), []).append(item)
-
-        keep_ids = set()
-        remove_ids = set()
-
-        for key, items in empty_by_owner.items():
-            if not items:
-                continue
-
-            # Keep the newest empty New Chat for each owner. Remove the rest.
-            newest = sorted(items, key=sort_key, reverse=True)[0]
-            keep_ids.add(str(newest.get("id") or ""))
-
-            for old in items:
-                old_id = str(old.get("id") or "")
-                if old_id and old_id != str(newest.get("id") or ""):
-                    remove_ids.add(old_id)
-
-        # NOVA_SESSION_NEW_PRUNER_GHOST_ACTIVE_REPAIR_20260703
-        # Always repair a ghost active_session_id, even when nothing was pruned.
-        valid_ids = [
-            str(item.get("id") or "")
-            for item in sessions
-            if isinstance(item, dict) and str(item.get("id") or "")
-        ]
-        old_active = str(store.get("active_session_id") or "")
-
-        if old_active and old_active not in set(valid_ids):
-            store["active_session_id"] = valid_ids[0] if valid_ids else ""
-            save_store(store)
-            return 0
-
-        if not remove_ids:
-            return 0
-
-        new_sessions = [
-            item for item in sessions
-            if not (isinstance(item, dict) and str(item.get("id") or "") in remove_ids)
-        ]
-
-        if old_active in remove_ids:
-            preferred = ""
-            for item in new_sessions:
-                if str(item.get("id") or "") in keep_ids:
-                    preferred = str(item.get("id") or "")
-                    break
-            if not preferred and new_sessions:
-                preferred = str(new_sessions[0].get("id") or "")
-            store["active_session_id"] = preferred
-
-        store["sessions"] = new_sessions
-        save_store(store)
-        return len(remove_ids)
-
     @app.after_request
     def nova_prune_empty_session_spam_after_request_20260610(response):
         path = str(request.path or "")
@@ -10124,7 +9821,7 @@ def _nova_install_empty_session_spam_pruner_20260610():
             or path.startswith("/api/chat/stream")
             or path == "/mobile"
         ):
-            removed = prune_empty_new_chat_spam()
+            removed = empty_session_pruner_service.prune_empty_new_chat_spam()
             if removed:
                 try:
                     app.logger.info("[Nova Session Spam Pruner] removed %s duplicate empty New Chat sessions", removed)
