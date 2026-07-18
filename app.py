@@ -233,6 +233,8 @@ from nova_backend.services.attachment_keypoints_service import (
 from nova_backend.services.attachment_analysis_service import (
     AttachmentAnalysisService,
 )
+
+from nova_backend.services.blog_service import BlogService
 # -----------------------
 # APP SETUP
 
@@ -741,6 +743,7 @@ runtime_response_sanitizer = RuntimeResponseSanitizerService()
 attachment_keypoints_service = AttachmentKeypointsService()
 install_project_chat_response_router(app)
 attachment_analysis_service = AttachmentAnalysisService()
+blog_service = BlogService()
 restored_runtime = getattr(
     runtime_brain,
     "restored_runtime_state",
@@ -10341,127 +10344,6 @@ def nova_blog_page_20260611():
     return render_template("blog.html")
 
 
-# NOVA_BLOG_WRITABLE_ROUTE_FAMILY_RESTORED_20260711
-def _nova_blog_posts_path_20260711():
-    from pathlib import Path
-
-    path = (
-        Path(__file__).resolve().parent
-        /
-        "data"
-        /
-        "blog_posts.json"
-    )
-
-    path.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    return path
-
-
-def _nova_blog_read_posts_20260711():
-    import json
-
-    path = _nova_blog_posts_path_20260711()
-
-    if not path.exists():
-        return []
-
-    try:
-        payload = json.loads(
-            path.read_text(
-                encoding="utf-8"
-            )
-        )
-    except Exception:
-        return []
-
-    if isinstance(
-        payload,
-        list,
-    ):
-        return [
-            item
-            for item in payload
-            if isinstance(
-                item,
-                dict,
-            )
-        ]
-
-    if isinstance(
-        payload,
-        dict,
-    ):
-        posts = payload.get(
-            "posts"
-        )
-
-        if isinstance(
-            posts,
-            list,
-        ):
-            return [
-                item
-                for item in posts
-                if isinstance(
-                    item,
-                    dict,
-                )
-            ]
-
-    return []
-
-
-def _nova_blog_write_posts_20260711(
-    posts,
-):
-    import json
-
-    path = _nova_blog_posts_path_20260711()
-
-    path.write_text(
-        json.dumps(
-            posts,
-            ensure_ascii=False,
-            indent=2,
-        )
-        +
-        "\n",
-        encoding="utf-8",
-    )
-
-
-def _nova_blog_slugify_20260711(
-    value,
-):
-    import re
-
-    value = str(
-        value
-        or
-        ""
-    ).strip().lower()
-
-    value = re.sub(
-        r"[^a-z0-9]+",
-        "-",
-        value,
-    )
-
-    value = value.strip(
-        "-"
-    )
-
-    return (
-        value
-        or
-        "post"
-    )
-
-
 @app.route("/blog/write")
 def nova_blog_write_page_restored_20260711():
     from flask import render_template
@@ -10490,11 +10372,11 @@ def nova_blog_post_page_restored_20260711(
         "POST",
     ],
 )
+
 def nova_blog_posts_api_restored_20260711():
-    from datetime import datetime, timezone
     from flask import jsonify, request
 
-    posts = _nova_blog_read_posts_20260711()
+    posts = blog_service.read_posts()
 
 
     if request.method == "GET":
@@ -10623,75 +10505,12 @@ def nova_blog_posts_api_restored_20260711():
         ), 400
 
 
-    base_slug = _nova_blog_slugify_20260711(
-        payload.get(
-            "slug"
-        )
-        or title
-    )
-
-
-    slug = base_slug
-
-
-    existing_slugs = {
-        str(
-            post.get(
-                "slug"
-            )
-            or
-            ""
-        )
-        for post in posts
-    }
-
-
-    suffix = 2
-
-
-    while slug in existing_slugs:
-
-        slug = (
-            base_slug
-            +
-            "-"
-            +
-            str(
-                suffix
-            )
-        )
-
-        suffix += 1
-
-
-    now = datetime.now(
-        timezone.utc
-    ).isoformat()
-
-
-    if not excerpt:
-
-        excerpt = body[:220].strip()
-
-
-    post = {
-        "slug": slug,
-        "title": title,
-        "excerpt": excerpt,
-        "body": body,
-        "tags": tags,
-        "created_at": now,
-        "updated_at": now,
-    }
-
-
-    posts.append(
-        post
-    )
-
-
-    _nova_blog_write_posts_20260711(
-        posts
+    post = blog_service.create_post(
+        title=title,
+        body=body,
+        excerpt=excerpt,
+        tags=tags,
+        slug=payload.get("slug"),
     )
 
 
@@ -10701,7 +10520,6 @@ def nova_blog_posts_api_restored_20260711():
             "post": post,
         }
     )
-
 
 @app.route(
     "/api/blog/posts/<slug>",
@@ -10714,30 +10532,16 @@ def nova_blog_single_post_api_restored_20260711(
 ):
     from flask import jsonify
 
-    posts = _nova_blog_read_posts_20260711()
+    post = blog_service.get_post(slug)
 
+    if post:
 
-    for post in posts:
-
-        if str(
-            post.get(
-                "slug"
-            )
-            or
-            ""
-        ) == str(
-            slug
-            or
-            ""
-        ):
-
-            return jsonify(
-                {
-                    "ok": True,
-                    "post": post,
-                }
-            )
-
+        return jsonify(
+            {
+                "ok": True,
+                "post": post,
+            }
+        )
 
     return jsonify(
         {
