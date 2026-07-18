@@ -148,6 +148,10 @@ from nova_backend.services.attachment_utils_service import (
     AttachmentUtilsService,
 )
 
+from nova_backend.services.execution_stream_service import (
+    ExecutionStreamService,
+)
+
 from nova_backend.services import session_auth_scope_service
 from nova_backend.services import attachment_gate_service
 from nova_backend.utils.api_response import ok_response, error_response
@@ -836,7 +840,6 @@ runtime_response_sanitizer = RuntimeResponseSanitizerService()
 attachment_keypoints_service = AttachmentKeypointsService()
 install_project_chat_response_router(app)
 attachment_analysis_service = AttachmentAnalysisService()
-attachment_endpoint_service = AttachmentEndpointService()
 attachment_text_service = AttachmentTextService()
 blog_service = BlogService()
 restored_runtime = getattr(
@@ -844,6 +847,10 @@ restored_runtime = getattr(
     "restored_runtime_state",
     {},
 )
+attachment_endpoint_service = AttachmentEndpointService()
+
+
+
 
 
 _nova_boot_log_20260701(
@@ -883,11 +890,20 @@ _nova_boot_log_20260701(
 )
 
 chat_service = ChatService(
+
     session_service=session_service,
     memory_service=memory_service,
     artifact_service=artifact_service,
     web_service=web_service,
     recon_service=recon_service,
+)
+
+execution_stream_service = ExecutionStreamService(
+    session_service=session_service,
+    chat_service=chat_service,
+    default_executor=default_executor,
+    next_move_class=NextMove,
+    update_execution_state_safe=update_execution_state_safe,
 )
 
 # =========================
@@ -6169,9 +6185,6 @@ def execution_stream():
             execution_state = {}
             action = "run_step"
 
-    def send_event(name, payload):
-        import json
-        return f"event: {name}\ndata: {json.dumps(payload)}\n\n"
 
 def save_execution(execution):
 
@@ -6265,11 +6278,11 @@ def save_execution(execution):
         import time
 
         if not session_id:
-            yield send_event("error", {"ok": False, "error": "missing session_id", "done": True})
+            yield execution_stream_service.send_event("error", {"ok": False, "error": "missing session_id", "done": True})
             return
 
         if not action:
-            yield send_event("error", {"ok": False, "error": "missing action", "done": True})
+            yield execution_stream_service.send_event("error", {"ok": False, "error": "missing action", "done": True})
             return
 
         session = session_service.get_session(
@@ -6298,7 +6311,7 @@ def save_execution(execution):
         if not isinstance(execution["history"], list):
             execution["history"] = []
 
-        yield send_event("start", {
+        yield execution_stream_service.execution_stream_service.send_event("start", {
             "ok": True,
             "action": action,
             "session_id": session_id,
@@ -6358,7 +6371,7 @@ def save_execution(execution):
             execution.setdefault("steps", []).append(step)
             save_execution(execution)
 
-            yield send_event("step_start", {
+            yield execution_stream_service.send_event("step_start", {
                 "step": step,
                 "execution_state": execution,
                 "done": False,
@@ -6381,13 +6394,13 @@ def save_execution(execution):
             )
             save_execution(execution)
 
-            yield send_event("step_done", {
+            yield execution_stream_service.send_event("step_done", {
                 "step": step,
                 "execution_state": execution,
                 "done": False,
             })
 
-            yield send_event("done", {
+            yield execution_stream_service.send_event("done", {
                 "ok": ok,
                 "execution_state": execution,
                 "done": True,
@@ -6408,7 +6421,7 @@ def save_execution(execution):
 
         save_execution(execution)
 
-        yield send_event("done", {
+        yield execution_stream_service.send_event("done", {
             "ok": True,
             "execution_state": execution,
             "done": True,
