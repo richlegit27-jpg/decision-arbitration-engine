@@ -156,6 +156,7 @@ from nova_backend.config import (
     RECON_TIMEOUT,
 )
 from nova_backend.services.mobile_exchange_service import MobileExchangeService
+from nova_backend.services.session_bootstrap_service import SessionBootstrapService
 from nova_backend.services import attachment_shape_service
 from nova_backend.services.admin_lead_service import AdminLeadService
 from nova_backend.services.session_detail_cache_service import SessionDetailCacheService
@@ -701,6 +702,10 @@ session_service = SessionService(
     DATA_DIR / "nova_sessions.json"
 )
 
+session_bootstrap_service = SessionBootstrapService(
+    session_service,
+    logger=app.logger,
+)
 
 mobile_exchange_service = MobileExchangeService(
     session_service
@@ -3755,7 +3760,7 @@ def api_chat():
         # FORCE_MOBILE_SESSION_OBJECT_CREATE_LOCK_20260606
         # Active id alone is not enough. Ensure the actual mobile session object exists.
         try:
-            _nova_ensure_requested_session(
+            session_bootstrap_service.ensure_requested_session(
                 requested_session_id,
                 title=user_text or "Mobile Chat",
             )
