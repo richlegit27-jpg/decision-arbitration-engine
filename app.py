@@ -158,6 +158,7 @@ from nova_backend.services.session_service import SessionService
 from nova_backend.services.session_history_service import (
     SessionHistoryService,
 )
+from nova_backend.services.history_service import HistoryService
 from nova_backend.services.artifact_service import ArtifactService
 from nova_backend.services.memory_service import MemoryService
 from nova_backend.services.memory_recall_service import (
@@ -695,6 +696,10 @@ session_service = SessionService(
 
 session_history_service = SessionHistoryService(
     BASE_DIR
+)
+
+history_service = HistoryService(
+    session_history_service
 )
 
 memory_service = MemoryService(
@@ -12458,119 +12463,13 @@ try:
 except Exception:
     pass
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# NOVA_HISTORY_LIST_AND_DETAIL_20260621
-def nova_history_load_sessions_20260621():
-    store = session_history_service.load_sessions_store()
-
-    sessions = store.get(
-        "sessions",
-        [],
-    )
-
-    if isinstance(sessions, list):
-        return sessions
-
-    return []
-
-def nova_history_sid_20260621(session):
-    if not isinstance(session, dict):
-        return ""
-    return str(
-        session.get("id") or
-        session.get("session_id") or
-        session.get("sid") or
-        session.get("uuid") or
-        ""
-    )
-
-
-def nova_history_title_20260621(session):
-    if not isinstance(session, dict):
-        return "Untitled session"
-    return str(
-        session.get("title") or
-        session.get("name") or
-        session.get("label") or
-        "Untitled session"
-    )
-
-
-def nova_history_messages_20260621(session):
-    if not isinstance(session, dict):
-        return []
-
-    for key in ("messages", "chat", "conversation", "items"):
-        value = session.get(key)
-        if isinstance(value, list):
-            return value
-
-    return []
-
-
-def nova_history_msg_text_20260621(message):
-    import json
-
-    if isinstance(message, str):
-        return message
-
-    if not isinstance(message, dict):
-        return str(message)
-
-    for key in ("content", "text", "message", "body", "output", "answer"):
-        value = message.get(key)
-        if value is not None and str(value).strip():
-            return str(value)
-
-    return json.dumps(message, ensure_ascii=False, indent=2)
-
-
-def nova_history_msg_role_20260621(message):
-    if not isinstance(message, dict):
-        return "message"
-
-    return str(
-        message.get("role") or
-        message.get("sender") or
-        message.get("type") or
-        "message"
-    )
-
-
 @app.route("/history")
 def nova_history_list_page_20260621():
     import html
 
     sessions = [
-        s for s in nova_history_load_sessions_20260621()
-        if nova_history_sid_20260621(s)
+        s for s in history_service.load_sessions()
+        if history_service.sid(s)
     ]
 
     def updated(s):
@@ -12583,9 +12482,9 @@ def nova_history_list_page_20260621():
     cards = []
 
     for s in sessions:
-        sid = nova_history_sid_20260621(s)
-        title = nova_history_title_20260621(s)
-        count = s.get("message_count") or len(nova_history_messages_20260621(s)) or 0
+        sid = history_service.sid(s)
+        title = history_service.title(s)
+        count = s.get("message_count") or len(history_service.messages(s)) or 0
 
         cards.append(f"""
           <a class="session" href="/history/{html.escape(sid)}">
@@ -12729,11 +12628,11 @@ def nova_history_list_page_20260621():
 def nova_history_detail_page_20260621(session_id):
     import html
 
-    sessions = nova_history_load_sessions_20260621()
+    sessions = history_service.load_sessions()
     session = None
 
     for s in sessions:
-        if nova_history_sid_20260621(s) == session_id:
+        if history_service.sid(s) == session_id:
             session = s
             break
 
@@ -12749,15 +12648,15 @@ def nova_history_detail_page_20260621(session_id):
 </html>
 """
 
-    title = nova_history_title_20260621(session)
-    sid = nova_history_sid_20260621(session)
-    messages = nova_history_messages_20260621(session)
+    title = history_service.title(session)
+    sid = history_service.sid(session)
+    messages = history_service.messages(session)
 
     rows = []
 
     for m in messages:
-        role = nova_history_msg_role_20260621(m)
-        text = nova_history_msg_text_20260621(m)
+        role = history_service.msg_role(m)
+        text = history_service.msg_text(m)
 
         rows.append(f"""
           <div class="msg {html.escape(role.lower())}">
