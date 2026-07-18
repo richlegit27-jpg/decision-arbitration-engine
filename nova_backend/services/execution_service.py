@@ -858,3 +858,144 @@ Write the exact goal in one sentence.
         # ===== DEFAULT FALLBACK =====
         return "Step executed."
 
+    def serialize_move(self, move):
+        if isinstance(move, dict):
+            return move
+
+        return {
+            "id": str(getattr(move, "id", "")),
+            "type": str(getattr(move, "type", "")),
+            "payload": (
+                getattr(move, "payload", {})
+                if isinstance(
+                    getattr(move, "payload", {}),
+                    dict,
+                )
+                else {}
+            ),
+        }
+
+    def apply_control_action(
+        self,
+        execution,
+        action,
+    ):
+        if action == "run_step":
+            step_num = len(execution["steps"]) + 1
+            step_title = f"Step {step_num}"
+
+            execution["steps"].append(
+                {
+                    "title": step_title,
+                    "status": "done",
+                    "output": "Step completed.",
+                }
+            )
+
+            execution["history"].append(
+                f"run_step: {step_title}"
+            )
+            execution["status"] = "complete"
+            execution["last_action"] = action
+            execution["current_step"] = step_title
+
+        elif action == "run_all":
+            start_num = len(execution["steps"]) + 1
+
+            for offset in range(3):
+                step_num = start_num + offset
+                step_title = f"Step {step_num}"
+
+                execution["steps"].append(
+                    {
+                        "title": step_title,
+                        "status": "done",
+                        "output": "Step completed.",
+                    }
+                )
+
+            execution["history"].append(
+                "run_all: added 3 completed steps"
+            )
+            execution["status"] = "complete"
+            execution["last_action"] = action
+            execution["current_step"] = "Run all complete"
+
+        elif action == "test_fail":
+            step_num = len(execution["steps"]) + 1
+            step_title = f"Failed Step {step_num}"
+
+            execution["steps"].append(
+                {
+                    "title": step_title,
+                    "status": "failed",
+                    "output": "Simulated failure.",
+                }
+            )
+
+            execution["history"].append(
+                f"test_fail: {step_title}"
+            )
+            execution["status"] = "error"
+            execution["last_action"] = action
+            execution["current_step"] = step_title
+
+        elif action in ("retry", "retry_failed"):
+            failed_index = None
+
+            for i in range(
+                len(execution["steps"]) - 1,
+                -1,
+                -1,
+            ):
+                step = execution["steps"][i]
+                status = str(
+                    step.get("status") or ""
+                ).lower()
+
+                if status in ("failed", "error"):
+                    failed_index = i
+                    break
+
+            if failed_index is not None:
+                failed_step = execution["steps"][failed_index]
+                title = str(
+                    failed_step.get("title")
+                    or f"Step {failed_index + 1}"
+                )
+
+                failed_step["status"] = "done"
+                failed_step["output"] = "Retry successful."
+
+                execution["status"] = "complete"
+                execution["last_action"] = "retry_failed"
+                execution["current_step"] = "Retry complete"
+                execution["history"].append(
+                    f"retry_failed: {title}"
+                )
+            else:
+                execution["history"].append(
+                    "retry_failed: no failed step found"
+                )
+                execution["status"] = "complete"
+                execution["last_action"] = "retry_failed"
+                execution["current_step"] = (
+                    "No failed step found"
+                )
+
+        elif action == "stop":
+            execution["history"].append("stop")
+            execution["status"] = "stopped"
+            execution["last_action"] = action
+            execution["current_step"] = "Stopped"
+
+        else:
+            execution["history"].append(
+                f"unknown action: {action}"
+            )
+            execution["status"] = "error"
+            execution["last_action"] = action
+            execution["current_step"] = "Unknown action"
+
+        return execution
+
