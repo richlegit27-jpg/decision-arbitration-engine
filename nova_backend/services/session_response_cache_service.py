@@ -443,3 +443,167 @@ class SessionResponseCacheService:
                 assistant_message,
                 session_obj,
             )
+
+    def persist_working_state(
+        self,
+        session_obj,
+        session_id,
+    ):
+        try:
+            working_state = session_obj.get(
+                "working_state"
+            )
+
+            if not isinstance(
+                working_state,
+                dict,
+            ):
+                working_state = {}
+
+            active_task = str(
+                working_state.get("active_task")
+                or working_state.get("task")
+                or ""
+            ).strip()
+
+            current_file = str(
+                working_state.get("current_file")
+                or working_state.get("file")
+                or ""
+            ).strip()
+
+            last_user_message = ""
+            last_assistant_message = ""
+
+            session_messages = session_obj.get(
+                "messages"
+            )
+
+            if not isinstance(
+                session_messages,
+                list,
+            ):
+                session_messages = []
+
+            for message in reversed(session_messages):
+                if not isinstance(message, dict):
+                    continue
+
+                role = str(
+                    message.get("role")
+                    or ""
+                ).strip().lower()
+
+                message_text = str(
+                    message.get("text")
+                    or message.get("content")
+                    or ""
+                ).strip()
+
+                if role == "user" and not last_user_message:
+                    last_user_message = message_text
+
+                if role == "assistant" and not last_assistant_message:
+                    last_assistant_message = message_text
+
+                if last_user_message and last_assistant_message:
+                    break
+
+            if not active_task:
+                session_title = str(
+                    session_obj.get("title")
+                    or ""
+                ).strip()
+
+                lowered_title = session_title.lower()
+
+                for prefix in (
+                    "we are working on ",
+                    "we're working on ",
+                    "working on ",
+                ):
+                    if lowered_title.startswith(prefix):
+                        active_task = (
+                            session_title[len(prefix):]
+                            .strip(" .")
+                        )
+                        break
+
+            if not active_task:
+                for message in reversed(session_messages):
+                    if not isinstance(message, dict):
+                        continue
+
+                    if str(
+                        message.get("role")
+                        or ""
+                    ).strip().lower() != "user":
+                        continue
+
+                    message_text = str(
+                        message.get("text")
+                        or message.get("content")
+                        or ""
+                    ).strip()
+
+                    lowered_message = message_text.lower()
+
+                    if lowered_message in {
+                        "what are we working on",
+                        "what are we working on?",
+                        "what were we working on",
+                        "what were we working on?",
+                        "what file are we in",
+                        "what file are we in?",
+                        "current file",
+                        "active task",
+                    }:
+                        continue
+
+                    for prefix in (
+                        "we are working on ",
+                        "we're working on ",
+                        "working on ",
+                    ):
+                        if lowered_message.startswith(prefix):
+                            active_task = (
+                                message_text[len(prefix):]
+                                .strip(" .")
+                            )
+                            break
+
+                    if active_task:
+                        break
+
+            if not current_file and active_task:
+                for part in active_task.replace(",", " ").split():
+                    clean_part = part.strip(
+                        "`'\".,:;()[]{}"
+                    )
+
+                    if clean_part.endswith(
+                        (
+                            ".py",
+                            ".js",
+                            ".css",
+                            ".html",
+                            ".json",
+                            ".md",
+                            ".txt",
+                        )
+                    ):
+                        current_file = clean_part
+                        break
+
+            working_state["active_task"] = active_task
+            working_state["current_file"] = current_file
+            working_state["last_user_message"] = last_user_message
+            working_state["last_assistant_message"] = last_assistant_message
+
+            session_obj["working_state"] = working_state
+            session_obj["active_session_id"] = session_id
+
+        except Exception:
+            pass
+
+        return session_obj

@@ -10007,10 +10007,16 @@ def nova_final_session_detail_response_cache_20260612(response):
             except Exception:
                 pass
 
+            session_obj = session_response_cache_service.persist_working_state(
+                session_obj,
+                session_id,
+            )
+
             cached = session_detail_cache_service.upsert_session_in_store(
                 session_id,
                 session_obj,
             )
+
             if isinstance(cached, dict):
                 response_session = dict(cached)
 
