@@ -118,6 +118,38 @@ class ExecutionStreamService:
             {},
         )
 
+        runtime = getattr(
+            self.chat_service,
+            "runtime",
+            None,
+        )
+
+        if runtime is not None:
+            runtime_strategy_memory = getattr(
+                runtime,
+                "runtime_strategy_memory",
+                None,
+            )
+
+            if isinstance(runtime_strategy_memory, list):
+                runtime_strategy_memory.append(
+                    {
+                        "action": move.get("type") or action,
+                        "success": replay_ok,
+                        "failure": not replay_ok,
+                        "runtime_signal": (
+                            "execution_success"
+                            if replay_ok
+                            else "execution_failure"
+                        ),
+                        "score_delta": (
+                            1
+                            if replay_ok
+                            else -1
+                        ),
+                    }
+                )
+
         self.update_execution_state_safe(
             execution,
             status=(

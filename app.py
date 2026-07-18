@@ -6224,57 +6224,7 @@ def save_execution(
         session_id,
         session,
     )
-    def replay_existing_step(execution, replay_step, step_title):
-        move = replay_step.get("move") if isinstance(replay_step, dict) else None
 
-        if not isinstance(move, dict):
-            replay_step["status"] = "failed"
-            replay_step["output"] = {
-                "error": "Replay failed: no move stored on step.",
-            }
-            execution["status"] = "error"
-            execution["current_step"] = f"Replay failed: {step_title}"
-            return replay_step
-
-        replay_result = default_executor(NextMove(
-            id=str(move.get("id") or f"replay-{uuid.uuid4().hex}"),
-            type=str(move.get("type") or "echo"),
-            payload=move.get("payload") if isinstance(move.get("payload"), dict) else {},
-        ))
-
-        replay_ok = bool(getattr(replay_result, "success", False))
-
-        replay_step["status"] = "done" if replay_ok else "failed"
-        replay_step["output"] = getattr(replay_result, "output", {})
-
-        runtime = getattr(chat_service, "runtime", None)
-
-        if runtime is not None:
-            runtime_strategy_memory = getattr(
-                runtime,
-                "runtime_strategy_memory",
-                None,
-            )
-
-            if isinstance(runtime_strategy_memory, list):
-                runtime_strategy_memory.append(
-                    {
-                        "action": move.get("type") or action,
-                        "success": replay_ok,
-                        "failure": not replay_ok,
-                        "runtime_signal": (
-                            "execution_success"
-                            if replay_ok
-                            else "execution_failure"
-                        ),
-                        "score_delta": 1 if replay_ok else -1,
-                    }
-                )
-
-        update_execution_state_safe(execution, status="complete" if replay_ok else "error")
-        execution["current_step"] = "Replay complete" if replay_ok else f"Replay failed: {step_title}"
-
-        return replay_step
 
     def generate():
         import time
