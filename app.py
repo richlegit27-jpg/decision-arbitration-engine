@@ -155,11 +155,12 @@ from nova_backend.config import (
     WEB_TIMEOUT,
     RECON_TIMEOUT,
 )
-
+from nova_backend.services.mobile_exchange_service import MobileExchangeService
 from nova_backend.services import attachment_shape_service
 from nova_backend.services.admin_lead_service import AdminLeadService
 from nova_backend.services.session_detail_cache_service import SessionDetailCacheService
 from nova_backend.services.session_service import SessionService
+from nova_backend.services.mobile_exchange_service import MobileExchangeService
 from nova_backend.services.session_history_service import (
     SessionHistoryService,
 )
@@ -699,6 +700,12 @@ app.config["UPLOAD_FOLDER"] = str(UPLOADS_DIR)
 session_service = SessionService(
     DATA_DIR / "nova_sessions.json"
 )
+
+
+mobile_exchange_service = MobileExchangeService(
+    session_service
+)
+
 
 session_history_service = SessionHistoryService(
     BASE_DIR
@@ -4051,13 +4058,14 @@ def api_chat():
                 len(image_attachments),
             )
 
-            # MOBILE_EARLY_IMAGE_SAVE_EXCHANGE_LOCK_20260606
-            _nova_direct_save_mobile_exchange(
+            mobile_exchange_service.direct_save_mobile_exchange(
                 session_id,
                 user_text,
                 reply_text,
                 attachments=current_attachments,
                 route="early_image_attachment_gate",
+                clean_text=_nova_strip_project_context_from_visible_text,
+                logger=app.logger,
             )
 
             return jsonify({
