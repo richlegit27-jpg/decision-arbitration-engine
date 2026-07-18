@@ -218,23 +218,23 @@ location.replace(
             encoding="utf-8",
         )
 
-def detail_page(
-    self,
-    session_id,
-    history_service,
-):
-    import html
+    def detail_page(
+        self,
+        session_id,
+        history_service,
+    ):
+        import html
 
-    sessions = history_service.load_sessions()
-    session = None
+        sessions = history_service.load_sessions()
+        session = None
 
-    for s in sessions:
-        if history_service.sid(s) == session_id:
-            session = s
-            break
+        for s in sessions:
+            if history_service.sid(s) == session_id:
+                session = s
+                break
 
-    if not session:
-        return f"""
+        if not session:
+            return f"""
 <!doctype html>
 <html>
 <body style="font-family:Arial;background:#0f172a;color:white;padding:24px;">
@@ -244,36 +244,35 @@ def detail_page(
 </body>
 </html>
 """
+        title = history_service.title(session)
+        sid = history_service.sid(session)
+        messages = history_service.messages(session)
 
-    title = history_service.title(session)
-    sid = history_service.sid(session)
-    messages = history_service.messages(session)
+        rows = []
 
-    rows = []
+        for m in messages:
+            role = history_service.msg_role(m)
+            text = history_service.msg_text(m)
 
-    for m in messages:
-        role = history_service.msg_role(m)
-        text = history_service.msg_text(m)
-
-        rows.append(
-            f"""
+            rows.append(
+                f"""
 <div class="msg {html.escape(role.lower())}">
 <div class="role">{html.escape(role)}</div>
 <pre>{html.escape(text)}</pre>
 </div>
 """
-        )
+            )
 
-    if not rows:
-        rows.append(
-            """
+        if not rows:
+            rows.append(
+                """
 <div class="empty">
 This is a new empty session. No messages yet.
 </div>
 """
-        )
+            )
 
-    return f"""
+        return f"""
 <!doctype html>
 <html>
 <head>
