@@ -140,6 +140,10 @@ from nova_backend.services.execution_bridge_service import (
     ExecutionBridgeService,
 )
 
+from nova_backend.services.attachment_text_service import (
+    AttachmentTextService,
+)
+
 from nova_backend.services import session_auth_scope_service
 from nova_backend.services import attachment_gate_service
 from nova_backend.utils.api_response import ok_response, error_response
@@ -790,6 +794,7 @@ runtime_response_sanitizer = RuntimeResponseSanitizerService()
 attachment_keypoints_service = AttachmentKeypointsService()
 install_project_chat_response_router(app)
 attachment_analysis_service = AttachmentAnalysisService()
+attachment_text_service = AttachmentTextService()
 blog_service = BlogService()
 restored_runtime = getattr(
     runtime_brain,
@@ -2083,20 +2088,6 @@ def _nova_plain_attachment_text_summary_20260609(file_name, file_path, content, 
 
     return "\n".join(body).strip()
 
-def _nova_strip_project_context_from_visible_text(text):
-    clean = str(text or "")
-
-    markers = (
-        "\n\nProject-aware context for Nova:",
-        "\nProject-aware context for Nova:",
-        "Project-aware context for Nova:",
-    )
-
-    for marker in markers:
-        if marker in clean:
-            clean = clean.split(marker, 1)[0].strip()
-
-    return clean
 
 def api_chat():
     from flask import session as flask_session
@@ -2526,7 +2517,7 @@ def api_chat():
                         _nova_preview = _nova_docx_text[:1200].strip()
 
                         # NOVA_DIRECT_DOCX_ATTACHMENT_SUMMARY_RETURN_20260609
-                        _nova_answer = _nova_plain_attachment_text_summary_20260609(
+                        _nova_answer = attachment_text_service.plain_attachment_text_summary(
                             _nova_name,
                             _nova_file_path,
                             _nova_docx_text,
@@ -3446,7 +3437,7 @@ def api_chat():
                 reply_text,
                 attachments=current_attachments,
                 route="early_image_attachment_gate",
-                clean_text=_nova_strip_project_context_from_visible_text,
+                clean_text=attachment_text_service.strip_project_context_from_visible_text,
                 logger=app.logger,
             )
 
@@ -11130,7 +11121,7 @@ def nova_final_session_detail_response_cache_20260612(response):
                 clean_msg = dict(msg)
 
                 if clean_msg.get("role") == "user":
-                    clean_msg["text"] = _nova_strip_project_context_from_visible_text(
+                    clean_msg["text"] = attachment_text_service.strip_project_context_from_visible_text(
                         clean_msg.get("text") or clean_msg.get("content") or ""
                     )
                     clean_msg["content"] = clean_msg["text"]
