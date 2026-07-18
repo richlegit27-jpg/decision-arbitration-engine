@@ -9,9 +9,6 @@ class SessionDetailResponseCacheService:
         session_detail_cache_service,
         session_response_cache_service,
         attachment_text_service,
-        user_message_already_saved,
-        assistant_message_already_saved,
-        assistant_same_text_already_saved,
     ):
         self.session_service = session_service
         self.session_detail_cache_service = session_detail_cache_service

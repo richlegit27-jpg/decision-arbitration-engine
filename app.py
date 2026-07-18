@@ -314,6 +314,10 @@ from nova_backend.services.session_detail_response_cache_service import (
     SessionDetailResponseCacheService,
 )
 
+from nova_backend.services.session_detail_response_cache_service import (
+    SessionDetailResponseCacheService,
+)
+
 from nova_backend.services.blog_service import BlogService
 from nova_backend.services import empty_session_pruner_service
 # -----------------------
@@ -874,10 +878,6 @@ restored_runtime = getattr(
 )
 attachment_endpoint_service = AttachmentEndpointService()
 
-
-
-
-
 _nova_boot_log_20260701(
     "RESTORED RUNTIME OK",
     {
@@ -919,9 +919,6 @@ session_detail_response_cache_service = SessionDetailResponseCacheService(
     session_detail_cache_service,
     session_response_cache_service,
     attachment_text_service,
-    user_message_already_saved,
-    assistant_message_already_saved,
-    assistant_same_text_already_saved,
 )
 
 chat_service = ChatService(
@@ -8606,322 +8603,11 @@ def _nova_final_session_detail_cache_path_20260612():
 
 @app.after_request
 def nova_final_session_detail_response_cache_20260612(response):
-
-    auth_user_id = ""
-
-    try:
-        flask_session = globals().get("session")
-        auth_user_id = str(
-            flask_session.get("nova_user_id")
-            or flask_session.get("user_id")
-            or ""
-        ).strip()
-    except Exception:
-        auth_user_id = ""
-
-    try:
-        request_path = str(getattr(request, "path", "") or "")
-        request_method = str(getattr(request, "method", "") or "").upper()
-
-
-
-
-
-        if request_method == "POST" and request_path == "/api/chat":
-            response_json = response.get_json(silent=True) or {}
-            if not isinstance(response_json, dict):
-                return response
-
-            session_id = str(
-                response_json.get("session_id")
-                or response_json.get("active_session_id")
-                or ""
-            ).strip()
-
-            if not session_id:
-                return response
-
-            session_obj = response_json.get("session")
-            if not isinstance(session_obj, dict):
-                session_obj = {
-                    "id": session_id,
-                    "title": "Web Fetch",
-                    "messages": [],
-                    "session_attachments": [],
-                    "meta": {},
-                }
-
-            session_obj["id"] = session_id
-
-            messages = session_obj.get("messages")
-            if not isinstance(messages, list):
-                messages = []
-
-            user_text = ""
-            try:
-                payload = request.get_json(silent=True) or {}
-                if isinstance(payload, dict):
-                    user_text = str(
-                        payload.get("user_text")
-                        or payload.get("message")
-                        or payload.get("text")
-                        or ""
-                    ).strip()
-            except Exception:
-                user_text = ""
-
-            assistant_message = response_json.get("assistant_message")
-            assistant_text = ""
-
-            if isinstance(assistant_message, dict):
-                assistant_text = str(
-                    assistant_message.get("text")
-                    or assistant_message.get("content")
-                    or ""
-                ).strip()
-
-            (
-                assistant_text,
-                assistant_message,
-                session_obj,
-            ) = session_response_cache_service.repair_working_recall(
-                session_obj,
-                messages,
-                user_text,
-                assistant_text,
-                assistant_message,
-                session_id,
-            )
-
-
-            if user_text and not user_message_already_saved(
-                messages,
-                user_text,
-            ):
-                messages.append({
-                    "role": "user",
-                    "text": user_text,
-                    "content": user_text,
-                    "attachments": [],
-                    "meta": {
-                        "route": "final_session_detail_response_cache",
-                        "session_id": session_id,
-                    },
-                })
-
-            assistant_id = ""
-            if isinstance(assistant_message, dict):
-                assistant_id = str(assistant_message.get("id") or "").strip()
-
-            existing_messages_blob = json.dumps(messages, ensure_ascii=False)
-
-            assistant_already_saved = assistant_message_already_saved(
-                messages,
-                assistant_text=assistant_text,
-                assistant_id=assistant_id,
-            )
-
-            # NOVA_FINALIZER_SAME_TEXT_GUARD_20260713
-            # Delegated same-text detection to session_response_finalizer_service.
-
-            if assistant_text and not assistant_already_saved:
-                assistant_already_saved = assistant_same_text_already_saved(
-                    messages,
-                    assistant_text=assistant_text,
-                )
-
-            if assistant_text and not assistant_already_saved:
-                saved_assistant = assistant_message if isinstance(assistant_message, dict) else {}
-                saved_assistant = dict(saved_assistant)
-                saved_assistant["role"] = "assistant"
-                saved_assistant["text"] = assistant_text
-                saved_assistant["content"] = assistant_text
-
-                session_meta = saved_assistant.get("meta")
-                if not isinstance(session_meta, dict):
-                    session_meta = {}
-                    saved_assistant["meta"] = session_meta
-
-                session_meta["route"] = session_meta.get("route") or "final_session_detail_response_cache"
-                session_meta["session_id"] = session_id
-
-                messages.append(saved_assistant)
-
-            cleaned_messages = []
-
-            for msg in messages:
-                if not isinstance(msg, dict):
-                    continue
-
-                clean_msg = dict(msg)
-
-                if clean_msg.get("role") == "user":
-                    clean_msg["text"] = attachment_text_service.strip_project_context_from_visible_text(
-                        clean_msg.get("text") or clean_msg.get("content") or ""
-                    )
-                    clean_msg["content"] = clean_msg["text"]
-
-                cleaned_messages.append(clean_msg)
-
-            messages = cleaned_messages
-
-            session_obj["messages"] = messages
-            session_obj["message_count"] = len(messages)
-            session_obj["active_session_id"] = session_id
-
-
-            session_obj = session_response_cache_service.persist_working_state(
-                session_obj,
-                session_id,
-            )
-
-            cached = session_detail_cache_service.upsert_session_in_store(
-                session_id,
-                session_obj,
-            )
-
-            if isinstance(cached, dict):
-                response_session = dict(cached)
-
-                # NOVA_HIDE_TOP_LEVEL_ASSISTANT_DUPLICATE_FROM_RESPONSE_20260630
-                # The assistant reply is already returned as response_json["assistant_message"].
-                # Do not also include the same newest assistant bubble inside response_json["session"]
-                # for this immediate /api/chat response, or the frontend can render it twice.
-                try:
-                    response_messages = response_session.get("messages")
-
-                    if isinstance(response_messages, list) and assistant_text:
-                        stripped_messages = []
-                        removed_current_assistant = False
-
-                        for msg in reversed(response_messages):
-                            if not isinstance(msg, dict):
-                                stripped_messages.append(msg)
-                                continue
-
-                            role = str(
-                                msg.get("role")
-                                or msg.get("sender")
-                                or ""
-                            ).strip().lower()
-
-                            msg_text = str(
-                                msg.get("text")
-                                or msg.get("content")
-                                or ""
-                            ).strip()
-
-                            if (
-                                not removed_current_assistant
-                                and role == "assistant"
-                                and msg_text == assistant_text
-                            ):
-                                removed_current_assistant = True
-                                continue
-
-                            stripped_messages.append(msg)
-
-                        stripped_messages.reverse()
-                        response_session["messages"] = stripped_messages
-
-                    if isinstance(response_json.get("assistant_message"), dict):
-                        response_json["assistant_message"].setdefault("meta", {})
-                        response_json["assistant_message"]["meta"]["render_source"] = "assistant_message_only"
-                        response_json["assistant_message"]["meta"]["already_saved_to_session"] = True
-
-                    response_session = session_response_cache_service.sync_repaired_recall_session_message(
-                        response_session,
-                        response_json,
-                        user_text,
-                        session_id,
-                    )
-
-                except Exception:
-                    response_session = dict(cached)
- 
-                from nova_backend.services.stale_working_state_history_service import (
-                    clean_response_stale_working_state_history,
-                )
-
-                response_json = clean_response_stale_working_state_history(
-                    response_json,
-                    session_id,
-                )
-
-                response_json["session"] = response_session
-                response_json["session_id"] = session_id
-                response_json["active_session_id"] = session_id
-
-                session_obj = session_service.get_session(
-                    session_id,
-                )
-
-                if session_obj:
-                    session_service.active_session_id = session_id
-
-                response_json["final_session_detail_response_cache"] = True
-                response.set_data(json.dumps(response_json, ensure_ascii=False))
-                response.headers["Content-Length"] = str(len(response.get_data()))
-                response.headers["Content-Type"] = "application/json"
-
-            return response
-
-        if request_method == "GET" and request_path.startswith("/api/sessions/"):
-            if request_path.rstrip("/") == "/api/sessions":
-                return response
-
-            if getattr(response, "status_code", 200) < 400:
-                return response
-
-            session_id = request_path[len("/api/sessions/"):].strip().strip("/")
-            if not session_id:
-                return response
-
-            session_obj = _NOVA_FINAL_SESSION_DETAIL_CACHE_20260612.get(session_id)
-
-            if not session_obj:
-                store = session_detail_cache_service.load_sessions_store()
-            session_obj = session_detail_cache_service.find_session_in_store(
-                store,
-                session_id,
-            )
-
-            if not isinstance(session_obj, dict):
-                return response
-
-            if not session_service._belongs_to_user(
-                session_obj,
-                auth_user_id,
-            ):
-                return response
-
-            messages = session_obj.get("messages")
-            if not isinstance(messages, list):
-                messages = []
-
-            payload = {
-                "ok": True,
-                "id": session_id,
-                "active_session_id": session_id,
-                "message_count": len(messages),
-                "session": session_obj,
-                "skip_session_auth_scope_filter": True,
-                "session_detail_web_fetch_cache_fallback": True,
-            }
-
-            return app.response_class(
-                response=json.dumps(payload, ensure_ascii=False),
-                status=200,
-                mimetype="application/json",
-            )
-
-    except Exception as error:
-        try:
-            app.logger.warning("[FinalSessionDetailCache] failed: %s", error)
-        except Exception:
-            pass
-
-    return response
+    return session_detail_response_cache_service.handle(
+        response,
+        request,
+        app,
+    )
 
 
 # Force this hook to run last. Flask executes after_request hooks in reverse order,
