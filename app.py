@@ -9949,21 +9949,14 @@ def nova_final_session_detail_response_cache_20260612(response):
                 except Exception:
                     response_session = dict(cached)
  
-                try:
-                    from nova_backend.services.stale_working_state_history_service import (
-                        clean_stale_working_state_history,
-                    )
+                from nova_backend.services.stale_working_state_history_service import (
+                    clean_response_stale_working_state_history,
+                )
 
-                    response_json = clean_stale_working_state_history(
-                        response_json,
-                        session_id,
-                    )
-
-                except Exception as error:
-                    print(
-                        "[NOVA_FINAL_CACHE_STALE_WORKING_STATE_HISTORY_CLEANUP_20260630] skipped:",
-                        error,
-                    )
+                response_json = clean_response_stale_working_state_history(
+                    response_json,
+                    session_id,
+                )
 
                 response_json["session"] = response_session
                 response_json["session_id"] = session_id

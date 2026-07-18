@@ -96,3 +96,20 @@ def clean_stale_working_state_history(
     response_json["session"] = response_session
 
     return response_json
+
+
+def clean_response_stale_working_state_history(
+    response_json,
+    session_id,
+):
+    try:
+        return clean_stale_working_state_history(
+            response_json,
+            session_id,
+        )
+    except Exception as error:
+        print(
+            "[NOVA_STALE_WORKING_STATE_HISTORY_CLEANUP_SKIPPED]",
+            error,
+        )
+        return response_json
