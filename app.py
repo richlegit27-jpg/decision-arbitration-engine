@@ -257,6 +257,10 @@ from nova_backend.services.attachment_analysis_service import (
     AttachmentAnalysisService,
 )
 
+from nova_backend.services.response_quality_service import (
+    ResponseQualityService,
+)
+
 from nova_backend.services.blog_service import BlogService
 from nova_backend.services import empty_session_pruner_service
 # -----------------------
@@ -784,6 +788,7 @@ attachment_context_service = AttachmentContextService(
     UPLOADS_DIR,
 )
 
+response_quality_service = ResponseQualityService()
 admin_lead_service = AdminLeadService()
 session_detail_cache_service = SessionDetailCacheService()
 web_service = WebService(timeout=WEB_TIMEOUT)
@@ -1317,107 +1322,6 @@ def _nova_api_chat_memory_response_live_20260611(raw_user_text, session_id, clea
 # -----------------------
 
 
-# NOVA_WEAK_BACKEND_RESPONSE_GUARD_LOCK
-# NOVA_WEAK_BACKEND_RESPONSE_MOJIBAKE_GUARD_LOCK
-def _nova_replace_weak_backend_reply(user_text, result):
-    """
-    Last-mile response guard.
-
-    Prevents weak generic fallback text like:
-    "I'm ready. What are we working on?"
-    from being returned as the final assistant response.
-
-    Also catches mojibake variants like:
-    "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢m ready. What are we working on?"
-    """
-    try:
-        if not isinstance(result, dict):
-            return result
-
-        assistant = result.get("assistant_message")
-        if not isinstance(assistant, dict):
-            return result
-
-        text = str(
-            assistant.get("text")
-            or assistant.get("content")
-            or ""
-        ).strip()
-
-        normalized = (
-            text
-            .lower()
-            .replace("â€™", "'")
-            .replace("`", "'")
-            .replace("Â´", "'")
-            .replace("Ã¢â‚¬â„¢", "'")
-            .replace("Ã£Â¢Ã¢â€šÂ¬Ã¢â€žÂ¢", "'")
-            .replace("iÃ£Â¢Ã¢â€šÂ¬Ã¢â€žÂ¢m", "i'm")
-            .replace("iÃ¢â‚¬â„¢m", "i'm")
-        )
-
-        compact = " ".join(normalized.split())
-
-        weak_hit = (
-            compact in {
-                "i'm ready. what are we working on?",
-                "i'm ready. what are we working on",
-                "im ready. what are we working on?",
-                "im ready. what are we working on",
-            }
-            or (
-                "ready" in compact
-                and "what are we working on" in compact
-            )
-        )
-
-        if not weak_hit:
-            return result
-
-        prompt = str(user_text or "").strip()
-        prompt_lc = prompt.lower()
-
-        if "life story" in prompt_lc:
-            replacement = (
-                "I do not have a personal life story like a human. "
-                "I was built to help you think, build, debug, write, learn, and move faster. "
-                "For Nova, the active phase is frontend polish: clean the mobile UI, remove weak fallback behavior, "
-                "and make the live app match the backend tests that are already passing."
-            )
-        else:
-            replacement = (
-        
-                "I'm here. What would you like to work on?"
-            )
-
-        assistant["text"] = replacement
-        assistant["content"] = replacement
-
-        meta = assistant.get("meta")
-        if not isinstance(meta, dict):
-            meta = {}
-
-        meta["weak_response_guarded"] = True
-        meta["weak_response_original"] = text
-        assistant["meta"] = meta
-
-        result["assistant_message"] = assistant
-
-        session = result.get("session")
-        if isinstance(session, dict) and isinstance(session.get("messages"), list):
-            for msg in reversed(session["messages"]):
-                if isinstance(msg, dict) and str(msg.get("role") or "").lower() == "assistant":
-                    msg["text"] = replacement
-                    msg["content"] = replacement
-                    msg["meta"] = dict(meta)
-                    break
-
-        return result
-
-    except Exception:
-        return result
-
-
 def _nova_safe_attachment_name(attachment, fallback="uploaded attachment"):
     """Return a readable attachment name instead of <unknown>."""
     if isinstance(attachment, dict):
@@ -1620,46 +1524,6 @@ def api_sessions():
         artifacts=artifact_service.build_list_payload(),
         memory=memory_service.build_list_payload(),
     )
-
-
-# SLIM_DIRECT_RECALL_PAYLOAD_LOCK
-def _nova_slim_assistant_payload(text, session_id="", **extra):
-    payload = {
-        "ok": True,
-        "assistant_message": {
-            "role": "assistant",
-            "text": str(text or "").strip(),
-        },
-        "active_session_id": str(session_id or "").strip(),
-    }
-
-    for key, value in extra.items():
-        if value is not None:
-            payload[key] = value
-
-    return jsonify(payload)
-
-
-def _nova_prevent_bad_exact_pong_response(assistant_text, user_text):
-    clean_answer = str(assistant_text or "").strip()
-    clean_user = str(user_text or "").strip().lower()
-
-    if clean_answer.lower() != "pong":
-        return clean_answer
-
-    allowed_pong_requests = {
-        "pong",
-        "say pong",
-        "say pong only",
-        "reply pong",
-        "reply with pong",
-    }
-
-    if clean_user in allowed_pong_requests:
-        return "pong"
-
-    return clean_answer
-
 
 
 
@@ -3493,7 +3357,7 @@ def api_chat():
             session_id,
         )
 
-        return _nova_slim_assistant_payload(
+        return response_quality_service.slim_assistant_payload(
             direct_project_state_response.get("text"),
             session_id=session_id,
             **{
@@ -3517,7 +3381,7 @@ def api_chat():
             session_id,
         )
 
-        return _nova_slim_assistant_payload(
+        return response_quality_service.slim_assistant_payload(
             direct_project_focus_response.get("text"),
             session_id=session_id,
             **{
@@ -4981,8 +4845,10 @@ def api_chat():
             pass
 
             # NOVA_SAFE_API_CHAT_WEAK_GUARD_AFTER_HANDLE_LOCK
-            result = _nova_replace_weak_backend_reply(image_command_user_text, result)
-
+            result = response_quality_service.replace_weak_backend_reply(
+                image_command_user_text,
+                result,
+            )
             # AFTER_WEAK_GUARD_ATTACHMENT_SUMMARY_LOCK
             # Final safety: if attachment text was extracted but the reply is still the old canned
             # attachment response, replace it with a local summary after weak-reply cleanup.
@@ -5312,7 +5178,7 @@ def api_chat():
         if not assistant_text and result.get("ok", True):
             assistant_text = "Nova completed the request but returned an empty assistant response."
 
-        assistant_text = _nova_prevent_bad_exact_pong_response(
+        assistant_text = response_quality_service.prevent_bad_exact_pong_response(
             assistant_text,
             user_text,
         )
@@ -10432,88 +10298,7 @@ def nova_focus_recall_before_web_20260611():
         return None
 
 
-# NOVA_ATTACHMENT_DIRECT_TEXT_CLEAN_FINAL_20260611
-def _nova_direct_clean_attachment_text_response_20260611(text_value):
-    """
-    Final safety cleaner for attachment-analysis replies.
 
-    Goal:
-    - keep real extracted attachment content
-    - remove recursive summary wrappers
-    - avoid repeated "This uploaded attachment contains readable text about..."
-    """
-    try:
-        raw = str(text_value or "").replace("\r\n", "\n").replace("\r", "\n").strip()
-        if not raw:
-            return raw
-
-        if "Attachment analysis:" not in raw:
-            return raw
-
-        lines = [line.strip() for line in raw.split("\n")]
-        kept = []
-        seen = set()
-
-        skip_prefixes = (
-            "This uploaded attachment contains readable text about:",
-            "Key points:",
-            "Preview:",
-        )
-
-        for line in lines:
-            if not line:
-                continue
-
-            low = line.lower().strip()
-
-            if low == "attachment analysis:":
-                continue
-
-            if any(low.startswith(prefix.lower()) for prefix in skip_prefixes):
-                continue
-
-            if re.match(r"^\d+\.\s*this uploaded attachment contains readable text about:", line, re.I):
-                continue
-
-            if "This uploaded attachment contains readable text about:" in line:
-                continue
-
-            normalized = re.sub(r"\s+", " ", line).strip()
-            if not normalized:
-                continue
-
-            key = normalized.lower()
-            if key in seen:
-                continue
-
-            seen.add(key)
-            kept.append(normalized)
-
-        content_lines = []
-
-        for line in kept:
-            if re.match(r"^Attachment\s+.+\s+content:\s*$", line, re.I):
-                content_lines.append(line)
-                continue
-
-            if "secret test phrase" in line.lower():
-                content_lines.append(line)
-                continue
-
-            if line.lower().startswith("attachment ") and " content:" in line.lower():
-                content_lines.append(line)
-                continue
-
-            if len(line) >= 12 and not line.lower().startswith("this uploaded attachment"):
-                content_lines.append(line)
-
-        if not content_lines:
-            return "Attachment analysis:\nThe attachment was received, but no clean readable text was found."
-
-        final = "Attachment analysis:\n" + "\n".join(content_lines[:12])
-        return final.strip()
-    except Exception:
-        return text_value
 
 
 # NOVA_WEB_FETCH_BRIDGE_JSON_IMPORT_FIX_20260612
@@ -15544,7 +15329,7 @@ try:
             )
 
             try:
-                return _nova_slim_assistant_payload(
+                return response_quality_service.slim_assistant_payload(
                     answer,
                     session_id=session_id,
                     route="coding_judgment_direct_answer",
@@ -15634,7 +15419,7 @@ try:
                 answer,
                 session_id=session_id,
                 route="answer_quality_95_direct_policy",
-                slim_payload_builder=_nova_slim_assistant_payload,
+                slim_payload_builder=response_quality_service.slim_assistant_payload,
             )
 
         except Exception as exc:
