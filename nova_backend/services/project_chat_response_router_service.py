@@ -268,6 +268,12 @@ try:
             "how close are we?",
             "status now",
             "progress now",
+            "what are we working on",
+            "what are we working on?",
+            "what are we working on now",
+            "what are we working on now?",
+            "what are we working on right now",
+            "what are we working on right now?",
         }
 
         fixed_exact = {
@@ -317,7 +323,7 @@ try:
         }
 
         if text in current_exact:
-            return "what are we working on?"
+            return ""
 
         if text in fixed_exact:
             return "what did we just fix?"
@@ -329,7 +335,6 @@ try:
             return "next"
 
         return ""
-
     def _nova_natural_project_request_json_20260701():
         try:
             data = _nova_natural_project_request_20260701.get_json(silent=True) or {}
