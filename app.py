@@ -154,6 +154,7 @@ from nova_backend.config import (
     RECON_TIMEOUT,
 )
 
+from nova_backend.services.session_detail_cache_service import SessionDetailCacheService
 from nova_backend.services.session_service import SessionService
 from nova_backend.services.session_history_service import (
     SessionHistoryService,
@@ -740,6 +741,7 @@ attachment_context_service = AttachmentContextService(
     UPLOADS_DIR,
 )
 
+session_detail_cache_service = SessionDetailCacheService()
 web_service = WebService(timeout=WEB_TIMEOUT)
 recon_service = ReconService(timeout=RECON_TIMEOUT)
 intent_router = IntentRouterService()
@@ -11613,35 +11615,6 @@ def _nova_final_session_detail_cache_path_20260612():
         return os.path.join(os.getcwd(), "data", "nova_sessions.json")
 
 
-def _nova_final_load_sessions_store_20260612():
-    return session_history_service.load_sessions_store()
-
-
-def _nova_final_save_sessions_store_20260612(store):
-    return session_history_service.save_sessions_store(
-        store
-    )
-
-def _nova_final_find_session_in_store_20260612(
-    store,
-    session_id,
-):
-    return session_history_service.find_session_in_store(
-        store,
-        session_id,
-    )
-
-
-def _nova_final_upsert_session_in_store_20260612(
-    session_id,
-    session_obj,
-):
-    return session_history_service.upsert_session_in_store(
-        session_id,
-        session_obj,
-    )
-
-
 @app.after_request
 def nova_final_session_detail_response_cache_20260612(response):
 
@@ -12179,8 +12152,10 @@ def nova_final_session_detail_response_cache_20260612(response):
             except Exception:
                 pass
 
-            cached = _nova_final_upsert_session_in_store_20260612(session_id, session_obj)
-
+            cached = session_detail_cache_service.upsert_session_in_store(
+                session_id,
+                session_obj,
+            )
             if isinstance(cached, dict):
                 response_session = dict(cached)
 
@@ -12399,8 +12374,11 @@ def nova_final_session_detail_response_cache_20260612(response):
             session_obj = _NOVA_FINAL_SESSION_DETAIL_CACHE_20260612.get(session_id)
 
             if not session_obj:
-                store = _nova_final_load_sessions_store_20260612()
-                session_obj = _nova_final_find_session_in_store_20260612(store, session_id)
+                store = session_detail_cache_service.load_sessions_store()
+            session_obj = session_detail_cache_service.find_session_in_store(
+                store,
+                session_id,
+            )
 
             if not isinstance(session_obj, dict):
                 return response
