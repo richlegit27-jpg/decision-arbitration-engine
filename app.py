@@ -6186,9 +6186,12 @@ def execution_stream():
             action = "run_step"
 
 
-def save_execution(execution):
-
-    session = session_service.get_session(
+def save_execution(
+    self,
+    session_id,
+    execution,
+):
+    session = self.session_service.get_session(
         session_id
     )
 
@@ -6217,11 +6220,10 @@ def save_execution(execution):
 
     session["working_state"] = working_state
 
-    session_service.update_session(
+    self.session_service.update_session(
         session_id,
         session,
     )
-
     def replay_existing_step(execution, replay_step, step_title):
         move = replay_step.get("move") if isinstance(replay_step, dict) else None
 
@@ -6369,7 +6371,10 @@ def save_execution(execution):
             execution["current_step"] = step["title"]
             execution["last_action"] = action
             execution.setdefault("steps", []).append(step)
-            save_execution(execution)
+            execution_stream_service.save_execution(
+                session_id,
+                execution,
+            )
 
             yield execution_stream_service.send_event("step_start", {
                 "step": step,
@@ -6392,7 +6397,10 @@ def save_execution(execution):
             execution.setdefault("history", []).append(
                 f"fix_file: {'success' if ok else 'failed'}"
             )
-            save_execution(execution)
+            execution_stream_service.save_execution(
+                session_id,
+                execution,
+            )
 
             yield execution_stream_service.send_event("step_done", {
                 "step": step,
@@ -6419,7 +6427,10 @@ def save_execution(execution):
             execution["last_action"] = action
             execution["current_step"] = "Unknown action"
 
-        save_execution(execution)
+            execution_stream_service.save_execution(
+                session_id,
+                execution,
+            )
 
         yield execution_stream_service.send_event("done", {
             "ok": True,
