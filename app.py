@@ -136,6 +136,10 @@ from nova_backend.services.upload_ownership_service import (
     UploadOwnershipService,
 )
 
+from nova_backend.services.execution_bridge_service import (
+    ExecutionBridgeService,
+)
+
 from nova_backend.services import session_auth_scope_service
 from nova_backend.services import attachment_gate_service
 from nova_backend.utils.api_response import ok_response, error_response
@@ -257,6 +261,10 @@ from nova_backend.services import empty_session_pruner_service
 
 # NOVA_EXECUTION_SERVICE_SINGLETON_20260607
 chat_execution_service = ChatExecutionService()
+execution_bridge_service = ExecutionBridgeService(
+    chat_execution_service,
+    None,
+)
 
 app = Flask(
     __name__,
@@ -1608,49 +1616,6 @@ def api_sessions():
         memory=memory_service.build_list_payload(),
     )
 
-# PROJECT_AWARE_MEMORY_CONTEXT_LOCK
-
-
-
-
-
-def _nova_try_project_focus_direct_recall(user_text, session_id):
-    if not project_focus_memory_service.is_project_focus_recall_question(
-        user_text
-    ):
-        return None
-
-    focus = project_focus_memory_service.find_recent_project_focus(
-        session_id
-    )
-
-    if not focus:
-        focus = project_focus_memory_service.find_project_focus_memory(
-            session_id
-        )
-
-    if not focus:
-        return None
-
-    payload = build_common_state_payload(session_id=session_id)
-
-    payload.update(
-        {
-            "assistant_message": {
-                "role": "assistant",
-                "text": f"Your current project focus was {focus}.",
-            },
-            "active_session_id": session_id,
-            "debug": {
-                "direct_recall": "project_focus",
-                "focus": focus,
-            },
-        }
-    )
-
-    return json_ok(**payload)
-
-
 
 # SLIM_DIRECT_RECALL_PAYLOAD_LOCK
 def _nova_slim_assistant_payload(text, session_id="", **extra):
@@ -1835,124 +1800,6 @@ except Exception as _nova_project_state_direct_freshness_bridge_error_20260702:
     print("[NOVA_PROJECT_STATE_DIRECT_FRESHNESS_BRIDGE_20260702] failed:", _nova_project_state_direct_freshness_bridge_error_20260702)
 
 
-
-# NOVA_PROJECT_STATE_CURRENT_MEMORY_DIRECT_RECALL_20260701
-# Direct recall fallback for clean project_state memory records.
-def _nova_find_current_project_state_memory_20260701():
-    try:
-        import json as _nova_project_state_json_20260701
-
-        memory_path = DATA_DIR / "nova_memory.json"
-        payload = _nova_project_state_json_20260701.loads(
-            memory_path.read_text(encoding="utf-8") or "{}"
-        )
-
-        items = payload.get("memory") or []
-        candidates = []
-
-        for item in items:
-            if not isinstance(item, dict):
-                continue
-
-            kind = str(item.get("kind") or "").strip().lower()
-            category = str(item.get("category") or "").strip().lower()
-            memory_id = str(item.get("id") or "").strip().lower()
-            value = str(item.get("text") or item.get("content") or "").strip()
-
-            if not value:
-                continue
-
-            if (
-                kind == "project_state"
-                or category == "project_state"
-                or memory_id == "memory_nova_project_state_current"
-            ):
-                try:
-                    weight = float(item.get("weight") or 0.0)
-                except Exception:
-                    weight = 0.0
-
-                candidates.append((
-                    0 if bool(item.get("pinned")) else 1,
-                    -weight,
-                    str(item.get("updated_at") or ""),
-                    value,
-                ))
-
-        candidates.sort()
-
-        if candidates:
-            return candidates[0][3]
-
-    except Exception as exc:
-        try:
-            app.logger.warning(
-                "[NOVA_PROJECT_STATE_CURRENT_MEMORY_DIRECT_RECALL_20260701] failed: %s",
-                exc,
-            )
-        except Exception:
-            pass
-
-    return ""
-
-
-def _nova_try_project_state_direct_recall(user_text, session_id):
-    kinds = project_state_memory_service.question_project_state_kinds(
-        user_text
-    )
-
-    if not kinds:
-        return None
-
-    lines = []
-
-    current_project_state_memory = _nova_find_current_project_state_memory_20260701()
-    if current_project_state_memory:
-        return _nova_slim_assistant_payload(
-            current_project_state_memory,
-            session_id=session_id,
-            route="project_state_current_memory_direct_recall",
-            route_taken="project_state_current_memory_direct_recall",
-            project_state_memory_recall=True,
-        )
-
-    for kind in kinds:
-        value = project_state_memory_service.find_project_state_memory(session_id, kind)
-
-        if not value:
-            continue
-
-        label = str(
-            (PROJECT_STATE_MEMORY_KINDS.get(kind) or {}).get("label")
-            or kind
-        ).strip()
-
-        clean_value = _nova_clean_project_state_value(value)
-
-        if not clean_value:
-            continue
-
-        lines.append(f"{label}: {clean_value}")
-
-    if not lines:
-        return None
-
-    answer_text = "\n".join(lines)
-
-    app.logger.info(
-        "[project-state-recall-override] answered kinds=%s session_id=%s",
-        ",".join(kinds),
-        session_id,
-    )
-
-    return _nova_slim_assistant_payload(
-        answer_text,
-        session_id=session_id,
-        direct_recall="project_state",
-        kinds=kinds,
-    )
-
-
 # ATTACHMENT_CURRENT_ONLY_BINARY_GUARD_LOCK
 def _nova_attachment_url_key(value):
     try:
@@ -2068,7 +1915,13 @@ def _nova_casual_chat_guard():
         if auto_plan_execution_result is not None:
             return jsonify(auto_plan_execution_result)
         # NOVA_EXECUTION_STATUS_GUARD_20260607
-        execution_status_result = _nova_try_execution_status_20260607(session_id, user_text)
+        execution_status_result = (
+            execution_bridge_service
+            .try_execution_status(
+                session_id,
+                user_text,
+            )
+        )
         if execution_status_result is not None:
             return jsonify(execution_status_result)
         # NOVA_EXECUTION_AUTOPLAN_START_GUARD_20260607
@@ -2076,7 +1929,13 @@ def _nova_casual_chat_guard():
         if execution_start_result is not None:
             return jsonify(execution_start_result)
         # NOVA_EXECUTION_TRIGGER_GUARD_20260607
-        execution_result = _nova_try_execution_trigger_20260607(session_id, user_text)
+        execution_result = (
+            execution_bridge_service
+            .try_execution_trigger(
+                session_id,
+                user_text,
+            )
+        )
         if execution_result is not None:
             return jsonify(execution_result)
         attachments = payload.get("attachments") or []
@@ -2136,230 +1995,6 @@ def _nova_mobile_now_iso():
         return datetime.now(timezone.utc).isoformat()
     except Exception:
         return ""
-
-
-# NOVA_EXECUTION_TRIGGER_BRIDGE_20260607
-def _nova_try_execution_trigger_20260607(session_id, user_text):
-    try:
-        if not chat_execution_service.is_execution_trigger(user_text):
-            return None
-
-        state = chat_execution_service.advance(session_id)
-        reply_text = chat_execution_service.format_reply(state)
-
-        return {
-            "ok": True,
-            "skip_cleanup": True,
-            "skip_post_processing": True,
-            "skip_rewrite": True,
-            "assistant_message": {
-                "role": "assistant",
-                "text": reply_text,
-                "content": reply_text,
-                "execution_state": state,
-            },
-            "execution_state": state,
-        }
-    except Exception as exc:
-        logger.exception("[NovaExecutionBridge] failed")
-        reply_text = "Execution bridge failed: " + str(exc)
-        return {
-            "ok": True,
-            "assistant_message": {
-                "role": "assistant",
-                "text": reply_text,
-                "content": reply_text,
-            },
-        }
-
-
-
-# NOVA_AUTO_PLAN_EXECUTION_START_20260607
-def _nova_try_auto_plan_execution_start_20260607(session_id, user_text):
-    try:
-        raw_text = str(user_text or "").strip()
-        clean_text = " ".join(raw_text.lower().split())
-
-        if not clean_text.startswith("auto-plan "):
-            return None
-
-        goal = raw_text[len("auto-plan "):].strip() or "Untitled execution mission"
-
-        steps = [
-            "Understand the mission and identify the target files",
-            "Make the smallest safe implementation change",
-            "Verify the result and report the next move",
-        ]
-
-        state = chat_execution_service.start(session_id, goal, steps)
-        if not isinstance(state, dict):
-            state = chat_execution_service.get_state(session_id)
-
-        current_step = state.get("current_step") if isinstance(state, dict) else None
-
-        reply_text = (
-            "Execution mission started: " + goal + "\n\n"
-            "Step 1/3: " + str(current_step or "Understand the mission and identify the target files") + "\n\n"
-            "Send k, next, continue, or run it to advance."
-        )
-
-        return {
-            "ok": True,
-            "skip_cleanup": True,
-            "skip_post_processing": True,
-            "skip_rewrite": True,
-            "assistant_message": {
-                "role": "assistant",
-                "text": reply_text,
-                "content": reply_text,
-                "execution_state": state,
-            },
-            "execution_state": state,
-        }
-    except Exception as exc:
-        logger.exception("[NovaAutoPlanExecutionStart] failed")
-        reply_text = "Auto-plan execution start failed: " + str(exc)
-        return {
-            "ok": True,
-            "skip_cleanup": True,
-            "skip_post_processing": True,
-            "skip_rewrite": True,
-            "assistant_message": {
-                "role": "assistant",
-                "text": reply_text,
-                "content": reply_text,
-            },
-            "execution_state": {
-                "status": "failed",
-                "error": str(exc),
-            },
-        }
-
-
-# NOVA_EXECUTION_AUTOPLAN_START_20260607
-def _nova_try_execution_autoplan_start_20260607(session_id, user_text):
-    try:
-        clean = str(user_text or "").strip()
-        lower = clean.lower()
-
-        prefixes = [
-            "auto-plan ",
-            "autoplan ",
-            "auto plan ",
-        ]
-
-        matched_prefix = None
-        for prefix in prefixes:
-            if lower.startswith(prefix):
-                matched_prefix = prefix
-                break
-
-        if not matched_prefix:
-            return None
-
-        goal = clean[len(matched_prefix):].strip()
-        if not goal:
-            goal = "Untitled mission"
-
-        steps = [
-            "Inspect the current target and identify the smallest safe change",
-            "Apply the implementation without disturbing working systems",
-            "Verify the result and report the next move",
-        ]
-
-        state = chat_execution_service.start(
-            session_id=session_id,
-            goal=goal,
-            steps=steps,
-        )
-
-        reply_text = (
-            "Mission started: " + goal + "\n\n"
-            "Step 1/" + str(len(steps)) + ": " + str(state.get("current_step")) + "\n\n"
-            "Send k, next, continue, or run it to advance."
-        )
-
-        return {
-            "ok": True,
-            "skip_cleanup": True,
-            "skip_post_processing": True,
-            "skip_rewrite": True,
-            "assistant_message": {
-                "role": "assistant",
-                "text": reply_text,
-                "content": reply_text,
-                "execution_state": state,
-            },
-            "execution_state": state,
-        }
-    except Exception as exc:
-        logger.exception("[NovaExecutionAutoPlanStart] failed")
-        reply_text = "Execution auto-plan start failed: " + str(exc)
-        return {
-            "ok": True,
-            "assistant_message": {
-                "role": "assistant",
-                "text": reply_text,
-                "content": reply_text,
-            },
-        }
-
-# NOVA_EXECUTION_STATUS_BRIDGE_20260607
-def _nova_try_execution_status_20260607(session_id, user_text):
-    try:
-        clean = str(user_text or "").strip().lower()
-
-        if clean not in {"status", "execution status", "mission status"}:
-            return None
-
-        state = chat_execution_service.get_state(session_id)
-
-        if not state or state.get("status") == "idle":
-            reply_text = "No active mission."
-        else:
-            steps = state.get("steps") or []
-            total = len(steps)
-            current_index = int(state.get("current_index") or 0)
-            current_step = state.get("current_step")
-            status = state.get("status") or "unknown"
-            goal = state.get("goal") or "Untitled mission"
-
-            if status == "complete":
-                step_line = "Step: complete"
-            else:
-                display_step = min(current_index + 1, total) if total else current_index + 1
-                step_line = "Step " + str(display_step) + "/" + str(total) + ": " + str(current_step)
-
-            reply_text = (
-                "Current mission: " + str(goal) + "\n"
-                "Status: " + str(status) + "\n"
-                + step_line
-            )
-
-        return {
-            "ok": True,
-            "skip_cleanup": True,
-            "skip_post_processing": True,
-            "skip_rewrite": True,
-            "assistant_message": {
-                "role": "assistant",
-                "text": reply_text,
-                "content": reply_text,
-                "execution_state": state,
-            },
-            "execution_state": state,
-        }
-    except Exception as exc:
-        logger.exception("[NovaExecutionStatus] failed")
-        reply_text = "Execution status failed: " + str(exc)
-        return {
-            "ok": True,
-            "assistant_message": {
-                "role": "assistant",
-                "text": reply_text,
-                "content": reply_text,
-            },
-        }
 
 
 # NOVA_RESTORE_DOCX_EXTRACTOR_20260609
