@@ -151,6 +151,11 @@ from nova_backend.services.attachment_utils_service import (
 from nova_backend.services.execution_stream_service import (
     ExecutionStreamService,
 )
+
+from nova_backend.services.chat_stream_service import (
+    ChatStreamService,
+)
+
 from nova_backend.services.execution_fix_service import (
     ExecutionFixService,
 )
@@ -908,6 +913,8 @@ execution_stream_service = ExecutionStreamService(
     next_move_class=NextMove,
     update_execution_state_safe=update_execution_state_safe,
 )
+
+chat_stream_service = ChatStreamService()
 
 execution_fix_service = ExecutionFixService(
     session_service=session_service,
@@ -6196,21 +6203,17 @@ def execution_stream():
         ):
             session = {}
 
-        execution = (session or {}).get("working_state", {}).get("execution") or {}
-        if not isinstance(execution, dict):
-            execution = {}
+        execution = (
+            (session or {})
+            .get("working_state", {})
+            .get("execution")
+            or {}
+        )
 
-        execution.setdefault("status", "idle")
-        execution.setdefault("steps", [])
-        execution.setdefault("history", [])
-        execution.setdefault("last_action", "")
-        execution.setdefault("current_step", "")
+        execution = execution_service.normalize_execution(
+            execution
+        )
 
-        if not isinstance(execution["steps"], list):
-            execution["steps"] = []
-
-        if not isinstance(execution["history"], list):
-            execution["history"] = []
 
         yield execution_stream_service.send_event("start", {
             "ok": True,
@@ -6299,7 +6302,12 @@ def api_debug_execution():
         if not isinstance(state, dict):
             state = {}
 
-        history = state.get("execution_history")
+        history = (
+            state.get("execution_history")
+            or state.get("history")
+            or []
+        )
+
         if not isinstance(history, list):
             history = []
 
@@ -8477,64 +8485,9 @@ def stream_events():
 @app.route("/api/chat/stream", methods=["POST"])
 def nova_chat_stream():
 
-    import json
-    from flask import Response
-
-    def generate():
-
-        try:
-            result = api_chat()
-
-            # --- FORCE NORMALIZATION ---
-            payload = None
-
-            if isinstance(result, dict):
-                payload = result
-            elif hasattr(result, "get_json"):
-                payload = result.get_json(silent=True)
-
-            if not isinstance(payload, dict):
-                payload = {}
-
-            assistant = payload.get("assistant_message") or {}
-
-            text = assistant.get("text", "")
-            
-            if not isinstance(text, str):
-                text = ""
-
-        except Exception as e:
-            yield "data: " + json.dumps({
-                "type": "error",
-                "content": str(e)
-            }) + "\n\n"
-            return
-
-        if not text:
-            text = "No response generated."
-
-        full = ""
-
-        for chunk in text.split():
-            full += chunk + " "
-
-            yield "data: " + json.dumps({
-                "type": "token",
-                "content": chunk + " "
-            }) + "\n\n"
-
-        yield "data: " + json.dumps({
-            "type": "message",
-            "content": full.strip()
-        }) + "\n\n"
-
-        yield "data: " + json.dumps({
-            "type": "done",
-            "done": True
-        }) + "\n\n"
-
-    return Response(generate(), mimetype="text/event-stream")
-
+    return chat_stream_service.stream(
+        api_chat
+    )
 
 @app.before_request
 def nova_memory_command_before_web_20260611():
