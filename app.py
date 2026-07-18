@@ -6186,46 +6186,6 @@ def execution_stream():
             action = "run_step"
 
 
-def save_execution(
-    self,
-    session_id,
-    execution,
-):
-    session = self.session_service.get_session(
-        session_id
-    )
-
-    if not isinstance(session, dict):
-        return
-
-    working_state = session.get(
-        "working_state",
-        {},
-    )
-
-    if not isinstance(working_state, dict):
-        working_state = {}
-
-    execution_map = working_state.get(
-        "execution",
-        {},
-    )
-
-    if not isinstance(execution_map, dict):
-        execution_map = {}
-
-    execution_map[session_id] = execution
-
-    working_state["execution"] = execution_map
-
-    session["working_state"] = working_state
-
-    self.session_service.update_session(
-        session_id,
-        session,
-    )
-
-
     def generate():
         import time
 
@@ -6263,7 +6223,7 @@ def save_execution(
         if not isinstance(execution["history"], list):
             execution["history"] = []
 
-        yield execution_stream_service.execution_stream_service.send_event("start", {
+        yield execution_stream_service.send_event("start", {
             "ok": True,
             "action": action,
             "session_id": session_id,

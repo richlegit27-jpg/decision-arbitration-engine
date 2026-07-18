@@ -1,3 +1,5 @@
+import uuid
+
 class ExecutionStreamService:
 
     def __init__(
@@ -81,7 +83,7 @@ class ExecutionStreamService:
             self.NextMove(
                 id=str(
                     move.get("id")
-                    or "replay"
+                    or f"replay-{uuid.uuid4().hex}"
                 ),
                 type=str(
                     move.get("type")
