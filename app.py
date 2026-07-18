@@ -154,6 +154,7 @@ from nova_backend.config import (
     RECON_TIMEOUT,
 )
 
+from nova_backend.services.admin_lead_service import AdminLeadService
 from nova_backend.services.session_detail_cache_service import SessionDetailCacheService
 from nova_backend.services.session_service import SessionService
 from nova_backend.services.session_history_service import (
@@ -741,6 +742,7 @@ attachment_context_service = AttachmentContextService(
     UPLOADS_DIR,
 )
 
+admin_lead_service = AdminLeadService()
 session_detail_cache_service = SessionDetailCacheService()
 web_service = WebService(timeout=WEB_TIMEOUT)
 recon_service = ReconService(timeout=RECON_TIMEOUT)
@@ -17665,46 +17667,6 @@ def nova_public_not_found_20260709(error):
         }), 404
 
     return render_template("nova_404.html", path=request.path), 404
-# /NOVA_PUBLIC_404_ROUTES_20260709
-
-
-# NOVA_LEAD_CAPTURE_ROUTES_20260709
-def _nova_lead_request_meta_20260709():
-    from flask import request
-
-    return {
-        "ip": request.headers.get("X-Forwarded-For", request.remote_addr or ""),
-        "user_agent": request.headers.get("User-Agent", ""),
-        "referer": request.headers.get("Referer", ""),
-        "path": request.path,
-    }
-
-
-def _nova_lead_admin_allowed_20260709():
-    import hmac
-    import os
-
-    from flask import request, session
-
-    expected_key = os.environ.get("NOVA_ADMIN_KEY", "").strip()
-    provided_key = (
-        request.headers.get("X-Nova-Admin-Key", "") or
-        request.args.get("key", "")
-    ).strip()
-
-    if expected_key and provided_key and hmac.compare_digest(expected_key, provided_key):
-        return True
-
-    username = (
-        session.get("username") or
-        session.get("user") or
-        session.get("nova_username") or
-        session.get("nova_user") or
-        ""
-    )
-
-    return str(username).lower() == "richard"
-
 
 @app.post("/api/contact")
 def nova_api_contact_submit_20260709():
@@ -17715,7 +17677,7 @@ def nova_api_contact_submit_20260709():
     payload = request.get_json(silent=True) or request.form.to_dict(flat=True)
 
     try:
-        lead = save_lead("contact", payload, _nova_lead_request_meta_20260709())
+        lead = save_lead("contact", payload, admin_lead_service.request_meta(request))
     except ValueError as error:
         return jsonify({
             "ok": False,
@@ -17739,7 +17701,7 @@ def nova_api_early_access_submit_20260709():
     payload = request.get_json(silent=True) or request.form.to_dict(flat=True)
 
     try:
-        lead = save_lead("early_access", payload, _nova_lead_request_meta_20260709())
+        lead = save_lead("early_access", payload, admin_lead_service.request_meta(request))
     except ValueError as error:
         return jsonify({
             "ok": False,
@@ -17760,7 +17722,7 @@ def nova_api_leads_admin_20260709():
 
     from nova_backend.services.lead_service import list_leads
 
-    if not _nova_lead_admin_allowed_20260709():
+    if not admin_lead_service.admin_allowed(request):
         return jsonify({
             "ok": False,
             "error": "Forbidden",
@@ -17779,7 +17741,7 @@ def nova_admin_leads_csv_export_20260709():
 
     from nova_backend.services.lead_service import list_leads
 
-    if not _nova_lead_admin_allowed_20260709():
+    if not admin_lead_service.admin_allowed(request):
         abort(403)
 
     raw_limit = request.args.get("limit", 10000)
@@ -17903,7 +17865,9 @@ def nova_admin_leads_csv_export_20260709():
 @app.context_processor
 def nova_admin_template_context_20260709():
     try:
-        allowed = bool(_nova_lead_admin_allowed_20260709())
+        allowed = bool(
+    admin_lead_service.admin_allowed(request)
+)
     except Exception:
         allowed = False
 
@@ -17925,7 +17889,7 @@ def nova_admin_lead_update_20260709(lead_id):
 
     from flask import abort, redirect, request
 
-    if not _nova_lead_admin_allowed_20260709():
+    if not admin_lead_service.admin_allowed(request):
         abort(403)
 
     allowed_statuses = ("new", "reviewed", "replied", "archived")
@@ -18004,7 +17968,7 @@ def nova_admin_leads_page_20260709():
 
     from nova_backend.services.lead_service import list_leads
 
-    guard = globals().get("_nova_lead_admin_allowed_20260709")
+    guard = lambda: admin_lead_service.admin_allowed(request)
     if callable(guard):
         if not guard():
             abort(403)
@@ -18105,7 +18069,7 @@ def nova_admin_home_dashboard_20260709():
 
     from nova_backend.services.lead_service import list_leads
 
-    if not _nova_lead_admin_allowed_20260709():
+    if not admin_lead_service.admin_allowed(request):
         abort(403)
 
     data = list_leads(10000)
@@ -18138,7 +18102,7 @@ def nova_admin_home_dashboard_20260709():
 def nova_admin_launch_checklist_repair_20260709():
     from flask import abort, render_template
 
-    guard = globals().get("_nova_lead_admin_allowed_20260709")
+    guard = lambda: admin_lead_service.admin_allowed(request)
 
     if callable(guard):
         if not guard():
