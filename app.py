@@ -129,7 +129,9 @@ from nova_backend.services.debug_route_service import DebugRouteService
 from nova_backend.services.attachment_shape_normalizer_service import (
     AttachmentShapeNormalizerService,
 )
-
+from nova_backend.services.execution_guard_service import (
+    ExecutionGuardService,
+)
 
 from nova_backend.services.lead_route_service import LeadRouteService
 
@@ -896,6 +898,9 @@ session_history_service = SessionHistoryService(
     BASE_DIR
 )
 
+execution_guard_service = ExecutionGuardService(
+    chat_execution_service
+)
 
 history_service = HistoryService(
     session_history_service
@@ -945,6 +950,7 @@ local_auth_route_service = LocalAuthRouteService(
     session,
 )
 
+chat_execution_service = ChatExecutionService()
 chat_request_context_service = ChatRequestContextService()
 chat_stream_service = ChatStreamService()
 session_route_service = SessionRouteService()
@@ -1898,6 +1904,12 @@ def api_chat():
         import os as _nova_os
 
         _nova_payload = request.get_json(silent=True) or {}
+        execution_guard_result = execution_guard_service.handle(
+            _nova_payload
+        )
+
+        if execution_guard_result:
+            return jsonify(execution_guard_result)
 
         _nova_chat_context = chat_request_context_service.build_context(
             _nova_payload
@@ -2584,7 +2596,7 @@ def api_chat():
                 "skip_rewrite": True,
             })
 
-        if _nova_exec_clean in {"k", "ok", "okay", "next", "continue", "run it", "run step", "execute", "go"}:
+        if False and _nova_exec_clean in {"k", "ok", "okay", "next", "continue", "run it", "run step", "execute", "go"}:
             _nova_exec_state = chat_execution_service.advance(_nova_exec_session_id)
             _nova_exec_reply = chat_execution_service.format_reply(_nova_exec_state)
             return jsonify({
