@@ -388,7 +388,7 @@ from nova_backend.services.history_route_service import (
 )
 
 from nova_backend.services import empty_session_pruner_service
-
+from nova_backend.services.chat_stream_service import ChatStreamService
 from nova_backend.services.command_route_service import (
     CommandRouteService,
 )
@@ -917,6 +917,7 @@ local_auth_route_service = LocalAuthRouteService(
     session,
 )
 
+chat_stream_service = ChatStreamService()
 session_route_service = SessionRouteService()
 public_route_service = PublicRouteService()
 login_page_route_service = LoginPageRouteService()
@@ -1075,7 +1076,6 @@ execution_stream_service = ExecutionStreamService(
     update_execution_state_safe=update_execution_state_safe,
 )
 
-chat_stream_service = ChatStreamService()
 
 execution_fix_service = ExecutionFixService(
     session_service=session_service,
@@ -7092,10 +7092,7 @@ def stream_events():
 
 @app.route("/api/chat/stream", methods=["POST"])
 def nova_chat_stream():
-
-    return chat_stream_service.stream(
-        api_chat
-    )
+    return chat_stream_service.stream(api_chat)
 
 @app.before_request
 def nova_memory_command_before_web_20260611():
