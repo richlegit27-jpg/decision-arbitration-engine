@@ -164,6 +164,10 @@ from nova_backend.services.execution_bridge_service import (
     ExecutionBridgeService,
 )
 
+from nova_backend.services.upload_route_service import (
+    UploadRouteService,
+)
+
 from nova_backend.services.attachment_text_service import (
     AttachmentTextService,
 )
@@ -909,6 +913,10 @@ upload_ownership_service = UploadOwnershipService(
     "data/nova_upload_ownership.json"
 )
 
+upload_route_service = UploadRouteService(
+    uploads_dir=UPLOADS_DIR,
+    upload_ownership_service=upload_ownership_service,
+)
 
 project_aware_context_service = ProjectAwareContextService(
     memory_context_service,
@@ -5965,16 +5973,6 @@ def api_upload():
                 "error": "Empty file.",
             }), 400
 
-        original_name = os.path.basename(str(file.filename or "upload"))
-        safe_name = secure_filename(original_name) or "upload.bin"
-
-        base, ext = os.path.splitext(safe_name)
-        ext = ext or ""
-        final_name = f"{base}_{uuid.uuid4().hex}{ext}"
-
-        save_path = UPLOADS_DIR / final_name
-        file.save(str(save_path))
-
         auth_user_id = ""
 
         try:
@@ -5983,47 +5981,18 @@ def api_upload():
                 or session.get("user_id")
                 or ""
             ).strip()
-
         except Exception:
             auth_user_id = ""
 
-        if auth_user_id:
-            app.logger.info(
-                "[UPLOAD OWNERSHIP DEBUG] registering %s owner=%s",
-                final_name,
-                auth_user_id,
-            )
-
-            upload_ownership_service.register_upload(
-                final_name,
-                auth_user_id,
-            )
-        else:
-            app.logger.warning(
-                "[UPLOAD OWNERSHIP DEBUG] NO AUTH USER"
-            )
-
-        mime_type = getattr(file, "mimetype", None) or "application/octet-stream"
-        size = save_path.stat().st_size if save_path.exists() else 0
-
-        app.logger.info(
-            "[api_upload] saved upload original=%s stored=%s mime_type=%s size=%s url=%s",
-            original_name,
-            final_name,
-            mime_type,
-            size,
-            f"/api/uploads/{final_name}",
+        result = upload_route_service.handle_upload(
+            file,
+            auth_user_id=auth_user_id,
+            logger=app.logger,
+            secure_filename=secure_filename,
         )
 
-        return jsonify({
-            "ok": True,
-            "filename": final_name,
-            "original_filename": original_name,
-            "file_url": f"/api/uploads/{final_name}",
-            "url": f"/api/uploads/{final_name}",
-            "mime_type": mime_type,
-            "size": size,
-        })
+        return jsonify(result)
+
     except Exception as e:
         app.logger.exception("api_upload failed")
         return jsonify({
