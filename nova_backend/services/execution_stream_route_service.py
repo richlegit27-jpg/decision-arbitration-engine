@@ -9,13 +9,11 @@ class ExecutionStreamRouteService:
         execution_service,
         execution_stream_service,
         execution_fix_service,
-        execution_loop_service,
     ):
         self.session_service = session_service
         self.execution_service = execution_service
         self.execution_stream_service = execution_stream_service
         self.execution_fix_service = execution_fix_service
-        self.execution_loop_service = execution_loop_service
 
     def stream(self, data):
 
@@ -27,9 +25,7 @@ class ExecutionStreamRouteService:
             data.get("action") or ""
         ).strip()
 
-        action = self.execution_loop_service.command_alias(
-            action
-        )
+        action = action.lower()
 
         def generate():
 

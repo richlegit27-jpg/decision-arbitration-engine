@@ -1101,10 +1101,9 @@ execution_fix_service = ExecutionFixService(
 
 execution_stream_route_service = ExecutionStreamRouteService(
     session_service=session_service,
-    execution_service=execution_service,
+    execution_service=chat_execution_service,
     execution_stream_service=execution_stream_service,
     execution_fix_service=execution_fix_service,
-    execution_loop_service=execution_loop_service,
 )
 # =========================
 # RUNTIME BINDING
