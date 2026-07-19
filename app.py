@@ -190,7 +190,6 @@ from nova_backend.services.session_detail_response_cache_service import (
 from nova_backend.services.chat_guard_service import (
     ChatGuardService,
 )
-
 from nova_backend.services.project_state_route_guard_service import (
     ProjectStateRouteGuardService,
 )
@@ -373,6 +372,9 @@ from nova_backend.services.session_auth_scope_service import (
 
 from nova_backend.services.admin_route_service import (
     AdminRouteService,
+)
+from nova_backend.services.execution_stream_route_service import (
+    ExecutionStreamRouteService,
 )
 
 from nova_backend.services.attachment_memory_gate_service import (
@@ -1096,6 +1098,14 @@ execution_fix_service = ExecutionFixService(
     next_move_class=NextMove,
     update_execution_state_safe=update_execution_state_safe,
 )
+
+execution_stream_route_service = ExecutionStreamRouteService(
+    session_service=session_service,
+    execution_service=execution_service,
+    execution_stream_service=execution_stream_service,
+    execution_fix_service=execution_fix_service,
+    execution_loop_service=execution_loop_service,
+)
 # =========================
 # RUNTIME BINDING
 # =========================
@@ -1786,30 +1796,16 @@ def _nova_casual_chat_guard():
         auto_plan_execution_result = None
         if auto_plan_execution_result is not None:
             return jsonify(auto_plan_execution_result)
-        # NOVA_EXECUTION_STATUS_GUARD_20260607
-        execution_status_result = (
-            execution_bridge_service
-            .try_execution_status(
-                session_id,
-                user_text,
-            )
+
+        chat_guard_result = chat_guard_service.handle_casual_chat_guard(
+            payload,
+            execution_bridge_service,
         )
-        if execution_status_result is not None:
-            return jsonify(execution_status_result)
-        # NOVA_EXECUTION_AUTOPLAN_START_GUARD_20260607
-        execution_start_result = None
-        if execution_start_result is not None:
-            return jsonify(execution_start_result)
-        # NOVA_EXECUTION_TRIGGER_GUARD_20260607
-        execution_result = (
-            execution_bridge_service
-            .try_execution_trigger(
-                session_id,
-                user_text,
-            )
-        )
-        if execution_result is not None:
-            return jsonify(execution_result)
+
+        if chat_guard_result is not None:
+            return jsonify(chat_guard_result)
+
+
         attachments = payload.get("attachments") or []
 
         if attachments:
@@ -6350,6 +6346,12 @@ def serialize_move(move):
 
 @app.route("/api/execution/stream", methods=["POST"])
 def execution_stream():
+    data = request.get_json(silent=True) or {}
+
+    return Response(
+        execution_stream_route_service.stream(data),
+        mimetype="text/event-stream",
+    )
     data = request.get_json(silent=True) or {}
 
     session_id = str(data.get("session_id") or "").strip()
