@@ -132,6 +132,9 @@ from nova_backend.services.attachment_shape_normalizer_service import (
 from nova_backend.services.execution_guard_service import (
     ExecutionGuardService,
 )
+from nova_backend.services.image_command_service import (
+    ImageCommandService,
+)
 
 from nova_backend.services.lead_route_service import LeadRouteService
 
@@ -1109,6 +1112,10 @@ chat_service = ChatService(
     artifact_service=artifact_service,
     web_service=web_service,
     recon_service=recon_service,
+)
+
+image_command_service = ImageCommandService(
+    chat_service
 )
 
 execution_stream_service = ExecutionStreamService(
@@ -2848,26 +2855,13 @@ def api_chat():
     except Exception:
         app.logger.exception("[api_chat] failed while logging attachment debug info")
 
-    regen_commands = {
-        "regen",
-        "regenerate",
-        "redo image",
-        "make another",
-        "another image",
-    }
+    regen_result = image_command_service.handle_regeneration(
+        user_text,
+        session_id,
+    )
 
-    if user_text.lower().strip() in regen_commands:
-        last_prompt = chat_service._get_session_meta(
-            session_id,
-            "last_image_prompt",
-        ) or "generate an image"
-
-        result = chat_service._handle_image_generation(
-            prompt=last_prompt,
-            session_id=session_id,
-            parent_artifact_id="",
-            source_type="regenerated",
-        )
+    if regen_result:
+        return jsonify(regen_result)
 
 
     force_new_session = bool(data.get("force_new_session") or data.get("new_session"))
