@@ -205,3 +205,96 @@ def normalize_store_for_user(user):
         write_sessions_store(store)
 
     return store, visible
+
+class SessionAuthScopeService:
+
+    def install(self, app):
+        from flask import request, g
+
+        @app.before_request
+        def nova_session_auth_scope_before_request_20260610():
+            path = str(request.path or "")
+
+            if not (
+                path.startswith("/api/sessions")
+                or path.startswith("/api/chat")
+                or path.startswith("/api/chat/stream")
+            ):
+                return None
+
+            user = current_auth_user()
+
+            g.nova_auth_user = user
+
+            normalize_store_for_user(user)
+
+            return None
+
+        @app.after_request
+        def nova_session_auth_scope_after_request_20260610(response):
+            try:
+                data = response.get_json(silent=True)
+
+                if (
+                    isinstance(data, dict)
+                    and data.get("skip_session_auth_scope_filter")
+                ):
+                    return response
+
+            except Exception:
+                pass
+
+            path = str(request.path or "")
+
+            if not path.startswith("/api/sessions"):
+                return response
+
+            if response.headers.get("X-Nova-Slim-Sessions") == "1":
+                return response
+
+            if request.method != "GET" and path in (
+                "/api/sessions/new",
+                "/api/sessions/switch",
+                "/api/sessions/rename",
+                "/api/sessions/pin",
+                "/api/sessions/delete",
+            ):
+                return response
+
+            user = (
+                getattr(g, "nova_auth_user", None)
+                or current_auth_user()
+            )
+
+            store, visible = normalize_store_for_user(user)
+
+            try:
+                payload = response.get_json(silent=True)
+            except Exception:
+                payload = None
+
+            if not isinstance(payload, dict):
+                return response
+
+            visible_ids = {
+                str(item.get("id") or "")
+                for item in visible
+                if isinstance(item, dict)
+            }
+
+            if isinstance(payload.get("sessions"), list):
+                payload["sessions"] = [
+                    item
+                    for item in payload["sessions"]
+                    if (
+                        isinstance(item, dict)
+                        and str(item.get("id") or "") in visible_ids
+                    )
+                ]
+
+                response.set_data(
+                    json.dumps(payload)
+                )
+                response.headers["Content-Type"] = "application/json"
+
+            return response
