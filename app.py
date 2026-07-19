@@ -6936,10 +6936,8 @@ def nova_desktop_app_fixed_20260610():
 def nova_account_profile_20260708():
     return account_profile_service.get_profile()
 
-local_auth_route_service.install_routes()
 
-# NOVA_LOGIN_PAGE_ROUTES_20260610
-def _nova_install_login_page_routes_20260610():
+local_auth_route_service.install_routes()
 
 # NOVA_LOGIN_PAGE_ROUTES_20260610
 # Page routes for local auth screens.
