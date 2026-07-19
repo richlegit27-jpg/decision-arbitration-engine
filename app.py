@@ -197,6 +197,9 @@ from nova_backend.services.chat_guard_service import (
 from nova_backend.services.project_state_route_guard_service import (
     ProjectStateRouteGuardService,
 )
+from nova_backend.services.chat_request_context_service import (
+    ChatRequestContextService,
+)
 
 from nova_backend.services import session_auth_scope_service
 from nova_backend.services import attachment_gate_service
@@ -939,6 +942,7 @@ local_auth_route_service = LocalAuthRouteService(
     session,
 )
 
+chat_request_context_service = ChatRequestContextService()
 chat_stream_service = ChatStreamService()
 session_route_service = SessionRouteService()
 public_route_service = PublicRouteService()
@@ -1890,20 +1894,13 @@ def api_chat():
 
         _nova_payload = request.get_json(silent=True) or {}
 
-        _nova_user_text = str(
-            _nova_payload.get("user_text")
-            or _nova_payload.get("text")
-            or _nova_payload.get("message")
-            or ""
-        ).strip()
+        _nova_chat_context = chat_request_context_service.build_context(
+            _nova_payload
+        )
 
-        _nova_session_id = str(
-            _nova_payload.get("session_id")
-            or _nova_payload.get("client_session_id")
-            or "default"
-        ).strip() or "default"
-
-        _nova_attachments = _nova_payload.get("attachments") or []
+        _nova_user_text = _nova_chat_context["user_text"]
+        _nova_session_id = _nova_chat_context["session_id"]
+        _nova_attachments = _nova_chat_context["attachments"]
 
         # ?? IMAGE FASTPATH SAFETY GUARD
         if str(_nova_user_text or "").strip().lower().startswith("/image"):
