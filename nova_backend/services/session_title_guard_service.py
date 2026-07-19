@@ -216,3 +216,15 @@ def clean_title(title, user_text, route, source):
         return "New Chat"
 
     return current or "New Chat"
+
+def install(app):
+    @app.after_request
+    def nova_final_title_guard_20260630(response):
+        try:
+            return apply_response_title_guard(response)
+        except Exception as error:
+            print(
+                "[NOVA_FINAL_TITLE_GUARD_20260630] skipped:",
+                error,
+            )
+        return response

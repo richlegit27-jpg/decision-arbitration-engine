@@ -6977,27 +6977,9 @@ try:
 except Exception:
     pass
 
+from nova_backend.services import session_title_guard_service
 
-# NOVA_FINAL_TITLE_GUARD_20260630
-# Delegated to session_title_guard_service.
-
-@app.after_request
-def nova_final_title_guard_20260630(response):
-    try:
-        from nova_backend.services.session_title_guard_service import (
-            apply_response_title_guard,
-        )
-
-        return apply_response_title_guard(response)
-
-    except Exception as error:
-        print(
-            "[NOVA_FINAL_TITLE_GUARD_20260630] skipped:",
-            error,
-        )
-
-    return response
-
+session_title_guard_service.install(app)
 
 # Project state route guard
 project_state_route_guard_service.install(app)
