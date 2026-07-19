@@ -364,5 +364,94 @@ class AdminRouteService:
                 },
             )
 
+        @app.context_processor
+        def nova_admin_template_context_20260709():
+            from flask import request
 
+            allowed = self.admin_lead_service.admin_allowed(request)
 
+            return {
+                "nova_show_admin_link": allowed,
+            }
+
+          # NOVA_ADMIN_LAUNCH_CHECKLIST_READY_COPY_20260709
+        try:
+            from flask import make_response
+
+            original = app.view_functions.get(
+                "nova_admin_launch_checklist_repair_20260709"
+            )
+
+            if callable(original):
+
+                def nova_admin_launch_checklist_ready_copy_20260709(
+                    *args,
+                    **kwargs,
+                ):
+                    response = make_response(
+                        original(*args, **kwargs)
+                    )
+
+                    if response.status_code != 200:
+                        return response
+
+                    body = response.get_data(as_text=True)
+
+                    if "NOVA_ADMIN_LAUNCH_CHECKLIST_READY_COPY_20260709_CARD" not in body:
+                        ready_card = """
+        <!-- NOVA_ADMIN_LAUNCH_CHECKLIST_READY_COPY_20260709_CARD -->
+        <section class="card" aria-label="Ready now launch status" style="margin-top: 16px;">
+            <h2>Ready now</h2>
+            <p>
+                Public pages, admin access, leads, sitemap, billing visibility,
+                staged payments routes, and backend usage enforcement are ready
+                for the current launch phase.
+                Real Stripe payment collection remains blocked until live keys,
+                price IDs, webhook verification, and the payments-live flag are
+                intentionally enabled.
+            </p>
+            <ul>
+                <li><strong>Ready:</strong> public smoke, admin smoke, leads, sitemap, and staged billing checks.</li>
+                <li><strong>Planned:</strong> live Stripe checkout, invoices, customer portal, and paid upgrades.</li>
+                <li><strong>Blocked:</strong> taking real payment while <code>safe_to_take_payment</code> is false.</li>
+            </ul>
+        </section>
+        <!-- /NOVA_ADMIN_LAUNCH_CHECKLIST_READY_COPY_20260709_CARD -->
+"""
+
+                        if "</main>" in body:
+                            body = body.replace(
+                                "</main>",
+                                ready_card + "\n</main>",
+                                1,
+                            )
+                        elif "</body>" in body:
+                            body = body.replace(
+                                "</body>",
+                                ready_card + "\n</body>",
+                                1,
+                            )
+                        else:
+                            body += ready_card
+
+                        response.set_data(body)
+
+                    return response
+
+                nova_admin_launch_checklist_ready_copy_20260709.__name__ = (
+                    "nova_admin_launch_checklist_ready_copy_20260709"
+                )
+
+                app.view_functions[
+                    "nova_admin_launch_checklist_repair_20260709"
+                ] = nova_admin_launch_checklist_ready_copy_20260709
+
+                print(
+                    "[NOVA_ADMIN_LAUNCH_CHECKLIST_READY_COPY_20260709] installed"
+                )
+
+        except Exception as error:
+            print(
+                "[NOVA_ADMIN_LAUNCH_CHECKLIST_READY_COPY_20260709] install failed:",
+                error,
+            )
