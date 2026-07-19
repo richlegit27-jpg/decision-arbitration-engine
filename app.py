@@ -130,7 +130,6 @@ from nova_backend.services.attachment_shape_normalizer_service import (
     AttachmentShapeNormalizerService,
 )
 
-from nova_backend.services.session_route_service import SessionRouteService
 
 from nova_backend.services.lead_route_service import LeadRouteService
 
@@ -918,7 +917,6 @@ local_auth_route_service = LocalAuthRouteService(
     session,
 )
 
-session_route_service = SessionRouteService()
 session_route_service = SessionRouteService()
 public_route_service = PublicRouteService()
 login_page_route_service = LoginPageRouteService()
@@ -7009,9 +7007,6 @@ def nova_before_request_slim_api_sessions_20260611():
         app,
         jsonify,
     )
-
-
-
 
 
 # NOVA_BEFORE_REQUEST_EXPLICIT_MEMORY_GUARD_20260611

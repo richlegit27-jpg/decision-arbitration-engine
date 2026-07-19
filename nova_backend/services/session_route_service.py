@@ -1,16 +1,21 @@
 from flask import jsonify
 
 
+from flask import jsonify
+
+
 class SessionRouteService:
 
-    def build_slim_sessions_response(
+    def handle_slim_sessions(
         self,
         request,
         session,
         session_service,
         app,
+        jsonify,
     ):
         try:
+            ...
             if request.path != "/api/sessions" or request.method != "GET":
                 return None
 
@@ -158,6 +163,7 @@ class SessionRouteService:
             return response
 
         except Exception as exc:
+            print("[SESSION_ROUTE_SERVICE_ERROR]", repr(exc))
             try:
                 app.logger.warning(
                     "[Nova Before Request Slim Sessions] failed: %s",
@@ -166,4 +172,4 @@ class SessionRouteService:
             except Exception:
                 pass
 
-            return None
+            raise
