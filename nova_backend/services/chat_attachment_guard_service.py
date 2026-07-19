@@ -60,3 +60,11 @@ class ChatAttachmentGuardService:
                 pass
 
         return attachments
+    def handle_inline_text_attachment(
+        self,
+        attachments,
+        user_text,
+        session_id,
+        requested_session_id,
+    ):
+        return None

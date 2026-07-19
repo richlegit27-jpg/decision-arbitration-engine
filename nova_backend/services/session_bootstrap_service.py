@@ -133,3 +133,46 @@ class SessionBootstrapService:
                 )
 
             return new_session
+
+    def resolve_chat_session(
+        self,
+        session_id,
+        data,
+        user_text,
+        auth_user_id="",
+    ):
+        force_new_session = bool(
+            data.get("force_new_session")
+            or data.get("new_session")
+        )
+
+        active_session_id = str(
+            session_id or ""
+        ).strip()
+
+        if not active_session_id and not force_new_session:
+            try:
+                active = self.session_service.get_active()
+
+                if active:
+                    active_session_id = str(
+                        active.get("id") or ""
+                    ).strip()
+
+            except Exception:
+                if self.logger:
+                    self.logger.exception(
+                        "[session-bootstrap] active session lookup failed"
+                    )
+
+        if not active_session_id:
+            created = self.session_service.create_session(
+                "New Chat",
+                user_id=auth_user_id,
+            )
+
+            active_session_id = str(
+                created.get("id") or ""
+            ).strip()
+
+        return active_session_id
