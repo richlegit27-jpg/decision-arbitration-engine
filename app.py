@@ -407,6 +407,9 @@ from nova_backend.services.history_route_service import (
 from nova_backend.services.chat_attachment_selector_service import (
     ChatAttachmentSelectorService,
 )
+from nova_backend.services.chat_response_cleanup_service import (
+    ChatResponseCleanupService,
+)
 
 from nova_backend.services import empty_session_pruner_service
 from nova_backend.services.chat_stream_service import ChatStreamService
@@ -950,6 +953,7 @@ local_auth_route_service = LocalAuthRouteService(
     session,
 )
 
+chat_response_cleanup_service = ChatResponseCleanupService()
 chat_execution_service = ChatExecutionService()
 chat_request_context_service = ChatRequestContextService()
 chat_stream_service = ChatStreamService()
@@ -2761,66 +2765,23 @@ def api_chat():
         result["session_id"] = result.get("session_id") or session_id
         result["active_session_id"] = result.get("active_session_id") or result.get("session_id") or session_id
 
-        # NOVA_IMAGE_FASTPATH_RESPONSE_CLEANUP_20260610
-        # Normalize echoed image-command text so the user sees only the real prompt.
-        def _nova_clean_image_echo_text(value):
-            value = str(value or "").strip()
-            prefix = "Generated image for:"
-            if not value.startswith(prefix):
-                return value
+        result = chat_response_cleanup_service.sync_attachment_text(
+            result
+        )
 
-            prompt = value[len(prefix):].strip()
-            lowered = prompt.lower()
+        result["text"] = chat_response_cleanup_service.clean_image_echo_text(
+            result.get("text")
+        )
 
-            cleanup_prefixes = [
-                "/image",
-                "generate an image of ",
-                "generate image of ",
-                "generate an image ",
-                "generate image ",
-                "create an image of ",
-                "create image of ",
-                "create an image ",
-                "create image ",
-                "make an image of ",
-                "make image of ",
-                "make an image ",
-                "make image ",
-                "draw ",
-            ]
-
-            if lowered == "/image":
-                prompt = "image"
-            else:
-                for item in cleanup_prefixes:
-                    if lowered.startswith(item):
-                        prompt = prompt[len(item):].strip() or "image"
-                        break
-
-            return f"Generated image for: {prompt}"
-
-        result["text"] = _nova_clean_image_echo_text(result.get("text"))
         assistant_message = result.get("assistant_message")
+
         if isinstance(assistant_message, dict):
-            assistant_message["text"] = _nova_clean_image_echo_text(assistant_message.get("text"))
+            assistant_message["text"] = (
+                chat_response_cleanup_service.clean_image_echo_text(
+                    assistant_message.get("text")
+                )
+            )
             result["assistant_message"] = assistant_message
-
-        
-        # NOVA_ATTACHMENT_SYNC_TEXT_TO_CLEAN_CONTENT_ALL_RETURNS_20260611
-        try:
-            _nova_result_for_attachment_sync = result if isinstance(result, dict) else None
-            if isinstance(_nova_result_for_attachment_sync, dict):
-                _nova_assistant_for_attachment_sync = _nova_result_for_attachment_sync.get("assistant_message")
-                if isinstance(_nova_assistant_for_attachment_sync, dict):
-                    _nova_content_for_attachment_sync = str(_nova_assistant_for_attachment_sync.get("content") or "").strip()
-                    if _nova_content_for_attachment_sync.startswith("Attachment analysis:") and "Attachment " in _nova_content_for_attachment_sync and " content:" in _nova_content_for_attachment_sync:
-                        _nova_assistant_for_attachment_sync["text"] = _nova_content_for_attachment_sync
-                        _nova_assistant_for_attachment_sync["content"] = _nova_content_for_attachment_sync
-                        _nova_result_for_attachment_sync["assistant_message"] = _nova_assistant_for_attachment_sync
-        except Exception:
-            pass
-        return jsonify(result)
-
 
     # MOBILE_SESSION_FORCE_LOCK_20260606
     # Honor mobile-provided session ids instead of letting backend drift to random session_* ids.
