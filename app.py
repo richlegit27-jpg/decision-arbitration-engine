@@ -273,6 +273,10 @@ from nova_backend.services.title_guard_service import (
     persist_title,
 )
 
+from nova_backend.services.chat_attachment_memory_service import (
+    ChatAttachmentMemoryService,
+)
+
 from nova_backend.services.project_recall_service import (
     ProjectRecallService,
 )
@@ -956,6 +960,7 @@ local_auth_route_service = LocalAuthRouteService(
     session,
 )
 
+chat_attachment_memory_service = ChatAttachmentMemoryService()
 chat_response_cleanup_service = ChatResponseCleanupService()
 chat_execution_service = ChatExecutionService()
 chat_request_context_service = ChatRequestContextService()
@@ -2863,33 +2868,20 @@ def api_chat():
     if regen_result:
         return jsonify(regen_result)
 
-
-    force_new_session = bool(data.get("force_new_session") or data.get("new_session"))
-
-    if not session_id and not force_new_session:
-        active = session_service.get_active()
-        if active:
-            session_id = str(active.get("id") or "").strip()
-
     auth_user_id = (
         flask_session.get("nova_user_id")
         or flask_session.get("user_id")
         or ""
     )
 
-    if not session_id:
-        created = session_service.create_session(
-            "New Chat",
-            user_id=auth_user_id,
-        )
+    session_id = session_bootstrap_service.resolve_chat_session(
+        session_id,
+        data,
+        user_text,
+        auth_user_id,
+    )
 
-    if not session_id:
-        created = session_service.create_session(
-            "New Chat",
-            user_id=auth_user_id,
-        )
 
-        session_id = created["id"]
 
     if not user_text and not attachments:
         return json_error("Missing user_text or attachments", 400)
@@ -3100,10 +3092,11 @@ def api_chat():
         # REAL_ATTACHMENT_MEMORY_BACKEND_LOCK
         if attachments:
             try:
-                added_attachment_memory = persist_attachments_for_session(
+                added_attachment_memory = chat_attachment_memory_service.persist(
                     attachments,
-                    session_id=session_id,
-                    client_session_id=requested_session_id,
+                    session_id,
+                    requested_session_id,
+                    logger=app.logger,
                 )
                 app.logger.info(
                     "[api_chat] persisted attachment memory count=%s session_id=%s",
@@ -3125,9 +3118,10 @@ def api_chat():
         try:
             remembered_session_attachments = summarize_attachments_for_session(
                 session_id,
+                requested_session_id,
                 limit=25,
-                client_session_id=requested_session_id,
             )
+
         except Exception:
             remembered_session_attachments = []
             app.logger.exception("[api_chat] failed to load remembered session attachments")

@@ -1,5 +1,7 @@
 ﻿from __future__ import annotations
 
+from __future__ import annotations
+
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,6 +13,55 @@ RUNTIME_DIR = ROOT_DIR / "runtime"
 ATTACHMENT_MEMORY_FILE = RUNTIME_DIR / "attachments_memory.json"
 
 
+class ChatAttachmentMemoryService:
+
+    def persist(
+        self,
+        attachments,
+        session_id,
+        requested_session_id,
+        logger=None,
+    ):
+        if not attachments:
+            return 0
+
+        try:
+            count = persist_attachments_for_session(
+                attachments,
+                session_id=session_id,
+                client_session_id=requested_session_id,
+            )
+
+            if logger:
+                logger.info(
+                    "[api_chat] persisted attachment memory count=%s session_id=%s",
+                    count,
+                    session_id,
+                )
+
+            return count
+
+        except Exception:
+            if logger:
+                logger.exception(
+                    "[api_chat] failed to persist attachment memory"
+                )
+            return 0
+
+    def summarize(
+        self,
+        session_id,
+        requested_session_id,
+        limit=25,
+    ):
+        try:
+            return get_attachments_for_session(
+                session_id,
+                limit=limit,
+                client_session_id=requested_session_id,
+            )
+        except Exception:
+            return 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
