@@ -330,6 +330,10 @@ from nova_backend.services.session_slim_response_service import (
     SessionSlimResponseService,
 )
 
+from nova_backend.services.account_profile_service import (
+    AccountProfileService,
+)
+
 from nova_backend.services.blog_service import BlogService
 from nova_backend.services.history_route_service import HistoryRouteService
 from nova_backend.services import empty_session_pruner_service
@@ -876,6 +880,8 @@ session_response_cache_service = SessionResponseCacheService(
     session_detail_cache_service,
     attachment_context_service,
 )
+
+account_profile_service = AccountProfileService()
 session_slim_response_service = SessionSlimResponseService()
 web_service = WebService(timeout=WEB_TIMEOUT)
 recon_service = ReconService(timeout=RECON_TIMEOUT)
@@ -6913,74 +6919,11 @@ def nova_mobile_direct_session_persist_20260609():
 @app.get("/app")
 def nova_desktop_app_fixed_20260610():
     return render_template("app.html")
+
 # NOVA_ACCOUNT_PROFILE_ROUTE_20260708
 @app.get("/api/account")
 def nova_account_profile_20260708():
-    from flask import jsonify, session
-
-    print("[ACCOUNT DEBUG SESSION]", dict(session))
-
-    username = ""
-
-    try:
-        user_id = session.get("nova_user_id")
-
-        print("[ACCOUNT USER ID]", user_id)
-
-        if user_id:
-            from pathlib import Path
-            import json
-
-            users_path = Path("data") / "nova_auth_users.json"
-            print("[ACCOUNT USERS FILE]", users_path, users_path.exists())
-
-            if users_path.exists():
-                users_data = json.loads(
-                    users_path.read_text(encoding="utf-8")
-                )
-
-                for user in users_data.get("users", []):
-                    if user.get("id") == user_id:
-                        username = str(
-                            user.get("username") or ""
-                        ).strip()
-                        break
-
-    except Exception as exc:
-        print("[ACCOUNT USER LOOKUP ERROR]", exc)
-
-    if not username:
-        username = str(
-            session.get("username") or ""
-        ).strip()
-
-    print("[ACCOUNT FINAL USERNAME]", username)
-
-    if not username:
-        username = "richard"
-
-    try:
-        from nova_backend.services.billing_service import get_account
-
-        billing = get_account(username)
-
-    except Exception:
-        billing = {
-            "plan": "free",
-            "credits": 0,
-            "monthly_credits": 0,
-            "created_at": "",
-        }
-
-    return jsonify({
-        "ok": True,
-        "username": username,
-        "plan": billing.get("plan", "free"),
-        "credits": billing.get("credits", 0),
-        "monthly_credits": billing.get("monthly_credits", 0),
-        "created_at": billing.get("created_at", ""),
-    })
-
+    return account_profile_service.get_profile()
 
 # NOVA_LOCAL_AUTH_ROUTES_20260610
 def _nova_install_local_auth_routes_20260610():
