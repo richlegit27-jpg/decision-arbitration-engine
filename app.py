@@ -2684,43 +2684,19 @@ def api_chat():
             or "default"
         ).strip() or "default"
 
-        _nova_exec_commands2 = {
-            "next": "next",
-            "nex": "next",
-            "continue": "next",
-            "continue on": "next",
-            "keep going": "next",
-            "go": "next",
-            "run next": "next",
-            "next step": "next",
-            "run step": "next",
-            "run_step": "next",
-            "run all": "run_all",
-            "run_all": "run_all",
-            "run it": "run_all",
-            "execute": "run_all",
-            "execute all": "run_all",
-            "auto": "run_all",
-            "auto mode": "run_all",
-            "autopilot": "run_all",
-            "retry": "retry",
-            "retry failed": "retry",
-            "retry_failed": "retry",
-            "try again": "retry",
-            "rerun failed": "retry",
-            "stop": "cancel",
-            "cancel": "cancel",
-        }
+        execution_action_result = execution_guard_service.handle_execution_action(
+            _nova_exec_clean2,
+            _nova_exec_session_id2,
+        )
 
-        if _nova_exec_clean2 in _nova_exec_commands2:
-            _nova_exec_action2 = _nova_exec_commands2[_nova_exec_clean2]
+        if execution_action_result:
+            _nova_exec_state2 = execution_action_result.get("state")
+            _nova_exec_action2 = execution_action_result.get("action")
+        else:
+            _nova_exec_state2 = None
+            _nova_exec_action2 = None
 
-            if _nova_exec_action2 == "run_all":
-                _nova_exec_state2 = chat_execution_service.run_all(_nova_exec_session_id2)
-            elif _nova_exec_action2 == "cancel":
-                _nova_exec_state2 = chat_execution_service.cancel(_nova_exec_session_id2)
-            else:
-                _nova_exec_state2 = chat_execution_service.advance(_nova_exec_session_id2)
+        if execution_action_result:
             return jsonify(
                 execution_guard_service.format_execution_response(
                     _nova_exec_state2,

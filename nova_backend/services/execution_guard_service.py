@@ -197,6 +197,52 @@ class ExecutionGuardService:
                 "skip_rewrite": True,
             }
 
+    def handle_execution_action(self, clean, session_id):
+        commands = {
+            "next": "next",
+            "nex": "next",
+            "continue": "next",
+            "continue on": "next",
+            "keep going": "next",
+            "go": "next",
+            "run next": "next",
+            "next step": "next",
+            "run step": "next",
+            "run_step": "next",
+            "run all": "run_all",
+            "run_all": "run_all",
+            "run it": "run_all",
+            "execute": "run_all",
+            "execute all": "run_all",
+            "auto": "run_all",
+            "auto mode": "run_all",
+            "autopilot": "run_all",
+            "retry": "retry",
+            "retry failed": "retry",
+            "retry_failed": "retry",
+            "try again": "retry",
+            "rerun failed": "retry",
+            "stop": "cancel",
+            "cancel": "cancel",
+        }
+
+        if clean not in commands:
+            return None
+
+        action = commands[clean]
+
+        if action == "run_all":
+            state = self.chat_execution_service.run_all(session_id)
+        elif action == "cancel":
+            state = self.chat_execution_service.cancel(session_id)
+        else:
+            state = self.chat_execution_service.advance(session_id)
+
+        return {
+            "state": state,
+            "action": action,
+        }
+
     def format_execution_response(self, state, command="", action=""):
         status = str(
             state.get("status") or ""
