@@ -214,6 +214,9 @@ from nova_backend.services.session_history_service import (
 from nova_backend.services.history_service import HistoryService
 from nova_backend.services.artifact_service import ArtifactService
 from nova_backend.services.memory_service import MemoryService
+from nova_backend.services.memory_guard_route_service import (
+    MemoryGuardRouteService,
+)
 from nova_backend.services.memory_recall_service import (
     MemoryRecallService,
 )
@@ -851,7 +854,6 @@ mobile_exchange_service = MobileExchangeService(
     session_service
 )
 
-
 session_history_service = SessionHistoryService(
     BASE_DIR
 )
@@ -861,13 +863,6 @@ history_service = HistoryService(
     session_history_service
 )
 
-memory_service = MemoryService(
-    str(DATA_DIR / "nova_memory.json")
-)
-
-memory_recall_service = MemoryRecallService(
-    memory_service
-)
 
 project_state_memory_service = ProjectStateMemoryService(
     DATA_DIR / "nova_project_state.json"
@@ -887,23 +882,10 @@ upload_ownership_service = UploadOwnershipService(
 )
 
 
-project_focus_memory_service = ProjectFocusMemoryService(
-    memory_service,
-    session_service,
-)
-
-project_recall_service = ProjectRecallService(
-    project_focus_memory_service,
-    project_state_memory_service,
-    PROJECT_STATE_MEMORY_KINDS,
-    DATA_DIR,
-)
-
 project_aware_context_service = ProjectAwareContextService(
     memory_context_service,
     session_service,
 )
-
 
 attachment_memory_gate_service = AttachmentMemoryGateService(
     attachment_gate_service,
@@ -928,7 +910,33 @@ attachment_shape_normalizer_service = AttachmentShapeNormalizerService()
 session_auth_scope_service = SessionAuthScopeService()
 mobile_session_persist_service = MobileSessionPersistService()
 project_state_route_guard_service = ProjectStateRouteGuardService()
+memory_service = MemoryService(
+    str(DATA_DIR / "nova_memory.json")
+)
+
+memory_recall_service = MemoryRecallService(
+    memory_service
+)
+
+project_focus_memory_service = ProjectFocusMemoryService(
+    memory_service,
+    session_service,
+)
+project_recall_service = ProjectRecallService(
+    project_focus_memory_service,
+    project_state_memory_service,
+    PROJECT_STATE_MEMORY_KINDS,
+    DATA_DIR,
+)
+
+
 memory_guard_service = MemoryGuardService()
+
+memory_guard_route_service = MemoryGuardRouteService(
+    memory_service,
+    session_service,
+    memory_guard_service,
+)
 attachment_summary_service = AttachmentSummaryService()
 attachment_utils_service = AttachmentUtilsService()
 response_quality_service = ResponseQualityService()
@@ -988,6 +996,23 @@ _nova_boot_log_20260701(
         ),
     },
 )
+
+
+
+memory_guard_route_service.install_routes(app)
+session_auth_scope_service.install(app)
+empty_session_pruner_service.install(app)
+memory_guard_route_service.install_routes(app)
+local_auth_route_service.install_routes()
+login_page_route_service.install_routes(app)
+auth_compat_route_service.install_routes(app)
+public_route_service.install_routes(app)
+admin_route_service.install_routes(app)
+history_route_service.install_routes(
+    app,
+    history_service,
+)
+
 
 last_compressed = getattr(
     runtime_brain,
@@ -6943,8 +6968,6 @@ def nova_account_profile_20260708():
     return account_profile_service.get_profile()
 
 
-local_auth_route_service.install_routes()
-
 # NOVA_LOGIN_PAGE_ROUTES_20260610
 login_page_route_service.install_routes(app)
 auth_compat_route_service.install_routes(app)
@@ -7094,18 +7117,11 @@ def nova_before_request_slim_api_sessions_20260611():
             pass
         return None
 
-session_auth_scope_service.install(app)
-empty_session_pruner_service.install(app)
 
-local_auth_route_service.install_routes()
-login_page_route_service.install_routes(app)
-auth_compat_route_service.install_routes(app)
-public_route_service.install_routes(app)
-admin_route_service.install_routes(app)
-history_route_service.install_routes(
-    app,
-    history_service,
-)
+
+
+
+
 
 # NOVA_BEFORE_REQUEST_EXPLICIT_MEMORY_GUARD_20260611
 @app.before_request
@@ -7568,169 +7584,6 @@ try:
     _nova_boot_log_20260701("[NOVA_PATCH_BUILD_ADAPTER_GUARD_20260701] installed")
 except Exception as _nova_patch_build_adapter_install_error_20260701:
     print("[NOVA_PATCH_BUILD_ADAPTER_GUARD_20260701] install failed:", _nova_patch_build_adapter_install_error_20260701)
-
-
-
-
-@app.before_request
-
-
-
-
-
-
-# NOVA_REPAIR_BUILD_COMMAND_GUARD_20260701
-# Instructions-only repair-build guard.
-# Adapter-owned; behavior must remain repair_build_command + repair_instructions_only.
-@app.before_request
-def nova_repair_build_command_guard_20260701():
-    try:
-        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
-            return None
-
-        payload = request.get_json(silent=True) or {}
-
-        from nova_backend.services.repair_build_adapter import (
-            build_repair_build_response,
-        )
-
-        response_payload = build_repair_build_response(payload, session_service)
-
-        if response_payload is None:
-            return None
-
-        return jsonify(response_payload)
-
-    except Exception as error:
-        try:
-            app.logger.exception("[NOVA_REPAIR_BUILD_COMMAND_GUARD_20260701] failed")
-        except Exception:
-            pass
-
-        return jsonify({
-            "ok": False,
-            "error": str(error),
-            "debug": {
-                "route": "repair_build_command",
-                "failed": True,
-            },
-        }), 500
-
-
-# NOVA_WORKFLOW_CATALOG_COMMAND_GUARD_20260701
-# Read-only workflow catalog guard.
-# Adapter-owned; behavior must remain workflow_catalog_command + manual_workflow_catalog_only.
-@app.before_request
-def nova_workflow_catalog_command_guard_20260701():
-    try:
-        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
-            return None
-
-        payload = request.get_json(silent=True) or {}
-
-        from nova_backend.services.workflow_catalog_adapter import (
-            build_workflow_catalog_response,
-        )
-
-        response_payload = build_workflow_catalog_response(payload, session_service)
-
-        if response_payload is None:
-            return None
-
-        return jsonify(response_payload)
-
-    except Exception as error:
-        try:
-            app.logger.exception("[NOVA_WORKFLOW_CATALOG_COMMAND_GUARD_20260701] failed")
-        except Exception:
-            pass
-
-        return jsonify({
-            "ok": False,
-            "error": str(error),
-            "debug": {
-                "route": "workflow_catalog_command",
-                "failed": True,
-            },
-        }), 500
-
-
-# NOVA_AUTONOMY_INDEX_COMMAND_GUARD_20260701
-# Read-only autonomy index guard.
-# Adapter-owned; behavior must remain autonomy_index_command + autonomy_ladder_index_only.
-@app.before_request
-def nova_autonomy_index_command_guard_20260701():
-    try:
-        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
-            return None
-
-        payload = request.get_json(silent=True) or {}
-
-        from nova_backend.services.autonomy_index_adapter import (
-            build_autonomy_index_response,
-        )
-
-        response_payload = build_autonomy_index_response(payload, session_service)
-
-        if response_payload is None:
-            return None
-
-        return jsonify(response_payload)
-
-    except Exception as error:
-        try:
-            app.logger.exception("[NOVA_AUTONOMY_INDEX_COMMAND_GUARD_20260701] failed")
-        except Exception:
-            pass
-
-        return jsonify({
-            "ok": False,
-            "error": str(error),
-            "debug": {
-                "route": "autonomy_index_command",
-                "failed": True,
-            },
-        }), 500
-
-
-# NOVA_COMMAND_REGISTRY_COMMAND_GUARD_20260701
-# Read-only command registry guard.
-# Adapter-owned; behavior must remain command_registry_command + read_only_command_registry.
-@app.before_request
-def nova_command_registry_command_guard_20260701():
-    try:
-        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
-            return None
-
-        payload = request.get_json(silent=True) or {}
-
-        from nova_backend.services.autonomy_command_registry_adapter import (
-            build_command_registry_response,
-        )
-
-        response_payload = build_command_registry_response(payload, session_service)
-
-        if response_payload is None:
-            return None
-
-        return jsonify(response_payload)
-
-    except Exception as error:
-        try:
-            app.logger.exception("[NOVA_COMMAND_REGISTRY_COMMAND_GUARD_20260701] failed")
-        except Exception:
-            pass
-
-        return jsonify({
-            "ok": False,
-            "error": str(error),
-            "debug": {
-                "route": "command_registry_command",
-                "failed": True,
-            },
-        }), 500
-
-
 
 # NOVA_ACTIVE_EXECUTION_STATUS_PRIORITY_20260701
 # Active execution missions should beat global project-state recall for status questions.

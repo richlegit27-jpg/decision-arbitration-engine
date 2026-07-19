@@ -573,3 +573,31 @@ New session created.
         return redirect(
             "/history/" + sid
         )
+
+    def install_routes(self, app, history_service):
+
+        @app.route("/history")
+        def nova_history_list_page_20260621():
+            return self.list_page(history_service)
+
+        @app.route("/history/<session_id>")
+        def nova_history_detail_page_20260621(session_id):
+            return self.detail_page(
+                session_id,
+                history_service,
+            )
+
+        @app.route("/new-session")
+        def nova_history_new_session_20260621():
+            return self.create_new_session()
+
+        @app.route("/open-session/<session_id>")
+        def nova_open_session_bridge_20260622(session_id):
+            return self.open_session_bridge(session_id)
+
+        @app.post("/history/<session_id>/send")
+        def nova_history_direct_send_20260622(session_id):
+            return self.direct_send(
+                session_id,
+                request,
+            )
