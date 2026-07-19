@@ -287,7 +287,6 @@ class LocalAuthRouteService:
                 "error": "User not found",
             }), 404
 
-
         routes = [
             ("/api/auth/status", "nova_auth_status_20260610", auth_status, ["GET"]),
             ("/api/auth/register", "nova_auth_register_20260610", auth_register, ["POST"]),
