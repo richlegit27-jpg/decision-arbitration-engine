@@ -213,3 +213,71 @@ def prune_empty_new_chat_spam():
     save_store(store)
 
     return len(remove_ids)
+
+def install(app):
+    from flask import request
+
+    @app.after_request
+    def nova_prune_empty_session_spam_after_request_20260610(response):
+        path = str(request.path or "")
+
+        if request.method != "GET" and path in (
+            "/api/sessions/new",
+            "/api/sessions/switch",
+            "/api/sessions/rename",
+            "/api/sessions/pin",
+            "/api/sessions/delete",
+        ):
+            return response
+
+        if (
+            path.startswith("/api/sessions")
+            or path.startswith("/api/chat")
+            or path.startswith("/api/chat/stream")
+            or path == "/mobile"
+        ):
+            removed = prune_empty_new_chat_spam()
+
+            if removed:
+                try:
+                    app.logger.info(
+                        "[Nova Session Spam Pruner] removed %s duplicate empty New Chat sessions",
+                        removed,
+                    )
+                except Exception:
+                    pass
+
+        return response
+    from flask import request
+
+    @app.after_request
+    def nova_prune_empty_session_spam_after_request_20260610(response):
+        path = str(request.path or "")
+
+        if request.method != "GET" and path in (
+            "/api/sessions/new",
+            "/api/sessions/switch",
+            "/api/sessions/rename",
+            "/api/sessions/pin",
+            "/api/sessions/delete",
+        ):
+            return response
+
+        if (
+            path.startswith("/api/sessions")
+            or path.startswith("/api/chat")
+            or path.startswith("/api/chat/stream")
+            or path == "/mobile"
+        ):
+            removed = prune_empty_new_chat_spam()
+
+            if removed:
+                try:
+                    app.logger.info(
+                        "[Nova Session Spam Pruner] removed %s duplicate empty New Chat sessions",
+                        removed,
+                    )
+                except Exception:
+                    pass
+
+        return response
