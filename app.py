@@ -298,6 +298,9 @@ from nova_backend.services.answer_quality_policy_service import (
 from nova_backend.services.memory_context_service import (
     MemoryContextService,
 )
+from nova_backend.services.chat_attachment_context_service import (
+    ChatAttachmentContextService,
+)
 
 from nova_backend.services.project_focus_memory_service import (
     ProjectFocusMemoryService,
@@ -960,6 +963,7 @@ local_auth_route_service = LocalAuthRouteService(
     session,
 )
 
+chat_attachment_context_service = ChatAttachmentContextService()
 chat_attachment_memory_service = ChatAttachmentMemoryService()
 chat_response_cleanup_service = ChatResponseCleanupService()
 chat_execution_service = ChatExecutionService()
@@ -3112,6 +3116,17 @@ def api_chat():
             attachments,
             logger=app.logger,
         )
+
+
+
+
+
+
+
+
+
+
+
 
 
         # PROJECT_AWARE_ATTACHMENT_CONTEXT_LOCK
