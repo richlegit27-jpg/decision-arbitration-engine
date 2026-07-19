@@ -382,6 +382,9 @@ from nova_backend.services.history_route_service import (
 
 from nova_backend.services import empty_session_pruner_service
 
+from nova_backend.services.command_route_service import (
+    CommandRouteService,
+)
 
 # NOVA_EXECUTION_SERVICE_SINGLETON_20260607
 chat_execution_service = ChatExecutionService()
@@ -841,6 +844,10 @@ session_service = SessionService(
     DATA_DIR / "nova_sessions.json"
 )
 
+command_route_service = CommandRouteService(
+    session_service
+)
+
 memory_command_service = MemoryCommandService(
     session_service=session_service,
 )
@@ -997,8 +1004,6 @@ _nova_boot_log_20260701(
     },
 )
 
-
-
 memory_guard_route_service.install_routes(app)
 session_auth_scope_service.install(app)
 empty_session_pruner_service.install(app)
@@ -1012,7 +1017,7 @@ history_route_service.install_routes(
     app,
     history_service,
 )
-
+command_route_service.install_routes(app)
 
 last_compressed = getattr(
     runtime_brain,
