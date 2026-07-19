@@ -5,6 +5,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from flask import redirect
 
+
 class HistoryRouteService:
 
     def __init__(
