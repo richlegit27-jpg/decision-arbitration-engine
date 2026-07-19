@@ -1008,6 +1008,7 @@ session_response_cache_service = SessionResponseCacheService(
     attachment_context_service,
 )
 
+chat_attachment_guard_service = ChatAttachmentGuardService()
 image_vision_service = ImageVisionService()
 chat_guard_service = ChatGuardService()
 account_profile_service = AccountProfileService()
@@ -2834,83 +2835,18 @@ def api_chat():
         except Exception:
             pass
 
-    # NOVA_INLINE_TEXT_ATTACHMENT_FASTPATH_20260612
-    # Inline attachment text from API/mobile/browser tests is valid content.
-    # Answer it before older upload-file lookup paths can return "file was not found in uploads."
-    try:
-        _nova_inline_text_items = []
-        if isinstance(attachments, list):
-            for _nova_inline_att in attachments:
-                if not isinstance(_nova_inline_att, dict):
-                    continue
-
-                _nova_inline_text = str(_nova_inline_att.get("text") or _nova_inline_att.get("content") or "").strip()
-                if not _nova_inline_text:
-                    continue
-
-                _nova_inline_name = str(
-                    _nova_inline_att.get("original_filename")
-                    or _nova_inline_att.get("filename")
-                    or "inline attachment"
-                ).strip()
-
-                _nova_inline_text_items.append((_nova_inline_name, _nova_inline_text))
-
-        _nova_inline_prompt = " ".join(str(user_text or "").lower().split())
-        _nova_inline_wants_attachment = (
-            bool(_nova_inline_text_items)
-            and (
-                "attachment" in _nova_inline_prompt
-                or "summarize" in _nova_inline_prompt
-                or "summary" in _nova_inline_prompt
-                or "what exact text" in _nova_inline_prompt
-                or "what is inside" in _nova_inline_prompt
-                or "what's inside" in _nova_inline_prompt
-                or "key point" in _nova_inline_prompt
-                or "keypoint" in _nova_inline_prompt
-                or len(_nova_inline_prompt) <= 60
-            )
+    inline_attachment_result = (
+        chat_attachment_guard_service.handle_inline_text_attachment(
+            attachments,
+            user_text,
+            session_id,
+            requested_session_id,
         )
+    )
 
-        if _nova_inline_wants_attachment:
-            _nova_inline_lines = []
-            for _nova_inline_name, _nova_inline_text in _nova_inline_text_items:
-                _nova_inline_lines.append(f"{_nova_inline_name}:")
-                _nova_inline_lines.append(_nova_inline_text)
+    if inline_attachment_result:
+        return jsonify(inline_attachment_result)
 
-            _nova_inline_reply = (
-                "Attachment analysis:\n"
-                + "\n".join(_nova_inline_lines).strip()
-            )
-
-            return jsonify({
-                "ok": True,
-                "session_id": session_id,
-                "active_session_id": session_id,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": _nova_inline_reply,
-                    "content": _nova_inline_reply,
-                },
-                "text": _nova_inline_reply,
-                "session_attachments": list(attachments or []),
-                "attachment_debug": {
-                    "requested_session_id": requested_session_id,
-                    "active_session_id": session_id,
-                    "session_attachments_count": len(attachments or []),
-                    "inline_text_fastpath": True,
-                },
-                "debug": {
-                    "route": "app_inline_text_attachment_fastpath",
-                    "route_taken": "attachment_analysis",
-                    "blocked_file_lookup": True,
-                },
-            })
-    except Exception as _nova_inline_text_fastpath_error:
-        app.logger.warning(
-            "[InlineTextAttachmentFastPath] failed; falling through: %s",
-            _nova_inline_text_fastpath_error,
-        )
     # BACKEND_ATTACHMENT_DEBUG_LOG_LOCK
     try:
         app.logger.info(
