@@ -2806,34 +2806,12 @@ def api_chat():
 
     attachments = normalize_attachments(request.json.get("attachments", []))
 
-    # NOVA_API_CHAT_WEB_INTENT_STRIPS_CURRENT_ATTACHMENTS_20260609
-    # If this is a fresh web/news request, do not let stale mobile attachment state hijack routing.
-    _nova_main_clean_for_web = " ".join(str(user_text or "").lower().split())
-    _nova_main_web_terms = (
-        "latest news",
-        "news about",
-        "today in",
-        "what happened today",
-        "current news",
-        "breaking news",
-        "recent news",
-        "latest tech news",
-        "latest sports",
-        "weather",
-        "forecast",
-        "current events",
+    attachments = chat_attachment_guard_service.handle_web_attachment_guard(
+        request,
+        data,
+        user_text,
+        attachments,
     )
-    if (
-        request.environ.get("NOVA_IGNORE_STALE_ATTACHMENTS_20260609") == "1"
-        or any(term in _nova_main_clean_for_web for term in _nova_main_web_terms)
-    ):
-        attachments = []
-        try:
-            data["attachments"] = []
-            request.environ["NOVA_FORCE_WEB_INTENT_20260609"] = "1"
-            request.environ["NOVA_IGNORE_STALE_ATTACHMENTS_20260609"] = "1"
-        except Exception:
-            pass
 
     inline_attachment_result = (
         chat_attachment_guard_service.handle_inline_text_attachment(
