@@ -128,6 +128,10 @@ from nova_backend.routes.memory_panel_routes import (
     register_memory_panel_routes,
 )
 
+from nova_backend.services.mobile_session_persist_service import (
+    MobileSessionPersistService,
+)
+
 from nova_backend.routes.improvement_routes import (
 
     register_improvement_routes,
@@ -859,6 +863,7 @@ attachment_context_service = AttachmentContextService(
     UPLOADS_DIR,
 )
 
+mobile_session_persist_service = MobileSessionPersistService()
 project_state_route_guard_service = ProjectStateRouteGuardService()
 memory_guard_service = MemoryGuardService()
 attachment_summary_service = AttachmentSummaryService()
@@ -6894,152 +6899,15 @@ except Exception as _nova_backend_readiness_route_error_20260609:
             "detail": str(_nova_backend_readiness_route_error_20260609),
         }, 500
 
-
 # NOVA_MOBILE_DIRECT_SESSION_PERSIST_ENDPOINT_20260609
 @app.post("/api/mobile/session/persist")
 def nova_mobile_direct_session_persist_20260609():
-    try:
-        from pathlib import Path
-        from datetime import datetime, timezone
-        import json
-        import uuid
+    payload = request.get_json(silent=True) or {}
 
-        payload = request.get_json(silent=True) or {}
-
-        session_id = str(
-            payload.get("session_id")
-            or payload.get("client_session_id")
-            or payload.get("active_session_id")
-            or ""
-        ).strip()
-
-        user_text = str(
-            payload.get("user_text")
-            or payload.get("text")
-            or payload.get("message")
-            or ""
-        ).strip()
-
-        assistant_text = str(
-            payload.get("assistant_text")
-            or payload.get("assistant")
-            or payload.get("response")
-            or ""
-        ).strip()
-
-        if not session_id:
-            session_id = "mobile_" + uuid.uuid4().hex[:16]
-
-        if not user_text and not assistant_text:
-            return jsonify({
-                "ok": False,
-                "error": "No message text supplied."
-            }), 400
-
-        root_dir = Path(__file__).resolve().parent
-        sessions_path = Path(globals().get("SESSIONS_FILE") or (root_dir / "data" / "nova_sessions.json"))
-        sessions_path.parent.mkdir(parents=True, exist_ok=True)
-
-        if sessions_path.exists():
-            raw = sessions_path.read_text(encoding="utf-8-sig").strip()
-            data = json.loads(raw) if raw else {"sessions": []}
-        else:
-            data = {"sessions": []}
-
-        if isinstance(data, list):
-            data = {"sessions": data}
-
-        sessions = data.setdefault("sessions", [])
-        now = datetime.now(timezone.utc).isoformat()
-
-        session = None
-        for item in sessions:
-            if isinstance(item, dict) and str(item.get("id") or "") == session_id:
-                session = item
-                break
-
-        if session is None:
-            session = {
-                "id": session_id,
-                "title": user_text[:60] or "New Chat",
-                "created_at": now,
-                "updated_at": now,
-                "pinned": False,
-                "messages": [],
-                "working_state": {
-                    "active_task": "",
-                    "checkpoint": "",
-                    "current_bug": "",
-                    "current_file": "",
-                    "last_success": "",
-                    "next_move": "",
-                    "updated_at": ""
-                },
-                "active_execution": None
-            }
-            sessions.append(session)
-
-        messages = session.setdefault("messages", [])
-        if not isinstance(messages, list):
-            messages = []
-            session["messages"] = messages
-
-        recent_pairs = [
-            (
-                str(messages[i].get("text") or "").strip(),
-                str(messages[i + 1].get("text") or "").strip() if i + 1 < len(messages) and isinstance(messages[i + 1], dict) else ""
-            )
-            for i in range(max(0, len(messages) - 10), len(messages))
-            if isinstance(messages[i], dict)
-        ]
-
-        if (user_text, assistant_text) not in recent_pairs:
-            if user_text:
-                messages.append({
-                    "id": "msg_" + uuid.uuid4().hex,
-                    "role": "user",
-                    "text": user_text,
-                    "attachments": payload.get("attachments") if isinstance(payload.get("attachments"), list) else [],
-                    "created_at": now,
-                    "updated_at": now,
-                    "meta": {
-                        "route": "mobile_direct_session_persist"
-                    }
-                })
-
-            if assistant_text:
-                messages.append({
-                    "id": "msg_" + uuid.uuid4().hex,
-                    "role": "assistant",
-                    "text": assistant_text,
-                    "attachments": [],
-                    "created_at": now,
-                    "updated_at": now,
-                    "meta": {
-                        "route": "mobile_direct_session_persist"
-                    }
-                })
-
-        if not str(session.get("title") or "").strip() or str(session.get("title")).lower() == "new chat":
-            session["title"] = user_text[:60] or "New Chat"
-
-        session["updated_at"] = now
-
-        tmp = sessions_path.with_suffix(sessions_path.suffix + ".tmp")
-        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(sessions_path)
-
-        return jsonify({
-            "ok": True,
-            "session_id": session_id,
-            "messages": len(messages)
-        })
-
-    except Exception as exc:
-        return jsonify({
-            "ok": False,
-            "error": str(exc)
-        }), 500
+    return mobile_session_persist_service.persist(
+        payload,
+        globals().get("SESSIONS_FILE"),
+    )
 
 # NOVA_APP_ROUTE_FIXED_CLEAN_BOTTOM_20260610
 @app.get("/app")
