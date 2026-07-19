@@ -998,6 +998,7 @@ session_response_cache_service = SessionResponseCacheService(
     attachment_context_service,
 )
 
+image_vision_service = ImageVisionService()
 chat_guard_service = ChatGuardService()
 account_profile_service = AccountProfileService()
 session_slim_response_service = SessionSlimResponseService()
