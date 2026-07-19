@@ -365,6 +365,10 @@ from nova_backend.services.blog_route_service import (
     BlogRouteService,
 )
 
+from nova_backend.services.public_route_service import (
+    PublicRouteService,
+)
+
 from nova_backend.services.history_route_service import HistoryRouteService
 from nova_backend.services import empty_session_pruner_service
 # -----------------------
@@ -910,6 +914,7 @@ local_auth_route_service = LocalAuthRouteService(
     session,
 )
 
+public_route_service = PublicRouteService()
 login_page_route_service = LoginPageRouteService()
 auth_compat_route_service = AuthCompatRouteService()
 attachment_shape_normalizer_service = AttachmentShapeNormalizerService()
