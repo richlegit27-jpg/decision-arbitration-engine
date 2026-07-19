@@ -402,6 +402,9 @@ from nova_backend.services.public_route_service import (
 from nova_backend.services.history_route_service import (
     HistoryRouteService,
 )
+from nova_backend.services.chat_attachment_selector_service import (
+    ChatAttachmentSelectorService,
+)
 
 from nova_backend.services import empty_session_pruner_service
 from nova_backend.services.chat_stream_service import ChatStreamService
@@ -979,6 +982,7 @@ memory_guard_route_service = MemoryGuardRouteService(
     session_service,
     memory_guard_service,
 )
+chat_attachment_selector_service = ChatAttachmentSelectorService()
 attachment_summary_service = AttachmentSummaryService()
 attachment_utils_service = AttachmentUtilsService()
 response_quality_service = ResponseQualityService()
@@ -1906,34 +1910,14 @@ def api_chat():
         if str(_nova_user_text or "").strip().lower().startswith("/image"):
             _nova_attachments = []
 
-        _nova_image = None
+        _nova_image = (
+            chat_attachment_selector_service
+            .find_image_attachment(
+                _nova_attachments
+            )
+        )
 
-        if isinstance(_nova_attachments, list):
-            for _nova_item in _nova_attachments:
-                if not isinstance(_nova_item, dict):
-                    continue
-
-                _nova_mime = str(
-                    _nova_item.get("mime_type")
-                    or _nova_item.get("type")
-                    or ""
-                ).lower()
-
-                _nova_name_probe = str(
-                    _nova_item.get("filename")
-                    or _nova_item.get("original_filename")
-                    or _nova_item.get("name")
-                    or _nova_item.get("url")
-                    or _nova_item.get("file_url")
-                    or ""
-                ).lower()
-
-                if (
-                    _nova_mime.startswith("image/")
-                    or any(ext in _nova_name_probe for ext in (".jpg", ".jpeg", ".png", ".webp", ".gif"))
-                ):
-                    _nova_image = _nova_item
-                    break
+    
         # NOVA_IMAGE_GATE_WEB_INTENT_STRIPS_STALE_ATTACHMENTS_20260609
         # Web/news prompts must ignore stale mobile attachment payload before the image gate scans it.
         _nova_image_gate_clean = " ".join(str(_nova_user_text or "").lower().split())
@@ -1963,28 +1947,6 @@ def api_chat():
             for _nova_item in _nova_attachments:
                 if not isinstance(_nova_item, dict):
                     continue
-
-                _nova_mime = str(
-                    _nova_item.get("mime_type")
-                    or _nova_item.get("type")
-                    or ""
-                ).lower()
-
-                _nova_name_probe = str(
-                    _nova_item.get("filename")
-                    or _nova_item.get("original_filename")
-                    or _nova_item.get("name")
-                    or _nova_item.get("url")
-                    or _nova_item.get("file_url")
-                    or ""
-                ).lower()
-
-                if (
-                    _nova_mime.startswith("image/")
-                    or any(_nova_ext in _nova_name_probe for _nova_ext in (".jpg", ".jpeg", ".png", ".webp", ".gif"))
-                ):
-                    _nova_image = _nova_item
-                    break
 
         if _nova_image:
             _nova_raw_url = str(
