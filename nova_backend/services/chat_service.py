@@ -4195,6 +4195,32 @@ if (not attachments) and (__name__ == "__main__"):
     ) -> str | None:
         text = (user_text or "").strip().lower().rstrip("?")
 
+        if text in {
+            "what are we working on",
+            "what are we working on now",
+            "what are we doing",
+            "where are we",
+            "what is next",
+            "what's next",
+            "whats next",
+            "next move",
+        }:
+            try:
+                from nova_backend.services.project_brain_context_builder import (
+                    build_project_brain_decision_context_answer,
+                )
+
+                return build_project_brain_decision_context_answer(
+                    user_text=text,
+                    pasted_output="",
+                )
+
+            except Exception as exc:
+                print(
+                    "[NOVA_PHASE11_PROJECT_BRAIN_CONTEXT_BRIDGE] failed:",
+                    exc,
+                )
+
         working_state = {}
         if isinstance(session, dict):
             working_state = session.get("working_state") or {}
