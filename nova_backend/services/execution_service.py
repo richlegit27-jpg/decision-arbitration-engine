@@ -225,6 +225,11 @@ class ExecutionService:
             "status": status,
             "goal": self._safe_str(execution.get("goal")),
             "steps": steps,
+            "history": (
+                execution.get("history")
+                if isinstance(execution.get("history"), list)
+                else []
+            ),
             "current_step": self._safe_str(execution.get("current_step")),
             "result": self._safe_str(execution.get("result")),
             "error": self._safe_str(execution.get("error")),
