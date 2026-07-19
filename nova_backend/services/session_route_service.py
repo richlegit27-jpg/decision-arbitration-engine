@@ -1,9 +1,6 @@
 from flask import jsonify
 
 
-from flask import jsonify
-
-
 class SessionRouteService:
 
     def handle_slim_sessions(
@@ -15,7 +12,7 @@ class SessionRouteService:
         jsonify,
     ):
         try:
-            ...
+            
             if request.path != "/api/sessions" or request.method != "GET":
                 return None
 
