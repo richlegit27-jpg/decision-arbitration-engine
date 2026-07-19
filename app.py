@@ -6878,56 +6878,6 @@ def _nova_clean_attachment_analysis_response(response):
         response
     )
 
-@app.before_request
-def _nova_stop_fake_attachment_chat_gate():
-    try:
-        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
-            return None
-
-        payload = request.get_json(silent=True) or {}
-
-        return attachment_gate_service.handle_stop_fake_attachment_chat_gate(
-            payload
-        )
-
-    except Exception:
-        return None
-
-@app.before_request
-def _nova_attachment_followup_recall_gate():
-    try:
-        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
-            return None
-
-        payload = request.get_json(silent=True) or {}
-
-        return attachment_gate_service.handle_attachment_followup_recall_gate(
-            payload
-        )
-
-    except Exception:
-        return None
-
-
-
-
-@app.before_request
-def nova_session_attachment_memory_gate_20260611():
-    try:
-        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
-            return None
-
-        payload = request.get_json(silent=True) or {}
-
-        return attachment_gate_service.handle_session_attachment_memory_gate(
-            payload,
-            attachment_memory_service,
-        )
-
-    except Exception:
-        return None
-
-
 
 # NOVA_BACKEND_READINESS_ROUTE_20260609
 # Live local backend readiness endpoint.
@@ -7120,8 +7070,12 @@ def nova_before_request_slim_api_sessions_20260611():
         return None
 
 session_auth_scope_service.install(app)
-
 empty_session_pruner_service.install(app)
+
+attachment_shape_normalizer_service.install(app)
+attachment_memory_gate_service.install(app)
+
+project_state_route_guard_service.install(app)
 
 # NOVA_ATTACHMENT_SHAPE_NORMALIZER_20260610
 # Keeps saved session message attachments as JSON-safe lists of objects.
