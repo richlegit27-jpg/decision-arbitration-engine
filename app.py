@@ -334,8 +334,15 @@ from nova_backend.services.account_profile_service import (
     AccountProfileService,
 )
 
+from nova_backend.services.login_page_route_service import (
+    LoginPageRouteService,
+)
 from nova_backend.services.local_auth_route_service import (
     LocalAuthRouteService,
+)
+
+from nova_backend.services.auth_compat_route_service import (
+    AuthCompatRouteService,
 )
 
 from nova_backend.services.blog_service import BlogService
@@ -877,6 +884,9 @@ local_auth_route_service = LocalAuthRouteService(
     jsonify,
     session,
 )
+
+login_page_route_service = LoginPageRouteService()
+auth_compat_route_service = AuthCompatRouteService()
 
 mobile_session_persist_service = MobileSessionPersistService()
 project_state_route_guard_service = ProjectStateRouteGuardService()
@@ -6940,47 +6950,7 @@ def nova_account_profile_20260708():
 local_auth_route_service.install_routes()
 
 # NOVA_LOGIN_PAGE_ROUTES_20260610
-# Page routes for local auth screens.
-def _nova_install_login_page_routes_20260610():
-    from flask import render_template, redirect, url_for, request, session
-
-    def route_exists(rule):
-        return any(str(r.rule) == rule for r in app.url_map.iter_rules())
-
-    def login_page():
-        return render_template(
-            "login.html",
-            active_tab="login",
-            prefill_username=request.args.get("username", ""),
-            prefill_register_username="",
-        )
-
-    def register_page():
-        return render_template(
-            "login.html",
-            active_tab="register",
-            prefill_username="",
-            prefill_register_username=request.args.get("username", ""),
-        )
-
-    if not route_exists("/login"):
-        app.add_url_rule("/login", "nova_login_page_20260610", login_page, methods=["GET"])
-
-    if not route_exists("/register"):
-        app.add_url_rule("/register", "nova_register_page_20260610", register_page, methods=["GET"])
-
-    # NOVA_LOGOUT_PAGE_CLEARS_SESSION_20260610
-    def logout_page():
-        session.pop("nova_user_id", None)
-        return redirect("/login")
-
-    if not route_exists("/logout"):
-        app.add_url_rule("/logout", "nova_logout_page_20260610", logout_page, methods=["GET"])
-    else:
-        app.view_functions["nova_logout_page_20260610"] = logout_page
-
-
-_nova_install_login_page_routes_20260610()
+login_page_route_service.install_routes(app)
 
 
 # NOVA_AUTH_COMPAT_ALIAS_ROUTES_SAFE_20260611
