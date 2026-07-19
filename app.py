@@ -106,7 +106,7 @@ import hashlib
 from datetime import datetime
 from pathlib import Path
 
-
+from nova_backend.services.image_vision_service import ImageVisionService
 from flask import Flask, Response, jsonify, render_template, request, send_from_directory, session
 from flask_cors import CORS
 from bs4 import BeautifulSoup
@@ -1859,6 +1859,12 @@ def _nova_mobile_now_iso():
 
 
 
+
+
+
+
+
+
 def api_chat():
     from flask import session as flask_session
     # NOVA_API_CHAT_IMAGE_VISION_GATE_20260607
@@ -2671,6 +2677,8 @@ def api_chat():
                 "error": str(exc),
             },
         })
+
+
     # NOVA_EXECUTION_COMMAND_TOP_GUARD_20260611
     # Explicit execution controls must beat web/news/search routing.
     try:
