@@ -141,6 +141,10 @@ from nova_backend.services.mobile_session_persist_service import (
     MobileSessionPersistService,
 )
 
+from nova_backend.services.chat_attachment_guard_service import (
+    ChatAttachmentGuardService,
+)
+
 from nova_backend.routes.improvement_routes import (
 
     register_improvement_routes,
@@ -1090,7 +1094,7 @@ execution_fix_service = ExecutionFixService(
 chat_service.runtime = runtime_brain
 chat_service.safe_runtime = runtime_brain
 chat_service.runtime_brain = runtime_brain
-
+durable_execution_guard_service = DurableExecutionGuardService()
 app.runtime_brain = runtime_brain
 app.config["runtime_brain"] = runtime_brain
 
