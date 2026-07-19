@@ -124,6 +124,8 @@ def update_execution_state_safe(execution, status=None, current_step=None, last_
 
 from werkzeug.utils import secure_filename
 
+from nova_backend.services.debug_route_service import DebugRouteService
+
 from nova_backend.services.attachment_shape_normalizer_service import (
     AttachmentShapeNormalizerService,
 )
@@ -971,7 +973,7 @@ install_project_chat_response_router(app)
 attachment_analysis_service = AttachmentAnalysisService()
 attachment_text_service = AttachmentTextService()
 blog_service = BlogService()
-
+debug_route_service = DebugRouteService()
 blog_route_service = BlogRouteService(
     blog_service
 )
@@ -1004,6 +1006,7 @@ _nova_boot_log_20260701(
     },
 )
 
+debug_route_service.install_routes(app)
 memory_guard_route_service.install_routes(app)
 session_auth_scope_service.install(app)
 empty_session_pruner_service.install(app)
@@ -10906,32 +10909,6 @@ def _nova_debug_routes_disabled_response():
             "ok": False,
             "error": "Debug routes are disabled. Set NOVA_DEBUG_ROUTES=1 to enable.",
         }, 404
-
-
-# NOVA_CHAT_TURN_DEBUG_ROUTE_20260705
-# NOVA_CHAT_TURN_DEBUG_ROUTE_GLOBAL_20260705
-@app.route("/api/debug/chat-turn-shadow", methods=["GET"])
-def api_debug_chat_turn_shadow():
-    try:
-        # NOVA_CHAT_TURN_DEBUG_ROUTE_GUARDED_20260705
-        if not _nova_debug_routes_enabled():
-            return _nova_debug_routes_disabled_response()
-
-        from flask import jsonify
-        from nova_backend.services.chat_service import ChatService
-
-        return jsonify(ChatService.get_global_chat_turn_shadow_snapshot())
-
-    except Exception as error:
-        try:
-            return jsonify(
-                {
-                    "ok": False,
-                    "error": str(error),
-                }
-            ), 500
-        except Exception:
-            return {"ok": False, "error": str(error)}, 500
 
 
 # NOVA_DURABLE_DATA_HEALTH_ROUTE_20260703
