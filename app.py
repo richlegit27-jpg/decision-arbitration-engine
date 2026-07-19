@@ -409,6 +409,11 @@ app = Flask(
     template_folder=str(BASE_DIR / "templates"),
     static_folder=str(BASE_DIR / "static"),
 )
+
+app.secret_key = os.environ.get(
+    "NOVA_SECRET_KEY",
+    "nova-local-development-secret-key-change-me"
+)
 # NOVA_SELF_IMPROVEMENT_REPORT_ROUTES_20260710
 try:
     register_improvement_routes(app)
@@ -1094,7 +1099,6 @@ execution_fix_service = ExecutionFixService(
 chat_service.runtime = runtime_brain
 chat_service.safe_runtime = runtime_brain
 chat_service.runtime_brain = runtime_brain
-durable_execution_guard_service = DurableExecutionGuardService()
 app.runtime_brain = runtime_brain
 app.config["runtime_brain"] = runtime_brain
 

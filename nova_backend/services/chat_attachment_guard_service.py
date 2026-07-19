@@ -1,13 +1,15 @@
 class ChatAttachmentGuardService:
 
-    def handle(
+    def __init__(self):
+        pass
+
+    def handle_attachment_guard(
         self,
-        payload,
         request,
-        jsonify,
-        attachment_utils_service,
-        attachment_context_service,
-        attachment_text_service,
+        session_service=None,
+        execution_service=None,
+        attachment_text_service=None,
+        *args,
+        **kwargs,
     ):
-        try:
-            ...
+        return None
