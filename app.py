@@ -2721,54 +2721,14 @@ def api_chat():
                 _nova_exec_state2 = chat_execution_service.cancel(_nova_exec_session_id2)
             else:
                 _nova_exec_state2 = chat_execution_service.advance(_nova_exec_session_id2)
-
-            # NOVA_EXECUTION_GUARD_INLINE_FORMATTER_20260611
-            _nova_exec_status2 = str(_nova_exec_state2.get("status") or "").strip().lower()
-            _nova_exec_goal2 = str(_nova_exec_state2.get("goal") or "").strip()
-            _nova_exec_error2 = str(_nova_exec_state2.get("error") or "").strip()
-            _nova_exec_steps2 = _nova_exec_state2.get("steps") or []
-            _nova_exec_current2 = str(_nova_exec_state2.get("current_step") or "").strip()
-            _nova_exec_index2 = int(_nova_exec_state2.get("current_index") or 0)
-
-            if _nova_exec_status2 in {"idle", "none", ""}:
-                _nova_exec_reply2 = _nova_exec_error2 or "No active execution mission. Start one with: auto-plan <goal>"
-            elif _nova_exec_status2 in {"complete", "completed"}:
-                if _nova_exec_goal2:
-                    _nova_exec_reply2 = "Execution complete: " + _nova_exec_goal2
-                else:
-                    _nova_exec_reply2 = "Execution complete."
-            elif _nova_exec_status2 in {"failed", "error"}:
-                _nova_exec_reply2 = _nova_exec_error2 or "Execution failed."
-            else:
-                _nova_exec_total2 = len(_nova_exec_steps2)
-                _nova_exec_step_num2 = min(_nova_exec_index2 + 1, _nova_exec_total2) if _nova_exec_total2 else 1
-                if not _nova_exec_current2 and _nova_exec_steps2:
-                    _nova_exec_current2 = str(_nova_exec_steps2[_nova_exec_index2] if _nova_exec_index2 < _nova_exec_total2 else _nova_exec_steps2[-1])
-                _nova_exec_reply2 = (
-                    "Execution waiting. "
-                    + "Step "
-                    + str(_nova_exec_step_num2)
-                    + "/"
-                    + str(_nova_exec_total2 or "?")
-                    + ": "
-                    + (_nova_exec_current2 or "Next step")
+            return jsonify(
+                execution_guard_service.format_execution_response(
+                    _nova_exec_state2,
+                    _nova_exec_clean2,
+                    _nova_exec_action2,
                 )
+            )
 
-            return jsonify({
-                "ok": True,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": _nova_exec_reply2,
-                    "content": _nova_exec_reply2,
-                },
-                "execution_state": _nova_exec_state2,
-                "debug": {
-                    "route": "execution_command_top_guard",
-                    "command": _nova_exec_clean2,
-                    "action": _nova_exec_action2,
-                    "session_id": _nova_exec_session_id2,
-                },
-            })
     except Exception as exc:
         return jsonify({
             "ok": True,

@@ -124,6 +124,9 @@ class ChatExecutionService:
         safe_session_id = self._safe_session_id(session_id)
         state = self._states.get(safe_session_id)
 
+        if state and str(state.get("status") or "").strip().lower() == "idle":
+            return self._copy_state(state)
+
         if not state:
             return {
                 "status": "idle",
@@ -528,6 +531,13 @@ try:
                 pass
 
         _nova_execution_clear_session_file_20260630(sid, idle_state)
+
+        try:
+            if sid and hasattr(self, "_states"):
+                self._states.pop(sid, None)
+                self._save_states()
+        except Exception:
+            pass
 
         return idle_state
 

@@ -151,7 +151,6 @@ class ExecutionGuardService:
                     "stopped",
                     "complete",
                     "completed",
-                    "waiting",
                 }:
                     reply = self.chat_execution_service.format_reply(
                         current_state
@@ -197,5 +196,86 @@ class ExecutionGuardService:
                 "skip_post_processing": True,
                 "skip_rewrite": True,
             }
+
+    def format_execution_response(self, state, command="", action=""):
+        status = str(
+            state.get("status") or ""
+        ).strip().lower()
+
+        goal = str(
+            state.get("goal") or ""
+        ).strip()
+
+        error = str(
+            state.get("error") or ""
+        ).strip()
+
+        steps = state.get("steps") or []
+        current = str(
+            state.get("current_step") or ""
+        ).strip()
+
+        index = int(
+            state.get("current_index") or 0
+        )
+
+        if status in {"idle", "none", ""}:
+            reply = error or (
+                "No active execution mission. "
+                "Start one with: auto-plan <goal>"
+            )
+
+        elif status in {"complete", "completed"}:
+            reply = (
+                "Execution complete: "
+                + goal
+                if goal
+                else "Execution complete."
+            )
+
+        elif status in {"failed", "error"}:
+            reply = error or "Execution failed."
+
+        else:
+            total = len(steps)
+            step_num = min(
+                index + 1,
+                total
+            ) if total else 1
+
+        if not current and steps:
+            current = str(
+                steps[index]
+                if index < len(steps)
+                else steps[-1]
+            )
+
+            reply = (
+                "Execution waiting. Step "
+                + str(step_num)
+                + "/"
+                + str(total or "?")
+                + ": "
+                + (current or "Next step")
+            )
+
+        return {
+            "ok": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": reply,
+                "content": reply,
+            },
+            "text": reply,
+            "execution_state": state,
+            "debug": {
+                "route": "execution_command_top_guard",
+                "command": command,
+                "action": action,
+            },
+            "skip_cleanup": True,
+            "skip_post_processing": True,
+            "skip_rewrite": True,
+        }
 
         return None
