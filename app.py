@@ -354,6 +354,10 @@ from nova_backend.services.session_auth_scope_service import (
     SessionAuthScopeService,
 )
 
+from nova_backend.services.admin_route_service import (
+    AdminRouteService,
+)
+
 from nova_backend.services.attachment_memory_gate_service import (
     AttachmentMemoryGateService,
 )
@@ -880,6 +884,8 @@ artifact_service = ArtifactService(
 upload_ownership_service = UploadOwnershipService(
     "data/nova_upload_ownership.json"
 )
+
+
 project_focus_memory_service = ProjectFocusMemoryService(
     memory_service,
     session_service,
@@ -926,6 +932,10 @@ attachment_summary_service = AttachmentSummaryService()
 attachment_utils_service = AttachmentUtilsService()
 response_quality_service = ResponseQualityService()
 admin_lead_service = AdminLeadService()
+
+admin_route_service = AdminRouteService(
+    admin_lead_service,
+)
 session_detail_cache_service = SessionDetailCacheService()
 session_response_cache_service = SessionResponseCacheService(
     session_service,
@@ -7089,6 +7099,7 @@ empty_session_pruner_service.install(app)
 attachment_shape_normalizer_service.install(app)
 attachment_memory_gate_service.install(app)
 project_state_route_guard_service.install(app)
+public_route_service.install_routes(app)
 
 
 # NOVA_BEFORE_REQUEST_EXPLICIT_MEMORY_GUARD_20260611
@@ -10681,207 +10692,6 @@ def api_attachment_status():
             }, 500
 
 
-# NOVA_PUBLIC_HOME_PREVIEW_ROUTES_20260709
-@app.get("/nova-home-preview")
-@app.get("/landing")
-def nova_public_home_preview_20260709():
-    from flask import render_template
-    return render_template("nova_landing_home.html")
-# /NOVA_PUBLIC_HOME_PREVIEW_ROUTES_20260709
-
-
-# NOVA_BILLING_DASHBOARD_ROUTES_20260709
-@app.get("/billing")
-def nova_billing_dashboard_20260709():
-    from flask import render_template, request
-    import json
-    import os
-
-    username = (
-        request.args.get("user")
-        or request.cookies.get("nova_username")
-        or "richard"
-    )
-
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    billing_file = os.path.join(base_dir, "data", "nova_billing.json")
-
-    data = {}
-    try:
-        with open(billing_file, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
-    except Exception:
-        data = {}
-
-    users = data.get("users") if isinstance(data, dict) else {}
-    if not isinstance(users, dict):
-        users = {}
-
-    account = users.get(username) or users.get("richard") or {}
-
-    def as_int(value, fallback=0):
-        try:
-            return int(value)
-        except Exception:
-            return fallback
-
-    plan = str(account.get("plan") or "developer").strip() or "developer"
-    credits = as_int(account.get("credits"), 0)
-    monthly_credits = as_int(account.get("monthly_credits"), 0)
-
-    used_credits = max(monthly_credits - credits, 0) if monthly_credits else 0
-    usage_percent = 0.0
-    if monthly_credits > 0:
-        usage_percent = min(max((used_credits / monthly_credits) * 100, 0), 100)
-
-    status_label = "Active" if credits > 0 or plan else "Needs credits"
-
-    return render_template(
-        "nova_billing.html",
-        username_label=str(username),
-        plan_label=plan,
-        status_label=status_label,
-        credits_label=f"{credits:,}",
-        monthly_credits_label=f"{monthly_credits:,}",
-        used_credits_label=f"{used_credits:,}",
-        usage_percent_raw=f"{usage_percent:.2f}",
-        usage_percent_label=f"{usage_percent:.1f}%",
-        billing_file_label=billing_file,
-    )
-
-
-@app.get("/api/billing/status")
-def nova_billing_status_api_20260709():
-    from flask import jsonify, request
-    import json
-    import os
-
-    username = (
-        request.args.get("user")
-        or request.cookies.get("nova_username")
-        or "richard"
-    )
-
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    billing_file = os.path.join(base_dir, "data", "nova_billing.json")
-
-    data = {}
-    try:
-        with open(billing_file, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
-    except Exception as exc:
-        return jsonify({
-            "ok": False,
-            "error": str(exc),
-            "billing_file": billing_file,
-        }), 200
-
-    users = data.get("users") if isinstance(data, dict) else {}
-    if not isinstance(users, dict):
-        users = {}
-
-    account = users.get(username) or users.get("richard") or {}
-
-    return jsonify({
-        "ok": True,
-        "username": username,
-        "account": account,
-        "billing_file": billing_file,
-    })
-# /NOVA_BILLING_DASHBOARD_ROUTES_20260709
-
-
-# NOVA_BLOG_PAGE_ROUTES_20260709
-# /NOVA_BLOG_PAGE_ROUTES_20260709
-
-
-
-# NOVA_ABOUT_FEATURES_PAGE_ROUTES_20260709
-@app.get("/about")
-def nova_about_page_20260709():
-    from flask import render_template
-    return render_template("nova_about.html")
-
-
-@app.get("/features")
-def nova_features_page_20260709():
-    from flask import render_template
-    return render_template("nova_features.html")
-# /NOVA_ABOUT_FEATURES_PAGE_ROUTES_20260709
-
-
-# NOVA_ROADMAP_PAGE_ROUTES_20260709
-@app.get("/roadmap")
-def nova_roadmap_page_20260709():
-    from flask import render_template
-    return render_template("nova_roadmap.html")
-# /NOVA_ROADMAP_PAGE_ROUTES_20260709
-
-
-# NOVA_FAQ_PAGE_ROUTES_20260709
-@app.get("/faq")
-def nova_faq_page_20260709():
-    from flask import render_template
-    return render_template("nova_faq.html")
-# /NOVA_FAQ_PAGE_ROUTES_20260709
-
-
-# NOVA_CONTACT_PAGE_ROUTES_20260709
-@app.get("/contact")
-@app.get("/early-access")
-def nova_contact_page_20260709():
-    from flask import render_template
-    return render_template("nova_contact.html")
-# /NOVA_CONTACT_PAGE_ROUTES_20260709
-
-
-# NOVA_PUBLIC_SEO_ROUTES_20260709
-@app.get("/sitemap.xml")
-def nova_public_sitemap_20260709():
-    from flask import Response, render_template, request
-
-    base_url = request.url_root.rstrip("/")
-    xml = render_template("nova_sitemap.xml", base_url=base_url)
-    return Response(xml, mimetype="application/xml")
-
-
-@app.get("/robots.txt")
-def nova_public_robots_20260709():
-    from flask import Response, render_template, request
-
-    base_url = request.url_root.rstrip("/")
-    text = render_template("nova_robots.txt", base_url=base_url)
-    return Response(text, mimetype="text/plain")
-# /NOVA_PUBLIC_SEO_ROUTES_20260709
-
-
-# NOVA_LEGAL_PAGE_ROUTES_20260709
-@app.get("/privacy")
-def nova_privacy_page_20260709():
-    from flask import render_template
-    return render_template("nova_privacy.html")
-
-
-@app.get("/terms")
-def nova_terms_page_20260709():
-    from flask import render_template
-    return render_template("nova_terms.html")
-# /NOVA_LEGAL_PAGE_ROUTES_20260709
-
-
-# NOVA_PUBLIC_404_ROUTES_20260709
-@app.errorhandler(404)
-def nova_public_not_found_20260709(error):
-    from flask import jsonify, render_template, request
-
-    if request.path.startswith("/api/"):
-        return jsonify({
-            "ok": False,
-            "error": "Not found"
-        }), 404
-
-    return render_template("nova_404.html", path=request.path), 404
-
 @app.post("/api/contact")
 def nova_api_contact_submit_20260709():
     from flask import jsonify, request
@@ -10891,7 +10701,7 @@ def nova_api_contact_submit_20260709():
     payload = request.get_json(silent=True) or request.form.to_dict(flat=True)
 
     try:
-        lead = save_lead("contact", payload, admin_lead_service.request_meta(request))
+        lead = save_lead("contact", payload, self.admin_lead_service.request_meta(request))
     except ValueError as error:
         return jsonify({
             "ok": False,
@@ -10905,7 +10715,6 @@ def nova_api_contact_submit_20260709():
         "message": "Thanks   your message was received.",
     })
 
-
 @app.post("/api/early-access")
 def nova_api_early_access_submit_20260709():
     from flask import jsonify, request
@@ -10915,7 +10724,11 @@ def nova_api_early_access_submit_20260709():
     payload = request.get_json(silent=True) or request.form.to_dict(flat=True)
 
     try:
-        lead = save_lead("early_access", payload, admin_lead_service.request_meta(request))
+        lead = save_lead(
+            "early_access",
+            payload,
+            admin_lead_service.request_meta(request),
+        )
     except ValueError as error:
         return jsonify({
             "ok": False,
@@ -10936,7 +10749,7 @@ def nova_api_leads_admin_20260709():
 
     from nova_backend.services.lead_service import list_leads
 
-    if not admin_lead_service.admin_allowed(request):
+    if not self.admin_lead_service.admin_allowed(request):
         return jsonify({
             "ok": False,
             "error": "Forbidden",
@@ -10955,7 +10768,7 @@ def nova_admin_leads_csv_export_20260709():
 
     from nova_backend.services.lead_service import list_leads
 
-    if not admin_lead_service.admin_allowed(request):
+    if not self.admin_lead_service.admin_allowed(request):
         abort(403)
 
     raw_limit = request.args.get("limit", 10000)
@@ -11080,7 +10893,7 @@ def nova_admin_leads_csv_export_20260709():
 def nova_admin_template_context_20260709():
     try:
         allowed = bool(
-    admin_lead_service.admin_allowed(request)
+    self.admin_lead_service.admin_allowed(request)
 )
     except Exception:
         allowed = False
@@ -11103,7 +10916,7 @@ def nova_admin_lead_update_20260709(lead_id):
 
     from flask import abort, redirect, request
 
-    if not admin_lead_service.admin_allowed(request):
+    if not self.admin_lead_service.admin_allowed(request):
         abort(403)
 
     allowed_statuses = ("new", "reviewed", "replied", "archived")
@@ -11182,7 +10995,7 @@ def nova_admin_leads_page_20260709():
 
     from nova_backend.services.lead_service import list_leads
 
-    guard = lambda: admin_lead_service.admin_allowed(request)
+    guard = lambda: self.admin_lead_service.admin_allowed(request)
     if callable(guard):
         if not guard():
             abort(403)
@@ -11283,7 +11096,7 @@ def nova_admin_home_dashboard_20260709():
 
     from nova_backend.services.lead_service import list_leads
 
-    if not admin_lead_service.admin_allowed(request):
+    if not self.admin_lead_service.admin_allowed(request):
         abort(403)
 
     data = list_leads(10000)
@@ -11316,7 +11129,7 @@ def nova_admin_home_dashboard_20260709():
 def nova_admin_launch_checklist_repair_20260709():
     from flask import abort, render_template
 
-    guard = lambda: admin_lead_service.admin_allowed(request)
+    guard = lambda: self.admin_lead_service.admin_allowed(request)
 
     if callable(guard):
         if not guard():
