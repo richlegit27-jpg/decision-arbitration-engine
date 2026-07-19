@@ -187,6 +187,9 @@ from nova_backend.services.execution_fix_service import (
 from nova_backend.services.session_detail_response_cache_service import (
     SessionDetailResponseCacheService,
 )
+from nova_backend.services.chat_guard_service import (
+    ChatGuardService,
+)
 
 from nova_backend.services.project_state_route_guard_service import (
     ProjectStateRouteGuardService,
@@ -977,6 +980,7 @@ session_response_cache_service = SessionResponseCacheService(
     attachment_context_service,
 )
 
+chat_guard_service = ChatGuardService()
 account_profile_service = AccountProfileService()
 session_slim_response_service = SessionSlimResponseService()
 web_service = WebService(timeout=WEB_TIMEOUT)
@@ -1095,7 +1099,6 @@ execution_fix_service = ExecutionFixService(
 # =========================
 # RUNTIME BINDING
 # =========================
-
 chat_service.runtime = runtime_brain
 chat_service.safe_runtime = runtime_brain
 chat_service.runtime_brain = runtime_brain
