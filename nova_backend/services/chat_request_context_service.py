@@ -30,3 +30,28 @@ class ChatRequestContextService:
             "session_id": session_id,
             "attachments": attachments,
         }
+
+def clean_web_attachment_context(self, user_text, attachments):
+    clean = " ".join(
+        str(user_text or "").lower().split()
+    )
+
+    web_terms = (
+        "latest news",
+        "news about",
+        "today in",
+        "what happened today",
+        "current news",
+        "breaking news",
+        "recent news",
+        "latest tech news",
+        "latest sports",
+        "weather",
+        "forecast",
+        "current events",
+    )
+
+    if any(term in clean for term in web_terms):
+        return [], True
+
+    return attachments, False
