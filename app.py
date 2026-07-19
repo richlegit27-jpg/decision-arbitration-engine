@@ -124,6 +124,10 @@ def update_execution_state_safe(execution, status=None, current_step=None, last_
 
 from werkzeug.utils import secure_filename
 
+from nova_backend.services.attachment_shape_normalizer_service import (
+    AttachmentShapeNormalizerService,
+)
+
 from nova_backend.routes.memory_panel_routes import (
     register_memory_panel_routes,
 )
@@ -891,7 +895,7 @@ local_auth_route_service = LocalAuthRouteService(
 
 login_page_route_service = LoginPageRouteService()
 auth_compat_route_service = AuthCompatRouteService()
-
+attachment_shape_normalizer_service = AttachmentShapeNormalizerService()
 session_auth_scope_service = SessionAuthScopeService()
 mobile_session_persist_service = MobileSessionPersistService()
 project_state_route_guard_service = ProjectStateRouteGuardService()
@@ -7106,50 +7110,8 @@ def nova_before_request_slim_api_sessions_20260611():
 session_auth_scope_service.install(app)
 
 
-# NOVA_PRUNE_EMPTY_SESSION_SPAM_20260610
-# Prevents frontend/route bugs from filling nova_sessions.json with duplicate empty "New Chat" records.
-def _nova_install_empty_session_spam_pruner_20260610():
-    import json
-    from pathlib import Path
-    from flask import request
 
-    data_dir = Path(__file__).resolve().parent / "data"
-    sessions_path = data_dir / "nova_sessions.json"
-
-    @app.after_request
-    def nova_prune_empty_session_spam_after_request_20260610(response):
-        path = str(request.path or "")
-
-        # NOVA_SESSION_NEW_PRUNER_MUTATION_ROUTE_SKIP_20260703
-        # Do not prune immediately after session mutation routes.
-        # These routes already changed the store; pruning after them can make
-        # new/rename/delete/pin look flaky or leave active_session_id as a ghost.
-        if request.method != "GET" and path in (
-            "/api/sessions/new",
-            "/api/sessions/switch",
-            "/api/sessions/rename",
-            "/api/sessions/pin",
-            "/api/sessions/delete",
-        ):
-            return response
-
-        if (
-            path.startswith("/api/sessions")
-            or path.startswith("/api/chat")
-            or path.startswith("/api/chat/stream")
-            or path == "/mobile"
-        ):
-            removed = empty_session_pruner_service.prune_empty_new_chat_spam()
-            if removed:
-                try:
-                    app.logger.info("[Nova Session Spam Pruner] removed %s duplicate empty New Chat sessions", removed)
-                except Exception:
-                    pass
-
-        return response
-
-
-_nova_install_empty_session_spam_pruner_20260610()
+empty_session_pruner_service.install(app)
 
 
 
@@ -7353,7 +7315,7 @@ def _nova_install_attachment_shape_normalizer_20260610():
         return response
 
 
-_nova_install_attachment_shape_normalizer_20260610()
+attachment_shape_normalizer_service.install(app)
 
 
 # NOVA_HELP_PAGE_ROUTE_20260611
