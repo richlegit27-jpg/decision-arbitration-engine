@@ -296,5 +296,73 @@ class AdminRouteService:
                 "nova_admin_launch_checklist.html"
             )
 
+        @app.get("/admin/leads.csv")
+        def nova_admin_leads_csv_export_20260709():
+            import csv
+            import io
+            from datetime import datetime, timezone
+
+            from flask import Response, abort, request
+
+            from nova_backend.services.lead_service import list_leads
+
+            if not self.admin_lead_service.admin_allowed(request):
+                abort(403)
+
+            raw_limit = request.args.get("limit", 10000)
+
+            try:
+                selected_limit = int(raw_limit)
+            except Exception:
+                selected_limit = 10000
+
+            selected_limit = max(1, min(selected_limit, 10000))
+
+            data = list_leads(selected_limit)
+            leads = data.get("leads", [])
+
+            output = io.StringIO()
+
+            headers = [
+                "created_at",
+                "kind",
+                "status",
+                "name",
+                "email",
+                "interest",
+                "message",
+                "source",
+                "owner_notes",
+                "admin_updated_at",
+            ]
+
+            writer = csv.DictWriter(
+                output,
+                fieldnames=headers,
+                extrasaction="ignore",
+            )
+
+            writer.writeheader()
+
+            for lead in leads:
+                writer.writerow({
+                    key: lead.get(key, "")
+                    for key in headers
+                })
+
+            stamp = datetime.now(timezone.utc).strftime(
+                "%Y%m%d-%H%M%S"
+            )
+
+            return Response(
+                "\ufeff" + output.getvalue(),
+                mimetype="text/csv",
+                headers={
+                    "Content-Disposition":
+                        f'attachment; filename="nova-leads-{stamp}.csv"',
+                    "Cache-Control": "no-store",
+                },
+            )
+
 
 
