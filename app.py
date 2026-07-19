@@ -963,7 +963,8 @@ local_auth_route_service = LocalAuthRouteService(
     session,
 )
 
-chat_attachment_context_service = ChatAttachmentContextService()
+
+
 chat_attachment_memory_service = ChatAttachmentMemoryService()
 chat_response_cleanup_service = ChatResponseCleanupService()
 chat_execution_service = ChatExecutionService()
@@ -1033,6 +1034,11 @@ runtime_response_sanitizer = RuntimeResponseSanitizerService()
 attachment_keypoints_service = AttachmentKeypointsService()
 install_project_chat_response_router(app)
 attachment_analysis_service = AttachmentAnalysisService()
+chat_attachment_context_service = ChatAttachmentContextService(
+    uploads_dir=UPLOADS_DIR,
+    base_dir=BASE_DIR,
+    attachment_analysis_service=attachment_analysis_service,
+)
 attachment_text_service = AttachmentTextService()
 blog_service = BlogService()
 debug_route_service = DebugRouteService()
@@ -3414,10 +3420,7 @@ def api_chat():
                     ""
                 ).strip()
 
-            attachment_content_lines.append(
-                f"Attachment {attachment_display_name} content:\n"
-                f"{content_snippet if content_snippet else fallback_text}"
-            )
+
 
         # GATE_REMEMBERED_ATTACHMENT_INJECTION_LOCK
         attachment_gate_text = str(user_text or "").lower().strip()
