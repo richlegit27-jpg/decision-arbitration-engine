@@ -27345,17 +27345,6 @@ def _nova_attachment_guard_install_web_routing_suppression():
     }
 
 
-def _nova_install_attachment_guard_web_suppression():
-    return _nova_attachment_guard_install_web_routing_suppression()
-
-
-# Install opportunistically at import time. Safe if no matching web functions exist.
-try:
-    _nova_attachment_guard_install_web_routing_suppression()
-except Exception:
-    pass
-
-# NOVA_CHAT_SERVICE_ATTACHMENT_WEB_SUPPRESSION_COMPAT_V2_20260705
 def _nova_attachment_guard_expand_call(*call_args, **call_kwargs):
     positional = list(call_args)
     keyword = dict(call_kwargs or {})
