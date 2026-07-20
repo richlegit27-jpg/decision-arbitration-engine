@@ -25967,7 +25967,7 @@ except Exception as _nova_project_state_fresh_priority_install_error_20260701:
 
 # NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701
 # Final top-priority guard for project-brain questions.
-# Fixes old direct_working_on_recall/chat fallback answers like:
+# Prevents stale project brain fallback answers.
 # "No active task is currently tracked yet."
 try:
     _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701 = ChatService.handle
