@@ -39,24 +39,60 @@ class ChatResponseCleanupService:
 
     def sync_attachment_text(self, result):
         try:
-            if not isinstance(result, dict):
-                return result
+            if isinstance(result, dict):
+                content = str(result.get("content") or "").strip()
+                text_value = str(result.get("text") or "").strip()
 
-            assistant_message = result.get("assistant_message")
+                if (
+                    content.startswith("Attachment analysis:")
+                    and "Attachment " in content
+                    and " content:" in content
+                    and content != text_value
+                ):
+                    result["text"] = content
+                    result["content"] = content
 
-            if isinstance(assistant_message, dict):
+                assistant_message = result.get("assistant_message")
+
+                if isinstance(assistant_message, dict):
+                    content = str(
+                        assistant_message.get("content") or ""
+                    ).strip()
+
+                    text_value = str(
+                        assistant_message.get("text") or ""
+                    ).strip()
+
+                    if (
+                        content.startswith("Attachment analysis:")
+                        and "Attachment " in content
+                        and " content:" in content
+                        and content != text_value
+                    ):
+                        assistant_message["text"] = content
+                        assistant_message["content"] = content
+                        result["assistant_message"] = assistant_message
+
+            else:
                 content = str(
-                    assistant_message.get("content") or ""
+                    getattr(result, "content", "") or ""
+                ).strip()
+
+                text_value = str(
+                    getattr(result, "text", "") or ""
                 ).strip()
 
                 if (
                     content.startswith("Attachment analysis:")
                     and "Attachment " in content
                     and " content:" in content
+                    and content != text_value
                 ):
-                    assistant_message["text"] = content
-                    assistant_message["content"] = content
-                    result["assistant_message"] = assistant_message
+                    try:
+                        setattr(result, "text", content)
+                        setattr(result, "content", content)
+                    except Exception:
+                        pass
 
         except Exception:
             pass

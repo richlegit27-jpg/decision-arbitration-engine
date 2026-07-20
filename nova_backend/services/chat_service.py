@@ -9,11 +9,14 @@ import shutil
 import tempfile
 import py_compile
 
+
+from nova_backend.services.response_mojibake_cleanup_service import ResponseMojibakeCleanupService
+from nova_backend.services.chat_response_cleanup_service import ChatResponseCleanupService
 from nova_backend.services.attachment_analysis_service import AttachmentAnalysisService
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, List
-
+from nova_backend.services.accidental_input_guard_service import AccidentalInputGuardService
 from nova_backend.services.execution_handler import (
     ExecutionHandler,
     NextMove,
@@ -4020,8 +4023,11 @@ if (not attachments) and (__name__ == "__main__"):
         recon_service: ReconService,
     ):
 
+        self.chat_response_cleanup_service = ChatResponseCleanupService()
         self.runtime_cognitive_firewall = RuntimeCognitiveFirewall()
         self.attachment_analysis_service = AttachmentAnalysisService()
+        self.accidental_input_guard_service = AccidentalInputGuardService()
+        self.response_mojibake_cleanup_service = ResponseMojibakeCleanupService()
 
         # =========================
         # CORE SERVICES
@@ -12119,6 +12125,19 @@ if (not attachments) and (__name__ == "__main__"):
 
 
     def handle(self, user_text: str, session_id: str = "", attachments=None):
+
+        try:
+            guard_result = self.accidental_input_guard_service.handle(
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
+            )
+
+            if guard_result:
+                return guard_result
+
+        except Exception:
+            pass
 
         # NOVA_CHAT_TURN_HANDLE_HELPER_SHADOW_20260705
         try:
@@ -23663,72 +23682,6 @@ except NameError:
     pass
 
 
-# NOVA_CHAT_SERVICE_ATTACHMENT_TEXT_SYNC_HANDLE_20260611
-def _nova_sync_attachment_text_fields_20260611(value):
-    try:
-        if isinstance(value, dict):
-            content = str(value.get("content") or "").strip()
-            text_value = str(value.get("text") or "").strip()
-
-            if (
-                content.startswith("Attachment analysis:")
-                and "Attachment " in content
-                and " content:" in content
-                and content != text_value
-            ):
-                value["text"] = content
-                value["content"] = content
-
-            assistant_message = value.get("assistant_message")
-            if isinstance(assistant_message, dict):
-                content = str(assistant_message.get("content") or "").strip()
-                text_value = str(assistant_message.get("text") or "").strip()
-
-                if (
-                    content.startswith("Attachment analysis:")
-                    and "Attachment " in content
-                    and " content:" in content
-                    and content != text_value
-                ):
-                    assistant_message["text"] = content
-                    assistant_message["content"] = content
-                    value["assistant_message"] = assistant_message
-
-        else:
-            content = str(getattr(value, "content", "") or "").strip()
-            text_value = str(getattr(value, "text", "") or "").strip()
-
-            if (
-                content.startswith("Attachment analysis:")
-                and "Attachment " in content
-                and " content:" in content
-                and content != text_value
-            ):
-                try:
-                    setattr(value, "text", content)
-                    setattr(value, "content", content)
-                except Exception:
-                    pass
-
-    except Exception:
-        pass
-
-    return value
-
-
-try:
-    _nova_original_chat_service_handle_20260611 = ChatService.handle
-
-    def _nova_chat_service_handle_attachment_text_sync_20260611(self, *args, **kwargs):
-        result = _nova_original_chat_service_handle_20260611(self, *args, **kwargs)
-        return _nova_sync_attachment_text_fields_20260611(result)
-
-    _nova_chat_service_handle_attachment_text_sync_20260611._nova_attachment_text_sync_20260611 = True
-    ChatService.handle = _nova_chat_service_handle_attachment_text_sync_20260611
-    _nova_boot_log_20260701("[NOVA ATTACHMENT SYNC] ChatService.handle attachment text sync installed")
-except Exception as exc:
-    print("[NOVA ATTACHMENT SYNC] ChatService.handle attachment text sync install failed:", exc)
-
 # =========================================================
 # NOVA_NON_WEB_SOURCE_LEAK_GUARD_20260622
 # Prevent latest-news / live-source cards from leaking into normal chat
@@ -24004,237 +23957,6 @@ except Exception as _nova_intent_authority_install_error:
         _nova_intent_authority_install_error,
     )
 
-
-# NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V4_20260624
-# Final response cleaner: exact known mojibake only. No broad word-ending regex.
-try:
-    _NOVA_PRE_FINAL_MOJIBAKE_HANDLE_V4_20260624 = ChatService.handle
-
-    def _nova_final_clean_mojibake_text_v4_20260624(value):
-        if not isinstance(value, str):
-            return value
-
-        text = value
-
-        # Build bad fragments by bytes so PowerShell/codepage cannot corrupt this patch.
-        apos = bytes([0xE2, 0x80, 0x99]).decode("utf-8", errors="replace")
-        lquote = bytes([0xE2, 0x80, 0x9C]).decode("utf-8", errors="replace")
-        rquote = bytes([0xE2, 0x80, 0x9D]).decode("utf-8", errors="replace")
-        ndash = bytes([0xE2, 0x80, 0x93]).decode("utf-8", errors="replace")
-        mdash = bytes([0xE2, 0x80, 0x94]).decode("utf-8", errors="replace")
-        ellip = bytes([0xE2, 0x80, 0xA6]).decode("utf-8", errors="replace")
-
-        replacements = {
-            apos: "'",
-            lquote: '"',
-            rquote: '"',
-            ndash: "-",
-            mdash: "-",
-            ellip: "...",
-            "? ": " ",
-            "?": "",
-        }
-
-        for bad, good in replacements.items():
-            text = text.replace(bad, good)
-
-        # Exact visible mojibake strings seen in Nova output.
-        exact = {
-            "it?s": "it's",
-            "It?s": "It's",
-            "that?s": "that's",
-            "That?s": "That's",
-            "there?s": "there's",
-            "There?s": "There's",
-            "what?s": "what's",
-            "What?s": "What's",
-            "don?t": "don't",
-            "Don?t": "Don't",
-            "doesn?t": "doesn't",
-            "Doesn?t": "Doesn't",
-            "isn?t": "isn't",
-            "Isn?t": "Isn't",
-            "aren?t": "aren't",
-            "Aren?t": "Aren't",
-            "can?t": "can't",
-            "Can?t": "Can't",
-            "won?t": "won't",
-            "Won?t": "Won't",
-            "you?re": "you're",
-            "You?re": "You're",
-            "we?re": "we're",
-            "We?re": "We're",
-            "they?re": "they're",
-            "They?re": "They're",
-            "I?m": "I'm",
-            "i?m": "I'm",
-            "I?ve": "I've",
-            "i?ve": "I've",
-            "I?ll": "I'll",
-            "i?ll": "I'll",
-        }
-
-        for bad, good in exact.items():
-            text = text.replace(bad, good)
-
-        return text
-
-    def _nova_final_clean_mojibake_obj_v4_20260624(obj):
-        if isinstance(obj, str):
-            return _nova_final_clean_mojibake_text_v4_20260624(obj)
-
-        if isinstance(obj, list):
-            return [_nova_final_clean_mojibake_obj_v4_20260624(item) for item in obj]
-
-        if isinstance(obj, dict):
-            return {
-                key: _nova_final_clean_mojibake_obj_v4_20260624(value)
-                for key, value in obj.items()
-            }
-
-        return obj
-
-    def _nova_final_mojibake_clean_handle_v4_20260624(self, *args, **kwargs):
-        result = _NOVA_PRE_FINAL_MOJIBAKE_HANDLE_V4_20260624(self, *args, **kwargs)
-        return _nova_final_clean_mojibake_obj_v4_20260624(result)
-
-    ChatService.handle = _nova_final_mojibake_clean_handle_v4_20260624
-    _nova_boot_log_20260701("[NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V4_20260624] installed")
-except Exception as _nova_final_mojibake_cleanup_v4_error_20260624:
-    print("[NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V4_20260624] failed:", _nova_final_mojibake_cleanup_v4_error_20260624)
-
-
-# NOVA_ACCIDENTAL_INPUT_GUARD_20260630
-# Final lightweight guard for keyboard-smash / accidental input.
-# Prevents garbage text from triggering web, image generation, planner, memory, or session title changes.
-try:
-    import re as _nova_accidental_re_20260630
-    from collections import Counter as _nova_accidental_counter_20260630
-
-    _NOVA_PRE_ACCIDENTAL_INPUT_GUARD_HANDLE_20260630 = ChatService.handle
-
-    def _nova_is_accidental_input_20260630(value) -> bool:
-        text = str(value or "")
-        compact = "".join(text.split())
-
-        if not compact:
-            return True
-
-        lower = compact.lower()
-
-        allowed_short_commands = {
-            "k",
-            "ok",
-            "okay",
-            "next",
-            "continue",
-            "run",
-            "runit",
-            "stop",
-            "cancel",
-            "yes",
-            "no",
-        }
-
-        if lower in allowed_short_commands:
-            return False
-
-        if len(compact) < 8:
-            return False
-
-        counts = _nova_accidental_counter_20260630(compact)
-        most_common_ratio = counts.most_common(1)[0][1] / max(len(compact), 1)
-
-        alpha_count = sum(1 for ch in compact if ch.isalpha())
-        digit_count = sum(1 for ch in compact if ch.isdigit())
-        symbol_count = sum(1 for ch in compact if not ch.isalnum())
-        symbol_digit_ratio = (digit_count + symbol_count) / max(len(compact), 1)
-
-        if len(compact) >= 12 and most_common_ratio >= 0.75:
-            return True
-
-        if len(compact) >= 20 and alpha_count == 0 and symbol_digit_ratio >= 0.90:
-            return True
-
-        if len(compact) >= 24 and alpha_count <= 2 and symbol_digit_ratio >= 0.80:
-            return True
-
-        repeated_runs = _nova_accidental_re_20260630.search(r"(.)\1{9,}", compact)
-        if repeated_runs and len(compact) >= 12:
-            return True
-
-        bracket_smash = _nova_accidental_re_20260630.search(r"([\[\]\(\)\{\}=\\\/\|'\-]){8,}", compact)
-        if bracket_smash and alpha_count <= 3:
-            return True
-
-        return False
-
-    def _nova_accidental_input_guard_handle_20260630(
-        self,
-        user_text: str = "",
-        session_id: str = "",
-        attachments=None,
-        *args,
-        **kwargs,
-    ):
-        try:
-            has_attachments = bool(attachments)
-
-            if not has_attachments and _nova_is_accidental_input_20260630(user_text):
-                clean_message = "Looks like that was accidental."
-
-                return {
-                    "ok": True,
-                    "route": "accidental_input_guard",
-                    "mode": "guard",
-                    "assistant_text": clean_message,
-                    "response": clean_message,
-                    "message": clean_message,
-                    "content": clean_message,
-                    "assistant_message": {
-                        "role": "assistant",
-                        "text": clean_message,
-                        "content": clean_message,
-                        "attachments": [],
-                        "meta": {
-                            "source": "accidental_input_guard",
-                            "save_memory": False,
-                            "use_memory": False,
-                            "skip_title_update": True,
-                        },
-                    },
-                    "session_id": session_id,
-                    "active_session_id": session_id,
-                    "attachments": [],
-                    "skip_post_processing": True,
-                    "save_memory": False,
-                    "use_memory": False,
-                    "skip_title_update": True,
-                }
-
-        except Exception as _nova_accidental_guard_error_20260630:
-            print(
-                "[NOVA_ACCIDENTAL_INPUT_GUARD_20260630] skipped:",
-                _nova_accidental_guard_error_20260630,
-            )
-
-        return _NOVA_PRE_ACCIDENTAL_INPUT_GUARD_HANDLE_20260630(
-            self,
-            user_text,
-            session_id,
-            attachments,
-            *args,
-            **kwargs,
-        )
-
-    ChatService.handle = _nova_accidental_input_guard_handle_20260630
-    _nova_boot_log_20260701("[NOVA_ACCIDENTAL_INPUT_GUARD_20260630] installed")
-
-except Exception as _nova_accidental_input_guard_install_error_20260630:
-    print(
-        "[NOVA_ACCIDENTAL_INPUT_GUARD_20260630] failed:",
-        _nova_accidental_input_guard_install_error_20260630,
-    )
 
 # NOVA_FINAL_LIVE_MARKET_PRICE_ROUTE_AUTHORITY_20260630
 # Final route authority: live market price questions must use web_fetch.
