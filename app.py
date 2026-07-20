@@ -286,6 +286,9 @@ from nova_backend.services.login_page_route_service import (
 from nova_backend.services.local_auth_route_service import (
     LocalAuthRouteService,
 )
+from nova_backend.services.project_state_direct_freshness_priority_service import (
+    ProjectStateDirectFreshnessPriorityService,
+)
 
 from nova_backend.services.auth_compat_route_service import (
     AuthCompatRouteService,
@@ -710,7 +713,12 @@ public_route_service.install_routes(app)
 admin_route_service.install_routes(app)
 normal_chat_bleed_guard_service.install(app)
 repair_plan_priority_guard_service.install(app)
-
+project_state_direct_freshness_priority_service = (
+    ProjectStateDirectFreshnessPriorityService(
+        execution_state_service=execution_state_service,
+    )
+)
+project_state_direct_freshness_priority_service.install(app)
 
 history_route_service.install_routes(
 
@@ -787,7 +795,6 @@ project_brain_general_intelligence_priority_service.install(app)
 
 if hasattr(chat_service, "start_execution_daemon"):
     chat_service.start_execution_daemon()
-
 
 image_command_service = ImageCommandService(
     chat_service
@@ -885,42 +892,6 @@ def build_common_state_payload(session_id: str = "") -> dict:
         "memory": memory_service.build_list_payload(),
     }
 
-def extract_memory_fact(user_text: str) -> dict | None:
-    return memory_recall_service.extract_memory_fact(
-        user_text
-    )
-
-def memory_exists_for_session(
-    session_id: str,
-    fact_text: str,
-) -> bool:
-    return memory_recall_service.memory_exists_for_session(
-        session_id,
-        fact_text,
-    )
-
-def extract_name_from_memory_text(
-    text: str,
-) -> str:
-    return memory_recall_service.extract_name_from_memory_text(
-        text
-    )
-
-def find_best_name_memory(
-    session_id: str,
-) -> dict | None:
-    return memory_recall_service.find_best_name_memory(
-        session_id
-    )
-
-def cleanup_competing_name_memories(
-    session_id: str,
-    winning_text: str,
-):
-    return memory_recall_service.cleanup_competing_name_memories(
-        session_id,
-        winning_text,
-    )
 
 @app.get("/")
 def index():
@@ -1279,149 +1250,6 @@ def api_fetch():
     )
 
     return jsonify(clean_result)
-
-
-
-# NOVA_PROJECT_STATE_DIRECT_FRESHNESS_BRIDGE_20260702
-# Fresh exact project-state recall bridge.
-# Thin app.py adapter; decision and response construction live in service layer.
-try:
-    from flask import jsonify as _nova_project_state_direct_fresh_jsonify_20260702
-    from flask import request as _nova_project_state_direct_fresh_request_20260702
-
-    @app.before_request
-    def _nova_project_state_direct_freshness_bridge_20260702():
-        try:
-            if (
-                _nova_project_state_direct_fresh_request_20260702.path
-                != "/api/chat"
-            ):
-                return None
-
-            if (
-                _nova_project_state_direct_fresh_request_20260702.method
-                != "POST"
-            ):
-                return None
-
-            payload = (
-                _nova_project_state_direct_fresh_request_20260702
-                .get_json(
-                    silent=True
-                )
-                or {}
-            )
-
-            if not isinstance(
-                payload,
-                dict,
-            ):
-                return None
-
-            session_id = str(
-                payload.get(
-                    "session_id"
-                )
-                or payload.get(
-                    "active_session_id"
-                )
-                or payload.get(
-                    "requested_session_id"
-                )
-                or ""
-            ).strip()
-
-            # -------------------------------------------------
-            # ACTIVE EXECUTION OWNS STATUS CONTINUITY.
-            #
-            # This before_request bridge runs before /api/chat
-            # endpoint wrappers. Without this priority check,
-            # exact project-state prompts return here before
-            # NOVA_PROJECT_STATE_DIRECT_FRESHNESS_ACTIVE_EXECUTION_BYPASS_20260701
-            # can answer.
-            # -------------------------------------------------
-
-            active_execution_getter = (
-                 execution_state_service.get_active_execution
-            )
-
-            if callable(
-                active_execution_getter
-            ):
-
-                try:
-
-                    active_execution = (
-                        active_execution_getter(
-                            session_id
-                        )
-                    )
-
-                except Exception as exc:
-
-                    active_execution = None
-
-                    try:
-                        print(
-                            "[NOVA_PROJECT_STATE_DIRECT_FRESHNESS_BRIDGE_20260702] "
-                            "active execution priority bypass:",
-                            exc,
-                        )
-                    except Exception:
-                        pass
-
-                if isinstance(
-                    active_execution,
-                    dict,
-                ):
-
-                    execution_is_active = (
-                        execution_state_service.execution_is_active
-                    )
-
-                    if (
-                        callable(
-                            execution_is_active
-                        )
-                        and execution_is_active(
-                            active_execution
-                        )
-                    ):
-                        return None
-
-            from nova_backend.services.project_state_direct_freshness_bridge import (
-                build_project_state_direct_fresh_response,
-            )
-
-            response_json = (
-                build_project_state_direct_fresh_response(
-                    payload
-                )
-            )
-
-            if not response_json:
-                return None
-
-            return (
-                _nova_project_state_direct_fresh_jsonify_20260702(
-                    response_json
-                )
-            )
-
-        except Exception as exc:
-            try:
-                print(
-                    "[NOVA_PROJECT_STATE_DIRECT_FRESHNESS_BRIDGE_20260702] failed:",
-                    exc,
-                )
-            except Exception:
-                pass
-
-            return None
-
-    print("[NOVA_PROJECT_STATE_DIRECT_FRESHNESS_BRIDGE_20260702] installed")
-except Exception as _nova_project_state_direct_freshness_bridge_error_20260702:
-    print("[NOVA_PROJECT_STATE_DIRECT_FRESHNESS_BRIDGE_20260702] failed:", _nova_project_state_direct_freshness_bridge_error_20260702)
 
 
 # CASUAL_CHAT_GUARD_20260604
