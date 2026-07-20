@@ -1510,6 +1510,64 @@ class WebService:
     # ARTIFACT PAYLOADS
     # -----------------------
 
+    def preview(self, url: str) -> dict:
+        url = self.normalize_url(url)
+
+        if not url:
+            return {
+                "ok": False,
+                "error": "Missing url",
+                "title": "Source preview",
+                "preview": "",
+                "url": "",
+            }
+
+        try:
+            response = requests.get(
+                url,
+                headers=self._headers(),
+                timeout=self.timeout,
+                allow_redirects=True,
+            )
+
+            response.raise_for_status()
+
+            final_url = response.url or url
+            html = response.text or ""
+
+            title = self._extract_title(html)
+            text = self._strip_html(html)
+
+            lines = [
+                line.strip()
+                for line in text.splitlines()
+                if line.strip()
+            ]
+
+            preview = "\n".join(lines[:24]).strip()
+
+            if not preview:
+                preview = (
+                    "Preview route is working, "
+                    "but no readable article text was found."
+                )
+
+            return {
+                "ok": True,
+                "title": title or "Source preview",
+                "preview": preview[:4000],
+                "url": final_url,
+            }
+
+        except Exception as exc:
+            return {
+                "ok": False,
+                "error": str(exc),
+                "title": "Source preview",
+                "preview": "Preview failed on backend.",
+                "url": url,
+            }
+
     def build_search_artifact_payload(self, result: Dict[str, Any]) -> dict:
         query = str(result.get("query") or "").strip()
         summary = str(result.get("summary") or "").strip()
