@@ -33,6 +33,9 @@ from nova_backend.services.repair_plan_priority_guard_service import (
 from nova_backend.services.autonomy_route_guard_service import (
     AutonomyRouteGuardService,
 )
+from nova_backend.services.project_brain_general_intelligence_priority_service import (
+    ProjectBrainGeneralIntelligencePriorityService,
+)
 
 from nova_backend.services.execution_priority_guard_service import (
     ExecutionPriorityGuardService,
@@ -690,6 +693,8 @@ session_route_service.install_routes(
     memory_service,
 )
 
+
+
 autonomy_route_guard_service.install(app)
 execution_priority_guard_service.install(app)
 session_history_persistence_guard_service.install(app)
@@ -714,6 +719,7 @@ history_route_service.install_routes(
     history_service,
 
 )
+
 
 command_route_service.install_routes(app)
 
@@ -770,6 +776,12 @@ chat_service = ChatService(
     artifact_service=artifact_service,
     web_service=web_service,
     recon_service=recon_service,
+)
+project_brain_general_intelligence_priority_service = (
+    ProjectBrainGeneralIntelligencePriorityService(
+        execution_state_service=execution_state_service,
+        chat_service=chat_service,
+    )
 )
 
 if hasattr(chat_service, "start_execution_daemon"):
