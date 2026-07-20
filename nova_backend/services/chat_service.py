@@ -6147,7 +6147,6 @@ if (not attachments) and (__name__ == "__main__"):
             "what did i say",
             "what was my last message",
         }:
-            print("RECALL INTERCEPT HIT")
 
             all_sessions = self.sessions.list_sessions()
 
@@ -10009,7 +10008,6 @@ if (not attachments) and (__name__ == "__main__"):
             )
             and (text.startswith("http://") or text.startswith("https://"))
         ):
-            print("DIRECT_URL_PATCH_HIT =", text)
 
             web_result = {}
 
@@ -17776,7 +17774,6 @@ Auto-fix result:
 
         if text == "test_fail":
 
-            print("TEST_FAIL HARD OVERRIDE HIT")
 
             live_execution = (
                 self._get_session_meta(
@@ -22910,7 +22907,6 @@ def _nova_runtime_handle_image_generation(
             "skip_rewrite": True,
         }
 
-    print("RUNTIME IMAGE HIT PROMPT =", repr(prompt))
 
     saved_artifact = None
 
