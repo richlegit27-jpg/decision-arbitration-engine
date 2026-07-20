@@ -19,11 +19,14 @@ DIRECT_PROJECT_STATE_PROMPTS = {
     "where are we at with nova",
     "what is the current nova state",
     "what is the current project state",
+    "where are we at with nova right now",
 }
 
 NEXT_MOVE_PROMPTS = {
     "what should we do next",
     "what do we do next",
+    "what should we work on next",
+    "what should we work on",
     "what next",
     "what's next",
     "whats next",
@@ -84,6 +87,7 @@ def build_project_state_direct_fresh_response(payload):
     )
 
     intent = classify_project_state_freshness_prompt(user_text)
+    print("[FRESHNESS BRIDGE DEBUG]", repr(user_text), repr(intent))
     if not intent:
         return None
 

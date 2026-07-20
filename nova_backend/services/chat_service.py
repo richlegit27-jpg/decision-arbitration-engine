@@ -25580,8 +25580,25 @@ try:
             try:
                 user_text = _nova_project_state_extract_text_20260630(args, kwargs)
 
+                normalized = (
+                    " ".join(
+                        str(user_text or "")
+                        .lower()
+                        .replace("?", " ")
+                        .replace("!", " ")
+                        .split()
+                    )
+                )
+
+                if normalized == "what should we work on next":
+                    return _NOVA_PRE_PROJECT_STATE_RECALL_HANDLE_20260630(
+                        self,
+                        *args,
+                        **kwargs,
+                    )
+
                 # NOVA_PROJECT_STATE_RECALL_CLASSIFICATION_DIRECT_TEXT_20260711
-                # Project-state classification must inspect the direct user portion only.
+                # Project-state classification must inspect the direct user portion only..
                 # Preserve the original enriched args for downstream general chat.
                 if isinstance(user_text, str):
                     _nova_project_state_context_marker_20260711 = (
@@ -25753,8 +25770,15 @@ try:
                         .replace("!", " ")
                         .split()
                     )
-                    .strip()
                 )
+
+                if normalized == "what should we work on next":
+                    return _NOVA_PRE_PROJECT_STATE_RECALL_FINAL_HANDLE_20260630(
+                        self,
+                        *args,
+                        **kwargs,
+                    )
+
 
                 direct_project_state_prompts = {
                     "what are we working on now",
@@ -26084,6 +26108,20 @@ try:
             return ""
 
         def _nova_project_state_idle_response_patch_dict_20260630(payload, reply):
+            request_text = ""
+
+            try:
+                request_text = (
+                    _nova_project_state_idle_response_request_text_20260630()
+                    .lower()
+                    .strip()
+                )
+            except Exception:
+                pass
+
+            if request_text == "what should we work on next":
+                return payload
+
             payload["content"] = reply
             payload["message"] = reply
             payload["response"] = reply
