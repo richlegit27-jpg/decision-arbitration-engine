@@ -27,6 +27,9 @@ from nova_backend.services.execution_guard_service import (
 from nova_backend.services.image_command_service import (
     ImageCommandService,
 )
+from nova_backend.services.repair_plan_priority_guard_service import (
+    RepairPlanPriorityGuardService,
+)
 
 from nova_backend.services.execution_priority_guard_service import (
     ExecutionPriorityGuardService,
@@ -410,6 +413,7 @@ attachment_context_service = AttachmentContextService(
 
 local_auth_route_service = None
 
+repair_plan_priority_guard_service = RepairPlanPriorityGuardService()
 chat_attachment_memory_service = ChatAttachmentMemoryService()
 chat_response_cleanup_service = ChatResponseCleanupService()
 chat_request_context_service = ChatRequestContextService()
@@ -695,6 +699,7 @@ auth_compat_route_service.install_routes(app)
 public_route_service.install_routes(app)
 admin_route_service.install_routes(app)
 normal_chat_bleed_guard_service.install(app)
+repair_plan_priority_guard_service.install(app)
 
 history_route_service.install_routes(
 
@@ -6261,6 +6266,16 @@ try:
     _nova_boot_log_20260701("[NOVA_PATCH_BUILD_ADAPTER_GUARD_20260701] installed")
 except Exception as _nova_patch_build_adapter_install_error_20260701:
     print("[NOVA_PATCH_BUILD_ADAPTER_GUARD_20260701] install failed:", _nova_patch_build_adapter_install_error_20260701)
+
+
+
+
+
+
+
+
+
+
 
 
 
