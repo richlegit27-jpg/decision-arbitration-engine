@@ -170,3 +170,13 @@ class SessionRouteService:
                 pass
 
             raise
+
+    def install_routes(
+        self,
+        app,
+        session_service,
+        artifact_service,
+        memory_service,
+        json_ok,
+    ):
+        pass
