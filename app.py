@@ -30,6 +30,9 @@ from nova_backend.services.image_command_service import (
 from nova_backend.services.repair_plan_priority_guard_service import (
     RepairPlanPriorityGuardService,
 )
+from nova_backend.services.autonomy_route_guard_service import (
+    AutonomyRouteGuardService,
+)
 
 from nova_backend.services.execution_priority_guard_service import (
     ExecutionPriorityGuardService,
@@ -368,7 +371,9 @@ session_history_service = SessionHistoryService(
     BASE_DIR
 )
 
-
+autonomy_route_guard_service = AutonomyRouteGuardService(
+    session_service,
+)
 
 history_service = HistoryService(
     session_history_service
@@ -685,6 +690,7 @@ session_route_service.install_routes(
     memory_service,
 )
 
+autonomy_route_guard_service.install(app)
 execution_priority_guard_service.install(app)
 session_history_persistence_guard_service.install(app)
 lead_route_service.install_routes(app)
@@ -6022,250 +6028,6 @@ session_title_guard_service.install(app)
 
 # Project state route guard
 project_state_route_guard_service.install(app)
-
-
-# NOVA_API_CHAT_AUTONOMY_TASK_BRIEF_20260701
-# Prefix-only autonomy task brief route.
-# Safe mode: proposal-only. Does not edit files, run commands, or execute plans.
-try:
-    import json as _nova_autonomy_json_20260701
-    import importlib.util as _nova_autonomy_importlib_util_20260701
-    from pathlib import Path as _NovaAutonomyPath20260701
-    from flask import request as _nova_autonomy_request_20260701
-    from flask import Response as _NovaAutonomyResponse20260701
-
-    _NOVA_AUTONOMY_PREFIXES_20260701 = (
-        "autonomy:",
-        "autonomy ",
-        "task brain:",
-        "safe task:",
-        "safe autonomy:",
-    )
-
-    def _nova_autonomy_request_json_20260701():
-        try:
-            data = _nova_autonomy_request_20260701.get_json(silent=True) or {}
-            return data if isinstance(data, dict) else {}
-        except Exception:
-            return {}
-
-    def _nova_autonomy_request_text_20260701(data):
-        for key in ("message", "user_text", "text", "prompt"):
-            value = data.get(key)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-        return ""
-
-    def _nova_autonomy_goal_from_text_20260701(user_text):
-        text = str(user_text or "").strip()
-        low = text.lower()
-
-        for prefix in _NOVA_AUTONOMY_PREFIXES_20260701:
-            if low.startswith(prefix):
-                return text[len(prefix):].strip() or "Improve Nova safely."
-
-        return ""
-
-    def _nova_autonomy_load_formatter_20260701():
-        service_path = (
-            _NovaAutonomyPath20260701(__file__)
-            .resolve()
-            .parent
-            / "nova_backend"
-            / "services"
-            / "autonomy_task_brain.py"
-        )
-
-        spec = _nova_autonomy_importlib_util_20260701.spec_from_file_location(
-            "_nova_autonomy_task_brain_direct_20260701",
-            str(service_path),
-        )
-
-        if not spec or not spec.loader:
-            return None
-
-        module = _nova_autonomy_importlib_util_20260701.module_from_spec(spec)
-        spec.loader.exec_module(module)
-
-        formatter = getattr(module, "format_autonomy_task_brief", None)
-        return formatter if callable(formatter) else None
-
-    def _nova_autonomy_payload_20260701(reply, data):
-        session_id = ""
-        if isinstance(data, dict):
-            session_id = str(data.get("session_id") or data.get("active_session_id") or "").strip()
-
-        return {
-            "ok": True,
-            "success": True,
-            "content": reply,
-            "message": reply,
-            "response": reply,
-            "session_id": session_id,
-            "active_session_id": session_id,
-            "assistant_message": {
-                "role": "assistant",
-                "content": reply,
-                "attachments": [],
-            },
-            "route": "autonomy_task_brief",
-            "route_taken": "autonomy_task_brief",
-            "debug": {
-                "route": "autonomy_task_brief",
-                "route_taken": "autonomy_task_brief",
-                "autonomy_mode": "proposal_only",
-            },
-            "meta": {
-                "route": "autonomy_task_brief",
-                "strategy": "proposal_only",
-            },
-        }
-
-    def _nova_autonomy_wrap_endpoint_20260701(app, endpoint_name):
-        view = app.view_functions.get(endpoint_name)
-        if not callable(view):
-            return False
-
-        if getattr(view, "_NOVA_API_CHAT_AUTONOMY_TASK_BRIEF_20260701", False):
-            return True
-
-        def _nova_autonomy_wrapped_view_20260701(*args, **kwargs):
-            try:
-                data = _nova_autonomy_request_json_20260701()
-                user_text = _nova_autonomy_request_text_20260701(data)
-                goal = _nova_autonomy_goal_from_text_20260701(user_text)
-
-                if goal:
-                    formatter = _nova_autonomy_load_formatter_20260701()
-
-                    if formatter:
-                        reply = formatter(goal)
-                        payload = _nova_autonomy_payload_20260701(reply, data)
-                        encoded = _nova_autonomy_json_20260701.dumps(payload, ensure_ascii=False)
-                        return _NovaAutonomyResponse20260701(
-                            encoded,
-                            status=200,
-                            mimetype="application/json",
-                        )
-            except Exception as _nova_autonomy_route_error_20260701:
-                try:
-                    print(
-                        "[NOVA_API_CHAT_AUTONOMY_TASK_BRIEF_20260701] bypass:",
-                        _nova_autonomy_route_error_20260701,
-                    )
-                except Exception:
-                    pass
-
-            return view(*args, **kwargs)
-
-        _nova_autonomy_wrapped_view_20260701.__name__ = getattr(
-            view,
-            "__name__",
-            "_nova_autonomy_wrapped_view_20260701",
-        )
-        _nova_autonomy_wrapped_view_20260701._NOVA_API_CHAT_AUTONOMY_TASK_BRIEF_20260701 = True
-
-        app.view_functions[endpoint_name] = _nova_autonomy_wrapped_view_20260701
-        return True
-
-    _nova_autonomy_wrapped_count_20260701 = 0
-    for _endpoint_name_20260701, _view_20260701 in list(app.view_functions.items()):
-        try:
-            rule_matches = [
-                rule.rule
-                for rule in app.url_map.iter_rules()
-                if rule.endpoint == _endpoint_name_20260701
-            ]
-
-            if "/api/chat" in rule_matches:
-                if _nova_autonomy_wrap_endpoint_20260701(app, _endpoint_name_20260701):
-                    _nova_autonomy_wrapped_count_20260701 += 1
-        except Exception:
-            pass
-
-    _nova_boot_log_20260701(
-        "[NOVA_API_CHAT_AUTONOMY_TASK_BRIEF_20260701] wrapped endpoints:",
-        _nova_autonomy_wrapped_count_20260701,
-    )
-except Exception as _nova_autonomy_install_error_20260701:
-    try:
-        print(
-            "[NOVA_API_CHAT_AUTONOMY_TASK_BRIEF_20260701] failed:",
-            _nova_autonomy_install_error_20260701,
-        )
-    except Exception:
-        pass
-
-
-
-
-# NOVA_AUTONOMY_PLAN_ADAPTER_GUARD_20260701
-# One-command adapter migration for autonomy-plan.
-# Adapter owns matching command requests; legacy fallback guard has been removed.
-try:
-    @app.before_request
-    def nova_autonomy_plan_adapter_guard_20260701():
-        try:
-            if request.method != "POST":
-                return None
-
-            if request.path not in ("/api/chat", "/api/chat/stream"):
-                return None
-
-            try:
-                payload = request.get_json(silent=True) or {}
-            except Exception:
-                payload = {}
-
-            from nova_backend.services.autonomy_plan_adapter import build_autonomy_plan_response
-
-            response_json = build_autonomy_plan_response(payload, session_service)
-
-            if not response_json:
-                return None
-
-            return jsonify(response_json)
-        except Exception as _nova_autonomy_plan_adapter_error_20260701:
-            print("[NOVA_AUTONOMY_PLAN_ADAPTER_GUARD_20260701] failed:", _nova_autonomy_plan_adapter_error_20260701)
-            return None
-
-    _nova_boot_log_20260701("[NOVA_AUTONOMY_PLAN_ADAPTER_GUARD_20260701] installed")
-except Exception as _nova_autonomy_plan_adapter_install_error_20260701:
-    print("[NOVA_AUTONOMY_PLAN_ADAPTER_GUARD_20260701] install failed:", _nova_autonomy_plan_adapter_install_error_20260701)
-
-# NOVA_PATCH_BUILD_ADAPTER_GUARD_20260701
-# One-command adapter migration for patch-build.
-# Adapter owns matching command requests; legacy fallback guard has been removed.
-try:
-    @app.before_request
-    def nova_patch_build_adapter_guard_20260701():
-        try:
-            if request.method != "POST":
-                return None
-
-            if request.path not in ("/api/chat", "/api/chat/stream"):
-                return None
-
-            try:
-                payload = request.get_json(silent=True) or {}
-            except Exception:
-                payload = {}
-
-            from nova_backend.services.patch_build_adapter import build_patch_build_response
-
-            response_json = build_patch_build_response(payload, session_service)
-
-            if not response_json:
-                return None
-
-            return jsonify(response_json)
-        except Exception as _nova_patch_build_adapter_error_20260701:
-            print("[NOVA_PATCH_BUILD_ADAPTER_GUARD_20260701] failed:", _nova_patch_build_adapter_error_20260701)
-            return None
-
-    _nova_boot_log_20260701("[NOVA_PATCH_BUILD_ADAPTER_GUARD_20260701] installed")
-except Exception as _nova_patch_build_adapter_install_error_20260701:
-    print("[NOVA_PATCH_BUILD_ADAPTER_GUARD_20260701] install failed:", _nova_patch_build_adapter_install_error_20260701)
 
 
 
