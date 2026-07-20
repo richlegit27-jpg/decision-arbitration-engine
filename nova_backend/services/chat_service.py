@@ -24258,7 +24258,7 @@ try:
     import re as _nova_img_polish_re_20260630
     from pathlib import Path as _nova_img_polish_Path_20260630
 
-    _nova_image_generation_response_polish_base_handle_20260630
+
 
     def _nova_clean_image_generation_prompt_20260630(text):
         raw = str(text or "").strip()
@@ -25243,21 +25243,32 @@ try:
     if not getattr(ChatService, "_NOVA_PROJECT_STATE_RECALL_20260630", False):
         _NOVA_PRE_PROJECT_STATE_RECALL_HANDLE_20260630 = ChatService.handle
 
-        def _nova_project_state_extract_text_20260630(args, kwargs):
-            for key in ("user_text", "message", "text", "prompt"):
+
+
+
+
+
+
+
+
+
+
+
+        def _nova_project_state_shared_extract_text_20260720(args, kwargs):
+            for key in ("user_text", "message", "text", "prompt", "content"):
                 value = kwargs.get(key)
                 if isinstance(value, str) and value.strip():
-                    return value
+                    return value.strip()
 
             for value in args:
                 if isinstance(value, str) and value.strip():
-                    return value
+                    return value.strip()
 
                 if isinstance(value, dict):
-                    for key in ("user_text", "message", "text", "prompt"):
+                    for key in ("user_text", "message", "text", "prompt", "content"):
                         nested = value.get(key)
                         if isinstance(nested, str) and nested.strip():
-                            return nested
+                            return nested.strip()
 
             return ""
 
@@ -25303,7 +25314,7 @@ try:
 
         def _nova_project_state_recall_handle_20260630(self, *args, **kwargs):
             try:
-                user_text = _nova_project_state_extract_text_20260630(args, kwargs)
+                user_text = _nova_project_state_shared_extract_text_20260720(args, kwargs)
 
                 normalized = (
                     " ".join(
@@ -25606,7 +25617,7 @@ try:
 
             return ""
 
-        def _nova_project_state_idle_extract_text_20260630(args, kwargs):
+        def _nova_project_state_shared_extract_text_20260720(args, kwargs):
             text = _nova_project_state_idle_extract_text_raw_20260711(args, kwargs)
 
             text = str(text or "")
@@ -25794,7 +25805,7 @@ try:
 
             return ""
 
-        def _nova_project_state_idle_response_extract_text_20260630(args, kwargs):
+        def _nova_project_state_shared_extract_text_20260720(args, kwargs):
             text = _nova_project_state_idle_response_extract_text_raw_20260711(args, kwargs)
 
             text = str(text or "")
@@ -26014,7 +26025,7 @@ try:
     if not getattr(ChatService, "_NOVA_PROJECT_STATE_FRESH_PRIORITY_GUARD_20260701", False):
         _NOVA_PRE_PROJECT_STATE_FRESH_PRIORITY_HANDLE_20260701 = ChatService.handle
 
-        def _nova_ps_fresh_priority_text_20260701(args, kwargs):
+        def _nova_project_state_shared_extract_text_20260720(args, kwargs):
             for key in ("user_text", "message", "text", "prompt"):
                 value = kwargs.get(key)
                 if isinstance(value, str) and value.strip():
@@ -26125,7 +26136,7 @@ try:
 
 
         def _nova_project_state_fresh_priority_handle_20260701(self, *args, **kwargs):
-            user_text = _nova_ps_fresh_priority_text_20260701(args, kwargs)
+            user_text = _nova_project_state_shared_extract_text_20260720(args, kwargs)
 
             if _nova_ps_fresh_priority_should_handle_20260701(user_text):
                 session_id = _nova_ps_fresh_priority_session_20260701(args, kwargs)
