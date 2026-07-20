@@ -95,6 +95,7 @@ from nova_backend.services.chat_request_context_service import (
     ChatRequestContextService,
 )
 
+from nova_backend.services.execution_route_service import ExecutionRouteService
 from nova_backend.services import session_auth_scope_service
 from nova_backend.services import attachment_gate_service
 from nova_backend.utils.api_response import ok_response, error_response
@@ -400,6 +401,10 @@ chat_response_cleanup_service = ChatResponseCleanupService()
 chat_request_context_service = ChatRequestContextService()
 chat_stream_service = ChatStreamService()
 chat_execution_service = ChatExecutionService()
+execution_route_service = ExecutionRouteService(
+    chat_execution_service,
+    chat_execution_service,
+)
 
 execution_bridge_service = ExecutionBridgeService(
     chat_execution_service,
@@ -5283,164 +5288,7 @@ def api_uploads(filename: str):
 
 @app.route("/api/execution/control", methods=["POST"])
 def execution_control():
-    data = request.get_json(silent=True) or {}
-
-    session_id = str(data.get("session_id") or "").strip()
-    action = str(data.get("action") or "").strip()
-
-    if not session_id:
-        return jsonify({
-            "ok": False,
-            "error": "missing session_id",
-            "execution_state": {
-                "status": "error",
-                "steps": [],
-                "history": ["missing session_id"],
-            },
-        }), 400
-
-    if not action:
-        return jsonify({
-            "ok": False,
-            "error": "missing action",
-            "execution_state": {
-                "status": "error",
-                "steps": [],
-                "history": ["missing action"],
-            },
-        }), 400
-
-    working = chat_service._get_working_state(session_id) or {}
-    execution = working.get("execution")
-
-    if not isinstance(execution, dict):
-        execution = {}
-
-    steps = execution.get("steps")
-    if not isinstance(steps, list):
-        steps = []
-
-    history = execution.get("history")
-    if not isinstance(history, list):
-        history = []
-
-    execution = {
-        "status": str(execution.get("status") or "idle"),
-        "steps": steps,
-        "history": history,
-        "last_action": str(execution.get("last_action") or ""),
-        "current_step": str(execution.get("current_step") or ""),
-    }
-
-    if action == "run_step":
-        step_num = len(execution["steps"]) + 1
-        step_title = f"Step {step_num}"
-
-        step = {
-            "title": step_title,
-            "status": "done",
-            "output": "Step completed.",
-        }
-
-        execution["steps"].append(step)
-        execution["history"].append(f"run_step: {step_title}")
-        execution["status"] = "complete"
-        execution["last_action"] = action
-        execution["current_step"] = step_title
-
-    elif action == "run_all":
-        start_num = len(execution["steps"]) + 1
-
-        for offset in range(3):
-            step_num = start_num + offset
-            step_title = f"Step {step_num}"
-
-            step = {
-                "title": step_title,
-                "status": "done",
-                "output": "Step completed.",
-            }
-
-            execution["steps"].append(step)
-
-        execution["history"].append("run_all: added 3 completed steps")
-        execution["status"] = "complete"
-        execution["last_action"] = action
-        execution["current_step"] = "Run all complete"
-
-    elif action == "test_fail":
-        step_num = len(execution["steps"]) + 1
-        step_title = f"Failed Step {step_num}"
-
-        failed_step = {
-            "title": step_title,
-            "status": "failed",
-            "output": "Simulated failure.",
-        }
-
-        execution["steps"].append(failed_step)
-        execution["history"].append(f"test_fail: {step_title}")
-        execution["status"] = "error"
-        execution["last_action"] = action
-        execution["current_step"] = step_title
-
-    elif action in ("retry", "retry_failed"):
-        failed_index = None
-
-        for i in range(len(execution["steps"]) - 1, -1, -1):
-            step = execution["steps"][i]
-            step_status = str(step.get("status") or "").strip().lower()
-
-            if step_status in ("failed", "error"):
-                failed_index = i
-                break
-
-        if failed_index is not None:
-            failed_step = execution["steps"][failed_index]
-            failed_title = str(failed_step.get("title") or f"Step {failed_index + 1}")
-
-            failed_step["status"] = "running"
-            failed_step["output"] = "Retrying failed step..."
-
-            execution["status"] = "running"
-            execution["last_action"] = "retry_failed"
-            execution["current_step"] = failed_title
-            execution["history"].append(f"retry_failed: {failed_title}")
-
-            failed_step["status"] = "done"
-            failed_step["output"] = "Retry successful."
-
-            execution["status"] = "complete"
-            execution["current_step"] = "Retry complete"
-        else:
-            execution["history"].append("retry_failed: no failed step found")
-            execution["status"] = "complete"
-            execution["last_action"] = "retry_failed"
-            execution["current_step"] = "No failed step found"
-
-    elif action == "stop":
-        execution["history"].append("stop")
-        execution["status"] = "stopped"
-        execution["last_action"] = action
-        execution["current_step"] = "Stopped"
-
-    else:
-        execution["history"].append(f"unknown action: {action}")
-        execution["status"] = "error"
-        execution["last_action"] = action
-        execution["current_step"] = "Unknown action"
-
-    chat_service._update_working_state(session_id, {
-        "execution": execution,
-    })
-
-    return jsonify({
-        "ok": True,
-        "action": action,
-        "session_id": session_id,
-        "execution_state": execution,
-    })
-
+    return execution_route_service.execution_control()
 
 def serialize_move(move):
     if isinstance(move, dict):
