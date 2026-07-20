@@ -647,6 +647,15 @@ ensure_dir(UPLOADS_DIR)
 app.config["UPLOAD_FOLDER"] = str(UPLOADS_DIR)
 
 memory_route_service.install_routes(app)
+
+session_route_service.install_routes(
+    app,
+    session_service,
+    artifact_service,
+    memory_service,
+    json_ok,
+)
+
 lead_route_service.install_routes(app)
 debug_route_service.install_routes(app)
 memory_guard_route_service.install_routes(app)

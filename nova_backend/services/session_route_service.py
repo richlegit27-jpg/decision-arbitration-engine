@@ -179,4 +179,31 @@ class SessionRouteService:
         memory_service,
         json_ok,
     ):
-        pass
+        from flask import request, session
+
+        @app.get("/api/sessions")
+        def api_sessions():
+            slim_response = self.handle_slim_sessions(
+                request,
+                session,
+                session_service,
+                app,
+                jsonify,
+            )
+
+            if slim_response is not None:
+                return slim_response
+
+            sessions = session_service.list_sessions(
+                user_id=str(
+                    session.get("nova_user_id") or ""
+                ).strip()
+            )
+
+            return json_ok(
+                sessions=sessions,
+                items=sessions,
+                artifacts=artifact_service.all()
+                if hasattr(artifact_service, "all")
+                else [],
+            )
