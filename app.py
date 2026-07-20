@@ -28,6 +28,9 @@ from nova_backend.services.image_command_service import (
     ImageCommandService,
 )
 
+from nova_backend.services.execution_priority_guard_service import (
+    ExecutionPriorityGuardService,
+)
 from nova_backend.services.lead_route_service import LeadRouteService
 
 from nova_backend.routes.memory_panel_routes import (
@@ -426,6 +429,7 @@ execution_guard_service = ExecutionGuardService(
     chat_execution_service
 )
 
+execution_priority_guard_service = ExecutionPriorityGuardService()
 web_preview_route_service = WebPreviewRouteService()
 session_route_service = SessionRouteService()
 public_route_service = PublicRouteService()
@@ -677,6 +681,7 @@ session_route_service.install_routes(
     memory_service,
 )
 
+execution_priority_guard_service.install(app)
 session_history_persistence_guard_service.install(app)
 lead_route_service.install_routes(app)
 debug_route_service.install_routes(app)
@@ -6256,196 +6261,12 @@ try:
 except Exception as _nova_patch_build_adapter_install_error_20260701:
     print("[NOVA_PATCH_BUILD_ADAPTER_GUARD_20260701] install failed:", _nova_patch_build_adapter_install_error_20260701)
 
-# NOVA_ACTIVE_EXECUTION_STATUS_PRIORITY_20260701
-# Active execution missions should beat global project-state recall for status questions.
-try:
-    from flask import request as _nova_phase4a_request, jsonify as _nova_phase4a_jsonify, make_response as _nova_phase4a_make_response
-    from pathlib import Path as _NovaPhase4APath
-    import json as _nova_phase4a_json
-    import functools as _nova_phase4a_functools
-
-    _NOVA_PHASE4A_ACTIVE_EXECUTION_CACHE_20260701 = {}
-    _NOVA_PHASE4D_COMPLETED_EXECUTION_CACHE_20260701 = {}
-
-    _NOVA_PHASE4A_STATUS_QUESTIONS_20260701 = {
-        "what are we working on",
-        "what are we working on?",
-        "what are we doing",
-        "what are we doing?",
-        "where are we",
-        "where are we?",
-        "status",
-        "current status",
-        "what is the status",
-        "what's the status",
-        "whats the status",
-        "what comes next",
-        "what comes next?",
-        "what is next",
-        "what's next",
-        "whats next",
-        "next step",
-        "what is the next step",
-        "what's the next step",
-        "whats the next step",
-    }
-
-    def _nova_phase4a_clean_text_20260701(value):
-        return execution_state_service.clean_text(value)
-
-
-    def _nova_phase4a_is_status_question_20260701(user_text):
-        return execution_state_service.is_status_question(user_text)
-
-
-    def _nova_phase4a_wrap_chat_endpoint_20260701(endpoint, view_func):
-        if getattr(view_func, "_nova_phase4a_active_execution_wrapped", False):
-            return view_func
-
-        @_nova_phase4a_functools.wraps(view_func)
-        def _nova_phase4a_wrapped(*args, **kwargs):
-            payload = {}
-            try:
-                payload = _nova_phase4a_request.get_json(silent=True) or {}
-            except Exception:
-                payload = {}
-
-            user_text = str(payload.get("message") or payload.get("text") or payload.get("user_text") or "").strip()
-            session_id = str(payload.get("session_id") or payload.get("active_session_id") or "").strip()
-
-            if _nova_phase4a_clean_text_20260701(user_text).strip(" .!") == "say only pong":
-                text = "pong"
-                return _nova_phase4a_jsonify({
-                    "ok": True,
-                    "session_id": session_id,
-                    "active_session_id": session_id,
-                    "assistant_message": {
-                        "role": "assistant",
-                        "text": text,
-                        "content": text,
-                        "session_id": session_id,
-                        "active_session_id": session_id,
-                        "meta": {
-                            "render_source": "direct_pong_priority",
-                        },
-                    },
-                    "debug": {
-                        "route": "chat",
-                        "route_taken": "chat",
-                        "direct_pong_priority": True,
-                    },
-                })
-
-            if session_id and _nova_phase4a_is_status_question_20260701(user_text):
-                active_execution = execution_state_service.get_active_execution(session_id)
-                if execution_state_service.execution_is_active(active_execution):
-                    text = _nova_phase4a_execution_status_text_20260701(active_execution)
-                    return _nova_phase4a_jsonify({
-                        "ok": True,
-                        "session_id": session_id,
-                        "active_session_id": session_id,
-                        "assistant_message": {
-                            "role": "assistant",
-                            "text": text,
-                            "content": text,
-                            "session_id": session_id,
-                            "active_session_id": session_id,
-                            "execution_state": active_execution,
-                            "meta": {
-                                "render_source": "active_execution_status",
-                            },
-                        },
-                        "execution_state": active_execution,
-                        "debug": {
-                            "route": "active_execution_status",
-                            "route_taken": "active_execution_status",
-                            "suppressed_project_state_recall": True,
-                        },
-                    })
-
-                completed_execution = execution_state_service.get_completed_execution(session_id)
-                if _nova_phase4d_execution_is_complete_20260701(completed_execution):
-                    text = execution_state_service.completed_status_text(completed_execution)
-                    return _nova_phase4a_jsonify({
-                        "ok": True,
-                        "session_id": session_id,
-                        "active_session_id": session_id,
-                        "assistant_message": {
-                            "role": "assistant",
-                            "text": text,
-                            "content": text,
-                            "session_id": session_id,
-                            "active_session_id": session_id,
-                            "execution_state": completed_execution,
-                            "meta": {
-                                "render_source": "completed_execution_status",
-                            },
-                        },
-                        "execution_state": completed_execution,
-                        "debug": {
-                            "route": "completed_execution_status",
-                            "route_taken": "completed_execution_status",
-                            "suppressed_project_state_recall": True,
-                        },
-                    })
-
-            result = view_func(*args, **kwargs)
-
-            try:
-                response = _nova_phase4a_make_response(result)
-                data = response.get_json(silent=True)
-
-                if isinstance(data, dict) and session_id:
-                    execution = data.get("execution_state")
-                    if not isinstance(execution, dict):
-                        assistant = data.get("assistant_message")
-                        if isinstance(assistant, dict):
-                            execution = assistant.get("execution_state")
-
-                    if _nova_phase4a_execution_is_active_20260701(execution) or _nova_phase4d_execution_is_complete_20260701(execution):
-                        execution_state_service.persist_execution(session_id, execution)
-
-                return response
-            except Exception:
-                return result
-
-        _nova_phase4a_wrapped._nova_phase4a_active_execution_wrapped = True
-        return _nova_phase4a_wrapped
-
-    _nova_phase4a_wrapped_count_20260701 = 0
-
-    for _nova_phase4a_endpoint_20260701, _nova_phase4a_view_20260701 in list(app.view_functions.items()):
-        try:
-            _nova_phase4a_rules_20260701 = [
-                str(rule.rule)
-                for rule in app.url_map.iter_rules(_nova_phase4a_endpoint_20260701)
-            ]
-        except Exception:
-            _nova_phase4a_rules_20260701 = []
-
-        if "/api/chat" in _nova_phase4a_rules_20260701:
-            app.view_functions[_nova_phase4a_endpoint_20260701] = _nova_phase4a_wrap_chat_endpoint_20260701(
-                _nova_phase4a_endpoint_20260701,
-                _nova_phase4a_view_20260701,
-            )
-            _nova_phase4a_wrapped_count_20260701 += 1
-
-    _nova_boot_log_20260701(f"[NOVA_ACTIVE_EXECUTION_STATUS_PRIORITY_20260701] wrapped endpoints: {_nova_phase4a_wrapped_count_20260701}")
-
-except Exception as _nova_phase4a_error_20260701:
-
-    print(
-    "[NOVA_ACTIVE_EXECUTION_STATUS_PRIORITY_20260701] failed:",
-    _nova_phase4a_error_20260701,
-)
 
 
 # NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701
 # Must be above
 
 # NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611
-
-
 
 # Must be above app.run(). Keeps normal chat from being overwritten by stale project/autonomy state.
 
