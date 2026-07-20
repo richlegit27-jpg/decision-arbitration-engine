@@ -5289,15 +5289,7 @@ def api_uploads(filename: str):
 def execution_control():
     return execution_route_service.execution_control()
 
-def serialize_move(move):
-    if isinstance(move, dict):
-        return move
 
-    return {
-        "id": str(getattr(move, "id", "")),
-        "type": str(getattr(move, "type", "")),
-        "payload": getattr(move, "payload", {}) if isinstance(getattr(move, "payload", {}), dict) else {},
-    }
 
 @app.route("/api/execution/stream", methods=["POST"])
 def execution_stream():
@@ -8063,41 +8055,6 @@ except Exception as _nvcvr_error:
         print("[NOVA_MOBILE_CHAT_VISIBLE_RECOVERY_INJECT_20260703] install failed:", _nvcvr_error)
     except Exception:
         pass
-
-
-# NOVA_DEBUG_ROUTES_GUARD_20260705
-def _nova_debug_routes_enabled():
-    try:
-        import os
-
-        value = str(os.getenv("NOVA_DEBUG_ROUTES", "")).strip().lower()
-
-        return value in {
-            "1",
-            "true",
-            "yes",
-            "on",
-            "enabled",
-        }
-    except Exception:
-        return False
-
-
-def _nova_debug_routes_disabled_response():
-    try:
-        from flask import jsonify
-
-        return jsonify(
-            {
-                "ok": False,
-                "error": "Debug routes are disabled. Set NOVA_DEBUG_ROUTES=1 to enable.",
-            }
-        ), 404
-    except Exception:
-        return {
-            "ok": False,
-            "error": "Debug routes are disabled. Set NOVA_DEBUG_ROUTES=1 to enable.",
-        }, 404
 
 
 # NOVA_DURABLE_DATA_HEALTH_ROUTE_20260703
