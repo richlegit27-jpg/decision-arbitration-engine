@@ -694,7 +694,6 @@ session_route_service.install_routes(
 )
 
 
-
 autonomy_route_guard_service.install(app)
 execution_priority_guard_service.install(app)
 session_history_persistence_guard_service.install(app)
@@ -711,6 +710,7 @@ public_route_service.install_routes(app)
 admin_route_service.install_routes(app)
 normal_chat_bleed_guard_service.install(app)
 repair_plan_priority_guard_service.install(app)
+
 
 history_route_service.install_routes(
 
@@ -783,6 +783,7 @@ project_brain_general_intelligence_priority_service = (
         chat_service=chat_service,
     )
 )
+project_brain_general_intelligence_priority_service.install(app)
 
 if hasattr(chat_service, "start_execution_daemon"):
     chat_service.start_execution_daemon()
