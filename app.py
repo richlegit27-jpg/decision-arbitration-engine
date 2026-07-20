@@ -7841,67 +7841,21 @@ except Exception as _npsr_error_20260703:
     except Exception:
         pass
 
-# --- NOVA_RICHARD_LOGIN_AND_STATUS_RESTORE_20260703_DISABLED ---
-# Disabled for multi-user launch.
-# Legacy Richard auto-login restore removed.
 
-if False:
-    try:
-        from flask import session as _nrla_session
-        from flask import request as _nrla_request
-        from flask import jsonify as _nrla_jsonify
-        from flask import redirect as _nrla_redirect
-        from flask import make_response as _nrla_make_response
 
-        def _nrla_set_richard_auth_20260703(response):
-            try:
-                _nrla_session.permanent = True
-                _nrla_session["authenticated"] = True
-                _nrla_session["auth_mode"] = "local"
-                _nrla_session["username"] = "richard"
-                _nrla_session["user_id"] = "user_richard_stable_local_login"
-            except Exception:
-                pass
 
-            return response
 
-        @app.get("/api/auth/richard-login")
-        @app.post("/api/auth/richard-login")
-        def nova_richard_login_restore_api_20260703():
-            response = _nrla_make_response(_nrla_redirect("/mobile"))
-            return _nrla_set_richard_auth_20260703(response)
 
-    except Exception:
-        pass
 
-    def _nrla_richard_payload_20260703():
-        return {
-            "ok": True,
-            "authenticated": True,
-            "mode": "local",
-            "user": {
-                "id": "user_richard_stable_local_login",
-                "username": "richard",
-                "email": "",
-            },
-        }
 
-    @app.get("/api/auth/richard-login")
-    @app.post("/api/auth/richard-login")
-    def nova_richard_login_restore_api_20260703():
-        response = _nrla_make_response(_nrla_redirect("/mobile"))
-        return _nrla_set_richard_auth_20260703(response)
 
-    print("[NOVA_RICHARD_LOGIN_AND_STATUS_RESTORE_20260703] installed")
 
-# --- NOVA_MOBILE_OWNER_AUTO_AUTH_20260703_DISABLED ---
-# Disabled for multi-user launch.
-# This legacy development shortcut forced every mobile/session request
-# into the Richard owner account.
-#
-# Real authentication now comes from:
-# session["nova_user_id"]
-# via the normal login/register flow
+
+
+
+
+
+
 
 # --- NOVA_AUTH_STATUS_FIRST_OWNER_FIX_20260703_DISABLED ---
 try:
