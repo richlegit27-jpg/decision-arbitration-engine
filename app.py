@@ -226,6 +226,8 @@ from nova_backend.config import (
     WEB_TIMEOUT,
     RECON_TIMEOUT,
 )
+
+from nova_backend.services import normal_chat_bleed_guard_service
 from nova_backend.services.mobile_exchange_service import MobileExchangeService
 from nova_backend.services.session_bootstrap_service import SessionBootstrapService
 from nova_backend.services import attachment_shape_service
@@ -8292,6 +8294,8 @@ try:
 except Exception as _nova_phase4g_error_20260701:
     print("[NOVA_PHASE4G_SESSION_HISTORY_RENAME_PERSISTENCE_20260701] failed:", _nova_phase4g_error_20260701)
 
+
+
 # NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701
 # Must be above
 
@@ -8300,6 +8304,15 @@ except Exception as _nova_phase4g_error_20260701:
 
 
 # Must be above app.run(). Keeps normal chat from being overwritten by stale project/autonomy state.
+
+from nova_backend.services.normal_chat_bleed_guard_service import (
+    is_normal_chat,
+    is_safe_probe,
+    extract_response_text,
+    is_bleed,
+    safe_answer,
+    set_answer,
+)
 try:
     import json as _nova_phase4f_prerun_json_20260701
     from flask import request as _nova_phase4f_prerun_request_20260701
@@ -8309,322 +8322,6 @@ try:
             return str(value or "").strip()
         except Exception:
             return ""
-
-    def _nova_phase4f_prerun_is_normal_chat_20260701(user_text):
-        text = _nova_phase4f_prerun_text_20260701(user_text).lower()
-        if not text:
-            return False
-
-        project_context_tokens = (
-            "nova",
-            "project",
-            "mission",
-            "checkpoint",
-            "progress",
-            "status",
-            "state",
-            "working on",
-            "where are we",
-            "where we are",
-            "what are we doing",
-            "what we're doing",
-            "what were we doing",
-            "what are we working on",
-            "what we're working on",
-            "what were we working on",
-            "what did we just fix",
-            "what did i just fix",
-            "what was just fixed",
-            "what is left",
-            "what's left",
-            "whats left",
-            "what remains",
-            "remaining work",
-            "next move",
-            "move on",
-            "continue project",
-            "continue nova",
-            "current focus",
-            "current checkpoint",
-        )
-
-        project_context_intent_tokens = (
-            "current",
-            "status",
-            "state",
-            "progress",
-            "where",
-            "working",
-            "doing",
-            "checkpoint",
-            "focus",
-            "left",
-            "remaining",
-            "remain",
-            "next",
-            "move",
-            "continue",
-            "fixed",
-            "fix",
-            "locked",
-            "lock",
-        )
-
-        if any(token in text for token in project_context_tokens):
-            return False
-
-        if ("nova" in text or "project" in text or "mission" in text) and any(token in text for token in project_context_intent_tokens):
-            return False
-
-        project_recall_exact = {
-            "current project state",
-            "project state",
-            "just fixed",
-            "remaining work",
-            "next command",
-            "k command",
-        }
-
-        project_recall_markers = (
-            "current project state",
-            "project state",
-            "just fixed",
-            "what did we just fix",
-            "what did i just fix",
-            "what was just fixed",
-            "remaining work",
-            "what remains",
-            "what's left",
-            "whats left",
-            "what is left",
-            "current focus",
-            "first remaining item",
-            "next command",
-            "k command",
-            "nova status",
-            "current nova",
-            "current status",
-            "locked status",
-            "lock status",
-            "project status",
-            "status of nova",
-            "nova progress",
-            "current progress",
-            "project progress",
-            "how far",
-            "where are we",
-            "where we are",
-            "what are we working on",
-            "what we're working on",
-            "what were we working on",
-            "what should we do next",
-            "what comes next",
-            "what is next",
-            "next move",
-            "move on",
-            "continue project",
-            "continue nova",
-            "nova context",
-            "project context",
-            "current checkpoint",
-            "checkpoint",
-        )
-
-        if text in project_recall_exact:
-            return False
-
-        if any(marker in text for marker in project_recall_markers):
-            return False
-
-        command_exact = {
-            "next",
-            "continue",
-            "run all",
-            "run step",
-            "run it",
-            "execute",
-            "stop",
-            "cancel",
-            "retry",
-            "status",
-            "what are we working on",
-            "what are we working on?",
-            "what's next",
-            "whats next",
-            "what next",
-        }
-
-        if text in command_exact:
-            return False
-
-        command_prefixes = (
-            "auto-plan",
-            "autoplan",
-            "auto build",
-            "autobuild",
-            "build ",
-            "create ",
-            "make ",
-            "implement ",
-            "fix ",
-            "repair ",
-            "upgrade ",
-            "run ",
-            "execute ",
-        )
-
-        if any(text.startswith(prefix) for prefix in command_prefixes):
-            return False
-
-        normal_prefixes = (
-            "what is ",
-            "what's ",
-            "whats ",
-            "who is ",
-            "where is ",
-            "when is ",
-            "why is ",
-            "how do ",
-            "how does ",
-            "how many ",
-            "how much ",
-            "tell me ",
-            "explain ",
-            "define ",
-            "ping",
-            "hello",
-            "hi",
-            "hey",
-        )
-
-        return text.endswith("?") or any(text.startswith(prefix) for prefix in normal_prefixes)
-
-    def _nova_phase4f_prerun_is_bleed_20260701(content):
-        text = _nova_phase4f_prerun_text_20260701(content).lower()
-        if not text:
-            return False
-
-        markers = (
-            "next move:",
-            "current focus:",
-            "first remaining item:",
-            "remaining work",
-            "next command",
-            "project state",
-            "active nova mission",
-            "active mission",
-            "last mission",
-            "autonomy task",
-            "fallback guard cleanup",
-            "autonomy-plan fallback",
-            "patch-build fallback",
-        )
-
-        return any(marker in text for marker in markers)
-
-
-    def _nova_phase4f_prerun_is_safe_probe_20260701(user_text):
-        text = _nova_phase4f_prerun_text_20260701(user_text).lower()
-        compact = (
-            text.replace(" ", "")
-            .replace("?", "")
-            .replace("plus", "+")
-            .replace("add", "+")
-        )
-
-        if text.startswith("ping"):
-            return True
-
-        if "2+2" in compact or "twoplustwo" in compact:
-            return True
-
-        if "short joke" in text or text.startswith("tell me a joke") or text.startswith("tell me a short joke"):
-            return True
-
-        return False
-
-
-    def _nova_phase4f_prerun_safe_answer_20260701(user_text):
-        text = _nova_phase4f_prerun_text_20260701(user_text).lower()
-        compact = (
-            text.replace(" ", "")
-            .replace("?", "")
-            .replace("plus", "+")
-            .replace("add", "+")
-        )
-
-        if "2+2" in compact or "twoplustwo" in compact:
-            return "2 plus 2 is 4."
-
-        if text.startswith("ping"):
-            return "pong"
-
-        if "short joke" in text or text.startswith("tell me a joke") or text.startswith("tell me a short joke"):
-            return "Why did the computer get cold? It left its Windows open."
-
-        return "I?m here. What would you like to talk about?"
-
-    def _nova_phase4f_prerun_extract_20260701(data):
-        assistant = data.get("assistant_message")
-        if isinstance(assistant, dict):
-            for key in ("content", "text", "message", "response", "answer"):
-                value = assistant.get(key)
-                if isinstance(value, str) and value.strip():
-                    return value
-
-        for key in ("content", "response", "message", "text", "answer"):
-            value = data.get(key)
-            if isinstance(value, str) and value.strip():
-                return value
-
-        return ""
-
-    def _nova_phase4f_prerun_set_answer_20260701(data, answer):
-        assistant = data.get("assistant_message")
-        if isinstance(assistant, dict):
-            assistant["content"] = answer
-            assistant["text"] = answer
-            data["assistant_message"] = assistant
-        else:
-            data["assistant_message"] = {
-                "role": "assistant",
-                "content": answer,
-                "text": answer,
-            }
-
-        data["content"] = answer
-        data["response"] = answer
-        data["message"] = answer
-        data["text"] = answer
-        data["answer"] = answer
-
-        debug = data.get("debug")
-        if not isinstance(debug, dict):
-            debug = {}
-
-        existing_route = str(
-            debug.get("route")
-            or data.get("route")
-            or data.get("route_taken")
-            or ""
-        ).strip()
-
-        if existing_route != "project_brain_general_intelligence":
-            debug["route"] = "chat"
-            debug["route_taken"] = "chat"
-            debug["normal_chat_priority"] = True
-            debug["suppressed_project_state_bleed"] = True
-        else:
-            debug["route"] = "project_brain_general_intelligence"
-            debug["route_taken"] = "project_brain_general_intelligence"
-
-        debug["phase4f_prerun_final_guard"] = True
-
-        data["debug"] = debug
-
-        return data
-
-
 
     @app.after_request
     def _nova_phase4f_prerun_final_normal_chat_bleed_guard_20260701(response):
@@ -8638,7 +8335,7 @@ try:
             request_payload = _nova_phase4f_prerun_request_20260701.get_json(silent=True) or {}
             user_text = request_payload.get("message") or request_payload.get("user_text") or ""
 
-            if not _nova_phase4f_prerun_is_normal_chat_20260701(user_text):
+            if not is_normal_chat(user_text):
                 return response
 
             # NOVA_PROJECT_BRAIN_ROUTE_PROTECTION_20260712
@@ -8650,7 +8347,7 @@ try:
             if response_owned_by_project_brain(response):
                 return response
 
-            if not _nova_phase4f_prerun_is_safe_probe_20260701(user_text):
+            if not is_safe_probe(user_text):
                 return response
 
             raw = response.get_data(as_text=True)
@@ -8661,12 +8358,12 @@ try:
             if not isinstance(data, dict):
                 return response
 
-            content = _nova_phase4f_prerun_extract_20260701(data)
-            if not _nova_phase4f_prerun_is_bleed_20260701(content):
+            content = extract_response_text(data)
+            if not is_bleed(content):
                 return response
 
-            answer = _nova_phase4f_prerun_safe_answer_20260701(user_text)
-            data = _nova_phase4f_prerun_set_answer_20260701(data, answer)
+            answer = safe_answer(user_text)
+            data = set_answer(data, answer)
 
             response.set_data(_nova_phase4f_prerun_json_20260701.dumps(data, ensure_ascii=False))
             response.headers["Content-Type"] = "application/json"
