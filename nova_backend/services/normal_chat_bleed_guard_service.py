@@ -271,8 +271,76 @@ def set_answer(data, answer):
 
     return data
 
+def install(app):
+    import json
+    from flask import request
 
+    @app.after_request
+    def normal_chat_bleed_after_request(response):
+        try:
+            if request.path != "/api/chat":
+                return response
 
+            if response.status_code >= 400:
+                return response
+
+            request_payload = request.get_json(silent=True) or {}
+            user_text = (
+                request_payload.get("message")
+                or request_payload.get("user_text")
+                or ""
+            )
+
+            if not is_normal_chat(user_text):
+                return response
+
+            from nova_backend.services.project_brain_route_protection_service import (
+                response_owned_by_project_brain,
+            )
+
+            if response_owned_by_project_brain(response):
+                return response
+
+            if not is_safe_probe(user_text):
+                return response
+
+            raw = response.get_data(as_text=True)
+            if not raw:
+                return response
+
+            data = json.loads(raw)
+
+            if not isinstance(data, dict):
+                return response
+
+            content = extract_response_text(data)
+
+            if not is_bleed(content):
+                return response
+
+            data = set_answer(
+                data,
+                safe_answer(user_text),
+            )
+
+            response.set_data(
+                json.dumps(data, ensure_ascii=False)
+            )
+            response.headers["Content-Type"] = "application/json"
+            response.headers["Content-Length"] = str(
+                len(response.get_data())
+            )
+
+            return response
+
+        except Exception as exc:
+            print(
+                "[NORMAL_CHAT_BLEED_GUARD] failed:",
+                exc,
+            )
+            return response
+
+    return app
 
 
   

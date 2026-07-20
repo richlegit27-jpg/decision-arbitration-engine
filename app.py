@@ -694,6 +694,7 @@ login_page_route_service.install_routes(app)
 auth_compat_route_service.install_routes(app)
 public_route_service.install_routes(app)
 admin_route_service.install_routes(app)
+normal_chat_bleed_guard_service.install(app)
 
 history_route_service.install_routes(
 
@@ -6262,99 +6263,6 @@ except Exception as _nova_patch_build_adapter_install_error_20260701:
     print("[NOVA_PATCH_BUILD_ADAPTER_GUARD_20260701] install failed:", _nova_patch_build_adapter_install_error_20260701)
 
 
-
-# NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701
-# Must be above
-
-# NOVA_MEMORY_GUARDS_INCLUDE_STREAM_20260611
-
-# Must be above app.run(). Keeps normal chat from being overwritten by stale project/autonomy state.
-
-from nova_backend.services.normal_chat_bleed_guard_service import (
-    is_normal_chat,
-    is_safe_probe,
-    extract_response_text,
-    is_bleed,
-    safe_answer,
-    set_answer,
-)
-try:
-    import json as _nova_phase4f_prerun_json_20260701
-    from flask import request as _nova_phase4f_prerun_request_20260701
-
-    def _nova_phase4f_prerun_text_20260701(value):
-        try:
-            return str(value or "").strip()
-        except Exception:
-            return ""
-
-    @app.after_request
-    def _nova_phase4f_prerun_final_normal_chat_bleed_guard_20260701(response):
-        try:
-            if _nova_phase4f_prerun_request_20260701.path != "/api/chat":
-                return response
-
-            if response.status_code >= 400:
-                return response
-
-            request_payload = _nova_phase4f_prerun_request_20260701.get_json(silent=True) or {}
-            user_text = request_payload.get("message") or request_payload.get("user_text") or ""
-
-            if not is_normal_chat(user_text):
-                return response
-
-            # NOVA_PROJECT_BRAIN_ROUTE_PROTECTION_20260712
-            # Do not overwrite Project Brain ownership metadata.
-            from nova_backend.services.project_brain_route_protection_service import (
-                response_owned_by_project_brain,
-            )
-
-            if response_owned_by_project_brain(response):
-                return response
-
-            if not is_safe_probe(user_text):
-                return response
-
-            raw = response.get_data(as_text=True)
-            if not raw:
-                return response
-
-            data = _nova_phase4f_prerun_json_20260701.loads(raw)
-            if not isinstance(data, dict):
-                return response
-
-            content = extract_response_text(data)
-            if not is_bleed(content):
-                return response
-
-            answer = safe_answer(user_text)
-            data = set_answer(data, answer)
-
-            response.set_data(_nova_phase4f_prerun_json_20260701.dumps(data, ensure_ascii=False))
-            response.headers["Content-Type"] = "application/json"
-            response.headers["Content-Length"] = str(len(response.get_data()))
-            return response
-
-        except Exception as exc:
-            try:
-                print("[NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701] failed:", exc)
-            except Exception:
-                pass
-            return response
-
-    try:
-        funcs = app.after_request_funcs.get(None, [])
-        if _nova_phase4f_prerun_final_normal_chat_bleed_guard_20260701 in funcs:
-            funcs.remove(_nova_phase4f_prerun_final_normal_chat_bleed_guard_20260701)
-            funcs.insert(0, _nova_phase4f_prerun_final_normal_chat_bleed_guard_20260701)
-            app.after_request_funcs[None] = funcs
-            _nova_boot_log_20260701("[NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701] forced final hook")
-    except Exception as order_exc:
-        print("[NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701] final-order failed:", order_exc)
-
-    _nova_boot_log_20260701("[NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701] installed")
-except Exception as guard_exc:
-    print("[NOVA_PHASE4F_PRE_RUN_FINAL_NORMAL_CHAT_BLEED_GUARD_20260701] failed:", guard_exc)
 
 # NOVA_REPAIR_PLAN_COMMAND_PRIORITY_GUARD_20260701
 # Explicit repair-plan / fix-plan commands must outrank project-context recall.
