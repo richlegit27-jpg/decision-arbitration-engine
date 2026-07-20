@@ -25740,9 +25740,39 @@ try:
                 },
             }
 
+
         def _nova_project_state_recall_final_handle_20260630(self, *args, **kwargs):
             try:
                 user_text = _nova_project_state_extract_text_final_20260630(args, kwargs)
+
+                normalized = (
+                    " ".join(
+                        str(user_text or "")
+                        .lower()
+                        .replace("?", " ")
+                        .replace("!", " ")
+                        .split()
+                    )
+                    .strip()
+                )
+
+                direct_project_state_prompts = {
+                    "what are we working on now",
+                    "what are we working on",
+                    "what are we working on right now",
+                    "where are we at with nova",
+                    "where are we at with nova right now",
+                    "where is nova at",
+                    "where is nova at right now",
+                }
+
+                if normalized not in direct_project_state_prompts:
+                    return _NOVA_PRE_PROJECT_STATE_RECALL_FINAL_HANDLE_20260630(
+                        self,
+                        *args,
+                        **kwargs,
+                    )
+
                 runtime_execution_state = _nova_project_state_runtime_state_final_20260630(self)
 
                 reply = _nova_project_state_answer_final_20260630(
@@ -25752,6 +25782,7 @@ try:
 
                 if reply:
                     return _nova_project_state_response_obj_final_20260630(reply)
+
             except Exception as _nova_project_state_recall_final_error_20260630:
                 try:
                     print(
@@ -25761,7 +25792,11 @@ try:
                 except Exception:
                     pass
 
-            return _NOVA_PRE_PROJECT_STATE_RECALL_FINAL_HANDLE_20260630(self, *args, **kwargs)
+            return _NOVA_PRE_PROJECT_STATE_RECALL_FINAL_HANDLE_20260630(
+                self,
+                *args,
+                **kwargs,
+            )
 
         ChatService.handle = _nova_project_state_recall_final_handle_20260630
         ChatService._NOVA_PROJECT_STATE_RECALL_FINAL_20260630 = True
