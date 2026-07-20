@@ -405,3 +405,213 @@ class SessionRouteService:
                 app,
                 json_ok,
             )
+
+    def handle_sessions_switch(
+        self,
+        payload,
+        session_service,
+        flask_session,
+        json_error,
+        json_ok,
+    ):
+        data = payload or {}
+
+        session_id = str(data.get("session_id") or "").strip()
+
+        if not session_id:
+            return json_error("Missing session_id", 400)
+
+        auth_user_id = ""
+
+        try:
+            auth_user_id = str(
+                flask_session.get("nova_user_id")
+                or flask_session.get("user_id")
+                or ""
+            ).strip()
+
+        except Exception:
+            auth_user_id = ""
+
+        session = session_service.set_active(
+            session_id,
+            user_id=auth_user_id,
+        )
+
+        if not session:
+            return json_error("Session not found", 404)
+
+        return json_ok(
+            session=session_service.get_session(session_id),
+            sessions=session_service.get_all(),
+            active_session_id=session_service.active_session_id,
+        )
+
+
+    def api_sessions_switch(self):
+        return self.handle_sessions_switch(
+            request_json(),
+            self.session_service,
+            session,
+            json_error,
+            json_ok,
+        )
+
+    def handle_sessions_pin(
+        self,
+        payload,
+        session_service,
+        flask_session,
+        json_error,
+        json_ok,
+    ):
+        data = payload or {}
+
+        session_id = str(data.get("session_id") or "").strip()
+        pinned = bool(data.get("pinned"))
+
+        if not session_id:
+            return json_error("Missing session_id", 400)
+
+        auth_user_id = ""
+
+        try:
+            auth_user_id = str(
+                flask_session.get("nova_user_id")
+                or flask_session.get("user_id")
+                or ""
+            ).strip()
+
+        except Exception:
+            auth_user_id = ""
+
+        session = session_service.pin(
+            session_id,
+            pinned,
+            user_id=auth_user_id,
+        )
+
+        if not session:
+            return json_error("Session not found", 404)
+
+        return json_ok(
+            session=session_service.get_session(session_id),
+            sessions=session_service.get_all(),
+            active_session_id=session_service.active_session_id,
+        )
+
+
+    def handle_sessions_delete(
+        self,
+        payload,
+        session_service,
+        flask_session,
+        json_error,
+        json_ok,
+    ):
+        data = payload or {}
+
+        session_id = str(data.get("session_id") or "").strip()
+
+        if not session_id:
+            return json_error("Missing session_id", 400)
+
+        auth_user_id = ""
+
+        try:
+            auth_user_id = str(
+                flask_session.get("nova_user_id")
+                or flask_session.get("user_id")
+                or ""
+            ).strip()
+
+        except Exception:
+            auth_user_id = ""
+
+        if not session_service.delete(
+            session_id,
+            user_id=auth_user_id,
+        ):
+            return json_error("Session not found", 404)
+
+        active_id = session_service.active_session_id
+        active_session = session_service.get_active()
+
+        return json_ok(
+            session=active_session,
+            sessions=session_service.get_all(),
+            active_session_id=active_id,
+        )
+
+    def api_sessions_pin(self):
+        return self.handle_sessions_pin(
+            request_json(),
+            self.session_service,
+            session,
+            json_error,
+            json_ok,
+        )
+
+
+    def api_sessions_delete(self):
+        return self.handle_sessions_delete(
+            request_json(),
+            self.session_service,
+            session,
+            json_error,
+            json_ok,
+        )
+
+    def handle_sessions_rename(
+        self,
+        payload,
+        session_service,
+        flask_session,
+        json_error,
+        json_ok,
+    ):
+        data = payload or {}
+
+        session_id = str(data.get("session_id") or "").strip()
+        title = str(data.get("title") or "").strip()
+
+        if not session_id:
+            return json_error("Missing session_id", 400)
+
+        auth_user_id = ""
+
+        try:
+            auth_user_id = str(
+                flask_session.get("nova_user_id")
+                or flask_session.get("user_id")
+                or ""
+            ).strip()
+
+        except Exception:
+            auth_user_id = ""
+
+        session = session_service.rename(
+            session_id,
+            title or "New Chat",
+            user_id=auth_user_id,
+        )
+
+        if not session:
+            return json_error("Session not found", 404)
+
+        return json_ok(
+            session=session_service.get_session(session_id),
+            sessions=session_service.get_all(),
+            active_session_id=session_service.active_session_id,
+        )
+
+    def api_sessions_rename(self):
+        return self.handle_sessions_rename(
+            request_json(),
+            self.session_service,
+            session,
+            json_error,
+            json_ok,
+        )
+
+

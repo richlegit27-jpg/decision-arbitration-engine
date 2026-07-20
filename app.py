@@ -5122,148 +5122,24 @@ def api_session_by_id(session_id: str):
     })
 
 
-
 @app.post("/api/sessions/switch")
 def api_sessions_switch():
-
-    data = request_json()
-    session_id = str(data.get("session_id") or "").strip()
-
-    if not session_id:
-        return json_error("Missing session_id", 400)
-
-    session = session_service.set_active(
-        session_id,
-        user_id=auth_user_id,
-    )
-    if not session:
-        return json_error("Session not found", 404)
-
-    return json_ok(
-        session=session_service.get_session(session_id),
-        sessions=session_service.get_all(),
-        active_session_id=session_service.active_session_id,
-    )
+    return session_route_service.api_sessions_switch()
 
 
 @app.post("/api/sessions/rename")
 def api_sessions_rename():
-
-    data = request_json()
-    session_id = str(data.get("session_id") or "").strip()
-    title = str(data.get("title") or "").strip()
-
-    if not session_id:
-        return json_error("Missing session_id", 400)
-
-    auth_user_id = ""
-
-    try:
-        flask_session = globals().get("session")
-
-        auth_user_id = str(
-            flask_session.get("nova_user_id")
-            or flask_session.get("user_id")
-            or ""
-        ).strip()
-
-    except Exception:
-        auth_user_id = ""
-
-    session = session_service.rename(
-        session_id,
-        title or "New Chat",
-        user_id=auth_user_id,
-    )
-
-    if not session:
-        return json_error("Session not found", 404)
-
-    return json_ok(
-        session=session_service.get_session(session_id),
-        sessions=session_service.get_all(),
-        active_session_id=session_service.active_session_id,
-    )
+    return session_route_service.api_sessions_rename()
 
 
 @app.post("/api/sessions/pin")
 def api_sessions_pin():
-
-    data = request_json()
-    session_id = str(data.get("session_id") or "").strip()
-    pinned = bool(data.get("pinned"))
-
-    if not session_id:
-        return json_error("Missing session_id", 400)
-
-    auth_user_id = ""
-
-    try:
-        flask_session = globals().get("session")
-
-        auth_user_id = str(
-            flask_session.get("nova_user_id")
-            or flask_session.get("user_id")
-            or ""
-        ).strip()
-
-    except Exception:
-        auth_user_id = ""
-
-    session = session_service.pin(
-        session_id,
-        pinned,
-        user_id=auth_user_id,
-    )
-
-    if not session:
-        return json_error("Session not found", 404)
-
-    return json_ok(
-        session=session_service.get_session(session_id),
-        sessions=session_service.get_all(),
-        active_session_id=session_service.active_session_id,
-    )
+    return session_route_service.api_sessions_pin()
 
 
 @app.post("/api/sessions/delete")
 def api_sessions_delete():
-
-    data = request_json()
-    session_id = str(data.get("session_id") or "").strip()
-
-    if not session_id:
-        return json_error("Missing session_id", 400)
-
-    auth_user_id = ""
-
-    try:
-        flask_session = globals().get("session")
-
-        auth_user_id = str(
-            flask_session.get("nova_user_id")
-            or flask_session.get("user_id")
-            or ""
-        ).strip()
-
-    except Exception:
-        auth_user_id = ""
-
-    if not session_service.delete(
-        session_id,
-        user_id=auth_user_id,
-    ):
-        return json_error("Session not found", 404)
-
-    active_id = session_service.active_session_id
-    active_session = session_service.get_active()
-
-    return json_ok(
-        session=active_session,
-        sessions=session_service.get_all(),
-        active_session_id=active_id,
-    )
-
+    return session_route_service.api_sessions_delete()
 # -----------------------
 # ARTIFACTS
 # -----------------------
