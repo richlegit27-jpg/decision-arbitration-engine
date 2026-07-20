@@ -630,22 +630,11 @@ def update_execution_state_safe(execution, status=None, current_step=None, last_
     if last_action is not None:
         execution["last_action"] = last_action
 
-
-# NOVA_EXECUTION_SERVICE_SINGLETON_20260607
-execution_bridge_service = ExecutionBridgeService(
-    chat_execution_service,
-    None,
-)
-
 app = Flask(
     __name__,
     template_folder=str(BASE_DIR / "templates"),
     static_folder=str(BASE_DIR / "static"),
 )
-
-
-
-
 
 CORS(app)
 
