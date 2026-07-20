@@ -16486,17 +16486,16 @@ Auto-fix result:
             confidence = 0.95
             reasons.append("checkpoint_project_state_query")
 
-        elif text_lc in {
-            "what now",
-            "status",
-            "recap",
-        }:
-            intent = "continuity"
-            route = "continuity"
-            strategy = "summarize_state"
+        elif (
+            "where are we at with nova" in text_lc
+            or "what are we working on" in text_lc
+        ):
+            intent = "current_project_state"
+            route = "project_brain_general_intelligence"
+            strategy = "project_brain_general_intelligence"
             priority = "high"
-            confidence = 0.9
-            reasons.append("continuity_query")
+            confidence = 0.95
+            reasons.append("project_brain_general_intelligence_query")
 
             self._update_working_state(
                 session_id,
@@ -25586,6 +25585,8 @@ try:
                         .lower()
                         .replace("?", " ")
                         .replace("!", " ")
+                        .replace(".", " ")
+                        .replace("`", "")
                         .split()
                     )
                 )
@@ -25614,6 +25615,22 @@ try:
                             _nova_project_state_context_marker_20260711,
                             1,
                         )[0].strip()
+                direct_project_state_prompts = {
+                    "what are we working on now",
+                    "what are we working on",
+                    "what are we working on right now",
+                    "where are we at with nova",
+                    "where are we at with nova right now",
+                    "where is nova at",
+                    "where is nova at right now",
+                }
+
+                if normalized not in direct_project_state_prompts:
+                    return _NOVA_PRE_PROJECT_STATE_RECALL_HANDLE_20260630(
+                        self,
+                        *args,
+                        **kwargs,
+                    )
                 runtime_execution_state = _nova_project_state_runtime_state_20260630(self)
 
                 reply = answer_project_state_question(
@@ -25768,6 +25785,8 @@ try:
                         .lower()
                         .replace("?", " ")
                         .replace("!", " ")
+                        .replace(".", " ")
+                        .replace("`", "")
                         .split()
                     )
                 )
@@ -25785,9 +25804,6 @@ try:
                     "what are we working on",
                     "what are we working on right now",
                     "where are we at with nova",
-                    "where are we at with nova right now",
-                    "where is nova at",
-                    "where is nova at right now",
                 }
 
                 if normalized not in direct_project_state_prompts:
@@ -26598,6 +26614,7 @@ try:
             "what's next",
             "whats next",
             "what is next",
+            "what should we work on next",
             "what should we do next",
             "next move",
         }:
@@ -26639,17 +26656,57 @@ try:
         answer = ""
 
         try:
-            fresh_answer = globals().get("_nova_answer_project_state_question_fresh_priority_20260701")
-            if callable(fresh_answer):
-                answer = str(fresh_answer(question, session_id=session_id) or "").strip()
-
-                print(
-                    "[NOVA FRESH PROJECT STATE ANSWER]",
-                    repr(answer),
+            if kind == "working":
+                fresh_answer = globals().get(
+                    "_nova_answer_project_state_question_fresh_priority_20260701"
                 )
+
+                if callable(fresh_answer):
+                    answer = str(
+                        fresh_answer(
+                            question,
+                            session_id=session_id,
+                        )
+                        or ""
+                    ).strip()
+
+                    print(
+                        "[NOVA FRESH PROJECT STATE ANSWER]",
+                        repr(answer),
+                    )
+
+            elif kind == "next":
+                from nova_backend.services.project_brain_general_intelligence import (
+                    build_project_brain_general_answer,
+                )
+
+                general_answer = build_project_brain_general_answer(
+                    question
+                )
+
+                if isinstance(general_answer, dict):
+                    answer = str(
+                        general_answer.get("content")
+                        or general_answer.get("text")
+                        or general_answer.get("answer")
+                        or ""
+                    ).strip()
+                else:
+                    answer = str(
+                        getattr(
+                            general_answer,
+                            "text",
+                            general_answer,
+                        )
+                        or ""
+                    ).strip()
+
         except Exception as exc:
             try:
-                print("[NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701] fresh answer bypass:", exc)
+                print(
+                    "[NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701] fresh answer bypass:",
+                    exc,
+                )
             except Exception:
                 pass
 
@@ -26659,15 +26716,13 @@ try:
         if kind == "next":
             return (
                 "Current Nova project context:\n"
-                "Current task: fix Nova project brain answer quality so project-state questions use fresh project context instead of idle fallbacks.\n"
-                "Next move: patch `nova_backend/services/chat_service.py`, run `python .\\tools\\nova_project_brain_live_answer_sample.py`, and confirm `what are we working on?` no longer returns an idle answer."
+                "Current task: fix Nova project brain answer quality.\n"
+                "Next move: continue improving project brain routing and verify the regression smoke."
             )
 
         return (
             "Current Nova project context:\n"
-            "Current task: fix Nova project brain answer quality.\n"
-            "Focus: `what are we working on?` is still hitting the old direct working-on fallback in `nova_backend/services/chat_service.py` instead of the fresh project-state context.\n"
-            "Next move: run `python .\\tools\\nova_project_brain_live_answer_sample.py` and confirm this answer replaces `No active task is currently tracked yet.`"
+            "Current task: fix Nova project brain answer quality."
         )
 
     def _nova_project_brain_response_20260701(text, session_id):
@@ -26758,6 +26813,14 @@ try:
             fresh_priority_predicate = globals().get(
                 "_nova_ps_fresh_priority_should_handle_20260701"
             )
+
+            if (
+                str(user_text or "")
+                .strip()
+                .lower()
+                == "what should we work on next"
+            ):
+                fresh_priority_predicate = None
 
             if (
                 callable(
