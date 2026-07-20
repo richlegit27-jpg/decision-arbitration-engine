@@ -615,3 +615,130 @@ class SessionRouteService:
         )
 
 
+    def handle_session_by_id(
+        self,
+        session_id,
+        session_service,
+        flask_session,
+        jsonify,
+    ):
+        sid = str(session_id or "").strip()
+
+        if not sid:
+            return jsonify({
+                "ok": False,
+                "error": "Session not found",
+                "session": None,
+                "active_session_id": "",
+                "session_id": sid,
+                "skip_session_auth_scope_filter": True,
+            }), 404
+
+        found = None
+        active_session_id = ""
+
+        auth_user_id = ""
+
+        try:
+            auth_user_id = str(
+                flask_session.get("nova_user_id")
+                or flask_session.get("user_id")
+                or ""
+            ).strip()
+
+        except Exception:
+            auth_user_id = ""
+
+        try:
+            candidate = session_service.get_session(
+                sid,
+                user_id=auth_user_id,
+            )
+
+            if isinstance(candidate, dict):
+                found = candidate
+
+        except Exception:
+            found = None
+
+        if found is None:
+            try:
+                sessions = session_service.get_all(
+                    user_id=auth_user_id,
+                )
+
+                if isinstance(sessions, list):
+                    for item in sessions:
+                        if not isinstance(item, dict):
+                            continue
+
+                        if str(item.get("id") or "").strip() != sid:
+                            continue
+
+                        if not session_service._belongs_to_user(
+                            item,
+                            auth_user_id,
+                        ):
+                            continue
+
+                        found = item
+                        break
+
+            except Exception:
+                found = None
+
+        if found is None:
+            try:
+                store = session_service._read_store()
+                items = (
+                    store.get("sessions")
+                    if isinstance(store, dict)
+                    else []
+                )
+
+                if isinstance(items, list):
+                    for item in items:
+                        if not isinstance(item, dict):
+                            continue
+
+                        if str(item.get("id") or "").strip() != sid:
+                            continue
+
+                        if not session_service._belongs_to_user(
+                            item,
+                            auth_user_id,
+                        ):
+                            continue
+
+                        found = item
+                        break
+
+            except Exception:
+                found = None
+
+        if found is None:
+            return jsonify({
+                "ok": False,
+                "error": "Session not found",
+                "session": None,
+                "active_session_id": active_session_id,
+                "session_id": sid,
+                "skip_session_auth_scope_filter": True,
+            }), 404
+
+        return jsonify({
+            "ok": True,
+            "session": found,
+            "active_session_id": active_session_id or sid,
+            "session_id": sid,
+            "detail_service_first": True,
+        })
+
+    def api_session_by_id(self, session_id):
+        return self.handle_session_by_id(
+            session_id,
+            self.session_service,
+            session,
+            jsonify,
+        )
+
