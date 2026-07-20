@@ -1,126 +1,17 @@
 ﻿from __future__ import annotations
 
-# NOVA_DURABLE_DATA_BOOTSTRAP_20260703
-def _nova_durable_data_bootstrap_20260703():
-    try:
-        import os
-        import shutil
-        import time
-        from pathlib import Path
-
-        base_dir = Path(__file__).resolve().parent
-        app_data = base_dir / "data"
-
-        candidates = []
-
-        explicit = os.environ.get("NOVA_DATA_DIR", "").strip()
-        if explicit:
-            candidates.append(Path(explicit))
-
-        # Only use /data when it already exists, which indicates a real mounted
-        # Railway volume. Do not create fake /data on local Windows or ephemeral
-        # containers, because that can move repo-local data unexpectedly.
-        volume_data = Path("/data")
-        if os.name != "nt" and volume_data.exists():
-            candidates.append(volume_data)
-
-        candidates.append(app_data)
-
-        chosen = None
-
-        for candidate in candidates:
-            try:
-                candidate.mkdir(parents=True, exist_ok=True)
-                probe = candidate / ".nova_write_probe"
-                probe.write_text("ok", encoding="utf-8")
-                probe.unlink(missing_ok=True)
-                chosen = candidate
-                break
-            except Exception:
-                continue
-
-        if chosen is None:
-            chosen = app_data
-            chosen.mkdir(parents=True, exist_ok=True)
-
-        os.environ["NOVA_DATA_DIR"] = str(chosen)
-
-        should_bridge_app_data = False
-        try:
-            should_bridge_app_data = chosen.resolve() != app_data.resolve()
-        except Exception:
-            should_bridge_app_data = str(chosen) != str(app_data)
-
-        if should_bridge_app_data:
-            chosen.mkdir(parents=True, exist_ok=True)
-
-            if app_data.exists() and not app_data.is_symlink():
-                for item in app_data.iterdir():
-                    target = chosen / item.name
-                    if target.exists():
-                        continue
-                    try:
-                        if item.is_dir():
-                            shutil.copytree(item, target)
-                        else:
-                            shutil.copy2(item, target)
-                    except Exception:
-                        pass
-
-                try:
-                    app_data.rename(base_dir / ("data_ephemeral_backup_" + time.strftime("%Y%m%d_%H%M%S")))
-                except Exception:
-                    pass
-
-            if not app_data.exists():
-                try:
-                    app_data.symlink_to(chosen, target_is_directory=True)
-                except Exception:
-                    pass
-
-        print("[NOVA_DURABLE_DATA_BOOTSTRAP_20260703] NOVA_DATA_DIR=", os.environ.get("NOVA_DATA_DIR"))
-        print("[NOVA_DURABLE_DATA_BOOTSTRAP_20260703] app_data=", str(app_data), "real=", str(app_data.resolve()))
-
-    except Exception as exc:
-        try:
-            print("[NOVA_DURABLE_DATA_BOOTSTRAP_20260703] failed:", exc)
-        except Exception:
-            pass
-
-
-_nova_durable_data_bootstrap_20260703()
-# /NOVA_DURABLE_DATA_BOOTSTRAP_20260703
-
-
-
-def _nova_boot_log_20260701(*args, **kwargs):
-    import os as _nova_boot_log_os_20260701
-
-    if str(_nova_boot_log_os_20260701.getenv("NOVA_VERBOSE_BOOT_LOGS", "")).strip().lower() in {"1", "true", "yes", "on"}:
-        print(*args, **kwargs)
-
 import os
 import re
 import shutil
 import hashlib
-from datetime import datetime
-from pathlib import Path
+import uuid
 
 from nova_backend.services.image_vision_service import ImageVisionService
 from flask import Flask, Response, jsonify, render_template, request, send_from_directory, session
 from flask_cors import CORS
 from bs4 import BeautifulSoup
-import uuid
-
-
-def update_execution_state_safe(execution, status=None, current_step=None, last_action=None):
-    """Safely assign status, current_step, last_action in execution dict."""
-    if status is not None:
-        execution["status"] = status
-    if current_step is not None:
-        execution["current_step"] = current_step
-    if last_action is not None:
-        execution["last_action"] = last_action
+from datetime import datetime
+from pathlib import Path
 
 from werkzeug.utils import secure_filename
 
@@ -193,9 +84,7 @@ from nova_backend.services.execution_fix_service import (
     ExecutionFixService,
 )
 
-from nova_backend.services.session_detail_response_cache_service import (
-    SessionDetailResponseCacheService,
-)
+
 from nova_backend.services.chat_guard_service import (
     ChatGuardService,
 )
@@ -228,7 +117,6 @@ from nova_backend.config import (
 )
 
 from nova_backend.services import normal_chat_bleed_guard_service
-from nova_backend.services.mobile_exchange_service import MobileExchangeService
 from nova_backend.services.session_bootstrap_service import SessionBootstrapService
 from nova_backend.services import attachment_shape_service
 from nova_backend.services.admin_lead_service import AdminLeadService
@@ -430,6 +318,313 @@ from nova_backend.services.command_route_service import (
     CommandRouteService,
 )
 
+# -----------------------
+# SERVICES
+# -----------------------
+
+
+session_service = SessionService(
+    DATA_DIR / "nova_sessions.json"
+)
+
+command_route_service = CommandRouteService(
+    session_service
+)
+
+execution_state_service = ExecutionStateService(
+    session_service=session_service
+)
+
+memory_command_service = MemoryCommandService(
+    session_service=session_service,
+)
+
+session_bootstrap_service = None
+
+mobile_exchange_service = MobileExchangeService(
+    session_service
+)
+
+session_history_service = SessionHistoryService(
+    BASE_DIR
+)
+
+
+
+history_service = HistoryService(
+    session_history_service
+)
+
+
+project_state_memory_service = ProjectStateMemoryService(
+    DATA_DIR / "nova_project_state.json"
+)
+
+memory_context_service = MemoryContextService(
+    DATA_DIR,
+    session_service,
+)
+
+artifact_service = ArtifactService(
+    str(DATA_DIR / "nova_artifacts.json")
+)
+
+upload_ownership_service = UploadOwnershipService(
+    "data/nova_upload_ownership.json"
+)
+
+upload_route_service = UploadRouteService(
+    uploads_dir=UPLOADS_DIR,
+    upload_ownership_service=upload_ownership_service,
+)
+
+project_aware_context_service = ProjectAwareContextService(
+    memory_context_service,
+    session_service,
+)
+
+attachment_memory_gate_service = AttachmentMemoryGateService(
+    attachment_gate_service,
+    attachment_memory_service,
+)
+
+attachment_context_service = AttachmentContextService(
+    UPLOADS_DIR,
+)
+
+local_auth_route_service = None
+
+chat_attachment_memory_service = ChatAttachmentMemoryService()
+chat_response_cleanup_service = ChatResponseCleanupService()
+chat_execution_service = ChatExecutionService()
+chat_request_context_service = ChatRequestContextService()
+chat_stream_service = ChatStreamService()
+execution_guard_service = ExecutionGuardService(
+    chat_execution_service
+)
+session_route_service = SessionRouteService()
+public_route_service = PublicRouteService()
+login_page_route_service = LoginPageRouteService()
+auth_compat_route_service = AuthCompatRouteService()
+attachment_shape_normalizer_service = AttachmentShapeNormalizerService()
+session_auth_scope_service = SessionAuthScopeService()
+mobile_session_persist_service = MobileSessionPersistService()
+project_state_route_guard_service = ProjectStateRouteGuardService()
+memory_service = MemoryService(
+    str(DATA_DIR / "nova_memory.json")
+)
+
+
+
+memory_recall_service = MemoryRecallService(
+    memory_service
+)
+
+project_focus_memory_service = ProjectFocusMemoryService(
+    memory_service,
+    session_service,
+)
+project_recall_service = ProjectRecallService(
+    project_focus_memory_service,
+    project_state_memory_service,
+    PROJECT_STATE_MEMORY_KINDS,
+    DATA_DIR,
+)
+
+
+memory_guard_service = MemoryGuardService()
+
+memory_guard_route_service = MemoryGuardRouteService(
+    memory_service,
+    session_service,
+    memory_guard_service,
+)
+chat_attachment_selector_service = ChatAttachmentSelectorService()
+attachment_summary_service = AttachmentSummaryService()
+attachment_utils_service = AttachmentUtilsService()
+response_quality_service = ResponseQualityService()
+admin_lead_service = AdminLeadService()
+lead_route_service = LeadRouteService(admin_lead_service)
+admin_route_service = AdminRouteService(
+    admin_lead_service,
+)
+session_detail_cache_service = SessionDetailCacheService()
+session_response_cache_service = SessionResponseCacheService(
+    session_service,
+    session_detail_cache_service,
+    attachment_context_service,
+)
+
+chat_attachment_guard_service = ChatAttachmentGuardService()
+image_vision_service = ImageVisionService()
+chat_guard_service = ChatGuardService()
+account_profile_service = AccountProfileService()
+session_slim_response_service = SessionSlimResponseService()
+web_service = WebService(timeout=WEB_TIMEOUT)
+recon_service = ReconService(timeout=RECON_TIMEOUT)
+intent_router = IntentRouterService()
+runtime_brain = SafeUnifiedRuntime()
+runtime_response_sanitizer = RuntimeResponseSanitizerService()
+attachment_keypoints_service = AttachmentKeypointsService()
+# install_project_chat_response_router moved below app creation
+attachment_analysis_service = AttachmentAnalysisService()
+chat_attachment_context_service = ChatAttachmentContextService(
+    uploads_dir=UPLOADS_DIR,
+    base_dir=BASE_DIR,
+    attachment_analysis_service=attachment_analysis_service,
+)
+attachment_text_service = AttachmentTextService()
+blog_service = BlogService()
+debug_route_service = DebugRouteService()
+blog_route_service = BlogRouteService(
+    blog_service
+)
+
+RuntimeBootstrap.save(
+    runtime_brain
+)
+
+
+# REMOVE_APP_STARTUP_CHATSERVICE_DEBUG_LOCK
+
+# -----------------------
+# HELPERS
+# -----------------------
+
+IDENTITY_QUESTION_PATTERNS = [
+    re.compile(r"\bwhat(?:'s| is)\s+my\s+name\b", re.IGNORECASE),
+    re.compile(r"\bdo\s+you\s+know\s+my\s+name\b", re.IGNORECASE),
+    re.compile(r"\bwho\s+am\s+i\b", re.IGNORECASE),
+    re.compile(r"\bwhat\s+do\s+you\s+know\s+about\s+me\b", re.IGNORECASE),
+]
+
+NAME_MEMORY_PATTERNS = [
+    re.compile(r"^\s*user\s+name\s+is\s+(.+?)\s*$", re.IGNORECASE),
+    re.compile(r"^\s*name\s*:\s*(.+?)\s*$", re.IGNORECASE),
+    re.compile(r"^\s*my\s+name\s+is\s+(.+?)\s*$", re.IGNORECASE),
+]
+
+blog_service = BlogService()
+
+history_route_service = HistoryRouteService(
+    BASE_DIR
+)
+
+restored_runtime = getattr(
+    runtime_brain,
+    "restored_runtime_state",
+    {},
+)
+attachment_endpoint_service = AttachmentEndpointService()
+
+# NOVA_DURABLE_DATA_BOOTSTRAP_20260703
+def _nova_durable_data_bootstrap_20260703():
+    try:
+        import os
+        import shutil
+        import time
+        from pathlib import Path
+
+        base_dir = Path(__file__).resolve().parent
+        app_data = base_dir / "data"
+
+        candidates = []
+
+        explicit = os.environ.get("NOVA_DATA_DIR", "").strip()
+        if explicit:
+            candidates.append(Path(explicit))
+
+        # Only use /data when it already exists, which indicates a real mounted
+        # Railway volume. Do not create fake /data on local Windows or ephemeral
+        # containers, because that can move repo-local data unexpectedly.
+        volume_data = Path("/data")
+        if os.name != "nt" and volume_data.exists():
+            candidates.append(volume_data)
+
+        candidates.append(app_data)
+
+        chosen = None
+
+        for candidate in candidates:
+            try:
+                candidate.mkdir(parents=True, exist_ok=True)
+                probe = candidate / ".nova_write_probe"
+                probe.write_text("ok", encoding="utf-8")
+                probe.unlink(missing_ok=True)
+                chosen = candidate
+                break
+            except Exception:
+                continue
+
+        if chosen is None:
+            chosen = app_data
+            chosen.mkdir(parents=True, exist_ok=True)
+
+        os.environ["NOVA_DATA_DIR"] = str(chosen)
+
+        should_bridge_app_data = False
+        try:
+            should_bridge_app_data = chosen.resolve() != app_data.resolve()
+        except Exception:
+            should_bridge_app_data = str(chosen) != str(app_data)
+
+        if should_bridge_app_data:
+            chosen.mkdir(parents=True, exist_ok=True)
+
+            if app_data.exists() and not app_data.is_symlink():
+                for item in app_data.iterdir():
+                    target = chosen / item.name
+                    if target.exists():
+                        continue
+                    try:
+                        if item.is_dir():
+                            shutil.copytree(item, target)
+                        else:
+                            shutil.copy2(item, target)
+                    except Exception:
+                        pass
+
+                try:
+                    app_data.rename(base_dir / ("data_ephemeral_backup_" + time.strftime("%Y%m%d_%H%M%S")))
+                except Exception:
+                    pass
+
+            if not app_data.exists():
+                try:
+                    app_data.symlink_to(chosen, target_is_directory=True)
+                except Exception:
+                    pass
+
+        print("[NOVA_DURABLE_DATA_BOOTSTRAP_20260703] NOVA_DATA_DIR=", os.environ.get("NOVA_DATA_DIR"))
+        print("[NOVA_DURABLE_DATA_BOOTSTRAP_20260703] app_data=", str(app_data), "real=", str(app_data.resolve()))
+
+    except Exception as exc:
+        try:
+            print("[NOVA_DURABLE_DATA_BOOTSTRAP_20260703] failed:", exc)
+        except Exception:
+            pass
+
+
+_nova_durable_data_bootstrap_20260703()
+# /NOVA_DURABLE_DATA_BOOTSTRAP_20260703
+
+
+def _nova_boot_log_20260701(*args, **kwargs):
+    import os as _nova_boot_log_os_20260701
+
+    if str(_nova_boot_log_os_20260701.getenv("NOVA_VERBOSE_BOOT_LOGS", "")).strip().lower() in {"1", "true", "yes", "on"}:
+        print(*args, **kwargs)
+
+def update_execution_state_safe(execution, status=None, current_step=None, last_action=None):
+    """Safely assign status, current_step, last_action in execution dict."""
+    if status is not None:
+        execution["status"] = status
+    if current_step is not None:
+        execution["current_step"] = current_step
+    if last_action is not None:
+        execution["last_action"] = last_action
+
+
 # NOVA_EXECUTION_SERVICE_SINGLETON_20260607
 chat_execution_service = ChatExecutionService()
 execution_bridge_service = ExecutionBridgeService(
@@ -442,6 +637,144 @@ app = Flask(
     template_folder=str(BASE_DIR / "templates"),
     static_folder=str(BASE_DIR / "static"),
 )
+
+
+
+
+
+CORS(app)
+
+ensure_dir(DATA_DIR)
+ensure_dir(UPLOADS_DIR)
+
+app.config["UPLOAD_FOLDER"] = str(UPLOADS_DIR)
+
+
+
+_nova_boot_log_20260701(
+    "RESTORED RUNTIME OK",
+    {
+        "runtime_health": restored_runtime.get(
+            "runtime_health"
+        ),
+        "runtime_signal": restored_runtime.get(
+            "runtime_signal"
+        ),
+        "cycle_count": restored_runtime.get(
+            "cycle_count"
+        ),
+    },
+)
+
+lead_route_service.install_routes(app)
+debug_route_service.install_routes(app)
+memory_guard_route_service.install_routes(app)
+session_auth_scope_service.install(app)
+empty_session_pruner_service.install(app)
+memory_guard_route_service.install_routes(app)
+local_auth_route_service = None
+login_page_route_service.install_routes(app)
+auth_compat_route_service.install_routes(app)
+public_route_service.install_routes(app)
+admin_route_service.install_routes(app)
+
+history_route_service.install_routes(
+    app,
+    history_service,
+)
+command_route_service.install_routes(app)
+
+last_compressed = getattr(
+    runtime_brain,
+    "last_compressed_runtime",
+    {},
+)
+
+_nova_boot_log_20260701(
+    "LAST COMPRESSED OK",
+    {
+        "runtime_health": last_compressed.get(
+            "runtime_health"
+        ),
+        "runtime_signal": last_compressed.get(
+            "runtime_signal"
+        ),
+        "cycle_count": last_compressed.get(
+            "cycle_count"
+        ),
+    },
+)
+
+session_detail_response_cache_service = SessionDetailResponseCacheService(
+    session_service,
+    session_detail_cache_service,
+    session_response_cache_service,
+    attachment_text_service,
+)
+
+chat_service = ChatService(
+
+    session_service=session_service,
+    memory_service=memory_service,
+    artifact_service=artifact_service,
+    web_service=web_service,
+    recon_service=recon_service,
+)
+
+if hasattr(chat_service, "start_execution_daemon"):
+    chat_service.start_execution_daemon()
+
+
+image_command_service = ImageCommandService(
+    chat_service
+)
+
+execution_stream_service = ExecutionStreamService(
+    session_service=session_service,
+    chat_service=chat_service,
+    default_executor=default_executor,
+    next_move_class=NextMove,
+    update_execution_state_safe=update_execution_state_safe,
+)
+
+
+execution_fix_service = ExecutionFixService(
+    session_service=session_service,
+    default_executor=default_executor,
+    next_move_class=NextMove,
+    update_execution_state_safe=update_execution_state_safe,
+)
+
+execution_stream_route_service = ExecutionStreamRouteService(
+    session_service=session_service,
+    execution_service=chat_execution_service,
+    execution_stream_service=execution_stream_service,
+    execution_fix_service=execution_fix_service,
+)
+# =========================
+# RUNTIME BINDING
+# =========================
+chat_service.runtime = runtime_brain
+chat_service.safe_runtime = runtime_brain
+chat_service.runtime_brain = runtime_brain
+app.runtime_brain = runtime_brain
+app.config["runtime_brain"] = runtime_brain
+
+install_project_chat_response_router(app)
+
+session_bootstrap_service = SessionBootstrapService(
+    session_service,
+    logger=app.logger,
+)
+
+local_auth_route_service = LocalAuthRouteService(
+    app,
+    request,
+    jsonify,
+    session,
+)
+
+local_auth_route_service.install_routes()
 
 app.secret_key = os.environ.get(
     "NOVA_SECRET_KEY",
@@ -872,328 +1205,6 @@ except Exception as _nova_project_brain_general_intelligence_priority_error_2026
         _nova_project_brain_general_intelligence_priority_error_20260701,
     )
 
-
-CORS(app)
-
-ensure_dir(DATA_DIR)
-ensure_dir(UPLOADS_DIR)
-
-app.config["UPLOAD_FOLDER"] = str(UPLOADS_DIR)
-
-# -----------------------
-# SERVICES
-# -----------------------
-
-
-session_service = SessionService(
-    DATA_DIR / "nova_sessions.json"
-)
-
-command_route_service = CommandRouteService(
-    session_service
-)
-
-execution_state_service = ExecutionStateService(
-    session_service=session_service
-)
-
-memory_command_service = MemoryCommandService(
-    session_service=session_service,
-)
-
-session_bootstrap_service = SessionBootstrapService(
-    session_service,
-    logger=app.logger,
-)
-
-mobile_exchange_service = MobileExchangeService(
-    session_service
-)
-
-session_history_service = SessionHistoryService(
-    BASE_DIR
-)
-
-execution_guard_service = ExecutionGuardService(
-    chat_execution_service
-)
-
-history_service = HistoryService(
-    session_history_service
-)
-
-
-project_state_memory_service = ProjectStateMemoryService(
-    DATA_DIR / "nova_project_state.json"
-)
-
-memory_context_service = MemoryContextService(
-    DATA_DIR,
-    session_service,
-)
-
-artifact_service = ArtifactService(
-    str(DATA_DIR / "nova_artifacts.json")
-)
-
-upload_ownership_service = UploadOwnershipService(
-    "data/nova_upload_ownership.json"
-)
-
-upload_route_service = UploadRouteService(
-    uploads_dir=UPLOADS_DIR,
-    upload_ownership_service=upload_ownership_service,
-)
-
-project_aware_context_service = ProjectAwareContextService(
-    memory_context_service,
-    session_service,
-)
-
-attachment_memory_gate_service = AttachmentMemoryGateService(
-    attachment_gate_service,
-    attachment_memory_service,
-)
-
-attachment_context_service = AttachmentContextService(
-    UPLOADS_DIR,
-)
-
-local_auth_route_service = LocalAuthRouteService(
-    app,
-    request,
-    jsonify,
-    session,
-)
-
-
-
-chat_attachment_memory_service = ChatAttachmentMemoryService()
-chat_response_cleanup_service = ChatResponseCleanupService()
-chat_execution_service = ChatExecutionService()
-chat_request_context_service = ChatRequestContextService()
-chat_stream_service = ChatStreamService()
-session_route_service = SessionRouteService()
-public_route_service = PublicRouteService()
-login_page_route_service = LoginPageRouteService()
-auth_compat_route_service = AuthCompatRouteService()
-attachment_shape_normalizer_service = AttachmentShapeNormalizerService()
-session_auth_scope_service = SessionAuthScopeService()
-mobile_session_persist_service = MobileSessionPersistService()
-project_state_route_guard_service = ProjectStateRouteGuardService()
-memory_service = MemoryService(
-    str(DATA_DIR / "nova_memory.json")
-)
-
-memory_recall_service = MemoryRecallService(
-    memory_service
-)
-
-project_focus_memory_service = ProjectFocusMemoryService(
-    memory_service,
-    session_service,
-)
-project_recall_service = ProjectRecallService(
-    project_focus_memory_service,
-    project_state_memory_service,
-    PROJECT_STATE_MEMORY_KINDS,
-    DATA_DIR,
-)
-
-
-memory_guard_service = MemoryGuardService()
-
-memory_guard_route_service = MemoryGuardRouteService(
-    memory_service,
-    session_service,
-    memory_guard_service,
-)
-chat_attachment_selector_service = ChatAttachmentSelectorService()
-attachment_summary_service = AttachmentSummaryService()
-attachment_utils_service = AttachmentUtilsService()
-response_quality_service = ResponseQualityService()
-admin_lead_service = AdminLeadService()
-lead_route_service = LeadRouteService(admin_lead_service)
-admin_route_service = AdminRouteService(
-    admin_lead_service,
-)
-session_detail_cache_service = SessionDetailCacheService()
-session_response_cache_service = SessionResponseCacheService(
-    session_service,
-    session_detail_cache_service,
-    attachment_context_service,
-)
-
-chat_attachment_guard_service = ChatAttachmentGuardService()
-image_vision_service = ImageVisionService()
-chat_guard_service = ChatGuardService()
-account_profile_service = AccountProfileService()
-session_slim_response_service = SessionSlimResponseService()
-web_service = WebService(timeout=WEB_TIMEOUT)
-recon_service = ReconService(timeout=RECON_TIMEOUT)
-intent_router = IntentRouterService()
-runtime_brain = SafeUnifiedRuntime()
-runtime_response_sanitizer = RuntimeResponseSanitizerService()
-attachment_keypoints_service = AttachmentKeypointsService()
-install_project_chat_response_router(app)
-attachment_analysis_service = AttachmentAnalysisService()
-chat_attachment_context_service = ChatAttachmentContextService(
-    uploads_dir=UPLOADS_DIR,
-    base_dir=BASE_DIR,
-    attachment_analysis_service=attachment_analysis_service,
-)
-attachment_text_service = AttachmentTextService()
-blog_service = BlogService()
-debug_route_service = DebugRouteService()
-blog_route_service = BlogRouteService(
-    blog_service
-)
-
-blog_service = BlogService()
-
-history_route_service = HistoryRouteService(
-    BASE_DIR
-)
-
-restored_runtime = getattr(
-    runtime_brain,
-    "restored_runtime_state",
-    {},
-)
-attachment_endpoint_service = AttachmentEndpointService()
-
-_nova_boot_log_20260701(
-    "RESTORED RUNTIME OK",
-    {
-        "runtime_health": restored_runtime.get(
-            "runtime_health"
-        ),
-        "runtime_signal": restored_runtime.get(
-            "runtime_signal"
-        ),
-        "cycle_count": restored_runtime.get(
-            "cycle_count"
-        ),
-    },
-)
-
-lead_route_service.install_routes(app)
-debug_route_service.install_routes(app)
-memory_guard_route_service.install_routes(app)
-session_auth_scope_service.install(app)
-empty_session_pruner_service.install(app)
-memory_guard_route_service.install_routes(app)
-local_auth_route_service.install_routes()
-login_page_route_service.install_routes(app)
-auth_compat_route_service.install_routes(app)
-public_route_service.install_routes(app)
-admin_route_service.install_routes(app)
-
-history_route_service.install_routes(
-    app,
-    history_service,
-)
-command_route_service.install_routes(app)
-
-last_compressed = getattr(
-    runtime_brain,
-    "last_compressed_runtime",
-    {},
-)
-
-_nova_boot_log_20260701(
-    "LAST COMPRESSED OK",
-    {
-        "runtime_health": last_compressed.get(
-            "runtime_health"
-        ),
-        "runtime_signal": last_compressed.get(
-            "runtime_signal"
-        ),
-        "cycle_count": last_compressed.get(
-            "cycle_count"
-        ),
-    },
-)
-
-session_detail_response_cache_service = SessionDetailResponseCacheService(
-    session_service,
-    session_detail_cache_service,
-    session_response_cache_service,
-    attachment_text_service,
-)
-
-chat_service = ChatService(
-
-    session_service=session_service,
-    memory_service=memory_service,
-    artifact_service=artifact_service,
-    web_service=web_service,
-    recon_service=recon_service,
-)
-
-image_command_service = ImageCommandService(
-    chat_service
-)
-
-execution_stream_service = ExecutionStreamService(
-    session_service=session_service,
-    chat_service=chat_service,
-    default_executor=default_executor,
-    next_move_class=NextMove,
-    update_execution_state_safe=update_execution_state_safe,
-)
-
-
-execution_fix_service = ExecutionFixService(
-    session_service=session_service,
-    default_executor=default_executor,
-    next_move_class=NextMove,
-    update_execution_state_safe=update_execution_state_safe,
-)
-
-execution_stream_route_service = ExecutionStreamRouteService(
-    session_service=session_service,
-    execution_service=chat_execution_service,
-    execution_stream_service=execution_stream_service,
-    execution_fix_service=execution_fix_service,
-)
-# =========================
-# RUNTIME BINDING
-# =========================
-chat_service.runtime = runtime_brain
-chat_service.safe_runtime = runtime_brain
-chat_service.runtime_brain = runtime_brain
-app.runtime_brain = runtime_brain
-app.config["runtime_brain"] = runtime_brain
-
-install_project_chat_response_router(app)
-
-RuntimeBootstrap.save(
-    runtime_brain
-)
-
-if hasattr(chat_service, "start_execution_daemon"):
-    chat_service.start_execution_daemon()
-
-# REMOVE_APP_STARTUP_CHATSERVICE_DEBUG_LOCK
-
-# -----------------------
-# HELPERS
-# -----------------------
-
-IDENTITY_QUESTION_PATTERNS = [
-    re.compile(r"\bwhat(?:'s| is)\s+my\s+name\b", re.IGNORECASE),
-    re.compile(r"\bdo\s+you\s+know\s+my\s+name\b", re.IGNORECASE),
-    re.compile(r"\bwho\s+am\s+i\b", re.IGNORECASE),
-    re.compile(r"\bwhat\s+do\s+you\s+know\s+about\s+me\b", re.IGNORECASE),
-]
-
-NAME_MEMORY_PATTERNS = [
-    re.compile(r"^\s*user\s+name\s+is\s+(.+?)\s*$", re.IGNORECASE),
-    re.compile(r"^\s*name\s*:\s*(.+?)\s*$", re.IGNORECASE),
-    re.compile(r"^\s*my\s+name\s+is\s+(.+?)\s*$", re.IGNORECASE),
-]
 
 
 def json_ok(**kwargs):

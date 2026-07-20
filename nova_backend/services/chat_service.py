@@ -94,6 +94,7 @@ import shutil
 import tempfile
 import py_compile
 
+from nova_backend.services.attachment_analysis_service import AttachmentAnalysisService
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, List
@@ -4016,6 +4017,7 @@ if (not attachments) and (__name__ == "__main__"):
     ):
 
         self.runtime_cognitive_firewall = RuntimeCognitiveFirewall()
+        self.attachment_analysis_service = AttachmentAnalysisService()
 
         # =========================
         # CORE SERVICES
@@ -6908,11 +6910,11 @@ if (not attachments) and (__name__ == "__main__"):
 
         if route == self.ROUTE_ATTACHMENT_ANALYSIS:
             # NOVA_DISPATCH_ATTACHMENT_ANALYSIS_ROUTE_20260607
-            return self._execute_attachment_analysis(
+            return self.attachment_analysis_service.execute_attachment_analysis(
+                attachments=attachments,
                 decision=decision,
                 user_text=user_text,
                 session_id=session_id,
-                attachments=attachments,
             )
 
         if route in isolated_routes:

@@ -1,7 +1,79 @@
 import re
+from pathlib import Path
+import zipfile
+import xml.etree.ElementTree as ET
 
 
 class AttachmentAnalysisService:
+
+    def __init__(self):
+        pass
+
+    def normalize_attachment(self, attachment):
+        if isinstance(attachment, dict):
+            return attachment
+
+        if isinstance(attachment, str):
+            value = attachment.strip()
+
+            if not value:
+                return {}
+
+            return {
+                "filename": value,
+                "original_filename": value,
+                "path": value,
+            }
+
+        return {}
+
+    def resolve_attachment_path(self, attachment):
+        root = Path(r"C:\Users\Owner\nova")
+        uploads = root / "uploads"
+
+        attachment = self.normalize_attachment(
+            attachment
+        )
+
+        candidates = []
+
+        for key in (
+            "path",
+            "file_path",
+            "local_path",
+        ):
+            value = attachment.get(key)
+
+            if value:
+                candidate = Path(str(value))
+                candidates.append(candidate)
+                candidates.append(
+                    uploads / candidate.name
+                )
+
+        for key in (
+            "stored_name",
+            "saved_name",
+            "filename",
+            "stored_filename",
+            "name",
+            "original_filename",
+        ):
+            value = attachment.get(key)
+
+            if value:
+                candidates.append(
+                    uploads / Path(str(value)).name
+                )
+
+        for candidate in candidates:
+            try:
+                if candidate.exists() and candidate.is_file():
+                    return candidate
+            except Exception:
+                pass
+
+        return None
 
     def clean_extracted_attachment_text(
         self,
@@ -207,8 +279,6 @@ class AttachmentAnalysisService:
         mime_type,
     ):
         try:
-            from pathlib import Path
-
             path_obj = Path(
                 str(attachment_path or "")
             )
@@ -234,9 +304,7 @@ class AttachmentAnalysisService:
                     pieces = []
 
                     for page in document:
-                        text = page.get_text(
-                            "text"
-                        )
+                        text = page.get_text("text")
 
                         if text:
                             pieces.append(text)
@@ -252,3 +320,100 @@ class AttachmentAnalysisService:
 
         except Exception:
             return ""
+
+
+    def read_attachment_text(
+        self,
+        file_path,
+    ):
+        try:
+            path = Path(
+                str(file_path or "")
+            )
+
+            if not path.exists():
+                return ""
+
+            if path.suffix.lower() == ".docx":
+                return self.extract_docx_text(path)
+
+            return path.read_text(
+                encoding="utf-8",
+                errors="replace",
+            )
+
+        except Exception:
+            return ""
+
+
+    def extract_docx_text(
+        self,
+        file_path,
+    ):
+        try:
+            file_path = Path(file_path)
+
+            if not file_path.exists():
+                return ""
+
+            chunks = []
+
+            with zipfile.ZipFile(file_path) as docx:
+                xml_names = [
+                    name
+                    for name in docx.namelist()
+                    if (
+                        name == "word/document.xml"
+                        or name.startswith("word/header")
+                        or name.startswith("word/footer")
+                    )
+                ]
+
+                for xml_name in xml_names:
+                    raw = docx.read(xml_name)
+                    root = ET.fromstring(raw)
+
+                    for node in root.iter():
+                        if node.tag.endswith("}t") and node.text:
+                            chunks.append(node.text)
+
+                        elif node.tag.endswith("}tab"):
+                            chunks.append("\t")
+
+                        elif node.tag.endswith("}br"):
+                            chunks.append("\n")
+
+            return " ".join(
+                " ".join(chunks).split()
+            ).strip()
+
+        except Exception:
+            return ""
+
+    def execute_attachment_analysis(
+        self,
+        attachments=None,
+        *args,
+        **kwargs,
+    ):
+        results = []
+
+        for attachment in attachments or []:
+            path = self.resolve_attachment_path(
+                attachment
+            )
+
+            text = self.read_attachment_text(
+                path
+            )
+
+            results.append(
+                {
+                    "path": path,
+                    "text": self.clean_extracted_attachment_text(
+                        text
+                    ),
+                }
+            )
+
+        return results
