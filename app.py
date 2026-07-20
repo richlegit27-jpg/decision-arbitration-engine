@@ -5060,35 +5060,7 @@ def api_delete_artifact(artifact_id: str):
     except Exception as e:
         return json_error(f"Failed to delete artifact: {e}", 500)
 
-def delete_artifact(self, artifact_id: str) -> bool:
-    from nova_backend.services.auth_context import get_current_user_id
 
-    try:
-        data = self._load()
-
-        artifacts = data.get("artifacts", [])
-
-        owner_id = get_current_user_id()
-
-        new_artifacts = [
-            a for a in artifacts
-            if not (
-                str(a.get("id")) == str(artifact_id)
-                and str(a.get("owner_id") or "") == str(owner_id)
-            )
-        ]
-
-        if len(new_artifacts) == len(artifacts):
-            return False
-
-        data["artifacts"] = new_artifacts
-        self._save(data)
-
-        return True
-
-    except Exception as e:
-        print("DELETE ARTIFACT ERROR:", e)
-        return False
 
 # -----------------------
 # WEB
