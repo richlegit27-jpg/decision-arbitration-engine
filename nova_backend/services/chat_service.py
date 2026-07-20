@@ -11817,6 +11817,36 @@ if (not attachments) and (__name__ == "__main__"):
         # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         # 3. WEB (STRICT ONLY)
         # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+        # LIVE MARKET PRICE ROUTE
+        # Current prices must use web, never normal chat.
+        market_terms = (
+            "bitcoin",
+            "btc",
+            "crypto",
+            "stock",
+            "stocks",
+            "share",
+            "shares",
+        )
+
+        price_terms = (
+            "price",
+            "worth",
+            "right now",
+            "current",
+            "live",
+            "today",
+            "market",
+            "trading at",
+        )
+
+        if (
+            any(term in lowered for term in market_terms)
+            and any(term in lowered for term in price_terms)
+        ):
+            return ("web", "fetch")
+
         web_keywords = (
             "news",
             "weather",
@@ -13165,6 +13195,13 @@ if (not attachments) and (__name__ == "__main__"):
             attachments
         )
 
+        print(
+            "[ROUTER DEBUG]",
+            user_text,
+            route,
+            command,
+        )
+
         # HARD RULE: execution must not leak into chat fallback
         if execution_active and route != "execution":
             route = "chat"
@@ -13188,9 +13225,13 @@ if (not attachments) and (__name__ == "__main__"):
             return self._execute_web_fetch(
                 user_text=user_text,
                 session_id=session_id,
-                attachments=attachments
+                attachments=attachments,
+                decision={
+                    "route": "web_fetch",
+                    "mode": "web_fetch",
+                    "query": user_text,
+                },
             )
-
         else:
             return self._execute_general_chat(
                 user_text=user_text,
@@ -16380,13 +16421,25 @@ Auto-fix result:
             user_text=user_text,
             session_id=session_id,
             attachments=attachments,
+
         )
 
         if (
             isinstance(intelligence_state, dict)
-            and intelligence_state.get("route") != self.ROUTE_GENERAL_CHAT
+            and intelligence_state.get("route") not in {
+                self.ROUTE_GENERAL_CHAT,
+                "chat",
+            }
         ):
-            return intelligence_state
+
+
+            if not (
+                "bitcoin" in lower_text
+                or "btc" in lower_text
+                or "crypto" in lower_text
+                or "stock" in lower_text
+            ):
+                return intelligence_state
 
         regen_commands = {
             "regen",
@@ -16480,6 +16533,16 @@ Auto-fix result:
             "share price",
             "bitcoin price",
             "crypto price",
+            "btc price",
+            "btc right now",
+            "bitcoin right now",
+            "crypto right now",
+            "current bitcoin",
+            "current btc",
+            "current crypto",
+            "market price",
+            "stock value",
+            "share value",
         )
 
         explicit_web_prefixes = (
@@ -24040,262 +24103,6 @@ try:
 except Exception as _nova_final_mojibake_cleanup_v4_error_20260624:
     print("[NOVA_FINAL_RESPONSE_MOJIBAKE_CLEANUP_V4_20260624] failed:", _nova_final_mojibake_cleanup_v4_error_20260624)
 
-# NOVA_IMAGE_GENERATION_FINAL_TEXT_SYNC_20260630
-# Absolute last-pass cleanup for generated image responses.
-# Fixes assistant_message.content/text and working_state after final session cache rewrites.
-try:
-    import json as _nova_img_final_json_20260630
-    import re as _nova_img_final_re_20260630
-    from pathlib import Path as _nova_img_final_Path_20260630
-
-    _NOVA_PRE_IMAGE_FINAL_TEXT_SYNC_HANDLE_20260630 = ChatService.handle
-
-    def _nova_img_final_clean_prompt_20260630(value):
-        text = str(value or "").strip()
-
-        text = _nova_img_final_re_20260630.sub(
-            r"^\s*generated\s+image\s*(for)?\s*:?\s*",
-            "",
-            text,
-            flags=_nova_img_final_re_20260630.I,
-        )
-
-        text = _nova_img_final_re_20260630.sub(
-            r"^\s*(please\s+)?(generate|create|make|draw|render|produce)\s+",
-            "",
-            text,
-            flags=_nova_img_final_re_20260630.I,
-        )
-
-        text = _nova_img_final_re_20260630.sub(
-            r"^\s*(an?\s+)?(image|picture|photo|illustration|artwork|drawing)\s+",
-            "",
-            text,
-            flags=_nova_img_final_re_20260630.I,
-        )
-
-        text = _nova_img_final_re_20260630.sub(
-            r"^\s*of\s+",
-            "",
-            text,
-            flags=_nova_img_final_re_20260630.I,
-        )
-
-        return text.strip(" .") or "your image"
-
-    def _nova_img_final_is_generated_image_response_20260630(data):
-        if not isinstance(data, dict):
-            return False
-
-        assistant_message = data.get("assistant_message") or {}
-        saved_artifact = data.get("saved_artifact") or {}
-
-        meta = assistant_message.get("meta") or {}
-        source = str(meta.get("source") or "").lower()
-        artifact_type = str(saved_artifact.get("type") or "").lower()
-        artifact_kind = str(saved_artifact.get("kind") or "").lower()
-
-        if source == "image_generation":
-            return True
-
-        if artifact_type == "image_generation":
-            return True
-
-        if artifact_kind == "image":
-            return True
-
-        if assistant_message.get("image_url") or saved_artifact.get("image_url"):
-            return True
-
-        attachments = assistant_message.get("attachments") or []
-        for item in attachments:
-            if not isinstance(item, dict):
-                continue
-
-            mime = str(item.get("mime_type") or item.get("type") or "").lower()
-            filename = str(item.get("filename") or item.get("stored_name") or "").lower()
-
-            if mime.startswith("image/") and filename.startswith("generated_"):
-                return True
-
-        return False
-
-    def _nova_img_final_sync_session_file_20260630(session_id, clean_message, clean_title):
-        if not session_id:
-            return
-
-        try:
-            sessions_path = _nova_img_final_Path_20260630("data/nova_sessions.json")
-
-            if not sessions_path.exists():
-                return
-
-            sessions_data = _nova_img_final_json_20260630.loads(
-                sessions_path.read_text(encoding="utf-8")
-            )
-
-            sessions = sessions_data
-            if isinstance(sessions_data, dict):
-                sessions = sessions_data.get("sessions", sessions_data)
-
-            target = None
-
-            if isinstance(sessions, dict):
-                target = sessions.get(session_id)
-            elif isinstance(sessions, list):
-                for item in sessions:
-                    if isinstance(item, dict) and item.get("id") == session_id:
-                        target = item
-                        break
-
-            if not isinstance(target, dict):
-                return
-
-            old_title = str(target.get("title") or "").strip().lower()
-            if old_title in {"", "web fetch", "new chat", "generated image"}:
-                target["title"] = clean_title
-
-            working_state = target.get("working_state")
-            if isinstance(working_state, dict):
-                working_state["last_assistant_message"] = clean_message
-                target["working_state"] = working_state
-
-            messages = target.get("messages")
-            if isinstance(messages, list):
-                for message in reversed(messages):
-                    if not isinstance(message, dict):
-                        continue
-
-                    role = str(message.get("role") or "").lower()
-                    body = str(message.get("content") or message.get("text") or "")
-
-                    looks_like_generated_image = (
-                        role == "assistant"
-                        and (
-                            message.get("image_url")
-                            or "generated image for:" in body.lower()
-                            or "generated image:" in body.lower()
-                        )
-                    )
-
-                    if looks_like_generated_image:
-                        message["content"] = clean_message
-                        message["text"] = clean_message
-                        break
-
-            sessions_path.write_text(
-                _nova_img_final_json_20260630.dumps(
-                    sessions_data,
-                    ensure_ascii=False,
-                    indent=2,
-                ),
-                encoding="utf-8",
-            )
-
-        except Exception as _nova_img_final_session_sync_error_20260630:
-            print(
-                "[NOVA_IMAGE_GENERATION_FINAL_TEXT_SYNC_20260630] session sync skipped:",
-                _nova_img_final_session_sync_error_20260630,
-            )
-
-    def _nova_img_final_sync_response_20260630(data):
-        if not _nova_img_final_is_generated_image_response_20260630(data):
-            return data
-
-        assistant_message = data.get("assistant_message")
-        if not isinstance(assistant_message, dict):
-            assistant_message = {}
-
-        saved_artifact = data.get("saved_artifact")
-        if not isinstance(saved_artifact, dict):
-            saved_artifact = {}
-
-        session = data.get("session")
-        if not isinstance(session, dict):
-            session = {}
-
-        working_state = session.get("working_state")
-        if not isinstance(working_state, dict):
-            working_state = {}
-
-        prompt_source = (
-            saved_artifact.get("prompt")
-            or saved_artifact.get("body")
-            or working_state.get("last_user_message")
-            or assistant_message.get("content")
-            or assistant_message.get("text")
-            or ""
-        )
-
-        clean_prompt = _nova_img_final_clean_prompt_20260630(prompt_source)
-        clean_message = f"Generated image: {clean_prompt}"
-        clean_title = f"Image: {clean_prompt}"[:80].rstrip()
-
-        assistant_message["content"] = clean_message
-        assistant_message["text"] = clean_message
-        data["assistant_message"] = assistant_message
-
-        saved_artifact["summary"] = clean_message
-
-        viewer = saved_artifact.get("viewer")
-        if isinstance(viewer, dict):
-            viewer["summary"] = clean_message
-            viewer["title"] = "Generated image"
-            saved_artifact["viewer"] = viewer
-
-        data["saved_artifact"] = saved_artifact
-
-        old_title = str(session.get("title") or "").strip().lower()
-        if old_title in {"", "web fetch", "new chat", "generated image"}:
-            session["title"] = clean_title
-
-        working_state["last_assistant_message"] = clean_message
-        session["working_state"] = working_state
-        data["session"] = session
-
-        session_id = data.get("session_id") or session.get("id")
-        _nova_img_final_sync_session_file_20260630(
-            session_id,
-            clean_message,
-            clean_title,
-        )
-
-        return data
-
-    def _nova_image_generation_final_text_sync_handle_20260630(self, *args, **kwargs):
-        result = _NOVA_PRE_IMAGE_FINAL_TEXT_SYNC_HANDLE_20260630(self, *args, **kwargs)
-
-        try:
-            if hasattr(result, "get_data") and hasattr(result, "set_data"):
-                raw = result.get_data(as_text=True)
-                data = _nova_img_final_json_20260630.loads(raw)
-                data = _nova_img_final_sync_response_20260630(data)
-
-                new_raw = _nova_img_final_json_20260630.dumps(data, ensure_ascii=False)
-                result.set_data(new_raw)
-                result.headers["Content-Length"] = str(len(result.get_data()))
-                result.headers["Content-Type"] = "application/json"
-                return result
-
-            if isinstance(result, dict):
-                return _nova_img_final_sync_response_20260630(result)
-
-        except Exception as _nova_img_final_text_sync_error_20260630:
-            print(
-                "[NOVA_IMAGE_GENERATION_FINAL_TEXT_SYNC_20260630] skipped:",
-                _nova_img_final_text_sync_error_20260630,
-            )
-
-        return result
-
-    ChatService.handle = _nova_image_generation_final_text_sync_handle_20260630
-    _nova_boot_log_20260701("[NOVA_IMAGE_GENERATION_FINAL_TEXT_SYNC_20260630] installed")
-
-except Exception as _nova_img_final_text_sync_install_error_20260630:
-    print(
-        "[NOVA_IMAGE_GENERATION_FINAL_TEXT_SYNC_20260630] failed:",
-        _nova_img_final_text_sync_install_error_20260630,
-    )
 
 # NOVA_ACCIDENTAL_INPUT_GUARD_20260630
 # Final lightweight guard for keyboard-smash / accidental input.
@@ -24511,117 +24318,6 @@ try:
     _nova_boot_log_20260701("[NOVA_FINAL_LIVE_MARKET_PRICE_ROUTE_AUTHORITY_20260630] installed")
 except Exception as _nova_final_live_market_price_error_20260630:
     print("[NOVA_FINAL_LIVE_MARKET_PRICE_ROUTE_AUTHORITY_20260630] failed:", _nova_final_live_market_price_error_20260630)
-
-# NOVA_FINAL_LIVE_MARKET_PRICE_ALL_ROUTE_AUTHORITY_20260630
-# Final route authority across both known route methods.
-# Live market price questions must use web_fetch, not canned chat.
-try:
-    def _nova_all_live_market_price_text_20260630(args, kwargs):
-        for key in ("user_text", "text", "message", "prompt", "query"):
-            value = kwargs.get(key)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-
-        for value in args:
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-
-        return ""
-
-    def _nova_all_live_market_price_attachments_20260630(args, kwargs):
-        value = kwargs.get("attachments")
-        if value:
-            return value
-
-        # Most route methods use args like: user_text, attachments, ...
-        if len(args) >= 2:
-            maybe_attachments = args[1]
-            if maybe_attachments:
-                return maybe_attachments
-
-        return None
-
-    def _nova_all_is_live_market_price_request_20260630(value):
-        text = " ".join(str(value or "").lower().replace("?", " ").split())
-        if not text:
-            return False
-
-        market_terms = (
-            "bitcoin",
-            "btc",
-            "crypto",
-            "stock",
-            "stocks",
-            "share",
-            "shares",
-        )
-
-        price_terms = (
-            "price",
-            "worth",
-            "trading at",
-            "right now",
-            "today",
-            "current",
-            "live",
-            "spot",
-            "market",
-        )
-
-        return (
-            any(term in text for term in market_terms)
-            and any(term in text for term in price_terms)
-        )
-
-    def _nova_all_live_market_price_decision_20260630(self, user_text):
-        return {
-            "route": self.ROUTE_WEB_FETCH,
-            "mode": "web_fetch",
-            "confidence": 1.0,
-            "reasons": ["final_all_live_market_price_route_authority"],
-            "save_artifact": True,
-            "save_memory": False,
-            "use_memory": False,
-            "query": user_text,
-        }
-
-    def _nova_all_wrap_live_market_price_route_20260630(method_name):
-        original = getattr(ChatService, method_name, None)
-
-        if not callable(original):
-            return False
-
-        if getattr(original, "_nova_all_live_market_price_route_authority_20260630", False):
-            return True
-
-        def _nova_all_live_market_price_route_wrapper_20260630(self, *args, **kwargs):
-            user_text = _nova_all_live_market_price_text_20260630(args, kwargs)
-            attachments = _nova_all_live_market_price_attachments_20260630(args, kwargs)
-
-            # Attachments still win. This only affects clean text market-price requests.
-            if not attachments and _nova_all_is_live_market_price_request_20260630(user_text):
-                return _nova_all_live_market_price_decision_20260630(self, user_text)
-
-            return original(self, *args, **kwargs)
-
-        _nova_all_live_market_price_route_wrapper_20260630._nova_all_live_market_price_route_authority_20260630 = True
-        setattr(ChatService, method_name, _nova_all_live_market_price_route_wrapper_20260630)
-        return True
-
-    _nova_all_live_market_price_installed_20260630 = []
-
-    for _nova_all_route_method_20260630 in ("_make_route_decision", "_decide_route"):
-        if _nova_all_wrap_live_market_price_route_20260630(_nova_all_route_method_20260630):
-            _nova_all_live_market_price_installed_20260630.append(_nova_all_route_method_20260630)
-
-    _nova_boot_log_20260701(
-        "[NOVA_FINAL_LIVE_MARKET_PRICE_ALL_ROUTE_AUTHORITY_20260630] installed:",
-        ",".join(_nova_all_live_market_price_installed_20260630) or "none",
-    )
-except Exception as _nova_all_live_market_price_error_20260630:
-    print("[NOVA_FINAL_LIVE_MARKET_PRICE_ALL_ROUTE_AUTHORITY_20260630] failed:", _nova_all_live_market_price_error_20260630)
-
-
 
 
 
