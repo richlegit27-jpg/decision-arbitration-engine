@@ -26670,11 +26670,6 @@ try:
                         or ""
                     ).strip()
 
-                    print(
-                        "[NOVA FRESH PROJECT STATE ANSWER]",
-                        repr(answer),
-                    )
-
             elif kind == "next":
                 from nova_backend.services.project_brain_general_intelligence import (
                     build_project_brain_general_answer,
