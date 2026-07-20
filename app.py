@@ -14,6 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from nova_backend.services.memory_route_service import MemoryRouteService
 from werkzeug.utils import secure_filename
+from nova_backend.services.web_preview_route_service import WebPreviewRouteService
 
 from nova_backend.services.debug_route_service import DebugRouteService
 
@@ -265,6 +266,8 @@ from nova_backend.services.account_profile_service import (
     AccountProfileService,
 )
 
+from nova_backend.services.attachment_route_service import AttachmentRouteService
+
 from nova_backend.services.login_page_route_service import (
     LoginPageRouteService,
 )
@@ -413,6 +416,8 @@ execution_bridge_service = ExecutionBridgeService(
 execution_guard_service = ExecutionGuardService(
     chat_execution_service
 )
+
+web_preview_route_service = WebPreviewRouteService()
 session_route_service = SessionRouteService()
 public_route_service = PublicRouteService()
 login_page_route_service = LoginPageRouteService()
@@ -427,8 +432,6 @@ memory_service = MemoryService(
 memory_route_service = MemoryRouteService(
     memory_service
 )
-
-
 
 memory_recall_service = MemoryRecallService(
     memory_service
@@ -529,6 +532,12 @@ restored_runtime = getattr(
     {},
 )
 attachment_endpoint_service = AttachmentEndpointService()
+
+attachment_route_service = AttachmentRouteService(
+    attachment_analysis_service,
+    attachment_endpoint_service,
+    UPLOADS_DIR,
+)
 
 # NOVA_DURABLE_DATA_BOOTSTRAP_20260703
 def _nova_durable_data_bootstrap_20260703():
@@ -5468,17 +5477,8 @@ def web_preview():
     data = request.get_json(silent=True) or {}
     url = str(data.get("url") or "").strip()
 
-    if not url:
-        return jsonify({
-            "ok": False,
-            "error": "Missing url",
-            "title": "Source preview",
-            "preview": "",
-            "url": "",
-        }), 400
-
     return jsonify(
-        web_service.preview(url)
+        web_preview_route_service.preview(url)
     )
 
 def create_startup_backup():
@@ -5529,92 +5529,20 @@ try:
             if str(_nova_rule.rule) == "/api/chat":
                 app.view_functions[_nova_rule.endpoint] = api_chat
                 _nova_boot_log_20260701(f"[NOVA ROUTE REPAIR] /api/chat endpoint={_nova_rule.endpoint} rebound to api_chat")
+
 except Exception as _nova_route_repair_error:
     print(f"[NOVA ROUTE REPAIR FAILED] {_nova_route_repair_error}")
 
-
-# ATTACHMENT_EXTRACT_ENDPOINT_LOCK
 @app.route("/api/attachment/extract", methods=["POST"])
 def api_attachment_extract():
-    """
-    Extract readable text from an uploaded PDF/image without touching the chat pipeline.
-    Accepts JSON:
-      {
-        "url": "/api/uploads/file.pdf",
-        "path": "optional local path",
-        "mime_type": "application/pdf"
-      }
-    """
-    try:
-        payload = request.get_json(silent=True) or {}
+    payload = request.get_json(silent=True) or {}
 
-        upload_url = str(payload.get("url") or payload.get("file_url") or "").strip()
-        local_path = str(payload.get("path") or "").strip()
-        mime_type = str(payload.get("mime_type") or payload.get("type") or "").strip()
+    result = attachment_route_service.extract(payload)
 
-        if not local_path and upload_url:
-            filename = upload_url.replace("\\", "/").split("/")[-1].strip()
-            if filename:
-                local_path = str(Path(UPLOADS_DIR) / filename)
+    if isinstance(result, tuple):
+        return jsonify(result[0]), result[1]
 
-        if not local_path:
-            return jsonify({
-                "ok": False,
-                "error": "Missing url or path.",
-            }), 400
-
-        file_path = Path(local_path)
-
-        if not file_path.exists():
-            return jsonify({
-                "ok": False,
-                "error": f"File not found: {file_path}",
-            }), 404
-
-        if not mime_type:
-            suffix = file_path.suffix.lower()
-            if suffix == ".pdf":
-                mime_type = "application/pdf"
-            elif suffix in {".jpg", ".jpeg"}:
-                mime_type = "image/jpeg"
-            elif suffix == ".png":
-                mime_type = "image/png"
-            elif suffix == ".webp":
-                mime_type = "image/webp"
-            else:
-                mime_type = "application/octet-stream"
-
-        extracted_text = attachment_analysis_service.analyze_binary_attachment_for_prompt(
-            str(file_path),
-            mime_type,
-        )
-
-        extracted_text = str(extracted_text or "").strip()
-
-        app.logger.info(
-            "[AttachmentExtractEndpoint] extracted path=%s chars=%s mime_type=%s",
-            str(file_path),
-            len(extracted_text),
-            mime_type,
-        )
-
-        return jsonify({
-            "ok": True,
-            "path": str(file_path),
-            "url": upload_url,
-            "mime_type": mime_type,
-            "chars": len(extracted_text),
-            "text": extracted_text,
-        })
-
-    except Exception as error:
-        app.logger.exception("[AttachmentExtractEndpoint] failed")
-        return jsonify({
-            "ok": False,
-            "error": str(error),
-        }), 500
-
-
+    return jsonify(result)
 
 @app.route("/api/attachment/summarize", methods=["POST"])
 def api_attachment_summarize():
