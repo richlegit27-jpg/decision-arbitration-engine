@@ -1217,12 +1217,10 @@ except Exception as _nova_project_brain_general_intelligence_priority_error_2026
     )
 
 
-
 def json_ok(**kwargs):
     payload = {"ok": True}
     payload.update(kwargs)
     return jsonify(payload)
-
 
 
 def json_error(message: str, status: int = 400, **kwargs):
@@ -1233,7 +1231,6 @@ def json_error(message: str, status: int = 400, **kwargs):
 def request_json() -> dict:
     data = request.get_json(silent=True)
     return data if isinstance(data, dict) else {}
-
 
 def build_common_state_payload(session_id: str = "") -> dict:
     session = None
@@ -1249,9 +1246,6 @@ def build_common_state_payload(session_id: str = "") -> dict:
         "artifacts": artifact_service.build_list_payload(),
         "memory": memory_service.build_list_payload(),
     }
-
-
-
 
 def extract_memory_fact(user_text: str) -> dict | None:
     return memory_recall_service.extract_memory_fact(
@@ -1272,45 +1266,6 @@ def extract_name_from_memory_text(
 ) -> str:
     return memory_recall_service.extract_name_from_memory_text(
         text
-    )
-
-def is_name_memory_item(
-    item: dict,
-) -> bool:
-    return memory_recall_service.is_name_memory_item(
-        item
-    )
-
-
-def get_memory_items():
-    try:
-        items = memory_service.all()
-        return items if isinstance(items, list) else []
-    except Exception:
-        return []
-
-
-def delete_memory_item(memory_id: str) -> bool:
-    if not memory_id:
-        return False
-
-    for method_name in ("delete_memory", "delete", "remove"):
-        method = getattr(memory_service, method_name, None)
-        if callable(method):
-            try:
-                return bool(method(memory_id))
-            except Exception:
-                return False
-    return False
-
-
-def score_name_memory(
-    item: dict,
-    session_id: str,
-) -> float:
-    return memory_recall_service.score_name_memory(
-        item,
-        session_id,
     )
 
 def find_best_name_memory(
