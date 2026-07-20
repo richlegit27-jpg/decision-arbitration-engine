@@ -315,6 +315,15 @@ from nova_backend.services.chat_response_cleanup_service import (
     ChatResponseCleanupService,
 )
 
+from nova_backend.services.session_history_persistence_guard_service import (
+    SessionHistoryPersistenceGuardService,
+)
+
+session_history_persistence_guard_service = (
+    SessionHistoryPersistenceGuardService()
+)
+
+
 from nova_backend.services.execution_state_service import ExecutionStateService
 from nova_backend.services import empty_session_pruner_service
 from nova_backend.services.chat_stream_service import ChatStreamService
@@ -668,6 +677,7 @@ session_route_service.install_routes(
     memory_service,
 )
 
+session_history_persistence_guard_service.install(app)
 lead_route_service.install_routes(app)
 debug_route_service.install_routes(app)
 memory_guard_route_service.install_routes(app)
