@@ -78,6 +78,7 @@ class MemoryCommandService:
         assistant_msg = {
             "role": "assistant",
             "text": assistant_text,
+            "content": assistant_text,
             "attachments": [],
             "memory_used": [],
             "meta": {
