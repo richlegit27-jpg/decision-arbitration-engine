@@ -1,4 +1,75 @@
 ﻿from __future__ import annotations
+
+import base64
+import os
+import re
+import uuid
+import logging
+import shutil
+import tempfile
+import py_compile
+
+from nova_backend.services.attachment_analysis_service import AttachmentAnalysisService
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, List
+
+from nova_backend.services.execution_handler import (
+    ExecutionHandler,
+    NextMove,
+    default_executor,
+)
+
+from openai import OpenAI
+from nova_backend.services.model_gateway_service import chat_completions_create
+# NOVA_CHAT_SERVICE_MODEL_GATEWAY_IMPORT_20260709
+
+from nova_backend.models.session import new_message
+from nova_backend.services.agent_service import AgentService
+from nova_backend.services.artifact_service import ArtifactService
+from nova_backend.services.autonomy_service import AutonomyService
+from nova_backend.services.memory_ranker_service import MemoryRankerService
+from nova_backend.services.memory_service import MemoryService
+from nova_backend.services.response_rewrite_service import ResponseRewriteService
+from nova_backend.services.nova_behavior_signal_builder import (
+    behavior_signal_builder,
+)
+
+from nova_backend.services.nova_behavior_observer import (
+    behavior_observer,
+)
+from nova_backend.services.recon_service import ReconService
+from nova_backend.services.session_service import SessionService
+from nova_backend.services.web_service import WebService
+from nova_backend.services.tool_service import ToolService
+from nova_backend.services.execution_service import ExecutionService
+from nova_backend.services.intent_service import IntentService
+from nova_backend.services.execution_loop_service import ExecutionLoopService
+from nova_backend.services.brain.brain_core import BrainCore
+from nova_backend.services.brain.strategy import StrategyEngine
+from nova_backend.services.memory.memory_core import MemoryCore
+from nova_backend.services.execution.executor import Executor
+from nova_backend.services.python_runner_service import PythonRunnerService
+from nova_backend.services.auth_context import get_current_user_id
+from nova_backend.services.upload_ownership_service import UploadOwnershipService
+from nova_backend.services.runtime_bootstrap import (
+    RuntimeBootstrap,
+
+
+)
+from nova_backend.services.runtime_cognitive_injection_service import (
+    RuntimeCognitiveInjectionService,
+)
+
+from nova_backend.services.runtime_cognitive_firewall import (
+    RuntimeCognitiveFirewall,
+)
+from nova_backend.services.nova_self_improvement_coordinator import (
+    process_behavior_observation,
+)
+
+
+
 from nova_backend.services.chat_turn_pipeline import build_chat_turn_from_request, build_model_messages
 def _nova_boot_log_20260701(*args, **kwargs):
     import os as _nova_boot_log_os_20260701
@@ -85,73 +156,6 @@ def _nova_local_project_status_answer_20260607(user_text):
     )
 # FINALIZE_RESPONSE_KWARGS_LOCK_20260604
 
-import base64
-import os
-import re
-import uuid
-import logging
-import shutil
-import tempfile
-import py_compile
-
-from nova_backend.services.attachment_analysis_service import AttachmentAnalysisService
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, List
-
-from nova_backend.services.execution_handler import (
-    ExecutionHandler,
-    NextMove,
-    default_executor,
-)
-
-from openai import OpenAI
-from nova_backend.services.model_gateway_service import chat_completions_create
-# NOVA_CHAT_SERVICE_MODEL_GATEWAY_IMPORT_20260709
-
-from nova_backend.models.session import new_message
-from nova_backend.services.agent_service import AgentService
-from nova_backend.services.artifact_service import ArtifactService
-from nova_backend.services.autonomy_service import AutonomyService
-from nova_backend.services.memory_ranker_service import MemoryRankerService
-from nova_backend.services.memory_service import MemoryService
-from nova_backend.services.response_rewrite_service import ResponseRewriteService
-from nova_backend.services.nova_behavior_signal_builder import (
-    behavior_signal_builder,
-)
-
-from nova_backend.services.nova_behavior_observer import (
-    behavior_observer,
-)
-from nova_backend.services.recon_service import ReconService
-from nova_backend.services.session_service import SessionService
-from nova_backend.services.web_service import WebService
-from nova_backend.services.tool_service import ToolService
-from nova_backend.services.execution_service import ExecutionService
-from nova_backend.services.intent_service import IntentService
-from nova_backend.services.execution_loop_service import ExecutionLoopService
-from nova_backend.services.brain.brain_core import BrainCore
-from nova_backend.services.brain.strategy import StrategyEngine
-from nova_backend.services.memory.memory_core import MemoryCore
-from nova_backend.services.execution.executor import Executor
-from nova_backend.services.python_runner_service import PythonRunnerService
-from nova_backend.services.auth_context import get_current_user_id
-from nova_backend.services.upload_ownership_service import UploadOwnershipService
-from nova_backend.services.runtime_bootstrap import (
-    RuntimeBootstrap,
-
-
-)
-from nova_backend.services.runtime_cognitive_injection_service import (
-    RuntimeCognitiveInjectionService,
-)
-
-from nova_backend.services.runtime_cognitive_firewall import (
-    RuntimeCognitiveFirewall,
-)
-from nova_backend.services.nova_self_improvement_coordinator import (
-    process_behavior_observation,
-)
 
 logger = logging.getLogger("nova.execution")
 DEBUG_EXECUTION = False
