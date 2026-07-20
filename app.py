@@ -653,7 +653,6 @@ session_route_service.install_routes(
     session_service,
     artifact_service,
     memory_service,
-    json_ok,
 )
 
 lead_route_service.install_routes(app)
@@ -1687,30 +1686,6 @@ def api_fetch():
     )
 
     return jsonify(clean_result)
-# NOVA_RESTORE_API_SESSIONS_ROUTE_20260609
-@app.get("/api/sessions")
-def api_sessions():
-    try:
-        flask_session = globals().get("session")
-        current_user_id = str(
-            flask_session.get("nova_user_id")
-            or flask_session.get("user_id")
-            or ""
-        ).strip()
-    except Exception:
-        current_user_id = ""
-
-    sessions = session_service.get_all(
-        user_id=current_user_id,
-    )
-
-    return json_ok(
-        sessions=sessions,
-        active_session_id=session_service.active_session_id,
-        session=session_service.get_active(),
-        artifacts=artifact_service.build_list_payload(),
-        memory=memory_service.build_list_payload(),
-    )
 
 
 

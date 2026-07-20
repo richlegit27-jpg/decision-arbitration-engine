@@ -177,7 +177,6 @@ class SessionRouteService:
         session_service,
         artifact_service,
         memory_service,
-        json_ok,
     ):
         from flask import request, session
 
@@ -200,10 +199,15 @@ class SessionRouteService:
                 ).strip()
             )
 
-            return json_ok(
-                sessions=sessions,
-                items=sessions,
-                artifacts=artifact_service.all()
-                if hasattr(artifact_service, "all")
-                else [],
-            )
+            return jsonify({
+                "ok": True,
+                "sessions": sessions,
+                "items": sessions,
+                "artifacts": (
+                    artifact_service.all()
+                    if hasattr(artifact_service, "all")
+                    else []
+                ),
+            })
+
+
