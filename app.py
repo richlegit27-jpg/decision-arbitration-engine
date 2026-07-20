@@ -396,9 +396,15 @@ local_auth_route_service = None
 
 chat_attachment_memory_service = ChatAttachmentMemoryService()
 chat_response_cleanup_service = ChatResponseCleanupService()
-chat_execution_service = ChatExecutionService()
 chat_request_context_service = ChatRequestContextService()
 chat_stream_service = ChatStreamService()
+chat_execution_service = ChatExecutionService()
+
+execution_bridge_service = ExecutionBridgeService(
+    chat_execution_service,
+    None,
+)
+
 execution_guard_service = ExecutionGuardService(
     chat_execution_service
 )
@@ -626,7 +632,6 @@ def update_execution_state_safe(execution, status=None, current_step=None, last_
 
 
 # NOVA_EXECUTION_SERVICE_SINGLETON_20260607
-chat_execution_service = ChatExecutionService()
 execution_bridge_service = ExecutionBridgeService(
     chat_execution_service,
     None,
