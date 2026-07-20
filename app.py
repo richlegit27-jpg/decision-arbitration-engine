@@ -423,6 +423,7 @@ from nova_backend.services.chat_response_cleanup_service import (
     ChatResponseCleanupService,
 )
 
+from nova_backend.services.execution_state_service import ExecutionStateService
 from nova_backend.services import empty_session_pruner_service
 from nova_backend.services.chat_stream_service import ChatStreamService
 from nova_backend.services.command_route_service import (
@@ -580,15 +581,11 @@ try:
             ):
 
                 active_execution_getter = (
-                    globals().get(
-                        "_nova_phase4a_get_active_execution_20260701"
-                    )
+                    execution_state_service.get_active_execution
                 )
 
                 execution_is_active = (
-                    globals().get(
-                        "_nova_phase4a_execution_is_active_20260701"
-                    )
+                    execution_state_service.execution_is_active
                 )
 
                 if (
@@ -894,6 +891,10 @@ session_service = SessionService(
 
 command_route_service = CommandRouteService(
     session_service
+)
+
+execution_state_service = ExecutionStateService(
+    session_service=session_service
 )
 
 memory_command_service = MemoryCommandService(
@@ -1749,8 +1750,8 @@ try:
             # can answer.
             # -------------------------------------------------
 
-            active_execution_getter = globals().get(
-                "_nova_phase4a_get_active_execution_20260701"
+            active_execution_getter = (
+                 execution_state_service.get_active_execution
             )
 
             if callable(
@@ -1783,8 +1784,8 @@ try:
                     dict,
                 ):
 
-                    execution_is_active = globals().get(
-                        "_nova_phase4a_execution_is_active_20260701"
+                    execution_is_active = (
+                        execution_state_service.execution_is_active
                     )
 
                     if (
@@ -7275,6 +7276,8 @@ try:
 
 
 
+
+
     def _nova_phase4a_clean_text_20260701(value):
         return " ".join(str(value or "").strip().lower().split())
 
@@ -7600,6 +7603,23 @@ try:
                     )
 
         return merged_state
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     def _nova_phase4a_persist_working_state_20260701(session_id, patch):
         session_id = str(session_id or "").strip()
