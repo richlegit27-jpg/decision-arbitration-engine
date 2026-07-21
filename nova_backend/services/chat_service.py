@@ -22730,54 +22730,6 @@ def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict
             exec_debug("MEMORY CLEANUP FAILED:", e)
 
 
-
-
-
-# ============================================================
-# CHAT SERVICE METHOD BRIDGE
-# Repairs methods that were accidentally defined outside class.
-# ============================================================
-# SAFE STATIC METHOD REGISTRY ONLY
-CHAT_SERVICE_METHODS = [
-    "_handle_image_generation",
-]
-
-for name in CHAT_SERVICE_METHODS:
-    if hasattr(ChatService, name):
-        continue
-    obj = globals().get(name)
-    if callable(obj):
-        setattr(ChatService, name, obj)
-
-# MEMORY_ITEMS_NAMEERROR_SAFE_LOCK
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # NOVA_PLANNER_SERVICE_WIRING_20260609
 # Safe planner_service wiring layer.
 # This does NOT delete the existing _process_goal_and_plan.
@@ -23805,4 +23757,4 @@ def _nova_attachment_guard_method_looks_like_result_web_route(name):
 
 
 
-# NOVA_CHAT_SERVICE_MODEL_GATEWAY_CALLS_20260709
+
