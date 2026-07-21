@@ -3,8 +3,13 @@ from __future__ import annotations
 
 class ProjectStateDirectFreshnessPriorityService:
 
-    def __init__(self, execution_state_service=None):
-        self.execution_state_service = execution_state_service
+    def __init__(
+        self,
+        execution_state_service=None,
+    ):
+        self.execution_state_service = (
+            execution_state_service
+        )
 
     def install(self, app):
         self._install_guard(app)
@@ -23,17 +28,47 @@ class ProjectStateDirectFreshnessPriorityService:
                     if request.method != "POST":
                         return None
 
-                    payload = request.get_json(silent=True) or {}
+                    payload = (
+                        request.get_json(
+                            silent=True
+                        )
+                        or {}
+                    )
 
                     if not isinstance(payload, dict):
                         return None
+
+                    session_id = str(
+                        payload.get("session_id")
+                        or payload.get(
+                            "active_session_id"
+                        )
+                        or ""
+                    ).strip()
+
+                    if (
+                        self.execution_state_service
+                        and session_id
+                    ):
+
+                        active_execution = (
+                            self.execution_state_service.get_active_execution(
+                                session_id
+                            )
+                        )
+
+                        if active_execution:
+                            return None
+
 
                     from nova_backend.services.project_state_direct_freshness_bridge import (
                         build_project_state_direct_fresh_response,
                     )
 
-                    response_json = build_project_state_direct_fresh_response(
-                        payload
+                    response_json = (
+                        build_project_state_direct_fresh_response(
+                            payload
+                        )
                     )
 
                     if not response_json:

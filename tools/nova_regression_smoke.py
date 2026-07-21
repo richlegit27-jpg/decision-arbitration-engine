@@ -192,7 +192,7 @@ def run():
     )
     assert_true(
         "project_paraphrase_general_intelligence_route",
-        route_of(project_paraphrase) == "project_state_current_memory_direct_recall",
+        route_of(project_paraphrase) == "project_brain_general_intelligence",
         json.dumps(project_paraphrase.get("debug", {}), indent=2),
     )
     assert_true(

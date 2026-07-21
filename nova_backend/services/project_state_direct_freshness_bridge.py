@@ -9,9 +9,6 @@ PROJECT_BRAIN_ROUTE = "project_brain_general_intelligence"
 SOURCE = "project_brain_context_builder"
 
 DIRECT_PROJECT_STATE_PROMPTS = {
-    "what are we working on now",
-    "what are we working on",
-    "what are we working on right now",
     "what are we doing now",
     "what is nova working on",
     "what is nova working on now",
@@ -19,7 +16,9 @@ DIRECT_PROJECT_STATE_PROMPTS = {
     "where are we at with nova",
     "what is the current nova state",
     "what is the current project state",
-    "where are we at with nova right now",
+    "what are we working on now",
+    "what are we working on",
+    "what are we working on right now",
 }
 
 NEXT_MOVE_PROMPTS = {
@@ -43,6 +42,12 @@ CURRENT_BLOCKER_PROMPTS = {
     "actual blocker on nova",
 }
 
+GENERAL_PROJECT_STATE_PROMPTS = {
+    "where are we at with nova right now",
+    "before we change more code, what is the safest next move",
+    "separate what nova remembers from what nova is actively doing",
+}
+
 
 def _clean_text(value):
     return str(value or "").strip().lower()
@@ -57,6 +62,9 @@ def classify_project_state_freshness_prompt(user_text):
 
     if normalized in DIRECT_PROJECT_STATE_PROMPTS:
         return "direct_project_state"
+
+    if normalized in GENERAL_PROJECT_STATE_PROMPTS:
+        return "general_project_answer"
 
     if normalized in NEXT_MOVE_PROMPTS:
         return "next_move"
@@ -93,7 +101,7 @@ def build_project_state_direct_fresh_response(payload):
 
     answer_source = SOURCE
 
-    if intent == "next_move":
+    if intent in {"next_move", "general_project_answer"}:
         from nova_backend.services.project_brain_general_intelligence import (
             build_project_brain_general_answer,
         )
@@ -113,6 +121,23 @@ def build_project_state_direct_fresh_response(payload):
             )
             or ""
         ).strip()
+
+        if intent == "general_project_answer":
+            from nova_backend.services.project_brain_context_builder import (
+                build_current_project_answer,
+            )
+
+            current_project_answer = str(
+                build_current_project_answer()
+                or ""
+            ).strip()
+
+            if current_project_answer:
+                answer = (
+                    f"{current_project_answer}\n\n"
+                    f"Project Brain general intelligence:\n{answer}\n\n"
+                    "Next move: follow the ranked Best Move above."
+                )
 
         answer_source = (
             "project_brain_general_intelligence"
