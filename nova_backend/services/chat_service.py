@@ -3931,7 +3931,25 @@ if (not attachments) and (__name__ == "__main__"):
         artifact_service: ArtifactService,
         web_service: WebService,
         recon_service: ReconService,
+        memory_context_service=None,
     ):
+
+        self.chat_response_cleanup_service = ChatResponseCleanupService()
+        self.runtime_cognitive_firewall = RuntimeCognitiveFirewall()
+        self.attachment_analysis_service = AttachmentAnalysisService()
+        self.accidental_input_guard_service = AccidentalInputGuardService()
+        self.response_mojibake_cleanup_service = ResponseMojibakeCleanupService()
+
+        # =========================
+        # CORE SERVICES
+        # =========================
+
+        self.session_service = session_service
+        self.memory_service = memory_service
+        self.artifact_service = artifact_service
+        self.web_service = web_service
+        self.recon_service = recon_service
+        self.memory_context_service = memory_context_service
 
         self.chat_response_cleanup_service = ChatResponseCleanupService()
         self.runtime_cognitive_firewall = RuntimeCognitiveFirewall()
@@ -21576,6 +21594,14 @@ Next action:
             "artifacts": self._list_artifacts_for_session(session_id),
             "memory": self._list_memory_for_session(session_id),
         }
+
+
+
+
+
+
+
+
 
         # ==============================
         # RESPONSE BUILDERS

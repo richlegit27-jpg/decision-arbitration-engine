@@ -784,7 +784,9 @@ chat_service = ChatService(
     artifact_service=artifact_service,
     web_service=web_service,
     recon_service=recon_service,
+    memory_context_service=memory_context_service,
 )
+
 project_brain_general_intelligence_priority_service = (
     ProjectBrainGeneralIntelligencePriorityService(
         execution_state_service=execution_state_service,
