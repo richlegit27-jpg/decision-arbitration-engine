@@ -605,17 +605,14 @@ if (not attachments) and (__name__ == "__main__"):
         # RETRY FAILED
         # =========================
         if command == "retry_failed":
-
-            execution_state["failure_count"] = (
-                int(execution_state.get("failure_count") or 0) + 1
+            (
+                execution_state,
+                failed_index,
+            ) = (
+                self.execution_mutation_service.prepare_failed_retry(
+                    execution_state,
+                )
             )
-
-            failed_index = None
-
-            for idx, step in enumerate(steps):
-                if step.get("status") == "failed":
-                    failed_index = idx
-                    break
 
             if failed_index is None:
                 return {
@@ -627,22 +624,6 @@ if (not attachments) and (__name__ == "__main__"):
                     "execution": execution_state,
                 }
 
-            execution_state["current_index"] = failed_index
-
-            failure_count = int(execution_state.get("failure_count") or 0)
-
-            if failure_count == 1:
-                execution_state["retry_strategy"] = "retry_step"
-
-            elif failure_count == 2:
-                execution_state["retry_strategy"] = "retry_with_smaller_scope"
-
-            elif failure_count == 3:
-                execution_state["retry_strategy"] = "retry_with_file_scope"
-
-            else:
-                execution_state["retry_strategy"] = "change_strategy"
-
             self._save_execution_state(
                 session_id,
                 execution_state,
@@ -653,42 +634,3 @@ if (not attachments) and (__name__ == "__main__"):
                 session_id=session_id,
                 execution_state=execution_state,
             )
-
-        # =========================
-        # CANCEL
-        # =========================
-        if command == "cancel":
-
-            execution_state = (
-                self.execution_mutation_service.cancel(
-                    execution_state,
-                )
-            )
-            self._save_execution_state(
-                session_id,
-                execution_state,
-            )
-
-            self._save_execution_state(
-                session_id,
-                {},
-            )
-
-            return {
-                "ok": True,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": "Execution cancelled.",
-                },
-                "execution": execution_state,
-            }
-
-
-        return {
-            "ok": False,
-            "assistant_message": {
-                "role": "assistant",
-                "text": (f"Unknown execution command: " f"{command}"),
-            },
-            "execution": execution_state,
-        }

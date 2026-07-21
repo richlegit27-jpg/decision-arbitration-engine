@@ -3744,7 +3744,7 @@ if (not attachments) and (__name__ == "__main__"):
         self.attachment_analysis_service = AttachmentAnalysisService()
         self.accidental_input_guard_service = AccidentalInputGuardService()
         self.response_mojibake_cleanup_service = ResponseMojibakeCleanupService()
-        self.execution_handler = ExecutionHandler(default_executor)
+
         # =========================
         # CORE SERVICES
         # =========================

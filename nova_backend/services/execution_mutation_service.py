@@ -65,6 +65,65 @@ class ExecutionMutationService:
 
         return execution_state
 
+    def prepare_failed_retry(
+        self,
+        execution_state,
+    ):
+        if not isinstance(execution_state, dict):
+            execution_state = {}
+
+        failure_count = (
+            int(
+                execution_state.get(
+                    "failure_count"
+                )
+                or 0
+            )
+            + 1
+        )
+
+        execution_state["failure_count"] = (
+            failure_count
+        )
+
+        steps = execution_state.get("steps") or []
+
+        failed_index = None
+
+        for index, step in enumerate(steps):
+            if (
+                isinstance(step, dict)
+                and step.get("status") == "failed"
+            ):
+                failed_index = index
+                break
+
+        if failed_index is None:
+            return execution_state, None
+
+
+
+        strategies = {
+            1: "retry_step",
+            2: "retry_with_smaller_scope",
+            3: "retry_with_file_scope",
+        }
+
+        execution_state["failure_count"] = (
+            failure_count
+        )
+        execution_state["current_index"] = (
+            failed_index
+        )
+        execution_state["retry_strategy"] = (
+            strategies.get(
+                failure_count,
+                "change_strategy",
+            )
+        )
+
+        return execution_state, failed_index
+
     def cancel(
         self,
         execution_state,
