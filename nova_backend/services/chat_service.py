@@ -19272,35 +19272,6 @@ Next action:
         except Exception:
             pass
 
-    def _classify_execution_error(self, error_text: str) -> str:
-        error_text_lc = self._safe_str(error_text).lower()
-
-        if "indentationerror" in error_text_lc or "taberror" in error_text_lc:
-            return "indentation"
-
-        if "syntaxerror" in error_text_lc:
-            return "syntax"
-
-        if "modulenotfounderror" in error_text_lc or "importerror" in error_text_lc:
-            return "import"
-
-        if "nameerror" in error_text_lc:
-            return "name"
-
-        if "attributeerror" in error_text_lc:
-            return "attribute"
-
-        if "typeerror" in error_text_lc:
-            return "type"
-
-        if "keyerror" in error_text_lc:
-            return "key"
-
-        if "filenotfounderror" in error_text_lc:
-            return "missing_file"
-
-        return "unknown"
-
 
 
     def _reinforce_memory(
