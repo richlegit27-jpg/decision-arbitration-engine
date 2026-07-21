@@ -1933,25 +1933,18 @@ Current step:
         exec_debug("MEMORY WRITE FAILED: no supported memory write method")
         return False
 
-    def _get_memory_list(self):
+def _get_memory_list(self):
+    if self.memory_service:
         try:
-            if not hasattr(self, "memory") or not self.memory:
-                return []
+            result = self.memory_service.list_memories()
 
-            if hasattr(self.memory, "list_memories"):
-                result = self.memory.list_memories()
-                if isinstance(result, list):
-                    return result
-
-            if hasattr(self.memory, "_read_store"):
-                data = self.memory._read_store()
-                if isinstance(data, dict):
-                    return data.get("memory", [])
-
-            return []
+            if isinstance(result, list):
+                return result
 
         except Exception:
-            return []
+            pass
+
+    return []
 
     def _get_sessions_list(self) -> list:
         try:
