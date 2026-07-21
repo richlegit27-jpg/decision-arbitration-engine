@@ -22730,21 +22730,6 @@ def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict
             exec_debug("MEMORY CLEANUP FAILED:", e)
 
 
-def _chatservice_archive_execution_state_patch(
-    self,
-    session_id: str,
-    execution_state: dict | None = None,
-    command: str = "",
-) -> None:
-    try:
-        return None
-    except Exception:
-        return None
-
-
-ChatService._archive_execution_state = _chatservice_archive_execution_state_patch
-
-
 
 
 
