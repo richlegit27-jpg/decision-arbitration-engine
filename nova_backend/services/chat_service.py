@@ -41,7 +41,7 @@ from nova_backend.services.image_generation_runtime_service import (
     install_image_generation_runtime,
 )
 from nova_backend.services.runtime_uploads_normalizer_service import (
-    install_runtime_uploads_normalizer,
+    RuntimeUploadsNormalizerService,
 )
 from nova_backend.services.attachment_web_suppression_service import (
     install_attachment_web_suppression,
@@ -1933,18 +1933,18 @@ Current step:
         exec_debug("MEMORY WRITE FAILED: no supported memory write method")
         return False
 
-def _get_memory_list(self):
-    if self.memory_service:
-        try:
-            result = self.memory_service.list_memories()
+    def _get_memory_list(self):
+        if self.memory_service:
+            try:
+                result = self.memory_service.list_memories()
 
-            if isinstance(result, list):
-                return result
+                if isinstance(result, list):
+                    return result
 
-        except Exception:
-            pass
+            except Exception:
+                pass
 
-    return []
+        return []
 
     def _get_sessions_list(self) -> list:
         try:
@@ -3809,7 +3809,8 @@ if (not attachments) and (__name__ == "__main__"):
         memory_context_service=None,
         working_state_service=None,
         execution_state_service=None,
-    ):
+        runtime_uploads_normalizer_service=None,
+        ):
 
         self.chat_response_cleanup_service = ChatResponseCleanupService()
         self.runtime_cognitive_firewall = RuntimeCognitiveFirewall()
@@ -3823,6 +3824,7 @@ if (not attachments) and (__name__ == "__main__"):
 
         self.session_service = session_service
         self.memory_service = memory_service
+        self.runtime_uploads_normalizer_service = runtime_uploads_normalizer_service
         self.artifact_service = artifact_service
         self.web_service = web_service
         self.recon_service = recon_service
@@ -18047,30 +18049,17 @@ Next action:
         return updated, done, total
 
     def _persist_message_fallback(self, session_id: str, message: dict) -> None:
-        result = self._call_first(
-            self.sessions,
-            ["append_message", "add_message", "save_message", "push_message"],
-            session_id,
-            message,
-        )
-        if result is not None:
-            return
-
-        self._call_first(
-            self.sessions,
-            ["append_message", "add_message", "save_message", "push_message"],
-            session_id=session_id,
-            message=message,
-        )
-
-    def _persist_turn(
-        self, session_id: str, user_msg: dict, assistant_msg: dict
-    ) -> None:
-        try:
-            self._persist_message_fallback(session_id, user_msg)
-            self._persist_message_fallback(session_id, assistant_msg)
-        except Exception as e:
-            exec_debug("TURN PERSIST FAILED:", e)
+        if self.session_service:
+            try:
+                self.session_service.append_message(
+                    session_id,
+                    message,
+                )
+            except Exception as e:
+                exec_debug(
+                    "MESSAGE PERSIST FAILED:",
+                    e,
+                )
 
     def _build_working_state_prompt_block(self, session_id: str) -> str:
         state = self._get_working_state(session_id) or {}
@@ -21994,12 +21983,16 @@ def _nova_build_planner_fallback_state_20260609(goal_text: str) -> dict:
     }
 
 
-try:
-    _nova_original_process_goal_and_plan_20260609 = getattr(
-        ChatService,
-        "_process_goal_and_plan",
-        None,
-    )
+def install_execution_planner_runtime_patches():
+
+    try:
+        _nova_original_process_goal_and_plan_20260609 = getattr(
+            ChatService,
+            "_process_goal_and_plan",
+            None,
+        )
+    except Exception:
+        _nova_original_process_goal_and_plan_20260609 = None
 
     def _nova_process_goal_and_plan_with_planner_20260609(
         self,
@@ -22058,8 +22051,6 @@ try:
 
     ChatService._process_goal_and_plan = _nova_process_goal_and_plan_with_planner_20260609
 
-except Exception:
-    pass
 
 
 
@@ -22203,12 +22194,13 @@ except Exception:
     pass
 
 
-install_non_web_source_leak_guard(ChatService)
+def install_chat_service_runtime_patches():
+    install_execution_planner_runtime_patches()
+    install_non_web_source_leak_guard(ChatService)
+    install_token_usage_finalize_wrapper(ChatService)
+    install_attachment_web_suppression()
 
 # NOVA_INTENT_AUTHORITY_DECIDE_ROUTE_20260630
-# Final lightweight intent authority wrapper.
-# Keeps hard attachment protections, but lets IntentService own high-confidence
-# route selection for image/web/planning/chat metadata.
 try:
     _nova_previous_decide_route_intent_authority_20260630 = ChatService._decide_route
 
@@ -22222,6 +22214,8 @@ try:
         **kwargs,
     ):
         attachments = attachments if isinstance(attachments, list) else []
+
+        # existing function body stays here
 
         # Real attachments always stay attachment-analysis.
         if attachments:
@@ -22823,10 +22817,11 @@ try:
             )
         )
 
-    ChatService.handle = _nova_project_brain_question_top_priority_handle_20260701
-    ChatService._NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701 = True
-    print("[NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701] installed")
+    if hasattr(ChatService, "handle"):
+        ChatService.handle = _nova_project_brain_question_top_priority_handle_20260701
 
+        ChatService._NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701 = True
+        print("[NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701] installed")
 except Exception as _nova_project_brain_question_top_priority_error_20260701:
     try:
         print(
@@ -22835,25 +22830,6 @@ except Exception as _nova_project_brain_question_top_priority_error_20260701:
         )
     except Exception:
         pass
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-install_runtime_uploads_normalizer(ChatService)
 
 install_token_usage_finalize_wrapper(ChatService)
 
