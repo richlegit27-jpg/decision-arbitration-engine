@@ -428,6 +428,78 @@ class ExecutionStateService:
         except Exception:
             return service_saved
 
+    def get_execution_state(
+        self,
+        session_id,
+    ):
+        session_id = str(session_id or "").strip()
+
+        if not session_id:
+            return {}
+
+        cached = self.active_execution_cache.get(
+            session_id
+        )
+
+        if isinstance(cached, dict) and cached:
+            return cached
+
+        state = self.get_working_state(
+            session_id
+        )
+
+        if isinstance(state, dict):
+
+            execution_state = state.get(
+                "execution_state"
+            )
+
+            if isinstance(execution_state, dict):
+                return execution_state
+
+            active_execution = state.get(
+                "active_execution"
+            )
+
+            if isinstance(active_execution, dict):
+                return active_execution
+
+        return {}
+
+
+    def save_execution_state(
+        self,
+        session_id,
+        execution_state=None,
+    ):
+        session_id = str(session_id or "").strip()
+
+        if not session_id:
+            return {}
+
+        execution_state = (
+            execution_state
+            if isinstance(execution_state, dict)
+            else {}
+        )
+
+        execution_state["_execution_processing"] = False
+        execution_state["lock"] = False
+
+        self.active_execution_cache[session_id] = (
+            execution_state
+        )
+
+        self.persist_working_state(
+            session_id,
+            {
+                "execution_state": execution_state,
+                "active_execution": execution_state,
+            },
+        )
+
+        return execution_state
+
     def get_active_execution(self, session_id):
         session_id = str(session_id or "").strip()
 

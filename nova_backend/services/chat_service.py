@@ -1795,51 +1795,10 @@ Current step:
         self,
         session_id="",
     ):
-        session_id = self._safe_str(session_id).strip()
-
-        if not session_id:
-            return {}
-
-        cache = getattr(
-            self,
-            "_execution_state_cache",
-            {},
-        )
-
-        cached_state = cache.get(session_id)
-
-        if isinstance(cached_state, dict) and cached_state:
-            return cached_state
-
-        try:
-            session = self._get_session_payload(session_id)
-
-            if isinstance(session, dict):
-
-                execution_state = session.get("execution_state")
-
-                if isinstance(execution_state, dict) and execution_state:
-                    return execution_state
-
-                active_execution = session.get("active_execution")
-
-                if isinstance(active_execution, dict) and active_execution:
-                    return active_execution
-
-        except Exception as e:
-            exec_debug(
-                "LOAD EXECUTION STATE FAILED:",
-                e,
+        if self.execution_state_service:
+            return self.execution_state_service.get_execution_state(
+                session_id
             )
-
-        working_state = self._get_working_state(session_id) or {}
-
-        if isinstance(working_state, dict):
-
-            execution_state = working_state.get("execution_state")
-
-            if isinstance(execution_state, dict) and execution_state:
-                return execution_state
 
         return {}
 
@@ -1848,85 +1807,13 @@ Current step:
         session_id="",
         execution_state=None,
     ):
-        session_id = self._safe_str(session_id).strip()
-
-        if not session_id:
-            return {}
-
-        execution_state = execution_state if isinstance(execution_state, dict) else {}
-
-        execution_state["_execution_processing"] = False
-        execution_state["lock"] = False
-
-        working_state = self._get_working_state(session_id) or {}
-
-        working_state["execution_state"] = execution_state
-
-        self._update_working_state(
-            session_id,
-            working_state,
-        )
-
-        self._execution_state_cache = getattr(
-            self,
-            "_execution_state_cache",
-            {},
-        )
-
-        self._execution_state_cache[session_id] = execution_state
-
-        self._set_session_meta(
-            session_id,
-            "execution_state",
-            execution_state,
-        )
-
-        self._set_session_meta(
-            session_id,
-            "active_execution",
-            execution_state,
-        )
-
-        sessions = self.sessions.load()
-
-        index = self.session_service._find(
-            sessions,
-            session_id,
-        )
-
-        if index is not None:
-            sessions[index]["execution_state"] = execution_state
-
-            sessions[index]["active_execution"] = (
-                execution_state
-                if (
-                    isinstance(execution_state, dict)
-                    and execution_state.get("steps")
-                    and self._safe_str(execution_state.get("status")).lower()
-                    not in {
-                        "complete",
-                        "completed",
-                        "done",
-                        "cancelled",
-                        "canceled",
-                    }
-                )
-                else {}
+        if self.execution_state_service:
+            return self.execution_state_service.save_execution_state(
+                session_id,
+                execution_state,
             )
 
-            meta = sessions[index].get("meta")
-
-            if not isinstance(meta, dict):
-                meta = {}
-
-            meta["execution_state"] = execution_state
-            meta["active_execution"] = execution_state
-
-            sessions[index]["meta"] = meta
-
-            self.sessions.save(sessions)
-
-        return execution_state
+        return {}
 
     def _get_session_meta(self, session_id: str, key: str = "", default=None):
         session_id = self._safe_str(session_id).strip()
@@ -3928,6 +3815,7 @@ if (not attachments) and (__name__ == "__main__"):
         recon_service: ReconService,
         memory_context_service=None,
         working_state_service=None,
+        execution_state_service=None,
     ):
 
         self.chat_response_cleanup_service = ChatResponseCleanupService()
@@ -3947,7 +3835,7 @@ if (not attachments) and (__name__ == "__main__"):
         self.recon_service = recon_service
         self.memory_context_service = memory_context_service
         self.working_state_service = working_state_service
-
+        self.execution_state_service = execution_state_service
 
         self.chat_response_cleanup_service = ChatResponseCleanupService()
         self.runtime_cognitive_firewall = RuntimeCognitiveFirewall()

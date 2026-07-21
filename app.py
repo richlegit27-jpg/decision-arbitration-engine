@@ -790,6 +790,7 @@ chat_service = ChatService(
     recon_service=recon_service,
     memory_context_service=memory_context_service,
     working_state_service=working_state_service,
+    execution_state_service=execution_state_service,
 )
 
 project_brain_general_intelligence_priority_service = (
