@@ -295,7 +295,10 @@ class SessionRouteService:
                 store["sessions"] = sessions
                 store["active_session_id"] = session_id
 
-                session_service._write_store(store)
+                session_service.save(
+                    sessions,
+                    active=session_id,
+                )
 
             except Exception as exc:
                 try:
@@ -661,6 +664,7 @@ class SessionRouteService:
         except Exception:
             found = None
 
+
         if found is None:
             try:
                 sessions = session_service.get_all(
@@ -675,39 +679,25 @@ class SessionRouteService:
                         if str(item.get("id") or "").strip() != sid:
                             continue
 
-                        if not session_service._belongs_to_user(
-                            item,
-                            auth_user_id,
-                        ):
-                            continue
-
                         found = item
                         break
 
             except Exception:
                 found = None
 
+
         if found is None:
             try:
-                store = session_service._read_store()
-                items = (
-                    store.get("sessions")
-                    if isinstance(store, dict)
-                    else []
+                sessions = session_service.get_all(
+                    user_id=auth_user_id,
                 )
 
-                if isinstance(items, list):
-                    for item in items:
+                if isinstance(sessions, list):
+                    for item in sessions:
                         if not isinstance(item, dict):
                             continue
 
                         if str(item.get("id") or "").strip() != sid:
-                            continue
-
-                        if not session_service._belongs_to_user(
-                            item,
-                            auth_user_id,
-                        ):
                             continue
 
                         found = item
