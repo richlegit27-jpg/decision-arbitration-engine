@@ -117,6 +117,7 @@ class SessionBootstrapService:
                 sessions,
                 active=target_session_id,
             )
+            return new_session
 
         except Exception:
             if self.logger:
