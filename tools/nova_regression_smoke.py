@@ -201,6 +201,41 @@ def run():
         text_of(project_paraphrase),
     )
 
+    # 11. Debugging intent stays available.
+    debugging = post_chat(
+        "fix this python error",
+        f"regression_debugging_{stamp}",
+    )
+    assert_true(
+        "debugging_intent_safe",
+        "error" in text_of(debugging).lower()
+        or "debug" in json.dumps(debugging.get("debug", {})).lower(),
+        json.dumps(debugging.get("debug", {}), indent=2),
+    )
+
+    # 12. Planning intent stays available.
+    planning = post_chat(
+        "what is the planning strategy for a new feature",
+        f"regression_planning_{stamp}",
+    )
+    assert_true(
+        "planning_intent_safe",
+        "plan" in text_of(planning).lower()
+        or "planning" in json.dumps(planning.get("debug", {})).lower(),
+        json.dumps(planning.get("debug", {}), indent=2),
+    )
+
+    # 13. Writing intent stays available.
+    writing = post_chat(
+        "write an email about the update",
+        f"regression_writing_{stamp}",
+    )
+    assert_true(
+        "writing_intent_safe",
+        route_of(writing) in {"general_chat", "chat"},
+        json.dumps(writing.get("debug", {}), indent=2),
+    )
+
     print("\nNOVA REGRESSION SMOKE PASSED")
 
 
