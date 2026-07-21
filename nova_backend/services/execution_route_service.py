@@ -53,7 +53,7 @@ class ExecutionRouteService:
             action,
         )
 
-        self.chat_service._update_working_state(
+        self.working_state_service.update_working_state(
             session_id,
             {
                 "execution": execution,
