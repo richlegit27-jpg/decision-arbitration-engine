@@ -666,27 +666,10 @@ class ChatService:
 
                 current[key] = value
 
-            if hasattr(self.sessions, "update_working_state"):
-                self.session_service.update_working_state(
-                    session_id,
-                    current,
-                )
-                return current
-
-            sessions = self.session_service._load_sessions()
-
-            index = self.session_service._find(
-                sessions,
+            self.session_service.update_working_state(
                 session_id,
+                current,
             )
-
-            if index is not None:
-                sessions[index]["working_state"] = current
-
-                self.session_service._save_sessions(
-                    sessions,
-                    self.session_service.get_active_session_id(),
-                )
 
             return current
 
@@ -1783,31 +1766,18 @@ Current step:
             return False
 
         try:
-            sessions = self.sessions._load_sessions()
-            index = self.sessions._find(sessions, session_id)
-
-            if index is None:
-                return False
-
-            meta = sessions[index].get("meta")
-
-            if not isinstance(meta, dict):
-                meta = {}
-
-            meta[key] = value
-            sessions[index]["meta"] = meta
-
-            self.session_service._save_sessions(
-                sessions,
-                self.session_service.get_active_session_id(),
+            return self.session_service.set_session_meta(
+                session_id,
+                key,
+                value,
             )
 
-            return True
-
         except Exception as e:
-            exec_debug("SET SESSION META FAILED:", e)
+            exec_debug(
+                "SET SESSION META FAILED:",
+                e,
+            )
             return False
-
     def _maybe_write_memory(
         self,
         decision=None,
@@ -4974,19 +4944,10 @@ if (not attachments) and (__name__ == "__main__"):
             )
 
 
-            sessions = self.sessions._load_sessions()
-
-            index = self.session_service._find(
-                sessions,
+            self.session_service.replace_session(
                 session_id,
+                session,
             )
-
-            if index >= 0:
-                sessions[index] = session
-                self.session_service._save_sessions(
-                    sessions,
-                    self.session_service.get_active_session_id(),
-                )
 
         except Exception as e:
             exec_debug("SESSION SAVE ERROR:", e)
@@ -13255,30 +13216,12 @@ if (not attachments) and (__name__ == "__main__"):
                 e,
             )
 
-        sessions = self.sessions._load_sessions()
-        index = self.sessions._find(sessions, session_id)
 
-        if index is not None:
-            sessions[index]["active_execution"] = (
-                execution_state
-                if (
-                    execution_state.get("steps")
-                    and self.safe_str(execution_state.get("status")).lower()
-                    not in {
-                        "complete",
-                        "completed",
-                        "failed",
-                        "cancelled",
-                    }
-                )
-                else {}
-            )
-            sessions[index]["execution_state"] = execution_state
+        self.session_service.update_execution_state(
+            session_id,
+            execution_state,
+        )
 
-            self.session_service._save_sessions(
-                sessions,
-                self.session_service.get_active_session_id(),
-            )
 
         exec_debug(
             "_process_goal_and_plan RETURN =",
@@ -18064,46 +18007,9 @@ Next action:
                 "completed_at": datetime.now(timezone.utc).isoformat(),
             }
 
-            sessions = self.sessions._load_sessions()
-
-            index = self.session_service._find(
-                sessions,
+            self.session_service.append_execution_history(
                 session_id,
-            )
-
-            if index is None:
-                return
-
-            history = sessions[index].get("execution_history") or []
-
-            cleaned_history = []
-
-            for item in history:
-                if not isinstance(item, dict):
-                    continue
-
-                completed = item.get("completed_steps") or []
-
-                if completed == ["No saved execution plan found"]:
-                    continue
-
-                if not completed and not item.get("failed_steps"):
-                    continue
-
-                cleaned_history.append(item)
-
-            history = cleaned_history
-
-            if not isinstance(history, list):
-                history = []
-
-            history.append(archive_entry)
-
-            sessions[index]["execution_history"] = history[-25:]
-
-            self.session_service._save_sessions(
-                sessions,
-                self.session_service.get_active_session_id(),
+                archive_entry,
             )
 
         except Exception as e:
@@ -18184,40 +18090,12 @@ Next action:
         )
 
         try:
-            sessions = self.sessions._load_sessions()
-
-            index = self.session_service._find(
-                sessions,
+            self.session_service.reset_execution_session(
                 session_id,
+                last_success,
             )
 
-            if index is not None:
 
-                sessions[index]["execution_state"] = {}
-
-                sessions[index]["active_execution"] = {}
-
-                sessions[index]["working_state"] = {
-                    "active_task": "",
-                    "current_file": "",
-                    "current_bug": "",
-                    "last_success": last_success,
-                    "next_move": "",
-                    "checkpoint": "",
-                    "updated_at": "",
-                }
-
-                sessions[index]["mission"] = {}
-
-                if not isinstance(sessions[index].get("meta"), dict):
-                    sessions[index]["meta"] = {}
-
-                sessions[index]["meta"]["mission"] = {}
-
-                self.session_service._save_sessions(
-                    sessions,
-                    self.session_service.get_active_session_id(),
-                )
 
         except Exception as e:
             exec_debug(

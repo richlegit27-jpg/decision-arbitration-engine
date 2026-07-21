@@ -21,6 +21,7 @@ WORKING_STATE_KEYS = (
 )
 
 
+
 def _new_working_state() -> Dict[str, str]:
     return {
         "active_task": "",
@@ -523,6 +524,173 @@ class SessionService:
         """
         return self._load_sessions()
 
+    def replace_session(
+        self,
+        session_id,
+        session_data,
+    ):
+        sessions = self._load_sessions()
+
+        index = self._find(
+            sessions,
+            session_id,
+        )
+
+        if index is None:
+            return False
+
+        sessions[index] = session_data
+
+        self._save_sessions(
+            sessions,
+            self.get_active_session_id(),
+        )
+
+        return True
+
+    def update_execution_state(
+        self,
+        session_id,
+        execution_state,
+    ):
+        sessions = self._load_sessions()
+
+        index = self._find(
+            sessions,
+            session_id,
+        )
+
+        if index is None:
+            return False
+
+        active_execution = (
+            execution_state
+            if (
+                execution_state.get("steps")
+                and str(
+                    execution_state.get("status") or ""
+                ).lower()
+                not in {
+                    "complete",
+                    "completed",
+                    "failed",
+                    "cancelled",
+                }
+            )
+            else {}
+        )
+
+        sessions[index]["active_execution"] = active_execution
+        sessions[index]["execution_state"] = execution_state
+
+        self._save_sessions(
+            sessions,
+            self.get_active_session_id(),
+        )
+
+        return True
+
+    def append_execution_history(
+        self,
+        session_id,
+        archive_entry,
+        limit=25,
+    ):
+        sessions = self._load_sessions()
+
+        index = self._find(
+            sessions,
+            session_id,
+        )
+
+        if index is None:
+            return False
+
+        history = sessions[index].get(
+            "execution_history"
+        ) or []
+
+        cleaned_history = []
+
+        for item in history:
+            if not isinstance(item, dict):
+                continue
+
+            completed = item.get("completed_steps") or []
+
+            if completed == [
+                "No saved execution plan found"
+            ]:
+                continue
+
+            if not completed and not item.get(
+                "failed_steps"
+            ):
+                continue
+
+            cleaned_history.append(item)
+
+        cleaned_history.append(
+            archive_entry
+        )
+
+        sessions[index][
+            "execution_history"
+        ] = cleaned_history[-limit:]
+
+        self._save_sessions(
+            sessions,
+            self.get_active_session_id(),
+        )
+
+        return True
+
+    def reset_execution_session(
+        self,
+        session_id,
+        last_success="",
+    ):
+        sessions = self._load_sessions()
+
+        index = self._find(
+            sessions,
+            session_id,
+        )
+
+        if index is None:
+            return False
+
+        sessions[index]["execution_state"] = {}
+
+        sessions[index]["active_execution"] = {}
+
+        sessions[index]["working_state"] = {
+            "active_task": "",
+            "current_file": "",
+            "current_bug": "",
+            "last_success": last_success,
+            "next_move": "",
+            "checkpoint": "",
+            "updated_at": "",
+        }
+
+        sessions[index]["mission"] = {}
+
+        if not isinstance(
+            sessions[index].get("meta"),
+            dict,
+        ):
+            sessions[index]["meta"] = {}
+
+        sessions[index]["meta"]["mission"] = {}
+
+        self._save_sessions(
+            sessions,
+            self.get_active_session_id(),
+        )
+
+        return True
+
     def save(self, sessions, active=None):
         """
         Compatibility bridge.
@@ -667,6 +835,38 @@ class SessionService:
     # -----------------------
     # WORKING STATE
     # -----------------------
+
+    def set_session_meta(
+        self,
+        session_id: str,
+        key: str,
+        value,
+    ):
+        sessions = self._load_sessions()
+
+        index = self._find(
+            sessions,
+            session_id,
+        )
+
+        if index is None:
+            return False
+
+        meta = sessions[index].get("meta")
+
+        if not isinstance(meta, dict):
+            meta = {}
+
+        meta[key] = value
+
+        sessions[index]["meta"] = meta
+
+        self._save_sessions(
+            sessions,
+            self.get_active_session_id(),
+        )
+
+        return True
 
     def get_working_state(self, session_id: str) -> Dict[str, str]:
         sessions = self._load_sessions()
