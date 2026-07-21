@@ -444,7 +444,7 @@ class ChatService:
                 continue
 
 
-            name = self._safe_str(
+            name = self.safe_str(
                 item.get("filename")
                 or item.get("original_filename")
                 or item.get("name")
@@ -452,7 +452,7 @@ class ChatService:
                 or item.get("file_url")
             ).lower()
 
-            mime_type = self._safe_str(
+            mime_type = self.safe_str(
                 item.get("mime_type")
                 or item.get("type")
             ).lower()
@@ -474,7 +474,7 @@ class ChatService:
                 session_id
             )
 
-        session_id = self._safe_str(session_id).strip()
+        session_id = self.safe_str(session_id).strip()
 
         if not session_id:
             return {}
@@ -490,10 +490,10 @@ class ChatService:
             if not isinstance(state, dict):
                 state = {}
 
-            active_task = self._safe_str(state.get("active_task")).strip()
+            active_task = self.safe_str(state.get("active_task")).strip()
 
             if not active_task:
-                title = self._safe_str(session.get("title")).strip()
+                title = self.safe_str(session.get("title")).strip()
                 inferred_task = ""
 
                 lowered_title = title.lower()
@@ -515,7 +515,7 @@ class ChatService:
                         if msg.get("role") != "user":
                             continue
 
-                        text = self._safe_str(
+                        text = self.safe_str(
                             msg.get("text") or msg.get("content")
                         ).strip()
 
@@ -551,7 +551,7 @@ class ChatService:
 
     def _is_control_command_value(self, value):
 
-        text = self._safe_str(value).strip().lower()
+        text = self.safe_str(value).strip().lower()
 
         blocked = {
             "run_step",
@@ -587,7 +587,7 @@ class ChatService:
                 session_id,
                 patch,
             )
-        session_id = self._safe_str(session_id).strip()
+        session_id = self.safe_str(session_id).strip()
 
         if not session_id:
             return {}
@@ -615,7 +615,7 @@ class ChatService:
             current = current if isinstance(current, dict) else {}
 
             for key, value in patch.items():
-                key = self._safe_str(key).strip()
+                key = self.safe_str(key).strip()
 
                 if key in {
                     "active_task",
@@ -642,7 +642,7 @@ class ChatService:
                     current[key] = value
                     continue
 
-                normalized_value = self._safe_str(value).lower().strip()
+                normalized_value = self.safe_str(value).lower().strip()
 
                 if key == "checkpoint" and normalized_value == "execution_plan_created":
 
@@ -932,7 +932,7 @@ class ChatService:
             if mode:
                 parts.append(f"Current operating mode: " f"{mode}.")
 
-        intent = self._safe_str((decision or {}).get("intent")).lower()
+        intent = self.safe_str((decision or {}).get("intent")).lower()
 
         if intent == "debugging":
 
@@ -958,86 +958,7 @@ class ChatService:
     def _auto_advance_execution(self, session_id):
         return None
 
-    def _execute_step_logic(self, session_id, step):
-        try:
-            step["status"] = "running"
 
-            step_action = self._safe_str(step.get("action")).lower()
-
-            print(
-                "STEP ACTION =",
-                repr(step_action),
-            )
-
-            target_file = self._safe_str(step.get("target_file"))
-
-            python_result = None
-
-            if step_action == "implement" and target_file:
-
-                Path(target_file).parent.mkdir(
-                    parents=True,
-                    exist_ok=True,
-                )
-
-                Path(target_file).write_text(
-                    """
-def add(a, b):
-    return a + b
-
-
-def subtract(a, b):
-    return a - b
-
-
-if __name__ == "__main__":
-    print("Calculator app created.")
-    print("2 + 3 =", add(2, 3))
-""".strip() + "\n",
-                    encoding="utf-8",
-                )
-
-                step["result"] = f"Created file: {target_file}"
-
-                step["error"] = None
-
-            elif (
-                step_action
-                in {
-                    "test",
-                    "run",
-                    "execute",
-                }
-                and target_file
-                and hasattr(self, "python_runner")
-            ):
-
-                python_result = self.python_runner.run_file(target_file)
-
-                result = (
-                    f"STDOUT="
-                    f"{python_result.get('stdout')} | "
-                    f"STDERR="
-                    f"{python_result.get('stderr')} | "
-                    f"ERROR="
-                    f"{python_result.get('error')}"
-                )
-
-                step["result"] = result
-
-                step["error"] = None if python_result.get("ok") else result
-
-            else:
-
-                step["result"] = "step executed"
-
-                step["error"] = None
-
-            step["status"] = "completed"
-
-        except Exception as e:
-            step["status"] = "failed"
-            step["error"] = str(e)
 
     def _resume_execution_if_needed(self, session_id):
         session = self.sessions.get(session_id)
@@ -1096,7 +1017,7 @@ Rules:
         )
 
     def _detect_answer_depth(self, user_text: str) -> str:
-        text = self._safe_str(user_text).lower().strip()
+        text = self.safe_str(user_text).lower().strip()
 
         deep_triggers = (
             "explain",
@@ -1189,7 +1110,7 @@ Rules:
                     return {
                         "ok": False,
                         "error": "Compile failed. Original file was not changed.",
-                        "details": self._safe_str(e),
+                        "details": self.safe_str(e),
                         "backup": str(backup_path),
                         "temp_file": str(tmp_path),
                     }
@@ -1206,7 +1127,7 @@ Rules:
         except Exception as e:
             return {
                 "ok": False,
-                "error": self._safe_str(e),
+                "error": self.safe_str(e),
             }
 
     def _validate_python_code(self, code: str) -> tuple[bool, str]:
@@ -1250,6 +1171,9 @@ Rules:
             return str(value)
         except Exception:
             return ""
+
+    def safe_str(self, value):
+        return self._safe_str(value)
 
     def _store_pending_fix(
         self, session_id: str, file_path: str, fixed_code: str
@@ -1513,7 +1437,7 @@ Current step:
             logger.error(f"[mission] failed to save mission state: {e}")
 
     def _resolve_mission_command(self, user_text: str, session_id: str = "") -> dict:
-        text = self._safe_str(user_text).lower().strip()
+        text = self.safe_str(user_text).lower().strip()
 
         session = self._get_session_payload(session_id)
         working_state = (
@@ -1531,10 +1455,15 @@ Current step:
             mission = {}
 
         execution_state = (
-            self._load_execution_state(session_id)
+            self.execution_state_service.load(
+                session_id
+            )
             or (
                 working_state.get("execution_state")
-                if isinstance(working_state.get("execution_state"), dict)
+                if isinstance(
+                    working_state.get("execution_state"),
+                    dict,
+                )
                 else {}
             )
             or {}
@@ -1616,7 +1545,7 @@ Current step:
                 [
                     bool(execution_state.get("steps")),
                     execution_state.get("current_step"),
-                    self._safe_str(execution_state.get("status")).lower().strip()
+                    self.safe_str(execution_state.get("status")).lower().strip()
                     == "running",
                 ]
             )
@@ -1645,7 +1574,7 @@ Current step:
                 "mission": mission,
                 "next_action": (
                     "retry_failed"
-                    if self._safe_str(mission.get("status")).lower().strip()
+                    if self.safe_str(mission.get("status")).lower().strip()
                     in {"error", "failed"}
                     else mission.get("next_action") or "run_step"
                 ),
@@ -1732,7 +1661,7 @@ Current step:
         if not isinstance(mission_command, dict):
             return None
 
-        mission_type = self._safe_str(mission_command.get("type")).lower().strip()
+        mission_type = self.safe_str(mission_command.get("type")).lower().strip()
 
         if mission_type == "empty_next_guard":
             return {
@@ -1751,14 +1680,18 @@ Current step:
         if mission_command.get("is_mission") is not True:
             return None
 
-        next_action = self._safe_str(mission_command.get("next_action")).lower().strip()
+        next_action = self.safe_str(mission_command.get("next_action")).lower().strip()
 
         execution_state = mission_command.get("execution") or {}
 
         if mission_type in {"continue", "execute"}:
 
-            persisted_execution_state = self._load_execution_state(session_id) or {}
-
+            persisted_execution_state = (
+                self.execution_state_service.load(
+                    session_id
+                )
+                or {}
+            )
             selected_execution_state = (
                 persisted_execution_state
                 if persisted_execution_state.get("steps")
@@ -1767,10 +1700,13 @@ Current step:
 
             selected_execution_state["_execution_dispatch_handled"] = True
 
-            return self._process_execution_command(
-                command=next_action or "run_step",
+            selected_execution_state["command"] = (
+                next_action or "run_step"
+            )
+
+            return self.execution_orchestrator_service.process_execution(
                 session_id=session_id,
-                execution_state=selected_execution_state,
+                state=selected_execution_state,
             )
 
         if mission_type == "inspect":
@@ -1816,8 +1752,8 @@ Current step:
         return {}
 
     def _get_session_meta(self, session_id: str, key: str = "", default=None):
-        session_id = self._safe_str(session_id).strip()
-        key = self._safe_str(key).strip()
+        session_id = self.safe_str(session_id).strip()
+        key = self.safe_str(key).strip()
 
         if not session_id or not key:
             return default
@@ -1840,8 +1776,8 @@ Current step:
             return default
 
     def _set_session_meta(self, session_id: str, key: str, value) -> bool:
-        session_id = self._safe_str(session_id).strip()
-        key = self._safe_str(key).strip()
+        session_id = self.safe_str(session_id).strip()
+        key = self.safe_str(key).strip()
 
         if not session_id or not key:
             return False
@@ -1883,7 +1819,7 @@ Current step:
         if decision.get("save_memory") is False:
             return False
 
-        text = self._safe_str(user_text).strip()
+        text = self.safe_str(user_text).strip()
         if not text:
             return False
 
@@ -2087,17 +2023,17 @@ Current step:
         # INVALID EXECUTION SANITIZER
         # =========================
 
-        goal_text = self._safe_str(live_execution.get("goal")).lower().strip()
+        goal_text = self.safe_str(live_execution.get("goal")).lower().strip()
 
         invalid_goal = "respond normally" in goal_text or (
             isinstance(live_execution.get("goal"), dict)
-            and self._safe_str(live_execution["goal"].get("goal")).lower().strip()
+            and self.safe_str(live_execution["goal"].get("goal")).lower().strip()
             == "respond normally"
         )
 
         invalid_general_execution = (
             invalid_goal
-            or self._safe_str(live_execution.get("original_user_text")).lower().strip()
+            or self.safe_str(live_execution.get("original_user_text")).lower().strip()
             == "run_step"
         )
 
@@ -2110,7 +2046,7 @@ Current step:
             meta["active_execution"] = {}
             meta["execution_state"] = {}
 
-        execution_status = self._safe_str(live_execution.get("status")).lower()
+        execution_status = self.safe_str(live_execution.get("status")).lower()
 
         execution_complete = (
             execution_status
@@ -2133,7 +2069,7 @@ Current step:
         return payload
 
     def _create_session(self, session_id: str = "") -> str:
-        sid = self._safe_str(session_id).strip()
+        sid = self.safe_str(session_id).strip()
 
         auth_user_id = ""
 
@@ -2186,7 +2122,7 @@ Current step:
             )
 
         if isinstance(created, dict):
-            created_id = self._safe_str(
+            created_id = self.safe_str(
                 created.get("id")
             ).strip()
 
@@ -2205,9 +2141,9 @@ Current step:
         self, execution_state=None, last_error: str = ""
     ) -> dict:
         execution_state = self._safe_dict(execution_state)
-        last_error = self._safe_str(last_error).strip()
+        last_error = self.safe_str(last_error).strip()
 
-        status = self._safe_str(execution_state.get("status")).lower()
+        status = self.safe_str(execution_state.get("status")).lower()
         current_step = execution_state.get("current_step")
         steps = execution_state.get("steps") or []
         history = execution_state.get("history") or []
@@ -2299,13 +2235,13 @@ Current step:
         user_text: str = "",
         last_error: str = "",
     ) -> dict:
-        session_id = self._safe_str(session_id).strip()
-        user_text = self._safe_str(user_text).strip()
-        last_error = self._safe_str(last_error).strip()
+        session_id = self.safe_str(session_id).strip()
+        user_text = self.safe_str(user_text).strip()
+        last_error = self.safe_str(last_error).strip()
 
         execution_state = execution_state if isinstance(execution_state, dict) else {}
 
-        status = self._safe_str(execution_state.get("status")).lower().strip()
+        status = self.safe_str(execution_state.get("status")).lower().strip()
 
         steps = execution_state.get("steps") or []
         current_index = int(execution_state.get("current_index") or 0)
@@ -2314,7 +2250,7 @@ Current step:
             step
             for step in steps
             if isinstance(step, dict)
-            and self._safe_str(step.get("status")).lower().strip()
+            and self.safe_str(step.get("status")).lower().strip()
             in {"failed", "error"}
         ]
 
@@ -2363,10 +2299,10 @@ Current step:
     def _choose_execution_recovery_strategy(
         self, session_id: str, command: str, status: str, error_text: str = ""
     ):
-        session_id = self._safe_str(session_id).strip()
-        command = self._safe_str(command).strip().lower()
-        status = self._safe_str(status).strip().lower()
-        error_text = self._safe_str(error_text).strip()
+        session_id = self.safe_str(session_id).strip()
+        command = self.safe_str(command).strip().lower()
+        status = self.safe_str(status).strip().lower()
+        error_text = self.safe_str(error_text).strip()
 
         working_state = self._get_working_state(session_id) or {}
 
@@ -2441,10 +2377,10 @@ Current step:
     def _record_execution_reward(
         self, session_id: str, command: str, status: str, error_text: str = ""
     ):
-        session_id = self._safe_str(session_id).strip()
-        command = self._safe_str(command).strip().lower()
-        status = self._safe_str(status).strip().lower()
-        error_text = self._safe_str(error_text).strip()
+        session_id = self.safe_str(session_id).strip()
+        command = self.safe_str(command).strip().lower()
+        status = self.safe_str(status).strip().lower()
+        error_text = self.safe_str(error_text).strip()
 
         reward = 0
 
@@ -2494,10 +2430,10 @@ Current step:
             else {}
         )
 
-        command = self._safe_str(command).strip().lower()
+        command = self.safe_str(command).strip().lower()
 
         intelligence_intent = (
-            self._safe_str(
+            self.safe_str(
                 execution_state.get("intent") or execution_state.get("mode") or ""
             )
             .strip()
@@ -2521,7 +2457,12 @@ Current step:
 
         working_state = self._get_working_state(session_id) or {}
 
-        persisted_execution_state = self._load_execution_state(session_id) or {}
+        persisted_execution_state = (
+            self.execution_state_service.load(
+                session_id
+            )
+            or {}
+        )
 
         persisted_has_state = bool(persisted_execution_state.get("steps"))
 
@@ -2616,8 +2557,12 @@ Current step:
 
             if not steps:
 
-                persisted_execution = self._load_execution_state(session_id) or {}
-
+                persisted_execution = (
+                    self.execution_state_service.load(
+                        session_id
+                    )
+                    or {}
+                )
                 if isinstance(
                     persisted_execution,
                     dict,
@@ -2667,7 +2612,7 @@ Current step:
                 execution_state["current_step"] = ""
                 execution_state["current_step_title"] = ""
 
-            while current_index < len(steps) and self._safe_str(
+            while current_index < len(steps) and self.safe_str(
                 steps[current_index].get("status")
             ).lower().strip() in {
                 "completed",
@@ -2706,7 +2651,10 @@ Current step:
                 }
 
             refreshed_execution = (
-                self._load_execution_state(session_id) or execution_state
+                self.execution_state_service.load(
+                    session_id
+                )
+                or execution_state
             )
 
             refreshed_steps = refreshed_execution.get("steps") or []
@@ -2747,7 +2695,10 @@ Current step:
                 }
 
             refreshed_execution = (
-                self._load_execution_state(session_id) or execution_state
+                self.execution_state_service.load(
+                    session_id
+                )
+                or execution_state
             )
 
             refreshed_steps = refreshed_execution.get("steps") or []
@@ -2785,7 +2736,7 @@ Current step:
             execution_state["current_step"] = step.get("title") or ""
             execution_state["current_step_title"] = step.get("title") or ""
 
-            result = self._execute_step_logic(
+            result = self.execute_step_logic(
                 session_id=session_id,
                 step=step,
             )
@@ -2922,7 +2873,7 @@ Current step:
                     execution_state,
                 )
 
-                result = self._execute_step_logic(
+                result = self.execute_step_logic(
                     session_id=session_id,
                     step=step,
                 )
@@ -2953,11 +2904,11 @@ Current step:
 
                 execution_state["history"] = execution_state.get("history") or []
 
-                step_title = self._safe_str(step.get("title"))
+                step_title = self.safe_str(step.get("title"))
 
-                step_action = self._safe_str(step.get("action")).lower()
+                step_action = self.safe_str(step.get("action")).lower()
 
-                target_file = self._safe_str(step.get("target_file"))
+                target_file = self.safe_str(step.get("target_file"))
 
                 python_result = None
 
@@ -3096,10 +3047,11 @@ if (not attachments) and (__name__ == "__main__"):
                 execution_state,
             )
 
-            return self._process_execution_command(
-                command="run_step",
+            execution_state["command"] = "run_step"
+
+            return self.execution_orchestrator_service.process_execution(
                 session_id=session_id,
-                execution_state=execution_state,
+                state=execution_state,
             )
 
         # =========================
@@ -3353,8 +3305,8 @@ if (not attachments) and (__name__ == "__main__"):
         text: str = "",
     ) -> int:
         try:
-            url = self._safe_str(url).lower()
-            text = self._safe_str(text).lower()
+            url = self.safe_str(url).lower()
+            text = self.safe_str(text).lower()
 
             score = 0
 
@@ -3480,7 +3432,7 @@ if (not attachments) and (__name__ == "__main__"):
         return cleaned[:5]
 
     def _web_search(self, query: str) -> dict:
-        query = self._safe_str(query).strip()
+        query = self.safe_str(query).strip()
         if not query:
             return {"results": []}
 
@@ -3983,6 +3935,8 @@ if (not attachments) and (__name__ == "__main__"):
             execution_handler=self.execution_handler,
             execution_state_service=self.execution_state_service,
             working_state_service=self.working_state_service,
+            safe_str=self._safe_str,
+            python_runner=self.python_runner,
         )
 
         self.runtime = RuntimeBootstrap.build(chat_service=self)
@@ -4259,7 +4213,7 @@ if (not attachments) and (__name__ == "__main__"):
         meta = meta or {}
         return {
             "role": "user",
-            "text": self._safe_str(text),
+            "text": self.safe_str(text),
             "attachments": attachments,
             "meta": meta,
         }
@@ -4310,7 +4264,7 @@ if (not attachments) and (__name__ == "__main__"):
 
         return {
             "role": "assistant",
-            "text": self._safe_str(text),
+            "text": self.safe_str(text),
             "attachments": attachments,
             "meta": meta,
             "memory_used": memory_used or [],
@@ -4679,7 +4633,7 @@ if (not attachments) and (__name__ == "__main__"):
 
         memory_written = False
 
-        clean_memory_user_text = self._safe_str(
+        clean_memory_user_text = self.safe_str(
             locals().get("original_user_text") or user_text
         ).strip()
 
@@ -4771,11 +4725,11 @@ if (not attachments) and (__name__ == "__main__"):
 
                     cache_payload = {
                         "updated_at": datetime.now().isoformat(timespec="seconds"),
-                        "session_id": self._safe_str(session_id),
+                        "session_id": self.safe_str(session_id),
                         "source_urls": [
-                            self._safe_str(url).strip()
+                            self.safe_str(url).strip()
                             for url in source_urls_for_cache[:5]
-                            if self._safe_str(url).strip()
+                            if self.safe_str(url).strip()
                         ],
                         "sources": (
                             sources_for_cache[:5]
@@ -4794,7 +4748,7 @@ if (not attachments) and (__name__ == "__main__"):
             if not meta.get("sources"):
                 import re
 
-                assistant_text = self._safe_str(
+                assistant_text = self.safe_str(
                     assistant_msg.get("text") or assistant_msg.get("content") or ""
                 )
 
@@ -5041,7 +4995,7 @@ if (not attachments) and (__name__ == "__main__"):
             assistant_text_for_tracking = ""
 
             if isinstance(assistant_msg, dict):
-                assistant_text_for_tracking = self._safe_str(assistant_msg.get("text"))
+                assistant_text_for_tracking = self.safe_str(assistant_msg.get("text"))
 
             self._auto_track_working_state(
                 session_id=session_id,
@@ -5120,7 +5074,7 @@ if (not attachments) and (__name__ == "__main__"):
 
         attachments = attachments or []
 
-        user_text = self._safe_str(user_text)
+        user_text = self.safe_str(user_text)
 
         path = self._guess_path_from_text(user_text)
 
@@ -5228,7 +5182,7 @@ if (not attachments) and (__name__ == "__main__"):
                 assistant_text = (
                     "Auto-fix failed.\n\n"
                     f"File: {file_path}\n\n"
-                    f"Reason: could not read file: {type(e).__name__}: {self._safe_str(e)}"
+                    f"Reason: could not read file: {type(e).__name__}: {self.safe_str(e)}"
                 )
 
                 assistant_msg = self._build_assistant_message(text=assistant_text)
@@ -5311,7 +5265,7 @@ if (not attachments) and (__name__ == "__main__"):
                 ],
             )
 
-            fixed_code = self._safe_str(model_response.output_text).strip()
+            fixed_code = self.safe_str(model_response.output_text).strip()
 
             if fixed_code.startswith("```"):
                 fixed_code = re.sub(
@@ -5323,7 +5277,7 @@ if (not attachments) and (__name__ == "__main__"):
                 raise ValueError("model returned empty fixed code")
 
         except Exception as e:
-            error_text = self._safe_str(e)
+            error_text = self.safe_str(e)
             error_name = type(e).__name__
             lowered_error = error_text.lower()
 
@@ -5409,7 +5363,7 @@ if (not attachments) and (__name__ == "__main__"):
             assistant_text = (
                 "Auto-fix failed.\n\n"
                 f"File: {file_path}\n"
-                f"Error: {type(e).__name__}: {self._safe_str(e)}"
+                f"Error: {type(e).__name__}: {self.safe_str(e)}"
             )
 
             assistant_msg = self._build_assistant_message(text=assistant_text)
@@ -5426,7 +5380,7 @@ if (not attachments) and (__name__ == "__main__"):
             assistant_text = (
                 "Auto-fix failed.\n\n"
                 f"File: {file_path}\n"
-                f"Error: {type(e).__name__}: {self._safe_str(e)}"
+                f"Error: {type(e).__name__}: {self.safe_str(e)}"
             )
 
             assistant_msg = self._build_assistant_message(text=assistant_text)
@@ -5505,7 +5459,7 @@ if (not attachments) and (__name__ == "__main__"):
         decision = decision if isinstance(decision, dict) else {}
         attachments = attachments or []
 
-        original_user_text = self._safe_str(user_text)
+        original_user_text = self.safe_str(user_text)
 
         text_lc = original_user_text.lower().strip()
 
@@ -5857,7 +5811,7 @@ if (not attachments) and (__name__ == "__main__"):
             decision["use_memory"] = False
             decision["source_urls"] = []
             decision["sources"] = []
-        route = self._safe_str(decision.get("route")).lower()
+        route = self.safe_str(decision.get("route")).lower()
 
         try:
             ws = self._get_working_state(session_id) or {}
@@ -5980,7 +5934,7 @@ if (not attachments) and (__name__ == "__main__"):
                 or ""
             )
 
-            last_prompt = self._safe_str(last_prompt).strip()
+            last_prompt = self.safe_str(last_prompt).strip()
 
             if not last_prompt or last_prompt in regen_commands:
                 last_prompt = "generate an image"
@@ -6087,7 +6041,7 @@ if (not attachments) and (__name__ == "__main__"):
                         if (
                             isinstance(execution_state, dict)
                             and execution_state.get("steps")
-                            and self._safe_str(execution_state.get("status")).lower()
+                            and self.safe_str(execution_state.get("status")).lower()
                             != "complete"
                         )
                         else {}
@@ -6122,7 +6076,7 @@ if (not attachments) and (__name__ == "__main__"):
                 execution_state=execution_state,
             )
 
-            if execution_state.get("steps") and self._safe_str(
+            if execution_state.get("steps") and self.safe_str(
                 execution_state.get("status")
             ).lower() in {
                 "running",
@@ -6146,10 +6100,11 @@ if (not attachments) and (__name__ == "__main__"):
                 "run_step",
             )
 
-            return self._process_execution_command(
-                command="run_step",
+            execution_state["command"] = "run_step"
+
+            return self.execution_orchestrator_service.process_execution(
                 session_id=session_id,
-                execution_state=execution_state,
+                state=execution_state,
             )
 
         is_continue = text_lc.strip() in {
@@ -6163,10 +6118,10 @@ if (not attachments) and (__name__ == "__main__"):
         state = self._get_working_state(session_id) or {}
         session = self._get_session_payload(session_id)
 
-        mission_mode = self._safe_str(state.get("mission_mode"))
+        mission_mode = self.safe_str(state.get("mission_mode"))
 
-        active_task = self._safe_str(state.get("active_task"))
-        next_step = self._safe_str(state.get("next_move"))
+        active_task = self.safe_str(state.get("active_task"))
+        next_step = self.safe_str(state.get("next_move"))
 
         # === EXECUTION LOCK DISABLED ===
         # Execution now only runs through _maybe_lock_execution_flow().
@@ -6237,7 +6192,7 @@ if (not attachments) and (__name__ == "__main__"):
                     if not isinstance(item, dict):
                         continue
 
-                    text = self._safe_str(
+                    text = self.safe_str(
                         item.get("text") or item.get("content")
                     ).strip()
 
@@ -6277,7 +6232,7 @@ if (not attachments) and (__name__ == "__main__"):
 
                 for line in fallback_lines:
 
-                    line_str = self._safe_str(line).strip()
+                    line_str = self.safe_str(line).strip()
 
                     if not line_str:
                         continue
@@ -6306,7 +6261,11 @@ if (not attachments) and (__name__ == "__main__"):
 
             working_state = self._get_working_state(session_id) or {}
 
-            persisted_execution_state = self._load_execution_state(session_id)
+            persisted_execution_state = (
+                self.execution_state_service.load(
+                    session_id
+                )
+            )
 
             if isinstance(
                 persisted_execution_state, dict
@@ -6359,7 +6318,7 @@ if (not attachments) and (__name__ == "__main__"):
             decision["use_memory"] = False
             decision["source_urls"] = []
             decision["sources"] = []
-        route = self._safe_str(decision.get("route")).lower()
+        route = self.safe_str(decision.get("route")).lower()
 
         isolated_routes = {
             self.ROUTE_WEB_FETCH,
@@ -6373,7 +6332,7 @@ if (not attachments) and (__name__ == "__main__"):
         if route == "runtime":
 
             runtime_command = (
-                self._safe_str(decision.get("runtime_command")).strip().lower()
+                self.safe_str(decision.get("runtime_command")).strip().lower()
             )
 
             execution_state = (
@@ -6761,8 +6720,8 @@ if (not attachments) and (__name__ == "__main__"):
                 if not isinstance(msg, dict):
                     continue
 
-                role = self._safe_str(msg.get("role"))
-                text = self._safe_str(msg.get("text")).strip()
+                role = self.safe_str(msg.get("role"))
+                text = self.safe_str(msg.get("text")).strip()
 
                 if role != "user":
                     continue
@@ -6917,7 +6876,7 @@ if (not attachments) and (__name__ == "__main__"):
         def dedupe_repeated_answer_20260630(value: str) -> str:
             import re
 
-            clean = self._safe_str(value).strip()
+            clean = self.safe_str(value).strip()
 
             if not clean:
                 return ""
@@ -7046,7 +7005,7 @@ if (not attachments) and (__name__ == "__main__"):
         }:
             assistant_text = assistant_text
         else:
-            rewritten_text = self._safe_str(
+            rewritten_text = self.safe_str(
                 intelligence_result.get(
                     "assistant_text",
                     "",
@@ -7096,7 +7055,7 @@ if (not attachments) and (__name__ == "__main__"):
 
         memory_text = " ".join(
             [
-                self._safe_str(m.get("text"))
+                self.safe_str(m.get("text"))
                 for m in used_memory_items
                 if isinstance(m, dict)
             ]
@@ -7147,7 +7106,7 @@ if (not attachments) and (__name__ == "__main__"):
                 "mission",
             ]:
 
-                value = self._safe_str(working_state.get(key)).strip()
+                value = self.safe_str(working_state.get(key)).strip()
 
                 if self._is_control_command_value(value):
                     working_state[key] = ""
@@ -7165,14 +7124,14 @@ if (not attachments) and (__name__ == "__main__"):
 
         used_memory_full = [
             {
-                "id": self._safe_str(m.get("id")),
-                "text": self._safe_str(m.get("text")),
-                "kind": self._safe_str(m.get("kind")),
+                "id": self.safe_str(m.get("id")),
+                "text": self.safe_str(m.get("text")),
+                "kind": self.safe_str(m.get("kind")),
                 "pinned": bool(m.get("pinned")),
                 "weight": m.get("weight", 1),
             }
             for m in used_memory_items
-            if isinstance(m, dict) and self._safe_str(m.get("text"))
+            if isinstance(m, dict) and self.safe_str(m.get("text"))
         ]
 
         decision_mission = (
@@ -7185,8 +7144,8 @@ if (not attachments) and (__name__ == "__main__"):
 
             for k, v in decision_mission.items():
 
-                key = self._safe_str(k)
-                value = self._safe_str(v).strip()
+                key = self.safe_str(k)
+                value = self.safe_str(v).strip()
 
                 if self._is_control_command_value(value):
                     sanitized_mission[key] = ""
@@ -7330,7 +7289,7 @@ if (not attachments) and (__name__ == "__main__"):
             # limit size
             return preview[:4000]
         except Exception as e:
-            return f"Diff preview failed: {self._safe_str(e)}"
+            return f"Diff preview failed: {self.safe_str(e)}"
 
     def _apply_pending_fix(self, session_id: str) -> dict:
         session = self._get_session_payload(session_id)
@@ -7340,8 +7299,8 @@ if (not attachments) and (__name__ == "__main__"):
 
         if isinstance(session, dict):
             state = session.get("working_state") or {}
-            pending_file_path = self._safe_str(state.get("pending_fix_file_path"))
-            pending_fix_code = self._safe_str(state.get("pending_fix_code"))
+            pending_file_path = self.safe_str(state.get("pending_fix_file_path"))
+            pending_fix_code = self.safe_str(state.get("pending_fix_code"))
 
         user_msg = self._build_user_message("apply fix")
 
@@ -7425,7 +7384,7 @@ if (not attachments) and (__name__ == "__main__"):
 
             # AUTO SELF-HEAL CONTINUE
             working_state = self._get_working_state(session_id) or {}
-            pending_action = self._safe_str(
+            pending_action = self.safe_str(
                 working_state.get("pending_execution_action")
             )
 
@@ -7455,7 +7414,7 @@ if (not attachments) and (__name__ == "__main__"):
 
         except Exception as e:
             assistant_msg = self._build_assistant_message(
-                text=f"Could not apply pending fix: {type(e).__name__}: {self._safe_str(e)}"
+                text=f"Could not apply pending fix: {type(e).__name__}: {self.safe_str(e)}"
             )
             return self._finalize_response(
                 session_id=session_id,
@@ -7906,9 +7865,9 @@ if (not attachments) and (__name__ == "__main__"):
     ) -> dict:
         decision = decision if isinstance(decision, dict) else {}
         attachments = attachments or []
-        assistant_text = self._safe_str(assistant_text).strip()
+        assistant_text = self.safe_str(assistant_text).strip()
 
-        user_text_lc = self._safe_str(user_text).lower().strip()
+        user_text_lc = self.safe_str(user_text).lower().strip()
 
         active_execution = (
             self._get_session_meta(
@@ -8066,7 +8025,7 @@ if (not attachments) and (__name__ == "__main__"):
         # =============================
         if assistant_text.startswith("Auto-fix applied."):
             return {"assistant_text": assistant_text}
-        user_text_clean = self._safe_str(user_text).strip()
+        user_text_clean = self.safe_str(user_text).strip()
         user_text_lc = user_text_clean.lower()
 
         try:
@@ -8343,8 +8302,8 @@ if (not attachments) and (__name__ == "__main__"):
         mission_mode: str = "",
         user_text: str = "",
     ) -> str:
-        text = self._safe_str(text).strip()
-        user_text_raw = self._safe_str(user_text).strip()
+        text = self.safe_str(text).strip()
+        user_text_raw = self.safe_str(user_text).strip()
         user_text_lc = user_text_raw.lower()
         response_policy = response_policy if isinstance(response_policy, dict) else {}
 
@@ -8610,7 +8569,7 @@ if (not attachments) and (__name__ == "__main__"):
         decision = decision if isinstance(decision, dict) else {}
         intelligence = intelligence if isinstance(intelligence, dict) else {}
 
-        text = self._safe_str(user_text).lower().strip()
+        text = self.safe_str(user_text).lower().strip()
 
         # NOVA_FORCE_IMAGE_ATTACHMENTS_ATTACHMENT_ANALYSIS_20260607
         if self._nova_has_image_attachment_20260607(attachments):
@@ -8624,9 +8583,9 @@ if (not attachments) and (__name__ == "__main__"):
             decision["use_memory"] = False
             decision["source_urls"] = []
             decision["sources"] = []
-        route = self._safe_str(decision.get("route")).lower()
-        mode = self._safe_str(decision.get("mode")).lower()
-        intent = self._safe_str(
+        route = self.safe_str(decision.get("route")).lower()
+        mode = self.safe_str(decision.get("mode")).lower()
+        intent = self.safe_str(
             intelligence.get("intent")
             or decision.get("intent")
             or mode
@@ -8746,14 +8705,14 @@ if (not attachments) and (__name__ == "__main__"):
 
         intelligence = intelligence if isinstance(intelligence, dict) else {}
 
-        text = self._safe_str(assistant_text).strip()
-        user_lc = self._safe_str(user_text).lower().strip()
+        text = self.safe_str(assistant_text).strip()
+        user_lc = self.safe_str(user_text).lower().strip()
 
-        strategy = self._safe_str(intelligence.get("strategy") or "").lower().strip()
+        strategy = self.safe_str(intelligence.get("strategy") or "").lower().strip()
 
-        route = self._safe_str(intelligence.get("route") or "").lower().strip()
+        route = self.safe_str(intelligence.get("route") or "").lower().strip()
 
-        mode = self._safe_str(intelligence.get("mode") or "").lower().strip()
+        mode = self.safe_str(intelligence.get("mode") or "").lower().strip()
 
         if not text:
             return text
@@ -8867,7 +8826,7 @@ if (not attachments) and (__name__ == "__main__"):
         decision = decision if isinstance(decision, dict) else {}
         intelligence = intelligence if isinstance(intelligence, dict) else {}
 
-        text = self._safe_str(user_text).lower().strip()
+        text = self.safe_str(user_text).lower().strip()
 
         # NOVA_FORCE_IMAGE_ATTACHMENTS_ATTACHMENT_ANALYSIS_20260607
         if self._nova_has_image_attachment_20260607(attachments):
@@ -8881,9 +8840,9 @@ if (not attachments) and (__name__ == "__main__"):
             decision["use_memory"] = False
             decision["source_urls"] = []
             decision["sources"] = []
-        route = self._safe_str(decision.get("route")).lower()
-        mode = self._safe_str(decision.get("mode")).lower()
-        intent = self._safe_str(
+        route = self.safe_str(decision.get("route")).lower()
+        mode = self.safe_str(decision.get("mode")).lower()
+        intent = self.safe_str(
             intelligence.get("intent")
             or decision.get("intent")
             or mode
@@ -9004,9 +8963,9 @@ if (not attachments) and (__name__ == "__main__"):
         decision = decision if isinstance(decision, dict) else {}
         intelligence = intelligence if isinstance(intelligence, dict) else {}
 
-        strategy = self._safe_str(intelligence.get("strategy") or "direct_answer")
-        next_move = self._safe_str(intelligence.get("next_move") or "")
-        user_lc = self._safe_str(user_text).lower().strip()
+        strategy = self.safe_str(intelligence.get("strategy") or "direct_answer")
+        next_move = self.safe_str(intelligence.get("next_move") or "")
+        user_lc = self.safe_str(user_text).lower().strip()
 
         return (
             "NOVA RESPONSE POLICY:\n"
@@ -9107,21 +9066,21 @@ if (not attachments) and (__name__ == "__main__"):
         # NOVA_WEBFETCH_INTERNAL_IMAGE_BOUNCE_20260607
         try:
             _nova_image_probe_parts = [
-                self._safe_str(user_text),
-                self._safe_str(decision.get("query") if isinstance(decision, dict) else ""),
-                self._safe_str(decision.get("text") if isinstance(decision, dict) else ""),
+                self.safe_str(user_text),
+                self.safe_str(decision.get("query") if isinstance(decision, dict) else ""),
+                self.safe_str(decision.get("text") if isinstance(decision, dict) else ""),
             ]
 
             if isinstance(attachments, list):
                 for _nova_attachment in attachments:
                     if isinstance(_nova_attachment, dict):
                         _nova_image_probe_parts.extend([
-                            self._safe_str(_nova_attachment.get("filename")),
-                            self._safe_str(_nova_attachment.get("original_filename")),
-                            self._safe_str(_nova_attachment.get("name")),
-                            self._safe_str(_nova_attachment.get("mime_type")),
-                            self._safe_str(_nova_attachment.get("url")),
-                            self._safe_str(_nova_attachment.get("file_url")),
+                            self.safe_str(_nova_attachment.get("filename")),
+                            self.safe_str(_nova_attachment.get("original_filename")),
+                            self.safe_str(_nova_attachment.get("name")),
+                            self.safe_str(_nova_attachment.get("mime_type")),
+                            self.safe_str(_nova_attachment.get("url")),
+                            self.safe_str(_nova_attachment.get("file_url")),
                         ])
 
             _nova_image_probe = " ".join(_nova_image_probe_parts).lower()
@@ -9402,7 +9361,7 @@ if (not attachments) and (__name__ == "__main__"):
         # OPEN_WEB_SOURCE_FOLLOWUP_HANDLER_LOCK
         # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
         if (not attachments) and (
-            self._safe_str(decision.get("strategy")).strip().lower()
+            self.safe_str(decision.get("strategy")).strip().lower()
             == "open_web_source_followup"
         ):
             import re
@@ -9449,7 +9408,7 @@ if (not attachments) and (__name__ == "__main__"):
                     if not isinstance(msg, dict):
                         continue
 
-                    if self._safe_str(msg.get("role")).lower() != "assistant":
+                    if self.safe_str(msg.get("role")).lower() != "assistant":
                         continue
 
                     meta = msg.get("meta") if isinstance(msg.get("meta"), dict) else {}
@@ -9458,9 +9417,9 @@ if (not attachments) and (__name__ == "__main__"):
 
                     if isinstance(urls, list) and urls:
                         prior_urls = [
-                            self._safe_str(url).strip()
+                            self.safe_str(url).strip()
                             for url in urls
-                            if self._safe_str(url).strip()
+                            if self.safe_str(url).strip()
                         ]
                         prior_sources = sources if isinstance(sources, list) else []
                         break
@@ -9473,9 +9432,9 @@ if (not attachments) and (__name__ == "__main__"):
                 and isinstance(getattr(self, "_last_web_source_urls", None), list)
             ):
                 cached_urls = [
-                    self._safe_str(url).strip()
+                    self.safe_str(url).strip()
                     for url in getattr(self, "_last_web_source_urls", [])
-                    if self._safe_str(url).strip()
+                    if self.safe_str(url).strip()
                 ]
 
                 # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
@@ -9508,9 +9467,9 @@ if (not attachments) and (__name__ == "__main__"):
 
                         if isinstance(cached_urls, list) and cached_urls:
                             prior_urls = [
-                                self._safe_str(url).strip()
+                                self.safe_str(url).strip()
                                 for url in cached_urls
-                                if self._safe_str(url).strip()
+                                if self.safe_str(url).strip()
                             ]
                             prior_sources = (
                                 cached_sources
@@ -9608,7 +9567,7 @@ if (not attachments) and (__name__ == "__main__"):
         # Only run direct URL fetch when route decision originally classified the USER input as a direct URL.
         # Cached source URLs / Google News URLs can also get copied into `text`, but they must not hijack
         # attachment quick actions like Summarize / Keypoints / Continue.
-        original_user_text_for_direct_url = self._safe_str(user_text).strip()
+        original_user_text_for_direct_url = self.safe_str(user_text).strip()
         direct_url_reasons = (
             decision.get("reasons") if isinstance(decision, dict) else []
         )
@@ -9653,32 +9612,32 @@ if (not attachments) and (__name__ == "__main__"):
                     "url": text,
                 }
 
-            source_url = self._safe_str(
+            source_url = self.safe_str(
                 web_result.get("final_url")
                 or web_result.get("source_url")
                 or web_result.get("url")
                 or text
             ).strip()
 
-            title = self._safe_str(
+            title = self.safe_str(
                 web_result.get("title") or source_url or text
             ).strip()
 
-            summary = self._safe_str(
+            summary = self.safe_str(
                 web_result.get("summary")
                 or web_result.get("description")
                 or web_result.get("preview")
                 or ""
             ).strip()
 
-            body = self._safe_str(
+            body = self.safe_str(
                 web_result.get("content")
                 or web_result.get("body")
                 or web_result.get("text")
                 or ""
             ).strip()
 
-            error = self._safe_str(web_result.get("error") or "").strip()
+            error = self.safe_str(web_result.get("error") or "").strip()
 
             if error and not summary and not body:
                 assistant_text = "Web fetch failed:\n" + error
@@ -9774,7 +9733,7 @@ if (not attachments) and (__name__ == "__main__"):
                 decision=decision,
             )
 
-        query = self._safe_str(
+        query = self.safe_str(
             decision.get("query")
             or decision.get("search_query")
             or decision.get("url")
@@ -9860,9 +9819,9 @@ if (not attachments) and (__name__ == "__main__"):
                         continue
 
                     for item in root.findall(".//item"):
-                        title = self._safe_str(item.findtext("title") or "").strip()
-                        link = self._safe_str(item.findtext("link") or "").strip()
-                        description = self._safe_str(
+                        title = self.safe_str(item.findtext("title") or "").strip()
+                        link = self.safe_str(item.findtext("link") or "").strip()
+                        description = self.safe_str(
                             item.findtext("description") or ""
                         ).strip()
 
@@ -9926,15 +9885,15 @@ if (not attachments) and (__name__ == "__main__"):
                     if not isinstance(_nova_item, dict):
                         continue
 
-                    _nova_url = self._safe_str(
+                    _nova_url = self.safe_str(
                         _nova_item.get("url")
                         or _nova_item.get("href")
                         or _nova_item.get("link")
                         or ""
                     ).strip()
 
-                    _nova_title = self._safe_str(_nova_item.get("title") or "").lower()
-                    _nova_snippet = self._safe_str(
+                    _nova_title = self.safe_str(_nova_item.get("title") or "").lower()
+                    _nova_snippet = self.safe_str(
                         _nova_item.get("snippet")
                         or _nova_item.get("description")
                         or _nova_item.get("content")
@@ -9970,10 +9929,10 @@ if (not attachments) and (__name__ == "__main__"):
         # results that never mention OpenAI in title/snippet/source/url.
         try:
             _nova_openai_probe = " ".join([
-                self._safe_str(query),
-                self._safe_str(user_text),
-                self._safe_str(decision.get("query") if isinstance(decision, dict) else ""),
-                self._safe_str(decision.get("search_query") if isinstance(decision, dict) else ""),
+                self.safe_str(query),
+                self.safe_str(user_text),
+                self.safe_str(decision.get("query") if isinstance(decision, dict) else ""),
+                self.safe_str(decision.get("search_query") if isinstance(decision, dict) else ""),
             ]).lower()
 
             if "openai" in _nova_openai_probe and isinstance(cleaned_sources, list):
@@ -9984,11 +9943,11 @@ if (not attachments) and (__name__ == "__main__"):
                         continue
 
                     _nova_blob = " ".join([
-                        self._safe_str(_nova_item.get("title")),
-                        self._safe_str(_nova_item.get("snippet")),
-                        self._safe_str(_nova_item.get("content")),
-                        self._safe_str(_nova_item.get("source")),
-                        self._safe_str(_nova_item.get("url")),
+                        self.safe_str(_nova_item.get("title")),
+                        self.safe_str(_nova_item.get("snippet")),
+                        self.safe_str(_nova_item.get("content")),
+                        self.safe_str(_nova_item.get("source")),
+                        self.safe_str(_nova_item.get("url")),
                     ]).lower()
 
                     if "openai" in _nova_blob:
@@ -10047,8 +10006,8 @@ if (not attachments) and (__name__ == "__main__"):
         # before ranking and final source-card construction.
         try:
             _nova_generic_news_probe = " ".join([
-                self._safe_str(query),
-                self._safe_str(user_text),
+                self.safe_str(query),
+                self.safe_str(user_text),
             ]).lower()
 
             _nova_is_generic_news_query = any(
@@ -10070,15 +10029,15 @@ if (not attachments) and (__name__ == "__main__"):
                     if not isinstance(_nova_item, dict):
                         continue
 
-                    _nova_title = self._safe_str(_nova_item.get("title")).lower()
-                    _nova_snippet = self._safe_str(
+                    _nova_title = self.safe_str(_nova_item.get("title")).lower()
+                    _nova_snippet = self.safe_str(
                         _nova_item.get("snippet")
                         or _nova_item.get("description")
                         or _nova_item.get("content")
                         or ""
                     ).lower()
-                    _nova_source = self._safe_str(_nova_item.get("source")).lower()
-                    _nova_url = self._safe_str(
+                    _nova_source = self.safe_str(_nova_item.get("source")).lower()
+                    _nova_url = self.safe_str(
                         _nova_item.get("url")
                         or _nova_item.get("href")
                         or _nova_item.get("link")
@@ -10122,9 +10081,9 @@ if (not attachments) and (__name__ == "__main__"):
         except Exception as _nova_bad_source_filter_exc:
             exec_debug("NOVA_WEBFETCH_GENERIC_NEWS_BAD_SOURCE_FILTER_FAILED:", _nova_bad_source_filter_exc)
         def _rank_key(item):
-            url = self._safe_str(item.get("url")).lower()
-            title = self._safe_str(item.get("title")).lower()
-            snippet = self._safe_str(
+            url = self.safe_str(item.get("url")).lower()
+            title = self.safe_str(item.get("title")).lower()
+            snippet = self.safe_str(
                 item.get("snippet")
                 or item.get("description")
                 or item.get("content")
@@ -10190,7 +10149,7 @@ if (not attachments) and (__name__ == "__main__"):
         except Exception as e:
             exec_debug("FINAL_RANK_ERROR:", e)
 
-        body = self._safe_str(
+        body = self.safe_str(
             web_result.get("body")
             or web_result.get("text")
             or web_result.get("content")
@@ -10207,17 +10166,17 @@ if (not attachments) and (__name__ == "__main__"):
             if not isinstance(item, dict):
                 continue
 
-            title = self._safe_str(item.get("title") or item.get("name") or "").strip()
+            title = self.safe_str(item.get("title") or item.get("name") or "").strip()
             rss_source = ""
             if " - " in title:
                 title_parts = title.rsplit(" - ", 1)
                 title = title_parts[0].strip()
                 rss_source = title_parts[1].strip()
-            url = self._safe_str(
+            url = self.safe_str(
                 item.get("url") or item.get("href") or item.get("link") or ""
             ).strip()
 
-            snippet = self._safe_str(
+            snippet = self.safe_str(
                 item.get("snippet")
                 or item.get("description")
                 or item.get("body")
@@ -10263,8 +10222,8 @@ if (not attachments) and (__name__ == "__main__"):
         # Final guard: remove broad landing pages after source cards are built.
         try:
             _nova_final_news_probe = " ".join([
-                self._safe_str(query),
-                self._safe_str(user_text),
+                self.safe_str(query),
+                self.safe_str(user_text),
             ]).lower()
 
             _nova_final_is_news = any(
@@ -10287,10 +10246,10 @@ if (not attachments) and (__name__ == "__main__"):
                         continue
 
                     _nova_blob = " ".join([
-                        self._safe_str(_nova_source_item.get("title")),
-                        self._safe_str(_nova_source_item.get("snippet")),
-                        self._safe_str(_nova_source_item.get("source")),
-                        self._safe_str(_nova_source_item.get("url")),
+                        self.safe_str(_nova_source_item.get("title")),
+                        self.safe_str(_nova_source_item.get("snippet")),
+                        self.safe_str(_nova_source_item.get("source")),
+                        self.safe_str(_nova_source_item.get("url")),
                     ]).lower()
 
                     _nova_bad_final_source = any(
@@ -10327,11 +10286,11 @@ if (not attachments) and (__name__ == "__main__"):
         except Exception as _nova_final_news_filter_exc:
             exec_debug("NOVA_WEBFETCH_FINAL_NEWS_BAD_SOURCE_FILTER_FAILED:", _nova_final_news_filter_exc)
         def _final_source_rank(source_item):
-            title_value = self._safe_str(source_item.get("title")).lower()
+            title_value = self.safe_str(source_item.get("title")).lower()
 
-            source_value = self._safe_str(source_item.get("source")).lower()
+            source_value = self.safe_str(source_item.get("source")).lower()
 
-            snippet_value = self._safe_str(source_item.get("snippet")).lower()
+            snippet_value = self.safe_str(source_item.get("snippet")).lower()
 
             combined = title_value + " " + source_value + " " + snippet_value
 
@@ -10487,13 +10446,13 @@ if (not attachments) and (__name__ == "__main__"):
             if not isinstance(item, dict):
                 continue
 
-            title_value = self._safe_str(item.get("title")).strip()
+            title_value = self.safe_str(item.get("title")).strip()
 
-            url_value = self._safe_str(item.get("url")).strip()
+            url_value = self.safe_str(item.get("url")).strip()
 
-            source_value = self._safe_str(item.get("source")).strip()
+            source_value = self.safe_str(item.get("source")).strip()
 
-            snippet_value = self._safe_str(item.get("snippet")).strip()
+            snippet_value = self.safe_str(item.get("snippet")).strip()
 
             snippet_value = html.unescape(snippet_value)
             snippet_value = re.sub(
@@ -10526,11 +10485,11 @@ if (not attachments) and (__name__ == "__main__"):
             )
 
         def _final_source_rank(item):
-            title_value = self._safe_str(item.get("title")).lower()
+            title_value = self.safe_str(item.get("title")).lower()
 
-            source_value = self._safe_str(item.get("source")).lower()
+            source_value = self.safe_str(item.get("source")).lower()
 
-            snippet_value = self._safe_str(item.get("snippet")).lower()
+            snippet_value = self.safe_str(item.get("snippet")).lower()
 
             combined = title_value + " " + source_value + " " + snippet_value
 
@@ -10579,9 +10538,9 @@ if (not attachments) and (__name__ == "__main__"):
         # WEB_FOLLOWUP_LAST_SOURCE_CACHE_LOCK
         try:
             self._last_web_source_urls = [
-                self._safe_str(url).strip()
+                self.safe_str(url).strip()
                 for url in source_urls[:5]
-                if self._safe_str(url).strip()
+                if self.safe_str(url).strip()
             ]
             self._last_web_sources = sources[:5] if isinstance(sources, list) else []
         except Exception as exc:
@@ -10596,12 +10555,12 @@ if (not attachments) and (__name__ == "__main__"):
 
             cache_payload = {
                 "updated_at": datetime.now().isoformat(timespec="seconds"),
-                "session_id": self._safe_str(session_id),
-                "query": self._safe_str(query),
+                "session_id": self.safe_str(session_id),
+                "query": self.safe_str(query),
                 "source_urls": [
-                    self._safe_str(url).strip()
+                    self.safe_str(url).strip()
                     for url in source_urls[:5]
-                    if self._safe_str(url).strip()
+                    if self.safe_str(url).strip()
                 ],
                 "sources": sources[:5] if isinstance(sources, list) else [],
             }
@@ -10644,7 +10603,7 @@ if (not attachments) and (__name__ == "__main__"):
 
     def _resolve_google_news_url(self, url: str) -> str:
         try:
-            url = self._safe_str(url).strip()
+            url = self.safe_str(url).strip()
 
             if not url or "news.google.com" not in url.lower():
                 return url
@@ -10667,7 +10626,7 @@ if (not attachments) and (__name__ == "__main__"):
                     allow_redirects=True,
                 )
 
-                final_url = self._safe_str(response.url).strip()
+                final_url = self.safe_str(response.url).strip()
 
                 if final_url and "news.google.com" not in final_url.lower():
                     return final_url
@@ -10682,7 +10641,7 @@ if (not attachments) and (__name__ == "__main__"):
                 allow_redirects=True,
             )
 
-            final_url = self._safe_str(response.url).strip()
+            final_url = self.safe_str(response.url).strip()
 
             if final_url and "news.google.com" not in final_url.lower():
                 return final_url
@@ -10755,7 +10714,7 @@ if (not attachments) and (__name__ == "__main__"):
 
     def _detect_mission_state(self, user_text: str = "", decision=None) -> dict:
         decision = decision if isinstance(decision, dict) else {}
-        text = self._safe_str(user_text).lower().strip()
+        text = self.safe_str(user_text).lower().strip()
 
         mission = {
             "mode": "general",
@@ -10861,8 +10820,8 @@ if (not attachments) and (__name__ == "__main__"):
         return "".join(lines[start_index:end_index]).rstrip()
 
     def _normalize_function_indent(self, fixed_code: str, original_code: str) -> str:
-        fixed_code = self._safe_str(fixed_code).replace("\t", "    ")
-        original_code = self._safe_str(original_code).replace("\t", "    ")
+        fixed_code = self.safe_str(fixed_code).replace("\t", "    ")
+        original_code = self.safe_str(original_code).replace("\t", "    ")
 
         if not fixed_code.strip():
             return ""
@@ -10964,10 +10923,10 @@ if (not attachments) and (__name__ == "__main__"):
                 original_code=snippet,
             )
 
-            fixed_code = self._safe_str(fixed_code)
+            fixed_code = self.safe_str(fixed_code)
 
             if not fixed_code.strip():
-                fixed_code = self._safe_str(snippet)
+                fixed_code = self.safe_str(snippet)
 
             if not fixed_code.strip():
                 assistant_text = "Auto-fix failed.\n\nGenerated code was empty."
@@ -11058,7 +11017,7 @@ if (not attachments) and (__name__ == "__main__"):
     def _handle_execution_control(
         self, user_text: str, session_id: str, attachments=None
     ):
-        text = self._safe_str(user_text).strip().lower()
+        text = self.safe_str(user_text).strip().lower()
 
         execution_state = (
             self._get_session_meta(
@@ -11156,10 +11115,13 @@ if (not attachments) and (__name__ == "__main__"):
         if action == "chat" and text not in execution_keywords:
 
             if route == "execution":
-                return self._process_execution_command(
-                    command=user_text,
+                execution_state = {
+                    "command": user_text,
+                }
+
+                return self.execution_orchestrator_service.process_execution(
                     session_id=session_id,
-                    execution_state={}
+                    state=execution_state,
                 )
 
             if route == "attachment":
@@ -11318,7 +11280,9 @@ if (not attachments) and (__name__ == "__main__"):
             )
 
         execution_state = (
-            self._load_execution_state(session_id)
+            self.execution_state_service.load(
+                session_id
+            )
             or execution_state
             or session.get("execution_state")
             or session.get("active_execution")
@@ -11353,10 +11317,11 @@ if (not attachments) and (__name__ == "__main__"):
 
             execution_state["_execution_processing"] = False
 
-            return self._process_execution_command(
-                command=command,
+            execution_state["command"] = command
+
+            return self.execution_orchestrator_service.process_execution(
                 session_id=session_id,
-                execution_state=execution_state,
+                state=execution_state,
             )
 
         # =========================
@@ -11427,7 +11392,7 @@ if (not attachments) and (__name__ == "__main__"):
                     isinstance(step, dict) and step.get("status") == "completed"
                     for step in steps
                 )
-                and self._safe_str(execution_state.get("status")).lower().strip()
+                and self.safe_str(execution_state.get("status")).lower().strip()
                 in {
                     "complete",
                     "completed",
@@ -11543,10 +11508,11 @@ if (not attachments) and (__name__ == "__main__"):
                 command,
             )
 
-            result = self._process_execution_command(
-                command=command,
+            execution_state["command"] = command
+
+            result = self.execution_orchestrator_service.process_execution(
                 session_id=session_id,
-                execution_state=execution_state,
+                state=execution_state,
             )
 
             print(
@@ -11601,7 +11567,7 @@ if (not attachments) and (__name__ == "__main__"):
 
     def _single_router(self, user_text, session_id="", attachments=None):
 
-        text = self._safe_str(user_text)
+        text = self.safe_str(user_text)
         lowered = text.lower().strip()
         attachments = attachments or []
 
@@ -12121,7 +12087,7 @@ if (not attachments) and (__name__ == "__main__"):
             except Exception:
                 pass
 
-        user_text = self._safe_str(user_text).strip()
+        user_text = self.safe_str(user_text).strip()
 
         for _nova_context_marker in (
             "Project-aware context for Nova:",
@@ -12416,14 +12382,14 @@ if (not attachments) and (__name__ == "__main__"):
         answer_depth = self._detect_answer_depth(user_text)
         self._set_session_meta(session_id, "answer_depth", answer_depth)
 
-        lowered = self._safe_str(user_text).lower().strip()
+        lowered = self.safe_str(user_text).lower().strip()
 
         # NOVA_CENTRAL_INTERPRETATION_WEB_ROUTE_20260612
         # Central pre-router interpretation, phase 2:
         # safely force messy news/current-events prompts into the web route.
         # This intentionally does NOT override attachments or execution yet.
         # NOVA_FIX_INTERPRETATION_ORIGINAL_USER_TEXT_20260612
-        original_user_text = self._safe_str(user_text).strip()
+        original_user_text = self.safe_str(user_text).strip()
 
         # NOVA_CLEAN_INPUT_BEFORE_INTERPRETATION_20260612
         # Some older Nova layers append project/session memory into user_text before routing.
@@ -12545,7 +12511,9 @@ if (not attachments) and (__name__ == "__main__"):
             _active_execution_state = {}
             try:
                 _active_execution_state = (
-                    self._load_execution_state(session_id)
+                    self.execution_state_service.load(
+                        session_id
+                    )
                     or self._get_session_meta(session_id, "execution_state")
                     or self._get_session_meta(session_id, "active_execution")
                     or {}
@@ -12555,7 +12523,7 @@ if (not attachments) and (__name__ == "__main__"):
 
             _has_active_execution = False
             if isinstance(_active_execution_state, dict):
-                _exec_status = self._safe_str(_active_execution_state.get("status")).lower()
+                _exec_status = self.safe_str(_active_execution_state.get("status")).lower()
                 _has_active_execution = any(
                     [
                         bool(_active_execution_state.get("steps")),
@@ -12593,14 +12561,14 @@ if (not attachments) and (__name__ == "__main__"):
             not attachments
             and isinstance(interpretation, dict)
             and interpretation.get("route_hint") == "web"
-            and self._safe_str(interpretation.get("rewritten_text") or original_user_text).strip()
+            and self.safe_str(interpretation.get("rewritten_text") or original_user_text).strip()
         ):
-            _interpreted_web_query = self._safe_str(
+            _interpreted_web_query = self.safe_str(
                 interpretation.get("rewritten_text") or original_user_text
             ).strip()
 
             user_text = _interpreted_web_query
-            lowered = self._safe_str(user_text).lower().strip()
+            lowered = self.safe_str(user_text).lower().strip()
 
             try:
                 self._last_interpretation = interpretation
@@ -12656,13 +12624,14 @@ if (not attachments) and (__name__ == "__main__"):
 
             if has_real_state or has_real_execution:
                 command = "run_step" if lowered in {"k", "kk", "go"} else lowered
-                return self._process_execution_command(
-                    command=command,
+                execution_state["command"] = command
+
+                return self.execution_orchestrator_service.process_execution(
                     session_id=session_id,
-                    execution_state=execution_state,
+                    state=execution_state,
                 )
 
-            next_move = self._safe_str(working_state.get("next_move")).strip()
+            next_move = self.safe_str(working_state.get("next_move")).strip()
             message = (
                 next_move or "No active mission yet. Start one with: auto-plan <goal>"
             )
@@ -12822,7 +12791,7 @@ if (not attachments) and (__name__ == "__main__"):
                     execution_state
                     if (
                         execution_state.get("steps")
-                        and self._safe_str(execution_state.get("status")).lower()
+                        and self.safe_str(execution_state.get("status")).lower()
                         not in {
                             "complete",
                             "completed",
@@ -13021,7 +12990,7 @@ if (not attachments) and (__name__ == "__main__"):
             "retry", "run it"
         }
 
-        lowered = self._safe_str(user_text).lower().strip()
+        lowered = self.safe_str(user_text).lower().strip()
 
         # Ã°Å¸Å¡Â¨ HARD RULE: execution cannot be bypassed by other routers
         # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
@@ -13047,10 +13016,13 @@ if (not attachments) and (__name__ == "__main__"):
 
         # SINGLE DISPATCH AUTHORITY
         if route == "execution":
-            return self._process_execution_command(
-                command=user_text,
+            execution_state = {
+                "command": user_text,
+            }
+
+            return self.execution_orchestrator_service.process_execution(
                 session_id=session_id,
-                execution_state={}
+                state=execution_state,
             )
 
         elif route == "attachment":
@@ -13080,7 +13052,7 @@ if (not attachments) and (__name__ == "__main__"):
             )
 
     def _process_goal_and_plan(self, user_text: str, session_id: str):
-        user_text = self._safe_str(user_text).strip()
+        user_text = self.safe_str(user_text).strip()
 
         goal = self._build_goal(user_text)
 
@@ -13114,7 +13086,7 @@ if (not attachments) and (__name__ == "__main__"):
                 action = step.get("action") or "execute"
                 input_value = step.get("input") or user_text
             else:
-                title = self._safe_str(step) or f"Execution Step {index}"
+                title = self.safe_str(step) or f"Execution Step {index}"
                 action = "execute"
                 input_value = user_text
 
@@ -13159,11 +13131,11 @@ if (not attachments) and (__name__ == "__main__"):
                 },
             ]
 
-        goal_text = self._safe_str(goal).lower().strip()
+        goal_text = self.safe_str(goal).lower().strip()
 
         invalid_general_goal = "respond normally" in goal_text or (
             isinstance(goal, dict)
-            and self._safe_str(goal.get("goal")).lower().strip() == "respond normally"
+            and self.safe_str(goal.get("goal")).lower().strip() == "respond normally"
         )
 
         if invalid_general_goal:
@@ -13249,7 +13221,7 @@ if (not attachments) and (__name__ == "__main__"):
                 if (
                     isinstance(execution_state, dict)
                     and execution_state.get("steps")
-                    and self._safe_str(execution_state.get("status")).lower()
+                    and self.safe_str(execution_state.get("status")).lower()
                     != "complete"
                 )
                 else {}
@@ -13266,7 +13238,7 @@ if (not attachments) and (__name__ == "__main__"):
                 if (
                     isinstance(execution_state, dict)
                     and execution_state.get("steps")
-                    and self._safe_str(execution_state.get("status")).lower()
+                    and self.safe_str(execution_state.get("status")).lower()
                     != "complete"
                 )
                 else {}
@@ -13291,7 +13263,7 @@ if (not attachments) and (__name__ == "__main__"):
                 execution_state
                 if (
                     execution_state.get("steps")
-                    and self._safe_str(execution_state.get("status")).lower()
+                    and self.safe_str(execution_state.get("status")).lower()
                     not in {
                         "complete",
                         "completed",
@@ -13318,8 +13290,8 @@ if (not attachments) and (__name__ == "__main__"):
     def _trigger_auto_fix_on_failure(
         self, session_id: str, error_text: str, action: str = ""
     ):
-        error_text = self._safe_str(error_text).strip() or "Unknown execution failure."
-        action = self._safe_str(action).strip() or "unknown"
+        error_text = self.safe_str(error_text).strip() or "Unknown execution failure."
+        action = self.safe_str(action).strip() or "unknown"
 
         self._update_working_state(
             session_id,
@@ -13352,7 +13324,7 @@ if (not attachments) and (__name__ == "__main__"):
         except Exception as e:
             auto_fix_result = {
                 "ok": False,
-                "error": self._safe_str(e),
+                "error": self.safe_str(e),
             }
 
         return self._build_assistant_message(text=f"""Execution failed.
@@ -13363,11 +13335,11 @@ Error:
 Auto-fix trigger armed.
 
 Auto-fix result:
-{self._safe_str(auto_fix_result)}""")
+{self.safe_str(auto_fix_result)}""")
 
 
     def _extract_file_path_from_error(self, error_text: str) -> str:
-        text = self._safe_str(error_text)
+        text = self.safe_str(error_text)
 
         match = re.search(r'File "([^"]+)"', text)
         if match:
@@ -13529,7 +13501,7 @@ Auto-fix result:
         value: str,
         limit: int = 300,
     ) -> str:
-        text = re.sub(r"\s+", " ", self._safe_str(value)).strip()
+        text = re.sub(r"\s+", " ", self.safe_str(value)).strip()
 
         if not text:
             return ""
@@ -13625,58 +13597,58 @@ Auto-fix result:
         )
 
         image_url = (
-            self._safe_str(artifact.get("image_url"))
-            or self._safe_str(meta.get("image_url"))
-            or self._safe_str(viewer.get("image_url"))
+            self.safe_str(artifact.get("image_url"))
+            or self.safe_str(meta.get("image_url"))
+            or self.safe_str(viewer.get("image_url"))
         )
 
-        artifact["kind"] = self._safe_str(artifact.get("kind")) or "image"
+        artifact["kind"] = self.safe_str(artifact.get("kind")) or "image"
 
-        artifact["group"] = self._safe_str(artifact.get("group")) or "Images"
+        artifact["group"] = self.safe_str(artifact.get("group")) or "Images"
 
-        artifact["title"] = self._safe_str(artifact.get("title")) or "Generated image"
+        artifact["title"] = self.safe_str(artifact.get("title")) or "Generated image"
 
         artifact["summary"] = description["summary"]
         artifact["preview"] = description["preview"]
         artifact["image_url"] = image_url or None
 
         artifact["source"] = (
-            self._safe_str(artifact.get("source")) or "image_generation"
+            self.safe_str(artifact.get("source")) or "image_generation"
         )
 
-        meta["prompt"] = self._safe_str(meta.get("prompt")) or self._safe_str(prompt)
+        meta["prompt"] = self.safe_str(meta.get("prompt")) or self.safe_str(prompt)
 
-        meta["revised_prompt"] = self._safe_str(
+        meta["revised_prompt"] = self.safe_str(
             meta.get("revised_prompt")
-        ) or self._safe_str(revised_prompt)
+        ) or self.safe_str(revised_prompt)
 
         meta["source_type"] = (
-            self._safe_str(meta.get("source_type"))
-            or self._safe_str(source_type)
+            self.safe_str(meta.get("source_type"))
+            or self.safe_str(source_type)
             or "generated"
         )
 
         meta["generation_mode"] = (
-            self._safe_str(meta.get("generation_mode"))
-            or self._safe_str(generation_mode)
+            self.safe_str(meta.get("generation_mode"))
+            or self.safe_str(generation_mode)
             or "text_to_image"
         )
 
-        meta["image_url"] = self._safe_str(meta.get("image_url")) or image_url
+        meta["image_url"] = self.safe_str(meta.get("image_url")) or image_url
 
         meta["artifact_description"] = description["summary"]
 
-        viewer["kind"] = self._safe_str(viewer.get("kind")) or "image"
+        viewer["kind"] = self.safe_str(viewer.get("kind")) or "image"
 
-        viewer["title"] = self._safe_str(viewer.get("title")) or artifact["title"]
+        viewer["title"] = self.safe_str(viewer.get("title")) or artifact["title"]
 
         viewer["body"] = description["body"]
 
-        viewer["image_url"] = self._safe_str(viewer.get("image_url")) or image_url
+        viewer["image_url"] = self.safe_str(viewer.get("image_url")) or image_url
 
-        viewer["source_url"] = self._safe_str(viewer.get("source_url"))
+        viewer["source_url"] = self.safe_str(viewer.get("source_url"))
 
-        viewer["filename"] = self._safe_str(viewer.get("filename"))
+        viewer["filename"] = self.safe_str(viewer.get("filename"))
 
         viewer["image_missing"] = bool(viewer.get("image_missing", False))
 
@@ -13700,7 +13672,7 @@ Auto-fix result:
         text = re.sub(
             r"\s+",
             " ",
-            self._safe_str(value),
+            self.safe_str(value),
         ).strip()
 
         if not text:
@@ -13806,7 +13778,7 @@ Auto-fix result:
             limit=6000,
         )
 
-        clean_url = self._safe_str(url)
+        clean_url = self.safe_str(url)
 
         clean_site = self._clean_web_text(
             site_name,
@@ -13892,33 +13864,33 @@ Auto-fix result:
         viewer = self._safe_dict(artifact.get("viewer"))
 
         title = (
-            self._safe_str(artifact.get("title"))
-            or self._safe_str(result.get("title"))
-            or self._safe_str(url)
+            self.safe_str(artifact.get("title"))
+            or self.safe_str(result.get("title"))
+            or self.safe_str(url)
             or "Web result"
         )
 
-        summary = self._safe_str(artifact.get("summary")) or self._safe_str(
+        summary = self.safe_str(artifact.get("summary")) or self.safe_str(
             result.get("summary")
         )
 
-        content = self._safe_str(artifact.get("body")) or self._safe_str(
+        content = self.safe_str(artifact.get("body")) or self.safe_str(
             result.get("content")
         )
 
         source_url = (
-            self._safe_str(artifact.get("source_url"))
-            or self._safe_str(meta.get("source_url"))
-            or self._safe_str(result.get("final_url"))
-            or self._safe_str(result.get("url"))
-            or self._safe_str(url)
+            self.safe_str(artifact.get("source_url"))
+            or self.safe_str(meta.get("source_url"))
+            or self.safe_str(result.get("final_url"))
+            or self.safe_str(result.get("url"))
+            or self.safe_str(url)
         )
 
-        artifact["kind"] = self._safe_str(artifact.get("kind")) or "web_result"
+        artifact["kind"] = self.safe_str(artifact.get("kind")) or "web_result"
 
-        artifact["group"] = self._safe_str(artifact.get("group")) or "Web"
+        artifact["group"] = self.safe_str(artifact.get("group")) or "Web"
 
-        artifact["title"] = self._safe_str(title) or "Web result"
+        artifact["title"] = self.safe_str(title) or "Web result"
 
         artifact["summary"] = summary
         artifact["preview"] = self._truncate_web_text(
@@ -13927,14 +13899,14 @@ Auto-fix result:
         )
 
         artifact["body"] = (
-            self._safe_str(artifact.get("body"))
-            or self._safe_str(result.get("content"))
+            self.safe_str(artifact.get("body"))
+            or self.safe_str(result.get("content"))
             or ""
         )
 
         artifact["source_url"] = source_url
 
-        artifact["source"] = self._safe_str(artifact.get("source")) or "web_fetch"
+        artifact["source"] = self.safe_str(artifact.get("source")) or "web_fetch"
 
         artifact["meta"] = meta
         artifact["viewer"] = viewer
@@ -13942,7 +13914,7 @@ Auto-fix result:
         return artifact
 
     def _categorize_memory(self, text: str) -> str:
-        t = self._safe_str(text).lower()
+        t = self.safe_str(text).lower()
 
         # preference
         if any(
@@ -14003,7 +13975,7 @@ Auto-fix result:
         decision: dict | None = None,
     ) -> bool:
 
-        text = self._safe_str(user_text).lower()
+        text = self.safe_str(user_text).lower()
 
         if not text:
             return False
@@ -14026,24 +13998,24 @@ Auto-fix result:
             decision["use_memory"] = False
             decision["source_urls"] = []
             decision["sources"] = []
-        route = self._safe_str(decision.get("route")).lower()
+        route = self.safe_str(decision.get("route")).lower()
 
         if route in {
-            self._safe_str(
+            self.safe_str(
                 getattr(
                     self,
                     "ROUTE_IMAGE_GENERATION",
                     "",
                 )
             ).lower(),
-            self._safe_str(
+            self.safe_str(
                 getattr(
                     self,
                     "ROUTE_WEB_FETCH",
                     "",
                 )
             ).lower(),
-            self._safe_str(
+            self.safe_str(
                 getattr(
                     self,
                     "ROUTE_ATTACHMENT_ANALYSIS",
@@ -14077,9 +14049,9 @@ Auto-fix result:
 
         decision = decision or {}
 
-        user_text = self._safe_str(user_text).lower()
+        user_text = self.safe_str(user_text).lower()
 
-        assistant_text = self._safe_str((assistant_msg or {}).get("text")).lower()
+        assistant_text = self.safe_str((assistant_msg or {}).get("text")).lower()
 
         # NOVA_FORCE_IMAGE_ATTACHMENTS_ATTACHMENT_ANALYSIS_20260607
         if self._nova_has_image_attachment_20260607(attachments):
@@ -14093,9 +14065,9 @@ Auto-fix result:
             decision["use_memory"] = False
             decision["source_urls"] = []
             decision["sources"] = []
-        route = self._safe_str(decision.get("route")).lower()
+        route = self.safe_str(decision.get("route")).lower()
 
-        mode = self._safe_str(decision.get("mode")).lower()
+        mode = self.safe_str(decision.get("mode")).lower()
 
         continuity_triggers = [
             "what are we doing now",
@@ -14213,7 +14185,7 @@ Auto-fix result:
             ),
             "next_move": self._clean_working_state_value(state.get("next_move", "")),
             "checkpoint": self._clean_working_state_value(state.get("checkpoint", "")),
-            "updated_at": self._safe_str(state.get("updated_at", "")),
+            "updated_at": self.safe_str(state.get("updated_at", "")),
         }
 
         text_lines = []
@@ -14254,18 +14226,18 @@ Auto-fix result:
         user_text: str,
     ) -> float:
 
-        user_text = self._safe_str(user_text).strip().lower()
+        user_text = self.safe_str(user_text).strip().lower()
 
         if not user_text:
             return 0.0
 
         if isinstance(memory_item, dict):
-            text = self._safe_str(memory_item.get("text"))
+            text = self.safe_str(memory_item.get("text"))
 
-            kind = self._safe_str(memory_item.get("kind"))
+            kind = self.safe_str(memory_item.get("kind"))
 
         else:
-            text = self._safe_str(memory_item)
+            text = self.safe_str(memory_item)
             kind = ""
 
         haystack = (f"{kind} {text}").strip().lower()
@@ -14438,7 +14410,7 @@ Auto-fix result:
         for item in chosen:
 
             if not isinstance(item, dict):
-                text = self._safe_str(item).strip()
+                text = self.safe_str(item).strip()
 
                 if not text:
                     continue
@@ -14463,11 +14435,11 @@ Auto-fix result:
                 lines.append(f"- {text}")
                 continue
 
-            text = self._safe_str(item.get("text")).strip()
+            text = self.safe_str(item.get("text")).strip()
 
-            kind = self._safe_str(item.get("kind")).strip()
+            kind = self.safe_str(item.get("kind")).strip()
 
-            item_session_id = self._safe_str(item.get("session_id")).strip()
+            item_session_id = self.safe_str(item.get("session_id")).strip()
 
             if not text:
                 continue
@@ -14675,7 +14647,7 @@ Auto-fix result:
         text: str,
     ) -> bool:
 
-        text = self._safe_str(text).strip().lower()
+        text = self.safe_str(text).strip().lower()
 
         if not text:
             return True
@@ -14698,7 +14670,7 @@ Auto-fix result:
     ) -> bool:
 
         attachments = attachments or []
-        text = self._safe_str(user_text)
+        text = self.safe_str(user_text)
         lowered = text.lower()
 
         if self._text_has_placeholder_debug_content(text):
@@ -14731,21 +14703,21 @@ Auto-fix result:
         step_title: str,
     ) -> bool:
 
-        return "apply" in self._safe_str(step_title).lower()
+        return "apply" in self.safe_str(step_title).lower()
 
     def _step_requires_verification(
         self,
         step_title: str,
     ) -> bool:
 
-        return "verify" in self._safe_str(step_title).lower()
+        return "verify" in self.safe_str(step_title).lower()
 
     def _step_output_indicates_real_change(
         self,
         step_output: str,
     ) -> bool:
 
-        lowered = self._safe_str(step_output).lower()
+        lowered = self.safe_str(step_output).lower()
 
         return any(
             x in lowered
@@ -14762,7 +14734,7 @@ Auto-fix result:
         step_output: str,
     ) -> bool:
 
-        lowered = self._safe_str(step_output).lower()
+        lowered = self.safe_str(step_output).lower()
 
         return any(
             x in lowered
@@ -14786,18 +14758,18 @@ Auto-fix result:
         execution = execution or {}
         attachments = attachments or []
 
-        goal_text = self._safe_str(execution.get("goal"))
+        goal_text = self.safe_str(execution.get("goal"))
 
-        current_step_text = self._safe_str(execution.get("current_step"))
+        current_step_text = self.safe_str(execution.get("current_step"))
 
         combined_text = "\n".join(
             part
             for part in [
-                self._safe_str(user_text),
+                self.safe_str(user_text),
                 goal_text,
                 current_step_text,
             ]
-            if self._safe_str(part).strip()
+            if self.safe_str(part).strip()
         )
 
         if not self._has_real_debug_context(
@@ -15133,7 +15105,7 @@ Auto-fix result:
         self, user_text, session=None, decision=None, memory_context=None
     ):
         session = session or {}
-        memory_context = self._safe_str(memory_context).strip()
+        memory_context = self.safe_str(memory_context).strip()
 
         system_prompt = self._build_system_prompt(decision=decision)
         continuity_context = self._build_continuity_context(session=session)
@@ -15177,7 +15149,7 @@ Auto-fix result:
         return messages
 
     def _maybe_update_working_state(self, session_id: str, user_text: str):
-        session_id = self._safe_str(session_id).strip()
+        session_id = self.safe_str(session_id).strip()
         if not session_id:
             return {}
 
@@ -15225,7 +15197,7 @@ Auto-fix result:
         return text
 
     def _normalize_memory_text_for_save(self, text) -> str:
-        raw = self._safe_str(text).strip()
+        raw = self.safe_str(text).strip()
         if not raw:
             return ""
 
@@ -15267,7 +15239,7 @@ Auto-fix result:
         if not cleaned:
             return False
 
-        kind = self._safe_str(kind).lower().strip()
+        kind = self.safe_str(kind).lower().strip()
         lowered = cleaned.lower()
 
         blocked_internal_phrases = (
@@ -15428,7 +15400,7 @@ Auto-fix result:
     # ==============================
 
     def _looks_like_url(self, text: str) -> bool:
-        t = self._safe_str(text).lower()
+        t = self.safe_str(text).lower()
         if not t:
             return False
         if "http://" in t or "https://" in t:
@@ -15436,7 +15408,7 @@ Auto-fix result:
         return bool(re.search(r"\bwww\.[^\s]+\.[^\s]+\b", t))
 
     def _extract_first_url(self, text: str) -> str:
-        t = self._safe_str(text)
+        t = self.safe_str(text)
         if not t:
             return ""
 
@@ -15451,7 +15423,7 @@ Auto-fix result:
         return ""
 
     def _looks_like_planning(self, text: str) -> bool:
-        t = self._safe_str(text).lower()
+        t = self.safe_str(text).lower()
         if not t:
             return False
 
@@ -15469,7 +15441,7 @@ Auto-fix result:
         return any(trigger in t for trigger in triggers)
 
     def _looks_like_memory_recall(self, text: str) -> bool:
-        t = self._safe_str(text).lower()
+        t = self.safe_str(text).lower()
         if not t:
             return False
 
@@ -15498,7 +15470,7 @@ Auto-fix result:
         attachments=None,
     ) -> dict:
         attachments = attachments or []
-        text = self._safe_str(user_text).strip()
+        text = self.safe_str(user_text).strip()
         text_lc = text.lower()
 
         working_state = self._get_working_state(session_id) or {}
@@ -15514,7 +15486,7 @@ Auto-fix result:
             for step in execution_state.get("steps") or []:
                 if (
                     isinstance(step, dict)
-                    and self._safe_str(step.get("status")).lower() == "failed"
+                    and self.safe_str(step.get("status")).lower() == "failed"
                 ):
                     failed_steps.append(step)
 
@@ -15543,7 +15515,7 @@ Auto-fix result:
         has_active_execution = (
             isinstance(execution_state, dict)
             and execution_state
-            and self._safe_str(execution_state.get("status")).lower()
+            and self.safe_str(execution_state.get("status")).lower()
             not in {"complete", "completed", "done", "cancelled", "canceled"}
         )
 
@@ -15816,7 +15788,7 @@ Auto-fix result:
         session_id: str = "",
     ) -> dict:
 
-        user_text = self._safe_str(user_text).strip()
+        user_text = self.safe_str(user_text).strip()
 
         text = user_text.lower().strip()
         lower_text = text
@@ -15827,7 +15799,7 @@ Auto-fix result:
         # RUNTIME LANE
         # =========================
 
-        if self._safe_str(user_text).startswith("/runtime"):
+        if self.safe_str(user_text).startswith("/runtime"):
 
             return {
                 "route": "runtime",
@@ -16091,7 +16063,7 @@ Auto-fix result:
 
         ws = self._get_working_state(session_id) or {}
 
-        updated_at = self._safe_str(ws.get("updated_at")).strip()
+        updated_at = self.safe_str(ws.get("updated_at")).strip()
 
         has_working_mission = False
 
@@ -16353,8 +16325,8 @@ Auto-fix result:
 
         active_execution = self._get_session_meta(session_id, "active_execution") or {}
 
-        active_status = self._safe_str(active_execution.get("status")).strip().lower()
-        execution_status = self._safe_str(execution_state.get("status")).strip().lower()
+        active_status = self.safe_str(active_execution.get("status")).strip().lower()
+        execution_status = self.safe_str(execution_state.get("status")).strip().lower()
 
         active_complete = (
             active_status in {"complete", "completed"}
@@ -16492,7 +16464,7 @@ Auto-fix result:
         )
 
     def _get_persisted_execution_artifact(self, session_id: str):
-        session_id = self._safe_str(session_id)
+        session_id = self.safe_str(session_id)
 
         if not session_id:
             return None
@@ -16526,7 +16498,7 @@ Auto-fix result:
             if not isinstance(session, dict):
                 continue
 
-            if self._safe_str(session.get("id")) != session_id:
+            if self.safe_str(session.get("id")) != session_id:
                 continue
 
             persisted = session.get("execution_state")
@@ -16551,7 +16523,7 @@ Auto-fix result:
     def _persist_execution_artifact(
         self, session_id: str, execution: dict | None
     ) -> None:
-        session_id = self._safe_str(session_id)
+        session_id = self.safe_str(session_id)
         if not session_id:
             return
 
@@ -16589,7 +16561,7 @@ Auto-fix result:
         for session in items:
             if not isinstance(session, dict):
                 continue
-            if self._safe_str(session.get("id")) != session_id:
+            if self.safe_str(session.get("id")) != session_id:
                 continue
 
             session["active_execution"] = dict(execution)
@@ -16608,7 +16580,7 @@ Auto-fix result:
             exec_debug("PERSIST EXECUTION SAVE SESSIONS FAILED:", e)
 
     def _find_latest_execution_artifact(self, session_id: str = ""):
-        session_id = self._safe_str(session_id)
+        session_id = self.safe_str(session_id)
 
         try:
             artifacts = []
@@ -16629,7 +16601,7 @@ Auto-fix result:
             for a in artifacts:
                 a = a or {}
 
-                if session_id and self._safe_str(a.get("session_id")) != session_id:
+                if session_id and self.safe_str(a.get("session_id")) != session_id:
                     continue
 
                 execution = (
@@ -16641,7 +16613,7 @@ Auto-fix result:
                     matches.append(a)
 
             matches.sort(
-                key=lambda x: self._safe_str(x.get("created_at")),
+                key=lambda x: self.safe_str(x.get("created_at")),
                 reverse=True,
             )
 
@@ -16701,7 +16673,7 @@ Auto-fix result:
     # =========================
 
     def _looks_like_execution_progression(self, user_text: str) -> bool:
-        text = self._safe_str(user_text).strip().lower()
+        text = self.safe_str(user_text).strip().lower()
         if not text:
             return False
 
@@ -16781,7 +16753,7 @@ Auto-fix result:
                 current_step = step.get("title") or step.get("action") or ""
 
         snapshot = {
-            "status": self._safe_str(execution_state.get("status")),
+            "status": self.safe_str(execution_state.get("status")),
             "steps": steps,
             "current_index": current_index,
             "current_step": current_step,
@@ -16789,7 +16761,7 @@ Auto-fix result:
             "progress": (execution_state.get("progress") or 0),
             "waiting": bool(execution_state.get("waiting")),
             "complete": bool(execution_state.get("complete")),
-            "runtime_signal": self._safe_str(execution_state.get("runtime_signal")),
+            "runtime_signal": self.safe_str(execution_state.get("runtime_signal")),
             "next_moves": (execution_state.get("next_moves") or []),
         }
 
@@ -16899,7 +16871,7 @@ Auto-fix result:
 
         for idx, step in enumerate(clean_steps):
 
-            existing_status = self._safe_str(step.get("status")).lower().strip()
+            existing_status = self.safe_str(step.get("status")).lower().strip()
 
             if existing_status in {
                 "completed",
@@ -17000,8 +16972,8 @@ Auto-fix result:
         self, user_text: str, session_id: str = "", attachments=None
     ):
         attachments = attachments or []
-        session_id = self._safe_str(session_id)
-        user_text = self._safe_str(user_text)
+        session_id = self.safe_str(session_id)
+        user_text = self.safe_str(user_text)
         assistant_text = ""
 
         exec_debug("ADVANCE SESSION_ID =", session_id)
@@ -17032,7 +17004,7 @@ Auto-fix result:
 
         execution = self._normalize_execution_state(execution)
 
-        if self._safe_str(execution.get("status")).lower() == "complete":
+        if self.safe_str(execution.get("status")).lower() == "complete":
             execution = {}
 
             self._save_execution_state(
@@ -17123,7 +17095,7 @@ Auto-fix result:
                     "execution": execution,
                 },
             )
-        goal_text = self._safe_str(execution.get("goal")).lower()
+        goal_text = self.safe_str(execution.get("goal")).lower()
         step_index = int(execution.get("current_index", 0) or 0)
         if "plan" in goal_text:
             if step_index == 0:
@@ -17182,7 +17154,7 @@ Next action:
                     execution = self._advance_execution_one_step(execution)
                     execution = self._normalize_execution_state(execution)
 
-                    status = self._safe_str(execution.get("status")).lower()
+                    status = self.safe_str(execution.get("status")).lower()
 
                     if status in {"complete", "completed", "error", "failed"}:
                         break
@@ -17203,7 +17175,7 @@ Next action:
             "kind": "execution",
             "title": "Execution Plan",
             "body": self._render_execution(execution),
-            "summary": f"Execution plan for: {self._safe_str(execution.get('goal'))}",
+            "summary": f"Execution plan for: {self.safe_str(execution.get('goal'))}",
             "preview": self._render_execution(execution)[:140],
             "session_id": session_id,
             "source": "execution",
@@ -17211,12 +17183,12 @@ Next action:
             "meta": {
                 "auto_generated": True,
                 "auto_executed": False,
-                "complete": self._safe_str(execution.get("status")).lower()
+                "complete": self.safe_str(execution.get("status")).lower()
                 == "complete",
                 "done": int(execution.get("progress", 0) or 0),
                 "total": len(execution.get("steps") or []),
                 "paused": False,
-                "active_execution": self._safe_str(execution.get("status")).lower()
+                "active_execution": self.safe_str(execution.get("status")).lower()
                 != "complete",
             },
         }
@@ -17255,7 +17227,7 @@ Next action:
 
         plan_body = self._render_execution(execution)
 
-        status = self._safe_str(execution.get("status")).lower()
+        status = self.safe_str(execution.get("status")).lower()
 
         if status in {"complete", "completed"}:
             assistant_text = "Auto-execution complete."
@@ -17283,10 +17255,10 @@ Next action:
             self._set_session_meta(
                 session_id,
                 "last_answer_topic",
-                self._safe_str(original_user_text)[:300],
+                self.safe_str(original_user_text)[:300],
             )
             self._set_session_meta(
-                session_id, "last_answer_text", self._safe_str(assistant_text)[:4000]
+                session_id, "last_answer_text", self.safe_str(assistant_text)[:4000]
             )
             self._set_session_meta(
                 session_id,
@@ -17314,7 +17286,7 @@ Next action:
     # =========================
 
     def _looks_like_auto_execution_request(self, user_text: str) -> bool:
-        text = self._safe_str(user_text).strip().lower()
+        text = self.safe_str(user_text).strip().lower()
 
         return text in {
             "run all",
@@ -17325,7 +17297,7 @@ Next action:
         }
 
     def _looks_like_plan_request(self, user_text: str) -> bool:
-        text = self._safe_str(user_text).strip().lower()
+        text = self.safe_str(user_text).strip().lower()
         if not text:
             return False
 
@@ -17476,7 +17448,7 @@ Next action:
 
         if status is not None:
             execution["status"] = (
-                self._safe_str(status) or execution.get("status") or "idle"
+                self.safe_str(status) or execution.get("status") or "idle"
             )
 
         if current_step is not None:
@@ -17559,7 +17531,7 @@ Next action:
         return [a for a in artifacts if isinstance(a, dict)]
 
     def _build_execution_plan(self, user_text: str, session_id: str):
-        goal = self._safe_str(user_text).strip() or "Complete the requested task"
+        goal = self.safe_str(user_text).strip() or "Complete the requested task"
 
         steps = [
             "Inspect the current state and constraints",
@@ -17645,7 +17617,7 @@ Next action:
 
         artifact_id = ""
         if isinstance(saved_artifact, dict):
-            artifact_id = self._safe_str(saved_artifact.get("id"))
+            artifact_id = self.safe_str(saved_artifact.get("id"))
 
         execution["artifact_id"] = artifact_id
         execution["session_id"] = session_id
@@ -17664,7 +17636,7 @@ Next action:
         return saved_artifact
 
     def _extract_execution_lines(self, body: str):
-        lines = self._safe_str(body).splitlines()
+        lines = self.safe_str(body).splitlines()
         step_indexes = []
         current_index = -1
 
@@ -17678,7 +17650,7 @@ Next action:
         return lines, step_indexes, current_index
 
     def _refresh_execution_header(self, body: str):
-        lines = self._safe_str(body).splitlines()
+        lines = self.safe_str(body).splitlines()
 
         total = sum(
             1
@@ -17757,7 +17729,7 @@ Next action:
 
         lines = []
         for key, label in ordered_fields:
-            value = self._safe_str(state.get(key)).strip()
+            value = self.safe_str(state.get(key)).strip()
             if value:
                 lines.append(f"- {label}: {value}")
 
@@ -17773,8 +17745,8 @@ Next action:
         current_state: dict | None = None,
     ) -> dict:
         current_state = current_state if isinstance(current_state, dict) else {}
-        step_title = self._safe_str(step_title).strip()
-        step_output = self._safe_str(step_output).strip()
+        step_title = self.safe_str(step_title).strip()
+        step_output = self.safe_str(step_output).strip()
 
         if not step_output:
             return {}
@@ -17817,7 +17789,7 @@ Next action:
 
             if first_line:
                 patch["next_move"] = first_line
-        if step_title and not self._safe_str(current_state.get("active_task")).strip():
+        if step_title and not self.safe_str(current_state.get("active_task")).strip():
             patch["active_task"] = step_title
 
         return patch
@@ -17827,7 +17799,7 @@ Next action:
         # ==============================
 
     def _set_working_state(self, session_id: str, state: dict):
-        session_id = self._safe_str(session_id).strip()
+        session_id = self.safe_str(session_id).strip()
         if not session_id:
             return {}
 
@@ -17835,13 +17807,13 @@ Next action:
             state = {}
 
         clean_state = {
-            "active_task": self._safe_str(state.get("active_task")).strip(),
-            "current_file": self._safe_str(state.get("current_file")).strip(),
-            "current_bug": self._safe_str(state.get("current_bug")).strip(),
-            "last_success": self._safe_str(state.get("last_success")).strip(),
-            "next_move": self._safe_str(state.get("next_move")).strip(),
-            "checkpoint": self._safe_str(state.get("checkpoint")).strip(),
-            "updated_at": self._safe_str(state.get("updated_at")).strip(),
+            "active_task": self.safe_str(state.get("active_task")).strip(),
+            "current_file": self.safe_str(state.get("current_file")).strip(),
+            "current_bug": self.safe_str(state.get("current_bug")).strip(),
+            "last_success": self.safe_str(state.get("last_success")).strip(),
+            "next_move": self.safe_str(state.get("next_move")).strip(),
+            "checkpoint": self.safe_str(state.get("checkpoint")).strip(),
+            "updated_at": self.safe_str(state.get("updated_at")).strip(),
         }
 
         try:
@@ -17862,9 +17834,9 @@ Next action:
 
         patch = {}
 
-        lowered = self._safe_str(user_text).lower().strip()
+        lowered = self.safe_str(user_text).lower().strip()
 
-        current_updated_at = self._safe_str(current.get("updated_at")).strip()
+        current_updated_at = self.safe_str(current.get("updated_at")).strip()
 
         stale_state = False
 
@@ -18045,7 +18017,7 @@ Next action:
         return self._get_working_state(session_id) or {}
 
     def _replace_working_state(self, session_id: str, new_state: dict):
-        session_id = self._safe_str(session_id).strip()
+        session_id = self.safe_str(session_id).strip()
 
         if not session_id:
             return {}
@@ -18162,9 +18134,9 @@ Next action:
     def _reset_execution_state(self, session_id: str):
         previous_state = self._get_working_state(session_id) or {}
 
-        last_success = self._safe_str(previous_state.get("last_success")).strip()
+        last_success = self.safe_str(previous_state.get("last_success")).strip()
 
-        checkpoint = self._safe_str(previous_state.get("checkpoint")).strip()
+        checkpoint = self.safe_str(previous_state.get("checkpoint")).strip()
 
         last_success = ""
         checkpoint = ""
@@ -18256,7 +18228,7 @@ Next action:
     def _extract_working_state_updates(
         self, user_text: str, current_state: dict | None = None
     ) -> dict:
-        text = self._safe_str(user_text).strip()
+        text = self.safe_str(user_text).strip()
         if not text:
             return {}
 
@@ -18289,7 +18261,7 @@ Next action:
         }
 
         def _clean_value(value: str) -> str:
-            value = self._safe_str(value).strip()
+            value = self.safe_str(value).strip()
             value = value.strip(
                 "+    ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â (FOUR SPACES ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â press space 4 times)\r\n-:;,."
             )
@@ -18382,10 +18354,10 @@ Next action:
         # -----------------------------------------
         deduped = {}
         for key, value in updates.items():
-            existing = self._safe_str(current_state.get(key)).strip()
+            existing = self.safe_str(current_state.get(key)).strip()
             if (
-                self._safe_str(value).strip()
-                and self._safe_str(value).strip() != existing
+                self.safe_str(value).strip()
+                and self.safe_str(value).strip() != existing
             ):
                 deduped[key] = value
 
@@ -18425,25 +18397,25 @@ Next action:
         }
 
         def friendly(value):
-            value = self._safe_str(value).strip()
+            value = self.safe_str(value).strip()
             return friendly_state_map.get(value, value)
 
-        if self._safe_str(state.get("active_task")):
-            lines.append(f"- Active task: {self._safe_str(state.get('active_task'))}")
+        if self.safe_str(state.get("active_task")):
+            lines.append(f"- Active task: {self.safe_str(state.get('active_task'))}")
 
-        if self._safe_str(state.get("current_file")):
-            lines.append(f"- Current file: {self._safe_str(state.get('current_file'))}")
+        if self.safe_str(state.get("current_file")):
+            lines.append(f"- Current file: {self.safe_str(state.get('current_file'))}")
 
-        if self._safe_str(state.get("current_bug")):
-            lines.append(f"- Current bug: {self._safe_str(state.get('current_bug'))}")
+        if self.safe_str(state.get("current_bug")):
+            lines.append(f"- Current bug: {self.safe_str(state.get('current_bug'))}")
 
-        if self._safe_str(state.get("last_success")):
+        if self.safe_str(state.get("last_success")):
             lines.append(f"- Last success: {friendly(state.get('last_success'))}")
 
-        if self._safe_str(state.get("next_move")):
+        if self.safe_str(state.get("next_move")):
             lines.append(f"- Next move: {friendly(state.get('next_move'))}")
 
-        if self._safe_str(state.get("checkpoint")):
+        if self.safe_str(state.get("checkpoint")):
             lines.append(f"- Checkpoint: {friendly(state.get('checkpoint'))}")
 
         if not lines:
@@ -18459,15 +18431,15 @@ Next action:
         working_state = working_state if isinstance(working_state, dict) else {}
         execution_state = execution_state if isinstance(execution_state, dict) else {}
 
-        active_task = self._safe_str(working_state.get("active_task")).strip()
-        current_file = self._safe_str(working_state.get("current_file")).strip()
-        current_bug = self._safe_str(working_state.get("current_bug")).strip()
-        last_success = self._safe_str(working_state.get("last_success")).strip()
-        next_move = self._safe_str(working_state.get("next_move")).strip()
-        checkpoint = self._safe_str(working_state.get("checkpoint")).strip()
+        active_task = self.safe_str(working_state.get("active_task")).strip()
+        current_file = self.safe_str(working_state.get("current_file")).strip()
+        current_bug = self.safe_str(working_state.get("current_bug")).strip()
+        last_success = self.safe_str(working_state.get("last_success")).strip()
+        next_move = self.safe_str(working_state.get("next_move")).strip()
+        checkpoint = self.safe_str(working_state.get("checkpoint")).strip()
 
-        execution_status = self._safe_str(execution_state.get("status")).strip()
-        execution_goal = self._safe_str(execution_state.get("goal")).strip()
+        execution_status = self.safe_str(execution_state.get("status")).strip()
+        execution_goal = self.safe_str(execution_state.get("goal")).strip()
 
         invalid_execution_goal = "respond normally" in execution_goal.lower()
 
@@ -18547,7 +18519,7 @@ Next action:
                 ]
             )
 
-        mission = self._safe_str(mission).strip()
+        mission = self.safe_str(mission).strip()
 
         if self._is_control_command_value(mission):
             mission = ""
@@ -18587,8 +18559,8 @@ Next action:
     ) -> str:
         mission_state = mission_state if isinstance(mission_state, dict) else {}
 
-        mission = self._safe_str(mission_state.get("mission")).strip()
-        recommended_next_move = self._safe_str(
+        mission = self.safe_str(mission_state.get("mission")).strip()
+        recommended_next_move = self.safe_str(
             mission_state.get("recommended_next_move")
         ).strip()
 
@@ -18610,7 +18582,7 @@ Next action:
             lines.append("")
             lines.append("Priorities:")
             for item in priorities[:5]:
-                item = self._safe_str(item).strip()
+                item = self.safe_str(item).strip()
                 if item:
                     lines.append(f"- {item}")
 
@@ -18618,7 +18590,7 @@ Next action:
             lines.append("")
             lines.append("Blockers:")
             for item in blockers[:5]:
-                item = self._safe_str(item).strip()
+                item = self.safe_str(item).strip()
                 if item:
                     lines.append(f"- {item}")
 
@@ -18627,9 +18599,9 @@ Next action:
     def _run_execution_next_move(
         self, active_task: str, next_move: str, session_id: str
     ) -> str:
-        active_task = self._safe_str(active_task).strip()
-        next_move = self._safe_str(next_move).strip()
-        session_id = self._safe_str(session_id).strip() or "default"
+        active_task = self.safe_str(active_task).strip()
+        next_move = self.safe_str(next_move).strip()
+        session_id = self.safe_str(session_id).strip() or "default"
 
         combined_text = f"{next_move} {active_task}".strip().lower()
 
@@ -18838,8 +18810,8 @@ Next action:
 
         state = self._get_working_state(session_id) or {}
 
-        active_task = self._safe_str(state.get("active_task"))
-        next_move = self._safe_str(state.get("next_move"))
+        active_task = self.safe_str(state.get("active_task"))
+        next_move = self.safe_str(state.get("next_move"))
 
         if not active_task:
             return "No active task to execute."
@@ -18848,7 +18820,7 @@ Next action:
 
         for step in range(max_steps):
             if next_move == "self_heal_fix_file":
-                error_text = self._safe_str(state.get("last_error"))
+                error_text = self.safe_str(state.get("last_error"))
 
                 fix_result = self.repair_execution_service._attempt_self_fix(
                     session_id=session_id,
@@ -18896,7 +18868,7 @@ Next action:
                     results_log.append("RETRY RESULT:\n" + retry_result)
 
             state = self._get_working_state(session_id) or {}
-            next_move = self._safe_str(state.get("next_move"))
+            next_move = self.safe_str(state.get("next_move"))
 
             if not next_move:
                 break
@@ -18918,8 +18890,8 @@ Next action:
         event_type: str,
         details: dict | None = None,
     ) -> None:
-        session_id = self._safe_str(session_id).strip()
-        event_type = self._safe_str(event_type).strip() or "execution_event"
+        session_id = self.safe_str(session_id).strip()
+        event_type = self.safe_str(event_type).strip() or "execution_event"
         details = details if isinstance(details, dict) else {}
 
         if not session_id:
@@ -19017,15 +18989,15 @@ Next action:
                     if not isinstance(item, dict):
                         continue
 
-                    kind = self._safe_str(
+                    kind = self.safe_str(
                         item.get("kind") or "memory"
                     ).strip()
 
-                    source = self._safe_str(
+                    source = self.safe_str(
                         item.get("source") or ""
                     ).strip()
 
-                    text = self._safe_str(
+                    text = self.safe_str(
                         item.get("text")
                         or item.get("content")
                         or ""
@@ -19073,11 +19045,11 @@ Next action:
                     if not isinstance(msg, dict):
                         continue
 
-                    role = self._safe_str(
+                    role = self.safe_str(
                         msg.get("role") or ""
                     ).strip()
 
-                    text = self._safe_str(
+                    text = self.safe_str(
                         msg.get("text")
                         or msg.get("content")
                         or msg.get("message")
@@ -19225,7 +19197,7 @@ Next action:
                 (
                     isinstance(item, dict)
                     and isinstance(item.get("memory"), dict)
-                    and self._safe_str(item.get("memory", {}).get("category")).lower()
+                    and self.safe_str(item.get("memory", {}).get("category")).lower()
                     in {
                         "operational",
                         "execution",
@@ -19540,7 +19512,7 @@ Next action:
             }
 
     def _handle_web_fetch(self, url: str, session_id: str = "") -> dict:
-        raw_url = self._safe_str(url)
+        raw_url = self.safe_str(url)
         normalized_url = raw_url
 
         if normalized_url and not re.match(
@@ -19580,19 +19552,19 @@ Next action:
         except Exception as e:
             artifact = {
                 "kind": "web_result",
-                "title": self._safe_str(result.get("title")) or normalized_url,
-                "summary": self._safe_str(result.get("summary")),
-                "body": self._safe_str(result.get("content")),
-                "preview": self._safe_str(result.get("preview")),
-                "source_url": self._safe_str(
+                "title": self.safe_str(result.get("title")) or normalized_url,
+                "summary": self.safe_str(result.get("summary")),
+                "body": self.safe_str(result.get("content")),
+                "preview": self.safe_str(result.get("preview")),
+                "source_url": self.safe_str(
                     result.get("final_url") or result.get("url") or normalized_url
                 ),
                 "meta": {
-                    "description": self._safe_str(result.get("description")),
-                    "site_name": self._safe_str(result.get("site_name")),
-                    "domain": self._safe_str(result.get("domain")),
-                    "content": self._safe_str(result.get("content")),
-                    "url": self._safe_str(
+                    "description": self.safe_str(result.get("description")),
+                    "site_name": self.safe_str(result.get("site_name")),
+                    "domain": self.safe_str(result.get("domain")),
+                    "content": self.safe_str(result.get("content")),
+                    "url": self.safe_str(
                         result.get("final_url") or result.get("url") or normalized_url
                     ),
                     "status_code": result.get("status_code"),
@@ -19601,13 +19573,13 @@ Next action:
                 },
                 "viewer": {
                     "kind": "web_result",
-                    "title": self._safe_str(result.get("title")) or normalized_url,
-                    "body": self._safe_str(result.get("content")),
-                    "analysis_text": self._safe_str(result.get("summary")),
+                    "title": self.safe_str(result.get("title")) or normalized_url,
+                    "body": self.safe_str(result.get("content")),
+                    "analysis_text": self.safe_str(result.get("summary")),
                     "bullets": self._safe_list(result.get("bullets")),
                     "links": self._safe_list(result.get("links")),
                     "images": self._safe_list(result.get("images")),
-                    "source_url": self._safe_str(
+                    "source_url": self.safe_str(
                         result.get("final_url") or result.get("url") or normalized_url
                     ),
                 },
@@ -19633,19 +19605,19 @@ Next action:
         )
 
         summary = (
-            self._safe_str(final_artifact.get("summary"))
+            self.safe_str(final_artifact.get("summary"))
             if isinstance(final_artifact, dict)
             else ""
         )
 
         body = (
-            self._safe_str(final_artifact.get("body"))
+            self.safe_str(final_artifact.get("body"))
             if isinstance(final_artifact, dict)
             else ""
         )
 
         title = (
-            self._safe_str(final_artifact.get("title"))
+            self.safe_str(final_artifact.get("title"))
             if isinstance(final_artifact, dict)
             else normalized_url
         )
@@ -19662,7 +19634,7 @@ Next action:
             else {}
         )
 
-        source_url = self._safe_str(meta.get("source_url")) or self._safe_str(
+        source_url = self.safe_str(meta.get("source_url")) or self.safe_str(
             result.get("final_url") or result.get("url") or normalized_url
         )
 
@@ -19676,7 +19648,7 @@ Next action:
             "text": summary or f"Fetched {title}",
             "artifact": final_artifact,
             "viewer": viewer,
-            "url": self._safe_str(
+            "url": self.safe_str(
                 result.get("final_url") or result.get("url") or normalized_url
             ),
             "source_url": source_url,
@@ -19689,7 +19661,7 @@ Next action:
                 "route_taken": "web_fetch",
                 "status_code": result.get("status_code"),
                 "artifact_kind": (
-                    self._safe_str(final_artifact.get("kind"))
+                    self.safe_str(final_artifact.get("kind"))
                     if isinstance(final_artifact, dict)
                     else "web_result"
                 ),
@@ -19711,8 +19683,8 @@ Next action:
 
             from openai import OpenAI
 
-            raw_url = self._safe_str(image_url).strip()
-            raw_name = self._safe_str(image_name).strip()
+            raw_url = self.safe_str(image_url).strip()
+            raw_name = self.safe_str(image_name).strip()
 
             if not raw_url:
                 return ""
@@ -19761,7 +19733,7 @@ Next action:
 
             data_url = f"data:{mime_type};base64,{encoded}"
 
-            prompt_text = self._safe_str(user_text).strip() or "Describe this image clearly."
+            prompt_text = self.safe_str(user_text).strip() or "Describe this image clearly."
 
             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -19799,7 +19771,7 @@ Next action:
                 max_tokens=500,
             )
 
-            return self._safe_str(response.choices[0].message.content).strip()
+            return self.safe_str(response.choices[0].message.content).strip()
 
         except Exception as exc:
             print("[NOVA_OPENAI_VISION_ATTACHMENT_ANALYSIS] failed:", exc)
@@ -19812,7 +19784,7 @@ Next action:
             if not isinstance(item, dict):
                 continue
 
-            name = self._safe_str(
+            name = self.safe_str(
                 item.get("original_filename")
                 or item.get("name")
                 or item.get("filename")
@@ -19820,7 +19792,7 @@ Next action:
                 or "attachment"
             )
 
-            existing_summary = self._safe_str(
+            existing_summary = self.safe_str(
                 item.get("attachment_summary")
                 or item.get("extracted_text")
                 or item.get("text")
@@ -19860,13 +19832,13 @@ Next action:
                     "saved_artifact": None,
                 }
 
-            att_type = self._safe_str(item.get("type")).lower()
-            mime_type = self._safe_str(
+            att_type = self.safe_str(item.get("type")).lower()
+            mime_type = self.safe_str(
                 item.get("mime_type")
                 or item.get("content_type")
             ).lower()
 
-            url = self._safe_str(
+            url = self.safe_str(
                 item.get("url")
                 or item.get("file_url")
             )
@@ -19951,10 +19923,10 @@ Next action:
     def _format_response_policy_for_prompt(self, response_policy=None) -> str:
         response_policy = response_policy if isinstance(response_policy, dict) else {}
 
-        instruction = self._safe_str(response_policy.get("instruction")).strip()
-        mode = self._safe_str(response_policy.get("mode")).strip()
-        answer_length = self._safe_str(response_policy.get("answer_length")).strip()
-        tone = self._safe_str(response_policy.get("tone")).strip()
+        instruction = self.safe_str(response_policy.get("instruction")).strip()
+        mode = self.safe_str(response_policy.get("mode")).strip()
+        answer_length = self.safe_str(response_policy.get("answer_length")).strip()
+        tone = self.safe_str(response_policy.get("tone")).strip()
 
         if not instruction and not mode:
             return ""
@@ -19981,7 +19953,7 @@ Next action:
         working_context_block: str = "",
         memory_context: str = "",
     ) -> str:
-        user_text = self._safe_str(user_text)
+        user_text = self.safe_str(user_text)
         decision = decision if isinstance(decision, dict) else {}
 
         # NOVA_FORCE_IMAGE_ATTACHMENTS_ATTACHMENT_ANALYSIS_20260607
@@ -20000,11 +19972,11 @@ Next action:
         try:
             _nova_has_image_attachment = False
             _nova_image_text_probe = (
-                self._safe_str(user_text)
+                self.safe_str(user_text)
                 + " "
-                + self._safe_str(decision.get("query") if isinstance(decision, dict) else "")
+                + self.safe_str(decision.get("query") if isinstance(decision, dict) else "")
                 + " "
-                + self._safe_str(decision.get("text") if isinstance(decision, dict) else "")
+                + self.safe_str(decision.get("text") if isinstance(decision, dict) else "")
             ).lower()
 
             _nova_image_text_markers = (
@@ -20025,11 +19997,11 @@ Next action:
             if any(_nova_marker in _nova_image_text_probe for _nova_marker in _nova_image_text_markers):
                 _nova_has_image_attachment = True
             _nova_image_text_probe = (
-                self._safe_str(user_text)
+                self.safe_str(user_text)
                 + " "
-                + self._safe_str(decision.get("query") if isinstance(decision, dict) else "")
+                + self.safe_str(decision.get("query") if isinstance(decision, dict) else "")
                 + " "
-                + self._safe_str(decision.get("text") if isinstance(decision, dict) else "")
+                + self.safe_str(decision.get("text") if isinstance(decision, dict) else "")
             ).lower()
 
             _nova_image_text_markers = (
@@ -20055,7 +20027,7 @@ Next action:
                     if not isinstance(_nova_item, dict):
                         continue
 
-                    _nova_name = self._safe_str(
+                    _nova_name = self.safe_str(
                         _nova_item.get("filename")
                         or _nova_item.get("original_filename")
                         or _nova_item.get("name")
@@ -20063,7 +20035,7 @@ Next action:
                         or _nova_item.get("file_url")
                     ).lower()
 
-                    _nova_mime = self._safe_str(
+                    _nova_mime = self.safe_str(
                         _nova_item.get("mime_type")
                         or _nova_item.get("type")
                     ).lower()
@@ -20092,7 +20064,7 @@ Next action:
 
         except Exception as _nova_image_route_error:
             print("[NOVA_IMAGE_ATTACHMENT_WEB_BLOCK] failed:", _nova_image_route_error)
-        route = self._safe_str(decision.get("route")).lower()
+        route = self.safe_str(decision.get("route")).lower()
 
         tool_locked_routes = {
             self.ROUTE_WEB_FETCH,
@@ -20139,7 +20111,7 @@ Next action:
             if not isinstance(item, dict):
                 return
 
-            text = self._safe_str(item.get("text") or item.get("content"))
+            text = self.safe_str(item.get("text") or item.get("content"))
 
             key = text.lower().strip()
 
@@ -20171,9 +20143,9 @@ Next action:
             if not item.get("pinned"):
                 continue
 
-            category = self._safe_str(item.get("category")).lower()
+            category = self.safe_str(item.get("category")).lower()
 
-            kind = self._safe_str(item.get("kind")).lower()
+            kind = self.safe_str(item.get("kind")).lower()
 
             if not has_real_state:
 
@@ -20229,7 +20201,7 @@ Next action:
             if item.get("pinned"):
                 continue
 
-            kind = self._safe_str(item.get("kind")).lower()
+            kind = self.safe_str(item.get("kind")).lower()
 
             if not has_real_state and kind in {
                 "goal",
@@ -20266,9 +20238,9 @@ Next action:
             if item in selected_memory:
                 continue
 
-            category = self._safe_str(item.get("category")).lower()
+            category = self.safe_str(item.get("category")).lower()
 
-            kind = self._safe_str(item.get("kind")).lower()
+            kind = self.safe_str(item.get("kind")).lower()
 
             if not has_real_state:
 
@@ -20305,9 +20277,9 @@ Next action:
             if len(selected_memory) >= 10:
                 break
 
-            category = self._safe_str(item.get("category")).lower()
+            category = self.safe_str(item.get("category")).lower()
 
-            kind = self._safe_str(item.get("kind")).lower()
+            kind = self.safe_str(item.get("kind")).lower()
 
             if not has_real_state:
 
@@ -20354,9 +20326,9 @@ Next action:
                 if not isinstance(item, dict):
                     continue
 
-                category = self._safe_str(item.get("category")).lower()
+                category = self.safe_str(item.get("category")).lower()
 
-                kind = self._safe_str(item.get("kind")).lower()
+                kind = self.safe_str(item.get("kind")).lower()
 
                 if category in blocked_categories or kind in blocked_kinds:
                     continue
@@ -20368,7 +20340,7 @@ Next action:
         self._last_used_memory_items = selected_memory
 
         if memory_context:
-            memory_block = self._safe_str(memory_context)
+            memory_block = self.safe_str(memory_context)
 
         session = self._get_session_payload(session_id)
         messages = session.get("messages", []) if isinstance(session, dict) else []
@@ -20380,8 +20352,8 @@ Next action:
             if not isinstance(msg, dict):
                 continue
 
-            role = self._safe_str(msg.get("role"))
-            text = self._safe_str(msg.get("text"))
+            role = self.safe_str(msg.get("role"))
+            text = self.safe_str(msg.get("text"))
 
             if not role or not text:
                 continue
@@ -20410,8 +20382,8 @@ Next action:
 
         for msg in cleaned_messages:
 
-            role = self._safe_str(msg.get("role"))
-            text = self._safe_str(msg.get("text"))
+            role = self.safe_str(msg.get("role"))
+            text = self.safe_str(msg.get("text"))
 
             if not role or not text:
                 continue
@@ -20580,12 +20552,12 @@ Next action:
                     if not isinstance(_nova_item, dict):
                         continue
 
-                    _nova_mime = self._safe_str(
+                    _nova_mime = self.safe_str(
                         _nova_item.get("mime_type")
                         or _nova_item.get("type")
                     ).lower()
 
-                    _nova_name_probe = self._safe_str(
+                    _nova_name_probe = self.safe_str(
                         _nova_item.get("filename")
                         or _nova_item.get("original_filename")
                         or _nova_item.get("name")
@@ -20602,13 +20574,13 @@ Next action:
                         break
 
             if _nova_image_item:
-                _nova_raw_url = self._safe_str(
+                _nova_raw_url = self.safe_str(
                     _nova_image_item.get("url")
                     or _nova_image_item.get("file_url")
                     or ""
                 ).strip()
 
-                _nova_raw_name = self._safe_str(
+                _nova_raw_name = self.safe_str(
                     _nova_image_item.get("filename")
                     or _nova_image_item.get("original_filename")
                     or _nova_image_item.get("name")
@@ -20684,7 +20656,7 @@ Next action:
                                     "content": [
                                         {
                                             "type": "text",
-                                            "text": self._safe_str(user_text) or "What is this image?",
+                                            "text": self.safe_str(user_text) or "What is this image?",
                                         },
                                         {
                                             "type": "image_url",
@@ -20699,7 +20671,7 @@ Next action:
                             max_tokens=500,
                         )
 
-                        _nova_text = self._safe_str(_nova_response.choices[0].message.content).strip()
+                        _nova_text = self.safe_str(_nova_response.choices[0].message.content).strip()
 
                         if not _nova_text:
                             _nova_text = "VISION_DEBUG: OpenAI vision returned empty text."
@@ -20744,7 +20716,7 @@ Next action:
         result = self._handle_attachment_analysis(user_text, attachments)
 
         assistant_msg = self._build_assistant_message(
-            text=self._safe_str(result.get("text")) or "Attachment analysis completed.",
+            text=self.safe_str(result.get("text")) or "Attachment analysis completed.",
             meta={"attachment_analysis": True},
             attachments=[],
         )
@@ -20847,7 +20819,7 @@ Next action:
             ["create_session", "new_session", "create", "start_session"],
         )
         if isinstance(created, dict):
-            created_id = self._safe_str(created.get("id")) or session_id
+            created_id = self.safe_str(created.get("id")) or session_id
             session = self._call_first(
                 self.sessions,
                 ["get_session", "read_session", "get", "load_session"],
@@ -20915,7 +20887,7 @@ Next action:
                     "current_bug": "",
                     "checkpoint": ("execution_complete"),
                     "last_success": (
-                        self._safe_str(execution.get("goal")) or "execution_complete"
+                        self.safe_str(execution.get("goal")) or "execution_complete"
                     ),
                     "execution_status": ("complete"),
                 },
@@ -20926,23 +20898,23 @@ Next action:
                 "step_output": ("No remaining execution step."),
                 "saved_artifact": {
                     "kind": "execution",
-                    "title": (self._safe_str(execution.get("goal")) or "Execution"),
+                    "title": (self.safe_str(execution.get("goal")) or "Execution"),
                     "body": self._render_execution(execution),
                     "execution": execution,
                     "meta": {
                         "execution": execution,
-                        "execution_id": (self._safe_str(execution.get("id"))),
+                        "execution_id": (self.safe_str(execution.get("id"))),
                         "status": (
-                            self._safe_str(execution.get("status")) or "complete"
+                            self.safe_str(execution.get("status")) or "complete"
                         ),
                         "progress": execution.get(
                             "progress",
                             len(steps),
                         ),
                         "current_step": (
-                            self._safe_str(execution.get("current_step")) or "complete"
+                            self.safe_str(execution.get("current_step")) or "complete"
                         ),
-                        "goal": self._safe_str(execution.get("goal")),
+                        "goal": self.safe_str(execution.get("goal")),
                     },
                 },
             }
@@ -20954,10 +20926,10 @@ Next action:
         current_step = steps[current_index] or {}
 
         step_title = (
-            self._safe_str(current_step.get("title")) or f"Step {current_index + 1}"
+            self.safe_str(current_step.get("title")) or f"Step {current_index + 1}"
         )
 
-        goal = self._safe_str(execution.get("goal"))
+        goal = self.safe_str(execution.get("goal"))
 
         execution.setdefault(
             "step_results",
@@ -20991,13 +20963,13 @@ Next action:
                 if not isinstance(item, dict):
                     continue
 
-                name = self._safe_str(
+                name = self.safe_str(
                     item.get("filename") or item.get("name") or item.get("stored_name")
                 )
 
-                url = self._safe_str(item.get("url"))
+                url = self.safe_str(item.get("url"))
 
-                mime_type = self._safe_str(item.get("mime_type") or item.get("mime"))
+                mime_type = self.safe_str(item.get("mime_type") or item.get("mime"))
 
                 bits = [
                     bit
@@ -21093,7 +21065,7 @@ Next action:
                 current_index=next_index,
                 status="running",
                 current_step=(
-                    self._safe_str(next_step.get("title"))
+                    self.safe_str(next_step.get("title"))
                     or (f"Step " f"{next_index + 1}")
                 ),
                 progress=max(
@@ -21102,7 +21074,7 @@ Next action:
                 ),
             )
 
-            next_step_title = self._safe_str(next_step.get("title")) or (
+            next_step_title = self.safe_str(next_step.get("title")) or (
                 f"Step " f"{next_index + 1}"
             )
 
@@ -21120,14 +21092,14 @@ Next action:
                 "goal": goal,
                 "step_index": current_index,
                 "step_title": step_title,
-                "execution_id": (self._safe_str(execution.get("id"))),
+                "execution_id": (self.safe_str(execution.get("id"))),
                 "tool_bundle": (tool_bundle or {}),
-                "status": self._safe_str(execution.get("status")),
+                "status": self.safe_str(execution.get("status")),
                 "progress": execution.get(
                     "progress",
                     0,
                 ),
-                "current_step": (self._safe_str(execution.get("current_step"))),
+                "current_step": (self.safe_str(execution.get("current_step"))),
             },
         }
 
@@ -21176,7 +21148,7 @@ Next action:
         import os
         import re
 
-        text = self._safe_str(text)
+        text = self.safe_str(text)
 
         traceback_paths = re.findall(
             r'File\s+["\']([^"\']+?\.py)["\']',
@@ -21219,23 +21191,23 @@ Next action:
         return ""
 
     def _guess_search_query_from_text(self, text: str) -> str:
-        text = self._safe_str(text)
+        text = self.safe_str(text)
 
         m = re.search(r"search for\s+(.+)", text, flags=re.IGNORECASE)
         if m:
-            return self._safe_str(m.group(1))
+            return self.safe_str(m.group(1))
 
         m = re.search(r"find\s+(.+)", text, flags=re.IGNORECASE)
         if m:
-            return self._safe_str(m.group(1))
+            return self.safe_str(m.group(1))
 
         return ""
 
     def _decide_tool_for_step(
         self, step_title: str, user_text: str, execution: dict | None = None
     ) -> dict:
-        step_title = self._safe_str(step_title).lower()
-        user_text = self._safe_str(user_text)
+        step_title = self.safe_str(step_title).lower()
+        user_text = self.safe_str(user_text)
         lowered = user_text.lower()
         execution = execution or {}
 
@@ -21243,7 +21215,7 @@ Next action:
 
         path = (
             self._guess_path_from_text(user_text)
-            or self._guess_path_from_text(self._safe_str(execution.get("goal")))
+            or self._guess_path_from_text(self.safe_str(execution.get("goal")))
             or working_state.get("detected_traceback_file_path", "")
         )
 
@@ -21345,7 +21317,7 @@ Next action:
         if not isinstance(tool_decision, dict):
             return {}
 
-        tool_name = self._safe_str(tool_decision.get("tool_name"))
+        tool_name = self.safe_str(tool_decision.get("tool_name"))
         args = tool_decision.get("args") or {}
 
         if not tool_name:
@@ -21365,8 +21337,8 @@ Next action:
                 }
 
             if tool_name == "auto_fix_file":
-                path = self._safe_str(args.get("path")).strip()
-                user_text = self._safe_str(args.get("user_text")).strip()
+                path = self.safe_str(args.get("path")).strip()
+                user_text = self.safe_str(args.get("user_text")).strip()
 
                 return {
                     "ok": True,
@@ -21418,7 +21390,7 @@ Next action:
             seen = set()
 
             for memory in memories:
-                text = self._safe_str(memory.get("text")).strip().lower()
+                text = self.safe_str(memory.get("text")).strip().lower()
 
                 if not text or len(text) < 4:
                     continue
@@ -21703,8 +21675,12 @@ try:
                 execution = {}
 
                 if hasattr(self, "_load_execution_state"):
-                    execution = self._load_execution_state(session_id) or {}
-
+                    execution = (
+                        self.execution_state_service.load(
+                            session_id
+                        )
+                        or {}
+                    )
                 if not execution and hasattr(self, "_get_session_meta"):
                     execution = self._get_session_meta(session_id, "execution_state") or {}
 
