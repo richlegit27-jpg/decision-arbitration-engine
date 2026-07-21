@@ -469,6 +469,11 @@ class ChatService:
         return False
 
     def _get_working_state(self, session_id: str) -> dict:
+        if self.working_state_service:
+            return self.working_state_service.get_working_state(
+                session_id
+            )
+
         session_id = self._safe_str(session_id).strip()
 
         if not session_id:
@@ -576,8 +581,12 @@ class ChatService:
         return text in blocked
 
 
-
     def _update_working_state(self, session_id: str, patch: dict) -> dict:
+        if self.working_state_service:
+            return self.working_state_service.update_working_state(
+                session_id,
+                patch,
+            )
         session_id = self._safe_str(session_id).strip()
 
         if not session_id:
@@ -658,15 +667,15 @@ class ChatService:
                 current[key] = value
 
             if hasattr(self.sessions, "update_working_state"):
-                self.sessions.update_working_state(
+                self.session_service.update_working_state(
                     session_id,
                     current,
                 )
                 return current
 
-            sessions = self.sessions._load_sessions()
+            sessions = self.session_service._load_sessions()
 
-            index = self.sessions._find(
+            index = self.session_service._find(
                 sessions,
                 session_id,
             )
@@ -674,9 +683,9 @@ class ChatService:
             if index is not None:
                 sessions[index]["working_state"] = current
 
-                self.sessions._save_sessions(
+                self.session_service._save_sessions(
                     sessions,
-                    self.sessions.get_active_session_id(),
+                    self.session_service.get_active_session_id(),
                 )
 
             return current
@@ -685,20 +694,6 @@ class ChatService:
             exec_debug("UPDATE WORKING STATE FAILED:", e)
             return {}
 
-    def _normalize_working_state(self, working_state):
-        if isinstance(working_state, dict):
-            return working_state
-        if working_state is None:
-            return {}
-        if isinstance(working_state, str):
-            try:
-                import json
-
-                parsed = json.loads(working_state)
-                return parsed if isinstance(parsed, dict) else {}
-            except Exception:
-                return {}
-        return {}
 
     def _build_working_state_summary(self, working_state):
         ws = self._normalize_working_state(working_state)
@@ -1894,7 +1889,7 @@ Current step:
 
         sessions = self.sessions.load()
 
-        index = self.sessions._find(
+        index = self.session_service._find(
             sessions,
             session_id,
         )
@@ -1979,9 +1974,9 @@ Current step:
             meta[key] = value
             sessions[index]["meta"] = meta
 
-            self.sessions._save_sessions(
+            self.session_service._save_sessions(
                 sessions,
-                self.sessions.get_active_session_id(),
+                self.session_service.get_active_session_id(),
             )
 
             return True
@@ -3932,6 +3927,7 @@ if (not attachments) and (__name__ == "__main__"):
         web_service: WebService,
         recon_service: ReconService,
         memory_context_service=None,
+        working_state_service=None,
     ):
 
         self.chat_response_cleanup_service = ChatResponseCleanupService()
@@ -3950,6 +3946,8 @@ if (not attachments) and (__name__ == "__main__"):
         self.web_service = web_service
         self.recon_service = recon_service
         self.memory_context_service = memory_context_service
+        self.working_state_service = working_state_service
+
 
         self.chat_response_cleanup_service = ChatResponseCleanupService()
         self.runtime_cognitive_firewall = RuntimeCognitiveFirewall()
@@ -5132,16 +5130,16 @@ if (not attachments) and (__name__ == "__main__"):
 
             sessions = self.sessions._load_sessions()
 
-            index = self.sessions._find(
+            index = self.session_service._find(
                 sessions,
                 session_id,
             )
 
             if index >= 0:
                 sessions[index] = session
-                self.sessions._save_sessions(
+                self.session_service._save_sessions(
                     sessions,
-                    self.sessions.get_active_session_id(),
+                    self.session_service.get_active_session_id(),
                 )
 
         except Exception as e:
@@ -13413,9 +13411,9 @@ if (not attachments) and (__name__ == "__main__"):
             )
             sessions[index]["execution_state"] = execution_state
 
-            self.sessions._save_sessions(
+            self.session_service._save_sessions(
                 sessions,
-                self.sessions.get_active_session_id(),
+                self.session_service.get_active_session_id(),
             )
 
         exec_debug(
@@ -14506,41 +14504,6 @@ Auto-fix result:
             return False
 
         return True
-
-    def _clean_working_state_value(
-        self,
-        value,
-        limit=160,
-    ):
-
-        text = self._safe_str(value).strip()
-
-        if not text:
-            return ""
-
-        text = text.replace("\r", " ").replace("\n", " ")
-
-        text = re.sub(
-            r"\s+",
-            " ",
-            text,
-        ).strip()
-
-        bad_starts = (
-            "yes",
-            "agreed",
-            "recommended next step",
-            "current project truth says",
-            "what this means",
-            "in short",
-        )
-
-        lower = text.lower()
-
-        if any(lower.startswith(x) for x in bad_starts):
-            return ""
-
-        return text[:limit]
 
     def _should_inject_working_context(
         self,
@@ -18581,7 +18544,7 @@ Next action:
 
             sessions = self.sessions._load_sessions()
 
-            index = self.sessions._find(
+            index = self.session_service._find(
                 sessions,
                 session_id,
             )
@@ -18616,9 +18579,9 @@ Next action:
 
             sessions[index]["execution_history"] = history[-25:]
 
-            self.sessions._save_sessions(
+            self.session_service._save_sessions(
                 sessions,
-                self.sessions.get_active_session_id(),
+                self.session_service.get_active_session_id(),
             )
 
         except Exception as e:
@@ -18701,7 +18664,7 @@ Next action:
         try:
             sessions = self.sessions._load_sessions()
 
-            index = self.sessions._find(
+            index = self.session_service._find(
                 sessions,
                 session_id,
             )
@@ -18729,9 +18692,9 @@ Next action:
 
                 sessions[index]["meta"]["mission"] = {}
 
-                self.sessions._save_sessions(
+                self.session_service._save_sessions(
                     sessions,
-                    self.sessions.get_active_session_id(),
+                    self.session_service.get_active_session_id(),
                 )
 
         except Exception as e:
@@ -18739,60 +18702,6 @@ Next action:
                 "RESET EXECUTION SESSION CLEAR FAILED:",
                 e,
             )
-
-
-    def _is_valid_state_value(self, value):
-        if not value:
-            return False
-
-        value = str(value).strip()
-        if not value:
-            return False
-
-        if len(value) > 120:
-            return False
-
-        if "\n" in value:
-            return False
-
-        bad_patterns = [
-            "recommended order",
-            "if you want",
-            "you can also",
-            "for example",
-        ]
-
-        lower = value.lower()
-        for p in bad_patterns:
-            if p in lower:
-                return False
-
-        return True
-
-    def _merge_working_state(self, current_state, updates):
-        current_state = current_state if isinstance(current_state, dict) else {}
-        updates = updates if isinstance(updates, dict) else {}
-
-        merged = {
-            "active_task": "",
-            "current_file": "",
-            "current_bug": "",
-            "last_success": "",
-            "next_move": "",
-            "checkpoint": "",
-        }
-
-        for key in merged.keys():
-            old_value = self._clean_working_state_value(current_state.get(key, ""))
-            new_value = self._clean_working_state_value(updates.get(key, ""))
-
-            merged[key] = new_value if new_value else old_value
-
-        from datetime import datetime, timezone
-
-        merged["updated_at"] = datetime.now(timezone.utc).isoformat()
-
-        return merged
 
     def _extract_working_state_updates(
         self, user_text: str, current_state: dict | None = None

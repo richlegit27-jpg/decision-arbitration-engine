@@ -151,6 +151,7 @@ from nova_backend.services.memory_recall_service import (
 )
 from nova_backend.services.web_service import WebService
 from nova_backend.services.recon_service import ReconService
+from nova_backend.services.working_state_service import WorkingStateService
 from nova_backend.services.intent_router_service import IntentRouterService
 from nova_backend.utils.file_utils import ensure_dir
 from nova_backend.services.chat_service import ChatService
@@ -777,14 +778,18 @@ session_detail_response_cache_service = SessionDetailResponseCacheService(
     attachment_text_service,
 )
 
-chat_service = ChatService(
+working_state_service = WorkingStateService(
+    session_service=session_service,
+)
 
+chat_service = ChatService(
     session_service=session_service,
     memory_service=memory_service,
     artifact_service=artifact_service,
     web_service=web_service,
     recon_service=recon_service,
     memory_context_service=memory_context_service,
+    working_state_service=working_state_service,
 )
 
 project_brain_general_intelligence_priority_service = (
