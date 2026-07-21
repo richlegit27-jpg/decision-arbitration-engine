@@ -5,18 +5,14 @@ class ExecutionOrchestratorService:
 
     def __init__(
         self,
-        execution_handler,
         execution_state_service=None,
         working_state_service=None,
         safe_str=None,
-        python_runner=None,
         execution_step_service=None,
     ):
-        self.execution_handler = execution_handler
         self.execution_state_service = execution_state_service
         self.working_state_service = working_state_service
         self._safe_str = safe_str
-        self.python_runner = python_runner
         self.execution_step_service = execution_step_service
 
     def _process_execution_command(
@@ -116,16 +112,6 @@ class ExecutionOrchestratorService:
         if current_index >= len(steps):
             current_index = len(steps)
 
-        print(
-            "EXECUTION DEBUG BEFORE COMPLETE CHECK =",
-            {
-                "command": command,
-                "current_index": current_index,
-                "steps_len": len(steps),
-                "status": execution_state.get("status"),
-                "current_step": execution_state.get("current_step"),
-            },
-        )
 
         # =========================
         # NEXT AFTER COMPLETION
@@ -478,16 +464,6 @@ class ExecutionOrchestratorService:
                     step=step,
                 )
 
-                print(
-                    "AFTER EXECUTE STEP OBJECT =",
-                    step,
-                )
-
-                print(
-                    "AFTER EXECUTE EXECUTION STEPS BEFORE WRITEBACK =",
-                    execution_state.get("steps"),
-                )
-
                 step["status"] = "completed"
 
                 if result:
@@ -497,75 +473,7 @@ class ExecutionOrchestratorService:
 
                 steps = execution_state["steps"]
 
-                print(
-                    "AFTER EXECUTE EXECUTION STEPS AFTER WRITEBACK =",
-                    execution_state.get("steps"),
-                )
-
                 step_title = self._safe_str(step.get("title"))
-
-                step_action = self._safe_str(step.get("action")).lower()
-
-                target_file = self._safe_str(step.get("target_file"))
-
-                python_result = None
-
-                if step_action == "implement" and target_file:
-
-                    Path(target_file).parent.mkdir(
-                        parents=True,
-                        exist_ok=True,
-                    )
-
-                    Path(target_file).write_text(
-                        """
-def add(a, b):
-    return a + b
-
-
-def subtract(a, b):
-    return a - b
-
-
-# NO_IMAGE_GENERATION_WHEN_ATTACHMENT_PRESENT_LOCK: attachment analysis must not be hijacked by image generation.
-if (not attachments) and (__name__ == "__main__"):
-    print("Calculator app created.")
-    print("2 + 3 =", add(2, 3))
-""".strip() + "\n",
-                        encoding="utf-8",
-                    )
-
-                    step["result"] = f"Created file: {target_file}"
-
-                    step["error"] = None
-
-                elif (
-                    step_action
-                    in {
-                        "test",
-                        "run",
-                        "execute",
-                    }
-                    and target_file
-                    and hasattr(self, "python_runner")
-                ):
-
-                    python_result = self.python_runner.run_file(target_file)
-
-                    step["result"] = (
-                        python_result.get("stdout")
-                        or python_result.get("stderr")
-                        or python_result.get("error")
-                        or "python executed"
-                    )
-
-                    step["error"] = None if python_result.get("ok") else step["result"]
-
-                else:
-
-                    step["result"] = "step executed"
-
-                    step["error"] = None
 
                 execution_state = (
                     self.execution_mutation_service.append_history(

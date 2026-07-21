@@ -3915,11 +3915,9 @@ if (not attachments) and (__name__ == "__main__"):
         )
 
         self.execution_orchestrator_service = ExecutionOrchestratorService(
-            execution_handler=self.execution_handler,
             execution_state_service=self.execution_state_service,
             working_state_service=self.working_state_service,
             safe_str=self._safe_str,
-            python_runner=self.python_runner,
             execution_step_service=self.execution_step_service,
         )
 
