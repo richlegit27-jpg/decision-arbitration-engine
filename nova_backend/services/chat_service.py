@@ -3901,6 +3901,9 @@ if (not attachments) and (__name__ == "__main__"):
         self.repair_execution_service = RepairExecutionService(
             execution_handler=self.execution_handler,
         )
+        self.execution_mutation_service = ExecutionMutationService(
+            execution_state_service=self.execution_state_service,
+        )
         self.execution_orchestrator_service = ExecutionOrchestratorService(
             execution_handler=self.execution_handler,
             execution_state_service=self.execution_state_service,
@@ -18094,8 +18097,6 @@ Next action:
                 session_id,
                 last_success,
             )
-
-
 
         except Exception as e:
             exec_debug(
