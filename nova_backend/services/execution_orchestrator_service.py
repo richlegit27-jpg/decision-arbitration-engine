@@ -269,12 +269,11 @@ class ExecutionOrchestratorService:
             execution_state["current_index"] = current_index
 
             if current_index >= len(steps):
-                execution_state["status"] = "complete"
-                execution_state["next_moves"] = []
-                execution_state["waiting"] = False
-                execution_state["complete"] = True
-                execution_state["current_step"] = ""
-                execution_state["current_step_title"] = ""
+                execution_state = (
+                    self.execution_mutation_service.mark_complete(
+                        execution_state,
+                    )
+                )
 
                 self._save_execution_state(
                     session_id,
@@ -391,28 +390,15 @@ class ExecutionOrchestratorService:
                 execution_state["current_step_title"] = next_step.get("title") or ""
 
             if execution_state["current_index"] >= len(steps):
-                execution_state["status"] = "complete"
-
-                execution_state["next_moves"] = []
-
-                execution_state["waiting"] = False
-
-                execution_state["complete"] = True
-
-                execution_state["current_step"] = ""
-
-                execution_state["current_step_title"] = ""
-
+                execution_state = (
+                    self.execution_mutation_service.mark_complete(
+                        execution_state,
+                    )
+                )
             self._save_execution_state(
                 session_id,
                 execution_state,
             )
-
-            self._save_execution_state(
-                session_id,
-                execution_state,
-            )
-
             return {
                 "ok": True,
                 "assistant_message": {
