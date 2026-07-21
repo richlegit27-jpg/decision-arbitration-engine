@@ -18553,48 +18553,6 @@ Next action:
 
             patch["next_move"] = "tighten product messaging and demos"
 
-        # NOVA_PROJECT_NEXT_DECISION_ENGINE_BRIDGE_20260717
-        if normalized_text in {"what's next", "whats next", "what is next", "next move", "what now"}:
-            try:
-                from nova_backend.services.project_brain_context_builder import (
-                    build_project_brain_decision_context_answer,
-                )
-
-                assistant_text = build_project_brain_decision_context_answer(
-                    user_text=normalized_text,
-                    pasted_output="",
-                )
-
-                assistant_message = self._build_assistant_message(
-                    text=assistant_text,
-                    meta={
-                        "route": "project_next_decision_engine_bridge",
-                        "strategy": "decision_engine_next_move",
-                        "session_id": session_id,
-                    },
-                )
-
-                return {
-                    "ok": True,
-                    "assistant_message": assistant_message,
-                    "saved_artifact": None,
-                    "session_id": session_id,
-                    "active_session_id": session_id,
-                    "debug": {
-                        "route": "project_next_decision_engine_bridge",
-                        "route_taken": "project_next_decision_engine_bridge",
-                    },
-                    "meta": {
-                        "route": "project_next_decision_engine_bridge",
-                        "strategy": "decision_engine_next_move",
-                    },
-                }
-
-            except Exception as exc:
-                print(
-                    "[NOVA_PROJECT_NEXT_DECISION_ENGINE_BRIDGE_20260717] failed:",
-                    exc,
-                )
         continuity_commands = {
             "where are we",
             "resume",
