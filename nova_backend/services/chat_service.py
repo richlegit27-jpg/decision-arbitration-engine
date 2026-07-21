@@ -23620,8 +23620,6 @@ try:
             )
         )
 
-        return _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701(self, *args, **kwargs)
-
     ChatService.handle = _nova_project_brain_question_top_priority_handle_20260701
     ChatService._NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701 = True
     print("[NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701] installed")
