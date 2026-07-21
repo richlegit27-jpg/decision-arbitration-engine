@@ -653,13 +653,10 @@ if (not attachments) and (__name__ == "__main__"):
                 execution_state,
             )
 
-            selected_execution_state["command"] = (
-                next_action or "run_step"
-            )
-
-            return self.execution_orchestrator_service.process_execution(
+            return self._process_execution_command(
+                command="run_step",
                 session_id=session_id,
-                state=selected_execution_state,
+                execution_state=execution_state,
             )
 
         # =========================
@@ -1092,7 +1089,7 @@ if (not attachments) and (__name__ == "__main__"):
 
 
 
-    def _execute_step_logic(self, session_id, step):
+    def execute_step_logic(self, session_id, step):
         try:
             step["status"] = "running"
 

@@ -2736,7 +2736,7 @@ Current step:
             execution_state["current_step"] = step.get("title") or ""
             execution_state["current_step_title"] = step.get("title") or ""
 
-            result = self.execute_step_logic(
+            result = self._execute_step_logic(
                 session_id=session_id,
                 step=step,
             )
@@ -2873,7 +2873,7 @@ Current step:
                     execution_state,
                 )
 
-                result = self.execute_step_logic(
+                result = self._execute_step_logic(
                     session_id=session_id,
                     step=step,
                 )
