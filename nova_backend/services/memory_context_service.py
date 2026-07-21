@@ -154,6 +154,38 @@ class MemoryContextService:
 
         return False
 
+    def format_memory_context(
+        self,
+        memory_items: list[dict],
+        user_text: str = "",
+        memory_limit: int = 12,
+    ) -> str:
+        if not isinstance(memory_items, list) or not memory_items:
+            return ""
+
+        lines = []
+
+        for item in memory_items[:memory_limit]:
+            if not isinstance(item, dict):
+                continue
+
+            text = self.compact_text(
+                item.get("text"),
+                limit=500,
+            )
+
+            kind = self.memory_kind(item)
+
+            if not text:
+                continue
+
+            if kind:
+                lines.append(f"- [{kind}] {text}")
+            else:
+                lines.append(f"- {text}")
+
+        return "\n".join(lines).strip()
+
     def memory_kind_weight(self, kind: str) -> float:
         weights = {
             "profile": 5.0,

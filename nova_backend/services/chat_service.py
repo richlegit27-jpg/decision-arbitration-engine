@@ -8181,7 +8181,7 @@ if (not attachments) and (__name__ == "__main__"):
 
         try:
             memory_text = str(
-                self._format_memory_context(
+                self.memory_context_service.format_memory_context(
                     getattr(self, "_last_used_memory_items", [])
                 )
             ).lower()
@@ -8463,7 +8463,7 @@ if (not attachments) and (__name__ == "__main__"):
         # === SMFF HARD OVERRIDE FOR CODE HELP ===
         try:
             memory_text = str(
-                self._format_memory_context(
+                self.memory_context_service.format_memory_context(
                     getattr(self, "_last_used_memory_items", [])
                 )
             ).lower()
@@ -20109,41 +20109,6 @@ Next action:
         return [item["memory"] for item in top]
 
 
-    def _format_memory_context(
-        self,
-        memory_items: list[dict],
-        user_text: str = "",
-    ) -> str:
-
-        if hasattr(self, "runtime_cognitive_firewall"):
-            memory_items = self.runtime_cognitive_firewall.filter_for_runtime(
-                memory_items,
-                user_text=user_text,
-            )
-
-        if not isinstance(memory_items, list) or not memory_items:
-            return ""
-
-        lines = []
-
-        for item in memory_items[: self.memory_limit]:
-
-            if not isinstance(item, dict):
-                continue
-
-            text = self._safe_str(item.get("text"))
-            kind = self._safe_str(item.get("kind"))
-
-            if not text:
-                continue
-
-            if kind:
-                lines.append(f"- [{kind}] {text}")
-            else:
-                lines.append(f"- {text}")
-
-        return "\n".join(lines).strip()
-
     def _memory_text_tokens(
         self,
         value: str,
@@ -21293,7 +21258,7 @@ Next action:
 
             add_memory_item(item)
 
-        memory_block = self._format_memory_context(
+        memory_block = self.memory_context_service.format_memory_context(
             selected_memory,
             user_text=user_text,
         )
