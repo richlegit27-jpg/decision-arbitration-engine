@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64
 import os
@@ -30,6 +30,7 @@ from openai import OpenAI
 from nova_backend.services.model_gateway_service import chat_completions_create
 from nova_backend.services.repair_execution_service import RepairExecutionService
 from nova_backend.services.execution_orchestrator_service import ExecutionOrchestratorService
+from nova_backend.services.execution_step_service import ExecutionStepService
 from nova_backend.models.session import new_message
 from nova_backend.services.agent_service import AgentService
 from nova_backend.services.artifact_service import ArtifactService
@@ -3908,12 +3909,18 @@ if (not attachments) and (__name__ == "__main__"):
         self.execution_mutation_service = ExecutionMutationService(
             execution_state_service=self.execution_state_service,
         )
+        self.execution_step_service = ExecutionStepService(
+            safe_str=self._safe_str,
+            python_runner=self.python_runner,
+        )
+
         self.execution_orchestrator_service = ExecutionOrchestratorService(
             execution_handler=self.execution_handler,
             execution_state_service=self.execution_state_service,
             working_state_service=self.working_state_service,
             safe_str=self._safe_str,
             python_runner=self.python_runner,
+            execution_step_service=self.execution_step_service,
         )
 
         self.runtime = RuntimeBootstrap.build(chat_service=self)
