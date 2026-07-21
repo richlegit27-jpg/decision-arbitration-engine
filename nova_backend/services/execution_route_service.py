@@ -31,7 +31,17 @@ class ExecutionRouteService:
                 "error": "missing action",
             }), 400
 
-        working = self.chat_service._get_working_state(session_id) or {}
+        working = {}
+
+        working = {}
+
+        if self.working_state_service:
+            working = (
+                self.working_state_service.get_working_state(
+                    session_id
+                )
+                or {}
+            )
 
         execution = working.get("execution")
 
