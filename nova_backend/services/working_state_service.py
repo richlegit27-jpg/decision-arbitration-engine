@@ -60,20 +60,10 @@ class WorkingStateService:
             state
         )
 
-        sessions = self.session_service._load_sessions()
-
-        index = self.session_service._find(
-            sessions,
+        self.session_service.update_working_state(
             session_id,
+            clean_state,
         )
-
-        if index is not None:
-            sessions[index]["working_state"] = clean_state
-
-            self.session_service._save_sessions(
-                sessions,
-                self.session_service.get_active_session_id(),
-            )
 
         return clean_state
 
