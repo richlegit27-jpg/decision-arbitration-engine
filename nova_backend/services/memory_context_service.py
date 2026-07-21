@@ -1,5 +1,6 @@
 import re
 
+from datetime import datetime, timezone
 
 
 class MemoryContextService:
@@ -92,6 +93,135 @@ class MemoryContextService:
         )
 
         return text_value[:500]
+
+    def memory_text_tokens(self, value):
+        text_value = str(value or "").lower()
+
+        return {
+            token.strip(".,!?;:()[]{}\"'")
+            for token in text_value.split()
+            if len(
+                token.strip(".,!?;:()[]{}\"'")
+            ) >= 3
+        }
+
+
+    def memory_kind_weight(self, kind: str) -> float:
+        weights = {
+            "profile": 5.0,
+            "preference": 4.0,
+            "user_fact": 4.0,
+            "project_focus": 3.5,
+            "note": 2.0,
+            "memory": 1.0,
+        }
+
+        return weights.get(
+            str(kind or "").strip().lower(),
+            1.0,
+        )
+
+
+    def memory_time_bonus(self, item: dict) -> float:
+        if not isinstance(item, dict):
+            return 0.0
+
+        timestamp = (
+            item.get("created_at")
+            or item.get("updated_at")
+            or item.get("timestamp")
+            or ""
+        )
+
+        if not timestamp:
+            return 0.0
+
+        try:
+            parsed = datetime.fromisoformat(
+                str(timestamp).replace(
+                    "Z",
+                    "+00:00",
+                )
+            )
+
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(
+                    tzinfo=timezone.utc
+                )
+
+            age_days = (
+                datetime.now(timezone.utc)
+                - parsed
+            ).days
+
+            if age_days <= 1:
+                return 5.0
+
+            if age_days <= 7:
+                return 2.0
+
+        except Exception:
+            pass
+
+        return 0.0
+
+
+    def memory_session_bonus(
+        self,
+        item: dict,
+        session_id: str = "",
+    ) -> float:
+        if not isinstance(item, dict):
+            return 0.0
+
+        item_session = str(
+            item.get("session_id")
+            or ""
+        ).strip()
+
+        if item_session and item_session == str(session_id or "").strip():
+            return 5.0
+
+        return 0.0
+
+
+    def score_memory_item(
+        self,
+        item,
+        query,
+        session_id="",
+    ):
+        memory_text = self.memory_text(item)
+
+        if not memory_text:
+            return 0.0
+
+        query_tokens = self.memory_text_tokens(query)
+        memory_tokens = self.memory_text_tokens(memory_text)
+
+        overlap = len(
+            query_tokens.intersection(
+                memory_tokens
+            )
+        )
+
+        kind_score = self.memory_kind_weight(
+            self.memory_kind(item)
+        )
+
+        return (
+            overlap * 10
+            + kind_score
+            + self.memory_time_bonus(item)
+            + self.memory_session_bonus(
+                item,
+                session_id=session_id,
+            )
+            - self.score_penalty(
+                memory_text,
+                self.memory_kind(item),
+            )
+        )
 
     def is_junk_memory(
         self,
@@ -228,27 +358,7 @@ class MemoryContextService:
 
         return []
 
-    def score_memory_item(
-        self,
-        item,
-        query_words,
-    ):
-        text_value = self.memory_text(item)
 
-        lowered = text_value.lower()
-
-        overlap = sum(
-            1
-            for word in query_words
-            if word
-            and word in lowered
-        )
-
-        priority = self.memory_priority(item)
-
-        return (
-            overlap * 10
-        ) + priority
 
     def message_text(self, message):
         if isinstance(message, str):
@@ -320,7 +430,7 @@ class MemoryContextService:
 
             score = self.score_memory_item(
                 item,
-                query_words,
+                user_text
             )
 
             score -= self.score_penalty(
