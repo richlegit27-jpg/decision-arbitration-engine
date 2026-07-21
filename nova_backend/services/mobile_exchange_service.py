@@ -32,59 +32,16 @@ class MobileExchangeService:
         now = _now_iso()
 
         try:
-            store = self.session_service._read_store()
-
-            sessions = (
-                store.get("sessions")
-                if isinstance(store, dict)
-                else []
+            session = self.session_service.get_session(
+                target_session_id
             )
 
-            if not isinstance(sessions, list):
-                sessions = []
+            if not isinstance(session, dict):
+                session = self.session_service.create_session(
+                    title=user_text or "Mobile Chat",
+                )
 
-            found = None
-
-            for item in sessions:
-                if (
-                    isinstance(item, dict)
-                    and str(item.get("id") or "").strip()
-                    == target_session_id
-                ):
-                    found = item
-                    break
-
-            if found is None:
-                found = {
-                    "id": target_session_id,
-                    "title": (
-                        str(user_text or "Mobile Chat")
-                        .strip()[:80]
-                        or "Mobile Chat"
-                    ),
-                    "messages": [],
-                    "pinned": False,
-                    "created_at": now,
-                    "updated_at": now,
-                    "working_state": {
-                        "active_task": "",
-                        "current_file": "",
-                        "current_bug": "",
-                        "last_success": "",
-                        "next_move": "",
-                        "checkpoint": "",
-                        "updated_at": "",
-                    },
-                    "active_execution": None,
-                }
-
-                sessions.insert(0, found)
-
-            messages = found.get("messages")
-
-            if not isinstance(messages, list):
-                messages = []
-                found["messages"] = messages
+                target_session_id = session.get("id")
 
             visible_text = (
                 clean_text(user_text)
@@ -92,7 +49,8 @@ class MobileExchangeService:
                 else str(user_text or "")
             )
 
-            messages.append(
+            self.session_service.append_message(
+                target_session_id,
                 {
                     "role": "user",
                     "text": visible_text,
@@ -101,10 +59,11 @@ class MobileExchangeService:
                     "meta": {
                         "route": route,
                     },
-                }
+                },
             )
 
-            messages.append(
+            self.session_service.append_message(
+                target_session_id,
                 {
                     "role": "assistant",
                     "text": str(assistant_text or "").strip(),
@@ -113,14 +72,12 @@ class MobileExchangeService:
                     "meta": {
                         "route": route,
                     },
-                }
+                },
             )
 
-            found["updated_at"] = now
-            store["sessions"] = sessions
-            store["active_session_id"] = target_session_id
-
-            self.session_service._write_store(store)
+            self.session_service.set_active(
+                target_session_id
+            )
 
             return True
 
