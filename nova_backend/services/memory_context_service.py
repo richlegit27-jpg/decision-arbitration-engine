@@ -264,6 +264,130 @@ class MemoryContextService:
 
         return 0.0
 
+    def rank_memory_items(
+        self,
+        memories,
+        user_text="",
+        limit=12,
+        priority_terms=None,
+        is_execution_chat=False,
+        casual_query=False,
+        operational_query=False,
+        has_real_state=False,
+    ):
+        memories = memories or []
+        priority_terms = priority_terms or []
+
+        text_lc = str(user_text or "").lower().strip()
+
+        ranked = []
+
+        for index, memory in enumerate(memories):
+
+            content = self.memory_text(memory)
+
+            if not content:
+                continue
+
+            category = str(
+                memory.get("category")
+                or memory.get("type")
+                or memory.get("kind")
+                or ""
+            ).lower() if isinstance(memory, dict) else ""
+
+            kind = str(
+                memory.get("kind")
+                or memory.get("type")
+                or memory.get("category")
+                or ""
+            ).lower() if isinstance(memory, dict) else ""
+
+            content_lc = content.lower()
+
+            blocked_runtime_memory_patterns = [
+                "big butts",
+                "cannot lie",
+                "joke memory",
+                "meme memory",
+                "temporary joke",
+            ]
+
+            if any(
+                pattern in content_lc
+                for pattern in blocked_runtime_memory_patterns
+            ):
+                continue
+
+            raw_weight = 1
+
+            if isinstance(memory, dict):
+                raw_weight = memory.get(
+                    "weight",
+                    1,
+                )
+
+            try:
+                score = float(raw_weight)
+            except Exception:
+                score = 1.0
+
+            for word in text_lc.split():
+                if len(word) >= 4 and word in content_lc:
+                    score += 2.0
+
+            if (
+                "profile" in category
+                or "identity" in category
+                or "preference" in category
+            ):
+                score += 10.0
+
+            if (
+                "name is" in content_lc
+                or "user's name" in content_lc
+                or "user is" in content_lc
+            ):
+                score += 18.0
+
+            if (
+                "prefers" in content_lc
+                or "from now on" in content_lc
+                or "always" in content_lc
+            ):
+                score += 12.0
+
+            if updated_at := (
+                memory.get("updated_at")
+                if isinstance(memory, dict)
+                else None
+            ):
+                score += 1.0
+
+            for term in priority_terms:
+                if term and term in content_lc:
+                    score += 20.0
+
+            ranked.append(
+                {
+                    "score": score,
+                    "index": index,
+                    "content": content,
+                    "memory": memory,
+                }
+            )
+
+        ranked.sort(
+            key=lambda item: (
+                item["score"],
+                -item["index"],
+            ),
+            reverse=True,
+        )
+
+        top = ranked[: max(1, int(limit or 12))]
+
+        return top
 
     def score_memory_item(
         self,
