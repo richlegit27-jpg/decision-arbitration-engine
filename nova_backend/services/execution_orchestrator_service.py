@@ -147,13 +147,14 @@ class ExecutionOrchestratorService:
                 or 0
             )
 
-            execution_state["current_index"] = current_index
-
-            execution_state["status"] = "running"
-
-            execution_state["waiting"] = False
-
-            execution_state["complete"] = False
+            execution_state = (
+                self.execution_mutation_service.mark_running(
+                    execution_state,
+                    step_index=current_index,
+                    current_step=execution_state.get("current_step") or "",
+                    waiting=False,
+                )
+            )
 
             self._save_execution_state(
                 session_id,
@@ -327,9 +328,14 @@ class ExecutionOrchestratorService:
 
             step["status"] = "running"
 
-            execution_state["status"] = "running"
-            execution_state["current_step"] = step.get("title") or ""
-            execution_state["current_step_title"] = step.get("title") or ""
+            execution_state = (
+                self.execution_mutation_service.mark_running(
+                    execution_state,
+                    step_index=current_index,
+                    current_step=step.get("title") or "",
+                    waiting=False,
+                )
+            )
 
             result = self.execute_step_logic(
                 session_id=session_id,
@@ -389,16 +395,21 @@ class ExecutionOrchestratorService:
 
                 execution_state["current_step_title"] = next_step.get("title") or ""
 
-            if execution_state["current_index"] >= len(steps):
-                execution_state = (
-                    self.execution_mutation_service.mark_complete(
-                        execution_state,
-                    )
-                )
             self._save_execution_state(
                 session_id,
                 execution_state,
             )
+
+            self._save_execution_state(
+                session_id,
+                execution_state,
+            )
+
+            self._save_execution_state(
+                session_id,
+                execution_state,
+            )
+
             return {
                 "ok": True,
                 "assistant_message": {
@@ -433,13 +444,11 @@ class ExecutionOrchestratorService:
                 current_index = int(execution_state.get("current_index", 0) or 0)
 
                 if current_index >= len(steps):
-                    execution_state["status"] = "complete"
-                    execution_state["next_moves"] = []
-                    execution_state["waiting"] = False
-                    execution_state["complete"] = True
-                    execution_state["current_step"] = ""
-                    execution_state["current_step_title"] = ""
-                    execution_state["_execution_processing"] = False
+                    execution_state = (
+                        self.execution_mutation_service.mark_complete(
+                            execution_state,
+                        )
+                    )
                     break
 
                 step = steps[current_index]
@@ -448,9 +457,14 @@ class ExecutionOrchestratorService:
 
                 execution_state["steps"][current_index] = dict(step)
 
-                execution_state["status"] = "running"
-                execution_state["current_step"] = step.get("title") or ""
-                execution_state["current_step_title"] = step.get("title") or ""
+                execution_state = (
+                    self.execution_mutation_service.mark_running(
+                        execution_state,
+                        step_index=current_index,
+                        current_step=step.get("title") or "",
+                        waiting=False,
+                    )
+                )
                 execution_state["_execution_processing"] = False
 
                 self._save_active_execution(
@@ -565,12 +579,11 @@ if (not attachments) and (__name__ == "__main__"):
                 outputs.append(f"Completed step: {step_title}")
 
                 if execution_state["current_index"] >= len(steps):
-                    execution_state["status"] = "complete"
-                    execution_state["next_moves"] = []
-                    execution_state["waiting"] = False
-                    execution_state["complete"] = True
-                    execution_state["current_step"] = ""
-                    execution_state["current_step_title"] = ""
+                    execution_state = (
+                        self.execution_mutation_service.mark_complete(
+                            execution_state,
+                        )
+                    )
                     break
 
             self._save_active_execution(
@@ -645,13 +658,11 @@ if (not attachments) and (__name__ == "__main__"):
         # =========================
         if command == "cancel":
 
-            execution_state["status"] = "cancelled"
-            execution_state["waiting"] = False
-            execution_state["lock"] = False
-            execution_state["next_moves"] = []
-            execution_state["current_step"] = ""
-            execution_state["current_step_title"] = ""
-
+            execution_state = (
+                self.execution_mutation_service.cancel(
+                    execution_state,
+                )
+            )
             self._save_execution_state(
                 session_id,
                 execution_state,
@@ -671,42 +682,6 @@ if (not attachments) and (__name__ == "__main__"):
                 "execution": execution_state,
             }
 
-        # =========================
-        # EXECUTION COMPLETE FALLBACK
-        # =========================
-        if False and steps and current_index >= len(steps):
-
-            execution_state["status"] = "complete"
-            execution_state["next_moves"] = []
-            execution_state["current_index"] = len(steps)
-            execution_state["lock"] = False
-            execution_state["waiting"] = False
-            execution_state["complete"] = True
-            execution_state["current_step"] = ""
-            execution_state["current_step_title"] = ""
-
-            self._save_execution_state(
-                session_id,
-                execution_state,
-            )
-
-            self._save_execution_state(
-                session_id,
-                {},
-            )
-
-            return {
-                "ok": True,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": (
-                        "Execution complete. "
-                        "Type 'next' to restart "
-                        "or 'auto-plan <task>'."
-                    ),
-                },
-                "execution": execution_state,
-            }
 
         return {
             "ok": False,
