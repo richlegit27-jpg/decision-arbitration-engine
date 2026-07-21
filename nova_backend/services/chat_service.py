@@ -3031,19 +3031,14 @@ if (not attachments) and (__name__ == "__main__"):
         # CANCEL
         # =========================
         if command == "cancel":
-
-            execution_state["status"] = "cancelled"
-            execution_state["waiting"] = False
-            execution_state["lock"] = False
-            execution_state["next_moves"] = []
-            execution_state["current_step"] = ""
-            execution_state["current_step_title"] = ""
+            execution_state = self.execution_mutation_service.cancel(
+                execution_state
+            )
 
             self._save_execution_state(
                 session_id,
                 execution_state,
             )
-
             self._save_execution_state(
                 session_id,
                 {},
