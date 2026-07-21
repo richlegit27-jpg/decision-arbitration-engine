@@ -7,7 +7,6 @@ from .web_service import WebService
 from .recon_service import ReconService
 from .agent_service import AgentService
 from .autonomy_service import AutonomyService
-from .chat_service import ChatService
 from .debug_service import DebugService
 
 __all__ = [
@@ -18,7 +17,6 @@ __all__ = [
     "ReconService",
     "AgentService",
     "AutonomyService",
-    "ChatService",
     "DebugService",
 ]
 

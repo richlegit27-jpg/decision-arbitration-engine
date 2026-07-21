@@ -10,7 +10,14 @@ class RepairPlanPriorityGuardService:
 
         from nova_backend.services.chat_service import ChatService
 
-        previous_handle = ChatService.handle
+        previous_handle = getattr(
+            ChatService,
+            "handle",
+            None,
+        )
+
+        if previous_handle is None:
+            return app
 
         def repair_plan_handle(self, *args, **kwargs):
             user_text = ""

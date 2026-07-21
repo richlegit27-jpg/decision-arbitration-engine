@@ -155,6 +155,13 @@ from nova_backend.services.working_state_service import WorkingStateService
 from nova_backend.services.intent_router_service import IntentRouterService
 from nova_backend.utils.file_utils import ensure_dir
 from nova_backend.services.chat_service import ChatService
+print(
+    "DEBUG CHAT SERVICE IMPORT",
+    ChatService,
+    getattr(ChatService, "__init__", None),
+    getattr(ChatService, "handle", None),
+    getattr(ChatService, "_decide_route", None),
+)
 from nova_backend.services.execution_handler import NextMove, default_executor
 from nova_backend.services.execution_daemon import ExecutionDaemon
 from nova_backend.services.chat_execution_service import ChatExecutionService
@@ -792,6 +799,12 @@ chat_service = ChatService(
     working_state_service=working_state_service,
     execution_state_service=execution_state_service,
 )
+
+from nova_backend.services.chat_service import (
+    install_chat_service_runtime_patches,
+)
+
+install_chat_service_runtime_patches()
 
 project_brain_general_intelligence_priority_service = (
     ProjectBrainGeneralIntelligencePriorityService(
