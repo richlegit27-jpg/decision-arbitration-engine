@@ -105,6 +105,54 @@ class MemoryContextService:
             ) >= 3
         }
 
+    def memory_is_relevant_enough(
+        self,
+        item: dict,
+        score: float,
+        user_text: str,
+    ) -> bool:
+        text = self.memory_text(item)
+
+        if not text:
+            return False
+
+        query = str(user_text or "").lower()
+
+        if any(
+            x in query
+            for x in [
+                "remember",
+                "memory",
+                "about me",
+                "my project",
+            ]
+        ):
+            return True
+
+        query_tokens = self.memory_text_tokens(user_text)
+        memory_tokens = self.memory_text_tokens(text)
+
+        overlap = query_tokens.intersection(
+            memory_tokens
+        )
+
+        if score >= 1.5:
+            return True
+
+        if len(overlap) >= 1:
+            return True
+
+        kind = self.memory_kind(item).lower()
+
+        if kind in {
+            "project",
+            "preference",
+            "profile",
+            "goal",
+        }:
+            return True
+
+        return False
 
     def memory_kind_weight(self, kind: str) -> float:
         weights = {
@@ -562,3 +610,4 @@ class MemoryContextService:
             used += len(line)
 
         return lines
+
