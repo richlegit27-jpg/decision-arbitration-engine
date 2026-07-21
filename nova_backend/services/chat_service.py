@@ -16416,121 +16416,31 @@ Auto-fix result:
             and new_steps == old_steps
         )
 
-    def _get_persisted_execution_artifact(self, session_id: str):
-        session_id = self.safe_str(session_id)
-
-        if not session_id:
-            return None
-
-        try:
-            sessions = self.session_service.list_sessions()
-
-        except Exception as e:
-            exec_debug(
-                "GET PERSISTED EXECUTION LOAD SESSIONS FAILED:",
-                e,
-            )
-            return None
-
-        if isinstance(sessions, dict):
-
-            if isinstance(sessions.get("sessions"), list):
-                sessions = sessions.get("sessions") or []
-
-            elif isinstance(sessions.get("items"), list):
-                sessions = sessions.get("items") or []
-
-            else:
-                sessions = []
-
-        if not isinstance(sessions, list):
-            return None
-
-        for session in sessions:
-
-            if not isinstance(session, dict):
-                continue
-
-            if self.safe_str(session.get("id")) != session_id:
-                continue
-
-            persisted = session.get("execution_state")
-
-            if isinstance(persisted, dict) and persisted:
-                return persisted
-
-            persisted = session.get("execution_state") or {}
-
-            if isinstance(persisted, dict) and persisted:
-                return persisted
-
-            persisted = session.get("working_execution")
-
-            if isinstance(persisted, dict) and persisted:
-                return persisted
-
-            return None
-
-        return None
-
     def _persist_execution_artifact(
-        self, session_id: str, execution: dict | None
+        self,
+        session_id: str,
+        execution: dict | None,
     ) -> None:
-        session_id = self.safe_str(session_id)
+        session_id = self.safe_str(session_id).strip()
+
         if not session_id:
             return
 
         if not isinstance(execution, dict):
             execution = {}
 
-        if not isinstance(execution, dict):
-            execution = {}
-
-        execution = self._normalize_execution_state(dict(execution))
+        execution = self._normalize_execution_state(
+            dict(execution)
+        )
 
         execution["session_id"] = session_id
         execution["active"] = True
 
-        try:
-            sessions = self.session_service.list_sessions()
-        except Exception as e:
-            exec_debug("PERSIST EXECUTION LOAD SESSIONS FAILED:", e)
-            return
-
-        if isinstance(sessions, dict):
-            items = sessions.get("sessions")
-            if not isinstance(items, list):
-                return
-            sessions["sessions"] = items
-            wrapped = True
-        elif isinstance(sessions, list):
-            items = sessions
-            wrapped = False
-        else:
-            return
-
-        updated = False
-
-        for session in items:
-            if not isinstance(session, dict):
-                continue
-            if self.safe_str(session.get("id")) != session_id:
-                continue
-
-            session["active_execution"] = dict(execution)
-            updated = True
-            break
-
-        if not updated:
-            return
-
-        try:
-            if wrapped:
-                self.session_service.save_sessions(sessions)
-            else:
-                self.session_service.save_sessions(items)
-        except Exception as e:
-            exec_debug("PERSIST EXECUTION SAVE SESSIONS FAILED:", e)
+        if self.execution_state_service:
+            self.execution_state_service.persist_execution(
+                session_id,
+                execution,
+            )
 
     def _find_latest_execution_artifact(self, session_id: str = ""):
         session_id = self.safe_str(session_id)
