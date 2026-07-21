@@ -4535,16 +4535,14 @@ if (not attachments) and (__name__ == "__main__"):
 
         execution_state["steps"] = steps
 
+
         # =========================
         # HISTORY TRACKING
         # =========================
-        history = execution_state.get("history")
-
-        if not isinstance(history, list):
-            history = []
-
-        history.append(step)
-        execution_state["history"] = history
+        execution_state = self.execution_mutation_service.append_history(
+            execution_state,
+            step,
+        )
 
         # =========================
         # ADVANCE POINTERS
