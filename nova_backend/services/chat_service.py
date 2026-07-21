@@ -2728,10 +2728,12 @@ Current step:
                 "",
             )
 
-            execution_state["history"] = execution_state.get("history") or []
-
-            execution_state["history"].append(f"completed: {step.get('title')}")
-
+            execution_state = (
+                self.execution_mutation_service.append_history(
+                    execution_state,
+                    f"completed: {step.get('title')}",
+                )
+            )
             execution_state["current_index"] = current_index + 1
 
             execution_state["current_step_index"] = current_index + 1

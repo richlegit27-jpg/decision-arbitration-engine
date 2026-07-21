@@ -368,9 +368,12 @@ class ExecutionOrchestratorService:
                 "",
             )
 
-            execution_state["history"] = execution_state.get("history") or []
-
-            execution_state["history"].append(f"completed: {step.get('title')}")
+            execution_state = (
+                self.execution_mutation_service.append_history(
+                    execution_state,
+                    f"completed: {step.get('title')}",
+                )
+            )
 
             execution_state["current_index"] = current_index + 1
 
@@ -515,8 +518,6 @@ class ExecutionOrchestratorService:
                     execution_state.get("steps"),
                 )
 
-                execution_state["history"] = execution_state.get("history") or []
-
                 step_title = self._safe_str(step.get("title"))
 
                 step_action = self._safe_str(step.get("action")).lower()
@@ -582,8 +583,12 @@ if (not attachments) and (__name__ == "__main__"):
 
                     step["error"] = None
 
-                execution_state["history"].append(f"completed: {step_title}")
-
+                execution_state = (
+                    self.execution_mutation_service.append_history(
+                        execution_state,
+                        f"completed: {step_title}",
+                    )
+                )
                 execution_state["current_index"] = current_index + 1
 
                 execution_state["progress"] = current_index + 1
@@ -928,9 +933,12 @@ if (not attachments) and (__name__ == "__main__"):
 
                 next_index = current_index + 1
 
-            execution_state["history"] = execution_state.get("history") or []
-
-            execution_state["history"].append(f"completed: {step.get('title')}")
+            execution_state = (
+                self.execution_mutation_service.append_history(
+                    execution_state,
+                    f"completed: {step.get('title')}",
+                )
+            )
 
             current_index += 1
 
