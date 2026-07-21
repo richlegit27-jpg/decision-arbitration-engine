@@ -20221,40 +20221,6 @@ Next action:
 
         return {token for token in tokens if token not in stop_words}
 
-
-
-
-
-
-
-    def _memory_is_relevant_enough(
-        self, item: dict, score: float, user_text: str
-    ) -> bool:
-        text = self._safe_str(item.get("text"))
-        if not text:
-            return False
-
-        query = self._safe_str(user_text).lower()
-
-        if any(x in query for x in ["remember", "memory", "about me", "my project"]):
-            return True
-
-        query_tokens = self._memory_text_tokens(user_text)
-        memory_tokens = self._memory_text_tokens(text)
-        overlap = query_tokens.intersection(memory_tokens)
-
-        if score >= 1.5:
-            return True
-
-        if len(overlap) >= 1:
-            return True
-
-        kind = self._safe_str(item.get("kind")).lower()
-        if kind in {"project", "preference", "profile", "goal"}:
-            return True
-
-        return False
-
     # ==============================
     # IMAGE HELPERS
     # ==============================
