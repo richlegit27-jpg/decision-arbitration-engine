@@ -32,19 +32,10 @@ class SessionBootstrapService:
             )
 
             if existing:
-                try:
-                    store = self.session_service._read_store()
-
-                    if not isinstance(store, dict):
-                        store = {
-                            "active_session_id": "",
-                            "sessions": [],
-                        }
-
-                    store["active_session_id"] = target_session_id
-
-                    self.session_service._write_store(store)
-
+                try:lk
+                    self.session_service.set_active(
+                        target_session_id
+                    )
                 except Exception:
                     if self.logger:
                         self.logger.exception(
@@ -122,9 +113,10 @@ class SessionBootstrapService:
             store["sessions"] = sessions
             store["active_session_id"] = target_session_id
 
-            self.session_service._write_store(store)
-
-            return new_session
+            self.session_service.save(
+                sessions,
+                active=target_session_id,
+            )
 
         except Exception:
             if self.logger:
