@@ -725,14 +725,6 @@ class ChatService:
 
         return "Working context:\n" + "\n".join(lines)
 
-    def _decide_route(
-        self,
-        user_text="",
-        attachments=None,
-        memory_context="",
-        working_context_block="",
-        session_id="",
-    ):
         # WEB_SOURCE_CARD_ROUTE_LOCK
         text = str(user_text or "").strip()
         lower = text.lower()
@@ -895,80 +887,6 @@ class ChatService:
             save_memory=True,
             use_memory=True,
         )
-
-    def _build_memory_context_for_chat(
-        self, user_text="", decision=None, session_id=""
-    ):
-        decision = decision if isinstance(decision, dict) else {}
-
-        if decision.get("use_memory") is False:
-            return ""
-
-        memory_limit = int(decision.get("memory_limit") or self.memory_limit or 6)
-        memory_limit = max(1, min(memory_limit, 12))
-
-        lines = []
-
-        try:
-            ranked_items = self._rank_memory_context(
-                user_text=user_text,
-                limit=memory_limit,
-                session_id=session_id,
-            )
-
-            if isinstance(ranked_items, list) and ranked_items:
-                lines.append("[RANKED MEMORY + WORKING STATE]")
-                for item in ranked_items:
-                    if not isinstance(item, dict):
-                        continue
-
-                    kind = self._safe_str(item.get("kind") or "memory").strip()
-                    source = self._safe_str(item.get("source") or "").strip()
-                    text = self._safe_str(
-                        item.get("text") or item.get("content") or ""
-                    ).strip()
-
-                    if not text:
-                        continue
-
-                    label = kind
-                    if source:
-                        label = f"{kind} / {source}"
-
-                    lines.append(f"- {label}: {text[:1000]}")
-
-        except Exception as e:
-            exec_debug("BUILD_RANKED_MEMORY_CONTEXT_FAILED:", e)
-
-        try:
-            session = self._get_session_payload(session_id) if session_id else {}
-            messages = session.get("messages", []) if isinstance(session, dict) else []
-
-            if isinstance(messages, list) and messages:
-                recent = messages[-8:]
-                lines.append("\n[RECENT SESSION CONTEXT]")
-                for msg in recent:
-                    if not isinstance(msg, dict):
-                        continue
-
-                    role = self._safe_str(msg.get("role") or "").strip()
-                    text = self._safe_str(
-                        msg.get("text")
-                        or msg.get("content")
-                        or msg.get("message")
-                        or ""
-                    ).strip()
-
-                    if "Generated image:" in text:
-                        continue
-
-                    if role and text:
-                        lines.append(f"{role}: {text[:800]}")
-
-        except Exception as e:
-            exec_debug("BUILD_RECENT_SESSION_CONTEXT_FAILED:", e)
-
-        return "\n".join(lines).strip()
 
     def _build_system_prompt(
         self,
@@ -1327,8 +1245,6 @@ Rules:
                 except Exception:
                     pass
 
-    def _safe_dict(self, value) -> dict:
-        return value if isinstance(value, dict) else {}
 
     def _safe_str(self, value) -> str:
         try:
@@ -3554,30 +3470,7 @@ if (not attachments) and (__name__ == "__main__"):
 
         return score
 
-    def _build_plan(self, brain_state):
 
-        text = brain_state["input"].lower()
-
-        existing_plan = brain_state.get("plan") or []
-
-        if "login" in text:
-            return [
-                {"step": "design login flow"},
-                {"step": "implement authentication"},
-                {"step": "test login system"},
-            ]
-
-        if "build" in text:
-            return [
-                {"step": "design structure"},
-                {"step": "implement core logic"},
-                {"step": "test system"},
-            ]
-
-        if existing_plan:
-            return existing_plan
-
-        return []
 
     def _source_quality_score(
         self,
@@ -8428,6 +8321,8 @@ if (not attachments) and (__name__ == "__main__"):
                 decision=decision,
                 intelligence=intelligence,
             )
+
+
         except Exception as e:
             exec_debug("STRATEGY_ERROR:", e)
             strategy = {}
@@ -8797,7 +8692,7 @@ if (not attachments) and (__name__ == "__main__"):
 
         return text or ""
 
-    def _decide_response_strategy(
+    def _apply_response_strategy_formatting(
         self,
         user_text: str = "",
         decision=None,
@@ -13909,35 +13804,6 @@ Auto-fix result:
 
         return ""
 
-    def _guess_path_from_text(self, text: str) -> str:
-        import re
-
-        text = self._safe_str(text)
-
-        quoted_traceback_match = re.search(
-            r'File\s+"([^"]+?\.py)"',
-            text,
-            re.IGNORECASE,
-        )
-        if quoted_traceback_match:
-            return quoted_traceback_match.group(1).strip().rstrip(".,:;)]}")
-
-        single_quoted_traceback_match = re.search(
-            r"File\s+'([^']+?\.py)'",
-            text,
-            re.IGNORECASE,
-        )
-        if single_quoted_traceback_match:
-            return single_quoted_traceback_match.group(1).strip().rstrip(".,:;)]}")
-
-        windows_py_match = re.search(
-            r"([A-Za-z]:\\[^\n\r\t\"']+?\.py)\b",
-            text,
-        )
-        if windows_py_match:
-            return windows_py_match.group(1).strip().rstrip(".,:;)]}")
-
-        return ""
 
     def _process_auto_fix(self, user_text: str, session_id: str, attachments=None):
         lowered = (user_text or "").lower()
@@ -15779,31 +15645,6 @@ Auto-fix result:
 
         return self._update_working_state(session_id, updates)
 
-    def _is_valid_state_value(self, value):
-        if not value:
-            return False
-
-        value = str(value).strip()
-
-        if len(value) > 120:
-            return False
-
-        if "\n" in value:
-            return False
-
-        bad_patterns = [
-            "recommended order",
-            "next, improve",
-            "current project truth",
-            "if you want",
-        ]
-
-        lower = value.lower()
-        for p in bad_patterns:
-            if p in lower:
-                return False
-
-        return True
 
     def _load_memory(self):
         """
@@ -18881,33 +18722,6 @@ Next action:
                 e,
             )
 
-    def _clean_working_state_value(self, value, limit=120):
-        text = self._safe_str(value).strip()
-
-        if not text:
-            return ""
-
-        text = text.replace("\r", " ").replace("\n", " ")
-        text = re.sub(r"\s+", " ", text).strip()
-
-        bad_starts = (
-            "yes",
-            "agreed",
-            "recommended",
-            "in short",
-            "what this means",
-        )
-
-        lower = text.lower()
-
-        if any(lower.startswith(x) for x in bad_starts):
-            return ""
-
-        for splitter in [" and ", " but ", " so "]:
-            if splitter in text:
-                text = text.split(splitter)[0].strip()
-
-        return text[:limit]
 
     def _is_valid_state_value(self, value):
         if not value:
@@ -19830,6 +19644,115 @@ Next action:
                 }
             )
 
+    def _build_memory_context_for_chat(self, user_text="", decision=None, session_id=""):
+        decision = decision if isinstance(decision, dict) else {}
+
+        if decision.get("use_memory") is False:
+            return ""
+
+        memory_limit = int(
+            decision.get("memory_limit")
+            or getattr(self, "memory_limit", 6)
+            or 6
+        )
+        memory_limit = max(1, min(memory_limit, 12))
+
+        lines = []
+
+        try:
+            ranked_items = self._rank_memory_context(
+                user_text=user_text,
+                limit=memory_limit,
+                session_id=session_id,
+            )
+
+            if isinstance(ranked_items, list) and ranked_items:
+                lines.append("[RANKED MEMORY + WORKING STATE]")
+
+                for item in ranked_items:
+                    if not isinstance(item, dict):
+                        continue
+
+                    kind = self._safe_str(
+                        item.get("kind") or "memory"
+                    ).strip()
+
+                    source = self._safe_str(
+                        item.get("source") or ""
+                    ).strip()
+
+                    text = self._safe_str(
+                        item.get("text")
+                        or item.get("content")
+                        or ""
+                    ).strip()
+
+                    if not text:
+                        continue
+
+                    label = kind
+
+                    if source:
+                        label = f"{kind} / {source}"
+
+                    lines.append(
+                        f"- {label}: {text[:1000]}"
+                    )
+
+        except Exception as e:
+            exec_debug(
+                "BUILD_RANKED_MEMORY_CONTEXT_FAILED:",
+                e,
+            )
+
+        try:
+            session = (
+                self._get_session_payload(session_id)
+                if session_id
+                else {}
+            )
+
+            messages = (
+                session.get("messages", [])
+                if isinstance(session, dict)
+                else []
+            )
+
+            if isinstance(messages, list) and messages:
+                recent = messages[-8:]
+
+                lines.append(
+                    "\n[RECENT SESSION CONTEXT]"
+                )
+
+                for msg in recent:
+                    if not isinstance(msg, dict):
+                        continue
+
+                    role = self._safe_str(
+                        msg.get("role") or ""
+                    ).strip()
+
+                    text = self._safe_str(
+                        msg.get("text")
+                        or msg.get("content")
+                        or msg.get("message")
+                        or ""
+                    ).strip()
+
+                    if role and text:
+                        lines.append(
+                            f"{role}: {text[:800]}"
+                        )
+
+        except Exception as e:
+            exec_debug(
+                "BUILD_RECENT_SESSION_CONTEXT_FAILED:",
+                e,
+            )
+
+        return "\n".join(lines).strip()
+
     def _rank_memory_context(
         self,
         memories=None,
@@ -20167,82 +20090,6 @@ Next action:
 
         return [item["memory"] for item in top]
 
-    def _memory_text_tokens(
-        self,
-        value: str,
-    ) -> set[str]:
-
-        text = self._safe_str(value).lower()
-
-        if not text:
-            return set()
-
-        stop_words = {
-            "the",
-            "a",
-            "an",
-            "and",
-            "or",
-            "but",
-            "if",
-            "then",
-            "than",
-            "to",
-            "of",
-            "for",
-            "in",
-            "on",
-            "at",
-            "by",
-            "with",
-            "from",
-            "is",
-            "are",
-            "was",
-            "were",
-            "be",
-            "been",
-            "being",
-            "it",
-            "this",
-            "that",
-            "these",
-            "those",
-            "i",
-            "me",
-            "my",
-            "you",
-            "your",
-            "we",
-            "our",
-            "do",
-            "does",
-            "did",
-            "have",
-            "has",
-            "had",
-            "what",
-            "when",
-            "where",
-            "why",
-            "how",
-            "can",
-            "could",
-            "should",
-            "would",
-            "will",
-            "about",
-            "into",
-            "over",
-            "under",
-            "again",
-            "right",
-            "now",
-        }
-
-        tokens = set(re.findall(r"[a-z0-9_]{2,}", text))
-
-        return {token for token in tokens if token not in stop_words}
 
     def _format_memory_context(
         self,
@@ -20621,26 +20468,26 @@ Next action:
         }
 
 
-def _save_artifact_fallback(self, artifact: dict):
-    if not isinstance(artifact, dict) or not artifact:
-        return None
+    def _save_artifact_fallback(self, artifact: dict):
+        if not isinstance(artifact, dict) or not artifact:
+            return None
 
-    try:
-        saved = self.artifacts.save_artifact(artifact)
+        try:
+            saved = self.artifacts.save_artifact(artifact)
 
-        if isinstance(saved, dict):
-            return saved
+            if isinstance(saved, dict):
+                return saved
 
-        if saved:
+            if saved:
+                return artifact
+
             return artifact
 
-        return artifact
+        except Exception as e:
+            exec_debug("ARTIFACT SAVE FAILED:", e)
+            exec_debug("ARTIFACT PAYLOAD:", artifact)
 
-    except Exception as e:
-        exec_debug("ARTIFACT SAVE FAILED:", e)
-        exec_debug("ARTIFACT PAYLOAD:", artifact)
-
-        return artifact
+            return artifact
 
     def _persist_image_generation_artifact(
         self,
@@ -21088,94 +20935,37 @@ def _save_artifact_fallback(self, artifact: dict):
             print("[NOVA_OPENAI_VISION_ATTACHMENT_ANALYSIS] failed:", exc)
             return ""
 
-def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict:
-    attachments = attachments or []
+    def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict:
+        attachments = attachments or []
 
-    for item in attachments:
-        if not isinstance(item, dict):
-            continue
+        for item in attachments:
+            if not isinstance(item, dict):
+                continue
 
-        existing_summary = self._safe_str(
-            item.get("attachment_summary")
-            or item.get("extracted_text")
-            or item.get("text")
-        )
-
-        # NOVA_ATTACHMENT_BINARY_SUMMARY_GUARD_20260714
-        # Prevent raw DOCX zip/XML from reaching attachment summaries.
-        if (
-            existing_summary.startswith("PK\x03\x04")
-            or "[Content_Types].xml" in existing_summary[:500]
-        ):
-            existing_summary = ""
-
-        if existing_summary and "PK" not in existing_summary[:20]:
-            preview = existing_summary[:6000].strip()
-
-            return {
-                "ok": True,
-                "text": (
-                    "Attachment analysis:\n"
-                    f"Attachment {name} content:\n"
-                    f"{preview}"
-                ),
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": (
-                        "Attachment analysis:\n"
-                        f"Attachment {name} content:\n"
-                        f"{preview}"
-                    ),
-                },
-                "attachment_analysis": True,
-                "vision_used": False,
-                "ocr_used": False,
-                "source_urls": [],
-                "sources": [],
-                "saved_artifact": None,
-            }
-
-        att_type = self._safe_str(item.get("type")).lower()
-        mime_type = self._safe_str(item.get("mime_type") or item.get("content_type")).lower()
-        url = self._safe_str(item.get("url") or item.get("file_url"))
-        name = self._safe_str(
-            item.get("original_filename")
-            or item.get("name")
-            or item.get("filename")
-            or item.get("stored_name")
-            or "attachment"
-        )
-
-        if url and (att_type == "image" or mime_type.startswith("image/")):
-            vision_text = self._nova_describe_image_with_openai_20260607(
-                image_url=url,
-                image_name=name,
-                user_text=user_text,
+            name = self._safe_str(
+                item.get("original_filename")
+                or item.get("name")
+                or item.get("filename")
+                or item.get("stored_name")
+                or "attachment"
             )
 
-            if vision_text:
-                return {
-                    "ok": True,
-                    "text": vision_text,
-                    "assistant_message": {
-                        "role": "assistant",
-                        "text": vision_text,
-                    },
-                    "attachment_analysis": True,
-                    "vision_used": True,
-                    "ocr_used": False,
-                    "source_urls": [],
-                    "sources": [],
-                    "saved_artifact": None,
-                }
+            existing_summary = self._safe_str(
+                item.get("attachment_summary")
+                or item.get("extracted_text")
+                or item.get("text")
+            )
 
-        path = _nova_resolve_attachment_path_20260608(item)
+            # NOVA_ATTACHMENT_BINARY_SUMMARY_GUARD_20260714
+            # Prevent raw DOCX zip/XML from reaching attachment summaries.
+            if (
+                existing_summary.startswith("PK\x03\x04")
+                or "[Content_Types].xml" in existing_summary[:500]
+            ):
+                existing_summary = ""
 
-        if path:
-            text = _nova_extract_attachment_text_string_safe_20260608(path)
-
-            if text:
-                preview = text[:6000].strip()
+            if existing_summary and "PK" not in existing_summary[:20]:
+                preview = existing_summary[:6000].strip()
 
                 return {
                     "ok": True,
@@ -21200,22 +20990,93 @@ def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict
                     "saved_artifact": None,
                 }
 
-    fallback = "Attachment received, but Nova could not extract readable text from it."
+            att_type = self._safe_str(item.get("type")).lower()
+            mime_type = self._safe_str(
+                item.get("mime_type")
+                or item.get("content_type")
+            ).lower()
 
-    return {
-        "ok": True,
-        "text": fallback,
-        "assistant_message": {
-            "role": "assistant",
+            url = self._safe_str(
+                item.get("url")
+                or item.get("file_url")
+            )
+
+            if url and (
+                att_type == "image"
+                or mime_type.startswith("image/")
+            ):
+                vision_text = self._nova_describe_image_with_openai_20260607(
+                    image_url=url,
+                    image_name=name,
+                    user_text=user_text,
+                )
+
+                if vision_text:
+                    return {
+                        "ok": True,
+                        "text": vision_text,
+                        "assistant_message": {
+                            "role": "assistant",
+                            "text": vision_text,
+                        },
+                        "attachment_analysis": True,
+                        "vision_used": True,
+                        "ocr_used": False,
+                        "source_urls": [],
+                        "sources": [],
+                        "saved_artifact": None,
+                    }
+
+            path = _nova_resolve_attachment_path_20260608(item)
+
+            if path:
+                text = _nova_extract_attachment_text_string_safe_20260608(path)
+
+                if text:
+                    preview = text[:6000].strip()
+
+                    return {
+                        "ok": True,
+                        "text": (
+                            "Attachment analysis:\n"
+                            f"Attachment {name} content:\n"
+                            f"{preview}"
+                        ),
+                        "assistant_message": {
+                            "role": "assistant",
+                            "text": (
+                                "Attachment analysis:\n"
+                                f"Attachment {name} content:\n"
+                                f"{preview}"
+                            ),
+                        },
+                        "attachment_analysis": True,
+                        "vision_used": False,
+                        "ocr_used": False,
+                        "source_urls": [],
+                        "sources": [],
+                        "saved_artifact": None,
+                    }
+
+        fallback = (
+            "Attachment received, but Nova could not extract "
+            "readable text from it."
+        )
+
+        return {
+            "ok": True,
             "text": fallback,
-        },
-        "attachment_analysis": True,
-        "vision_used": False,
-        "ocr_used": False,
-        "source_urls": [],
-        "sources": [],
-        "saved_artifact": None,
-    }
+            "assistant_message": {
+                "role": "assistant",
+                "text": fallback,
+            },
+            "attachment_analysis": True,
+            "vision_used": False,
+            "ocr_used": False,
+            "source_urls": [],
+            "sources": [],
+            "saved_artifact": None,
+        }
 
     def _format_response_policy_for_prompt(self, response_policy=None) -> str:
         response_policy = response_policy if isinstance(response_policy, dict) else {}
