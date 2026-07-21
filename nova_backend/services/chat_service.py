@@ -16841,11 +16841,22 @@ Auto-fix result:
         if not text:
             return False
 
-        # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ PLAN CREATION
-        if any(x in text for x in ["plan", "steps", "how to", "next steps"]):
+        # Explicit execution planning only.
+        execution_markers = [
+            "auto-plan",
+            "start execution",
+            "start mission",
+            "run plan",
+            "execute plan",
+            "execute steps",
+            "run steps",
+            "begin task",
+        ]
+
+        if any(x in text for x in execution_markers):
             return True
 
-        # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ FALLBACK: coding / structured intent
+        # FALLBACK: coding / structured intent
         if decision and decision.get("mode") in {"coding", "analysis"}:
             return True
 
