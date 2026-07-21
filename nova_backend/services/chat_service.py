@@ -20358,38 +20358,6 @@ Next action:
     # IMAGE HELPERS
     # ==============================
 
-    def _is_image_generation_request(self, user_text: str) -> bool:
-        text = str(user_text or "").strip().lower()
-
-        if not text:
-            return False
-
-        if text in {
-            "regen",
-            "regenerate",
-            "redo image",
-            "make another",
-            "another image",
-        }:
-            return True
-
-        if text.startswith("/image"):
-            return True
-
-        explicit_image_requests = (
-            "generate an image",
-            "generate image",
-            "create an image",
-            "create image",
-            "make an image",
-            "make image",
-            "draw me",
-            "draw a",
-            "draw an",
-        )
-
-        return text.startswith(explicit_image_requests)
-
     def _build_image_generation_meta(
         self,
         prompt: str,
