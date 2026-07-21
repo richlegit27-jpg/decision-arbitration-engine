@@ -953,7 +953,7 @@ if (not attachments) and (__name__ == "__main__"):
 
                     current_bug = str(current_step.get("error") or "").strip()
 
-                    self._update_working_state(
+                    self.working_state_service.update_working_state(
                         session_id,
                         {
                             "current_file": current_file,
