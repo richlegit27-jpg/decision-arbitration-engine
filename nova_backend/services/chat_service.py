@@ -23080,7 +23080,20 @@ try:
             intent_route = str(intent_decision.get("route") or "").strip()
             intent_confidence = float(intent_decision.get("confidence") or 0)
 
-            if intent_route and intent_confidence >= 0.94:
+            trusted_intents = {
+                "debugging",
+                "coding",
+                "planning",
+                "writing",
+            }
+
+            if (
+                intent_route
+                and (
+                    intent_confidence >= 0.94
+                    or intent_decision.get("intent") in trusted_intents
+                )
+            ):
                 return {
                     "route": intent_route,
                     "mode": intent_decision.get("mode") or intent_decision.get("intent") or "chat",
