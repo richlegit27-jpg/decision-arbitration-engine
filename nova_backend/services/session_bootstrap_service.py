@@ -32,7 +32,7 @@ class SessionBootstrapService:
             )
 
             if existing:
-                try:lk
+                try:
                     self.session_service.set_active(
                         target_session_id
                     )
