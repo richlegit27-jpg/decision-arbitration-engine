@@ -36,10 +36,10 @@ class ExecutionOrchestratorService:
             else {}
         )
 
-        command = self.safe_str(command).strip().lower()
+        command = self._safe_str(command).strip().lower()
 
         intelligence_intent = (
-            self.safe_str(
+            self._safe_str(
                 execution_state.get("intent") or execution_state.get("mode") or ""
             )
             .strip()
@@ -61,8 +61,15 @@ class ExecutionOrchestratorService:
         elif intelligence_intent == "cancel_execution":
             command = "cancel"
 
-        working_state = self._get_working_state(session_id) or {}
+        working_state = {}
 
+        if self.working_state_service:
+            working_state = (
+                self.working_state_service.get_working_state(
+                    session_id
+                )
+                or {}
+            )
         persisted_execution_state = (
             self.execution_state_service.load(
                 session_id
@@ -219,7 +226,7 @@ class ExecutionOrchestratorService:
                 execution_state["current_step"] = ""
                 execution_state["current_step_title"] = ""
 
-            while current_index < len(steps) and self.safe_str(
+            while current_index < len(steps) and self._safe_str(
                 steps[current_index].get("status")
             ).lower().strip() in {
                 "completed",
@@ -510,11 +517,11 @@ class ExecutionOrchestratorService:
 
                 execution_state["history"] = execution_state.get("history") or []
 
-                step_title = self.safe_str(step.get("title"))
+                step_title = self._safe_str(step.get("title"))
 
-                step_action = self.safe_str(step.get("action")).lower()
+                step_action = self._safe_str(step.get("action")).lower()
 
-                target_file = self.safe_str(step.get("target_file"))
+                target_file = self._safe_str(step.get("target_file"))
 
                 python_result = None
 
@@ -1093,14 +1100,14 @@ if (not attachments) and (__name__ == "__main__"):
         try:
             step["status"] = "running"
 
-            step_action = self.safe_str(step.get("action")).lower()
+            step_action = self._safe_str(step.get("action")).lower()
 
             print(
                 "STEP ACTION =",
                 repr(step_action),
             )
 
-            target_file = self.safe_str(step.get("target_file"))
+            target_file = self._safe_str(step.get("target_file"))
 
             python_result = None
 
