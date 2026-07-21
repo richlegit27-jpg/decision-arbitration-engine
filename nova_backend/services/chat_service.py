@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import base64
 import os
@@ -2877,7 +2877,6 @@ Current step:
                     execution_state.get("steps"),
                 )
 
-                execution_state["history"] = execution_state.get("history") or []
 
                 step_title = self.safe_str(step.get("title"))
 
@@ -2944,7 +2943,12 @@ if (not attachments) and (__name__ == "__main__"):
 
                     step["error"] = None
 
-                execution_state["history"].append(f"completed: {step_title}")
+                execution_state = (
+                    self.execution_mutation_service.append_history(
+                        execution_state,
+                        f"completed: {step_title}",
+                    )
+                )
 
                 execution_state["current_index"] = current_index + 1
 
@@ -17974,24 +17978,9 @@ Next action:
             )
 
     def _finalize_execution_state(self, execution_state: dict | None = None) -> dict:
-        execution_state = dict(execution_state or {})
-
-        execution_state["status"] = "idle"
-        execution_state["waiting"] = False
-        execution_state["complete"] = False
-        execution_state["active"] = False
-
-        execution_state["steps"] = []
-        execution_state["plan"] = []
-        execution_state["current_index"] = 0
-        execution_state["history"] = []
-
-        execution_state["current_step"] = ""
-        execution_state["current_step_title"] = ""
-        execution_state["last_action"] = ""
-
-        return execution_state
-
+        return self.execution_mutation_service.reset(
+            execution_state,
+        )
     def _reset_execution_state(self, session_id: str):
         previous_state = self._get_working_state(session_id) or {}
 
@@ -22216,8 +22205,3 @@ def _nova_attachment_guard_method_looks_like_result_web_route(name):
         return False
 
     return True
-
-
-
-
-

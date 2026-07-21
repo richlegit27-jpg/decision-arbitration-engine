@@ -3,7 +3,6 @@ class ExecutionMutationService:
     def __init__(self, execution_state_service=None):
         self.execution_state_service = execution_state_service
 
-
     def mark_running(
         self,
         execution_state,
@@ -23,7 +22,6 @@ class ExecutionMutationService:
         execution_state["current_step_title"] = current_step or ""
 
         return execution_state
-
 
     def mark_complete(
         self,
@@ -49,8 +47,11 @@ class ExecutionMutationService:
 
         return execution_state
 
-    def append_history(self, execution_state, message):
-
+    def append_history(
+        self,
+        execution_state,
+        message,
+    ):
         if not isinstance(execution_state, dict):
             execution_state = {}
 
@@ -64,8 +65,10 @@ class ExecutionMutationService:
 
         return execution_state
 
-    def cancel(self, execution_state):
-
+    def cancel(
+        self,
+        execution_state,
+    ):
         if not isinstance(execution_state, dict):
             execution_state = {}
 
@@ -78,16 +81,27 @@ class ExecutionMutationService:
 
         return execution_state
 
-    def reset(self):
+    def reset(
+        self,
+        execution_state=None,
+    ):
+        if not isinstance(execution_state, dict):
+            execution_state = {}
 
-        return {
-            "status": "idle",
-            "current_step": "",
-            "current_step_title": "",
-            "progress": 0,
-            "waiting": False,
-            "complete": False,
-            "lock": False,
-            "steps": [],
-            "history": [],
-        }
+        execution_state = dict(execution_state)
+
+        execution_state["status"] = "idle"
+        execution_state["waiting"] = False
+        execution_state["complete"] = False
+        execution_state["active"] = False
+
+        execution_state["steps"] = []
+        execution_state["plan"] = []
+        execution_state["current_index"] = 0
+        execution_state["history"] = []
+
+        execution_state["current_step"] = ""
+        execution_state["current_step_title"] = ""
+        execution_state["last_action"] = ""
+
+        return execution_state
