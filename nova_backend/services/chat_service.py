@@ -7533,66 +7533,6 @@ Rules:
                         exc,
                     )
 
-            if not web_result.get("results"):
-                exec_debug("WEB_FETCH_FALLBACK: using Google News RSS")
-
-                import requests
-                import xml.etree.ElementTree as ET
-                from urllib.parse import quote_plus
-
-                rss_results = []
-                seen_rss_urls = set()
-                rss_queries = self._build_news_rss_queries(query)
-
-                exec_debug("RSS_QUERIES:", rss_queries)
-
-                for rss_query in rss_queries:
-                    rss_url = "https://news.google.com/rss/search?q=" + quote_plus(
-                        rss_query
-                    )
-                    rss_res = requests.get(rss_url, timeout=20)
-
-                    exec_debug("RSS_QUERY:", rss_query)
-                    exec_debug("RSS_STATUS:", rss_res.status_code)
-                    exec_debug("RSS_LEN:", len(rss_res.content))
-
-                    try:
-                        root = ET.fromstring(rss_res.content)
-                    except Exception as e:
-                        exec_debug("RSS_PARSE_ERROR:", e)
-                        continue
-
-                    for item in root.findall(".//item"):
-                        title = self.safe_str(item.findtext("title") or "").strip()
-                        link = self.safe_str(item.findtext("link") or "").strip()
-                        description = self.safe_str(
-                            item.findtext("description") or ""
-                        ).strip()
-
-                        if not title or not link:
-                            continue
-
-                        if link in seen_rss_urls:
-                            continue
-
-                        seen_rss_urls.add(link)
-
-                        rss_results.append(
-                            {
-                                "title": title,
-                                "snippet": description,
-                                "content": description,
-                                "url": link,
-                            }
-                        )
-
-                        if len(rss_results) >= 12:
-                            break
-
-                    if len(rss_results) >= 12:
-                        break
-
-                web_result = {"results": rss_results}
 
         except Exception as e:
             exec_debug("WEB_FETCH_ERROR:", e)
