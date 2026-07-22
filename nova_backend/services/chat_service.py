@@ -17478,11 +17478,18 @@ Next action:
         }
 
         try:
-            return self.sessions.update_working_state(session_id, clean_state)
-        except Exception as e:
-            exec_debug("SET_WORKING_STATE_DIRECT_CALL_ERROR:", e)
+            return self.working_state_service.set_working_state(
+                session_id,
+                clean_state,
+            )
 
-        return clean_state
+        except Exception as e:
+            exec_debug(
+                "SET_WORKING_STATE_SERVICE_ERROR:",
+                e,
+            )
+
+            return clean_state
 
     def _auto_track_working_state(
         self,
