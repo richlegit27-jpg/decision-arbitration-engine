@@ -1106,26 +1106,9 @@ Rules:
             )
 
             execution_state = (
-                self._get_session_meta(
-                    session_id,
-                    "execution_state",
+                self._load_execution_state(
+                    session_id
                 )
-                or self._get_working_state(session_id).get("execution_state")
-                or {}
-            )
-
-            session = self.session_service.get_session(session_id)
-
-            if not isinstance(
-                session,
-                dict,
-            ):
-                session = {}
-
-            execution_state = (
-                session.get("execution_state")
-                or session.get("active_execution")
-                or execution_state
                 or {}
             )
 
@@ -1249,7 +1232,7 @@ Current step:
             mission = {}
 
         execution_state = (
-            self.execution_state_service.load(
+            self._load_execution_state(
                 session_id
             )
             or (
@@ -1481,7 +1464,7 @@ Current step:
         if mission_type in {"continue", "execute"}:
 
             persisted_execution_state = (
-                self.execution_state_service.load(
+                self._load_execution_state(
                     session_id
                 )
                 or {}
@@ -2239,7 +2222,7 @@ Current step:
         working_state = self._get_working_state(session_id) or {}
 
         persisted_execution_state = (
-            self.execution_state_service.load(
+            self._load_execution_state(
                 session_id
             )
             or {}
@@ -2339,7 +2322,7 @@ Current step:
             if not steps:
 
                 persisted_execution = (
-                    self.execution_state_service.load(
+                    self._load_execution_state(
                         session_id
                     )
                     or {}
@@ -2432,7 +2415,7 @@ Current step:
                 }
 
             refreshed_execution = (
-                self.execution_state_service.load(
+                self._load_execution_state(
                     session_id
                 )
                 or execution_state
@@ -2476,7 +2459,7 @@ Current step:
                 }
 
             refreshed_execution = (
-                self.execution_state_service.load(
+                self._load_execution_state(
                     session_id
                 )
                 or execution_state
@@ -6059,7 +6042,7 @@ if (not attachments) and (__name__ == "__main__"):
             working_state = self._get_working_state(session_id) or {}
 
             persisted_execution_state = (
-                self.execution_state_service.load(
+                self._load_execution_state(
                     session_id
                 )
             )
@@ -11095,14 +11078,10 @@ if (not attachments) and (__name__ == "__main__"):
             )
 
         execution_state = (
-            self.execution_state_service.load(
+            self._load_execution_state(
                 session_id
             )
             or execution_state
-            or session.get("execution_state")
-            or session.get("active_execution")
-            or session.get("meta", {}).get("execution_state")
-            or session.get("meta", {}).get("active_execution")
             or {}
         )
 
@@ -11145,13 +11124,11 @@ if (not attachments) and (__name__ == "__main__"):
 
         execution_state = (
             execution_state
-            or session.get("execution_state")
-            or session.get("active_execution")
-            or session.get("meta", {}).get("execution_state")
-            or session.get("meta", {}).get("active_execution")
+            or self._load_execution_state(
+                session_id
+            )
             or {}
         )
-
         if not isinstance(
             execution_state,
             dict,
@@ -12326,7 +12303,7 @@ if (not attachments) and (__name__ == "__main__"):
             _active_execution_state = {}
             try:
                 _active_execution_state = (
-                    self.execution_state_service.load(
+                    self._load_execution_state(
                         session_id
                     )
                     or self._get_session_meta(session_id, "execution_state")
@@ -21262,7 +21239,7 @@ try:
 
                 if hasattr(self, "_load_execution_state"):
                     execution = (
-                        self.execution_state_service.load(
+                        self._load_execution_state(
                             session_id
                         )
                         or {}
