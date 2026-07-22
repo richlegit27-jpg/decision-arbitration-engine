@@ -7,13 +7,56 @@ class ExecutionOrchestratorService:
         self,
         execution_state_service=None,
         working_state_service=None,
+        execution_mutation_service=None,
         safe_str=None,
         execution_step_service=None,
     ):
         self.execution_state_service = execution_state_service
         self.working_state_service = working_state_service
+        self.execution_mutation_service = (
+            execution_mutation_service
+        )
         self._safe_str = safe_str
         self.execution_step_service = execution_step_service
+
+    def process_execution(
+        self,
+        session_id="",
+        state=None,
+        command="",
+    ):
+        execution_state = (
+            state
+            if isinstance(state, dict)
+            else {}
+        )
+
+        selected_command = (
+            command
+            or execution_state.get("command")
+            or execution_state.get("intent")
+            or execution_state.get("mode")
+            or ""
+        )
+
+        return self._process_execution_command(
+            command=selected_command,
+            session_id=session_id,
+            execution_state=execution_state,
+        )
+
+    def _save_execution_state(
+        self,
+        session_id="",
+        execution_state=None,
+    ):
+        if not self.execution_state_service:
+            return {}
+
+        return self.execution_state_service.save_execution_state(
+            session_id,
+            execution_state,
+        )
 
     def _process_execution_command(
         self,
@@ -68,7 +111,7 @@ class ExecutionOrchestratorService:
                 or {}
             )
         persisted_execution_state = (
-            self.execution_state_service.load(
+            self.execution_state_service.get_execution_state(
                 session_id
             )
             or {}
@@ -159,7 +202,7 @@ class ExecutionOrchestratorService:
             if not steps:
 
                 persisted_execution = (
-                    self.execution_state_service.load(
+                    self.execution_state_service.get_execution_state(
                         session_id
                     )
                     or {}
@@ -236,7 +279,7 @@ class ExecutionOrchestratorService:
                 }
 
             refreshed_execution = (
-                self.execution_state_service.load(
+                self.execution_state_service.get_execution_state(
                     session_id
                 )
                 or execution_state
@@ -278,7 +321,7 @@ class ExecutionOrchestratorService:
                 }
 
             refreshed_execution = (
-                self.execution_state_service.load(
+                self.execution_state_service.get_execution_state(
                     session_id
                 )
                 or execution_state
