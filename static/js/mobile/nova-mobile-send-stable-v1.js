@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
     "use strict";
 
     var VERSION = "send-single-upload-owner-20260705";
@@ -101,14 +101,15 @@
         document.head.appendChild(style);
     }
 
-function appendMessage(role, text) {
+function appendMessage(role, text, message) {
     if (
         window.NovaMobileChatUI &&
         typeof window.NovaMobileChatUI.appendMessage === "function"
     ) {
         return window.NovaMobileChatUI.appendMessage(
             role,
-            text
+            text,
+            message
         );
     }
 
@@ -575,9 +576,46 @@ fetch("/api/chat", {
         }
 
         var responsePayload = JSON.parse(raw);
-        var reply = extractReply(responsePayload) || "[empty response]";
+        var reply =
+            extractReply(responsePayload) ||
+            "[empty response]";
 
-appendMessage("assistant", reply);
+        var assistantMessage =
+            responsePayload.assistant_message &&
+            typeof responsePayload.assistant_message ===
+                "object"
+                ? Object.assign(
+                    {},
+                    responsePayload.assistant_message
+                )
+                : {
+                    role: "assistant",
+                    text: reply
+                };
+
+        if (
+            responsePayload.image_url &&
+            !assistantMessage.image_url
+        ) {
+            assistantMessage.image_url =
+                responsePayload.image_url;
+        }
+
+        if (
+            Array.isArray(responsePayload.attachments) &&
+            !Array.isArray(
+                assistantMessage.attachments
+            )
+        ) {
+            assistantMessage.attachments =
+                responsePayload.attachments;
+        }
+
+        appendMessage(
+            "assistant",
+            reply,
+            assistantMessage
+        );
 
 try {
     window.NovaMobileUpload?.clearPendingAttachments?.();

@@ -8450,6 +8450,9 @@ Rules:
         if attachments:
             return ("attachment", "analyze")
 
+        if self._is_image_generation_request(text):
+            return ("image", "generate")
+
         # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         # 3. WEB (STRICT ONLY)
         # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
@@ -9874,6 +9877,12 @@ Rules:
                 user_text=user_text,
                 attachments=attachments,
                 session_id=session_id
+            )
+
+        elif route == "image":
+            return self._handle_image_generation(
+                prompt=user_text,
+                session_id=session_id,
             )
 
         elif route == "web":
@@ -14173,6 +14182,11 @@ Rules:
         source_type: str = "generated",
     ) -> dict:
         try:
+            image_bytes = b""
+            filename = (
+                f"generated_{uuid.uuid4().hex}.png"
+            )
+
             result = self.client.images.generate(
                 model=self.image_model,
                 prompt=prompt,
@@ -14190,8 +14204,6 @@ Rules:
                     raise ValueError("Image API returned no image data")
 
                 image_bytes = base64.b64decode(image_b64)
-                filename = f"generated_{uuid.uuid4().hex}.png"
-
                 save_path = os.path.join(
                     self.uploads_dir,
                     filename,
@@ -14215,28 +14227,43 @@ Rules:
             saved_artifact = None
 
             try:
-                saved_artifact = self.artifacts.create_artifact(
-                    kind="image",
-                    type="image_generation",
-                    title="Generated image",
-                    body=prompt,
-                    summary=f"Generated image: {prompt}",
-                    preview=image_url,
-                    session_id=session_id,
-                    source="generated",
-                    image_url=image_url,
-                    prompt=prompt,
-                    revised_prompt="",
-                    parent_id=parent_artifact_id or None,
-                    meta={
+                saved_artifact = self.artifacts.create(
+                    {
+                        "kind": "image",
+                        "type": "image_generation",
+                        "title": "Generated image",
+                        "body": prompt,
+                        "summary": (
+                            f"Generated image: {prompt}"
+                        ),
+                        "preview": image_url,
+                        "session_id": session_id,
+                        "source": "generated",
                         "image_url": image_url,
                         "prompt": prompt,
-                        "generation_mode": "text_to_image",
-                        "source_type": source_type,
-                    },
+                        "revised_prompt": "",
+                        "parent_id": (
+                            parent_artifact_id or None
+                        ),
+                        "viewer": {
+                            "type": "image",
+                            "image_url": image_url,
+                        },
+                        "meta": {
+                            "image_url": image_url,
+                            "prompt": prompt,
+                            "generation_mode": (
+                                "text_to_image"
+                            ),
+                            "source_type": source_type,
+                        },
+                    }
                 )
             except Exception as exc:
-                exec_debug("IMAGE ARTIFACT FALLBACK SAVE FAILED:", exc)
+                exec_debug(
+                    "IMAGE ARTIFACT FALLBACK SAVE FAILED:",
+                    exc,
+                )
 
             try:
                 if (
@@ -14289,9 +14316,7 @@ Rules:
                 "skip_cleanup": True,
                 "skip_post_processing": True,
                 "assistant_message": {
-                    "role": "assistant",
-                    "text": f"Generated image: {prompt}",
-                    "content": f"Generated image: {prompt}",
+                    **assistant_image_message,
                     "image_url": image_url,
                 },
                 "image_url": image_url,

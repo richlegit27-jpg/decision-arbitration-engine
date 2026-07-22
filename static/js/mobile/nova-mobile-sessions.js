@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
     "use strict";
 
     if (window.__NOVA_MOBILE_SESSIONS_FINAL_OWNER_V2_20260708__) {
@@ -432,19 +432,41 @@ if (!title || /^(new|new chat|chat|untitled|\d+)$/i.test(title)) {
         });
 
         const sessions = getSessions(data);
-sessions.sort(function (a, b) {
-    const ac = a.message_count ?? (Array.isArray(a.messages) ? a.messages.length : 0);
-    const bc = b.message_count ?? (Array.isArray(b.messages) ? b.messages.length : 0);
+        const activeId =
+            activeIdFromStorage() ||
+            data.active_session_id ||
+            "";
 
-    if (bc !== ac) {
-        return bc - ac;
-    }
+        sessions.sort(function (a, b) {
+            const aId = String(
+                a.id || a.session_id || ""
+            );
+            const bId = String(
+                b.id || b.session_id || ""
+            );
 
-    return String(b.updated_at || b.created_at || "").localeCompare(
-        String(a.updated_at || a.created_at || "")
-    );
-});
-        const activeId = activeIdFromStorage() || data.active_session_id || "";
+            if (aId === activeId && bId !== activeId) {
+                return -1;
+            }
+
+            if (bId === activeId && aId !== activeId) {
+                return 1;
+            }
+
+            if (!!a.pinned !== !!b.pinned) {
+                return a.pinned ? -1 : 1;
+            }
+
+            return String(
+                b.updated_at || b.created_at || ""
+            ).localeCompare(
+                String(
+                    a.updated_at ||
+                    a.created_at ||
+                    ""
+                )
+            );
+        });
 
         window.NOVA_SESSION_CORE.sessions = sessions;
 
@@ -494,11 +516,16 @@ sessions.sort(function (a, b) {
         url.searchParams.set("session_id", id || ("mobile_" + Date.now()));
         history.replaceState({}, "", url.toString());
 
-        if (window.chatContainer) {
-            window.chatContainer.innerHTML = "";
-        }
-
-        window.NOVA_MESSAGES = [];
+        renderSession({
+            session_id: id,
+            session: Object.assign({}, session, {
+                id: session.id || id,
+                session_id: session.session_id || id,
+                messages: [],
+                message_count: 0
+            }),
+            messages: []
+        });
 
         setStatus("New session created");
 

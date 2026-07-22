@@ -464,25 +464,55 @@ class SessionService:
         return sessions
 
     def _save_sessions(self, sessions, active):
-        MAX_SESSIONS = 25
+        max_sessions_per_owner = 25
+        grouped = {}
 
-        safe_sessions = []
-
-        for s in sessions[-MAX_SESSIONS:]:
-            if not isinstance(s, dict):
+        for session_item in sessions:
+            if not isinstance(session_item, dict):
                 continue
 
-            # ðŸ”¥ THIS IS THE CRITICAL LINE
-            cleaned = self.sanitize_session_for_storage(s)
+            cleaned = self.sanitize_session_for_storage(
+                session_item
+            )
 
-            # optional preview cap
             if cleaned.get("last_message_preview"):
-                cleaned["last_message_preview"] = str(cleaned["last_message_preview"])[:200]
+                cleaned["last_message_preview"] = str(
+                    cleaned["last_message_preview"]
+                )[:200]
 
-            safe_sessions.append(cleaned)
+            owner_id = str(
+                cleaned.get("user_id") or "__unowned__"
+            ).strip() or "__unowned__"
+
+            grouped.setdefault(owner_id, []).append(
+                cleaned
+            )
+
+        retained = []
+
+        for owner_sessions in grouped.values():
+            owner_sessions.sort(
+                key=lambda item: (
+                    str(item.get("id") or "") ==
+                    str(active or ""),
+                    bool(item.get("pinned", False)),
+                    str(
+                        item.get("updated_at")
+                        or item.get("created_at")
+                        or ""
+                    ),
+                ),
+                reverse=True,
+            )
+
+            retained.extend(
+                owner_sessions[:max_sessions_per_owner]
+            )
+
+        retained.sort(key=_session_sort_key)
 
         payload = {
-            "sessions": safe_sessions,
+            "sessions": retained,
             "active_session_id": active,
         }
 

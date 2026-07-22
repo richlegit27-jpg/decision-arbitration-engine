@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
     "use strict";
 
     var MARK = "NOVA_MOBILE_NEW_CHAT_BACKEND_CREATE_SINGLE_OWNER_20260705";
@@ -109,7 +109,76 @@
                 localStorage.setItem("nova_active_session_id", sid);
             } catch (_) {}
 
-            location.href = "/mobile?session_id=" + encodeURIComponent(sid) + "&v=new-chat-owner-" + Date.now();
+            var emptySession = Object.assign(
+                {},
+                data.session || {},
+                {
+                    id: sid,
+                    session_id: sid,
+                    messages: [],
+                    message_count: 0
+                }
+            );
+
+            var url = new URL(window.location.href);
+            url.searchParams.set("session_id", sid);
+            url.searchParams.set(
+                "v",
+                "new-chat-owner-" + Date.now()
+            );
+            history.replaceState({}, "", url.toString());
+
+            window.NOVA_MESSAGES = [];
+
+            if (
+                typeof window.NovaMobileRenderSession ===
+                "function"
+            ) {
+                window.NovaMobileRenderSession(
+                    emptySession,
+                    sid
+                );
+            } else if (
+                window.NovaMobileChatUI &&
+                typeof window.NovaMobileChatUI
+                    .renderSessionPayload === "function"
+            ) {
+                window.NovaMobileChatUI.renderSessionPayload(
+                    {
+                        session_id: sid,
+                        session: emptySession,
+                        messages: []
+                    },
+                    "new-chat-owner"
+                );
+            } else {
+                window.dispatchEvent(
+                    new CustomEvent(
+                        "nova:session-selected",
+                        {
+                            detail: {
+                                session_id: sid,
+                                session: emptySession,
+                                messages: []
+                            }
+                        }
+                    )
+                );
+            }
+
+            if (
+                typeof window.NovaMobileReloadSessions ===
+                "function"
+            ) {
+                await window.NovaMobileReloadSessions();
+            }
+
+            if (
+                typeof window.NovaMobileCloseSessions ===
+                "function"
+            ) {
+                window.NovaMobileCloseSessions();
+            }
         } catch (error) {
             console.error("[" + MARK + "] failed", error);
             alert("New Chat failed: " + (error && error.message ? error.message : String(error)));

@@ -1,7 +1,7 @@
-﻿(function () {
+(function () {
     "use strict";
 
-    function appendMessage(role, text) {
+    function appendMessage(role, text, message) {
         if (!window.chatContainer) {
             return null;
         }
@@ -29,6 +29,60 @@
         } else {
             content.textContent = text || "";
         }
+
+        const attachments =
+            message &&
+            Array.isArray(message.attachments)
+                ? message.attachments
+                : [];
+
+        if (
+            message &&
+            message.image_url &&
+            !attachments.length
+        ) {
+            attachments.push({
+                url: message.image_url,
+                filename: "Generated image"
+            });
+        }
+
+        attachments.forEach(function (attachment) {
+            const imageUrl = String(
+                attachment &&
+                (
+                    attachment.url ||
+                    attachment.image_url ||
+                    ""
+                )
+            ).trim();
+
+            if (
+                !imageUrl ||
+                !window.NovaMobileImages ||
+                typeof window.NovaMobileImages
+                    .renderImageIntoBubble !== "function"
+            ) {
+                return;
+            }
+
+            const imageHost =
+                document.createElement("div");
+
+            imageHost.className =
+                "mobile-message-image-host";
+
+            content.appendChild(imageHost);
+
+            window.NovaMobileImages
+                .renderImageIntoBubble(
+                    imageHost,
+                    imageUrl,
+                    attachment.filename ||
+                    attachment.name ||
+                    "Generated image"
+                );
+        });
 
         wrapper.appendChild(content);
         window.chatContainer.appendChild(wrapper);
@@ -175,7 +229,8 @@
             try {
                 appendMessage(
                     msg.role || "assistant",
-                    msg.content ?? msg.text ?? ""
+                    msg.content ?? msg.text ?? "",
+                    msg
                 );
 
                 renderedCount += 1;

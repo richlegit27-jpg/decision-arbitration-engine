@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <!-- NOVA_DEPLOY_MARKER_LEGACY_SESSIONS_OWNER_REMOVED_20260703_7f20b27 -->
@@ -417,8 +417,14 @@ Close Account
         Loading settings...
     </div>
 
-    <button type="button"
-            onclick="document.getElementById('nova-mobile-settings-panel').classList.add('hidden')">
+    <button
+        type="button"
+        onclick="
+            const panel = document.getElementById('nova-mobile-settings-panel');
+            panel.classList.add('hidden');
+            panel.removeAttribute('style');
+        "
+    >
         Close
     </button>
 
@@ -808,7 +814,7 @@ body {
      CHAT RENDERING LAYER
 ========================= -->
 
-<script src="/static/js/mobile/nova-mobile-chat-ui.js?v=mobile-modular-001"></script>
+<script src="/static/js/mobile/nova-mobile-chat-ui.js?v=image-attachment-render-20260722"></script>
 
 <script src="/static/js/mobile/nova-mobile-message-actions.js?v=mobile-actions-fix-007"></script>
 
@@ -3804,7 +3810,7 @@ composer.style.setProperty("overflow", "visible", "important");
 <!--
 
 -->
-<script src="/static/js/mobile/nova-mobile-new-chat-backend-create-v1.js?v=new-chat-single-owner-20260705"></script>
+<script src="/static/js/mobile/nova-mobile-new-chat-backend-create-v1.js?v=new-chat-in-place-reset-20260722"></script>
 <!-- DISABLED_DUPLICATE_SEND_OWNER_20260706 -->
 <!-- <script src="/static/js/mobile/nova-mobile-send-dedupe-guard-v1.js?v=send-dedupe-v1-20260703"></script> -->
 <!-- DISABLED_CHAT_VISIBLE_RECOVERY_AFTER_SESSION_CLEAN_20260706 -->
@@ -3826,7 +3832,7 @@ composer.style.setProperty("overflow", "visible", "important");
 <!-- NOVA_CLEANUP_DISABLED_20260705: disabled plus-menu attach experiment :: <script src="/static/js/mobile/nova-mobile-plus-menu-reliability-v1.js?v=plus-menu-reliability-v1-20260705"></script> -->
 <script src="/static/js/mobile/nova-mobile-upload-change-authority-v1.js?v=upload-single-owner-20260714h"></script>
 <script src="/static/js/mobile/nova-mobile-runtime.js?v=runtime-stop-wire-20260706"></script>
-<script src="/static/js/mobile/nova-mobile-send-stable-v1.js?v=send-single-upload-owner-20260705"></script>
+<script src="/static/js/mobile/nova-mobile-send-stable-v1.js?v=image-response-pass-through-20260722"></script>
 <script src="/static/js/mobile/nova-mobile-attachment-send-cleanup-v1.js?v=attachment-send-cleanup-v2-20260706"></script>
 <!-- TEST_DISABLED_CHAT_VISIBLE_RECOVERY_20260706 -->
 <!--
@@ -3895,10 +3901,33 @@ composer.style.setProperty("overflow", "visible", "important");
 
     const logout = document.getElementById("nova-mobile-menu-logout");
     if (logout) {
-        logout.onclick = function () {
-            const real = document.getElementById("nova-mobile-auth-logout");
-            if (real) {
-                real.click();
+        logout.onclick = async function () {
+            logout.disabled = true;
+            logout.textContent = "Logging out...";
+
+            try {
+                const response = await fetch("/api/auth/logout", {
+                    method: "POST",
+                    credentials: "include",
+                    cache: "no-store"
+                });
+
+                if (!response.ok) {
+                    throw new Error(
+                        "Logout failed with HTTP " + response.status
+                    );
+                }
+
+                localStorage.removeItem("nova_last_auth_username");
+                localStorage.removeItem("nova_mobile_active_session_id");
+                localStorage.removeItem("nova_active_session_id");
+
+                window.location.replace("/login");
+            } catch (error) {
+                console.error("[Nova Mobile Logout]", error);
+                logout.disabled = false;
+                logout.textContent = "Logout";
+                alert("Logout failed. Please try again.");
             }
         };
     }
