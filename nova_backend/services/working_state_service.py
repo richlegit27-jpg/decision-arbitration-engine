@@ -91,8 +91,3 @@ class WorkingStateService:
                 return {}
 
         return {}
-
-
-
-
-
