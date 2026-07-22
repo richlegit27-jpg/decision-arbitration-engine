@@ -9916,68 +9916,14 @@ Rules:
                 "session": self._get_session_payload(session_id),
                 "ok": True,
             }
-
     def _handle_execution_control(
-        self, user_text: str, session_id: str, attachments=None
+        self,
+        user_text: str,
+        session_id: str,
+        attachments=None,
     ):
         text = self.safe_str(user_text).strip().lower()
 
-        execution_state = (
-            self._get_session_meta(
-                session_id,
-                "execution_state",
-            )
-            or self._get_session_meta(
-                session_id,
-                "active_execution",
-            )
-            or (
-                self._get_working_state(session_id).get("execution_state")
-                if isinstance(
-                    self._get_working_state(session_id),
-                    dict,
-                )
-                else {}
-            )
-            or {}
-        )
-        # =========================
-        # ONLY EXECUTION COMMANDS
-        # =========================
-        execution_keywords = {
-            "next",
-            "nex",
-            "continue",
-            "continue on",
-            "keep going",
-            "go",
-            "run next",
-            "next step",
-            "what next",
-            "what now",
-            "run_step",
-            "run step",
-            "run_all",
-            "run all",
-            "run it",
-            "execute",
-            "execute all",
-            "retry",
-            "retry_failed",
-            "retry failed",
-            "try again",
-            "rerun failed",
-            "apply_auto_fix",
-            "apply auto fix",
-            "auto fix",
-            "autofix",
-            "stop",
-            "cancel",
-        }
-
-        # =========================
-        # MISSION COMMAND GATE
-        # =========================
         mission_command = self._resolve_mission_command(
             user_text=text,
             session_id=session_id,
@@ -9989,89 +9935,17 @@ Rules:
         )
 
         if mission_result is not None:
-            exec_debug(
-                "MISSION GATE RETURN:",
-                mission_command.get("type"),
-            )
             return mission_result
 
-        # =========================
-        # BRAIN CONTROL GATE
-        # =========================
-        working_state = self._get_working_state(session_id) or {}
-
-        brain_state = self._build_brain_state(
-            execution_state=execution_state,
-            working_state=working_state,
-            session=session_id,
-            user_text=text,
-        )
-
-        action = self._decide_brain_action(brain_state)
-        brain_state["decision"] = action
-
-        if text in execution_keywords:
-            action = "execute"
-            brain_state["decision"] = action
-
-        # CHAT EXIT PATH
-        if action == "chat" and text not in execution_keywords:
-
-            if route == "execution":
-                execution_state = {
-                    "command": user_text,
-                }
-
-                return self.execution_orchestrator_service.process_execution(
-                    session_id=session_id,
-                    state=execution_state,
-                )
-
-            if route == "attachment":
-                return self._handle_attachment(
-                    user_text=user_text,
-                    attachments=attachments,
-                    session_id=session_id
-                )
-
-            if route == "web":
-                return self._execute_web_fetch(
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments
-                )
-
-            chat_result = self._execute_general_chat(
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-                decision={"route": "chat"}
-            )
-
-            if isinstance(chat_result, dict):
-                return chat_result
-
-            return {
-                "ok": True,
-                "assistant_message": self._build_assistant_message(
-                    self._execute_general_chat(user_text, session_id)
-                ),
-                "execution": None,
-                "brain_action": "chat",
-            }
-
-        # =========================
-        # COMMAND ROUTING
-        # =========================
         if text in {
             "apply_auto_fix",
             "apply auto fix",
             "auto fix",
             "autofix",
         }:
-            command = "apply_auto_fix"
+            return self._apply_pending_fix(session_id)
 
-        elif text in {
+        if text in {
             "retry",
             "retry_failed",
             "retry failed",
@@ -10086,6 +9960,9 @@ Rules:
             "run it",
             "execute",
             "execute all",
+            "auto",
+            "auto mode",
+            "autopilot",
         }:
             command = "run_all"
 
@@ -10096,6 +9973,7 @@ Rules:
             "continue on",
             "keep going",
             "go",
+            "resume",
             "run next",
             "next step",
             "what next",
@@ -10103,10 +9981,7 @@ Rules:
             "run_step",
             "run step",
         }:
-            if execution_state.get("status") == "failed":
-                command = "retry_failed"
-            else:
-                command = "run_step"
+            command = "run_step"
 
         elif text in {
             "stop",
@@ -10117,332 +9992,31 @@ Rules:
         else:
             return None
 
-        # =========================
-        # UNLOCK EXECUTION STATE
-        # =========================
+        execution_state = (
+            self._load_execution_state(session_id)
+            or {}
+        )
 
-        # ignore non-execution input
-        if text not in execution_keywords:
-            return None
+        if not isinstance(execution_state, dict):
+            execution_state = {}
 
-        # =========================
-        # COMMAND ROUTING
-        # =========================
-        if text in {"apply_auto_fix", "apply auto fix", "auto fix", "autofix"}:
-            command = "apply_auto_fix"
-
-        elif text in {
-            "retry",
-            "retry_failed",
-            "retry failed",
-            "try again",
-            "rerun failed",
-        }:
+        if (
+            command == "run_step"
+            and self.safe_str(
+                execution_state.get("status")
+            ).strip().lower() == "failed"
+        ):
             command = "retry_failed"
 
-        elif text in {"run_all", "run all", "run it", "execute", "execute all"}:
-            command = "run_all"
+        execution_state["lock"] = False
+        execution_state["_execution_processing"] = False
+        execution_state["command"] = command
 
-        elif text in {"test_fail", "test fail"}:
-            command = "test_fail"
-
-        elif text in {
-            "next",
-            "nex",
-            "continue",
-            "continue on",
-            "keep going",
-            "go",
-            "run next",
-            "next step",
-            "what next",
-            "what now",
-            "run_step",
-            "run step",
-        }:
-            if execution_state.get("status") == "failed":
-                command = "retry_failed"
-            else:
-                if execution_state.get("status") == "failed":
-                    command = "retry_failed"
-                else:
-                    command = "run_step"
-
-        elif text in {"stop", "cancel"}:
-            command = "cancel"
-
-        # =========================
-        # UNLOCK EXECUTION STATE
-        # =========================
-        if execution_state:
-            execution_state["lock"] = False
-
-            self._save_execution_state(
-                session_id,
-                execution_state,
-            )
-
-        execution_state = (
-            self._load_execution_state(
-                session_id
-            )
-            or execution_state
-            or {}
+        return self.execution_orchestrator_service.process_execution(
+            session_id=session_id,
+            state=execution_state,
+            command=command,
         )
-
-        if not isinstance(
-            execution_state,
-            dict,
-        ):
-            execution_state = {}
-
-        # =========================
-        # EXECUTION COMMAND DISPATCH
-        # =========================
-        if command:
-
-            already_processing = bool(execution_state.get("_execution_processing"))
-
-            if already_processing:
-                execution_state["_execution_processing"] = False
-
-                execution_state["lock"] = False
-                execution_state["waiting"] = True
-
-                self._save_execution_state(
-                    session_id,
-                    execution_state,
-                )
-
-            execution_state["_execution_processing"] = False
-
-            execution_state["command"] = command
-
-            return self.execution_orchestrator_service.process_execution(
-                session_id=session_id,
-                state=execution_state,
-            )
-
-        # =========================
-        # EXECUTION STATE HANDLING
-        # =========================
-
-        execution_state = (
-            execution_state
-            or self._load_execution_state(
-                session_id
-            )
-            or {}
-        )
-        if not isinstance(
-            execution_state,
-            dict,
-        ):
-
-            execution_snapshot = self._build_execution_snapshot(execution_state)
-
-            steps = execution_snapshot["steps"]
-
-            current_index = execution_snapshot["current_index"]
-
-            status = execution_snapshot["status"]
-
-            current_step = execution_snapshot["current_step"]
-            execution_state = {}
-
-            if not steps:
-                execution_state["status"] = "idle"
-                execution_state["current_step"] = ""
-                execution_state["progress"] = 0
-
-            self._save_execution_state(
-                session_id,
-                {},
-            )
-
-            self._save_execution_state(
-                session_id,
-                execution_state,
-            )
-
-            return {
-                "ok": True,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": ("Execution plan is empty. " "Create a new plan first."),
-                },
-            }
-
-            if command == "retry_failed":
-                return {
-                    "ok": False,
-                    "assistant_message": {
-                        "role": "assistant",
-                        "text": "No failed execution step found to retry.",
-                    },
-                    "execution": execution_state,
-                }
-
-            if (
-                steps
-                and all(
-                    isinstance(step, dict) and step.get("status") == "completed"
-                    for step in steps
-                )
-                and self.safe_str(execution_state.get("status")).lower().strip()
-                in {
-                    "complete",
-                    "completed",
-                    "done",
-                }
-            ):
-
-                execution_state = self.execution_mutation_service.mark_complete(
-                    execution_state,
-                )
-
-                execution_state["current_index"] = len(steps)
-                execution_state["progress"] = len(steps)
-                execution_state["current_step"] = "complete"
-                execution_state["current_step_title"] = "complete"
-                execution_state["complete"] = True
-                execution_state["lock"] = False
-
-                self._save_execution_state(
-                    session_id,
-                    execution_state,
-                )
-
-                pass
-
-        # =========================
-        # NEXT AFTER COMPLETION HANDLING
-        # =========================
-        if command in {
-            "run_step",
-            "run_all",
-            "retry_failed",
-            "cancel",
-        }:
-
-            self._save_execution_state(
-                session_id,
-                execution_state,
-            )
-
-            # =========================
-            # SYNC STATE
-            # =========================
-            current_pointer = int(execution_state.get("current_index", 0) or 0)
-
-            current_title = ""
-
-            if (
-                isinstance(steps, list)
-                and current_pointer < len(steps)
-                and isinstance(steps[current_pointer], dict)
-            ):
-                current_title = steps[current_pointer].get("title", "") or ""
-
-            execution_state = self._sync_execution_state(
-                execution=execution_state,
-                current_index=current_pointer,
-                current_step=current_title,
-                progress=current_pointer,
-            )
-
-            synced_index = self._execution_current_index(execution_state)
-
-            if synced_index < len(steps):
-
-                synced_step = steps[synced_index] or {}
-
-                execution_state = self._sync_execution_state(
-                    execution=execution_state,
-                    current_index=synced_index,
-                    current_step=synced_step.get(
-                        "title",
-                        "",
-                    ),
-                    progress=synced_index,
-                )
-
-                execution_state["current_step"] = synced_step.get(
-                    "title",
-                    "",
-                )
-
-                execution_state["current_step_title"] = synced_step.get(
-                    "title",
-                    "",
-                )
-
-                execution_state["next_moves"] = [
-                    {
-                        "type": synced_step.get(
-                            "action",
-                            "execute",
-                        ),
-                        "title": synced_step.get(
-                            "title",
-                            "",
-                        ),
-                        "step_index": synced_index,
-                    }
-                ]
-
-            else:
-
-                execution_state["next_moves"] = []
-
-            self._save_execution_state(
-                session_id,
-                execution_state,
-            )
-
-            print(
-                "EXECUTION RETURNING PROCESS COMMAND =",
-                command,
-            )
-
-            execution_state["command"] = command
-
-            result = self.execution_orchestrator_service.process_execution(
-                session_id=session_id,
-                state=execution_state,
-            )
-
-            print(
-                "EXECUTION PROCESS RESULT =",
-                result,
-            )
-
-            if isinstance(result, dict):
-                return result
-
-            return {
-                "ok": False,
-                "assistant_message": self._build_assistant_message(
-                    "Execution returned no result."
-                ),
-                "session": self._get_session_payload(session_id),
-            }
-
-            return {
-                "ok": True,
-                "assistant_message": self._build_assistant_message(
-                    "Execution command processed."
-                ),
-                "session": self._get_session_payload(session_id),
-            }
-
-        if not result:
-            result = {
-                "ok": False,
-                "assistant_message": self._build_assistant_message(
-                    "Execution command failed to produce output."
-                ),
-            }
 
     # ATTACHMENT_BLOCKS_WEB_ROUTE_LOCK
     def _nova_current_text_has_attachment_context(self, text: str) -> bool:

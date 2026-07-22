@@ -553,6 +553,30 @@ class ExecutionOrchestratorService:
             }
 
         # =========================
+        # CANCEL
+        # =========================
+        if command == "cancel":
+            execution_state = (
+                self.execution_mutation_service.cancel(
+                    execution_state
+                )
+            )
+
+            self._save_execution_state(
+                session_id,
+                execution_state,
+            )
+
+            return {
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": "Execution cancelled.",
+                },
+                "execution": execution_state,
+            }
+
+        # =========================
         # RETRY FAILED
         # =========================
         if command == "retry_failed":
