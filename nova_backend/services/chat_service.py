@@ -8644,6 +8644,82 @@ Rules:
         if self._is_image_generation_request(text):
             return ("image", "generate")
 
+        # CONTEXTUAL WEATHER FOLLOW-UP ROUTE
+        weather_followup = any(
+            marker in lowered
+            for marker in (
+                "umbrella",
+                "rain",
+                "snow",
+                "temperature",
+                "forecast",
+                "weather",
+                "wind",
+            )
+        )
+
+        if weather_followup and session_id:
+            session_payload = (
+                self._get_session_payload(session_id)
+                or {}
+            )
+            session_messages = (
+                session_payload.get("messages")
+                if isinstance(session_payload, dict)
+                else []
+            ) or []
+
+            previous_exchange = (
+                self._get_session_meta(
+                    session_id,
+                    "last_verified_web_exchange",
+                )
+                or {}
+            )
+
+            weather_context_parts = []
+
+            for message in session_messages[-8:]:
+                if not isinstance(message, dict):
+                    continue
+
+                weather_context_parts.append(
+                    self.safe_str(
+                        message.get("content")
+                        or message.get("text")
+                        or ""
+                    )
+                )
+
+            if isinstance(previous_exchange, dict):
+                weather_context_parts.extend(
+                    [
+                        self.safe_str(
+                            previous_exchange.get("query")
+                        ),
+                        self.safe_str(
+                            previous_exchange.get("answer")
+                        ),
+                    ]
+                )
+
+            weather_context = " ".join(
+                weather_context_parts
+            ).lower()
+
+            if any(
+                marker in weather_context
+                for marker in (
+                    "weather",
+                    "forecast",
+                    "precipitation",
+                    "temperature",
+                    "?c",
+                    "?f",
+                )
+            ):
+                return ("web", "fetch")
+
         # WRITING INTENT MUST BEAT FRESH-WEB WORDS
         writing_request = bool(
             re.match(

@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
@@ -531,9 +531,6 @@ class SessionService:
         return get_current_user_id()
 
     def _belongs_to_user(self, session, user_id=""):
-        if not user_id:
-            return False
-
         session_user_id = str(
             session.get("user_id") or ""
         ).strip()
@@ -542,10 +539,17 @@ class SessionService:
             user_id or ""
         ).strip()
 
-        if session_user_id == current_user_id:
+        # Anonymous sessions may continue anonymously.
+        if not current_user_id:
+            return not session_user_id
+
+        # Allow an authenticated user to claim an
+        # existing unowned session. get_session()
+        # persists the owner immediately afterward.
+        if not session_user_id:
             return True
 
-        return False
+        return session_user_id == current_user_id
 
     def load(self):
         """

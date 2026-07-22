@@ -450,6 +450,33 @@ class WebService:
 
         route = self.classify_web_query(query)
 
+        query_lower = str(query or "").lower()
+        context_lower = str(context or "").lower()
+
+        contextual_weather_followup = (
+            any(
+                marker in query_lower
+                for marker in (
+                    "umbrella",
+                    "rain",
+                    "snow",
+                    "temperature",
+                    "forecast",
+                    "weather",
+                )
+            )
+            and any(
+                marker in context_lower
+                for marker in (
+                    "weather",
+                    "forecast",
+                )
+            )
+        )
+
+        if contextual_weather_followup:
+            route = "weather"
+
         try:
             if route == "url_fetch":
                 fetched = self.fetch(query)
@@ -480,7 +507,10 @@ class WebService:
                 return self.lookup_crypto_price(query)
 
             if route == "weather":
-                return self.lookup_weather(query)
+                return self.lookup_weather(
+                    query,
+                    context=context,
+                )
 
             if route == "business_lookup":
                 return self.lookup_business(query, max_results=max_results)
@@ -633,8 +663,46 @@ class WebService:
                 "coin_id": coin_id,
             }
 
-    def lookup_weather(self, query: str) -> dict:
-        return self.search_web_api(query, max_results=5, preferred_mode="weather")
+    def lookup_weather(
+        self,
+        query: str,
+        context: str = "",
+    ) -> dict:
+        from nova_backend.services.weather_service import (
+            WeatherService,
+        )
+
+        weather_result = WeatherService(
+            timeout=self.timeout,
+        ).lookup(
+            query,
+            context=context,
+        )
+
+        if weather_result.get("ok"):
+            return weather_result
+
+        fallback = self.search_web_api(
+            query,
+            max_results=5,
+            preferred_mode="weather",
+            context=context,
+        )
+
+        debug = (
+            dict(fallback.get("debug") or {})
+            if isinstance(fallback, dict)
+            else {}
+        )
+
+        debug["structured_weather_error"] = (
+            weather_result.get("error")
+        )
+
+        if isinstance(fallback, dict):
+            fallback["debug"] = debug
+
+        return fallback
 
     def lookup_business(self, query: str, max_results: int = 5) -> dict:
         return self.search_web_api(query, max_results=max_results, preferred_mode="business")
