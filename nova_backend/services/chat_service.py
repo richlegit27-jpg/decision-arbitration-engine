@@ -473,85 +473,9 @@ class ChatService:
         return False
 
     def _get_working_state(self, session_id: str) -> dict:
-        if self.working_state_service:
-            return self.working_state_service.get_working_state(
-                session_id
-            )
-
-        session_id = self.safe_str(session_id).strip()
-
-        if not session_id:
-            return {}
-
-        try:
-            session = self._get_session_payload(session_id)
-
-            if not isinstance(session, dict):
-                return {}
-
-            state = session.get("working_state")
-
-            if not isinstance(state, dict):
-                state = {}
-
-            active_task = self.safe_str(state.get("active_task")).strip()
-
-            if not active_task:
-                title = self.safe_str(session.get("title")).strip()
-                inferred_task = ""
-
-                lowered_title = title.lower()
-
-                if lowered_title.startswith("we are working on "):
-                    inferred_task = title[len("we are working on "):].strip(" .")
-                elif lowered_title.startswith("we're working on "):
-                    inferred_task = title[len("we're working on "):].strip(" .")
-                elif lowered_title.startswith("working on "):
-                    inferred_task = title[len("working on "):].strip(" .")
-
-                if not inferred_task:
-                    messages = session.get("messages") or []
-
-                    for msg in reversed(messages):
-                        if not isinstance(msg, dict):
-                            continue
-
-                        if msg.get("role") != "user":
-                            continue
-
-                        text = self.safe_str(
-                            msg.get("text") or msg.get("content")
-                        ).strip()
-
-                        lowered_text = text.lower()
-
-                        if lowered_text.startswith("we are working on "):
-                            inferred_task = text[len("we are working on "):].strip(" .")
-                            break
-
-                        if lowered_text.startswith("we're working on "):
-                            inferred_task = text[len("we're working on "):].strip(" .")
-                            break
-
-                        if lowered_text.startswith("working on "):
-                            inferred_task = text[len("working on "):].strip(" .")
-                            break
-
-                if inferred_task:
-                    state["active_task"] = inferred_task
-
-                    if ".py" in inferred_task and not state.get("current_file"):
-                        for part in inferred_task.replace("\\", "/").split():
-                            clean_part = part.strip("`'\".,:;()[]{}")
-                            if clean_part.endswith(".py"):
-                                state["current_file"] = clean_part.split("/")[-1]
-                                break
-
-            return state
-
-        except Exception as e:
-            exec_debug("GET WORKING STATE FAILED:", e)
-            return {}
+        return self.working_state_service.get_working_state(
+            session_id
+        )
 
     def _is_control_command_value(self, value):
 
@@ -585,102 +509,15 @@ class ChatService:
         return text in blocked
 
 
-    def _update_working_state(self, session_id: str, patch: dict) -> dict:
-        if self.working_state_service:
-            return self.working_state_service.update_working_state(
-                session_id,
-                patch,
-            )
-        session_id = self.safe_str(session_id).strip()
-
-        if not session_id:
-            return {}
-
-        if not isinstance(patch, dict):
-            patch = {}
-
-        blocked_state_values = {
-            "",
-            "continuity_working",
-            "working_state_resume_context",
-            "no active work to resume.",
-        }
-
-        protected_keys = {
-            "last_success",
-            "checkpoint",
-            "next_move",
-            "active_task",
-            "current_bug",
-        }
-
-        try:
-            current = self._get_working_state(session_id)
-            current = current if isinstance(current, dict) else {}
-
-            for key, value in patch.items():
-                key = self.safe_str(key).strip()
-
-                if key in {
-                    "active_task",
-                    "next_move",
-                    "mission",
-                }:
-
-                    if self._is_control_command_value(value):
-                        continue
-
-                if not key:
-                    continue
-
-                # allow explicit clearing
-                if value in [None, "", [], {}]:
-
-                    if key in current:
-                        del current[key]
-
-                    continue
-
-                # preserve structured state dictionaries
-                if isinstance(value, dict):
-                    current[key] = value
-                    continue
-
-                normalized_value = self.safe_str(value).lower().strip()
-
-                if key == "checkpoint" and normalized_value == "execution_plan_created":
-
-                    execution_state = (
-                        self._get_session_meta(
-                            session_id,
-                            "execution_state",
-                        )
-                        or {}
-                    )
-
-                    steps = execution_state.get("steps") or []
-
-                    if not steps:
-                        continue
-
-                if key in protected_keys and normalized_value in blocked_state_values:
-                    if key in current:
-                        del current[key]
-                    continue
-
-                current[key] = value
-
-            self.session_service.update_working_state(
-                session_id,
-                current,
-            )
-
-            return current
-
-        except Exception as e:
-            exec_debug("UPDATE WORKING STATE FAILED:", e)
-            return {}
-
+    def _update_working_state(
+        self,
+        session_id: str,
+        patch: dict,
+    ) -> dict:
+        return self.working_state_service.update_working_state(
+            session_id,
+            patch,
+        )
 
     def _build_working_state_summary(self, working_state):
         ws = self._normalize_working_state(working_state)
@@ -3756,6 +3593,14 @@ if (not attachments) and (__name__ == "__main__"):
         self.web_service = web_service
         self.recon_service = recon_service
         self.memory_context_service = memory_context_service
+        if working_state_service is None:
+            from nova_backend.services.working_state_service import (
+                WorkingStateService,
+            )
+
+            working_state_service = WorkingStateService(
+                session_service
+            )
         self.working_state_service = working_state_service
         self.execution_state_service = execution_state_service
 
