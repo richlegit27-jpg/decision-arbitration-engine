@@ -2426,63 +2426,6 @@ Rules:
     def _debug(self, *args):
         exec_debug(*args)
 
-    def _build_runtime_cognition(self):
-
-        runtime_summary = {}
-        runtime_decision = {}
-
-        runtime = getattr(
-            self,
-            "runtime_brain",
-            None,
-        )
-
-        if runtime is None:
-
-            return {
-                "has_runtime_cognition": False,
-            }
-
-        if hasattr(
-            runtime,
-            "get_summary",
-        ):
-
-            runtime_summary = runtime.get_summary()
-
-        elif hasattr(
-            runtime,
-            "summary",
-        ):
-
-            runtime_summary = runtime.summary()
-
-        elif hasattr(
-            runtime,
-            "runtime_state",
-        ):
-
-            runtime_summary = getattr(
-                runtime,
-                "runtime_state",
-                {},
-            )
-
-        if hasattr(
-            runtime,
-            "last_decision",
-        ):
-
-            runtime_decision = getattr(
-                runtime,
-                "last_decision",
-                {},
-            )
-
-        return self.runtime_cognitive_injection.build(
-            runtime_summary=runtime_summary,
-            runtime_decision=runtime_decision,
-        )
 
     def _run_test_harness(self, session_id):
 
@@ -13304,61 +13247,6 @@ Auto-fix result:
 
         return "Working state:\n" + "\n".join(lines)
 
-    def _derive_working_state_patch_from_step_output(
-        self,
-        step_title: str,
-        step_output: str,
-        current_state: dict | None = None,
-    ) -> dict:
-        current_state = current_state if isinstance(current_state, dict) else {}
-        step_title = self.safe_str(step_title).strip()
-        step_output = self.safe_str(step_output).strip()
-
-        if not step_output:
-            return {}
-
-        patch = {}
-
-        # basic success memory
-        patch["last_success"] = step_title or "Completed execution step"
-
-        lowered = step_output.lower()
-
-        next_markers = [
-            "next implication",
-            "next move",
-            "next step",
-        ]
-
-        extracted_next = ""
-        for marker in next_markers:
-            idx = lowered.find(marker)
-            if idx != -1:
-                raw = step_output[idx:]
-                parts = raw.split("\n", 1)
-                if len(parts) > 1:
-                    extracted_next = parts[1].strip()
-                else:
-                    extracted_next = raw.strip()
-                break
-
-        if extracted_next:
-            first_line = extracted_next.splitlines()[0].strip(" -:\t")
-
-            blocked_moves = {
-                "request_traceback",
-                "manual_review_required",
-            }
-
-            if first_line.lower() in blocked_moves:
-                first_line = ""
-
-            if first_line:
-                patch["next_move"] = first_line
-        if step_title and not self.safe_str(current_state.get("active_task")).strip():
-            patch["active_task"] = step_title
-
-        return patch
 
         # ==============================
         # WORKING STATE (PHASE 3)
