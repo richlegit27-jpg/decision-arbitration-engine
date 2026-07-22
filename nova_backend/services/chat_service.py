@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import base64
 import os
@@ -2900,6 +2900,24 @@ Rules:
             assistant_msg["meta"] = meta
 
         session = self._get_session_payload(session_id) or {}
+
+        verified_exchange = (
+            decision.get("last_verified_web_exchange")
+            if isinstance(decision, dict)
+            else None
+        )
+
+        if isinstance(verified_exchange, dict):
+            session_meta = session.get("meta")
+            session_meta = (
+                dict(session_meta)
+                if isinstance(session_meta, dict)
+                else {}
+            )
+            session_meta[
+                "last_verified_web_exchange"
+            ] = verified_exchange
+            session["meta"] = session_meta
 
         try:
             from flask import g, session as flask_session
@@ -7333,14 +7351,187 @@ Rules:
 
         self._last_web_query = query
 
+        conversation_context = ""
+        previous_web_context = {}
+
+        try:
+            session = (
+                self._get_session_payload(session_id)
+                or self.session_service.get_session(session_id)
+                or {}
+            )
+            messages = (
+                session.get("messages", [])
+                if isinstance(session, dict)
+                else []
+            )
+
+            context_lines = []
+
+            for message in messages[-10:]:
+                if not isinstance(message, dict):
+                    continue
+
+                role = self.safe_str(
+                    message.get("role") or "unknown"
+                ).strip()
+
+                content = self.safe_str(
+                    message.get("text")
+                    or message.get("content")
+                    or ""
+                ).strip()
+
+                if not content:
+                    continue
+
+                context_lines.append(
+                    f"{role}: {content[:1200]}"
+                )
+
+            previous_web_context = (
+                self._get_session_meta(
+                    session_id,
+                    "last_verified_web_exchange",
+                )
+                or {}
+            )
+
+            if isinstance(previous_web_context, dict):
+                previous_query = self.safe_str(
+                    previous_web_context.get("query")
+                ).strip()
+                previous_answer = self.safe_str(
+                    previous_web_context.get("answer")
+                ).strip()
+
+                if previous_query:
+                    context_lines.append(
+                        "Previous verified web question: "
+                        + previous_query[:1200]
+                    )
+
+                if previous_answer:
+                    context_lines.append(
+                        "Previous verified web answer: "
+                        + previous_answer[:2400]
+                    )
+
+            conversation_context = "\n".join(
+                context_lines
+            )[-6000:]
+
+        except Exception as exc:
+            exec_debug(
+                "WEB_CONVERSATION_CONTEXT_ERROR:",
+                exc,
+            )
+
+        resolved_search_query = query
+        query_lc = query.lower()
+
+        contextual_followup_markers = (
+            " they ",
+            " them ",
+            " their ",
+            " he ",
+            " she ",
+            " it ",
+            " that ",
+            " those ",
+            " the final",
+            "what about",
+            "how about",
+            "and what",
+        )
+
+        padded_query = f" {query_lc} "
+
+        if (
+            isinstance(previous_web_context, dict)
+            and previous_web_context
+            and any(
+                marker in padded_query
+                for marker in contextual_followup_markers
+            )
+        ):
+            previous_query = self.safe_str(
+                previous_web_context.get("query")
+            ).strip()
+            previous_answer = self.safe_str(
+                previous_web_context.get("answer")
+            ).strip()
+
+            resolved_search_query = (
+                "Resolve and research this conversational follow-up.\n"
+                f"Previous verified question: {previous_query}\n"
+                f"Previous verified answer: {previous_answer}\n"
+                f"Follow-up question: {query}"
+            )
+
         web_result = {"results": []}
 
         try:
-            if hasattr(self, "_web_search"):
+            search_service = (
+                getattr(self, "web_service", None)
+                or getattr(self, "web", None)
+            )
+
+            if (
+                search_service is not None
+                and callable(
+                    getattr(search_service, "search", None)
+                )
+            ):
+                web_result = search_service.search(
+                    resolved_search_query,
+                    max_results=10,
+                    context=conversation_context,
+                )
+            elif hasattr(self, "_web_search"):
                 web_result = self._web_search(query)
 
             if not isinstance(web_result, dict):
                 web_result = {"body": str(web_result or ""), "results": []}
+
+            if (
+                web_result.get("ok")
+                and web_result.get("results")
+            ):
+                try:
+                    verified_answer = self.safe_str(
+                        web_result.get("body")
+                        or web_result.get("summary")
+                        or ""
+                    ).strip()
+
+                    verified_exchange = {
+                        "query": query,
+                        "answer": verified_answer[:4000],
+                        "source_type": self.safe_str(
+                            web_result.get("source_type")
+                        ),
+                    }
+
+                    if isinstance(decision, dict):
+                        decision[
+                            "last_verified_web_exchange"
+                        ] = verified_exchange
+
+                    try:
+                        self._set_session_meta(
+                            session_id,
+                            "last_verified_web_exchange",
+                            verified_exchange,
+                        )
+                    except Exception:
+                        pass
+
+                except Exception as exc:
+                    exec_debug(
+                        "SAVE_VERIFIED_WEB_EXCHANGE_ERROR:",
+                        exc,
+                    )
 
             if not web_result.get("results"):
                 exec_debug("WEB_FETCH_FALLBACK: using Google News RSS")
@@ -8453,6 +8644,60 @@ Rules:
         if self._is_image_generation_request(text):
             return ("image", "generate")
 
+        # WRITING INTENT MUST BEAT FRESH-WEB WORDS
+        writing_request = bool(
+            re.match(
+                r"^(write|draft|compose|rewrite|edit|proofread)\b",
+                lowered,
+            )
+        )
+
+        explicit_writing_research = any(
+            marker in lowered
+            for marker in (
+                "search the web",
+                "look up",
+                "research ",
+                "find sources",
+                "cite sources",
+            )
+        )
+
+        if (
+            writing_request
+            and not explicit_writing_research
+        ):
+            return ("chat", "writing")
+
+        # CENTRAL WEB DECISION AUTHORITY
+        # Reuse Nova's full route decision instead of maintaining
+        # a second, keyword-only web router.
+        try:
+            central_decision = self._decide(
+                user_text=text,
+                attachments=attachments,
+                session_id=session_id,
+            )
+
+            central_route = self.safe_str(
+                central_decision.get("route")
+                if isinstance(central_decision, dict)
+                else ""
+            ).strip()
+
+            if central_route in {
+                self.ROUTE_WEB_FETCH,
+                "web",
+                "web_search",
+            }:
+                return ("web", "fetch")
+
+        except Exception as exc:
+            exec_debug(
+                "SINGLE_ROUTER_CENTRAL_WEB_DECISION_ERROR:",
+                exc,
+            )
+
         # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         # 3. WEB (STRICT ONLY)
         # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
@@ -9230,6 +9475,39 @@ Rules:
         self._set_session_meta(session_id, "answer_depth", answer_depth)
 
         lowered = self.safe_str(user_text).lower().strip()
+
+        early_writing_request = bool(
+            re.match(
+                r"^(write|draft|compose|rewrite|edit|proofread)\b",
+                lowered,
+            )
+        )
+
+        early_writing_research = any(
+            marker in lowered
+            for marker in (
+                "search the web",
+                "look up",
+                "research ",
+                "find sources",
+                "cite sources",
+            )
+        )
+
+        if (
+            early_writing_request
+            and not early_writing_research
+        ):
+            return self._execute_general_chat(
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
+                decision={
+                    "route": "chat",
+                    "intent": "writing",
+                    "mode": "writing",
+                },
+            )
 
         # NOVA_CENTRAL_INTERPRETATION_WEB_ROUTE_20260612
         # Central pre-router interpretation, phase 2:
@@ -11835,6 +12113,40 @@ Rules:
             }
 
         normalized_web_text = lower_text.strip()
+
+        writing_request = bool(
+            re.match(
+                r"^(write|draft|compose|rewrite|edit|proofread)\b",
+                normalized_web_text,
+            )
+        )
+
+        explicit_research_request = (
+            normalized_web_text.startswith(
+                explicit_web_prefixes
+            )
+            or "research " in normalized_web_text
+            or "find sources" in normalized_web_text
+            or "cite sources" in normalized_web_text
+        )
+
+        if (
+            writing_request
+            and not explicit_research_request
+        ):
+            return {
+                "route": self.ROUTE_GENERAL_CHAT,
+                "mode": "chat",
+                "intent": "writing",
+                "confidence": 1.0,
+                "reasons": [
+                    "writing_request_before_live_web"
+                ],
+                "save_artifact": False,
+                "save_memory": True,
+                "use_memory": True,
+            }
+
         web_words = set(
             normalized_web_text
             .replace("?", " ")

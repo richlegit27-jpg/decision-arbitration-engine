@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import hashlib
 import os
@@ -9,11 +9,16 @@ from urllib.parse import urljoin, urlparse
 import requests
 from bs4 import BeautifulSoup
 
+from nova_backend.services.hosted_web_search_service import (
+    HostedWebSearchService,
+)
+
 
 class WebService:
     def __init__(self, timeout: int = 6):
         self.timeout = int(timeout or 12)
         self.cache: Dict[str, dict] = {}
+        self.hosted_web_search_service = HostedWebSearchService()
 
         self.brave_api_key = str(os.getenv("BRAVE_SEARCH_API_KEY") or "").strip()
         self.brave_web_endpoint = "https://api.search.brave.com/res/v1/web/search"
@@ -426,7 +431,12 @@ class WebService:
     # SEARCH ROUTER
     # -----------------------
 
-    def search(self, query: str, max_results: int = 5) -> dict:
+    def search(
+        self,
+        query: str,
+        max_results: int = 5,
+        context: str = "",
+    ) -> dict:
         query = str(query or "").strip()
 
         if not query:
@@ -479,6 +489,7 @@ class WebService:
                 query,
                 max_results=max_results,
                 preferred_mode="news" if self._looks_like_news_query(query) else "general",
+                context=context,
             )
 
         except Exception as e:
@@ -910,7 +921,13 @@ class WebService:
             print("DDG ERROR:", e)  # ðŸ”¥ debug visibility
             return []
 
-    def search_web_api(self, query: str, max_results: int = 5, preferred_mode: str = "general") -> dict:
+    def search_web_api(
+        self,
+        query: str,
+        max_results: int = 5,
+        preferred_mode: str = "general",
+        context: str = "",
+    ) -> dict:
         query = str(query or "").strip()
         if not query:
             return {
@@ -918,8 +935,26 @@ class WebService:
                 "query": query,
                 "results": [],
                 "summary": "Empty query.",
-                "source_type": "brave_web",
+                "source_type": "openai_hosted_web",
             }
+
+        hosted_result = self.hosted_web_search_service.search(
+            query,
+            context=context,
+            max_results=max_results,
+        )
+
+        if hosted_result.get("ok"):
+            hosted_result["debug"] = {
+                "preferred_mode": preferred_mode,
+                "primary_provider": "openai_hosted_web",
+                "fallback_used": "",
+            }
+            return hosted_result
+
+        hosted_error = str(
+            hosted_result.get("error") or ""
+        ).strip()
 
         key_error = self._check_api_key()
         brave_error = ""
