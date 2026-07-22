@@ -17503,6 +17503,41 @@ Auto-fix result:
             print("[NOVA_OPENAI_VISION_ATTACHMENT_ANALYSIS] failed:", exc)
             return ""
 
+    def _handle_attachment(
+        self,
+        user_text: str,
+        attachments=None,
+        session_id: str = "",
+    ) -> dict:
+        result = self._handle_attachment_analysis(
+            user_text=user_text,
+            attachments=attachments or [],
+        )
+
+        if not isinstance(result, dict):
+            result = {
+                "ok": False,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": "Attachment analysis returned no result.",
+                },
+            }
+
+        result.setdefault(
+            "session_id",
+            session_id,
+        )
+        result.setdefault(
+            "active_session_id",
+            session_id,
+        )
+        result.setdefault(
+            "session",
+            self._get_session_payload(session_id),
+        )
+
+        return result
+
     def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict:
         attachments = attachments or []
 
@@ -17595,10 +17630,18 @@ Auto-fix result:
                         "saved_artifact": None,
                     }
 
-            path = _nova_resolve_attachment_path_20260608(item)
+            path = (
+                self.attachment_analysis_service.resolve_attachment_path(
+                    item
+                )
+            )
 
             if path:
-                text = _nova_extract_attachment_text_string_safe_20260608(path)
+                text = (
+                    self.attachment_analysis_service.read_attachment_text(
+                        path
+                    )
+                )
 
                 if text:
                     preview = text[:6000].strip()

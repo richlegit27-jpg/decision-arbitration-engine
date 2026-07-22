@@ -2582,8 +2582,8 @@ def api_chat():
         try:
             remembered_session_attachments = summarize_attachments_for_session(
                 session_id,
-                requested_session_id,
                 limit=25,
+                client_session_id=requested_session_id,
             )
 
         except Exception:
