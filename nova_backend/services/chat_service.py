@@ -15263,74 +15263,6 @@ Auto-fix result:
             progress=current_index,
         )
 
-    def _advance_execution_one_step(self, execution):
-        execution = self._normalize_execution_state(execution or {})
-
-        steps = execution.get("steps") or []
-        step_count = len(steps)
-
-        current_index = self._execution_current_index(execution)
-
-        if step_count == 0:
-            execution = self._finalize_execution_state(execution)
-            execution["steps"] = []
-
-            execution = self._sync_execution_state(
-                execution=execution,
-                current_index=0,
-                progress=0,
-            )
-
-            return self._normalize_execution_state(execution)
-
-        if current_index >= step_count:
-            execution = self._finalize_execution_state(execution)
-
-            execution = self._sync_execution_state(
-                execution=execution,
-                current_index=step_count,
-                progress=step_count,
-            )
-
-            return self._normalize_execution_state(execution)
-
-        next_index = current_index + 1
-
-        if next_index >= step_count:
-            execution = self._finalize_execution_state(execution)
-
-            execution = self._sync_execution_state(
-                execution=execution,
-                current_index=step_count,
-                progress=step_count,
-            )
-        else:
-            execution = self._sync_execution_state(
-                execution=execution,
-                current_index=next_index,
-                status="running",
-                current_step=steps[next_index].get("title", ""),
-                progress=next_index,
-            )
-
-        return self._normalize_execution_state(execution)
-
-    # =========================================
-    # LEGACY EXECUTION PATH
-    # =========================================
-    # This execution progression system is kept
-    # temporarily for artifact compatibility.
-    #
-    # Canonical execution flow is now:
-    #
-    # _handle_execution_control
-    #     -> _process_execution_command
-    #     -> _execute_current_step
-    #     -> _sync_execution_state
-    #
-    # Avoid adding new execution logic here.
-    # =========================================
-
     # =========================
     # AUTO EXECUTION LOOP (PHASE 6)
     # =========================
@@ -20312,5 +20244,6 @@ def _nova_attachment_guard_method_looks_like_result_web_route(name):
 
     if any(word in lowered for word in blocked):
         return False
+
 
     return True
