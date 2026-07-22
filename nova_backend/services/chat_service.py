@@ -2456,50 +2456,6 @@ Rules:
 
         return {"ok": True, "results": results}
 
-    def _auto_diagnose(self, user_text, brain_state, execution_state, error=None):
-
-        diagnosis = {
-            "input": user_text,
-            "status": execution_state.get("status"),
-            "step": execution_state.get("current_index"),
-            "decision": brain_state.get("decision"),
-            "error": str(error) if error else None,
-            "root_cause": None,
-            "fix_suggestion": None,
-        }
-
-        # -------------------------
-        # FAILURE CASE
-        # -------------------------
-        if execution_state.get("status") == "failed":
-
-            diagnosis["root_cause"] = "execution step failed during runtime"
-
-            if execution_state.get("current_index") is not None:
-                diagnosis[
-                    "root_cause"
-                ] += f" at step {execution_state.get('current_index')}"
-
-            diagnosis["fix_suggestion"] = "retry step or adjust plan mutation logic"
-
-        # -------------------------
-        # STALL CASE
-        # -------------------------
-        elif execution_state.get("status") is None:
-
-            diagnosis["root_cause"] = (
-                "execution state not updated (possible routing issue)"
-            )
-            diagnosis["fix_suggestion"] = "check decision ? executor wiring"
-
-        # -------------------------
-        # DEFAULT CASE
-        # -------------------------
-        else:
-            diagnosis["root_cause"] = "system behaving normally"
-            diagnosis["fix_suggestion"] = "no action required"
-
-        return diagnosis
 
     def _build_user_message(self, text: str, attachments=None, meta=None) -> dict:
         attachments = attachments or []
@@ -10157,55 +10113,6 @@ Rules:
 
         return execution_state
 
-    def _trigger_auto_fix_on_failure(
-        self, session_id: str, error_text: str, action: str = ""
-    ):
-        error_text = self.safe_str(error_text).strip() or "Unknown execution failure."
-        action = self.safe_str(action).strip() or "unknown"
-
-        self._update_working_state(
-            session_id,
-            {
-                "last_execution_status": "failed",
-                "last_execution_error": error_text,
-                "last_error": error_text,
-                "active_task": action,
-                "next_move": "auto_fix_failure",
-                "pending_execution_action": "apply_auto_fix",
-                "auto_fix_triggered": True,
-                "auto_fix_reason": "execution_failure",
-            },
-        )
-
-        self._set_session_meta(session_id, "last_execution_status", "failed")
-        self._set_session_meta(session_id, "last_execution_error", error_text)
-        self._set_session_meta(session_id, "pending_fix_error", error_text)
-        self._set_session_meta(session_id, "pending_fix_source", "execution_failure")
-        self._set_session_meta(session_id, "pending_execution_action", "apply_auto_fix")
-
-        auto_fix_result = None
-
-        try:
-            auto_fix_result = self._process_auto_fix(
-                user_text=f"fix this error:\n{error_text}",
-                session_id=session_id,
-                attachments=None,
-            )
-        except Exception as e:
-            auto_fix_result = {
-                "ok": False,
-                "error": self.safe_str(e),
-            }
-
-        return self._build_assistant_message(text=f"""Execution failed.
-
-Error:
-{error_text}
-
-Auto-fix trigger armed.
-
-Auto-fix result:
-{self.safe_str(auto_fix_result)}""")
 
 
     def _extract_file_path_from_error(self, error_text: str) -> str:
@@ -10422,52 +10329,6 @@ Auto-fix result:
 
 
 
-    def _build_working_context_block(
-        self,
-        session_id: str,
-    ):
-
-        state = self._get_working_state(session_id)
-
-        rows = [
-            (
-                "Active task",
-                state.get("active_task", ""),
-            ),
-            (
-                "Current file",
-                state.get("current_file", ""),
-            ),
-            (
-                "Current bug",
-                state.get("current_bug", ""),
-            ),
-            (
-                "Last success",
-                state.get("last_success", ""),
-            ),
-            (
-                "Next move",
-                state.get("next_move", ""),
-            ),
-            (
-                "Checkpoint",
-                state.get("checkpoint", ""),
-            ),
-        ]
-
-        lines = []
-
-        for label, value in rows:
-            value = self._clean_working_state_value(value)
-
-            if value:
-                lines.append(f"{label}: {value}")
-
-        if not lines:
-            return ""
-
-        return "Working context:\n" + "\n".join(lines)
 
 
     def _score_memory_for_text(
@@ -13225,46 +13086,6 @@ Auto-fix result:
 
         return clean_state
 
-    def _archive_execution_state(
-        self,
-        session_id: str,
-        execution_state: dict,
-        command: str = "",
-    ):
-        try:
-            from datetime import datetime, timezone
-
-            execution_state = execution_state or {}
-
-            completed_steps = self.execution_loop.completed_step_titles(execution_state)
-
-            failed_steps = self.execution_loop.failed_step_titles(execution_state)
-
-            if not completed_steps and not failed_steps:
-                return
-
-            if completed_steps == ["No saved execution plan found"]:
-                return
-
-            archive_entry = {
-                "status": str(execution_state.get("status") or "").strip(),
-                "command": str(command or "").strip(),
-                "completed_steps": completed_steps,
-                "failed_steps": failed_steps,
-                "last_action": str(execution_state.get("last_action") or "").strip(),
-                "completed_at": datetime.now(timezone.utc).isoformat(),
-            }
-
-            self.session_service.append_execution_history(
-                session_id,
-                archive_entry,
-            )
-
-        except Exception as e:
-            exec_debug(
-                "ARCHIVE EXECUTION STATE FAILED:",
-                e,
-            )
 
     def _finalize_execution_state(self, execution_state: dict | None = None) -> dict:
         return self.execution_mutation_service.reset(
@@ -13489,48 +13310,6 @@ Auto-fix result:
     # WORKING STATE HELPERS
     # =========================
 
-    def _format_working_state_context(self, session_id: str) -> str:
-        state = self._get_working_state(session_id)
-
-        if not isinstance(state, dict) or not state:
-            return ""
-
-        lines = []
-
-        friendly_state_map = {
-            "execution_cycle_complete": "continuity stabilization",
-            "execution_complete": "execution pipeline stabilized",
-            "retry_failed": "execution recovery and polish",
-            "run_step": "step-by-step execution flow",
-            "run_all": "autonomous execution mode",
-        }
-
-        def friendly(value):
-            value = self.safe_str(value).strip()
-            return friendly_state_map.get(value, value)
-
-        if self.safe_str(state.get("active_task")):
-            lines.append(f"- Active task: {self.safe_str(state.get('active_task'))}")
-
-        if self.safe_str(state.get("current_file")):
-            lines.append(f"- Current file: {self.safe_str(state.get('current_file'))}")
-
-        if self.safe_str(state.get("current_bug")):
-            lines.append(f"- Current bug: {self.safe_str(state.get('current_bug'))}")
-
-        if self.safe_str(state.get("last_success")):
-            lines.append(f"- Last success: {friendly(state.get('last_success'))}")
-
-        if self.safe_str(state.get("next_move")):
-            lines.append(f"- Next move: {friendly(state.get('next_move'))}")
-
-        if self.safe_str(state.get("checkpoint")):
-            lines.append(f"- Checkpoint: {friendly(state.get('checkpoint'))}")
-
-        if not lines:
-            return ""
-
-        return "Working context:\n" + "\n".join(lines)
 
     def _build_mission_state(
         self,
