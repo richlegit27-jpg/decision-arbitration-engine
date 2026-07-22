@@ -12,6 +12,7 @@ import py_compile
 
 from nova_backend.services.response_mojibake_cleanup_service import ResponseMojibakeCleanupService
 from nova_backend.services.chat_response_cleanup_service import ChatResponseCleanupService
+from nova_backend.services.chat_response_policy_service import ChatResponsePolicyService
 from nova_backend.services.attachment_analysis_service import AttachmentAnalysisService
 from datetime import datetime, timezone
 from pathlib import Path
@@ -2280,6 +2281,7 @@ Rules:
         ):
 
         self.chat_response_cleanup_service = ChatResponseCleanupService()
+        self.chat_response_policy_service = ChatResponsePolicyService()
         self.runtime_cognitive_firewall = RuntimeCognitiveFirewall()
         self.attachment_analysis_service = AttachmentAnalysisService()
         self.accidental_input_guard_service = AccidentalInputGuardService()
@@ -5908,195 +5910,15 @@ Rules:
             "is_debugging": is_debugging,
         }
 
-    def _build_response_policy(self, user_text: str = "", decision=None) -> dict:
-        """
-        Central response policy layer.
-
-        This does NOT answer the user.
-        It tells Nova HOW to answer:
-        - short/direct
-        - SMFF/full-file mode
-        - debugging mode
-        - frustrated user mode
-        - latest/news mode
-        - command-first mode
-        """
-
-        decision = decision if isinstance(decision, dict) else {}
-        text = str(user_text or "").strip()
-        lower = text.lower()
-
-        policy = {
-            "mode": "normal",
-            "answer_length": "normal",
-            "tone": "direct",
-            "needs_steps": False,
-            "needs_full_file": False,
-            "needs_commands": False,
-            "needs_latest": False,
-            "needs_debug": False,
-            "user_frustrated": False,
-            "avoid_examples": False,
-            "prefer_power_shell": True,
-            "instruction": "",
-        }
-
-        # -----------------------------
-        # User frustration / urgency
-        # -----------------------------
-        frustration_markers = [
-            "fuck",
-            "wtf",
-            "this sucks",
-            "waste of time",
-            "madness",
-            "annoying",
-            "broken again",
-            "i don't know what to do",
-            "im lost",
-            "i'm lost",
-        ]
-
-        if any(marker in lower for marker in frustration_markers):
-            policy["user_frustrated"] = True
-            policy["tone"] = "calm_direct"
-            policy["answer_length"] = "short"
-            policy["needs_steps"] = True
-
-            policy["instruction"] += (
-                "User is frustrated. Do not lecture. Do not explain feelings. "
-                "Give the fix first. Use short confident language. "
-                "One path forward only. Maximum 5 lines unless full code is requested.\n"
-            )
-
-        # -----------------------------
-        # SMFF / full-file mode
-        # -----------------------------
-        smff_markers = [
-            "smff",
-            "full file",
-            "whole file",
-            "give me the whole",
-            "full replacement",
-            "replace the whole",
-        ]
-
-        if any(marker in lower for marker in smff_markers):
-            policy["mode"] = "smff"
-            policy["needs_full_file"] = True
-            policy["answer_length"] = "full"
-            policy["avoid_examples"] = True
-            policy["instruction"] += (
-                "User wants SMFF/full-file style. Provide complete replacement code "
-                "or a complete helper block with exact file path and anchor. "
-                "Avoid tiny partial snippets unless the user only pasted a small block.\n"
-            )
-
-        # -----------------------------
-        # Debugging mode
-        # -----------------------------
-        debug_markers = [
-            "error",
-            "traceback",
-            "syntaxerror",
-            "indentationerror",
-            "taberror",
-            "uncaught",
-            "404",
-            "500",
-            "not found",
-            "failed to load",
-            "broken",
-            "compile",
-        ]
-
-        if any(marker in lower for marker in debug_markers):
-            policy["needs_debug"] = True
-            policy["needs_steps"] = True
-            policy["needs_commands"] = True
-            policy["answer_length"] = "short"
-            policy["instruction"] += (
-                "User is debugging. Identify the root cause first, then give the exact "
-                "replacement or exact command. Do not wander.\n"
-            )
-
-        # -----------------------------
-        # Next-step mode
-        # -----------------------------
-        next_markers = [
-            "next",
-            "what now",
-            "what next",
-            "go",
-            "continue",
-            "keep going",
-        ]
-
-        if lower in next_markers:
-            policy["mode"] = "next_step"
-            policy["needs_steps"] = True
-            policy["answer_length"] = "ultra_short"
-            policy["instruction"] += (
-                "User said next. Reply with ONE concrete next action only. "
-                "No explanation. No menu. No markdown essay. Maximum 3 short lines.\n"
-            )
-
-        # -----------------------------
-        # Latest/news mode
-        # -----------------------------
-        latest_markers = [
-            "latest",
-            "fresh",
-            "current",
-            "right now",
-            "news",
-            "update",
-        ]
-
-        if any(marker in lower for marker in latest_markers):
-            policy["needs_latest"] = True
-            policy["instruction"] += (
-                "User wants current information. Prefer fresh web/search route when available. "
-                "Answer in words first, then sources if useful.\n"
-            )
-
-        # -----------------------------
-        # PowerShell / command mode
-        # -----------------------------
-        command_markers = [
-            "powershell",
-            "command",
-            "run this",
-            "compile",
-            "restart",
-            "test",
-        ]
-
-        if any(marker in lower for marker in command_markers):
-            policy["needs_commands"] = True
-            policy["prefer_power_shell"] = True
-            policy[
-                "instruction"
-            ] += "Use PowerShell commands when commands are needed.\n"
-
-        # -----------------------------
-        # User dislikes examples
-        # -----------------------------
-        no_example_markers = [
-            "no examples",
-            "don't give examples",
-            "dont give examples",
-            "just the code",
-            "only the code",
-        ]
-
-        if any(marker in lower for marker in no_example_markers):
-            policy["avoid_examples"] = True
-            policy[
-                "instruction"
-            ] += "Avoid examples. Give the exact needed code or action only.\n"
-
-        return policy
+    def _build_response_policy(
+        self,
+        user_text: str = "",
+        decision=None,
+    ) -> dict:
+        return self.chat_response_policy_service.build_response_policy(
+            user_text=user_text,
+            decision=decision,
+        )
 
     def _apply_response_intelligence(
         self,
@@ -6941,41 +6763,6 @@ Rules:
             "is_debugging": is_debugging,
             "is_learning": is_learning,
         }
-
-    def _build_response_policy_prompt(
-        self,
-        user_text: str = "",
-        decision=None,
-        intelligence=None,
-    ) -> str:
-
-        decision = decision if isinstance(decision, dict) else {}
-        intelligence = intelligence if isinstance(intelligence, dict) else {}
-
-        strategy = self.safe_str(intelligence.get("strategy") or "direct_answer")
-        next_move = self.safe_str(intelligence.get("next_move") or "")
-        user_lc = self.safe_str(user_text).lower().strip()
-
-        return (
-            "NOVA RESPONSE POLICY:\n"
-            "- Answer like an execution-focused AI, not a generic chatbot.\n"
-            "- Be direct, useful, and specific.\n"
-            "- Do not add filler, soft disclaimers, or fake helpfulness.\n"
-            "- Do not ask clarification questions unless the task is truly blocked.\n"
-            "- Infer the likely next move from the current mission.\n"
-            "- When the user says next, continue the current task instead of asking what they want.\n"
-            "- When the user asks for code, provide complete usable code or exact replacement blocks.\n"
-            "- For code edits, include the file path, anchor text, placement, and compile/test command.\n"
-            "- For Python/Flask/Nova work, prefer PowerShell commands.\n"
-            "- For debugging, lead with likely cause, then give the fastest verification/fix.\n"
-            "- For explanations, explain clearly and finish with the core takeaway.\n"
-            "- Never say 'if you want'.\n"
-            "- Never say 'provide more details' unless there is no actionable path.\n"
-            "- Never give vague snippets when the user is asking for implementation.\n\n"
-            f"Detected strategy: {strategy}\n"
-            f"Recommended next move: {next_move}\n"
-            f"Current user message: {user_lc}\n"
-        )
 
     def _build_news_rss_queries(self, query: str) -> list[str]:
         import re
@@ -16111,32 +15898,6 @@ Auto-fix result:
             "sources": [],
             "saved_artifact": None,
         }
-
-    def _format_response_policy_for_prompt(self, response_policy=None) -> str:
-        response_policy = response_policy if isinstance(response_policy, dict) else {}
-
-        instruction = self.safe_str(response_policy.get("instruction")).strip()
-        mode = self.safe_str(response_policy.get("mode")).strip()
-        answer_length = self.safe_str(response_policy.get("answer_length")).strip()
-        tone = self.safe_str(response_policy.get("tone")).strip()
-
-        if not instruction and not mode:
-            return ""
-
-        return (
-            "\n\nRESPONSE POLICY ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â HIGH PRIORITY:\n"
-            f"- Mode: {mode or 'normal'}\n"
-            f"- Answer length: {answer_length or 'normal'}\n"
-            f"- Tone: {tone or 'direct'}\n"
-            f"- Needs full file: {bool(response_policy.get('needs_full_file'))}\n"
-            f"- Needs debug: {bool(response_policy.get('needs_debug'))}\n"
-            f"- Needs commands: {bool(response_policy.get('needs_commands'))}\n"
-            f"- User frustrated: {bool(response_policy.get('user_frustrated'))}\n\n"
-            "Follow these rules above generic assistant behavior.\n"
-            "When policy conflicts with normal style, policy wins.\n"
-            f"{instruction}\n"
-        )
-
 
     def _build_common_state_payload(self, session_id: str = "") -> dict:
         session = self._get_session_payload(session_id)
