@@ -119,6 +119,38 @@ function appendMessage(role, text, message) {
 
     return null;
 }
+    function forceLatestMessageVisible() {
+        function scroll() {
+            if (
+                window.NovaMobileBridge &&
+                typeof window.NovaMobileBridge.scrollBottom ===
+                    "function"
+            ) {
+                window.NovaMobileBridge.scrollBottom(true);
+                return;
+            }
+
+            if (
+                window.NovaMobileCore &&
+                typeof window.NovaMobileCore.scrollBottom ===
+                    "function"
+            ) {
+                window.NovaMobileCore.scrollBottom(true);
+                return;
+            }
+
+            if (window.chatContainer) {
+                window.chatContainer.scrollTop =
+                    window.chatContainer.scrollHeight;
+            }
+        }
+
+        scroll();
+        requestAnimationFrame(scroll);
+        setTimeout(scroll, 120);
+        setTimeout(scroll, 350);
+    }
+
     function extractReply(payload) {
         if (!payload) return "";
 
@@ -469,6 +501,7 @@ if (!text) {
         inFlight = true;
 
         appendMessage("user", text);
+        forceLatestMessageVisible();
 
         if (input) {
             input.value = "";
@@ -616,6 +649,7 @@ fetch("/api/chat", {
             reply,
             assistantMessage
         );
+        forceLatestMessageVisible();
 
 try {
     window.NovaMobileUpload?.clearPendingAttachments?.();
