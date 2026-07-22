@@ -1131,47 +1131,28 @@ class WebService:
                 },
             }
 
-        fallback_results: List[dict] = []
-
-        if preferred_mode == "weather":
-            fallback_results.append({
-                "title": query.strip().title(),
-                "url": f"https://www.google.com/search?q={requests.utils.quote(query)}",
-                "snippet": "Current weather and forecast lookup.",
-                "domain": "google.com",
-                "score": 70.0,
-            })
-        elif preferred_mode == "business":
-            fallback_results.append({
-                "title": query.strip().title(),
-                "url": f"https://www.google.com/maps/search/{requests.utils.quote(query)}",
-                "snippet": "Nearby locations, hours, directions, and contact details.",
-                "domain": "google.com",
-                "score": 70.0,
-            })
-        else:
-            fallback_results.append({
-                "title": query.strip().title(),
-                "url": f"https://www.google.com/search?q={requests.utils.quote(query)}",
-                "snippet": "Live results available via search.",
-                "domain": "google.com",
-                "score": 50.0,
-            })
-
-        ranked_results = self._rank_search_results(query, fallback_results, preferred_mode=preferred_mode)
-        final_results = ranked_results[:max_results]
+        evidence_error = (
+            hosted_error
+            or brave_error
+            or "No verifiable web evidence was available."
+        )
 
         return {
-            "ok": True,
+            "ok": False,
             "query": query,
-            "results": final_results,
-            "summary": self._summarize_search_results(query, final_results),
-            "source_type": "fallback_web",
+            "results": [],
+            "body": "",
+            "summary": (
+                "No verifiable web evidence was available."
+            ),
+            "source_type": "web_unavailable",
+            "error": evidence_error,
             "debug": {
                 "preferred_mode": preferred_mode,
+                "hosted_error": hosted_error,
                 "brave_error": brave_error,
-                "fallback_used": "google_link",
-                "ranked_results_count": len(final_results),
+                "fallback_used": "",
+                "ranked_results_count": 0,
             },
         }
 

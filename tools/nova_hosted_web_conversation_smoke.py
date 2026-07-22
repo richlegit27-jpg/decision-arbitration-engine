@@ -156,6 +156,58 @@ assert_true(
     == "required",
 )
 
+fallback_service = WebService()
+
+fallback_service.hosted_web_search_service.search = (
+    lambda query, **kwargs: {
+        "ok": False,
+        "results": [],
+        "body": "",
+        "summary": "",
+        "error": "Hosted provider unavailable.",
+    }
+)
+
+fallback_service._check_api_key = (
+    lambda: "Brave provider unavailable."
+)
+fallback_service._duckduckgo_search = (
+    lambda query, max_results=10: []
+)
+fallback_service._bing_search = (
+    lambda query, max_results=10: []
+)
+fallback_service._news_rss_search = (
+    lambda query, max_results=10: []
+)
+
+unavailable = fallback_service.search_web_api(
+    "Give me a verified current fact.",
+    preferred_mode="general",
+)
+
+assert_true(
+    "placeholder_fallback_rejected",
+    unavailable.get("ok") is False,
+)
+
+assert_true(
+    "placeholder_has_no_fake_results",
+    unavailable.get("results") == [],
+)
+
+assert_true(
+    "placeholder_reports_web_unavailable",
+    unavailable.get("source_type")
+    == "web_unavailable",
+)
+
+assert_true(
+    "placeholder_contains_no_google_search_link",
+    "google.com/search"
+    not in str(unavailable).lower(),
+)
+
 print(
     "\nNOVA HOSTED WEB CONVERSATION SMOKE PASSED"
 )
