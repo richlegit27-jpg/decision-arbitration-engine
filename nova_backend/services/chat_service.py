@@ -10585,69 +10585,6 @@ Auto-fix result:
         return cleaned[:5]
 
 
-    def _upgrade_web_artifact_payload(
-        self,
-        artifact: dict | None,
-        result: dict | None,
-        url: str = "",
-    ) -> dict:
-
-        artifact = self._safe_dict(artifact)
-        result = self._safe_dict(result)
-
-        meta = self._safe_dict(artifact.get("meta"))
-
-        viewer = self._safe_dict(artifact.get("viewer"))
-
-        title = (
-            self.safe_str(artifact.get("title"))
-            or self.safe_str(result.get("title"))
-            or self.safe_str(url)
-            or "Web result"
-        )
-
-        summary = self.safe_str(artifact.get("summary")) or self.safe_str(
-            result.get("summary")
-        )
-
-        content = self.safe_str(artifact.get("body")) or self.safe_str(
-            result.get("content")
-        )
-
-        source_url = (
-            self.safe_str(artifact.get("source_url"))
-            or self.safe_str(meta.get("source_url"))
-            or self.safe_str(result.get("final_url"))
-            or self.safe_str(result.get("url"))
-            or self.safe_str(url)
-        )
-
-        artifact["kind"] = self.safe_str(artifact.get("kind")) or "web_result"
-
-        artifact["group"] = self.safe_str(artifact.get("group")) or "Web"
-
-        artifact["title"] = self.safe_str(title) or "Web result"
-
-        artifact["summary"] = summary
-        artifact["preview"] = self._truncate_web_text(
-            summary,
-            limit=140,
-        )
-
-        artifact["body"] = (
-            self.safe_str(artifact.get("body"))
-            or self.safe_str(result.get("content"))
-            or ""
-        )
-
-        artifact["source_url"] = source_url
-
-        artifact["source"] = self.safe_str(artifact.get("source")) or "web_fetch"
-
-        artifact["meta"] = meta
-        artifact["viewer"] = viewer
-
-        return artifact
 
     def _categorize_memory(self, text: str) -> str:
         t = self.safe_str(text).lower()
@@ -10754,65 +10691,6 @@ Auto-fix result:
 
         return "Working context:\n" + "\n".join(lines)
 
-    def _build_working_context_payload(
-        self,
-        session_id: str,
-    ) -> dict:
-
-        state = self._get_working_state(session_id)
-
-        if not isinstance(state, dict):
-            state = {}
-
-        cleaned = {
-            "active_task": self._clean_working_state_value(
-                state.get("active_task", "")
-            ),
-            "current_file": self._clean_working_state_value(
-                state.get("current_file", "")
-            ),
-            "current_bug": self._clean_working_state_value(
-                state.get("current_bug", "")
-            ),
-            "last_success": self._clean_working_state_value(
-                state.get("last_success", "")
-            ),
-            "next_move": self._clean_working_state_value(state.get("next_move", "")),
-            "checkpoint": self._clean_working_state_value(state.get("checkpoint", "")),
-            "updated_at": self.safe_str(state.get("updated_at", "")),
-        }
-
-        text_lines = []
-
-        if cleaned["active_task"]:
-            text_lines.append(f"- Active task: " f"{cleaned['active_task']}")
-
-        if cleaned["current_file"]:
-            text_lines.append(f"- Current file: " f"{cleaned['current_file']}")
-
-        if cleaned["current_bug"]:
-            text_lines.append(f"- Current bug: " f"{cleaned['current_bug']}")
-
-        if cleaned["last_success"]:
-            text_lines.append(f"- Last success: " f"{cleaned['last_success']}")
-
-        if cleaned["next_move"]:
-            text_lines.append(f"- Next move: " f"{cleaned['next_move']}")
-
-        if cleaned["checkpoint"]:
-            text_lines.append(f"- Checkpoint: " f"{cleaned['checkpoint']}")
-
-        text = ""
-
-        if text_lines:
-            text = "Working context:\n" + "\n".join(text_lines)
-
-        return {
-            "show": bool(text_lines),
-            "text": text,
-            "state": cleaned,
-            "collapsed": False,
-        }
 
     def _score_memory_for_text(
         self,
