@@ -75,6 +75,50 @@ class AttachmentAnalysisService:
 
         return None
 
+    def existing_attachment_text(
+        self,
+        attachment,
+        limit=6000,
+    ):
+        attachment = self.normalize_attachment(
+            attachment
+        )
+
+        text = str(
+            attachment.get("attachment_summary")
+            or attachment.get("extracted_text")
+            or attachment.get("text")
+            or ""
+        )
+
+        if (
+            text.startswith("PK\x03\x04")
+            or "[Content_Types].xml" in text[:500]
+            or "PK" in text[:20]
+        ):
+            return ""
+
+        return text[:limit].strip()
+
+
+    def extracted_file_text(
+        self,
+        attachment,
+        limit=6000,
+    ):
+        path = self.resolve_attachment_path(
+            attachment
+        )
+
+        if not path:
+            return ""
+
+        text = self.read_attachment_text(
+            path
+        )
+
+        return str(text or "")[:limit].strip()
+
     def clean_extracted_attachment_text(
         self,
         text,

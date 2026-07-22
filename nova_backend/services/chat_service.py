@@ -9884,22 +9884,6 @@ Rules:
         )
 
     # ATTACHMENT_BLOCKS_WEB_ROUTE_LOCK
-    def _nova_current_text_has_attachment_context(self, text: str) -> bool:
-        """Detect attachment-injected prompts so web/news routing does not hijack them."""
-        value = str(text or "").lower()
-        markers = (
-            "uploaded attachment context below",
-            "attachment content:",
-            "uploaded attachment",
-            "extracted attachment text",
-            "[mobile quick action attachment context active]",
-            "summarize this uploaded pdf attachment",
-            "summarize the uploaded attachment",
-            "key points from the uploaded attachment",
-            "continue from the uploaded attachment",
-            "uploaded pdf attachment",
-        )
-        return any(marker in value for marker in markers)
 
     def _single_router(self, user_text, session_id="", attachments=None):
 
@@ -17553,19 +17537,11 @@ Auto-fix result:
                 or "attachment"
             )
 
-            existing_summary = self.safe_str(
-                item.get("attachment_summary")
-                or item.get("extracted_text")
-                or item.get("text")
+            existing_summary = (
+                self.attachment_analysis_service.existing_attachment_text(
+                    item
+                )
             )
-
-            # NOVA_ATTACHMENT_BINARY_SUMMARY_GUARD_20260714
-            # Prevent raw DOCX zip/XML from reaching attachment summaries.
-            if (
-                existing_summary.startswith("PK\x03\x04")
-                or "[Content_Types].xml" in existing_summary[:500]
-            ):
-                existing_summary = ""
 
             if existing_summary and "PK" not in existing_summary[:20]:
                 preview = existing_summary[:6000].strip()
@@ -17630,20 +17606,13 @@ Auto-fix result:
                         "saved_artifact": None,
                     }
 
-            path = (
-                self.attachment_analysis_service.resolve_attachment_path(
+            text = (
+                self.attachment_analysis_service.extracted_file_text(
                     item
                 )
             )
 
-            if path:
-                text = (
-                    self.attachment_analysis_service.read_attachment_text(
-                        path
-                    )
-                )
-
-                if text:
+            if text:
                     preview = text[:6000].strip()
 
                     return {
@@ -18299,205 +18268,6 @@ Auto-fix result:
             saved_artifact=None,
         )
 
-    def _execute_attachment_analysis(
-        self,
-        decision: dict,
-        user_text: str,
-        session_id: str,
-        attachments=None,
-    ) -> dict:
-        attachments = attachments or []
-        # NOVA_HARD_VISION_EXECUTOR_20260607
-        try:
-            import base64
-            import mimetypes
-            import os
-            from pathlib import Path
-
-            _nova_image_item = None
-
-            if isinstance(attachments, list):
-                for _nova_item in attachments:
-                    if not isinstance(_nova_item, dict):
-                        continue
-
-                    _nova_mime = self.safe_str(
-                        _nova_item.get("mime_type")
-                        or _nova_item.get("type")
-                    ).lower()
-
-                    _nova_name_probe = self.safe_str(
-                        _nova_item.get("filename")
-                        or _nova_item.get("original_filename")
-                        or _nova_item.get("name")
-                        or _nova_item.get("url")
-                        or _nova_item.get("file_url")
-                    ).lower()
-
-                    if (
-                        _nova_mime.startswith("image/")
-                        or _nova_name_probe.endswith((".jpg", ".jpeg", ".png", ".webp", ".gif"))
-                        or any(_nova_ext in _nova_name_probe for _nova_ext in (".jpg", ".jpeg", ".png", ".webp", ".gif"))
-                    ):
-                        _nova_image_item = _nova_item
-                        break
-
-            if _nova_image_item:
-                _nova_raw_url = self.safe_str(
-                    _nova_image_item.get("url")
-                    or _nova_image_item.get("file_url")
-                    or ""
-                ).strip()
-
-                _nova_raw_name = self.safe_str(
-                    _nova_image_item.get("filename")
-                    or _nova_image_item.get("original_filename")
-                    or _nova_image_item.get("name")
-                    or ""
-                ).strip()
-
-                _nova_filename = ""
-
-                if "/api/uploads/" in _nova_raw_url:
-                    _nova_filename = _nova_raw_url.split("/api/uploads/", 1)[1].split("?", 1)[0].split("#", 1)[0]
-                elif _nova_raw_url:
-                    _nova_filename = Path(_nova_raw_url).name
-
-                if not _nova_filename and _nova_raw_name:
-                    _nova_filename = Path(_nova_raw_name).name
-
-                _nova_filename = _nova_filename.replace("\\", "/").split("/")[-1].strip()
-
-                _nova_candidates = [
-                    Path.cwd() / "uploads" / _nova_filename,
-                    Path.cwd() / "static" / "uploads" / _nova_filename,
-                    Path(__file__).resolve().parents[2] / "uploads" / _nova_filename,
-                    Path(__file__).resolve().parents[1] / "uploads" / _nova_filename,
-                ]
-
-                _nova_image_path = None
-
-                for _nova_candidate in _nova_candidates:
-                    try:
-                        if _nova_candidate.exists() and _nova_candidate.is_file():
-                            _nova_image_path = _nova_candidate
-                            break
-                    except Exception:
-                        continue
-
-                if _nova_image_path is None:
-                    _nova_text = (
-                        "VISION_DEBUG: image file not found. "
-                        + "filename=" + str(_nova_filename)
-                        + " raw_url=" + str(_nova_raw_url)
-                        + " candidates=" + " | ".join(str(c) for c in _nova_candidates)
-                    )
-                else:
-                    try:
-                        from openai import OpenAI
-
-                        _nova_mime_type = mimetypes.guess_type(str(_nova_image_path))[0] or "image/jpeg"
-
-                        with open(_nova_image_path, "rb") as _nova_image_file:
-                            _nova_encoded = base64.b64encode(_nova_image_file.read()).decode("utf-8")
-
-                        _nova_data_url = "data:" + _nova_mime_type + ";base64," + _nova_encoded
-
-                        _nova_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-                        _nova_response = chat_completions_create(
-                            nova_username=getattr(self, "username", None) or os.getenv("NOVA_DEFAULT_USERNAME") or "richard",
-                            nova_session_id=locals().get("session_id") or getattr(getattr(self, "session_service", None), "active_session_id", "") or "",
-                            model=os.getenv("NOVA_VISION_MODEL", "gpt-4o-mini"),
-                            messages=[
-                                {
-                                    "role": "system",
-                                    "content": (
-                                        "You are Nova's image analysis module. "
-                                        "Describe the image directly. "
-                                        "Do not use web search. "
-                                        "Do not mention unrelated news. "
-                                        "If you cannot identify something, say what is visible instead."
-                                    ),
-                                },
-                                {
-                                    "role": "user",
-                                    "content": [
-                                        {
-                                            "type": "text",
-                                            "text": self.safe_str(user_text) or "What is this image?",
-                                        },
-                                        {
-                                            "type": "image_url",
-                                            "image_url": {
-                                                "url": _nova_data_url,
-                                            },
-                                        },
-                                    ],
-                                },
-                            ],
-                            temperature=0.2,
-                            max_tokens=500,
-                        )
-
-                        _nova_text = self.safe_str(_nova_response.choices[0].message.content).strip()
-
-                        if not _nova_text:
-                            _nova_text = "VISION_DEBUG: OpenAI vision returned empty text."
-
-                    except Exception as _nova_vision_exc:
-                        _nova_text = "VISION_DEBUG: OpenAI vision failed: " + str(_nova_vision_exc)
-
-                _nova_user_msg = self._build_user_message(user_text, attachments=attachments)
-
-                _nova_assistant_msg = self._build_assistant_message(
-                    text=_nova_text,
-                    meta={
-                        "attachment_analysis": True,
-                        "hard_vision_executor": True,
-                        "vision_used": not _nova_text.startswith("VISION_DEBUG:"),
-                        "source_urls": [],
-                        "sources": [],
-                    },
-                    attachments=[],
-                )
-
-                if isinstance(decision, dict):
-                    decision["route"] = self.ROUTE_ATTACHMENT_ANALYSIS
-                    decision["mode"] = "image_analysis"
-                    decision["strategy"] = "hard_vision_executor"
-                    decision["source_urls"] = []
-                    decision["sources"] = []
-
-                return self._finalize_response(
-                    session_id=session_id,
-                    user_text=user_text,
-                    user_msg=_nova_user_msg,
-                    assistant_msg=_nova_assistant_msg,
-                    decision=decision if isinstance(decision, dict) else {},
-                    saved_artifact=None,
-                )
-
-        except Exception as _nova_hard_vision_executor_error:
-            print("[NOVA_HARD_VISION_EXECUTOR] failed:", _nova_hard_vision_executor_error)
-
-        user_msg = self._build_user_message(user_text, attachments=attachments)
-        result = self._handle_attachment_analysis(user_text, attachments)
-
-        assistant_msg = self._build_assistant_message(
-            text=self.safe_str(result.get("text")) or "Attachment analysis completed.",
-            meta={"attachment_analysis": True},
-            attachments=[],
-        )
-
-        return self._finalize_response(
-            session_id=session_id,
-            user_text=user_text,
-            user_msg=user_msg,
-            assistant_msg=assistant_msg,
-            decision=decision,
-            saved_artifact=result.get("saved_artifact"),
-        )
 
     def _execute_web_operator(self, user_text: str, session_id: str) -> dict:
         try:
