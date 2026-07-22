@@ -958,8 +958,6 @@ try:
             _NovaAutonomyPath20260701(__file__)
             .resolve()
             .parent
-            / "nova_backend"
-            / "services"
             / "autonomy_task_brain.py"
         )
 

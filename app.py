@@ -5644,6 +5644,58 @@ try:
                             or ""
                         )
 
+                        normalized_user_text = str(
+                            user_text or ""
+                        ).strip().lower()
+
+                        autonomy_prefixes = (
+                            "autonomy:",
+                            "autonomy ",
+                            "task brain:",
+                            "safe task:",
+                            "safe autonomy:",
+                        )
+
+                        if normalized_user_text.startswith(
+                            autonomy_prefixes
+                        ):
+                            from nova_backend.services.project_chat_response_router_service import (
+                                _nova_autonomy_goal_from_text_20260701,
+                                _nova_autonomy_load_formatter_20260701,
+                                _nova_autonomy_payload_20260701,
+                            )
+
+                            autonomy_goal = (
+                                _nova_autonomy_goal_from_text_20260701(
+                                    user_text
+                                )
+                            )
+
+                            autonomy_formatter = (
+                                _nova_autonomy_load_formatter_20260701()
+                            )
+
+                            if autonomy_goal and autonomy_formatter:
+                                autonomy_reply = autonomy_formatter(
+                                    autonomy_goal
+                                )
+
+                                autonomy_payload = (
+                                    _nova_autonomy_payload_20260701(
+                                        autonomy_reply,
+                                        payload,
+                                    )
+                                )
+
+                                return _nova_next_fixed_flask_response_20260701(
+                                    _nova_next_fixed_json_20260701.dumps(
+                                        autonomy_payload,
+                                        ensure_ascii=False,
+                                    ),
+                                    status=200,
+                                    mimetype="application/json",
+                                )
+
                         if _nova_next_fixed_is_question_20260701(user_text):
                             session_id = str(
                                 payload.get("session_id")
