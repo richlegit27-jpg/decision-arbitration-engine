@@ -5316,61 +5316,6 @@ Rules:
             saved_artifact=None,
         )
 
-    def _resolve_answer_length_preference(
-        self, user_text: str, memory_items: list
-    ) -> str:
-        """
-        Returns: "short" | "long" | "normal"
-        Priority:
-        1. current user message
-        2. latest preference memory
-        3. default
-        """
-
-        user_text_lc = str(user_text or "").lower().strip()
-
-        # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ 1. HARD USER OVERRIDE (strongest)
-        if any(
-            p in user_text_lc
-            for p in [
-                "don't give short",
-                "dont give short",
-                "no short answers",
-                "long answers",
-                "full answers",
-                "more detail",
-                "explain more",
-            ]
-        ):
-            return "long"
-
-        if any(
-            p in user_text_lc
-            for p in [
-                "short answers",
-                "keep it short",
-                "be concise",
-                "quick answer",
-                "one sentence",
-            ]
-        ):
-            return "short"
-
-        # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ 2. MEMORY (most recent wins)
-        for m in reversed(memory_items or []):
-            if not isinstance(m, dict):
-                continue
-
-            text = str(m.get("text") or "").lower()
-
-            if "long answers" in text or "full answers" in text:
-                return "long"
-
-            if "short answers" in text:
-                return "short"
-
-        # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ 3. DEFAULT
-        return "normal"
 
     def _build_diff_preview(self, old: str, new: str, file_path: str) -> str:
         try:
@@ -12993,56 +12938,6 @@ Auto-fix result:
 
         return lines, step_indexes, current_index
 
-    def _refresh_execution_header(self, body: str):
-        lines = self.safe_str(body).splitlines()
-
-        total = sum(
-            1
-            for line in lines
-            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â", "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â"])
-        )
-        done = sum(
-            1
-            for line in lines
-            if any(x in line for x in ["[x]", "[X]", "ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â", "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â"])
-        )
-
-        updated = "\n".join(lines)
-        updated = re.sub(
-            r"Progress:\s*\d+/\d+",
-            f"Progress: {done}/{total}",
-            updated,
-        )
-
-        current_line = ""
-        for line in lines:
-            if "[>]" in line:
-                current_line = (
-                    line.replace("[>]", "")
-                    .replace("[ ]", "")
-                    .replace("[x]", "")
-                    .replace("[X]", "")
-                    .replace("ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â", "")
-                    .replace("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â", "")
-                    .strip(" -")
-                    .strip()
-                )
-                break
-
-        if current_line:
-            updated = re.sub(
-                r"Current step:\s*.*",
-                f"Current step: {current_line}",
-                updated,
-            )
-        elif done == total and total > 0:
-            updated = re.sub(
-                r"Current step:\s*.*",
-                "Current step: Complete",
-                updated,
-            )
-
-        return updated, done, total
 
     def _persist_message_fallback(self, session_id: str, message: dict) -> None:
         if self.session_service:
