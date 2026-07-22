@@ -999,38 +999,6 @@ Rules:
     def safe_str(self, value):
         return self._safe_str(value)
 
-    def _store_pending_fix(
-        self, session_id: str, file_path: str, fixed_code: str
-    ) -> bool:
-        session_id = str(session_id or "").strip()
-        file_path = str(file_path or "").strip()
-        fixed_code = str(fixed_code or "")
-
-        if not session_id or not file_path or not fixed_code.strip():
-            return False
-
-        try:
-            session = self.session_service.get_session(session_id)
-            if not isinstance(session, dict):
-                return False
-
-            working_state = session.get("working_state")
-            if not isinstance(working_state, dict):
-                working_state = {}
-
-            working_state["pending_fix_file_path"] = file_path
-            working_state["pending_fix_code"] = fixed_code
-            session["working_state"] = working_state
-
-            if hasattr(self.session_service, "update_working_state"):
-                self.session_service.update_working_state(session_id, working_state)
-                return True
-
-            return False
-
-        except Exception as e:
-            exec_debug("STORE PENDING FIX ERROR:", e)
-            return False
 
     def _auto_execute_request(
         self,
@@ -5137,12 +5105,23 @@ if (not attachments) and (__name__ == "__main__"):
         # =============================
 
         try:
-            self._set_session_meta(session_id, "pending_fix_file_path", file_path)
+            fixed_code = self._normalize_python_indentation(
+                fixed_code
+            )
 
-            fixed_code = self._normalize_python_indentation(fixed_code)
+            self._update_working_state(
+                session_id,
+                {
+                    "pending_fix_file_path": file_path,
+                    "pending_fix_code": fixed_code,
+                },
+            )
 
-            self._set_session_meta(session_id, "pending_fix_code", fixed_code)
-            self._set_session_meta(session_id, "pending_fix_mode", pending_fix_mode)
+            self._set_session_meta(
+                session_id,
+                "pending_fix_mode",
+                pending_fix_mode,
+            )
 
             if pending_fix_mode == "function":
                 self._set_session_meta(
@@ -7108,15 +7087,17 @@ if (not attachments) and (__name__ == "__main__"):
             return f"Diff preview failed: {self.safe_str(e)}"
 
     def _apply_pending_fix(self, session_id: str) -> dict:
-        session = self._get_session_payload(session_id)
+        state = self._get_working_state(
+            session_id
+        ) or {}
 
-        pending_file_path = ""
-        pending_fix_code = ""
+        pending_file_path = self.safe_str(
+            state.get("pending_fix_file_path")
+        )
 
-        if isinstance(session, dict):
-            state = session.get("working_state") or {}
-            pending_file_path = self.safe_str(state.get("pending_fix_file_path"))
-            pending_fix_code = self.safe_str(state.get("pending_fix_code"))
+        pending_fix_code = self.safe_str(
+            state.get("pending_fix_code")
+        )
 
         user_msg = self._build_user_message("apply fix")
 
@@ -7185,10 +7166,26 @@ if (not attachments) and (__name__ == "__main__"):
                         "details": result,
                     }
 
-            self._set_session_meta(session_id, "pending_fix_file_path", "")
-            self._set_session_meta(session_id, "pending_fix_code", "")
-            self._set_session_meta(session_id, "pending_fix_mode", "")
-            self._set_session_meta(session_id, "pending_fix_func_name", "")
+            self._update_working_state(
+                session_id,
+                {
+                    "pending_fix_file_path": "",
+                    "pending_fix_code": "",
+                },
+            )
+
+            self._set_session_meta(
+                session_id,
+                "pending_fix_mode",
+                "",
+            )
+
+
+            self._set_session_meta(
+                session_id,
+                "pending_fix_func_name",
+                "",
+            )
 
             assistant_msg = self._build_assistant_message(
                 text=(
