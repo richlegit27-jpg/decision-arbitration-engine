@@ -2296,33 +2296,17 @@ Rules:
         self.web_service = web_service
         self.recon_service = recon_service
         self.memory_context_service = memory_context_service
+
         if working_state_service is None:
             from nova_backend.services.working_state_service import (
                 WorkingStateService,
             )
-
             working_state_service = WorkingStateService(
                 session_service
             )
+
         self.working_state_service = working_state_service
         self.execution_state_service = execution_state_service
-
-        self.chat_response_cleanup_service = ChatResponseCleanupService()
-        self.runtime_cognitive_firewall = RuntimeCognitiveFirewall()
-        self.attachment_analysis_service = AttachmentAnalysisService()
-        self.accidental_input_guard_service = AccidentalInputGuardService()
-        self.response_mojibake_cleanup_service = ResponseMojibakeCleanupService()
-
-        # =========================
-        # CORE SERVICES
-        # =========================
-
-        self.session_service = session_service
-        self.memory_service = memory_service
-        self.artifact_service = artifact_service
-        self.web_service = web_service
-        self.recon_service = recon_service
-        self.intent_service = IntentService()
 
         # =========================
         # EXISTING ALIASES
