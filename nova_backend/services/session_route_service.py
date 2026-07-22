@@ -1,4 +1,6 @@
-from flask import jsonify
+import json
+
+from flask import jsonify, request, session
 
 
 class SessionRouteService:
@@ -163,7 +165,6 @@ class SessionRouteService:
         session,
         session_service,
         DATA_DIR,
-        load_json,
         app,
         json_ok,
     ):
@@ -215,7 +216,12 @@ class SessionRouteService:
 
         try:
             users_path = DATA_DIR / "nova_auth_users.json"
-            users_data = load_json(users_path, {"users": []})
+            if users_path.exists():
+                users_data = json.loads(
+                    users_path.read_text(encoding="utf-8-sig")
+                )
+            else:
+                users_data = {"users": []}
             users = (
                 users_data.get("users", [])
                 if isinstance(users_data, dict)
@@ -363,8 +369,27 @@ class SessionRouteService:
         session_service,
         artifact_service,
         memory_service,
+        DATA_DIR,
     ):
-        from flask import request, session
+        self.session_service = session_service
+        self.request_json = (
+            lambda: request.get_json(silent=True) or {}
+        )
+
+        self.json_ok = (
+            lambda **payload: jsonify({
+                "ok": True,
+                **payload,
+            })
+        )
+
+        def _json_error(message, status=400):
+            return jsonify({
+                "ok": False,
+                "error": str(message),
+            }), status
+
+        self.json_error = _json_error
 
         @app.get("/api/sessions")
         def api_sessions():
@@ -400,13 +425,12 @@ class SessionRouteService:
         @app.post("/api/sessions/new")
         def api_sessions_new():
             return self.handle_sessions_new(
-                request_json,
+                self.request_json,
                 session,
                 session_service,
                 DATA_DIR,
-                load_json,
                 app,
-                json_ok,
+                self.json_ok,
             )
 
     def handle_sessions_switch(
@@ -453,11 +477,11 @@ class SessionRouteService:
 
     def api_sessions_switch(self):
         return self.handle_sessions_switch(
-            request_json(),
+            self.request_json(),
             self.session_service,
             session,
-            json_error,
-            json_ok,
+            self.json_error,
+            self.json_ok,
         )
 
     def handle_sessions_pin(
@@ -548,21 +572,21 @@ class SessionRouteService:
 
     def api_sessions_pin(self):
         return self.handle_sessions_pin(
-            request_json(),
+            self.request_json(),
             self.session_service,
             session,
-            json_error,
-            json_ok,
+            self.json_error,
+            self.json_ok,
         )
 
 
     def api_sessions_delete(self):
         return self.handle_sessions_delete(
-            request_json(),
+            self.request_json(),
             self.session_service,
             session,
-            json_error,
-            json_ok,
+            self.json_error,
+            self.json_ok,
         )
 
     def handle_sessions_rename(
@@ -610,11 +634,11 @@ class SessionRouteService:
 
     def api_sessions_rename(self):
         return self.handle_sessions_rename(
-            request_json(),
+            self.request_json(),
             self.session_service,
             session,
-            json_error,
-            json_ok,
+            self.json_error,
+            self.json_ok,
         )
 
 
