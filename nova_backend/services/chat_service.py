@@ -1031,11 +1031,9 @@ Rules:
         mission_status = ""
 
         try:
-            session = self._get_session_payload(session_id)
-
-            working_state = (
-                session.get("working_state", {}) if isinstance(session, dict) else {}
-            )
+            working_state = self._get_working_state(
+                session_id
+            ) or {}
 
             mission = (
                 working_state.get("mission", {})
@@ -1194,18 +1192,18 @@ Current step:
                 "session": self._get_session_payload(session_id),
             }
 
-    def _save_mission_state(self, session_id: str, mission: dict) -> None:
+    def _save_mission_state(
+        self,
+        session_id: str,
+        mission: dict,
+    ) -> None:
         if not session_id or not isinstance(mission, dict):
             return
 
         try:
-            existing = self._get_session_payload(session_id)
-            working_state = (
-                existing.get("working_state", {}) if isinstance(existing, dict) else {}
-            )
-
-            if not isinstance(working_state, dict):
-                working_state = {}
+            working_state = self._get_working_state(
+                session_id
+            ) or {}
 
             has_real_execution = any(
                 [
@@ -1217,24 +1215,28 @@ Current step:
                 ]
             )
 
-            if has_real_execution:
-                working_state["mission"] = mission
-
-            else:
-                working_state.pop("mission", None)
-            if hasattr(self.sessions, "update_working_state"):
-                self.sessions.update_working_state(session_id, working_state)
+            self._update_working_state(
+                session_id,
+                {
+                    "mission": (
+                        mission
+                        if has_real_execution
+                        else {}
+                    ),
+                },
+            )
 
         except Exception as e:
-            logger.error(f"[mission] failed to save mission state: {e}")
+            logger.error(
+                f"[mission] failed to save mission state: {e}"
+            )
 
     def _resolve_mission_command(self, user_text: str, session_id: str = "") -> dict:
         text = self.safe_str(user_text).lower().strip()
 
-        session = self._get_session_payload(session_id)
-        working_state = (
-            session.get("working_state", {}) if isinstance(session, dict) else {}
-        )
+        working_state = self._get_working_state(
+            session_id
+        ) or {}
 
         if not isinstance(working_state, dict):
             working_state = {}
