@@ -225,19 +225,22 @@ def run():
         json.dumps(planning.get("debug", {}), indent=2),
     )
 
-    # 13. Writing intent stays available.
     writing = post_chat(
         "write an email about the update",
         f"regression_writing_{stamp}",
     )
+
+    print(
+        "[WRITING DEBUG]",
+        json.dumps(writing, indent=2)[:1000],
+    )
+
     assert_true(
         "writing_intent_safe",
         route_of(writing) in {"general_chat", "chat"},
         json.dumps(writing.get("debug", {}), indent=2),
     )
-
     print("\nNOVA REGRESSION SMOKE PASSED")
-
 
 if __name__ == "__main__":
     try:

@@ -1498,15 +1498,16 @@ def api_chat():
 
                     _nova_data_url = "data:" + _nova_mime_type + ";base64," + _nova_encoded
 
+
                     _nova_response = _nova_chat_completions_create(
                         nova_username=(
-                            (
-                                getattr(
-                                    g,
-                                    "nova_auth_user",
-                                    None,
-                                )
-                                or {}
+                            getattr(
+                                getattr(g, "nova_auth_user", None),
+                                "username",
+                                None,
+                            )
+                            or (
+                                getattr(g, "nova_auth_user", None) or {}
                             ).get("username")
                             or _nova_os.getenv("NOVA_DEFAULT_USERNAME")
                             or "richard"
@@ -3806,12 +3807,17 @@ def api_chat():
             )
         )
 
-        if result is None:
-            result = chat_service.handle(
-                user_text=image_command_user_text,
-                session_id=session_id,
-                attachments=attachments_for_chat_service,
-            )
+        result = chat_service.handle(
+            user_text=image_command_user_text,
+            session_id=session_id,
+            attachments=attachments_for_chat_service,
+        )
+
+        print(
+            "[CHAT SERVICE RESULT DEBUG]",
+            repr(result)[:3000],
+        )
+
         # NOVA_MOBILE_IMAGE_URL_ACTIVE_SESSION_FORCE_20260630
         # Image generation can create the PNG but leave image_url attached to
         # a stale/placeholder session. Force the image URL onto the actual
@@ -4346,6 +4352,12 @@ def api_chat():
                 },
             }
 
+        print(
+            "[NOVA RESULT TYPE DEBUG]",
+            type(result),
+            repr(result)[:500],
+        )
+
         assistant_message = result.get("assistant_message") or {
             "role": "assistant",
             "text": "",
@@ -4367,7 +4379,19 @@ def api_chat():
             or ""
         ).strip()
 
+        print(
+            "[EMPTY RESPONSE DEBUG]",
+            {
+                "result_keys": list(result.keys()) if isinstance(result, dict) else None,
+                "assistant_message": assistant_message,
+                "result_preview": repr(result)[:1000],
+            },
+        )
+
+        print("[EMPTY RESPONSE DEBUG RESULT]", repr(result)[:3000])
+
         if not assistant_text and result.get("ok", True):
+
             assistant_text = "Nova completed the request but returned an empty assistant response."
 
         assistant_text = response_quality_service.prevent_bad_exact_pong_response(

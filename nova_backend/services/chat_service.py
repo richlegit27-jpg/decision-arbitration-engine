@@ -2459,7 +2459,9 @@ Rules:
 
     def _normalize_assistant_message(self, message):
         if message is None:
-            return self._build_assistant_message(text="")
+            return self._build_assistant_message(
+                text="I’m here. Send the next instruction."
+            )
 
         if isinstance(message, dict):
             text = (
@@ -2501,9 +2503,14 @@ Rules:
         attachments = attachments or []
         meta = meta or {}
 
+        safe_text = self.safe_str(text).strip()
+
+        if not safe_text:
+            safe_text = "I’m here. Send the next instruction."
+
         return {
             "role": "assistant",
-            "text": self.safe_str(text),
+            "text": safe_text,
             "attachments": attachments,
             "meta": meta,
             "memory_used": memory_used or [],
@@ -3533,6 +3540,10 @@ Rules:
         attachments = attachments or []
 
         original_user_text = self.safe_str(user_text)
+        print(
+            "DEBUG EXECUTE GENERAL CHAT HIT =",
+            repr(user_text),
+        )
 
         text_lc = original_user_text.lower().strip()
 
@@ -5012,8 +5023,20 @@ Rules:
                     return cleaned
 
             return clean
+
+        print(
+            "DEBUG BEFORE MODEL CALL REACHED",
+            user_text,
+        )
+
         try:
+            print(
+                "DEBUG GENERAL MODEL MESSAGES =",
+                repr(model_messages)[:2000],
+            )
+
             response = responses_create(
+
                 nova_username=(
                     getattr(self, "username", None)
                     or os.getenv("NOVA_DEFAULT_USERNAME")
@@ -5021,44 +5044,55 @@ Rules:
                 ),
                 nova_session_id=session_id,
                 model=self.chat_model,
-                intent=(
-                    decision.get("intent")
-                    if isinstance(decision, dict)
-                    else ""
-                ),
                 input=model_messages,
+            )
+
+            print(
+                "DEBUG GENERAL RESPONSE RAW =",
+                repr(response)[:1000],
+            )
+
+            print(
+                "DEBUG EXTRACT TEST RESPONSE =",
+                repr(response)[:3000],
             )
 
             assistant_text = dedupe_repeated_answer_20260630(
                 self._extract_response_text(response)
             )
 
+            print(
+                "DEBUG AFTER EXTRACTION =",
+                repr(assistant_text),
+            )
         except Exception as e:
-            import traceback
 
-            error_text = "".join(
-                traceback.format_exception(
-                    type(e),
-                    e,
-                    e.__traceback__,
-                )
-            )
+                import traceback
 
-            exec_debug(
-                "GENERAL CHAT ERROR:",
-                error_text,
-            )
+                error_text = "".join(
+                    traceback.format_exception(
+                        type(e),
+                        e,
+                        e.__traceback__,
+                    )
+                )
 
-            if "insufficient_quota" in str(e).lower():
-                assistant_text = (
-                    "OpenAI API quota exhausted.\n\n"
-                    "Nova backend is working, but the configured "
-                    "API key has no remaining quota."
+                exec_debug(
+                    "GENERAL CHAT ERROR:",
+                    error_text,
                 )
-            else:
-                assistant_text = (
-                    "General chat failed.\n\n" f"{type(e).__name__}: {str(e)}"
-                )
+
+                if "insufficient_quota" in str(e).lower():
+                    assistant_text = (
+                        "OpenAI API quota exhausted.\n\n"
+                        "Nova backend is working, but the configured "
+                        "API key has no remaining quota."
+                    )
+                else:
+                    assistant_text = (
+                        "General chat failed.\n\n"
+                        f"{type(e).__name__}: {str(e)}"
+                    )
 
         if not assistant_text:
             if "name" in text_lc:
@@ -5070,11 +5104,21 @@ Rules:
                 assistant_text = "I m here. Send the next instruction."
 
         intelligence_result = self._apply_response_intelligence(
+
+
             user_text=user_text,
             assistant_text=assistant_text,
             decision=decision,
             session_id=session_id,
             attachments=attachments,
+        )
+
+        print(
+            "DEBUG AFTER INTELLIGENCE =",
+            {
+                "assistant_text": repr(assistant_text),
+                "intelligence_result": repr(intelligence_result)[:2000],
+            },
         )
 
         intelligence_result = (
@@ -8724,7 +8768,11 @@ Rules:
             writing_request
             and not explicit_writing_research
         ):
-            return ("chat", "writing")
+            return {
+                "route": "chat",
+                "mode": "writing",
+                "intent": "writing",
+            }
 
         # CENTRAL WEB DECISION AUTHORITY
         # Reuse Nova's full route decision instead of maintaining
@@ -8748,6 +8796,16 @@ Rules:
                 "web_search",
             }:
                 return ("web", "fetch")
+
+            if (
+                isinstance(central_decision, dict)
+                and central_decision.get("intent") == "writing"
+            ):
+                return {
+                    "route": "chat",
+                    "mode": "writing",
+                    "intent": "writing",
+                }
 
         except Exception as exc:
             exec_debug(
@@ -9531,6 +9589,18 @@ Rules:
 
         lowered = self.safe_str(user_text).lower().strip()
 
+        decision = self._decide_route(
+            user_text=user_text,
+            attachments=attachments,
+            session_id=session_id,
+        )
+
+        print(
+            "WRITING ROUTE DEBUG:",
+            user_text,
+            decision,
+        )
+
         early_writing_request = bool(
             re.match(
                 r"^(write|draft|compose|rewrite|edit|proofread)\b",
@@ -9553,16 +9623,38 @@ Rules:
             early_writing_request
             and not early_writing_research
         ):
-            return self._execute_general_chat(
+            if isinstance(decision, dict):
+                decision["route"] = self.ROUTE_GENERAL_CHAT
+                decision["mode"] = "chat"
+                decision["intent"] = "writing"
+                decision["strategy"] = "direct_writing_request"
+                decision["source_urls"] = []
+                decision["sources"] = []
+            writing_result = self._execute_general_chat(
                 user_text=user_text,
                 session_id=session_id,
                 attachments=attachments,
-                decision={
-                    "route": "chat",
-                    "intent": "writing",
-                    "mode": "writing",
-                },
+                decision=decision,
             )
+
+            if isinstance(writing_result, list):
+                writing_result = {
+                    "ok": True,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": "\n".join(
+                            str(x) for x in writing_result
+                        ),
+                    },
+                }
+
+            print(
+                "[WRITING RESULT DEBUG]",
+                repr(writing_result)[:3000],
+            )
+
+            return writing_result
+
 
         # NOVA_CENTRAL_INTERPRETATION_WEB_ROUTE_20260612
         # Central pre-router interpretation, phase 2:
@@ -10174,6 +10266,12 @@ Rules:
 
         # SAFE ROUTE DISPATCH (FIXED)
 
+        decision = self._decide_route(
+            user_text=user_text,
+            attachments=attachments,
+            session_id=session_id,
+        )
+
 
         route, command = self._single_router(
             user_text,
@@ -10232,7 +10330,7 @@ Rules:
                 user_text=user_text,
                 session_id=session_id,
                 attachments=attachments,
-                decision={"route": "chat"}
+                decision=decision,
             )
 
     def _process_goal_and_plan(self, user_text: str, session_id: str):
@@ -11532,34 +11630,93 @@ Rules:
     def _extract_response_text(self, resp) -> str:
         try:
             output_text = getattr(resp, "output_text", None)
+
             if output_text:
                 return str(output_text).strip()
+
         except Exception:
             pass
 
         try:
-            data = resp.model_dump()
+            data = (
+                resp.model_dump()
+                if hasattr(resp, "model_dump")
+                else {}
+            )
+
         except Exception:
-            data = None
+            data = {}
 
         if isinstance(data, dict):
+
             text_parts = []
-            output = data.get("output") or []
-            for item in output:
+
+            # Responses API output blocks
+            for item in data.get("output") or []:
+
                 if not isinstance(item, dict):
                     continue
-                content = item.get("content") or []
-                for part in content:
+
+                for part in item.get("content") or []:
+
                     if not isinstance(part, dict):
                         continue
-                    if part.get("type") in ("output_text", "text"):
-                        text_value = part.get("text")
-                        if text_value:
-                            text_parts.append(str(text_value))
-            if text_parts:
-                return "\n".join(text_parts).strip()
 
-        return "I’m here, but the model returned an empty response."
+                    text_value = (
+                        part.get("text")
+                        or part.get("output_text")
+                    )
+
+                    if text_value:
+                        text_parts.append(
+                            str(text_value)
+                        )
+
+            if text_parts:
+                return "\n".join(
+                    text_parts
+                ).strip()
+
+            # Fallback fields
+            for key in (
+                "text",
+                "content",
+                "message",
+            ):
+                value = data.get(key)
+
+                if value:
+                    return str(value).strip()
+
+        # Object fallback
+        try:
+            if hasattr(resp, "output"):
+
+                for item in resp.output:
+
+                    content = getattr(
+                        item,
+                        "content",
+                        [],
+                    )
+
+                    for part in content:
+
+                        text_value = getattr(
+                            part,
+                            "text",
+                            None,
+                        )
+
+                        if text_value:
+                            return str(
+                                text_value
+                            ).strip()
+
+        except Exception:
+            pass
+
+        return ""
 
     # ==============================
     # DECISION CONTRACT
@@ -12376,7 +12533,7 @@ Rules:
 
                 return {
                     "route": self.ROUTE_GENERAL_CHAT,
-                    "mode": "chat",
+                    "mode": "writing",
                     "confidence": 1.0,
                     "reasons": ["working_state_continue_override"],
                     "save_artifact": False,
@@ -15030,28 +15187,81 @@ Rules:
             "saved_artifact": None,
         }
 
-    def _build_common_state_payload(self, session_id: str = "") -> dict:
-        session = self._get_session_payload(session_id)
+    def _build_chat_input(
+        self,
+        user_text: str,
+        decision: dict,
+        session_id: str = "",
+    ) -> str:
+        user_text = self._safe_str(user_text)
 
-        return {
-            "ok": True,
-            "active_session_id": session_id,
-            "session_id": session_id,
-            "session": session if isinstance(session, dict) else {},
-            "active_session": session if isinstance(session, dict) else {},
-            "messages": (
-                session.get("messages", []) if isinstance(session, dict) else []
-            ),
-            "artifacts": self._list_artifacts_for_session(session_id),
-            "memory": self._list_memory_for_session(session_id),
-        }
+        memory_items = self._rank_memory_context(
+            user_text=user_text,
+            limit=int(decision.get("memory_limit") or self.memory_limit),
+            session_id=session_id,
+        )
+
+        memory_block = self._format_memory_context(memory_items[:3])
+
+        sections = []
+
+        if memory_block:
+            sections.append(
+                "Relevant memory:\n"
+                f"{memory_block}"
+            )
+
+        if not sections:
+            return user_text
+
+        return (
+            "\n\n".join(sections)
+            + "\n\nInstructions:\n"
+            + "- Answer clearly and directly.\n"
+            + "- Use relevant memory when it helps.\n"
+            + "- Do not claim missing context if the answer is already available.\n\n"
+            + "User message:\n"
+            + user_text
+        )
 
 
+    def _run_chat_model(
+        self,
+        user_text: str,
+        decision: dict,
+        session_id: str = "",
+    ) -> str:
+        prompt = self._build_chat_input(
+            user_text=user_text,
+            decision=decision,
+            session_id=session_id,
+        )
 
+        try:
+            print(
+                "DEBUG GENERAL MODEL INPUT =",
+                repr(prompt)[:2000],
+            )
 
+            response = self.client.responses.create(
+                model=self.chat_model,
+                input=prompt,
+            )
 
+            assistant_text = self._extract_response_text(response)
+            assistant_text = self._safe_str(assistant_text).strip()
 
+            if not assistant_text:
+                assistant_text = (
+                    "I can help with that. "
+                    "Tell me the details you want included."
+                )
 
+            print("DEBUG WRITING MODEL OUTPUT =", repr(assistant_text))
+            return assistant_text
+
+        except Exception as e:
+            return f"Model error: {e}"
 
 
         # ==============================
@@ -16135,16 +16345,38 @@ try:
             self,
             user_text=user_text,
             attachments=attachments,
-            memory_context=memory_context,
-            working_context_block=working_context_block,
             session_id=session_id,
-            **kwargs,
         )
 
-        if isinstance(decision, dict) and isinstance(intent_decision, dict):
-            decision.setdefault("intent", intent_decision.get("intent") or "")
-            decision.setdefault("intent_confidence", intent_decision.get("confidence") or 0)
-            decision.setdefault("intent_reasons", intent_decision.get("reasons") or [])
+        if isinstance(intent_decision, dict):
+            intent_name = str(
+                intent_decision.get("intent") or ""
+            ).strip()
+
+            if intent_name in {
+                "coding",
+                "debugging",
+                "planning",
+                "writing",
+            }:
+                return {
+                    "route": intent_decision.get("route") or intent_name,
+                    "mode": intent_decision.get("mode") or intent_name,
+                    "intent": intent_name,
+                    "confidence": intent_decision.get("confidence") or 0,
+                    "reasons": list(
+                        intent_decision.get("reasons") or []
+                    ) + ["intent_authority"],
+                    "save_artifact": bool(
+                        intent_decision.get("save_artifact", False)
+                    ),
+                    "save_memory": bool(
+                        intent_decision.get("save_memory", True)
+                    ),
+                    "use_memory": bool(
+                        intent_decision.get("use_memory", True)
+                    ),
+                }
 
         return decision
 
