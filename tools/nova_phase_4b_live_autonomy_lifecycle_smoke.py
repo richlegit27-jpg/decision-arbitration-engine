@@ -3,6 +3,7 @@
 import json
 import sys
 import time
+import atexit
 from pathlib import Path
 from urllib import request, error
 
@@ -72,6 +73,19 @@ def assert_true(name: str, condition: bool, detail: str = ""):
 
 def main() -> int:
     session_id = f"phase_4b_live_autonomy_lifecycle_{int(time.time())}"
+
+    def cleanup_execution():
+        try:
+            post_chat(
+                "stop",
+                session_id,
+            )
+        except Exception:
+            pass
+
+    atexit.register(
+        cleanup_execution
+    )
 
     start = post_chat("auto-plan clean up a test notes file", session_id)
     start_text = assistant_text(start)
