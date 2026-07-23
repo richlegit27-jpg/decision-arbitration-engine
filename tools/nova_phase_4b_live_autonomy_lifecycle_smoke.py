@@ -32,6 +32,26 @@ def post_chat(message: str, session_id: str) -> dict:
     except error.URLError as exc:
         raise AssertionError(f"API request failed for {message!r}: {exc}") from exc
 
+def delete_session(session_id: str) -> dict:
+    payload = {
+        "session_id": session_id,
+    }
+
+    req = request.Request(
+        f"{BASE_URL}/api/sessions/delete",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    with request.urlopen(req, timeout=20) as resp:
+        return json.loads(
+            resp.read().decode(
+                "utf-8",
+                errors="replace",
+            )
+        )
+
 
 def get_nested(data: dict, *keys, default=None):
     current = data
@@ -78,6 +98,13 @@ def main() -> int:
         try:
             post_chat(
                 "stop",
+                session_id,
+            )
+        except Exception:
+            pass
+
+        try:
+            delete_session(
                 session_id,
             )
         except Exception:
