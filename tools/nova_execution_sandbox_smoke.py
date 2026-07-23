@@ -1,6 +1,12 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from nova_backend.services.execution_mutation_service import (
+    ExecutionMutationService,
+)
+from nova_backend.services.execution_orchestrator_service import (
+    ExecutionOrchestratorService,
+)
 from nova_backend.services.execution_step_service import (
     ExecutionStepService,
 )
@@ -70,10 +76,12 @@ with TemporaryDirectory() as temporary_directory:
     )
 
     text_file = sandbox / "notes.txt"
+
     text_file.parent.mkdir(
         parents=True,
         exist_ok=True,
     )
+
     text_file.write_text(
         "not python",
         encoding="utf-8",
@@ -98,6 +106,7 @@ with TemporaryDirectory() as temporary_directory:
         "target_file": str(
             root / "blocked_write.py"
         ),
+        "content": 'print("blocked")\n',
     }
 
     step_service.execute_step_logic(
@@ -117,9 +126,13 @@ with TemporaryDirectory() as temporary_directory:
     )
 
     allowed_target = sandbox / "generated.py"
+
     allowed_step = {
         "action": "implement",
         "target_file": str(allowed_target),
+        "content": (
+            'print("sandbox generated content")\n'
+        ),
     }
 
     step_service.execute_step_logic(
@@ -138,13 +151,40 @@ with TemporaryDirectory() as temporary_directory:
         allowed_target.exists(),
     )
 
+    assert_true(
+        "sandbox_write_uses_explicit_content",
+        allowed_target.read_text(
+            encoding="utf-8"
+        ) == 'print("sandbox generated content")\n',
+    )
 
-from nova_backend.services.execution_mutation_service import (
-    ExecutionMutationService,
-)
-from nova_backend.services.execution_orchestrator_service import (
-    ExecutionOrchestratorService,
-)
+    missing_content_target = (
+        sandbox / "missing_content.py"
+    )
+
+    missing_content_step = {
+        "action": "implement",
+        "target_file": str(
+            missing_content_target
+        ),
+    }
+
+    step_service.execute_step_logic(
+        session_id="safety-smoke",
+        step=missing_content_step,
+    )
+
+    assert_true(
+        "missing_content_step_blocked",
+        missing_content_step.get("status")
+        == "failed",
+        missing_content_step,
+    )
+
+    assert_true(
+        "missing_content_file_not_created",
+        not missing_content_target.exists(),
+    )
 
 
 class FakeExecutionStateService:
@@ -206,6 +246,7 @@ def failed_execution_state(command):
 run_step_state = failed_execution_state(
     "run_step"
 )
+
 run_step_store = FakeExecutionStateService(
     run_step_state
 )
@@ -254,6 +295,7 @@ assert_true(
 run_all_state = failed_execution_state(
     "run_all"
 )
+
 run_all_store = FakeExecutionStateService(
     run_all_state
 )
@@ -289,6 +331,7 @@ assert_true(
     ).get("status") == "failed",
     run_all_result,
 )
+
 
 class SuccessfulStepService:
 

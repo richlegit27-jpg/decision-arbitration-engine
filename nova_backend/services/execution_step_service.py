@@ -17,6 +17,19 @@ class ExecutionStepService:
 
         return str(value or "")
 
+    def _implementation_content(self, step):
+        for key in (
+            "content",
+            "file_content",
+            "code",
+        ):
+            value = step.get(key)
+
+            if isinstance(value, str) and value:
+                return value
+
+        return ""
+
     def execute_step_logic(
         self,
         session_id,
@@ -27,16 +40,11 @@ class ExecutionStepService:
 
             step_action = self._safe_str(
                 step.get("action")
-            ).lower()
-
-            print(
-                "STEP ACTION =",
-                repr(step_action),
-            )
+            ).strip().lower()
 
             target_file = self._safe_str(
                 step.get("target_file")
-            )
+            ).strip()
 
             if step_action == "implement" and target_file:
                 if (
@@ -50,11 +58,22 @@ class ExecutionStepService:
                         "Nova's execution sandbox."
                     )
 
+                content = self._implementation_content(
+                    step
+                )
+
+                if not content:
+                    raise ValueError(
+                        "Implement step requires explicit "
+                        "file content."
+                    )
+
                 target_file = str(
                     self.python_runner.resolve_sandbox_path(
                         target_file
                     )
                 )
+
                 step["target_file"] = target_file
 
                 Path(target_file).parent.mkdir(
@@ -62,20 +81,11 @@ class ExecutionStepService:
                     exist_ok=True,
                 )
 
+                if not content.endswith("\n"):
+                    content += "\n"
+
                 Path(target_file).write_text(
-                    """
-def add(a, b):
-    return a + b
-
-
-def subtract(a, b):
-    return a - b
-
-
-if __name__ == "__main__":
-    print("Calculator app created.")
-    print("2 + 3 =", add(2, 3))
-""".strip() + "\n",
+                    content,
                     encoding="utf-8",
                 )
 
