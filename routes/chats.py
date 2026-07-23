@@ -1,6 +1,8 @@
 ﻿from fastapi import APIRouter, Body, HTTPException, Request
 
-from services.ai_service import generate_reply
+from nova_backend.services.model_gateway_service import (
+    chat_completions_create,
+)
 from services.auth_service import get_user_by_username
 from services.chat_service import (
     add_message,
@@ -191,8 +193,26 @@ async def create_real_ai_reply(chat_id: int, request: Request, payload: dict = B
         raise HTTPException(status_code=404, detail="Chat not found")
 
     try:
-        assistant_text = generate_reply(history, model=model)
+        response = chat_completions_create(
+            model=model or "gpt-4.1-mini",
+            messages=[
+                {
+                    "role": item.get("role"),
+                    "content": item.get("content"),
+                }
+                for item in history
+            ],
+        )
+
+        assistant_text = (
+            response.choices[0]
+            .message
+            .content
+            or ""
+        )
+
     except RuntimeError as error:
+
         raise HTTPException(status_code=500, detail=str(error)) from error
     except Exception as error:
         raise HTTPException(status_code=500, detail=f"AI reply failed: {error}") from error
