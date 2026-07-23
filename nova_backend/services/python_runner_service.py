@@ -1,4 +1,4 @@
-﻿import subprocess
+import subprocess
 import sys
 from pathlib import Path
 
@@ -20,13 +20,65 @@ class PythonRunnerService:
             exist_ok=True,
         )
 
+    def resolve_sandbox_path(
+        self,
+        file_path,
+    ):
+        candidate = Path(file_path)
+
+        if not candidate.is_absolute():
+            candidate = self.sandbox_dir / candidate
+
+        sandbox = self.sandbox_dir.resolve()
+        candidate = candidate.resolve()
+
+        try:
+            candidate.relative_to(sandbox)
+        except ValueError:
+            return None
+
+        return candidate
+
+    def is_path_allowed(
+        self,
+        file_path,
+    ):
+        return (
+            self.resolve_sandbox_path(file_path)
+            is not None
+        )
+
     def run_file(
         self,
         file_path,
         timeout=20,
     ):
 
-        file_path = Path(file_path)
+        file_path = self.resolve_sandbox_path(
+            file_path
+        )
+
+        if file_path is None:
+            return {
+                "ok": False,
+                "error": (
+                    "Execution blocked: file is outside "
+                    "Nova's sandbox."
+                ),
+                "stdout": "",
+                "stderr": "",
+            }
+
+        if file_path.suffix.lower() != ".py":
+            return {
+                "ok": False,
+                "error": (
+                    "Execution blocked: only Python "
+                    "files may run in this sandbox."
+                ),
+                "stdout": "",
+                "stderr": "",
+            }
 
         if not file_path.exists():
 
@@ -115,9 +167,35 @@ class PythonRunnerService:
         timeout=20,
     ):
 
-        target = (
-            self.sandbox_dir
-            / filename
+        target = self.resolve_sandbox_path(
+            filename
+        )
+
+        if target is None:
+            return {
+                "ok": False,
+                "error": (
+                    "Execution blocked: filename escapes "
+                    "Nova's sandbox."
+                ),
+                "stdout": "",
+                "stderr": "",
+            }
+
+        if target.suffix.lower() != ".py":
+            return {
+                "ok": False,
+                "error": (
+                    "Execution blocked: generated files "
+                    "must use the .py extension."
+                ),
+                "stdout": "",
+                "stderr": "",
+            }
+
+        target.parent.mkdir(
+            parents=True,
+            exist_ok=True,
         )
 
         target.write_text(

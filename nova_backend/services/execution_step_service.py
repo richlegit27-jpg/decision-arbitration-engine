@@ -39,6 +39,24 @@ class ExecutionStepService:
             )
 
             if step_action == "implement" and target_file:
+                if (
+                    self.python_runner is None
+                    or not self.python_runner.is_path_allowed(
+                        target_file
+                    )
+                ):
+                    raise PermissionError(
+                        "Write blocked: target is outside "
+                        "Nova's execution sandbox."
+                    )
+
+                target_file = str(
+                    self.python_runner.resolve_sandbox_path(
+                        target_file
+                    )
+                )
+                step["target_file"] = target_file
+
                 Path(target_file).parent.mkdir(
                     parents=True,
                     exist_ok=True,
