@@ -205,67 +205,105 @@ class ExecutionBridgeService:
             }
 
     # NOVA_EXECUTION_STATUS_BRIDGE_20260607
-    def try_execution_status(self, session_id, user_text):
+    def try_execution_status(
+        self,
+        session_id,
+        user_text,
+    ):
         try:
-            clean = str(user_text or "").strip().lower()
+            clean = (
+                " ".join(
+                    str(user_text or "")
+                    .strip()
+                    .lower()
+                    .split()
+                )
+                .rstrip("?!.")
+            )
 
-            if clean not in {
+            status_questions = {
                 "status",
                 "execution status",
                 "mission status",
-            }:
+                "what are we working on",
+                "what are we working on now",
+                "what are we working on right now",
+                "what comes next",
+            }
+
+            if clean not in status_questions:
                 return None
 
-            state = self.chat_execution_service.get_state(
-                session_id
+            refresh_states = getattr(
+                self.chat_execution_service,
+                "_load_states",
+                None,
             )
 
-            if not state or state.get("status") == "idle":
-                reply_text = "No active mission."
+            if callable(refresh_states):
+                try:
+                    refresh_states()
+                except Exception:
+                    pass
 
-            else:
-                steps = state.get("steps") or []
-                total = len(steps)
+            state = (
+                self.chat_execution_service.get_state(
+                    session_id
+                )
+            )
 
-                current_index = int(
-                    state.get("current_index") or 0
+            if (
+                not isinstance(state, dict)
+                or state.get("status") == "idle"
+                or state.get("complete") is True
+            ):
+                return None
+
+            goal = str(
+                state.get("goal")
+                or "Untitled mission"
+            ).strip()
+
+            status = str(
+                state.get("status")
+                or "ready"
+            ).strip()
+
+            steps = state.get("steps") or []
+
+            current_index = int(
+                state.get("current_index")
+                or 0
+            )
+
+            current_step = str(
+                state.get("current_step")
+                or ""
+            ).strip()
+
+            lines = [
+                f"Active mission: {goal}",
+                f"Status: {status}",
+            ]
+
+            if current_step and steps:
+                lines.append(
+                    f"Step {current_index + 1}/{len(steps)}: "
+                    f"{current_step}"
                 )
 
-                current_step = state.get("current_step")
-                status = state.get("status") or "unknown"
-                goal = state.get("goal") or "Untitled mission"
-
-                if status == "complete":
-                    step_line = "Step: complete"
-
-                else:
-                    display_step = (
-                        min(current_index + 1, total)
-                        if total
-                        else current_index + 1
-                    )
-
-                    step_line = (
-                        "Step "
-                        + str(display_step)
-                        + "/"
-                        + str(total)
-                        + ": "
-                        + str(current_step)
-                    )
-
-                reply_text = (
-                    "Current mission: "
-                    + str(goal)
-                    + "\n"
-                    + "Status: "
-                    + str(status)
-                    + "\n"
-                    + step_line
+            if state.get("waiting"):
+                lines.append(
+                    "Next: send next, k, continue, "
+                    "or run it to advance."
                 )
+
+            reply_text = "\n".join(lines)
 
             return {
                 "ok": True,
+                "text": reply_text,
+                "content": reply_text,
                 "skip_cleanup": True,
                 "skip_post_processing": True,
                 "skip_rewrite": True,
@@ -274,25 +312,25 @@ class ExecutionBridgeService:
                     "text": reply_text,
                     "content": reply_text,
                     "execution_state": state,
+                    "attachments": [],
+                    "meta": {
+                        "route": "active_execution_status",
+                    },
                 },
                 "execution_state": state,
+                "session_id": session_id,
+                "active_session_id": session_id,
+                "debug": {
+                    "route": "active_execution_status",
+                    "route_taken": "active_execution_status",
+                    "suppressed_project_state_recall": True,
+                },
             }
 
         except Exception as exc:
-            self.logger.exception(
-                "[NovaExecutionStatus] failed"
-            )
+            if self.logger is not None:
+                self.logger.exception(
+                    "[NovaExecutionStatus] failed"
+                )
 
-            reply_text = (
-                "Execution status failed: "
-                + str(exc)
-            )
-
-            return {
-                "ok": True,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": reply_text,
-                    "content": reply_text,
-                },
-            }
+            return None

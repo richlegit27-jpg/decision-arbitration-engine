@@ -164,7 +164,9 @@ print(
 )
 from nova_backend.services.execution_handler import NextMove, default_executor
 from nova_backend.services.execution_daemon import ExecutionDaemon
-from nova_backend.services.chat_execution_service import ChatExecutionService
+from nova_backend.services.chat_execution_service import (
+    chat_execution_service,
+)
 from nova_backend.services.safe_unified_runtime import (
     SafeUnifiedRuntime,
 )
@@ -437,7 +439,6 @@ chat_attachment_memory_service = ChatAttachmentMemoryService()
 chat_response_cleanup_service = ChatResponseCleanupService()
 chat_request_context_service = ChatRequestContextService()
 chat_stream_service = ChatStreamService()
-chat_execution_service = ChatExecutionService()
 execution_route_service = ExecutionRouteService(
     chat_execution_service,
     chat_execution_service,
@@ -725,6 +726,7 @@ repair_plan_priority_guard_service.install(app)
 project_state_direct_freshness_priority_service = (
     ProjectStateDirectFreshnessPriorityService(
         execution_state_service=execution_state_service,
+        chat_execution_service=chat_execution_service,
     )
 )
 project_state_direct_freshness_priority_service.install(app)
@@ -3780,12 +3782,19 @@ def api_chat():
         except Exception:
             pass
 
-        result = chat_service.handle(
-            user_text=image_command_user_text,
-            session_id=session_id,
-            attachments=attachments_for_chat_service,
+        result = (
+            execution_bridge_service.try_execution_status(
+                session_id=session_id,
+                user_text=image_command_user_text,
+            )
         )
 
+        if result is None:
+            result = chat_service.handle(
+                user_text=image_command_user_text,
+                session_id=session_id,
+                attachments=attachments_for_chat_service,
+            )
         # NOVA_MOBILE_IMAGE_URL_ACTIVE_SESSION_FORCE_20260630
         # Image generation can create the PNG but leave image_url attached to
         # a stale/placeholder session. Force the image URL onto the actual
