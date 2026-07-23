@@ -7,6 +7,7 @@ import hashlib
 import uuid
 
 from nova_backend.services.auth_context import get_current_user_id
+from nova_backend.services.onboarding_service import OnboardingService
 from nova_backend.services.image_vision_service import ImageVisionService
 from flask import Flask, Response, jsonify, render_template, request, send_from_directory, session
 from flask_cors import CORS
