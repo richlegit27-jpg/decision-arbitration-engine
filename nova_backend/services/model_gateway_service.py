@@ -41,30 +41,47 @@ def resolve_nova_model(model):
 
 def resolve_nova_task_model(
     model=None,
-    task_type=None,
     text="",
+    intent="",
 ):
     if model:
         return resolve_nova_model(model)
 
-    content = str(text or "").lower()
+    intent = str(intent or "").lower().strip()
+
+    if intent in {
+        "coding",
+        "debugging",
+    }:
+        return NOVA_MODEL_ALIASES["nova-coding"]
+
+    if intent == "image":
+        return NOVA_MODEL_ALIASES["nova-vision"]
+
+    if intent in {
+        "planning",
+        "working_state",
+    }:
+        return NOVA_MODEL_ALIASES["nova-smart"]
+
+    text = str(text or "").lower()
 
     if any(
-        word in content
+        word in text
         for word in [
-            "code",
             "python",
+            "code",
             "bug",
             "error",
-            "debug",
             "function",
-            "api",
+            "script",
+            "debug",
         ]
     ):
         return NOVA_MODEL_ALIASES["nova-coding"]
 
     if any(
-        word in content
+        word in text
         for word in [
             "image",
             "photo",
@@ -73,6 +90,32 @@ def resolve_nova_task_model(
         ]
     ):
         return NOVA_MODEL_ALIASES["nova-vision"]
+
+    return NOVA_MODEL_ALIASES["nova-fast"]
+
+def resolve_nova_intent_model(
+    intent="",
+    model=None,
+):
+    if model:
+        return resolve_nova_model(model)
+
+    intent = str(intent or "").lower().strip()
+
+    if intent in {
+        "coding",
+        "debugging",
+    }:
+        return NOVA_MODEL_ALIASES["nova-coding"]
+
+    if intent == "image":
+        return NOVA_MODEL_ALIASES["nova-vision"]
+
+    if intent in {
+        "planning",
+        "working_state",
+    }:
+        return NOVA_MODEL_ALIASES["nova-smart"]
 
     return NOVA_MODEL_ALIASES["nova-fast"]
 
