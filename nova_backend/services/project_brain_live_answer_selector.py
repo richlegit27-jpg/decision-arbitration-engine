@@ -124,7 +124,12 @@ def should_use_project_brain_decision_context(user_text: str = "", pasted_output
 
     return False, "plain_project_context"
 
-def build_project_brain_live_answer(user_text: str = "", pasted_output: str = "") -> ProjectBrainLiveAnswer:
+def build_project_brain_live_answer(
+    user_text: str = "",
+    pasted_output: str = "",
+    user_id=None,
+) -> ProjectBrainLiveAnswer:
+
     """Build the selected Project Brain answer without touching Flask or app.py."""
 
     use_decision, reason = should_use_project_brain_decision_context(
