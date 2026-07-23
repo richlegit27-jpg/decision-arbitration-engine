@@ -541,13 +541,10 @@ class SessionService:
 
         # Anonymous sessions may continue anonymously.
         if not current_user_id:
-            return not session_user_id
+            return False
 
-        # Allow an authenticated user to claim an
-        # existing unowned session. get_session()
-        # persists the owner immediately afterward.
         if not session_user_id:
-            return True
+            return False
 
         return session_user_id == current_user_id
 

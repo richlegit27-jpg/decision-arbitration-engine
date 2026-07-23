@@ -43,5 +43,10 @@ with app.test_request_context("/"):
     session["nova_user_id"] = "user_b"
 
     print("MEMORY USER B:", memory.all())
-    print("SESSION USER B:", sessions.all())
+    print(
+    "SESSION USER B:",
+    sessions.list_sessions(
+        user_id="user_b"
+    )
+)
     print("ARTIFACT USER B:", artifacts.all())
