@@ -14604,7 +14604,11 @@ Rules:
                 f"generated_{uuid.uuid4().hex}.png"
             )
 
-            result = self.client.images.generate(
+            from nova_backend.services.model_gateway_service import (
+                images_generate_create,
+            )
+
+            result = images_generate_create(
                 model=self.image_model,
                 prompt=prompt,
                 size=self.image_size,

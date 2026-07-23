@@ -398,6 +398,21 @@ def _nova_consume_and_record_usage(
 
     return billing_result
 
+def images_generate_create(*args, **kwargs):
+    try:
+        from openai import OpenAI
+    except Exception as error:
+        raise RuntimeError(
+            f"OpenAI client is unavailable: {error}"
+        ) from error
+
+    client = OpenAI()
+
+    return client.images.generate(
+        *args,
+        **kwargs,
+    )
+
 
 def chat_completions_create(*args, **kwargs):
     username, session_id, enforce = _nova_pop_internal_kwargs(kwargs)
