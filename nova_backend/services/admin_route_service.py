@@ -1,10 +1,13 @@
 from pathlib import Path
-
+from flask import request
+from flask import jsonify
+from nova_backend.services.auth_context import get_current_user_id
 
 class AdminRouteService:
 
     def __init__(self, admin_lead_service):
         self.admin_lead_service = admin_lead_service
+        self.onboarding_service = OnboardingService()
 
     def install_routes(self, app):
 
@@ -294,6 +297,41 @@ class AdminRouteService:
 
             return render_template(
                 "nova_admin_launch_checklist.html"
+            )
+
+        @app.get("/admin/onboarding/status")
+        def nova_admin_onboarding_status_20260723():
+            if not self.admin_lead_service.admin_allowed(request):
+                return "Forbidden", 403
+
+            user_id = get_current_user_id()
+
+            return jsonify(
+                {
+                    "user_id": user_id,
+                    "onboarding": self.onboarding_service.load_user_state(
+                        user_id
+                    ),
+                }
+            )
+
+
+        @app.post("/admin/onboarding/reset")
+        def nova_admin_onboarding_reset_20260723():
+            if not self.admin_lead_service.admin_allowed(request):
+                return "Forbidden", 403
+
+            user_id = get_current_user_id()
+
+            ok = self.onboarding_service.reset_user_state(
+                user_id
+            )
+
+            return jsonify(
+                {
+                    "ok": ok,
+                    "user_id": user_id,
+                }
             )
 
         @app.get("/admin/leads.csv")

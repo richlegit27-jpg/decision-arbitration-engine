@@ -153,3 +153,32 @@ class OnboardingService:
 
         except Exception:
             return {}
+
+    def reset_user_state(self, user_id):
+        if not user_id:
+            return False
+
+        try:
+            if not self.USER_ONBOARDING_FILE.exists():
+                return True
+
+            data = json.loads(
+                self.USER_ONBOARDING_FILE.read_text(
+                    encoding="utf-8"
+                )
+            )
+
+            data.pop(str(user_id), None)
+
+            self.USER_ONBOARDING_FILE.write_text(
+                json.dumps(
+                    data,
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+
+            return True
+
+        except Exception:
+            return False
