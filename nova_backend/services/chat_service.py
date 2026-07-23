@@ -5021,6 +5021,11 @@ Rules:
                 ),
                 nova_session_id=session_id,
                 model=self.chat_model,
+                intent=(
+                    decision.get("intent")
+                    if isinstance(decision, dict)
+                    else ""
+                ),
                 input=model_messages,
             )
 
