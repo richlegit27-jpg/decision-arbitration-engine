@@ -735,7 +735,10 @@ def _nova_project_brain_command_center_question_20260702(user_text):
 
     return False
 
-def build_project_brain_general_answer(user_text=""):
+def build_project_brain_general_answer(
+    user_text="",
+    user_id=None,
+):
     intent = classify_project_brain_intent(user_text)
 
     print(
@@ -866,13 +869,9 @@ def build_project_brain_general_answer(user_text=""):
             text=answer_project_state_question(user_text),
         )
 
-    if should_handle_project_brain_general_question(user_text):
-        from nova_backend.services.project_brain_live_answer_selector import (
-            build_project_brain_live_answer,
-        )
-
         live_answer = build_project_brain_live_answer(
             user_text=user_text,
+            user_id=user_id,
         )
 
         if live_answer:
