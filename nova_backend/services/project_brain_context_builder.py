@@ -50,7 +50,7 @@ def _recent_commits(limit: int = 4) -> List[str]:
         return []
 
 
-def build_project_brain_context() -> ProjectBrainContext:
+def build_project_brain_context(user_id=None) -> ProjectBrainContext:
     from nova_backend.services.project_brain_freshness_snapshot import (
         build_project_brain_freshness_snapshot,
     )
@@ -60,13 +60,14 @@ def build_project_brain_context() -> ProjectBrainContext:
     user_first_intent = ""
 
     try:
-        from nova_backend.services.onboarding_service import (
-            OnboardingService,
-        )
+        if user_id:
+            from nova_backend.services.onboarding_service import (
+                OnboardingService,
+            )
 
-        user_first_intent = OnboardingService().get_first_intent(
-            "richard"
-        )
+            user_first_intent = OnboardingService().get_first_intent(
+                user_id
+            )
 
     except Exception:
         user_first_intent = ""
@@ -103,8 +104,10 @@ def _first_intent_text(context: ProjectBrainContext) -> str:
     )
 
 
-def build_current_project_answer() -> str:
-    context = build_project_brain_context()
+def build_current_project_answer(user_id=None) -> str:
+    context = build_project_brain_context(
+        user_id=user_id
+    )
 
     return (
         "Source: Project Brain freshness snapshot. "
