@@ -15257,7 +15257,10 @@ Rules:
                     "Tell me the details you want included."
                 )
 
-            print("DEBUG WRITING MODEL OUTPUT =", repr(assistant_text))
+            exec_debug(
+            "DEBUG WRITING MODEL OUTPUT =",
+            repr(assistant_text),
+        )
             return assistant_text
 
         except Exception as e:
@@ -16715,8 +16718,18 @@ try:
                     build_project_brain_general_answer,
                 )
 
+                user_id = ""
+
+                try:
+                    user_id = str(
+                        get_current_user_id() or ""
+                    ).strip()
+                except Exception:
+                    user_id = ""
+
                 general_answer = build_project_brain_general_answer(
-                    question
+                    question,
+                    user_id=user_id,
                 )
 
                 if isinstance(general_answer, dict):
