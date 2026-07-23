@@ -205,7 +205,9 @@ def build_project_brain_live_answer(
             build_current_project_answer,
         )
 
-        text = build_current_project_answer()
+        text = build_current_project_answer(
+            user_id=user_id
+        )
 
         return ProjectBrainLiveAnswer(
             text=text,
