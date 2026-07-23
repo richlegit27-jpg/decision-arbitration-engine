@@ -186,6 +186,31 @@ with TemporaryDirectory() as temporary_directory:
         not missing_content_target.exists(),
     )
 
+    unsupported_step = {
+        "action": "teleport",
+    }
+
+    step_service.execute_step_logic(
+        session_id="safety-smoke",
+        step=unsupported_step,
+    )
+
+    assert_true(
+        "unsupported_action_blocked",
+        unsupported_step.get("status")
+        == "failed",
+        unsupported_step,
+    )
+
+    assert_true(
+        "unsupported_action_explained",
+        "Unsupported execution action"
+        in str(
+            unsupported_step.get("error")
+            or ""
+        ),
+        unsupported_step,
+    )
 
 class FakeExecutionStateService:
 

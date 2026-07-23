@@ -127,8 +127,15 @@ class ExecutionStepService:
                 )
 
             else:
-                step["result"] = "step executed"
-                step["error"] = None
+                action_label = (
+                    step_action
+                    or "missing"
+                )
+
+                raise ValueError(
+                    "Unsupported execution action: "
+                    f"{action_label}"
+                )
 
             step["status"] = "completed"
 
