@@ -127,6 +127,16 @@ class OnboardingService:
         except Exception:
             return {}
 
+    def get_first_intent(self, user_id):
+        state = self.load_user_state(user_id)
+
+        if not isinstance(state, dict):
+            return ""
+
+        return str(
+            state.get("first_intent") or ""
+        ).strip()
+
     def save_user_state(self, user_id, patch):
         if not user_id:
             return {}

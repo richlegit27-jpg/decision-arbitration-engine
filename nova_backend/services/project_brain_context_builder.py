@@ -16,6 +16,7 @@ class ProjectBrainContext:
     next_move: str
     validation: List[str]
     recent_commits: List[str]
+    user_first_intent: str = ""
 
 
 def _repo_root() -> Path:
@@ -56,6 +57,20 @@ def build_project_brain_context() -> ProjectBrainContext:
 
     snapshot = build_project_brain_freshness_snapshot()
 
+    user_first_intent = ""
+
+    try:
+        from nova_backend.services.onboarding_service import (
+            OnboardingService,
+        )
+
+        user_first_intent = OnboardingService().get_first_intent(
+            "richard"
+        )
+
+    except Exception:
+        user_first_intent = ""
+
     return ProjectBrainContext(
         project_name="Nova",
         local_app="local Nova Flask app",
@@ -65,6 +80,7 @@ def build_project_brain_context() -> ProjectBrainContext:
         next_move=snapshot.next_move,
         validation=snapshot.validation,
         recent_commits=snapshot.recent_commits,
+        user_first_intent=user_first_intent,
     )
 
 
