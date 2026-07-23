@@ -71,7 +71,7 @@ def should_use_project_brain_decision_context(user_text: str = "", pasted_output
         "route stealing",
         "wrapper",
     ]):
-        return True, "route_layer_risk"
+        return True, "safety_route_layer_risk"
 
     if _contains_any(combined, [
         "should we patch",
@@ -121,6 +121,16 @@ def should_use_project_brain_decision_context(user_text: str = "", pasted_output
         "project status",
     ]):
         return False, "plain_project_status_general_intelligence"
+
+    if _contains_any(combined, [
+        "failure",
+        "failed",
+        "assertionerror",
+        "traceback",
+        "exception",
+        "error",
+    ]):
+        return True, "failure_interpretation"
 
     return False, "plain_project_context"
 
