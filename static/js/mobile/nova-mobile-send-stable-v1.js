@@ -608,11 +608,18 @@ fetch("/api/chat", {
             throw new Error("HTTP " + response.status + ": " + raw.slice(0, 500));
         }
 
-        var responsePayload = JSON.parse(raw);
-        var reply =
-            extractReply(responsePayload) ||
-            "[empty response]";
+var responsePayload = JSON.parse(raw);
 
+if (
+    window.NovaMobileOnboardingActions &&
+    typeof window.NovaMobileOnboardingActions.render === "function"
+) {
+    window.NovaMobileOnboardingActions.render(responsePayload);
+}
+
+var reply =
+    extractReply(responsePayload) ||
+    "[empty response]";
         var assistantMessage =
             responsePayload.assistant_message &&
             typeof responsePayload.assistant_message ===

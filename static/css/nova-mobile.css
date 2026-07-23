@@ -15259,3 +15259,30 @@ font-size: 18px !important;
     height: 32px !important;
     border-radius: 50% !important;
 }
+
+.nova-onboarding-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 4px 0;
+}
+
+.nova-onboarding-actions button {
+    padding: 10px 16px;
+    border-radius: 999px;
+    border: 1px solid rgba(128, 128, 128, 0.35);
+    background: transparent;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1.2;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.nova-onboarding-actions button:hover {
+    opacity: 0.85;
+}
+
+.nova-onboarding-actions button:active {
+    transform: scale(0.97);
+}

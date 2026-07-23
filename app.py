@@ -6,6 +6,7 @@ import shutil
 import hashlib
 import uuid
 
+from nova_backend.services.auth_context import get_current_user_id
 from nova_backend.services.image_vision_service import ImageVisionService
 from flask import Flask, Response, jsonify, render_template, request, send_from_directory, session
 from flask_cors import CORS
@@ -15,6 +16,7 @@ from pathlib import Path
 from nova_backend.services.memory_route_service import MemoryRouteService
 from werkzeug.utils import secure_filename
 from nova_backend.services.web_preview_route_service import WebPreviewRouteService
+from nova_backend.services.onboarding_service import OnboardingService
 
 from nova_backend.services.debug_route_service import DebugRouteService
 
@@ -434,6 +436,7 @@ attachment_context_service = AttachmentContextService(
 
 local_auth_route_service = None
 
+onboarding_service = OnboardingService()
 repair_plan_priority_guard_service = RepairPlanPriorityGuardService()
 chat_attachment_memory_service = ChatAttachmentMemoryService()
 chat_response_cleanup_service = ChatResponseCleanupService()
@@ -3807,11 +3810,85 @@ def api_chat():
             )
         )
 
-        result = chat_service.handle(
-            user_text=image_command_user_text,
-            session_id=session_id,
-            attachments=attachments_for_chat_service,
-        )
+        # NOVA_ONBOARDING_SERVICE_GATE_20260723
+        try:
+            current_session = session_service.get_session(session_id) or {}
+
+            user_id = get_current_user_id()
+
+            user_onboarding = onboarding_service.load_user_state(
+                user_id
+            )
+
+            if (
+                onboarding_service.should_show_welcome(current_session)
+                and onboarding_service.should_show_user_welcome(
+                    user_onboarding
+                )
+            ):
+                meta = current_session.get("meta") or {}
+
+                meta.update(
+                    onboarding_service.build_onboarding_patch()
+                )
+
+                session_service.set_session_meta(
+                    session_id,
+                    meta,
+                )
+
+                onboarding_service.save_user_state(
+                    user_id,
+                    onboarding_service.build_user_onboarding_patch(),
+                )
+
+                result = {
+                    "ok": True,
+                    "onboarding": True,
+                    "onboarding_state": "complete",
+                    "actions": onboarding_service.build_welcome_actions(),
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": onboarding_service.build_welcome_message(),
+                    },
+                }
+
+            elif onboarding_service.should_show_returning_message(current_session):
+                meta = current_session.get("meta") or {}
+
+                meta["onboarding"]["returning_greeting_seen"] = True
+
+                session_service.set_session_meta(
+                    session_id,
+                    meta,
+                )
+
+                result = {
+                    "ok": True,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": onboarding_service.build_returning_message(),
+                    },
+                }
+
+            else:
+                result = chat_service.handle(
+                    user_text=image_command_user_text,
+                    session_id=session_id,
+                    attachments=attachments_for_chat_service,
+                )
+
+        except Exception as onboarding_error:
+            app.logger.warning(
+                "[NOVA_ONBOARDING_SERVICE_GATE] failed: %s",
+                onboarding_error,
+            )
+
+            result = chat_service.handle(
+                user_text=image_command_user_text,
+                session_id=session_id,
+                attachments=attachments_for_chat_service,
+            )
 
         print(
             "[CHAT SERVICE RESULT DEBUG]",
