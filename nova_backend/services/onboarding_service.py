@@ -2,10 +2,13 @@ import json
 from pathlib import Path
 from datetime import datetime, timezone
 
+
 class OnboardingService:
 
     VERSION = 1
-    USER_ONBOARDING_FILE = Path("data/nova_user_onboarding.json")
+    USER_ONBOARDING_FILE = Path(
+        "data/nova_user_onboarding.json"
+    )
 
     def get_state(self, session):
         if not isinstance(session, dict):
@@ -42,31 +45,38 @@ class OnboardingService:
         meta = session.get("meta") or {}
         onboarding = meta.get("onboarding") or {}
 
-        return onboarding.get("returning_greeting_seen") is not True
+        return onboarding.get(
+            "returning_greeting_seen"
+        ) is not True
 
     def build_welcome_actions(self):
         return [
             {
-                "id": "ask_question",
-                "label": "Ask a question",
-                "prompt": "I want to ask a question. Help me get started.",
+                "id": "learn",
+                "label": "Ask questions",
+                "prompt": "I want to ask questions and learn things. Help me get started.",
+                "intent": "learning",
             },
             {
-                "id": "plan_project",
+                "id": "plan",
                 "label": "Plan something",
-                "prompt": "I want to plan something. Help me figure out the next steps.",
+                "prompt": "I want to plan something. Help me organize the next steps.",
+                "intent": "planning",
             },
             {
-                "id": "upload_file",
-                "label": "Upload a file",
-                "prompt": "I want to upload a file. Help me understand what I can do with it.",
+                "id": "create",
+                "label": "Create something",
+                "prompt": "I want to create something. Help me build it.",
+                "intent": "creation",
             },
             {
-                "id": "start_build",
-                "label": "Build something",
-                "prompt": "I want to build something. Help me decide where to start.",
+                "id": "files",
+                "label": "Work with files",
+                "prompt": "I want to work with a file. Help me understand what I can do.",
+                "intent": "files",
             },
         ]
+
     def build_onboarding_patch(self):
         return {
             "onboarding": {
@@ -117,7 +127,7 @@ class OnboardingService:
         except Exception:
             return {}
 
-    def load_user_state(self, user_id):
+    def save_user_state(self, user_id, patch):
         if not user_id:
             return {}
 
@@ -137,7 +147,10 @@ class OnboardingService:
                 )
 
             current = data.get(str(user_id), {})
-            current.update(patch)
+
+            current.update(
+                patch or {}
+            )
 
             data[str(user_id)] = current
 
@@ -168,7 +181,10 @@ class OnboardingService:
                 )
             )
 
-            data.pop(str(user_id), None)
+            data.pop(
+                str(user_id),
+                None,
+            )
 
             self.USER_ONBOARDING_FILE.write_text(
                 json.dumps(

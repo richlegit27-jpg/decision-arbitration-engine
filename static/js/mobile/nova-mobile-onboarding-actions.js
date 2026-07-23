@@ -43,6 +43,14 @@ button.onclick = function () {
 
     if (input) {
         input.value = action.prompt || action.label;
+
+        try {
+            sessionStorage.setItem(
+                "nova_onboarding_intent",
+                action.intent || ""
+            );
+        } catch (_) {}
+
         input.focus();
     }
 

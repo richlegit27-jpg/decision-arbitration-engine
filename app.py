@@ -3061,6 +3061,17 @@ def api_chat():
         # This prevents chat_service attachment guards from returning canned attachment responses.
         attachments_for_chat_service = list(attachments or [])
 
+        onboarding_intent = ""
+
+        try:
+            onboarding_intent = str(
+                data.get("onboarding_intent") or ""
+            ).strip()
+        except Exception:
+            onboarding_intent = ""
+
+        image_command_user_text = user_text
+
         # NOVA_IMAGE_COMMAND_ATTACHMENT_BYPASS_20260610
         # Explicit image generation commands must not be hijacked by stale/current attachment gates.
         _nova_image_command_text = str(data.get("user_text") or data.get("text") or data.get("message") or "").strip().lower()
@@ -3793,28 +3804,7 @@ def api_chat():
         username = ""
 
         try:
-            from flask import g
-
-            user = getattr(g, "nova_auth_user", None) or {}
-
-            username = str(
-                user.get("username") or ""
-            ).strip()
-
-        except Exception:
-            pass
-
-        result = (
-            execution_bridge_service.try_execution_status(
-                session_id=session_id,
-                user_text=image_command_user_text,
-            )
-        )
-
-        # NOVA_ONBOARDING_SERVICE_GATE_20260723
-        try:
             current_session = session_service.get_session(session_id) or {}
-
             user_id = get_current_user_id()
 
             user_onboarding = onboarding_service.load_user_state(
@@ -3827,6 +3817,7 @@ def api_chat():
                     user_onboarding
                 )
             ):
+
                 meta = current_session.get("meta") or {}
 
                 meta.update(
@@ -3838,9 +3829,16 @@ def api_chat():
                     meta,
                 )
 
+                user_onboarding_patch = (
+                    onboarding_service.build_user_onboarding_patch()
+                )
+
+                if onboarding_intent:
+                    user_onboarding_patch["first_intent"] = onboarding_intent
+
                 onboarding_service.save_user_state(
                     user_id,
-                    onboarding_service.build_user_onboarding_patch(),
+                    user_onboarding_patch,
                 )
 
                 result = {
