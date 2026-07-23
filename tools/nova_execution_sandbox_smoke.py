@@ -44,6 +44,82 @@ with TemporaryDirectory() as temporary_directory:
         inside_result,
     )
 
+    timeout_result = runner.run_code(
+        "while True:\n    pass\n",
+        filename="timeout.py",
+        timeout=1,
+    )
+
+    assert_true(
+        "sandbox_timeout_enforced",
+        (
+            timeout_result.get("ok") is False
+            and "timed out"
+            in str(
+                timeout_result.get("error")
+                or ""
+            ).lower()
+        ),
+        timeout_result,
+    )
+
+    output_result = runner.run_code(
+        'print("x" * 25000)\n',
+        filename="large_output.py",
+    )
+
+    assert_true(
+        "sandbox_output_truncated",
+        (
+            output_result.get("ok") is True
+            and output_result.get(
+                "output_truncated"
+            )
+            is True
+            and len(
+                output_result.get("stdout")
+                or ""
+            )
+            <= runner.MAX_OUTPUT_BYTES
+        ),
+        output_result,
+    )
+
+    environment_result = runner.run_code(
+        (
+            "import os\n"
+            'print(os.getenv("OPENAI_API_KEY", '
+            '"missing"))\n'
+        ),
+        filename="environment.py",
+    )
+
+    assert_true(
+        "sandbox_secret_environment_removed",
+        (
+            environment_result.get("ok")
+            is True
+            and environment_result.get(
+                "stdout"
+            )
+            == "missing"
+        ),
+        environment_result,
+    )
+
+    oversized_result = runner.run_code(
+        "x" * (
+            runner.MAX_SCRIPT_BYTES + 1
+        ),
+        filename="oversized.py",
+    )
+
+    assert_true(
+        "sandbox_script_size_limited",
+        oversized_result.get("ok") is False,
+        oversized_result,
+    )
+
     traversal_result = runner.run_code(
         'print("should not be written")',
         filename="../escaped.py",
@@ -211,6 +287,7 @@ with TemporaryDirectory() as temporary_directory:
         ),
         unsupported_step,
     )
+
 
 class FakeExecutionStateService:
 
