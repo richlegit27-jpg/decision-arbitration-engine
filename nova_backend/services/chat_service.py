@@ -9595,7 +9595,7 @@ Rules:
             session_id=session_id,
         )
 
-        print(
+        exec_debug(
             "WRITING ROUTE DEBUG:",
             user_text,
             decision,
