@@ -39,6 +39,42 @@ def resolve_nova_model(model):
         "gpt-4.1-mini",
     )
 
+def resolve_nova_task_model(
+    model=None,
+    task_type=None,
+    text="",
+):
+    if model:
+        return resolve_nova_model(model)
+
+    content = str(text or "").lower()
+
+    if any(
+        word in content
+        for word in [
+            "code",
+            "python",
+            "bug",
+            "error",
+            "debug",
+            "function",
+            "api",
+        ]
+    ):
+        return NOVA_MODEL_ALIASES["nova-coding"]
+
+    if any(
+        word in content
+        for word in [
+            "image",
+            "photo",
+            "picture",
+            "vision",
+        ]
+    ):
+        return NOVA_MODEL_ALIASES["nova-vision"]
+
+    return NOVA_MODEL_ALIASES["nova-fast"]
 
 def _nova_text(value: Any) -> str:
     try:
@@ -434,9 +470,13 @@ def images_generate_create(*args, **kwargs):
 
 
 def chat_completions_create(*args, **kwargs):
-    kwargs["model"] = resolve_nova_model(
-        kwargs.get("model")
+    kwargs["model"] = resolve_nova_task_model(
+        model=kwargs.get("model"),
+        text=_nova_messages_text(
+            kwargs.get("messages")
+        ),
     )
+
     username, session_id, enforce = _nova_pop_internal_kwargs(kwargs)
 
     model = str(
@@ -449,15 +489,24 @@ def chat_completions_create(*args, **kwargs):
     messages = kwargs.get("messages")
 
     if enforce:
-        _nova_preflight_credits(username=username, model=model)
+        _nova_preflight_credits(
+            username=username,
+            model=model,
+        )
 
     try:
         from openai import OpenAI
     except Exception as error:
-        raise RuntimeError(f"OpenAI client is unavailable: {error}") from error
+        raise RuntimeError(
+            f"OpenAI client is unavailable: {error}"
+        ) from error
 
     client = OpenAI()
-    response = client.chat.completions.create(*args, **kwargs)
+
+    response = client.chat.completions.create(
+        *args,
+        **kwargs,
+    )
 
     _nova_consume_and_record_usage(
         username=username,
@@ -471,8 +520,11 @@ def chat_completions_create(*args, **kwargs):
     return response
 
 def responses_create(*args, **kwargs):
-    kwargs["model"] = resolve_nova_model(
-        kwargs.get("model")
+    kwargs["model"] = resolve_nova_task_model(
+        model=kwargs.get("model"),
+        text=_nova_text(
+            kwargs.get("input")
+        ),
     )
     username, session_id, enforce = (
         _nova_pop_internal_kwargs(
