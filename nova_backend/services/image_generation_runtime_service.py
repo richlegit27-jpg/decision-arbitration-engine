@@ -65,7 +65,11 @@ def _nova_runtime_handle_image_generation(
     }
 
     try:
-        result = self.client.images.generate(
+        from nova_backend.services.model_gateway_service import (
+            images_generate_create,
+        )
+
+        result = images_generate_create(
             model=self.image_model,
             prompt=prompt,
             size=self.image_size,
