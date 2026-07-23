@@ -20,6 +20,25 @@ from typing import Any, Dict, Tuple
 
 NOVA_GATEWAY_MINIMUM_CREDIT_COST = 1
 
+NOVA_MODEL_ALIASES = {
+    "nova-fast": "gpt-4.1-mini",
+    "nova-smart": "gpt-5.4",
+    "nova-vision": "gpt-4o-mini",
+    "nova-coding": "gpt-5.4",
+}
+
+
+def resolve_nova_model(model):
+    requested = str(model or "").strip()
+
+    if requested in NOVA_MODEL_ALIASES:
+        return NOVA_MODEL_ALIASES[requested]
+
+    return requested or os.environ.get(
+        "OPENAI_MODEL",
+        "gpt-4.1-mini",
+    )
+
 
 def _nova_text(value: Any) -> str:
     try:
@@ -415,6 +434,9 @@ def images_generate_create(*args, **kwargs):
 
 
 def chat_completions_create(*args, **kwargs):
+    kwargs["model"] = resolve_nova_model(
+        kwargs.get("model")
+    )
     username, session_id, enforce = _nova_pop_internal_kwargs(kwargs)
 
     model = str(
@@ -449,6 +471,9 @@ def chat_completions_create(*args, **kwargs):
     return response
 
 def responses_create(*args, **kwargs):
+    kwargs["model"] = resolve_nova_model(
+        kwargs.get("model")
+    )
     username, session_id, enforce = (
         _nova_pop_internal_kwargs(
             kwargs
