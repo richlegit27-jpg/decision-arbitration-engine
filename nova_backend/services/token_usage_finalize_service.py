@@ -100,11 +100,6 @@ def install_token_usage_finalize_wrapper(ChatService):
                     record_model_usage,
                 )
 
-                from nova_backend.services.billing_service import (
-                    consume_usage,
-                )
-
-
                 username = ""
 
                 try:
@@ -185,38 +180,6 @@ def install_token_usage_finalize_wrapper(ChatService):
                         "estimated": True,
                     },
                 )
-
-
-                try:
-                    billing_result = consume_usage(
-                        username=username,
-                        model=str(
-                            model_name or "unknown"
-                        ),
-                        input_tokens=len(
-                            (user_text or "").split()
-                        ),
-                        output_tokens=len(
-                            (assistant_text or "").split()
-                        ),
-                    )
-
-                    print(
-                        "[NOVA_BILLING]",
-                        "username=",
-                        username,
-                        "model=",
-                        model_name,
-                        "result=",
-                        billing_result,
-                        flush=True,
-                    )
-
-                except Exception as billing_error:
-                    print(
-                        "[NOVA_BILLING] failed:",
-                        billing_error,
-                    )
 
 
             except Exception as exc:

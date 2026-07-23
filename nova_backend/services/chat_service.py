@@ -28,7 +28,10 @@ from nova_backend.services.execution_mutation_service import (
 )
 
 from openai import OpenAI
-from nova_backend.services.model_gateway_service import chat_completions_create
+from nova_backend.services.model_gateway_service import (
+    chat_completions_create,
+    responses_create,
+)
 from nova_backend.services.repair_execution_service import RepairExecutionService
 from nova_backend.services.execution_orchestrator_service import ExecutionOrchestratorService
 from nova_backend.services.execution_step_service import ExecutionStepService
@@ -3321,7 +3324,13 @@ Rules:
             )
 
         try:
-            model_response = self.client.responses.create(
+            model_response = responses_create(
+                nova_username=(
+                    getattr(self, "username", None)
+                    or os.getenv("NOVA_DEFAULT_USERNAME")
+                    or "richard"
+                ),
+                nova_session_id=session_id,
                 model=self.model,
                 input=[
                     {
@@ -5026,7 +5035,13 @@ Rules:
 
             return clean
         try:
-            response = self.client.responses.create(
+            response = responses_create(
+                nova_username=(
+                    getattr(self, "username", None)
+                    or os.getenv("NOVA_DEFAULT_USERNAME")
+                    or "richard"
+                ),
+                nova_session_id=session_id,
                 model=self.chat_model,
                 input=model_messages,
             )
@@ -15322,7 +15337,13 @@ Rules:
 
         try:
 
-            response = self.client.responses.create(
+            response = responses_create(
+                nova_username=(
+                    getattr(self, "username", None)
+                    or os.getenv("NOVA_DEFAULT_USERNAME")
+                    or "richard"
+                ),
+                nova_session_id=session_id,
                 model=self.chat_model,
                 input=[
                     {
@@ -16044,8 +16065,11 @@ except Exception:
 
 def install_chat_service_runtime_patches():
     install_execution_planner_runtime_patches()
-    install_token_usage_finalize_wrapper(ChatService)
-    install_attachment_web_suppression()
+install_token_usage_finalize_wrapper(ChatService)
+
+install_non_web_source_leak_guard(ChatService)
+
+install_attachment_web_suppression()
 
 # NOVA_INTENT_AUTHORITY_DECIDE_ROUTE_20260630
 try:

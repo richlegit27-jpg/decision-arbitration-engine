@@ -134,16 +134,17 @@ def _nova_extract_response_text(response: Any) -> str:
     return ""
 
 
-def _nova_pop_internal_kwargs(kwargs: Dict[str, Any]) -> Tuple[str, str, bool]:
-    username = (
+def _nova_pop_internal_kwargs(
+    kwargs: Dict[str, Any],
+) -> Tuple[str, str, bool]:
+    provided_username = (
         kwargs.pop("nova_username", None)
         or kwargs.pop("_nova_username", None)
         or kwargs.pop("billing_username", None)
-        or os.environ.get("NOVA_DEFAULT_USERNAME")
-        or "richard"
+        or ""
     )
 
-    session_id = (
+    provided_session_id = (
         kwargs.pop("nova_session_id", None)
         or kwargs.pop("_nova_session_id", None)
         or kwargs.pop("billing_session_id", None)
@@ -151,17 +152,140 @@ def _nova_pop_internal_kwargs(kwargs: Dict[str, Any]) -> Tuple[str, str, bool]:
         or ""
     )
 
-    enforce = kwargs.pop("nova_enforce_billing", None)
+    enforce = kwargs.pop(
+        "nova_enforce_billing",
+        None,
+    )
 
     if enforce is None:
-        raw = os.environ.get("NOVA_MODEL_GATEWAY_BILLING_ENFORCED", "1")
-        enforce = str(raw).strip().lower() not in {"0", "false", "no", "off"}
+        raw = os.environ.get(
+            "NOVA_MODEL_GATEWAY_BILLING_ENFORCED",
+            "1",
+        )
+        enforce = (
+            str(raw).strip().lower()
+            not in {
+                "0",
+                "false",
+                "no",
+                "off",
+            }
+        )
 
-    username = str(username or "richard").strip().lower() or "richard"
-    session_id = str(session_id or "").strip()
+    authenticated_username = ""
+    request_session_id = ""
+    has_flask_request = False
 
-    return username, session_id, bool(enforce)
+    try:
+        from flask import (
+            g,
+            has_request_context,
+            request,
+        )
 
+        has_flask_request = bool(
+            has_request_context()
+        )
+
+        if has_flask_request:
+            auth_user = getattr(
+                g,
+                "nova_auth_user",
+                None,
+            )
+
+            if isinstance(auth_user, dict):
+                authenticated_username = str(
+                    auth_user.get("username")
+                    or ""
+                ).strip()
+            else:
+                authenticated_username = str(
+                    getattr(
+                        auth_user,
+                        "username",
+                        "",
+                    )
+                    or ""
+                ).strip()
+
+            payload = (
+                request.get_json(silent=True)
+                if request.is_json
+                else {}
+            )
+
+            if isinstance(payload, dict):
+                request_session_id = str(
+                    payload.get("session_id")
+                    or payload.get(
+                        "active_session_id"
+                    )
+                    or ""
+                ).strip()
+
+    except Exception:
+        pass
+
+    payments_live = (
+        str(
+            os.environ.get(
+                "NOVA_PAYMENTS_LIVE",
+                "",
+            )
+        )
+        .strip()
+        .lower()
+        in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+    )
+
+    if (
+        enforce
+        and payments_live
+        and has_flask_request
+        and not authenticated_username
+    ):
+        raise RuntimeError(
+            "Nova billing blocked model call: "
+            "authenticated billing identity required."
+        )
+
+    username = (
+        authenticated_username
+        or provided_username
+        or os.environ.get(
+            "NOVA_DEFAULT_USERNAME"
+        )
+        or "richard"
+    )
+
+    session_id = (
+        provided_session_id
+        or request_session_id
+        or ""
+    )
+
+    username = (
+        str(username or "richard")
+        .strip()
+        .lower()
+        or "richard"
+    )
+
+    session_id = str(
+        session_id or ""
+    ).strip()
+
+    return (
+        username,
+        session_id,
+        bool(enforce),
+    )
 
 def _nova_preflight_credits(username: str, model: str) -> None:
     try:
@@ -303,6 +427,52 @@ def chat_completions_create(*args, **kwargs):
         session_id=session_id,
         model=model,
         messages=messages,
+        response=response,
+        enforce=enforce,
+    )
+
+    return response
+
+def responses_create(*args, **kwargs):
+    username, session_id, enforce = (
+        _nova_pop_internal_kwargs(
+            kwargs
+        )
+    )
+
+    model = str(
+        kwargs.get("model")
+        or os.environ.get("OPENAI_MODEL")
+        or os.environ.get("NOVA_OPENAI_MODEL")
+        or "unknown"
+    )
+
+    model_input = kwargs.get("input")
+
+    if enforce:
+        _nova_preflight_credits(
+            username=username,
+            model=model,
+        )
+
+    try:
+        from openai import OpenAI
+    except Exception as error:
+        raise RuntimeError(
+            f"OpenAI client is unavailable: {error}"
+        ) from error
+
+    client = OpenAI()
+    response = client.responses.create(
+        *args,
+        **kwargs,
+    )
+
+    _nova_consume_and_record_usage(
+        username=username,
+        session_id=session_id,
+        model=model,
+        messages=model_input,
         response=response,
         enforce=enforce,
     )

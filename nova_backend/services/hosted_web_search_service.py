@@ -3,15 +3,16 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
-
-from openai import OpenAI
+from nova_backend.services.model_gateway_service import (
+    responses_create,
+)
 
 
 class HostedWebSearchService:
     """Evidence-backed web research through OpenAI hosted search."""
 
     def __init__(self, client=None, model: str = ""):
-        self.client = client or OpenAI()
+        self.client = client
         self.model = (
             str(model or "").strip()
             or os.getenv("NOVA_WEB_SEARCH_MODEL", "").strip()
@@ -135,7 +136,7 @@ class HostedWebSearchService:
         )
 
         try:
-            response = self.client.responses.create(
+            response = responses_create(
                 model=self.model,
                 tools=[
                     {

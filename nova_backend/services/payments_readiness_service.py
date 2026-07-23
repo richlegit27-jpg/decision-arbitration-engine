@@ -74,18 +74,114 @@ def _planned_plans() -> List[Dict[str, Any]]:
 
 
 def _usage_enforcement_status() -> Dict[str, Any]:
-    billing_text = _safe_read(ROOT / "nova_backend" / "services" / "billing_service.py").lower()
-    gateway_text = _safe_read(ROOT / "nova_backend" / "services" / "model_gateway_service.py").lower()
-    chat_text = _safe_read(ROOT / "nova_backend" / "services" / "chat_service.py").lower()
+    services = ROOT / "nova_backend" / "services"
+
+    billing_text = _safe_read(
+        services / "billing_service.py"
+    ).lower()
+
+    gateway_text = _safe_read(
+        services / "model_gateway_service.py"
+    ).lower()
+
+    chat_text = _safe_read(
+        services / "chat_service.py"
+    ).lower()
+
+    finalizer_text = _safe_read(
+        services / "token_usage_finalize_service.py"
+    ).lower()
+
+    hosted_web_text = _safe_read(
+        services / "hosted_web_search_service.py"
+    ).lower()
+
+    image_vision_text = _safe_read(
+        services / "image_vision_service.py"
+    ).lower()
+
+    app_text = _safe_read(
+        ROOT / "app.py"
+    ).lower()
+
+    gateway_usage_enforced = all(
+        marker in gateway_text
+        for marker in (
+            "def chat_completions_create",
+            "def responses_create",
+            "consume_usage(",
+            "_nova_preflight_credits(",
+        )
+    )
+
+    chat_usage_enforced = (
+        "responses_create(" in chat_text
+        and "chat_completions_create(" in chat_text
+        and "self.client.responses.create(" not in chat_text
+    )
+
+    hosted_web_usage_enforced = (
+        "response = responses_create(" in hosted_web_text
+        and "self.client.responses.create(" not in hosted_web_text
+    )
+
+    image_vision_usage_enforced = (
+        "response = chat_completions_create("
+        in image_vision_text
+        and "client.chat.completions.create("
+        not in image_vision_text
+    )
+
+    app_vision_usage_enforced = (
+        "_nova_response = _nova_chat_completions_create("
+        in app_text
+        and "_nova_client.chat.completions.create("
+        not in app_text
+    )
+
+    duplicate_finalize_billing = (
+        "consume_usage(" in finalizer_text
+    )
+
+    active_model_paths_gateway_enforced = all(
+        (
+            chat_usage_enforced,
+            hosted_web_usage_enforced,
+            image_vision_usage_enforced,
+            app_vision_usage_enforced,
+        )
+    )
 
     return {
-        "billing_service_consume_usage_exists": "def consume_usage" in billing_text,
-        "model_gateway_mentions_billing": "billing_service" in gateway_text or "consume_usage" in gateway_text,
-        "chat_service_mentions_billing": "billing_service" in chat_text or "consume_usage" in chat_text,
-        "gateway_usage_enforced": "consume_usage" in gateway_text,
-        "chat_usage_enforced": "consume_usage" in chat_text,
+        "billing_service_consume_usage_exists": (
+            "def consume_usage" in billing_text
+        ),
+        "model_gateway_mentions_billing": (
+            "billing_service" in gateway_text
+            or "consume_usage" in gateway_text
+        ),
+        "chat_service_mentions_billing": (
+            "responses_create(" in chat_text
+            or "chat_completions_create(" in chat_text
+        ),
+        "gateway_usage_enforced": gateway_usage_enforced,
+        "chat_usage_enforced": chat_usage_enforced,
+        "hosted_web_usage_enforced": (
+            hosted_web_usage_enforced
+        ),
+        "image_vision_usage_enforced": (
+            image_vision_usage_enforced
+        ),
+        "app_vision_usage_enforced": (
+            app_vision_usage_enforced
+        ),
+        "active_model_paths_gateway_enforced": (
+            active_model_paths_gateway_enforced
+        ),
+        "duplicate_finalize_billing": (
+            duplicate_finalize_billing
+        ),
     }
-
 
 def build_payments_readiness(username: str = "richard") -> Dict[str, Any]:
     clean_username = (username or "richard").strip() or "richard"
@@ -117,7 +213,21 @@ def build_payments_readiness(username: str = "richard") -> Dict[str, Any]:
         blockers.append("No paid Stripe price IDs are configured.")
 
     if not usage.get("gateway_usage_enforced"):
-        blockers.append("Model gateway does not enforce billing credits yet.")
+        blockers.append(
+            "Model gateway does not enforce billing credits yet."
+        )
+
+    if not usage.get(
+        "active_model_paths_gateway_enforced"
+    ):
+        blockers.append(
+            "One or more active model paths bypass billing enforcement."
+        )
+
+    if usage.get("duplicate_finalize_billing"):
+        blockers.append(
+            "Duplicate response-finalizer billing is still enabled."
+        )
 
     checkout_ready = (
         payments_live
@@ -130,7 +240,19 @@ def build_payments_readiness(username: str = "richard") -> Dict[str, Any]:
         and stripe_webhook_secret_configured
     )
 
-    live_ready = checkout_ready and webhook_ready and usage.get("gateway_usage_enforced")
+    live_ready = (
+        checkout_ready
+        and webhook_ready
+        and usage.get(
+            "gateway_usage_enforced"
+        )
+        and usage.get(
+            "active_model_paths_gateway_enforced"
+        )
+        and not usage.get(
+            "duplicate_finalize_billing"
+        )
+    )
 
     return {
         "mode": "live_ready" if live_ready else "staged_planned",

@@ -1487,7 +1487,9 @@ def api_chat():
                 _nova_vision_used = False
             else:
                 try:
-                    from openai import OpenAI as _NovaOpenAI
+                    from nova_backend.services.model_gateway_service import (
+                        chat_completions_create as _nova_chat_completions_create,
+                    )
 
                     _nova_mime_type = _nova_mimetypes.guess_type(str(_nova_image_path))[0] or "image/jpeg"
 
@@ -1496,9 +1498,24 @@ def api_chat():
 
                     _nova_data_url = "data:" + _nova_mime_type + ";base64," + _nova_encoded
 
-                    _nova_client = _NovaOpenAI(api_key=_nova_os.getenv("OPENAI_API_KEY"))
-
-                    _nova_response = _nova_client.chat.completions.create(
+                    _nova_response = _nova_chat_completions_create(
+                        nova_username=(
+                            (
+                                getattr(
+                                    g,
+                                    "nova_auth_user",
+                                    None,
+                                )
+                                or {}
+                            ).get("username")
+                            or _nova_os.getenv("NOVA_DEFAULT_USERNAME")
+                            or "richard"
+                        ),
+                        nova_session_id=str(
+                            locals().get("session_id")
+                            or locals().get("requested_session_id")
+                            or ""
+                        ),
                         model=_nova_os.getenv("NOVA_VISION_MODEL", "gpt-4o-mini"),
                         messages=[
                             {

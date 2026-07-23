@@ -3,6 +3,10 @@ import base64
 import mimetypes
 import os
 
+from nova_backend.services.model_gateway_service import (
+    chat_completions_create,
+)
+
 
 class ImageVisionService:
 
@@ -71,8 +75,6 @@ class ImageVisionService:
 
             else:
                 try:
-                    from openai import OpenAI
-
                     mime_type = mimetypes.guess_type(
                         str(image_path)
                     )[0] or "image/jpeg"
@@ -89,11 +91,7 @@ class ImageVisionService:
                         + encoded
                     )
 
-                    client = OpenAI(
-                        api_key=os.getenv("OPENAI_API_KEY")
-                    )
-
-                    response = client.chat.completions.create(
+                    response = chat_completions_create(
                         model=os.getenv(
                             "NOVA_VISION_MODEL",
                             "gpt-4o-mini",
