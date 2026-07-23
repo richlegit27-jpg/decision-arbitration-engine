@@ -2325,31 +2325,9 @@ Rules:
 
         # FORCE_CHAT_SERVICE_OPENAI_KEY_LOCK
         # Load the exact Nova .env key before creating the OpenAI client.
-        env_key = str(os.getenv("OPENAI_API_KEY") or "").strip().strip('"').strip("'")
 
-        if not env_key:
-            env_path = Path(os.getcwd()) / ".env"
 
-            if env_path.exists():
-                for raw_line in env_path.read_text(
-                    encoding="utf-8", errors="ignore"
-                ).splitlines():
-                    line = raw_line.strip()
 
-                    if not line or line.startswith("#"):
-                        continue
-
-                    if line.startswith("OPENAI_API_KEY="):
-                        env_key = line.split("=", 1)[1].strip().strip('"').strip("'")
-                        break
-
-        if env_key:
-            os.environ["OPENAI_API_KEY"] = env_key
-            print("[Nova OpenAI Key] loaded")
-            self.client = OpenAI(api_key=env_key)
-        else:
-            print("[Nova OpenAI Key] not configured")
-            self.client = OpenAI()
         self.agent = AgentService()
         self.memory_ranker = MemoryRankerService()
         self.tools = ToolService(base_dir=os.getcwd())
@@ -14781,7 +14759,6 @@ Rules:
             import os
             from pathlib import Path
 
-            from openai import OpenAI
 
             raw_url = self.safe_str(image_url).strip()
             raw_name = self.safe_str(image_name).strip()
@@ -14835,7 +14812,7 @@ Rules:
 
             prompt_text = self.safe_str(user_text).strip() or "Describe this image clearly."
 
-            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            
 
             response = chat_completions_create(
                 nova_username=getattr(self, "username", None) or os.getenv("NOVA_DEFAULT_USERNAME") or "richard",
