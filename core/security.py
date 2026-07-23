@@ -20,7 +20,10 @@ COOKIE_MAX_AGE = SESSION_HOURS * 60 * 60
 COOKIE_PATH = "/"
 COOKIE_SAMESITE = "lax"
 COOKIE_HTTPONLY = True
-COOKIE_SECURE = False  # set True when running over HTTPS
+COOKIE_SECURE = os.getenv(
+    "NOVA_COOKIE_SECURE",
+    "false",
+).lower() == "true"
 
 SECRET_KEY = os.getenv("NOVA_SECRET_KEY", "nova-dev-secret-change-this")
 
