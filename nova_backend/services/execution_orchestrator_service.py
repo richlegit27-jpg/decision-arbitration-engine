@@ -58,6 +58,16 @@ class ExecutionOrchestratorService:
             execution_state,
         )
 
+    def _save_active_execution(
+        self,
+        session_id="",
+        execution_state=None,
+    ):
+        return self._save_execution_state(
+            session_id=session_id,
+            execution_state=execution_state,
+        )
+
     def _process_execution_command(
         self,
         command="",
@@ -372,6 +382,64 @@ class ExecutionOrchestratorService:
                 step=step,
             )
 
+            step_status = self._safe_str(
+                step.get("status")
+            ).lower().strip()
+
+            if step_status in {
+                "failed",
+                "blocked",
+                "waiting_approval",
+            }:
+                step_error = self._safe_str(
+                    step.get("error")
+                    or "Execution step failed."
+                )
+                step_title = self._safe_str(
+                    step.get("title")
+                    or "current step"
+                )
+
+                execution_state["steps"][
+                    current_index
+                ] = dict(step)
+
+                execution_state = (
+                    self.execution_mutation_service.mark_failed(
+                        execution_state,
+                        step_index=current_index,
+                        error=step_error,
+                    )
+                )
+
+                execution_state = (
+                    self.execution_mutation_service.append_history(
+                        execution_state,
+                        f"failed: {step_title}: {step_error}",
+                    )
+                )
+
+                self._save_execution_state(
+                    session_id,
+                    execution_state,
+                )
+
+                return {
+                    "ok": False,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": (
+                            f"Step failed: {step_title}. "
+                            f"{step_error}"
+                        ),
+                    },
+                    "execution": execution_state,
+                    "step_output": step.get(
+                        "result",
+                        "",
+                    ),
+                }
+
             step["status"] = "completed"
 
             if result:
@@ -506,6 +574,67 @@ class ExecutionOrchestratorService:
                     session_id=session_id,
                     step=step,
                 )
+
+                step_status = self._safe_str(
+                    step.get("status")
+                ).lower().strip()
+
+                if step_status in {
+                    "failed",
+                    "blocked",
+                    "waiting_approval",
+                }:
+                    step_error = self._safe_str(
+                        step.get("error")
+                        or "Execution step failed."
+                    )
+                    step_title = self._safe_str(
+                        step.get("title")
+                        or "current step"
+                    )
+
+                    execution_state["steps"][
+                        current_index
+                    ] = dict(step)
+
+                    execution_state = (
+                        self.execution_mutation_service.mark_failed(
+                            execution_state,
+                            step_index=current_index,
+                            error=step_error,
+                        )
+                    )
+
+                    execution_state = (
+                        self.execution_mutation_service.append_history(
+                            execution_state,
+                            (
+                                f"failed: {step_title}: "
+                                f"{step_error}"
+                            ),
+                        )
+                    )
+
+                    self._save_active_execution(
+                        session_id,
+                        execution_state,
+                    )
+
+                    return {
+                        "ok": False,
+                        "assistant_message": {
+                            "role": "assistant",
+                            "text": (
+                                f"Step failed: {step_title}. "
+                                f"{step_error}"
+                            ),
+                        },
+                        "execution": execution_state,
+                        "step_output": step.get(
+                            "result",
+                            "",
+                        ),
+                    }
 
                 step["status"] = "completed"
 

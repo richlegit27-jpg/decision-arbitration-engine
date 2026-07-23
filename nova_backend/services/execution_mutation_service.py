@@ -47,6 +47,36 @@ class ExecutionMutationService:
 
         return execution_state
 
+    def mark_failed(
+        self,
+        execution_state,
+        step_index=0,
+        error="",
+    ):
+        execution_state = dict(
+            execution_state or {}
+        )
+
+        execution_state["status"] = "failed"
+        execution_state["complete"] = False
+        execution_state["waiting"] = True
+        execution_state["lock"] = False
+        execution_state["current_index"] = step_index
+        execution_state["current_step_index"] = (
+            step_index
+        )
+        execution_state["failed_step_index"] = (
+            step_index
+        )
+        execution_state["error"] = str(
+            error or "Execution step failed."
+        )
+        execution_state[
+            "_execution_processing"
+        ] = False
+
+        return execution_state
+
     def append_history(
         self,
         execution_state,
