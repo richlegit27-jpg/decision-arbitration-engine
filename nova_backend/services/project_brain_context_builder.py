@@ -94,6 +94,14 @@ def _recent_commit_text(context: ProjectBrainContext) -> str:
 
     return "Recent commits: " + "; ".join(context.recent_commits) + "."
 
+def _first_intent_text(context: ProjectBrainContext) -> str:
+    if not context.user_first_intent:
+        return ""
+
+    return (
+        f" User starting preference: {context.user_first_intent}."
+    )
+
 
 def build_current_project_answer() -> str:
     context = build_project_brain_context()
@@ -106,6 +114,7 @@ def build_current_project_answer() -> str:
         f"Current blocker: {context.blocker} "
         f"Next move: {context.next_move} "
         f"{_recent_commit_text(context)}"
+        f"{_first_intent_text(context)}"
     )
 
 
@@ -137,6 +146,7 @@ def build_app_py_risk_answer() -> str:
         "risk is behavior priority and maintainability: lower-quality fallback, memory-write, or generic chat "
         "paths can compete with project-brain logic if priority is not protected. "
         f"Current safe direction: {context.next_move}"
+        f"{_first_intent_text(context)}"
     )
 
 
@@ -153,7 +163,8 @@ def build_practical_project_answer() -> str:
         "Safe move: continue focused cleanup, validation, and bounded changes through the existing Project Brain smoke stack. "
         "Safe validation: run the context-builder smoke, project-state memory API smoke, general-intelligence smoke, "
         "route-contract smoke, classifier-broadening smoke, answer-quality smoke, and guard-stack audit. "
-        "Then check `git status --short` and commit only after the board is green."
+        "Then check `git status --short` and commit only after the board is green. "
+        f"{_first_intent_text(context)}"
     )
 # NOVA_PROJECT_BRAIN_DECISION_CONTEXT_BUILDER_20260702
 # Service-only bridge from Project Brain context builder to Decision Engine.
