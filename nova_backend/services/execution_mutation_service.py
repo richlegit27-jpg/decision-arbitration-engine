@@ -61,15 +61,59 @@ class ExecutionMutationService:
         execution_state["complete"] = False
         execution_state["waiting"] = True
         execution_state["lock"] = False
-        execution_state["current_index"] = step_index
-        execution_state["current_step_index"] = (
+        execution_state["current_index"] = (
             step_index
         )
-        execution_state["failed_step_index"] = (
-            step_index
-        )
+        execution_state[
+            "current_step_index"
+        ] = step_index
+        execution_state[
+            "failed_step_index"
+        ] = step_index
         execution_state["error"] = str(
-            error or "Execution step failed."
+            error
+            or "Execution step failed."
+        )
+        execution_state[
+            "_execution_processing"
+        ] = False
+
+        return execution_state
+
+    def mark_waiting_approval(
+        self,
+        execution_state,
+        step_index=0,
+        reason="",
+    ):
+        execution_state = dict(
+            execution_state or {}
+        )
+
+        execution_state["status"] = (
+            "waiting_approval"
+        )
+        execution_state["complete"] = False
+        execution_state["waiting"] = True
+        execution_state["lock"] = False
+        execution_state["current_index"] = (
+            step_index
+        )
+        execution_state[
+            "current_step_index"
+        ] = step_index
+        execution_state[
+            "approval_required"
+        ] = True
+        execution_state[
+            "approval_status"
+        ] = "pending"
+        execution_state["error"] = str(
+            reason
+            or (
+                "Approval required "
+                "before execution."
+            )
         )
         execution_state[
             "_execution_processing"

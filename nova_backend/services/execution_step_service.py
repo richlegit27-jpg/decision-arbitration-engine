@@ -1,5 +1,9 @@
 from pathlib import Path
 
+from nova_backend.services.execution_approval_service import (
+    ExecutionApprovalService,
+)
+
 
 class ExecutionStepService:
 
@@ -7,9 +11,14 @@ class ExecutionStepService:
         self,
         safe_str=None,
         python_runner=None,
+        approval_service=None,
     ):
         self.safe_str = safe_str
         self.python_runner = python_runner
+        self.approval_service = (
+            approval_service
+            or ExecutionApprovalService()
+        )
 
     def _safe_str(self, value):
         if callable(self.safe_str):
@@ -36,6 +45,26 @@ class ExecutionStepService:
         step,
     ):
         try:
+            approval = (
+                self.approval_service.evaluate(
+                    step
+                )
+            )
+
+            if approval.get("waiting"):
+                step["status"] = (
+                    "waiting_approval"
+                )
+                step["result"] = ""
+                step["error"] = (
+                    approval.get("reason")
+                    or (
+                        "Approval required "
+                        "before execution."
+                    )
+                )
+                return None
+
             step["status"] = "running"
 
             step_action = self._safe_str(

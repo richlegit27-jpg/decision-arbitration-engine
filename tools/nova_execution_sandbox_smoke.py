@@ -288,6 +288,60 @@ with TemporaryDirectory() as temporary_directory:
         unsupported_step,
     )
 
+    approval_target = (
+        sandbox / "approval_required.py"
+    )
+
+    pending_approval_step = {
+        "action": "implement",
+        "target_file": str(
+            approval_target
+        ),
+        "content": 'print("approved")\n',
+        "requires_approval": True,
+    }
+
+    step_service.execute_step_logic(
+        session_id="approval-smoke",
+        step=pending_approval_step,
+    )
+
+    assert_true(
+        "approval_required_step_waits",
+        pending_approval_step.get("status")
+        == "waiting_approval",
+        pending_approval_step,
+    )
+
+    assert_true(
+        "unapproved_step_does_not_write",
+        not approval_target.exists(),
+    )
+
+    approved_step = dict(
+        pending_approval_step
+    )
+    approved_step["approved"] = True
+    approved_step["status"] = "pending"
+    approved_step["error"] = ""
+
+    step_service.execute_step_logic(
+        session_id="approval-smoke",
+        step=approved_step,
+    )
+
+    assert_true(
+        "approved_step_executes",
+        approved_step.get("status")
+        == "completed",
+        approved_step,
+    )
+
+    assert_true(
+        "approved_step_writes_file",
+        approval_target.exists(),
+    )
+
 
 class FakeExecutionStateService:
 
@@ -328,7 +382,22 @@ class FailingStepService:
         return ""
 
 
-def failed_execution_state(command):
+class WaitingApprovalStepService:
+
+    def execute_step_logic(
+        self,
+        session_id,
+        step,
+    ):
+        step["status"] = "waiting_approval"
+        step["error"] = (
+            "Approval required before execution."
+        )
+        step["result"] = ""
+        return None
+
+
+def execution_state(command):
     return {
         "command": command,
         "status": "running",
@@ -337,7 +406,7 @@ def failed_execution_state(command):
         "current_index": 0,
         "steps": [
             {
-                "title": "Unsafe step",
+                "title": "Protected step",
                 "action": "implement",
                 "status": "pending",
             }
@@ -345,7 +414,7 @@ def failed_execution_state(command):
     }
 
 
-run_step_state = failed_execution_state(
+run_step_state = execution_state(
     "run_step"
 )
 
@@ -394,7 +463,7 @@ assert_true(
     run_step_result,
 )
 
-run_all_state = failed_execution_state(
+run_all_state = execution_state(
     "run_all"
 )
 
@@ -432,6 +501,120 @@ assert_true(
         or {}
     ).get("status") == "failed",
     run_all_result,
+)
+
+approval_state = execution_state(
+    "run_step"
+)
+
+approval_store = FakeExecutionStateService(
+    approval_state
+)
+
+approval_orchestrator = ExecutionOrchestratorService(
+    execution_state_service=approval_store,
+    working_state_service=None,
+    execution_mutation_service=(
+        ExecutionMutationService()
+    ),
+    safe_str=lambda value: str(value or ""),
+    execution_step_service=(
+        WaitingApprovalStepService()
+    ),
+)
+
+approval_result = (
+    approval_orchestrator.process_execution(
+        session_id="approval-run-step",
+        state=approval_state,
+    )
+)
+
+assert_true(
+    "orchestrator_waits_for_approval",
+    approval_result.get("ok") is True,
+    approval_result,
+)
+
+assert_true(
+    "approval_state_preserved",
+    (
+        approval_result.get("execution")
+        or {}
+    ).get("status") == "waiting_approval",
+    approval_result,
+)
+
+assert_true(
+    "approval_does_not_advance",
+    (
+        approval_result.get("execution")
+        or {}
+    ).get("current_index") == 0,
+    approval_result,
+)
+
+run_all_approval_state = execution_state(
+    "run_all"
+)
+
+run_all_approval_store = (
+    FakeExecutionStateService(
+        run_all_approval_state
+    )
+)
+
+run_all_approval_orchestrator = (
+    ExecutionOrchestratorService(
+        execution_state_service=(
+            run_all_approval_store
+        ),
+        working_state_service=None,
+        execution_mutation_service=(
+            ExecutionMutationService()
+        ),
+        safe_str=lambda value: str(
+            value or ""
+        ),
+        execution_step_service=(
+            WaitingApprovalStepService()
+        ),
+    )
+)
+
+run_all_approval_result = (
+    run_all_approval_orchestrator.process_execution(
+        session_id="approval-run-all",
+        state=run_all_approval_state,
+    )
+)
+
+assert_true(
+    "run_all_stops_for_approval",
+    run_all_approval_result.get("ok") is True,
+    run_all_approval_result,
+)
+
+assert_true(
+    "run_all_approval_state_preserved",
+    (
+        run_all_approval_result.get(
+            "execution"
+        )
+        or {}
+    ).get("status") == "waiting_approval",
+    run_all_approval_result,
+)
+
+assert_true(
+    "run_all_approval_does_not_advance",
+    (
+        run_all_approval_result.get(
+            "execution"
+        )
+        or {}
+    ).get("current_index") == 0,
+    run_all_approval_result,
 )
 
 

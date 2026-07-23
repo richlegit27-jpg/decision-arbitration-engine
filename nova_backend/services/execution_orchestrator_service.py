@@ -386,10 +386,64 @@ class ExecutionOrchestratorService:
                 step.get("status")
             ).lower().strip()
 
+            if step_status == "waiting_approval":
+                approval_reason = self._safe_str(
+                    step.get("error")
+                    or (
+                        "Approval required "
+                        "before execution."
+                    )
+                )
+
+                step_title = self._safe_str(
+                    step.get("title")
+                    or "current step"
+                )
+
+                execution_state["steps"][
+                    current_index
+                ] = dict(step)
+
+                execution_state = (
+                    self.execution_mutation_service.mark_waiting_approval(
+                        execution_state,
+                        step_index=current_index,
+                        reason=approval_reason,
+                    )
+                )
+
+                execution_state = (
+                    self.execution_mutation_service.append_history(
+                        execution_state,
+                        (
+                            "waiting approval: "
+                            f"{step_title}"
+                        ),
+                    )
+                )
+
+                self._save_execution_state(
+                    session_id,
+                    execution_state,
+                )
+
+                return {
+                    "ok": True,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": (
+                            "Approval required: "
+                            f"{step_title}. "
+                            f"{approval_reason}"
+                        ),
+                    },
+                    "execution": execution_state,
+                    "step_output": "",
+                }
+
             if step_status in {
                 "failed",
                 "blocked",
-                "waiting_approval",
             }:
                 step_error = self._safe_str(
                     step.get("error")
@@ -579,15 +633,70 @@ class ExecutionOrchestratorService:
                     step.get("status")
                 ).lower().strip()
 
+                if step_status == "waiting_approval":
+                    approval_reason = self._safe_str(
+                        step.get("error")
+                        or (
+                            "Approval required "
+                            "before execution."
+                        )
+                    )
+
+                    step_title = self._safe_str(
+                        step.get("title")
+                        or "current step"
+                    )
+
+                    execution_state["steps"][
+                        current_index
+                    ] = dict(step)
+
+                    execution_state = (
+                        self.execution_mutation_service.mark_waiting_approval(
+                            execution_state,
+                            step_index=current_index,
+                            reason=approval_reason,
+                        )
+                    )
+
+                    execution_state = (
+                        self.execution_mutation_service.append_history(
+                            execution_state,
+                            (
+                                "waiting approval: "
+                                f"{step_title}"
+                            ),
+                        )
+                    )
+
+                    self._save_active_execution(
+                        session_id,
+                        execution_state,
+                    )
+
+                    return {
+                        "ok": True,
+                        "assistant_message": {
+                            "role": "assistant",
+                            "text": (
+                                "Approval required: "
+                                f"{step_title}. "
+                                f"{approval_reason}"
+                            ),
+                        },
+                        "execution": execution_state,
+                        "step_output": "",
+                    }
+
                 if step_status in {
                     "failed",
                     "blocked",
-                    "waiting_approval",
                 }:
                     step_error = self._safe_str(
                         step.get("error")
                         or "Execution step failed."
                     )
+
                     step_title = self._safe_str(
                         step.get("title")
                         or "current step"
@@ -635,8 +744,6 @@ class ExecutionOrchestratorService:
                             "",
                         ),
                     }
-
-                step["status"] = "completed"
 
                 if result:
                     step["result"] = result
