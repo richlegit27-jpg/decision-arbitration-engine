@@ -3,7 +3,9 @@
 import os
 from typing import Any, Dict, List, Optional
 
-from openai import OpenAI
+from nova_backend.services.model_gateway_service import (
+    responses_create,
+)
 
 from nova_backend.services.prompt_builder_service import PromptBuilderService
 
@@ -29,7 +31,7 @@ class AutonomyService:
         self.prompt_builder = PromptBuilderService()
 
         self.model = os.getenv("OPENAI_MODEL", "gpt-5.4")
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        
 
     def _text(self, value: Any) -> str:
         return str(value or "").strip()
@@ -90,7 +92,7 @@ class AutonomyService:
 
     def _call_model(self, *, system_prompt: str, user_prompt: str) -> str:
         try:
-            response = self.client.responses.create(
+            response = responses_create(
                 model=self.model,
                 input=[
                     {"role": "system", "content": system_prompt},
