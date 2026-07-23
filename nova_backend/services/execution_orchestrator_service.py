@@ -10,6 +10,7 @@ class ExecutionOrchestratorService:
         execution_mutation_service=None,
         safe_str=None,
         execution_step_service=None,
+        approval_service=None,
     ):
         self.execution_state_service = execution_state_service
         self.working_state_service = working_state_service
@@ -18,6 +19,7 @@ class ExecutionOrchestratorService:
         )
         self._safe_str = safe_str
         self.execution_step_service = execution_step_service
+        self.approval_service = approval_service
 
     def process_execution(
         self,
@@ -102,6 +104,12 @@ class ExecutionOrchestratorService:
         }:
             command = "run_step"
 
+        elif intelligence_intent == "approve_execution":
+            command = "approve"
+
+        elif intelligence_intent == "deny_execution":
+            command = "deny"
+
         elif intelligence_intent == "run_all_steps":
             command = "run_all"
 
@@ -164,6 +172,157 @@ class ExecutionOrchestratorService:
 
         if current_index >= len(steps):
             current_index = len(steps)
+
+        # =========================
+        # APPROVAL CONTROL
+        # =========================
+        if command in {
+            "approve",
+            "deny",
+        }:
+            state_status = self._safe_str(
+                execution_state.get("status")
+            ).lower().strip()
+
+            if state_status != "waiting_approval":
+                return {
+                    "ok": False,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": (
+                            "No execution step is "
+                            "waiting for approval."
+                        ),
+                    },
+                    "execution": execution_state,
+                }
+
+            if (
+                current_index >= len(steps)
+                or not isinstance(
+                    steps[current_index],
+                    dict,
+                )
+            ):
+                return {
+                    "ok": False,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": (
+                            "The pending approval step "
+                            "could not be found."
+                        ),
+                    },
+                    "execution": execution_state,
+                }
+
+            if self.approval_service is None:
+                return {
+                    "ok": False,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": (
+                            "Execution approval service "
+                            "is unavailable."
+                        ),
+                    },
+                    "execution": execution_state,
+                }
+
+            pending_step = steps[
+                current_index
+            ]
+
+            if command == "approve":
+                approved_step = (
+                    self.approval_service.approve_step(
+                        pending_step
+                    )
+                )
+
+                execution_state["steps"][
+                    current_index
+                ] = approved_step
+
+                execution_state[
+                    "approval_required"
+                ] = False
+                execution_state[
+                    "approval_status"
+                ] = "approved"
+                execution_state["error"] = ""
+                execution_state["status"] = (
+                    "running"
+                )
+                execution_state["waiting"] = False
+                execution_state["command"] = (
+                    "run_step"
+                )
+
+                self._save_execution_state(
+                    session_id,
+                    execution_state,
+                )
+
+                return (
+                    self._process_execution_command(
+                        command="run_step",
+                        session_id=session_id,
+                        execution_state=(
+                            execution_state
+                        ),
+                    )
+                )
+
+            denied_step = (
+                self.approval_service.deny_step(
+                    pending_step
+                )
+            )
+
+            execution_state["steps"][
+                current_index
+            ] = denied_step
+
+            execution_state = (
+                self.execution_mutation_service.cancel(
+                    execution_state
+                )
+            )
+
+            execution_state[
+                "approval_required"
+            ] = False
+            execution_state[
+                "approval_status"
+            ] = "denied"
+            execution_state["error"] = (
+                "Execution approval denied."
+            )
+
+            execution_state = (
+                self.execution_mutation_service.append_history(
+                    execution_state,
+                    "approval denied",
+                )
+            )
+
+            self._save_execution_state(
+                session_id,
+                execution_state,
+            )
+
+            return {
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": (
+                        "Execution approval denied. "
+                        "The protected step was not run."
+                    ),
+                },
+                "execution": execution_state,
+            }
 
 
         # =========================
@@ -521,31 +680,39 @@ class ExecutionOrchestratorService:
 
             execution_state["progress"] = current_index + 1
 
-            execution_state["waiting"] = True
 
-            execution_state["_execution_processing"] = False
-
-            next_index = execution_state.get(
-                "current_index",
-                current_index + 1,
+            next_index = (
+                execution_state[
+                    "current_index"
+                ]
             )
 
-            if next_index < len(steps):
+            if next_index >= len(steps):
+                execution_state = (
+                    self.execution_mutation_service.mark_complete(
+                        execution_state
+                    )
+                )
+
+            else:
                 next_step = steps[next_index]
 
-                execution_state["current_step"] = next_step.get("title") or ""
-
-                execution_state["current_step_title"] = next_step.get("title") or ""
-            execution_state["_execution_processing"] = False
-
-            next_index = execution_state["current_index"]
-
-            if next_index < len(steps):
-                next_step = steps[next_index]
-
-                execution_state["current_step"] = next_step.get("title") or ""
-
-                execution_state["current_step_title"] = next_step.get("title") or ""
+                execution_state["waiting"] = True
+                execution_state[
+                    "_execution_processing"
+                ] = False
+                execution_state[
+                    "current_step"
+                ] = (
+                    next_step.get("title")
+                    or ""
+                )
+                execution_state[
+                    "current_step_title"
+                ] = (
+                    next_step.get("title")
+                    or ""
+                )
 
             self._save_execution_state(
                 session_id,

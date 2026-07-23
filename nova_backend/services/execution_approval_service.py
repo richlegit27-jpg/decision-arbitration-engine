@@ -50,6 +50,30 @@ class ExecutionApprovalService:
 
         return False
 
+    def approve_step(self, step):
+        step = dict(step or {})
+
+        step["approved"] = True
+        step["approval_required"] = False
+        step["requires_approval"] = False
+        step["approval_status"] = "approved"
+        step["status"] = "pending"
+        step["error"] = ""
+
+        return step
+
+    def deny_step(self, step):
+        step = dict(step or {})
+
+        step["approved"] = False
+        step["approval_status"] = "denied"
+        step["status"] = "blocked"
+        step["error"] = (
+            "Execution approval denied."
+        )
+
+        return step
+
     def evaluate(self, step):
         required = self.requires_approval(
             step

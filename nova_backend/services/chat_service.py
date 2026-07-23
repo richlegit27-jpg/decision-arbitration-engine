@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64
 import os
@@ -32,6 +32,7 @@ from nova_backend.services.model_gateway_service import chat_completions_create
 from nova_backend.services.repair_execution_service import RepairExecutionService
 from nova_backend.services.execution_orchestrator_service import ExecutionOrchestratorService
 from nova_backend.services.execution_step_service import ExecutionStepService
+from nova_backend.services.execution_approval_service import ExecutionApprovalService
 from nova_backend.models.session import new_message
 from nova_backend.services.agent_service import AgentService
 from nova_backend.services.artifact_service import ArtifactService
@@ -171,14 +172,16 @@ def _nova_is_local_project_status_question_20260607(user_text):
 # NOVA_LOCAL_PROJECT_CONTEXT_GUARD_ANSWER_20260607
 def _nova_local_project_status_answer_20260607(user_text):
     return (
-        "Here is what we actually fixed today:\n\n"
-        "- Fixed the mobile composer buttons so the send/voice/attach/tools buttons stopped stretching and now hold a clean square size.\n"
-        "- Fixed the mojibukakke icon problem where symbols were showing as broken text like ÃƒÂ¢Ã…Â¾Ã‚Â¤, ÃƒÂ°Ã…Â¸Ã…Â½Ã¢â€žÂ¢, and ÃƒÂ¯Ã‚Â¼Ã¢â‚¬Â¹.\n"
-        "- Fixed the stale frontend cache problem where /mobile kept loading an old nova-mobile-app.js?v=attachment-payload-bridge-20260607204432 version instead of the patched one.\n"
-        "- Slimmed the mobile input/composer bar down so the textarea and main composer buttons are now 40px high.\n"
-        "- Found the next real issue: Nova's answer quality is contaminated by stale web/search context, so normal project questions can get wrong web-result answers.\n\n"
-        "Next move: block stale web/search context from normal Nova project/session questions."
+        "Here is what we fixed in this checkpoint:\n\n"
+        "- Fixed the mobile composer buttons so the send, voice, attach, and tools buttons stopped stretching and now keep a clean square size.\n"
+        "- Fixed the mojibake icon problem where symbols were appearing as corrupted text.\n"
+        "- Fixed the stale frontend cache problem where the mobile page kept loading an outdated JavaScript bundle instead of the patched version.\n"
+        "- Slimmed the mobile input and composer bar so the text area and main composer buttons are 40 pixels high.\n"
+        "- Identified stale web and search context leaking into normal project questions.\n\n"
+        "Next move: prevent stale web and search context from affecting normal Nova project and session questions."
     )
+
+
 # FINALIZE_RESPONSE_KWARGS_LOCK_20260604
 
 
@@ -2376,9 +2379,15 @@ Rules:
         self.execution_mutation_service = ExecutionMutationService(
             execution_state_service=self.execution_state_service,
         )
+        self.execution_approval_service = (
+            ExecutionApprovalService()
+        )
+
         self.execution_step_service = ExecutionStepService(
             safe_str=self._safe_str,
             python_runner=self.python_runner,
+            approval_service=self.execution_approval_service,
+
         )
 
         self.execution_orchestrator_service = ExecutionOrchestratorService(
@@ -8442,16 +8451,22 @@ Rules:
         session_id: str,
         attachments=None,
     ):
-        text = self.safe_str(user_text).strip().lower()
+        text = self.safe_str(
+            user_text
+        ).strip().lower()
 
-        mission_command = self._resolve_mission_command(
-            user_text=text,
-            session_id=session_id,
+        mission_command = (
+            self._resolve_mission_command(
+                user_text=text,
+                session_id=session_id,
+            )
         )
 
-        mission_result = self._handle_mission_command_result(
-            mission_command=mission_command,
-            session_id=session_id,
+        mission_result = (
+            self._handle_mission_command_result(
+                mission_command=mission_command,
+                session_id=session_id,
+            )
         )
 
         if mission_result is not None:
@@ -8463,9 +8478,28 @@ Rules:
             "auto fix",
             "autofix",
         }:
-            return self._apply_pending_fix(session_id)
+            return self._apply_pending_fix(
+                session_id
+            )
 
         if text in {
+            "approve",
+            "approved",
+            "approve step",
+            "approve execution",
+        }:
+            command = "approve"
+
+        elif text in {
+            "deny",
+            "denied",
+            "deny step",
+            "deny execution",
+            "reject",
+        }:
+            command = "deny"
+
+        elif text in {
             "retry",
             "retry_failed",
             "retry failed",
@@ -8513,29 +8547,42 @@ Rules:
             return None
 
         execution_state = (
-            self._load_execution_state(session_id)
+            self._load_execution_state(
+                session_id
+            )
             or {}
         )
 
-        if not isinstance(execution_state, dict):
+        if not isinstance(
+            execution_state,
+            dict,
+        ):
             execution_state = {}
 
         if (
             command == "run_step"
             and self.safe_str(
-                execution_state.get("status")
-            ).strip().lower() == "failed"
+                execution_state.get(
+                    "status"
+                )
+            ).strip().lower()
+            == "failed"
         ):
             command = "retry_failed"
 
         execution_state["lock"] = False
-        execution_state["_execution_processing"] = False
+        execution_state[
+            "_execution_processing"
+        ] = False
         execution_state["command"] = command
 
-        return self.execution_orchestrator_service.process_execution(
-            session_id=session_id,
-            state=execution_state,
-            command=command,
+        return (
+            self.execution_orchestrator_service
+            .process_execution(
+                session_id=session_id,
+                state=execution_state,
+                command=command,
+            )
         )
 
     # ATTACHMENT_BLOCKS_WEB_ROUTE_LOCK
@@ -8546,9 +8593,7 @@ Rules:
         lowered = text.lower().strip()
         attachments = attachments or []
 
-        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         # LOAD EXECUTION STATE
-        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         execution_state = (
             self._get_session_meta(session_id, "execution_state")
             or self._get_session_meta(session_id, "active_execution")
@@ -8567,17 +8612,15 @@ Rules:
             "retry", "run it"
         }
 
-        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-        # 1. EXECUTION MODE
-        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+ # 1. EXECUTION MODE
+
         if execution_active:
             if lowered in execution_commands:
                 return ("execution", "run")
             return ("chat", "escape_execution")
 
-        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         # 2. ATTACHMENTS
-        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
         if attachments:
             return ("attachment", "analyze")
 
@@ -8714,9 +8757,9 @@ Rules:
                 exc,
             )
 
-        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
         # 3. WEB (STRICT ONLY)
-        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
 
         # LIVE MARKET PRICE ROUTE
         # Current prices must use web, never normal chat.
@@ -8759,15 +8802,13 @@ Rules:
         if any(keyword in lowered for keyword in web_keywords):
             return ("web", "fetch")
 
-        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         # 4. START EXECUTION
-        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
         if lowered.startswith(("auto-plan", "build", "create", "fix", "implement", "upgrade")):
             return ("execution", "start")
 
-        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         # 5. DEFAULT (IMPORTANT FIX)
-        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
         return ("chat", "normal")
 
 
@@ -10133,10 +10174,8 @@ Rules:
 
         lowered = self.safe_str(user_text).lower().strip()
 
-        # Ã°Å¸Å¡Â¨ HARD RULE: execution cannot be bypassed by other routers
-        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         # SAFE ROUTE DISPATCH (FIXED)
-        # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
 
         route, command = self._single_router(
             user_text,
@@ -11522,7 +11561,7 @@ Rules:
             if text_parts:
                 return "\n".join(text_parts).strip()
 
-        return "IÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢m here, but the model returned an empty response."
+        return "I’m here, but the model returned an empty response."
 
     # ==============================
     # DECISION CONTRACT
@@ -11678,17 +11717,52 @@ Rules:
             "try again",
             "stop",
             "cancel",
+            "approve",
+            "approved",
+            "approve step",
+            "approve execution",
+            "deny",
+            "denied",
+            "deny step",
+            "deny execution",
+            "reject",
         }
 
         if text_lc in execution_commands:
 
-            if "retry" in text_lc:
+            if text_lc in {
+                "approve",
+                "approved",
+                "approve step",
+                "approve execution",
+            }:
+                intent = "approve_execution"
+
+            elif text_lc in {
+                "deny",
+                "denied",
+                "deny step",
+                "deny execution",
+                "reject",
+            }:
+                intent = "deny_execution"
+
+            elif "retry" in text_lc:
                 intent = "retry_failed_step"
 
-            elif "run all" in text_lc or text_lc == "execute all":
+            elif (
+                "run all" in text_lc
+                or text_lc in {
+                    "run_all",
+                    "execute all",
+                }
+            ):
                 intent = "run_all_steps"
 
-            elif text_lc in {"stop", "cancel"}:
+            elif text_lc in {
+                "stop",
+                "cancel",
+            }:
                 intent = "cancel_execution"
 
             elif has_failed_steps:
