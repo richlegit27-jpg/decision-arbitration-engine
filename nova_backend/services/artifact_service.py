@@ -53,7 +53,24 @@ class ArtifactService:
         return data
 
     def _write_store(self, data: Dict[str, Any]) -> None:
-        save_json_file(self.artifacts_file, data)
+        try:
+            save_json_file(self.artifacts_file, data)
+
+        except Exception as exc:
+            try:
+                from nova_backend.services.error_reporting_service import (
+                    ErrorReportingService,
+                )
+
+                ErrorReportingService().report(
+                    exc,
+                    service="artifact_write_store",
+                )
+
+            except Exception:
+                pass
+
+            raise
 
     def list_by_session(self, session_id: str):
         session_id = str(session_id or "").strip()
