@@ -12029,6 +12029,28 @@ Rules:
             confidence = 1.0
             reasons.append("source_followup_forced_before_full_file")
 
+        # LOCAL_NOVA_PROJECT_CONTEXT_BEATS_WEB_FRESHNESS
+        elif (
+            "nova project" in text_lc
+            or "our nova project" in text_lc
+            or "the nova project" in text_lc
+            or "in the nova project" in text_lc
+            or (
+                "what changed" in text_lc
+                and "nova" in text_lc
+            )
+            or (
+                "what changed recently" in text_lc
+                and "nova" in text_lc
+            )
+        ):
+            intent = "current_project_state"
+            route = "project_brain_general_intelligence"
+            strategy = "project_brain_general_intelligence"
+            priority = "high"
+            confidence = 0.95
+            reasons.append("local_nova_project_context_priority")
+
         # LATEST_NEWS_BEFORE_FULL_FILE_INTENT_LOCK
         elif any(
             marker in text_lc
@@ -12466,7 +12488,25 @@ Rules:
             )
         )
 
-        if has_url or wants_explicit_web or wants_live_web or wants_web_topic:
+        local_nova_project_context = (
+            "nova project" in normalized_web_text
+            or "the nova project" in normalized_web_text
+            or "our nova project" in normalized_web_text
+            or (
+                "what changed" in normalized_web_text
+                and "nova" in normalized_web_text
+            )
+            or (
+                "what changed recently" in normalized_web_text
+                and "nova" in normalized_web_text
+            )
+        )
+
+        if (
+            (has_url or wants_explicit_web or wants_live_web or wants_web_topic)
+            and not local_nova_project_context
+            and route != "project_brain_general_intelligence"
+        ):
             return {
                 "route": self.ROUTE_WEB_FETCH,
                 "mode": "web_fetch",
@@ -16912,6 +16952,10 @@ try:
             or "nova status" in bare
             or "give me the nova status" in bare
             or "status without hype" in bare
+            or (
+                "what changed" in bare
+                and "nova" in bare
+            )
         ):
             return "working"
 
@@ -16985,7 +17029,11 @@ try:
 
         return low.startswith(bad_starts)
 
-    def _nova_project_brain_answer_20260701(kind, session_id, user_text=""):
+    def _nova_project_brain_answer_20260701(
+        kind,
+        session_id,
+        user_text="",
+    ):
         print(
             "[ANSWER BUILDER DEBUG]",
             repr(kind),
@@ -17011,15 +17059,9 @@ try:
             )
 
             if kind == "failure_interpreter":
-                print(
-                    "[FAILURE INTERPRETER BRANCH HIT]",
-                    repr(user_text),
-                )
-
                 from nova_backend.services.project_brain_failure_interpreter import (
                     build_project_brain_failure_interpreter_answer,
                 )
-
 
                 answer = build_project_brain_failure_interpreter_answer(
                     user_text=user_text,
@@ -17046,34 +17088,13 @@ try:
                 ).strip()
 
             elif kind == "working":
-                from nova_backend.services.project_brain_general_intelligence import (
-                    build_project_brain_general_answer,
-                )
-
-                fresh_answer = build_project_brain_general_answer(
-                    question,
-                    user_id="",
-                )
-
-                answer = str(
-                    getattr(
-                        fresh_answer,
-                        "text",
-                        fresh_answer,
-                    )
-                    or ""
-                ).strip()
-
-            elif kind == "working":
                 from nova_backend.services.project_state_service import (
                     answer_project_state_question,
                 )
 
-                fresh_answer = answer_project_state_question
-
-                if callable(fresh_answer):
+                if callable(answer_project_state_question):
                     answer = str(
-                        fresh_answer(
+                        answer_project_state_question(
                             question,
                             session_id=session_id,
                         )
@@ -17085,18 +17106,9 @@ try:
                     build_project_brain_general_answer,
                 )
 
-                user_id = ""
-
-                try:
-                    user_id = str(
-                        get_current_user_id() or ""
-                    ).strip()
-                except Exception:
-                    user_id = ""
-
                 general_answer = build_project_brain_general_answer(
                     question,
-                    user_id=user_id,
+                    user_id="",
                 )
 
                 if isinstance(general_answer, dict):
@@ -17121,13 +17133,10 @@ try:
 
             traceback.print_exc()
 
-            try:
-                print(
-                    "[NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701] fresh answer bypass:",
-                    exc,
-                )
-            except Exception:
-                pass
+            print(
+                "[NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701] fresh answer bypass:",
+                exc,
+            )
 
         print(
             "[FINAL PROJECT BRAIN ANSWER DEBUG]",

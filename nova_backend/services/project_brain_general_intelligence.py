@@ -9,7 +9,6 @@ class ProjectBrainAnswer:
     intent: str
     text: str
 
-
 def _clean(value: object) -> str:
     return str(value or "").strip()
 
@@ -26,6 +25,17 @@ def classify_project_brain_intent(user_text: object) -> Optional[str]:
 
     if not text:
         return None
+    if _has_any(
+        text,
+        (
+            "mission control",
+            "mission-control",
+            "show mission",
+            "mission card",
+            "operator mode",
+        ),
+    ):
+        return "mission_control"
 
     if _has_any(
         text,
