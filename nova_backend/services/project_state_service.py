@@ -310,8 +310,9 @@ def _format_current(state: Dict[str, Any]) -> str:
 
     lines = [
         "Current Nova checkpoint:",
-        f"- Working on: {state.get('current_focus') or 'unknown'}",
-        f"- Checkpoint: {state.get('checkpoint') or 'unknown'}",
+        f"- Current task: {state.get('current_focus') or 'unknown'}",
+        f"- Current checkpoint: {state.get('checkpoint') or 'unknown'}",
+        f"- Current blocker: {state.get('blocker') or 'unknown'}",
         f"- Repo: {_repo_line(git)}",
         f"- Locked: {_format_locked(locked)}",
     ]
@@ -324,7 +325,7 @@ def _format_current(state: Dict[str, Any]) -> str:
 
     next_move = str(state.get("next_move") or "").strip()
     if next_move:
-        lines.append(f"- Next: {next_move}")
+        lines.append(f"- Next move: {next_move}")
 
     dirty_files = _as_list(git.get("dirty_files"))
     if dirty_files:
@@ -764,20 +765,42 @@ try:
         if not isinstance(state, dict):
             return ""
 
-        current_task = _nova_ps_fresh_clean_20260701(state.get("current_task"))
-        next_move = _nova_ps_fresh_clean_20260701(state.get("next_move"))
-        checkpoint = _nova_ps_fresh_clean_20260701(state.get("last_checkpoint"))
+        current_task = _nova_ps_fresh_clean_20260701(
+            state.get("current_task")
+        )
+        next_move = _nova_ps_fresh_clean_20260701(
+            state.get("next_move")
+        )
+        checkpoint = _nova_ps_fresh_clean_20260701(
+            state.get("last_checkpoint")
+        )
+        blocker = _nova_ps_fresh_clean_20260701(
+            state.get("blocker")
+        )
 
-        lines = ["Current Nova project state:"]
+        lines = [
+            "Current Nova project state:"
+        ]
 
         if current_task:
-            lines.append(f"- Working on: {current_task}")
+            lines.append(
+                f"- Current task: {current_task}"
+            )
 
         if checkpoint:
-            lines.append(f"- Checkpoint: {checkpoint}")
+            lines.append(
+                f"- Current checkpoint: {checkpoint}"
+            )
+
+        if blocker:
+            lines.append(
+                f"- Current blocker: {blocker}"
+            )
 
         if next_move:
-            lines.append(f"- Next: {next_move}")
+            lines.append(
+                f"- Next move: {next_move}"
+            )
 
         lines.append(
             "- Capability: answer-quality contract is protected."

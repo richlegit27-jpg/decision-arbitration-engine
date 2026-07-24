@@ -12071,6 +12071,9 @@ Rules:
         elif (
             "where are we at with nova" in text_lc
             or "what are we working on" in text_lc
+            or "nova status" in text_lc
+            or "give me the nova status" in text_lc
+            or "status without hype" in text_lc
         ):
             intent = "current_project_state"
             route = "project_brain_general_intelligence"
@@ -16321,6 +16324,8 @@ try:
                 "coding",
                 "planning",
                 "writing",
+                "current_project_state",
+                "project_brain_general_intelligence",
             }
 
             if (
@@ -16642,15 +16647,23 @@ try:
         text = " ".join(text.split())
         bare = text.rstrip("?!.")
 
-        if bare in {
-            "what are we working on",
-            "what are we working on now",
-            "what are we working on right now",
-            "what are we doing",
-            "what am i working on",
-            "what is the current task",
-            "current task",
-        }:
+        if (
+            bare in {
+                "what are we working on",
+                "what are we working on now",
+                "what are we working on right now",
+                "what are we doing",
+                "what am i working on",
+                "what is the current task",
+                "current task",
+            }
+            or "where are we at with nova" in bare
+            or bare == "where are we at"
+            or bare == "where is nova at"
+            or "nova status" in bare
+            or "give me the nova status" in bare
+            or "status without hype" in bare
+        ):
             return "working"
 
         if bare in {
@@ -16700,9 +16713,11 @@ try:
 
         try:
             if kind == "working":
-                fresh_answer = globals().get(
-                    "_nova_answer_project_state_question_fresh_priority_20260701"
+                from nova_backend.services.project_state_service import (
+                    answer_project_state_question,
                 )
+
+                fresh_answer = answer_project_state_question
 
                 if callable(fresh_answer):
                     answer = str(
@@ -16775,8 +16790,8 @@ try:
 
     def _nova_project_brain_response_20260701(text, session_id):
         meta = {
-            "route": "project_brain_question_top_priority",
-            "strategy": "project_brain_question_top_priority",
+            "route": "project_brain_general_intelligence",
+            "strategy": "project_brain_general_intelligence",
             "session_id": session_id,
             "source_urls": [],
             "sources": [],
@@ -16801,11 +16816,11 @@ try:
                 "attachments": [],
                 "meta": meta,
             },
-            "route": "project_brain_question_top_priority",
-            "route_taken": "project_brain_question_top_priority",
+            "route": "project_brain_general_intelligence",
+            "route_taken": "project_brain_general_intelligence",
             "debug": {
-                "route": "project_brain_question_top_priority",
-                "route_taken": "project_brain_question_top_priority",
+                "route": "project_brain_general_intelligence",
+                "route_taken": "project_brain_general_intelligence",
             },
             "meta": meta,
             "session_id": session_id,
@@ -16828,6 +16843,12 @@ try:
             _nova_project_brain_question_kind_20260701(
                 user_text
             )
+        )
+
+        print(
+            "[PROJECT BRAIN DEBUG]",
+            repr(user_text),
+            repr(kind),
         )
 
         if kind:
@@ -16858,8 +16879,22 @@ try:
                         **kwargs,
                     )
 
-            fresh_priority_predicate = globals().get(
-                "_nova_ps_fresh_priority_should_handle_20260701"
+            def _nova_ps_fresh_priority_should_handle_20260701(user_text):
+                text = str(user_text or "").strip().lower()
+
+                return any(
+                    phrase in text
+                    for phrase in (
+                        "where are we at",
+                        "where is nova at",
+                        "nova status",
+                        "give me the nova status",
+                        "status without hype",
+                    )
+                )
+
+            fresh_priority_predicate = (
+                _nova_ps_fresh_priority_should_handle_20260701
             )
 
             if (
@@ -16878,6 +16913,7 @@ try:
                     user_text
                 )
             ):
+
                 from nova_backend.services.project_state_service import (
                     answer_project_state_question,
                 )
