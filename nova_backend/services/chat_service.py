@@ -5103,6 +5103,11 @@ Rules:
             else:
                 assistant_text = "I m here. Send the next instruction."
 
+        print(
+            "[DECISION DEBUG BEFORE INTELLIGENCE]",
+            repr(decision),
+        )
+
         intelligence_result = self._apply_response_intelligence(
 
 
@@ -5775,10 +5780,36 @@ Rules:
         attachments=None,
     ) -> dict:
         decision = decision if isinstance(decision, dict) else {}
+
+        if (
+            decision.get("route")
+            == "project_brain_general_intelligence"
+            or decision.get("mode")
+            == "project_brain_general_intelligence"
+            or decision.get("intent")
+            == "mission_control"
+        ):
+            return None
+
         attachments = attachments or []
         assistant_text = self.safe_str(assistant_text).strip()
 
         user_text_lc = self.safe_str(user_text).lower().strip()
+
+        if any(
+            marker in user_text_lc
+            for marker in [
+                "what does this failure mean",
+                "failure report",
+                "failed smoke",
+                "smoke failed",
+                "assertionerror",
+                "missing expected signals",
+                "nova answer quality smoke",
+                "project brain failure interpreter",
+            ]
+        ):
+            return None
 
         active_execution = (
             self._get_session_meta(
@@ -6481,6 +6512,14 @@ Rules:
     ) -> dict:
 
         decision = decision if isinstance(decision, dict) else {}
+
+        print(
+            "[RESPONSE INTELLIGENCE DECISION DEBUG]",
+            decision,
+        )
+
+        attachments = attachments or []
+        assistant_text = self.safe_str(assistant_text).strip()
         intelligence = intelligence if isinstance(intelligence, dict) else {}
 
         text = self.safe_str(user_text).lower().strip()
@@ -16277,6 +16316,8 @@ install_attachment_web_suppression()
 try:
     _nova_previous_decide_route_intent_authority_20260630 = ChatService._decide_route
 
+
+
     def _nova_intent_authority_decide_route_20260630(
         self,
         user_text="",
@@ -16287,6 +16328,109 @@ try:
         **kwargs,
     ):
         attachments = attachments if isinstance(attachments, list) else []
+        text_lower = str(user_text or "").lower()
+
+        failure_interpreter_signal = (
+            "what does this failure mean" in text_lower
+            or "failure report" in text_lower
+            or "failed smoke" in text_lower
+            or "smoke failed" in text_lower
+            or "assertionerror" in text_lower
+            or "indentationerror" in text_lower
+            or "syntaxerror" in text_lower
+            or "winerror 10061" in text_lower
+            or "connection refused" in text_lower
+        )
+
+        if failure_interpreter_signal:
+            return {
+                "route": "project_brain_general_intelligence",
+                "mode": "project_brain_general_intelligence",
+                "intent": "failure_interpreter",
+                "confidence": 1.0,
+                "reasons": [
+                    "failure_interpreter_authority",
+                ],
+                "save_artifact": False,
+                "save_memory": False,
+                "use_memory": False,
+                "source_urls": [],
+                "sources": [],
+                "prompt": user_text,
+            }
+
+        failure_interpreter_signal = (
+            "what does this failure mean" in text_lower
+            or "failure report" in text_lower
+            or "failed smoke" in text_lower
+            or "smoke failed" in text_lower
+            or "assertionerror" in text_lower
+            or "indentationerror" in text_lower
+            or "syntaxerror" in text_lower
+            or "winerror 10061" in text_lower
+            or "connection refused" in text_lower
+            or "unexpected indent" in text_lower
+        )
+
+        if failure_interpreter_signal:
+            return {
+                "route": "project_brain_general_intelligence",
+                "mode": "project_brain_general_intelligence",
+                "intent": "failure_interpreter",
+                "confidence": 1.0,
+                "reasons": [
+                    "failure_interpreter_authority",
+                ],
+                "save_artifact": False,
+                "save_memory": False,
+                "use_memory": False,
+                "source_urls": [],
+                "sources": [],
+                "prompt": user_text,
+            }
+
+        failure_text_signal = (
+            "indentationerror" in text_lower
+            or "syntaxerror" in text_lower
+            or "unexpected indent" in text_lower
+            or "traceback" in text_lower
+            or "assertionerror" in text_lower
+            or "failed smoke" in text_lower
+            or "smoke failed" in text_lower
+        )
+
+        mission_control_signal = (
+            (
+                "mission control" in text_lower
+                or "mission-control" in text_lower
+                or (
+                    "show me the mission card" in text_lower
+                    and not failure_text_signal
+                )
+                or "operator mode" in text_lower
+                or (
+                    "failure interpreter" in text_lower
+                    and not failure_text_signal
+                )
+            )
+        )
+
+        if mission_control_signal:
+            return {
+                "route": "project_brain_general_intelligence",
+                "mode": "project_brain_general_intelligence",
+                "intent": "mission_control",
+                "confidence": 1.0,
+                "reasons": [
+                    "mission_control_signal",
+                ],
+                "save_artifact": False,
+                "save_memory": True,
+                "use_memory": True,
+                "source_urls": [],
+                "sources": [],
+                "prompt": user_text,
+            }
 
         # existing function body stays here
 
@@ -16305,13 +16449,52 @@ try:
                 "sources": [],
             }
 
+        # Project Brain mission/failure interpreter signals.
+        normalized_text = str(user_text or "").lower()
+
+        if (
+            (
+                "mission control" in normalized_text
+                or "mission card" in normalized_text
+                or "operator mode" in normalized_text
+            )
+            and not (
+                "indentationerror" in normalized_text
+                or "syntaxerror" in normalized_text
+                or "unexpected indent" in normalized_text
+                or "traceback" in normalized_text
+                or "assertionerror" in normalized_text
+                or "failed smoke" in normalized_text
+                or "smoke failed" in normalized_text
+            )
+        ):
+            return {
+                "route": "project_brain_general_intelligence",
+                "mode": "project_brain_general_intelligence",
+                "intent": "mission_control",
+                "confidence": 0.95,
+                "reasons": [
+                    "mission_control_signal",
+                    "failure_interpreter_signal",
+                ],
+                "save_artifact": False,
+                "save_memory": True,
+                "use_memory": True,
+                "source_urls": [],
+                "sources": [],
+                "prompt": user_text,
+            }
+
         intent_decision = {}
 
         try:
             intent_service = getattr(self, "intent_service", None)
 
             if intent_service is not None and hasattr(intent_service, "detect"):
+                print("INTENT AUTH TEXT:", repr(user_text))
                 intent_decision = intent_service.detect(user_text)
+                print("INTENT AUTH RESULT:", intent_decision)
+
         except Exception:
             intent_decision = {}
 
@@ -16327,6 +16510,30 @@ try:
                 "current_project_state",
                 "project_brain_general_intelligence",
             }
+
+
+            if (
+                "what does this failure mean" in text_lower
+                or "failure report" in text_lower
+                or "failed smoke" in text_lower
+                or "smoke failed" in text_lower
+                or "assertionerror" in text_lower
+            ):
+                return {
+                    "route": "project_brain_general_intelligence",
+                    "mode": "project_brain_general_intelligence",
+                    "intent": "failure_interpreter",
+                    "confidence": 1.0,
+                    "reasons": [
+                        "failure_interpreter_authority",
+                    ],
+                    "save_artifact": False,
+                    "save_memory": False,
+                    "use_memory": False,
+                    "source_urls": [],
+                    "sources": [],
+                    "prompt": user_text,
+                }
 
             if (
                 intent_route
@@ -16459,7 +16666,16 @@ try:
 
     def _nova_final_live_market_price_decide_20260630(self, *args, **kwargs):
         user_text = _nova_final_live_market_price_text_20260630(args, kwargs)
-        attachments = _nova_final_live_market_price_attachments_20260630(args, kwargs)
+
+        print(
+            "FINAL ROUTE TEXT:",
+            repr(user_text),
+        )
+
+        attachments = _nova_final_live_market_price_attachments_20260630(
+            args,
+            kwargs,
+        )
 
         # Attachments still win. This guard is only for clean text market-price questions.
         if not attachments and _nova_is_live_market_price_request_20260630(user_text):
@@ -16648,6 +16864,39 @@ try:
         bare = text.rstrip("?!.")
 
         if (
+            "what does this failure mean" in bare
+            or "failure" in bare
+            and (
+                "error" in bare
+                or "traceback" in bare
+                or "failed" in bare
+                or "smoke" in bare
+            )
+        ):
+            return "failure_interpreter"
+
+        if (
+            (
+                "mission control" in bare
+                or "mission-control" in bare
+                or "show mission" in bare
+                or "mission card" in bare
+                or "show mission card" in bare
+                or "project mission" in bare
+            )
+            and not (
+                "indentationerror" in bare
+                or "syntaxerror" in bare
+                or "unexpected indent" in bare
+                or "traceback" in bare
+                or "assertionerror" in bare
+                or "failed smoke" in bare
+                or "smoke failed" in bare
+            )
+        ):
+            return "mission_control"
+
+        if (
             bare in {
                 "what are we working on",
                 "what are we working on now",
@@ -16675,6 +16924,36 @@ try:
             "next move",
         }:
             return "next"
+
+        if bare in {
+            "what's next",
+            "whats next",
+            "what is next",
+            "what should we work on next",
+            "what should we do next",
+            "next move",
+        }:
+            return "next"
+
+        if (
+            "indentationerror" in bare
+            or "syntaxerror" in bare
+            or "unexpected indent" in bare
+            or "traceback" in bare
+            or "assertionerror" in bare
+            or "failed smoke" in bare
+            or "smoke failed" in bare
+            or (
+                "failure" in bare
+                and (
+                    "error" in bare
+                    or "failed" in bare
+                    or "smoke" in bare
+                )
+            )
+            or "what does this failure mean" in bare
+        ):
+            return "failure_interpreter"
 
         return ""
 
@@ -16706,13 +16985,86 @@ try:
 
         return low.startswith(bad_starts)
 
-    def _nova_project_brain_answer_20260701(kind, session_id):
-        question = "what are we working on?" if kind == "working" else "what's next?"
+    def _nova_project_brain_answer_20260701(kind, session_id, user_text=""):
+        print(
+            "[ANSWER BUILDER DEBUG]",
+            repr(kind),
+        )
+
+        question = (
+            "give me mission control"
+            if kind == "mission_control"
+            else "what are we working on?"
+            if kind == "working"
+            else user_text
+            if kind == "failure_interpreter"
+            else "what's next?"
+        )
 
         answer = ""
 
         try:
-            if kind == "working":
+            print(
+                "[ANSWER KIND BEFORE BRANCH]",
+                repr(kind),
+                repr(user_text),
+            )
+
+            if kind == "failure_interpreter":
+                print(
+                    "[FAILURE INTERPRETER BRANCH HIT]",
+                    repr(user_text),
+                )
+
+                from nova_backend.services.project_brain_failure_interpreter import (
+                    build_project_brain_failure_interpreter_answer,
+                )
+
+
+                answer = build_project_brain_failure_interpreter_answer(
+                    user_text=user_text,
+                    pasted_output=user_text,
+                )
+
+            elif kind == "mission_control":
+                from nova_backend.services.project_brain_general_intelligence import (
+                    build_project_brain_general_answer,
+                )
+
+                fresh_answer = build_project_brain_general_answer(
+                    question,
+                    user_id="",
+                )
+
+                answer = str(
+                    getattr(
+                        fresh_answer,
+                        "text",
+                        fresh_answer,
+                    )
+                    or ""
+                ).strip()
+
+            elif kind == "working":
+                from nova_backend.services.project_brain_general_intelligence import (
+                    build_project_brain_general_answer,
+                )
+
+                fresh_answer = build_project_brain_general_answer(
+                    question,
+                    user_id="",
+                )
+
+                answer = str(
+                    getattr(
+                        fresh_answer,
+                        "text",
+                        fresh_answer,
+                    )
+                    or ""
+                ).strip()
+
+            elif kind == "working":
                 from nova_backend.services.project_state_service import (
                     answer_project_state_question,
                 )
@@ -16765,6 +17117,10 @@ try:
                     ).strip()
 
         except Exception as exc:
+            import traceback
+
+            traceback.print_exc()
+
             try:
                 print(
                     "[NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701] fresh answer bypass:",
@@ -16772,6 +17128,17 @@ try:
                 )
             except Exception:
                 pass
+
+        print(
+            "[FINAL PROJECT BRAIN ANSWER DEBUG]",
+            repr(answer),
+        )
+
+        if kind in {
+            "mission_control",
+            "failure_interpreter",
+        }:
+            return answer
 
         if not _nova_project_brain_bad_answer_20260701(answer):
             return answer
@@ -16839,10 +17206,21 @@ try:
             )
         )
 
+        print(
+            "[QUESTION TEXT DEBUG]",
+            repr(user_text),
+        )
+
         kind = (
             _nova_project_brain_question_kind_20260701(
                 user_text
             )
+        )
+
+        print(
+            "[KIND CHECK BEFORE ANSWER]",
+            repr(user_text),
+            repr(kind),
         )
 
         print(
@@ -16858,6 +17236,15 @@ try:
                     args,
                     kwargs,
                 )
+            )
+
+            print(
+                "[EXECUTION CHECK DEBUG]",
+                repr(session_id),
+                _nova_project_brain_has_active_execution_20260711(
+                    self,
+                    session_id,
+                ),
             )
 
             if (
@@ -16933,10 +17320,17 @@ try:
                         )
                     )
 
+            print(
+                "ANSWER KIND:",
+                repr(kind),
+                repr(user_text),
+            )
+
             answer = (
                 _nova_project_brain_answer_20260701(
                     kind,
                     session_id,
+                    user_text,
                 )
             )
 

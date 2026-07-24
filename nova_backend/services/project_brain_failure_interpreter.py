@@ -192,13 +192,15 @@ def interpret_project_brain_failure(
 
 def format_project_brain_failure_interpretation(result: ProjectBrainFailureInterpretation) -> str:
     return (
+        "Project Brain Mission Control\n"
+        "intent: mission_control\n\n"
         "Project Brain Failure Interpreter:\n"
         f"Failure type: {result.failure_type}\n"
-        f"Severity: {result.severity}\n"
+        f"Failure severity: {result.severity}\n"
         f"Likely source: {result.likely_source}\n"
-        f"Patch target: {result.patch_target}\n"
+        f"Failure patch target: {result.patch_target}\n"
         f"Do not touch: {'; '.join(result.do_not_touch)}\n"
-        f"Next command: {result.next_command}\n"
+        f"Failure next command: {result.next_command}\n"
         f"Evidence: {'; '.join(result.evidence) if result.evidence else 'none'}\n"
         f"Rationale: {result.rationale}"
     )
