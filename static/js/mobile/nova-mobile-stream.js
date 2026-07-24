@@ -257,41 +257,10 @@ window.NovaMobileStream = {
 })();
 
 
-/* NOVA_MOBILE_RESTORE_BUBBLE_ACTIONS_20260609 */
-(function() {
-    const attachBubbleActions = function(bubble) {
-        if (!bubble) return;
-        if (bubble.querySelector('.nova-mobile-message-actions')) return; // already added
-
-        const row = document.createElement('div');
-        row.className = 'nova-mobile-message-actions';
-
-        // Copy button
-        const copyBtn = document.createElement('button');
-        copyBtn.className = 'nova-mobile-copy-chat';
-        copyBtn.textContent = 'Copy';
-        copyBtn.onclick = function() {
-            if (window.copyText) window.copyText(bubble.textContent || '');
-        };
-        row.appendChild(copyBtn);
-
-        // Regenerate button
-        const regenBtn = document.createElement('button');
-        regenBtn.className = 'nova-mobile-regen-chat';
-        regenBtn.textContent = 'Regenerate';
-        regenBtn.onclick = function() {
-            if (window.NovaComposerBundle && window.NovaComposerBundle.regenBubble) {
-                window.NovaComposerBundle.regenBubble(bubble);
-            }
-        };
-        row.appendChild(regenBtn);
-
-        bubble.appendChild(row);
-    };
-
-    // Expose globally for render calls
-    window.NovaAttachBubbleActions = attachBubbleActions;
-})();
+/*
+NOVA_MOBILE_RESTORE_BUBBLE_ACTIONS_20260609 disabled.
+Replaced by nova-mobile-message-actions.js
+*/
 
 
 

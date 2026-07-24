@@ -264,12 +264,15 @@
         return clean(clone.textContent || "");
     }
 
-    function normalizeResponseText(text) {
-        return clean(text)
-            .replace(/^Generated image for:\s*of\s+/i, "Generated image: ")
-            .replace(/^Generated image for:\s*/i, "Generated image: ")
-            .replace(/^Generated image:\s*of\s+/i, "Generated image: ");
-    }
+function normalizeResponseText(text) {
+    return clean(text)
+        .replace(/\bCopy\s*Regenerate\b/gi, "")
+        .replace(/\bCopy\s+Regen\b/gi, "")
+        .replace(/^Generated image for:\s*of\s+/i, "Generated image: ")
+        .replace(/^Generated image for:\s*/i, "Generated image: ")
+        .replace(/^Generated image:\s*of\s+/i, "Generated image: ")
+        .trim();
+}
 
     function getAllMessages() {
         const container = getChatContainer();
@@ -535,7 +538,7 @@
                 bar.appendChild(regenButton);
             }
 
-            message.appendChild(bar);
+            message.insertAdjacentElement("afterend", bar);
             message.dataset.novaCopyRegenActions = "1";
         }
     }
@@ -553,7 +556,8 @@
     setTimeout(installActions, 600);
     setTimeout(installActions, 1500);
 
-    window.NovaMobileInstallCopyRegenerateActions = installActions;
+/*
+NOVA_MOBILE_COPY_REGENERATE_FINAL_20260630 DISABLED
+*/
 
-    console.log("[NOVA_MOBILE_COPY_REGENERATE_FINAL_20260630] ready");
 })();

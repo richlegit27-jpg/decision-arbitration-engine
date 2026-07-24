@@ -1157,9 +1157,9 @@ if (stopGeneration) {
 })();
 
 
-// NOVA_MOBILE_BUBBLE_ACTIONS_OBSERVER_20260609
+/*
+NOVA_MOBILE_BUBBLE_ACTIONS_OBSERVER_20260609 DISABLED
 (function () {
-    "use strict";
 
     function getChatRoot() {
         return (
@@ -1347,7 +1347,7 @@ if (stopGeneration) {
 
         row.appendChild(copyButton);
         row.appendChild(regenButton);
-        node.appendChild(row);
+        node.insertAdjacentElement("afterend", row);
     }
 
     function scanBubbleActions() {
@@ -1402,6 +1402,7 @@ if (stopGeneration) {
         window.setTimeout(startObserver, 250);
     });
 })();
+*/
 
 
 // NOVA_MOBILE_FIX_REGEN_CLICK_20260609
