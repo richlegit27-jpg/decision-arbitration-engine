@@ -9,7 +9,7 @@ import shutil
 import tempfile
 import py_compile
 
-
+from nova_backend.services.onboarding_service import OnboardingService
 from nova_backend.services.response_mojibake_cleanup_service import ResponseMojibakeCleanupService
 from nova_backend.services.chat_response_cleanup_service import ChatResponseCleanupService
 from nova_backend.services.chat_response_policy_service import ChatResponsePolicyService
@@ -2225,6 +2225,7 @@ Rules:
         self.attachment_analysis_service = AttachmentAnalysisService()
         self.accidental_input_guard_service = AccidentalInputGuardService()
         self.response_mojibake_cleanup_service = ResponseMojibakeCleanupService()
+        self.onboarding_service = OnboardingService()
 
         # =========================
         # CORE SERVICES
@@ -3097,8 +3098,24 @@ Rules:
                 e
             )
 
+        onboarding_payload = {}
+
+        try:
+            if self.onboarding_service.should_show_welcome(session):
+                onboarding_payload = {
+                    "onboarding": True,
+                    "actions": self.onboarding_service.build_welcome_actions(),
+                }
+
+        except Exception as e:
+            exec_debug(
+                "ONBOARDING_RESPONSE_ERROR:",
+                e,
+            )
+
         return {
             "ok": True,
+            **onboarding_payload,
             "assistant_message": assistant_msg,
             "session": {
                 **session,
