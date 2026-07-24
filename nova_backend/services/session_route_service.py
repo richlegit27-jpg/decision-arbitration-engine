@@ -1,7 +1,7 @@
 import json
 
 from flask import jsonify, request, session
-
+from nova_backend.services.error_reporting_service import ErrorReportingService
 
 class SessionRouteService:
 
@@ -372,6 +372,7 @@ class SessionRouteService:
         DATA_DIR,
     ):
         self.session_service = session_service
+        self.error_reporting_service = ErrorReportingService()
         self.request_json = (
             lambda: request.get_json(silent=True) or {}
         )
@@ -460,10 +461,22 @@ class SessionRouteService:
         except Exception:
             auth_user_id = ""
 
-        session = session_service.set_active(
-            session_id,
-            user_id=auth_user_id,
-        )
+        try:
+            session = session_service.set_active(
+                session_id,
+                user_id=auth_user_id,
+            )
+
+        except Exception as exc:
+            try:
+                self.error_reporting_service.report(
+                    exc,
+                    service="session_switch",
+                )
+            except Exception:
+                pass
+
+            return json_error(str(exc), 500)
 
         if not session:
             return json_error("Session not found", 404)
@@ -512,12 +525,23 @@ class SessionRouteService:
         except Exception:
             auth_user_id = ""
 
-        session = session_service.pin(
-            session_id,
-            pinned,
-            user_id=auth_user_id,
-        )
+        try:
+            session = session_service.pin(
+                session_id,
+                pinned,
+                user_id=auth_user_id,
+            )
 
+        except Exception as exc:
+            try:
+                self.error_reporting_service.report(
+                    exc,
+                    service="session_pin",
+                )
+            except Exception:
+                pass
+
+            return json_error(str(exc), 500)
         if not session:
             return json_error("Session not found", 404)
 
@@ -555,10 +579,24 @@ class SessionRouteService:
         except Exception:
             auth_user_id = ""
 
-        if not session_service.delete(
-            session_id,
-            user_id=auth_user_id,
-        ):
+        try:
+            deleted = session_service.delete(
+                session_id,
+                user_id=auth_user_id,
+            )
+
+        except Exception as exc:
+            try:
+                self.error_reporting_service.report(
+                    exc,
+                    service="session_delete",
+                )
+            except Exception:
+                pass
+
+            return json_error(str(exc), 500)
+
+        if not deleted:
             return json_error("Session not found", 404)
 
         active_id = session_service.active_session_id
@@ -617,12 +655,23 @@ class SessionRouteService:
         except Exception:
             auth_user_id = ""
 
-        session = session_service.rename(
-            session_id,
-            title or "New Chat",
-            user_id=auth_user_id,
-        )
+        try:
+            session = session_service.rename(
+                session_id,
+                title or "New Chat",
+                user_id=auth_user_id,
+            )
 
+        except Exception as exc:
+            try:
+                self.error_reporting_service.report(
+                    exc,
+                    service="session_rename",
+                )
+            except Exception:
+                pass
+
+            return json_error(str(exc), 500)
         if not session:
             return json_error("Session not found", 404)
 
