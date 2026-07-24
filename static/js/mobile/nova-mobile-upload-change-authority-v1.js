@@ -369,9 +369,39 @@ img.style.borderRadius = "8px";
 
         img.alt = item.filename || "attachment";
         thumb.appendChild(img);
-    } else {
-        thumb.textContent = "📎";
+} else {
+    var ext = String(item.filename || item.name || "")
+        .split(".")
+        .pop()
+        .toLowerCase();
+
+    var icon = "📄";
+
+    if (ext === "pdf") {
+        icon = "📕";
+    } else if (
+        ext === "doc" ||
+        ext === "docx"
+    ) {
+        icon = "📘";
+    } else if (
+        ext === "xls" ||
+        ext === "xlsx"
+    ) {
+        icon = "📊";
+    } else if (
+        ext === "txt" ||
+        ext === "md"
+    ) {
+        icon = "📄";
     }
+
+    thumb.textContent = icon;
+    thumb.style.display = "flex";
+    thumb.style.alignItems = "center";
+    thumb.style.justifyContent = "center";
+    thumb.style.fontSize = "24px";
+}
 
     var name = document.createElement("div");
     name.className = "nova-mobile-upload-preview-name";
@@ -407,44 +437,40 @@ remove.addEventListener("click", function (event) {
 
     host.innerHTML = "";
 host.appendChild(chip);
-
 host.style.display = "flex";
-host.style.flexDirection = "row";
 host.style.alignItems = "center";
-host.style.height = "56px";
-host.style.maxHeight = "56px";
+host.style.height = "52px";
 
 chip.style.display = "flex";
-chip.style.flexDirection = "row";
 chip.style.alignItems = "center";
-chip.style.gap = "8px";
-chip.style.height = "48px";
-chip.style.minHeight = "48px";
-chip.style.maxHeight = "48px";
-chip.style.width = "fit-content";
+chip.style.gap = "10px";
+chip.style.padding = "6px 10px";
+chip.style.borderRadius = "12px";
+chip.style.maxWidth = "95%";
+chip.style.background = "rgba(255,255,255,.08)";
 
-thumb.style.width = "64px";
-thumb.style.height = "64px";
-thumb.style.flex = "0 0 64px";
+thumb.style.width = "40px";
+thumb.style.height = "40px";
+thumb.style.flex = "0 0 40px";
 
 var previewImage = thumb.querySelector("img");
 if (previewImage) {
-    previewImage.style.width = "64px";
-    previewImage.style.height = "64px";
-    previewImage.style.maxWidth = "64px";
-    previewImage.style.maxHeight = "64px";
+    previewImage.style.width = "40px";
+    previewImage.style.height = "40px";
     previewImage.style.objectFit = "cover";
+    previewImage.style.borderRadius = "8px";
 }
 
+name.style.maxWidth = "320px";
 name.style.whiteSpace = "nowrap";
 name.style.overflow = "hidden";
 name.style.textOverflow = "ellipsis";
+name.style.fontSize = "13px";
 
+remove.style.marginLeft = "auto";
 remove.style.width = "28px";
 remove.style.height = "28px";
-remove.style.minWidth = "28px";
-remove.style.minHeight = "28px";
-
+remove.style.borderRadius = "50%";
     host.hidden = false;
     host.style.setProperty("display", "flex", "important");
     host.style.setProperty("visibility", "visible", "important");

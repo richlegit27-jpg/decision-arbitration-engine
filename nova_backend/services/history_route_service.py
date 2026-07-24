@@ -535,12 +535,15 @@ New session created.
         target["message_count"] = len(messages)
         target["updated_at"] = now
 
-        if str(
-            target.get("title") or ""
-        ).strip().lower() in (
-            "",
-            "new chat",
-            "untitled session",
+        if (
+            not target.get("title_manual")
+            and str(
+                target.get("title") or ""
+            ).strip().lower() in (
+                "",
+                "new chat",
+                "untitled session",
+            )
         ):
             words = (
                 text

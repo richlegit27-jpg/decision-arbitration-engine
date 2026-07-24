@@ -32,9 +32,11 @@ function getMessageText(message) {
         message.message ||
         message.body ||
         ""
-    );
+    )
+    .replace(/\bCopy\s*Regenerate\b/gi, "")
+    .replace(/\bCopy\s+Regen\b/gi, "")
+    .trim();
 }
-
 function getMessageRole(message) {
     return message.role === "user" ? "user" : "assistant";
 }

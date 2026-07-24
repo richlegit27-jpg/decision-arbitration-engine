@@ -796,6 +796,7 @@ class SessionService:
                 return None
 
             session["title"] = clean_title
+            session["title_manual"] = True
             session["updated_at"] = iso_now()
 
             self._write_store(data)
@@ -1078,7 +1079,10 @@ class SessionService:
 
         # NOVA_SESSION_BAD_TITLE_AUTOFIX_20260624
         try:
-            if _nova_session_should_auto_title_20260624(session.get("title")):
+            if (
+    not session.get("title_manual")
+    and _nova_session_should_auto_title_20260624(session.get("title"))
+):
                 candidate = _nova_session_title_from_message_20260624(message)
                 if candidate:
                     session["title"] = candidate

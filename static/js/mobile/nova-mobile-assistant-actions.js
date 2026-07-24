@@ -175,10 +175,11 @@ No old laggy observer pile.
             el.remove();
         });
 
-        return String(clone.innerText || clone.textContent || "")
-            .replace(/\n{3,}/g, "\n\n")
-            .replace(/\bCopy\s+Regen\b/gi, "")
-            .trim();
+return String(clone.innerText || clone.textContent || "")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/\bCopy\s*Regenerate\b/gi, "")
+    .replace(/\bCopy\s+Regen\b/gi, "")
+    .trim();
     }
 
     function getLastUserPrompt() {

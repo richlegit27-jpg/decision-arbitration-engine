@@ -214,7 +214,13 @@
             return false;
         }
 
-        renderSessionPayload(payload);
+if (typeof window.NovaMobileRenderSession === "function") {
+    window.NovaMobileRenderSession(
+        payload.session,
+        sessionId
+    );
+}
+
         closePanel();
 
         return true;
@@ -398,13 +404,12 @@
         console.error("[Nova Session Switch Restore V1] launcher bound");
     }
 
-    window.NovaMobileSessionSwitchRestoreV1 = {
-        version: "session-switch-restore-v1",
-        openPanel: openPanel,
-        closePanel: closePanel,
-        switchToSession: switchToSession,
-        renderSessionPayload: renderSessionPayload
-    };
+window.NovaMobileSessionSwitchRestoreV1 = {
+    version: "session-switch-restore-v1",
+    openPanel: openPanel,
+    closePanel: closePanel,
+    switchToSession: switchToSession
+};
 
     bindLaunchers();
 

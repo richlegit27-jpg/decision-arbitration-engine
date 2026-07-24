@@ -263,9 +263,17 @@
             console.warn("[CHAT UI DIRECT RESTORE SCROLL FAILED]", err);
         }
 
-        console.log("[CHAT UI DIRECT RESTORE AFTER SCROLL]");
+console.log("[CHAT UI DIRECT RESTORE AFTER SCROLL]");
 
-        setTimeout(function () {
+try {
+    if (typeof window.NovaMobileInstallCopyRegenerateActions === "function") {
+        window.NovaMobileInstallCopyRegenerateActions();
+    }
+} catch (err) {
+    console.warn("[CHAT UI ACTION RESTORE FAILED]", err);
+}
+
+setTimeout(function () {
             window.__NOVA_SESSION_RENDERING__ = false;
             window.__NOVA_SUPPRESS_SAVE = false;
         }, 250);

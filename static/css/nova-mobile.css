@@ -15260,29 +15260,50 @@ font-size: 18px !important;
     border-radius: 50% !important;
 }
 
-.nova-onboarding-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 12px;
-    padding: 4px 0;
+/* NOVA MOBILE ATTACHMENT CHIP POLISH FINAL */
+
+#nova-mobile-upload-preview-owner {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    height: 56px !important;
+    min-height: 56px !important;
+    max-height: 56px !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
 }
 
-.nova-onboarding-actions button {
-    padding: 10px 16px;
-    border-radius: 999px;
-    border: 1px solid rgba(128, 128, 128, 0.35);
-    background: transparent;
-    cursor: pointer;
-    font-size: 14px;
-    line-height: 1.2;
-    transition: transform 0.15s ease, opacity 0.15s ease;
+#nova-mobile-upload-preview-owner > .nova-mobile-upload-preview-chip {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 10px !important;
+    height: 48px !important;
+    padding: 6px 12px !important;
+    border-radius: 14px !important;
+    background: rgba(255,255,255,0.08) !important;
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    width: auto !important;
 }
 
-.nova-onboarding-actions button:hover {
-    opacity: 0.85;
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-thumb {
+    width: 40px !important;
+    height: 40px !important;
+    flex: 0 0 40px !important;
 }
 
-.nova-onboarding-actions button:active {
-    transform: scale(0.97);
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-name {
+    flex: 1 1 auto !important;
+    min-width: 120px !important;
+    max-width: 420px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+#nova-mobile-upload-preview-owner .nova-mobile-upload-preview-remove {
+    flex: 0 0 30px !important;
+    width: 30px !important;
+    height: 30px !important;
 }

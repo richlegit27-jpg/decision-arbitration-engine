@@ -383,46 +383,63 @@ function activeIdFromStorage() {
         return panel;
     }
 
-    function sessionRow(session, activeId) {
-        const id = String(session.id || session.session_id || "");
-        let title = String(session.title || "").trim();
+function sessionRow(session, activeId) {
+    const id = String(session.id || session.session_id || "");
 
-if (!title || /^(new|new chat|chat|untitled|\d+)$/i.test(title)) {
-    const count =
-        session.message_count ??
-        (Array.isArray(session.messages) ? session.messages.length : 0);
+    let title = String(session.title || "").trim();
 
-    title = count > 0
-        ? "Session " + String(session.id || session.session_id || "").slice(-8)
-        : "Empty session " + String(session.id || session.session_id || "").slice(-8);
-}
-        const pinned = !!session.pinned;
-        const count = session.message_count ?? (
-            Array.isArray(session.messages) ? session.messages.length : 0
-        );
+    if (!title) {
+        const count =
+            session.message_count ??
+            (Array.isArray(session.messages) ? session.messages.length : 0);
 
-        const active = id && id === activeId;
-
-        return [
-            '<div data-session-id="' + escapeHtml(id) + '"',
-            '     style="border:1px solid ' + (active ? "rgba(255,255,255,.45)" : "rgba(255,255,255,.1)") + ';',
-            "            border-radius:14px;",
-            "            padding:10px;",
-            "            margin:0 0 8px;",
-            "            background:" + (active ? "rgba(255,255,255,.12)" : "rgba(255,255,255,.05)") + ';">',
-            '    <button type="button" data-nova-action="open"',
-            '            style="display:block;width:100%;text-align:left;background:transparent;color:#fff;border:0;padding:0;margin:0 0 8px;font-size:14px;font-weight:800;">',
-            "        " + (pinned ? "ðŸ“Œ " : "") + escapeHtml(title),
-            "    </button>",
-            '    <div style="display:flex;align-items:center;gap:6px;">',
-            '        <span style="flex:1;color:rgba(255,255,255,.62);font-size:12px;">' + escapeHtml(id.slice(-8)) + " Â· " + count + " msgs</span>",
-            '        <button type="button" data-nova-action="rename" style="border:0;border-radius:9px;padding:7px 9px;font-weight:700;">Rename</button>',
-            '        <button type="button" data-nova-action="pin" data-pinned="' + (pinned ? "true" : "false") + '" style="border:0;border-radius:9px;padding:7px 9px;font-weight:700;">' + (pinned ? "Unpin" : "Pin") + "</button>",
-            '        <button type="button" data-nova-action="delete" style="border:0;border-radius:9px;padding:7px 9px;font-weight:700;">Delete</button>',
-            "    </div>",
-            "</div>"
-        ].join("");
+        title = count > 0
+            ? "Session " + String(session.id || session.session_id || "").slice(-8)
+            : "Empty session";
     }
+
+    const pinned = !!session.pinned;
+
+    const count = session.message_count ?? (
+        Array.isArray(session.messages)
+            ? session.messages.length
+            : 0
+    );
+
+    const active = id && id === activeId;
+
+    return [
+        '<div data-session-id="' + escapeHtml(id) + '"',
+        '     style="border:1px solid ' + (active ? "rgba(255,255,255,.45)" : "rgba(255,255,255,.1)") + ';',
+        "            border-radius:14px;",
+        "            padding:10px;",
+        "            margin:0 0 8px;",
+        "            background:" + (active ? "rgba(255,255,255,.12)" : "rgba(255,255,255,.05)") + ';">',
+
+        '    <button type="button" data-nova-action="open"',
+        '            style="display:block;width:100%;text-align:left;background:transparent;color:#fff;border:0;padding:0;margin:0 0 8px;font-size:14px;font-weight:800;">',
+        "        " + (pinned ? "📌 " : "") + escapeHtml(title),
+        "    </button>",
+
+        '    <div style="display:flex;align-items:center;gap:6px;">',
+
+        '        <span style="flex:1;color:rgba(255,255,255,.62);font-size:12px;">' +
+            count + " msgs</span>",
+
+        '        <button type="button" data-nova-action="rename" style="border:0;border-radius:9px;padding:7px 9px;font-weight:700;">Rename</button>',
+
+        '        <button type="button" data-nova-action="pin" data-pinned="' +
+            (pinned ? "true" : "false") +
+            '" style="border:0;border-radius:9px;padding:7px 9px;font-weight:700;">' +
+            (pinned ? "Unpin" : "Pin") +
+            "</button>",
+
+        '        <button type="button" data-nova-action="delete" style="border:0;border-radius:9px;padding:7px 9px;font-weight:700;">Delete</button>',
+
+        "    </div>",
+        "</div>"
+    ].join("");
+}
 
     async function loadSessions() {
         setStatus("Loading sessionsâ€¦");

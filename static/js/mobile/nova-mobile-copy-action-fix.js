@@ -65,11 +65,11 @@
             "button, [role='button'], .nova-mobile-message-actions, .message-actions, .bubble-actions, .assistant-actions, .copy, .regen, .regenerate"
         ).forEach(el => el.remove());
 
-        return textOf(clone)
-            .replace(/\bCopy\b\s*/gi, "")
-            .replace(/\bRegen\b\s*/gi, "")
-            .replace(/\bRegenerate\b\s*/gi, "")
-            .trim();
+return textOf(clone)
+    .replace(/\bCopy\s*Regenerate\b/gi, "")
+    .replace(/\bCopy\b\s*/gi, "")
+    .replace(/\bRegenerate\b\s*/gi, "")
+    .trim();
     }
 
     async function copyText(text) {

@@ -519,6 +519,7 @@ function normalizeResponseText(text) {
 document.querySelectorAll(".nova-mobile-copy-regen-actions").forEach(function (bar) {
     bar.remove();
 });
+
         const messages = getAllMessages();
 
         for (const message of messages) {
