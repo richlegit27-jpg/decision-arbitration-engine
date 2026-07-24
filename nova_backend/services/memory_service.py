@@ -140,8 +140,24 @@ class MemoryService:
         return data
 
     def _write_store(self, data: Dict[str, Any]) -> None:
-        save_json_file(self.memory_file, data)
+        try:
+            save_json_file(self.memory_file, data)
 
+        except Exception as exc:
+            try:
+                from nova_backend.services.error_reporting_service import (
+                    ErrorReportingService,
+                )
+
+                ErrorReportingService().report(
+                    exc,
+                    service="memory_write_store",
+                )
+
+            except Exception:
+                pass
+
+            raise
     def _base_weight_for_kind(self, kind: str, pinned: bool = False) -> float:
         if pinned:
             return 10.0
