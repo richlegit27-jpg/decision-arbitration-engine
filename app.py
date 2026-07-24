@@ -4528,6 +4528,15 @@ def api_chat():
     except Exception as exc:
         import traceback
         traceback.print_exc()
+
+        try:
+            error_reporting_service.report(
+                exc,
+                service="api_chat",
+            )
+        except Exception:
+            pass
+
         return json_error(str(exc), 500)
 
 @app.get("/api/chat/<session_id>")
