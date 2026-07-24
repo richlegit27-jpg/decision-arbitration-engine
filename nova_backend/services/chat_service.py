@@ -42,6 +42,9 @@ from nova_backend.services.artifact_service import ArtifactService
 from nova_backend.services.autonomy_service import AutonomyService
 from nova_backend.services.memory_ranker_service import MemoryRankerService
 from nova_backend.services.memory_service import MemoryService
+from nova_backend.services.error_reporting_service import (
+    ErrorReportingService,
+)
 from nova_backend.services.response_rewrite_service import ResponseRewriteService
 from nova_backend.services.nova_behavior_signal_builder import (
     behavior_signal_builder,
@@ -2226,6 +2229,7 @@ Rules:
         self.accidental_input_guard_service = AccidentalInputGuardService()
         self.response_mojibake_cleanup_service = ResponseMojibakeCleanupService()
         self.onboarding_service = OnboardingService()
+        self.error_reporting_service = ErrorReportingService()
 
         # =========================
         # CORE SERVICES
