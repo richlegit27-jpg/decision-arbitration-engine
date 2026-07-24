@@ -2,6 +2,7 @@ from pathlib import Path
 from flask import request
 from flask import jsonify
 from nova_backend.services.auth_context import get_current_user_id
+from nova_backend.services.onboarding_service import OnboardingService
 
 class AdminRouteService:
 
