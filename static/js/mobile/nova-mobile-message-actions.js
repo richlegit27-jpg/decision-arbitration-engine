@@ -1,6 +1,12 @@
 ﻿(function () {
     "use strict";
 
+if (window.__NOVA_MOBILE_MESSAGE_ACTIONS_LOADED__) {
+    return;
+}
+
+window.__NOVA_MOBILE_MESSAGE_ACTIONS_LOADED__ = true;
+
     function notifyMessageCopied() {
         if (typeof showToast === "function") {
             showToast("Copied");
@@ -510,6 +516,9 @@ function normalizeResponseText(text) {
     }
 
     function installActions() {
+document.querySelectorAll(".nova-mobile-copy-regen-actions").forEach(function (bar) {
+    bar.remove();
+});
         const messages = getAllMessages();
 
         for (const message of messages) {
@@ -519,6 +528,10 @@ function normalizeResponseText(text) {
             const role = getRole(message);
 
             if (!text && role !== "assistant") continue;
+
+if (message.querySelector(".nova-mobile-copy-regen-actions")) {
+    continue;
+}
 
             const bar = document.createElement("div");
             bar.className = "nova-mobile-copy-regen-actions";

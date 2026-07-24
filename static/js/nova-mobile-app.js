@@ -2640,6 +2640,7 @@ function fixChatTopSafeArea() {
     }
 
 function addActions(el) {
+    return;
     if (!isAssistantBubble(el)) return;
     if (el.querySelector(":scope > .nova-real-message-actions")) return;
 
@@ -4913,7 +4914,7 @@ if (
 
         actionRows.forEach((row) => row.remove());
 
-        el.appendChild(makeActionRow(el));
+        // NOVA_DISABLE_DUPLICATE_FINAL_MESSAGE_ACTIONS_20260724
         el.dataset.novaFinalActionsOwner = "1";
     }
 
