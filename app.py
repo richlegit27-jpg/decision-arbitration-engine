@@ -63,7 +63,7 @@ from nova_backend.routes.improvement_routes import (
 )
 
 from nova_backend.services.session_route_service import SessionRouteService
-
+from nova_backend.services.error_reporting_service import ErrorReportingService
 from nova_backend.services.stale_working_state_history_service import (
     clean_response_stale_working_state_history,
 )

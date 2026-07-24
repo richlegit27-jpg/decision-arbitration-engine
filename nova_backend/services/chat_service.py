@@ -9,6 +9,7 @@ import shutil
 import tempfile
 import py_compile
 
+from nova_backend.services.error_reporting_service import ErrorReportingService
 from nova_backend.services.onboarding_service import OnboardingService
 from nova_backend.services.response_mojibake_cleanup_service import ResponseMojibakeCleanupService
 from nova_backend.services.chat_response_cleanup_service import ChatResponseCleanupService
