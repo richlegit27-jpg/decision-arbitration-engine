@@ -1,6 +1,4 @@
-﻿# C:\Users\Owner\nova\nova_backend\services\intent_service.py
-
-import re
+﻿import re
 
 
 class IntentService:
@@ -26,6 +24,7 @@ class IntentService:
     def detect(self, user_text: str = "", route: str = "", mode: str = "") -> dict:
         text = str(user_text or "").strip()
         lower = self._normalize(text)
+
         route = str(route or "").strip().lower()
         mode = str(mode or "").strip().lower()
 
@@ -38,7 +37,7 @@ class IntentService:
                 ["empty_or_default_chat"],
             )
 
-        # 1. Working-state recall must beat "current" web triggers.
+        # 1. Working-state recall
         if lower in {
             "what file are we in",
             "what file are we working in",
@@ -57,28 +56,41 @@ class IntentService:
                 self.ROUTE_MEMORY_RECALL,
                 "working_state_recall",
                 1.0,
-                ["direct_working_state_recall", "project_state_memory_recall"],
+                [
+                    "direct_working_state_recall",
+                    "project_state_memory_recall",
+                ],
                 memory_limit=5,
             )
 
         # 2. Project Brain questions beat normal chat.
-        if self._has_any(lower, [
-            "actual blocker",
-            "real blocker",
-            "what's the blocker",
-            "whats the blocker",
-            "blocker on nova",
-            "blocking nova",
-            "where's the project",
-            "where is the project",
-            "current project",
-            "what is locked",
-            "what's locked",
-            "what got locked",
-            "what did we lock",
-            "what did we lock recently",
-            "what got locked recently",
-        ]):
+        if self._has_any(
+            lower,
+            [
+                "actual blocker",
+                "real blocker",
+                "what's the blocker",
+                "whats the blocker",
+                "blocker on nova",
+                "blocking nova",
+                "where's the project",
+                "where is the project",
+                "current project",
+                "what is locked",
+                "what's locked",
+                "what got locked",
+                "what did we lock",
+                "what did we lock recently",
+                "what got locked recently",
+                "what does this failure mean",
+                "what failed",
+                "failure report",
+                "failed smoke",
+                "smoke failed",
+                "traceback",
+                "assertionerror",
+            ],
+        ):
             return self._result(
                 "project_brain_general_intelligence",
                 "project_brain_general_intelligence",
@@ -87,8 +99,7 @@ class IntentService:
                 ["project_brain_trigger"],
             )
 
-
-        # 2. Attachment/file requests must beat web.
+        # 3. Attachment/file requests
         attachment_markers = [
             "attached file",
             "attachment",
@@ -114,7 +125,7 @@ class IntentService:
                 ["attachment_language"],
             )
 
-        # 3. Explicit image generation.
+        # 4. Explicit image generation
         if self._is_image_generation(lower):
             return self._result(
                 self.INTENT_IMAGE,
@@ -127,7 +138,70 @@ class IntentService:
                 use_memory=False,
             )
 
-        # 4. Fresh/current web.
+        # LOCAL_NOVA_PROJECT_CONTEXT_BEATS_WEB_FRESHNESS
+        if (
+            (
+                "nova project" in lower
+                or "the nova project" in lower
+                or "our nova project" in lower
+            )
+            and (
+                "what changed" in lower
+                or "what changed recently" in lower
+                or "recent changes" in lower
+            )
+        ):
+            return self._result(
+                "current_project_state",
+                self.ROUTE_PROJECT_BRAIN,
+                "project_brain_general_intelligence",
+                0.95,
+                ["local_nova_project_context_priority"],
+                save_artifact=False,
+                save_memory=True,
+            )
+
+        # LOCAL_NOVA_PROJECT_CONTEXT_BEATS_WEB_FRESHNESS
+        if (
+            (
+                "nova project" in lower
+                or "the nova project" in lower
+                or "our nova project" in lower
+            )
+            and (
+                "what changed" in lower
+                or "what changed recently" in lower
+                or "recent changes" in lower
+            )
+        ):
+            return self._result(
+                self.ROUTE_PROJECT_BRAIN,
+                self.ROUTE_PROJECT_BRAIN,
+                "project_brain_general_intelligence",
+                0.95,
+                ["local_nova_project_context_priority"],
+                save_artifact=False,
+                save_memory=True,
+            )
+
+        # PROJECT BRAIN COMMANDS BEFORE WEB/GENERAL ROUTING
+        if (
+            "mission control" in lower
+            or "mission-control" in lower
+            or "give me mission control" in lower
+            or "show mission card" in lower
+        ):
+            return self._result(
+                "mission_control",
+                self.ROUTE_PROJECT_BRAIN,
+                "project_brain_general_intelligence",
+                0.98,
+                ["project_brain_priority"],
+                save_artifact=False,
+                save_memory=True,
+            )
+
+        # 5. Fresh/current web
         fresh_words = [
             "latest",
             "today",
@@ -172,37 +246,22 @@ class IntentService:
                 save_memory=False,
             )
 
-        if self._has_any(lower, [
-            "open the first",
-            "open first",
-            "open 1",
-            "first one",
-            "open the top",
-            "top one",
-        ]):
-            return self._result(
-                self.INTENT_WEB,
-                self.ROUTE_WEB_FETCH,
-                "followup_web_open",
-                0.96,
-                ["followup_open_request"],
-                save_artifact=True,
-                save_memory=False,
-            )
-
-        # 5. Debugging/coding/planning/writing.
-        if self._has_any(lower, [
-            "bug",
-            "fix",
-            "error",
-            "traceback",
-            "exception",
-            "broken",
-            "not working",
-            "500",
-            "syntaxerror",
-            "indentationerror",
-        ]):
+        # 6. Debugging
+        if self._has_any(
+            lower,
+            [
+                "bug",
+                "fix",
+                "error",
+                "traceback",
+                "exception",
+                "broken",
+                "not working",
+                "500",
+                "syntaxerror",
+                "indentationerror",
+            ],
+        ):
             return self._result(
                 self.INTENT_DEBUGGING,
                 self.ROUTE_GENERAL_CHAT,
@@ -211,18 +270,22 @@ class IntentService:
                 ["debugging_signal"],
             )
 
-        if self._has_any(lower, [
-            "code",
-            "function",
-            "class",
-            "python",
-            "javascript",
-            "html",
-            "css",
-            "smff",
-            "powershell",
-            "flask",
-        ]):
+        # 7. Coding
+        if self._has_any(
+            lower,
+            [
+                "code",
+                "function",
+                "class",
+                "python",
+                "javascript",
+                "html",
+                "css",
+                "smff",
+                "powershell",
+                "flask",
+            ],
+        ):
             return self._result(
                 self.INTENT_CODING,
                 self.ROUTE_GENERAL_CHAT,
@@ -231,7 +294,16 @@ class IntentService:
                 ["coding_signal"],
             )
 
-        if self._has_any(lower, ["plan", "next step", "roadmap", "strategy"]):
+        # 8. Planning
+        if self._has_any(
+            lower,
+            [
+                "plan",
+                "next step",
+                "roadmap",
+                "strategy",
+            ],
+        ):
             return self._result(
                 self.INTENT_PLANNING,
                 self.ROUTE_PLANNING,
@@ -240,7 +312,17 @@ class IntentService:
                 ["planning_signal"],
             )
 
-        if self._has_any(lower, ["write", "rewrite", "draft", "email", "story"]):
+        # 9. Writing
+        if self._has_any(
+            lower,
+            [
+                "write",
+                "rewrite",
+                "draft",
+                "email",
+                "story",
+            ],
+        ):
             return self._result(
                 self.INTENT_WRITING,
                 self.ROUTE_GENERAL_CHAT,
@@ -279,7 +361,10 @@ class IntentService:
         if self._has_any(lower, explicit_phrases):
             return True
 
-        if re.match(r"^(draw|generate|create|make)\s+(me\s+)?(a|an|the)?\s*.+", lower):
+        if re.match(
+            r"^(draw|generate|create|make)\s+(me\s+)?(a|an|the)?\s*.+",
+            lower,
+        ):
             visual_words = [
                 "image",
                 "picture",
@@ -301,7 +386,9 @@ class IntentService:
         return False
 
     def _normalize(self, value: str) -> str:
-        return " ".join(str(value or "").strip().lower().split())
+        return " ".join(
+            str(value or "").strip().lower().split()
+        )
 
     def _has_any(self, text: str, terms: list[str]) -> bool:
         return any(term in text for term in terms)
