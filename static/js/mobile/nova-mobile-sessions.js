@@ -123,7 +123,10 @@
     }
 
 function activeIdFromStorage() {
+    const urlId = sessionIdFromUrl();
+
     return (
+        urlId ||
         localStorage.getItem("nova_mobile_active_session_id") ||
         localStorage.getItem("nova_active_session_id") ||
         window.novaActiveSessionId ||
@@ -449,10 +452,9 @@ function sessionRow(session, activeId) {
         });
 
         const sessions = getSessions(data);
-        const activeId =
-            activeIdFromStorage() ||
-            data.active_session_id ||
-            "";
+const activeId =
+    activeIdFromStorage() ||
+    "";
 
         sessions.sort(function (a, b) {
             const aId = String(
@@ -724,8 +726,12 @@ function openPanel() {
         pointerEvents: panel.style.pointerEvents
     });
 
-    loadSessions().catch(function (error) {
-        setStatus("Error: " + (error && error.message ? error.message : String(error)));
+loadSessions()
+    .catch(function (error) {
+        setStatus(
+            "Error: " +
+            (error && error.message ? error.message : String(error))
+        );
     });
 }
 
@@ -823,6 +829,15 @@ let bootSessionId =
 
 async function restoreBootSession() {
     try {
+console.log(
+    "[BOOT RESTORE INPUTS]",
+    {
+        url: new URL(window.location.href).searchParams.get("session_id"),
+        local_active: localStorage.getItem("nova_active_session_id"),
+        mobile_active: localStorage.getItem("nova_mobile_active_session_id")
+    }
+);
+
         if (!bootSessionId && authReady) {
             const data = await jsonFetch(
                 API.list + "?boot_restore=" + Date.now(),
@@ -866,13 +881,12 @@ async function restoreBootSession() {
     }
 }
 
-setTimeout(function () {
-    restoreBootSession();
-}, 200);
 
-        setTimeout(bindHeaderButton, 250);
-        setTimeout(bindHeaderButton, 800);
-    }
+restoreBootSession();
+
+setTimeout(bindHeaderButton, 250);
+setTimeout(bindHeaderButton, 800);
+
 
     document.addEventListener("click", function (event) {
         const header = event.target.closest("#" + IDS.headerButton);
@@ -894,8 +908,7 @@ setTimeout(function () {
         boot();
     }
 
-    installFinalSessionGlobals();
+}
+
+installFinalSessionGlobals();
 })();
-
-
-

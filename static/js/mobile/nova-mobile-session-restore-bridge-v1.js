@@ -276,6 +276,6 @@ if (document.readyState === "complete") {
 
 console.log(LOG, "installed");
 
+} // close outer IIFE function
+
 })();
-
-

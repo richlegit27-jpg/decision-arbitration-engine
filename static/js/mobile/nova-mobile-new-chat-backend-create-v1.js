@@ -210,15 +210,8 @@
         return count;
     }
 
-    document.addEventListener("click", function (event) {
-        var target = event.target;
-        var button = target && target.closest && target.closest("button, a, [role='button']");
-        if (!button) return;
-
-        if (isNewChatButton(button)) {
-            createNewChat(event);
-        }
-    }, true);
+// Removed global new chat click interceptor.
+// Button ownership handled by bindButtons().
 
     function boot() {
         var count = bindButtons();
@@ -231,15 +224,8 @@
         boot();
     }
 
-    setTimeout(boot, 250);
-    setTimeout(boot, 900);
-    setTimeout(boot, 1800);
-
-    var observer = new MutationObserver(boot);
-    observer.observe(document.documentElement || document.body, {
-        childList: true,
-        subtree: true
-    });
+// Single ownership: bind once.
+// Removed mutation observer and repeated boot scans.
 
     window.NovaMobileNewChatBackendCreateV1 = {
         version: MARK,

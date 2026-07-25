@@ -190,7 +190,12 @@
                     ? session.messages
                     : [];
 
-        console.log("[CHAT UI DIRECT RESTORE]", {
+        console.trace("🚨 CHAT UI DIRECT RESTORE SOURCE");
+
+console.trace("🚨 CHAT UI DIRECT RESTORE SOURCE");
+
+console.log("[CHAT UI DIRECT RESTORE]", {
+    id: session?.id,
             reason: reason || "unknown",
             session_id: sessionId,
             messages: messages.length
@@ -299,7 +304,9 @@ setTimeout(function () {
         );
     };
 
-    window.addEventListener("nova:session-selected", function (event) {
+window.addEventListener("nova:session-selected", function (event) {
+
+    console.trace("🚨 SESSION SELECT EVENT");
         console.log("[CHAT UI LISTENER FIRED]", event.detail);
         return renderSessionPayload(event.detail || {}, "event");
     });
