@@ -22,7 +22,15 @@ class OnboardingService:
         )
 
     def should_show_welcome(self, session):
-        return self.get_state(session) == "new"
+        if not isinstance(session, dict):
+            return True
+
+        meta = session.get("meta") or {}
+        onboarding = meta.get("onboarding") or {}
+
+        return onboarding.get(
+            "state"
+        ) != "complete"
 
     def build_welcome_message(self):
         return (
@@ -80,11 +88,8 @@ class OnboardingService:
     def build_onboarding_patch(self):
         return {
             "onboarding": {
-                "state": "complete",
+                "state": "shown",
                 "version": self.VERSION,
-                "completed_at": datetime.now(
-                    timezone.utc
-                ).isoformat(),
             }
         }
 
@@ -101,11 +106,8 @@ class OnboardingService:
 
     def build_user_onboarding_patch(self):
         return {
-            "onboarding_complete": True,
+            "onboarding_complete": False,
             "onboarding_version": self.VERSION,
-            "onboarding_completed_at": datetime.now(
-                timezone.utc
-            ).isoformat(),
         }
 
     def load_user_state(self, user_id):

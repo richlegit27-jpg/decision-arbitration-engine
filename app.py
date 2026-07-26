@@ -3073,12 +3073,22 @@ def api_chat():
 
         onboarding_intent = ""
 
+        onboarding_intent = ""
+
         try:
             onboarding_intent = str(
                 data.get("onboarding_intent") or ""
             ).strip()
         except Exception:
             onboarding_intent = ""
+
+        if onboarding_intent and user_id:
+            onboarding_service.save_user_state(
+                user_id,
+                {
+                    "first_intent": onboarding_intent,
+                },
+            )
 
         image_command_user_text = user_text
 
@@ -3868,7 +3878,6 @@ def api_chat():
 
             if (
                 not _nova_skip_onboarding
-                and onboarding_service.should_show_welcome(current_session)
                 and onboarding_service.should_show_user_welcome(
                     user_onboarding
                 )
@@ -3887,17 +3896,19 @@ def api_chat():
                         value,
                     )
 
-                user_onboarding_patch = (
-                    onboarding_service.build_user_onboarding_patch()
-                )
+                # NOVA_ONBOARDING_SHOWN_ONLY_20260726
+                # Do not complete onboarding until the user chooses an action.
+
+                user_onboarding_patch = {}
 
                 if onboarding_intent:
                     user_onboarding_patch["first_intent"] = onboarding_intent
 
-                onboarding_service.save_user_state(
-                    user_id,
-                    user_onboarding_patch,
-                )
+                if user_onboarding_patch:
+                    onboarding_service.save_user_state(
+                        user_id,
+                        user_onboarding_patch,
+                    )
 
                 result = {
                     "ok": True,

@@ -128,50 +128,24 @@
             );
             history.replaceState({}, "", url.toString());
 
-            window.NOVA_MESSAGES = [];
+window.NOVA_MESSAGES = [];
 
-            if (
-                typeof window.NovaMobileRenderSession ===
-                "function"
-            ) {
-                window.NovaMobileRenderSession(
-                    emptySession,
-                    sid
-                );
-            } else if (
-                window.NovaMobileChatUI &&
-                typeof window.NovaMobileChatUI
-                    .renderSessionPayload === "function"
-            ) {
-                window.NovaMobileChatUI.renderSessionPayload(
-                    {
-                        session_id: sid,
-                        session: emptySession,
-                        messages: []
-                    },
-                    "new-chat-owner"
-                );
-            } else {
-                window.dispatchEvent(
-                    new CustomEvent(
-                        "nova:session-selected",
-                        {
-                            detail: {
-                                session_id: sid,
-                                session: emptySession,
-                                messages: []
-                            }
-                        }
-                    )
-                );
-            }
+if (
+    typeof window.NovaMobileRenderSession ===
+    "function"
+) {
+    window.NovaMobileRenderSession(
+        emptySession,
+        sid
+    );
+}
 
-            if (
-                typeof window.NovaMobileReloadSessions ===
-                "function"
-            ) {
-                await window.NovaMobileReloadSessions();
-            }
+if (
+    typeof window.NovaMobileReloadSessions ===
+    "function"
+) {
+    await window.NovaMobileReloadSessions();
+}
 
             if (
                 typeof window.NovaMobileCloseSessions ===
