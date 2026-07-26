@@ -4637,6 +4637,39 @@ Rules:
         if project_status_query:
             memory_context = ""
             working_context_block = ""
+
+        # NOVA_MEMORY_RECALL_PRIORITY_20260726
+        memory_recall_query = any(
+            phrase in original_user_text.lower()
+            for phrase in [
+                "what did i ask you to remember",
+                "what did i tell you to remember",
+                "what do you remember about me",
+                "show my memories",
+                "what memories do you have",
+            ]
+        )
+
+        if memory_recall_query:
+            assistant_msg = self._build_assistant_message(
+                text=self._build_memory_recall_text(
+                    session_id=session_id,
+                    user_text=user_text,
+                    limit=5,
+                )
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=self._build_user_message(
+                    original_user_text,
+                    attachments=attachments,
+                ),
+                assistant_msg=assistant_msg,
+                decision=decision,
+            )
+
         if not memory_context:
             memory_context = self._build_memory_context_for_chat(
                 user_text,
@@ -10936,14 +10969,54 @@ Rules:
 
         ranked = []
 
-        for item in all_memory:
+        memory_recall_query = any(
+            phrase in str(user_text or "").lower()
+            for phrase in [
+                "what did i ask you to remember",
+                "what did i tell you to remember",
+                "show my memories",
+                "what memories do you have",
+            ]
+        )
+
+        for item in items:
             score = self._score_memory_for_text(
                 item,
                 user_text,
             )
 
-            if score > 0:
-                ranked.append((score, item))
+            if memory_recall_query and isinstance(item, dict):
+                kind = str(
+                    item.get("kind")
+                    or item.get("category")
+                    or ""
+                ).lower()
+
+                text = str(
+                    item.get("text")
+                    or item.get("content")
+                    or ""
+                ).lower()
+
+                if (
+                    "remember this" in text
+                    or "remember that" in text
+                    or kind in {
+                        "memory",
+                        "note",
+                        "user_fact",
+                    }
+                ):
+                    score += 50
+
+                if kind in {
+                    "preference",
+                    "profile",
+                    "identity",
+                }:
+                    score -= 20
+
+            ranked.append((score, item))
 
         ranked.sort(
             key=lambda x: x[0],
@@ -11014,6 +11087,7 @@ Rules:
         try:
             if hasattr(self, "memory") and self.memory and hasattr(self.memory, "all"):
                 items = self.memory.all() or []
+                print("[MEMORY RECALL DEBUG]", items[-5:])
 
         except Exception:
             items = []
@@ -11023,11 +11097,51 @@ Rules:
 
         ranked = []
 
+        memory_recall_query = any(
+            phrase in str(user_text or "").lower()
+            for phrase in [
+                "what did i ask you to remember",
+                "what did i tell you to remember",
+                "show my memories",
+                "what memories do you have",
+            ]
+        )
+
         for item in items:
             score = self._score_memory_for_text(
                 item,
                 user_text,
             )
+
+            if memory_recall_query and isinstance(item, dict):
+                kind = str(
+                    item.get("kind")
+                    or item.get("category")
+                    or ""
+                ).lower()
+
+                text = str(
+                    item.get("text")
+                    or item.get("content")
+                    or ""
+                ).lower()
+
+                if kind in {
+                    "memory",
+                    "note",
+                    "user_fact",
+                }:
+                    score += 50
+
+                if "remember this" in text or "remember that" in text:
+                    score += 100
+
+                if kind in {
+                    "preference",
+                    "profile",
+                    "identity",
+                }:
+                    score -= 30
 
             ranked.append((score, item))
 
