@@ -3106,13 +3106,35 @@ Rules:
         onboarding_payload = {}
 
         try:
-            if self.onboarding_service.should_show_welcome(session):
+            print(
+                "[NOVA WELCOME CHECK]",
+                repr(session_id),
+                str(session_id).startswith("regression_"),
+                repr(text_lc),
+            )
+
+            if (
+                not str(session_id).startswith("regression_")
+                and self.onboarding_service.should_show_welcome(session)
+                and text_lc in [
+                    "",
+                    "hi",
+                    "hello",
+                    "hey",
+                    "yo",
+                    "good morning",
+                    "good afternoon",
+                    "good evening",
+                ]
+            ):
                 onboarding_payload = {
                     "onboarding": True,
                     "actions": self.onboarding_service.build_welcome_actions(),
                 }
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             exec_debug(
                 "ONBOARDING_RESPONSE_ERROR:",
                 e,
@@ -3562,12 +3584,119 @@ Rules:
         attachments = attachments or []
 
         original_user_text = self.safe_str(user_text)
+
+        text_lc = original_user_text.lower().strip()
+
+        print(
+            "[NOVA EXECUTE GENERAL CHAT DEBUG]",
+            repr(session_id),
+            repr(user_text),
+        )
+
         print(
             "DEBUG EXECUTE GENERAL CHAT HIT =",
             repr(user_text),
         )
 
-        text_lc = original_user_text.lower().strip()
+        print(
+            "[NOVA WELCOME DEBUG]",
+            "session=",
+            repr(session_id),
+            "text=",
+            repr(text_lc),
+            flush=True,
+        )
+
+        # NOVA_FIRST_RUN_WELCOME_GATE_20260726
+
+        try:
+            session = self.session_service.get_session(
+                session_id
+            ) or {}
+
+            print(
+                "[NOVA WELCOME SESSION]",
+                repr(session_id),
+                session,
+                flush=True,
+            )
+
+            if (
+                not str(session_id).startswith("regression_")
+                and self.onboarding_service.should_show_welcome(session)
+                and not re.match(
+                    r"^(write|draft|compose|rewrite|edit|proofread)\b",
+                    text_lc,
+                )
+                and text_lc in [
+                    "",
+                    "hi",
+                    "hello",
+                    "hey",
+                    "yo",
+                    "good morning",
+                    "good afternoon",
+                    "good evening",
+                ]
+            ):
+
+                meta = session.get("meta") or {}
+
+                meta.update(
+                    self.onboarding_service.build_onboarding_patch()
+                )
+
+                session["meta"] = meta
+
+                self.session_service.replace_session(
+                    session_id,
+                    session,
+                )
+
+                print(
+                    "[NOVA ONBOARDING RETURN]",
+                    repr(session_id),
+                    repr(original_user_text),
+                    flush=True,
+                )
+
+                import traceback
+                traceback.print_stack()
+
+                assistant_msg = self._build_assistant_message(
+                    text=self.onboarding_service.build_welcome_message(),
+                    meta={
+                        "onboarding_welcome": True,
+                    },
+                )
+
+                return self._finalize_response(
+                    session_id=session_id,
+                    user_text=original_user_text,
+                    user_msg=self._build_user_message(
+                        original_user_text,
+                        attachments=attachments,
+                    ),
+                    assistant_msg=assistant_msg,
+                    decision={
+                        "route": "onboarding_welcome",
+                        "mode": "onboarding",
+                        "confidence": 1.0,
+                        "reasons": [
+                            "first_run_user_welcome"
+                        ],
+                        "save_artifact": False,
+                        "save_memory": False,
+                        "use_memory": False,
+                    },
+                    saved_artifact=None,
+                )
+
+        except Exception as e:
+            exec_debug(
+                "FIRST_RUN_WELCOME_GATE_FAILED:",
+                e,
+            )
 
         # NOVA_PROJECT_STATUS_DIRECT_ROUTE_20260607
         project_status_query = any(
