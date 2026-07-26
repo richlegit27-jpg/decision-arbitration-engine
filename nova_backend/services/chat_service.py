@@ -3604,10 +3604,6 @@ Rules:
             if (
                 not str(session_id).startswith("regression_")
                 and self.onboarding_service.should_show_welcome(session)
-                and not re.match(
-                    r"^(write|draft|compose|rewrite|edit|proofread)\b",
-                    text_lc,
-                )
                 and text_lc in [
                     "",
                     "hi",
@@ -3633,15 +3629,6 @@ Rules:
                     session,
                 )
 
-                print(
-                    "[NOVA ONBOARDING RETURN]",
-                    repr(session_id),
-                    repr(original_user_text),
-                    flush=True,
-                )
-
-                import traceback
-                traceback.print_stack()
 
                 assistant_msg = self._build_assistant_message(
                     text=self.onboarding_service.build_welcome_message(),
