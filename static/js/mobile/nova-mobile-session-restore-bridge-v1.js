@@ -84,14 +84,18 @@ function getMessageRole(message) {
 
         messages.forEach((message) => {
             const role = getMessageRole(message);
-            const bubble = document.createElement("div");
+const bubble = document.createElement("div");
 
-            bubble.className = [
-                "nova-mobile-visible-message-v1",
-                "nova-mobile-polished-bubble",
-                "nova-mobile-polished-" + role
-            ].join(" ");
+bubble.className = [
+    "nova-mobile-visible-message-v1",
+    "nova-mobile-polished-bubble",
+    "nova-mobile-polished-" + role
+].join(" ");
 
+bubble.setAttribute(
+    "data-nova-ignore-polish",
+    "1"
+);
             bubble.setAttribute("data-session-restore-bridge", "1");
             bubble.setAttribute("data-message-role", role);
 

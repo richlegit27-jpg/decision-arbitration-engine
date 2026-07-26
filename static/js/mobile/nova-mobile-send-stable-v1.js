@@ -548,6 +548,19 @@ var payload = {
     session_id: sid
 };
 
+var onboardingIntent = "";
+
+try {
+    onboardingIntent =
+        sessionStorage.getItem("nova_onboarding_intent") || "";
+} catch (_) {
+    onboardingIntent = "";
+}
+
+if (onboardingIntent) {
+    payload.onboarding_intent = onboardingIntent;
+}
+
 console.log("[Nova Send Stable] BEFORE CHAT SEND", {
     text: text,
     session_id: sid,

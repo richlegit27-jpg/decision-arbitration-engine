@@ -103,15 +103,16 @@ No old laggy observer pile.
 
         let nodes = Array.from(root.querySelectorAll(selectors));
 
-        nodes = nodes.filter(function (node) {
-            if (!node || !node.isConnected) return false;
-            if (looksUser(node)) return false;
-            if (node.closest("#nova-mobile-tools-panel, #nova-mobile-artifacts-panel, #nova-mobile-execution-panel, #nova-mobile-memory-panel")) return false;
+nodes = nodes.filter(function (node) {
+    if (!node || !node.isConnected) return false;
+    if (looksUser(node)) return false;
+    if (node.closest("#nova-mobile-tools-panel, #nova-mobile-artifacts-panel, #nova-mobile-execution-panel, #nova-mobile-memory-panel")) return false;
+    if (node.closest(".nova-onboarding-actions")) return false;
 
-            const value = cleanAssistantText(node);
+    const value = cleanAssistantText(node);
 
-            return value && value.length > 1;
-        });
+    return value && value.length > 1;
+});
 
         return Array.from(new Set(nodes)).slice(-40);
     }
