@@ -2544,6 +2544,25 @@ Rules:
         if isinstance(assistant_msg, str):
             assistant_msg = self._build_assistant_message(text=assistant_msg)
 
+        if isinstance(assistant_msg, dict):
+            meta = assistant_msg.get("meta")
+
+            if not isinstance(meta, dict):
+                meta = {}
+
+            meta.setdefault(
+                "response_quality",
+                {},
+            )
+
+            meta["response_quality"].update(
+                {
+                    "finalized": True,
+                }
+            )
+
+            assistant_msg["meta"] = meta
+
         return assistant_msg
 
     def _safe_return(
