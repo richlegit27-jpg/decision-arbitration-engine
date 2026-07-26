@@ -1,81 +1,28 @@
-from collections import Counter
-import re
 import json
-from pathlib import Path
-from flask import request
+
 
 def persist_title(session_id, clean_title):
     try:
-        sid = str(session_id or "").strip()
-
-        if not sid:
+        if not session_id:
             return
 
-        data_path = (
-            Path(__file__).resolve().parents[2]
-            / "data"
-            / "nova_sessions.json"
+        from nova_backend.services import session_service
+
+        service = getattr(
+            session_service,
+            "session_service",
+            None,
         )
 
-        if not data_path.exists():
-            return
+        if service:
+            session = service.get_session(session_id) or {}
 
-        store = json.loads(
-            data_path.read_text(encoding="utf-8")
-        )
-
-        sessions = store.get("sessions")
-
-        if not isinstance(sessions, list):
-            return
-
-        changed = False
-
-        for item in sessions:
-            if not isinstance(item, dict):
-                continue
-
-            item_id = str(
-                item.get("id")
-                or item.get("session_id")
-                or ""
-            ).strip()
-
-            if item_id != sid:
-                continue
-
-            old_title = str(
-                item.get("title") or ""
-            ).strip()
-
-            if (
-                old_title.lower()
-                in {
-                    "",
-                    "web fetch",
-                    "source preview",
-                    "generated image",
-                }
-                or is_garbage_title(old_title)
-            ):
-                item["title"] = clean_title
-                changed = True
-
-        if changed:
-            tmp = data_path.with_suffix(
-                data_path.suffix + ".tmp"
-            )
-
-            tmp.write_text(
-                json.dumps(
-                    store,
-                    indent=2,
-                    ensure_ascii=False,
-                ),
-                encoding="utf-8",
-            )
-
-            tmp.replace(data_path)
+            if isinstance(session, dict):
+                session["title"] = clean_title
+                service.save(
+                    service.get_all(),
+                    active=session_id,
+                )
 
     except Exception as error:
         print(
@@ -83,10 +30,27 @@ def persist_title(session_id, clean_title):
             error,
         )
 
+
 def apply_response_title_guard(response):
     try:
-        request_path = str(getattr(request, "path", "") or "")
-        request_method = str(getattr(request, "method", "") or "").upper()
+        request = getattr(
+            response,
+            "_nova_request",
+            None,
+        )
+
+        if request is None:
+            return response
+
+        request_path = str(
+            getattr(request, "path", "")
+            or ""
+        )
+
+        request_method = str(
+            getattr(request, "method", "")
+            or ""
+        ).upper()
 
         if request_method != "POST" or request_path != "/api/chat":
             return response
@@ -109,7 +73,8 @@ def apply_response_title_guard(response):
             return response
 
         old_title = str(
-            session.get("title") or ""
+            session.get("title")
+            or ""
         ).strip()
 
         route = str(
@@ -121,7 +86,7 @@ def apply_response_title_guard(response):
             data.get("source")
             or ""
         ).strip()
-        
+
         cleaned = clean_title(
             old_title,
             user_text,
@@ -129,15 +94,30 @@ def apply_response_title_guard(response):
             source,
         )
 
+        print(
+            "[TITLE GUARD DEBUG]",
+            {
+                "old_title": old_title,
+                "user_text": user_text,
+                "route": route,
+                "source": source,
+                "cleaned": cleaned,
+            },
+        )
+
         if cleaned != old_title:
             session["title"] = cleaned
+
             persist_title(
                 session.get("id"),
                 cleaned,
             )
 
             response.set_data(
-                json.dumps(data, ensure_ascii=False)
+                json.dumps(
+                    data,
+                    ensure_ascii=False,
+                )
             )
 
         return response
@@ -150,6 +130,7 @@ def apply_response_title_guard(response):
 
     return response
 
+
 def is_garbage_title(value) -> bool:
     text = str(value or "")
     compact = "".join(text.split())
@@ -159,36 +140,14 @@ def is_garbage_title(value) -> bool:
 
     lower = compact.lower()
 
-    if lower in {
-        "k",
-        "ok",
-        "okay",
-        "next",
-        "continue",
-        "run",
-        "stop",
-        "cancel",
-        "yes",
-        "no",
-        "hello",
-        "hi",
-        "hey",
-    }:
-        return False
-
-    if len(compact) < 8:
-        return False
-
-    counts = Counter(compact)
-    ratio = counts.most_common(1)[0][1] / max(len(compact), 1)
-
-    if len(compact) >= 12 and ratio >= 0.75:
-        return True
-
-    if re.search(r"(.)\1{9,}", compact):
-        return True
-
-    return False
+    return lower in {
+        "webfetch",
+        "web fetch",
+        "sourcepreview",
+        "source preview",
+        "generatedimage",
+        "generated image",
+    }
 
 
 def clean_title(title, user_text, route, source):
@@ -208,23 +167,35 @@ def clean_title(title, user_text, route, source):
         "source preview",
         "generated image",
     }:
-        candidate = str(user_text or "").replace("\n", " ").strip()
+        candidate = str(
+            user_text or ""
+        ).replace(
+            "\n",
+            " ",
+        ).strip()
 
-        if candidate and not is_garbage_title(candidate):
+        if (
+            candidate
+            and not is_garbage_title(candidate)
+            and len(candidate) >= 4
+        ):
             return candidate[:60]
 
         return "New Chat"
 
     return current or "New Chat"
 
+
 def install(app):
     @app.after_request
     def nova_final_title_guard_20260630(response):
         try:
             return apply_response_title_guard(response)
+
         except Exception as error:
             print(
                 "[NOVA_FINAL_TITLE_GUARD_20260630] skipped:",
                 error,
             )
+
         return response

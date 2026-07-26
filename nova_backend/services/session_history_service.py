@@ -122,7 +122,7 @@ class SessionHistoryService:
                 "id": session_id,
                 "title": str(
                     session_obj.get("title")
-                    or "Web Fetch"
+                    or "New Chat"
                 )[:80],
                 "messages": [],
                 "session_attachments": [],

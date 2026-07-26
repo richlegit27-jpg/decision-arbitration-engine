@@ -274,7 +274,7 @@ from nova_backend.services.attachment_endpoint_service import (
 from nova_backend.services.web_fetch_bridge_service import (
     WebFetchBridgeService,
 )
-
+from nova_backend.services import session_title_guard_service
 from nova_backend.services.session_detail_response_cache_service import (
     SessionDetailResponseCacheService,
 )
@@ -792,6 +792,19 @@ session_detail_response_cache_service = SessionDetailResponseCacheService(
     session_response_cache_service,
     attachment_text_service,
 )
+
+try:
+    from nova_backend.services import session_title_guard_service
+
+    session_title_guard_service.install(app)
+
+    print("[NOVA_SESSION_TITLE_GUARD] installed")
+
+except Exception as _title_guard_install_error:
+    print(
+        "[NOVA_SESSION_TITLE_GUARD] install failed:",
+        _title_guard_install_error,
+    )
 
 working_state_service = WorkingStateService(
     session_service=session_service,
@@ -3897,8 +3910,15 @@ def api_chat():
                     },
                 }
 
+                result["_nova_onboarding_locked"] = True
+
             elif onboarding_service.should_show_returning_message(current_session):
                 meta = current_session.get("meta") or {}
+
+                meta.setdefault(
+                    "onboarding",
+                    {},
+                )
 
                 meta["onboarding"]["returning_greeting_seen"] = True
 
@@ -3923,11 +3943,15 @@ def api_chat():
                 )
 
         except Exception as onboarding_error:
+            print(
+                "[ONBOARDING FAILURE DEBUG]",
+                repr(onboarding_error),
+            )
+
             app.logger.warning(
                 "[NOVA_ONBOARDING_SERVICE_GATE] failed: %s",
                 onboarding_error,
             )
-
             result = chat_service.handle(
                 user_text=image_command_user_text,
                 session_id=session_id,
@@ -4494,6 +4518,15 @@ def api_chat():
                     "normalized_list_result": True,
                     "route_taken": "list_result_contract_guard",
                 },
+            }
+
+        if (
+            isinstance(result, dict)
+            and result.get("_nova_onboarding_locked")
+        ):
+            result["assistant_message"] = {
+                "role": "assistant",
+                "text": onboarding_service.build_welcome_message(),
             }
 
         assistant_message = result.get("assistant_message") or {

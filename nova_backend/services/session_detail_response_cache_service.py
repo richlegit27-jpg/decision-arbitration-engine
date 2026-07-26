@@ -112,7 +112,7 @@ class SessionDetailResponseCacheService:
                 if not isinstance(session_obj, dict):
                     session_obj = {
                         "id": session_id,
-                        "title": "Web Fetch",
+                        "title": "New Chat",
                         "messages": [],
                         "session_attachments": [],
                         "meta": {},
