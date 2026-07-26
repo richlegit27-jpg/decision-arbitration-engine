@@ -12075,7 +12075,7 @@ Rules:
 
         # LATEST_NEWS_BEFORE_FULL_FILE_INTENT_LOCK
         elif any(
-            marker in text_lc
+            marker in text_lc.split()
             for marker in (
                 "latest",
                 "fresh",

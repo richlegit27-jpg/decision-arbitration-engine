@@ -122,42 +122,12 @@
         return normalizeSessionsPayload(data);
     }
 
-    async function createNewChat() {
-        try {
-            var response = await fetch("/api/sessions/new", {
-                method: "POST",
-                credentials: "include",
-                cache: "no-store",
-                headers: {
-                    "Accept": "application/json",
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({})
-            });
+async function createNewChat() {
+    console.log("[SESSION OWNER FINAL] disabled, backend creator owns New Chat");
+    return;
 
-            var data = await response.json();
-            var id =
-                data.session_id ||
-                data.id ||
-                (data.session && data.session.id) ||
-                (data.result && data.result.id) ||
-                "";
-
-            if (!id) {
-                id = "mobile_" + Date.now();
-            }
-
-            try {
-                localStorage.setItem("nova_mobile_active_session_id", id);
-            } catch (_) {}
-
-            location.href = "/mobile?session_id=" + encodeURIComponent(id) + "&v=session-owner-new-" + Date.now();
-        } catch (error) {
-            console.error("[Nova Session Owner Final V1] new chat failed", error);
-            var fallback = "mobile_" + Date.now();
-            location.href = "/mobile?session_id=" + encodeURIComponent(fallback) + "&v=session-owner-new-fallback-" + Date.now();
-        }
-    }
+    try {
+        var response = await fetch("/api/sessions/new", {
 
     function switchToSession(id) {
         if (!id) {

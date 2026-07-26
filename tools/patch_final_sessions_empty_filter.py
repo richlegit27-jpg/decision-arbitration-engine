@@ -21,9 +21,12 @@ try:
     import json as _nova_final_sessions_json
     from flask import request as _nova_final_sessions_request
 
-    def _nova_final_sessions_count_20260702(item):
+    def _nova_sessions_filter_count_20260702(item):
         try:
-            return int(item.get("message_count") or 0)
+            return max(
+                int(item.get("message_count") or 0),
+                len(item.get("messages") or [])
+            )
         except Exception:
             return 0
 

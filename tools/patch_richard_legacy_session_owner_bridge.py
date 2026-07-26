@@ -65,17 +65,36 @@ insert = '''        if request.path != "/api/sessions" or request.method != "GET
                         continue
 
                     item_user_id = str(item.get("user_id") or "").strip()
+
                     item_username = str(item.get("username") or "").strip().lower()
 
-                    is_current = bool(current_uid and item_user_id == current_uid)
-                    is_same_name = bool(item_username and item_username == current_username)
-                    is_legacy_joe = item_username == "joe"
-                    is_unowned = not item_user_id and not item_username
+                    is_current = bool(
+                        current_uid and item_user_id == current_uid
+                    )
 
-                    if not (is_current or is_same_name or is_legacy_joe or is_unowned):
+                    is_same_name = bool(
+                        item_username and item_username == current_username
+                    )
+
+                    is_legacy_user = item_username in (
+                        "joe",
+                        "bob",
+                    )
+
+                    is_unowned = (
+                        not item_user_id
+                        and not item_username
+                    )
+
+                    if not (
+                        is_current
+                        or is_same_name
+                        or is_legacy_user
+                        or is_unowned
+                    ):
                         continue
 
-                    if is_legacy_joe or is_unowned:
+                    if is_legacy_user or is_unowned:
                         meta = item.get("meta")
                         if not isinstance(meta, dict):
                             meta = {}

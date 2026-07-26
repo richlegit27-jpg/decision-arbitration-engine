@@ -930,10 +930,17 @@ filename='js/mobile/nova-mobile-auth.js') }}?v=auth-header-clean-final-20260716"
 
         candidates
             .filter(isVisible)
-            .filter(function (el) {
-                if (el.closest(".nova-mobile-auth-dock, .nova-mobile-user-dock, .nova-mobile-backend-dock")) return false;
+ .filter(function (el) {
 
-                const rect = el.getBoundingClientRect();
+    if (
+        el.id === "nova-mobile-sessions-final-panel-v1"
+    ) {
+        return false;
+    }
+
+    if (el.closest(".nova-mobile-auth-dock, .nova-mobile-user-dock, .nova-mobile-backend-dock")) return false;
+
+    const rect = el.getBoundingClientRect();
                 if (rect.width < 100 || rect.height < 80) return false;
 
                 return scoreMenu(el) >= 4;
@@ -1518,19 +1525,22 @@ filename='js/mobile/nova-mobile-auth.js') }}?v=auth-header-clean-final-20260716"
         return document.getElementById("novaMobileMemoryV2Panel");
     }
 
-    function closeMemoryPanelHard() {
-        const overlay = getOverlay();
-        if (!overlay) return;
+function closeMemoryPanelHard() {
+    const overlay = getOverlay();
 
-        overlay.classList.remove("is-open");
-        overlay.style.display = "none";
+    if (!overlay) return;
 
-        setTimeout(function () {
-            overlay.style.removeProperty("display");
-        }, 250);
-    }
+    overlay.classList.remove("is-open");
+    overlay.style.display = "none";
+}
 
-    function setAddStatus(text) {
+/*
+setTimeout(function () {
+    restoreBootSession();
+}, 200);
+*/
+
+function setAddStatus(text) {
         const status = document.getElementById("novaMobileMemoryV2AddStatus");
         if (status) status.textContent = text || "";
     }
@@ -3622,7 +3632,9 @@ composer.style.setProperty("overflow", "visible", "important");
 
 <!-- DISABLED_DUPLICATE_SESSION_SANITIZER_20260706 -->
 <!--
+<!-- DISABLED_SESSION_SANITIZER_DUPLICATE_OWNER_20260725
 <script src="/static/js/mobile/nova-mobile-active-session-sanitizer-v1.js?v=active-session-sanitizer-v1-20260703"></script>
+-->
 -->
 <!-- DISABLED_DUPLICATE_SESSION_RESTORE_KEEPER_20260706 -->
 <!--
@@ -3688,7 +3700,7 @@ composer.style.setProperty("overflow", "visible", "important");
 <!-- <script src="/static/js/mobile/nova-mobile-session-clean-owner-v1.js?v=session-clean-owner-v1-20260705"></script> -->
 <!-- DISABLED DUPLICATE SESSION OWNER -->
 <!-- <script src="/static/js/mobile/nova-mobile-session-drawer-owner-v1.js?v=session-drawer-owner-v1-20260706"></script> -->
-<script src="/static/js/mobile/nova-mobile-sessions.js?v=sessions-reopen-guard-20260709c"></script>
+<script src="/static/js/mobile/nova-mobile-sessions.js?v=sessions-reopen-guard-20260725"></script>
 
 <script>
 (function () {
