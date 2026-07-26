@@ -7,7 +7,6 @@ import hashlib
 import uuid
 
 from nova_backend.services.auth_context import get_current_user_id
-from nova_backend.services.onboarding_service import OnboardingService
 from nova_backend.services.image_vision_service import ImageVisionService
 from flask import Flask, Response, jsonify, render_template, request, send_from_directory, session
 from flask_cors import CORS
@@ -17,7 +16,6 @@ from pathlib import Path
 from nova_backend.services.memory_route_service import MemoryRouteService
 from werkzeug.utils import secure_filename
 from nova_backend.services.web_preview_route_service import WebPreviewRouteService
-from nova_backend.services.onboarding_service import OnboardingService
 
 from nova_backend.services.debug_route_service import DebugRouteService
 
@@ -437,7 +435,7 @@ attachment_context_service = AttachmentContextService(
 
 local_auth_route_service = None
 
-onboarding_service = OnboardingService()
+
 repair_plan_priority_guard_service = RepairPlanPriorityGuardService()
 chat_attachment_memory_service = ChatAttachmentMemoryService()
 chat_response_cleanup_service = ChatResponseCleanupService()
@@ -2642,7 +2640,6 @@ def api_chat():
         if (
             not attachments
             and _nova_clean_casual_text in _nova_casual_greetings
-            and not onboarding_service.should_show_welcome(current_session)
         ):
             app.logger.info(
                 "[api_chat] hard bypass casual greeting session_id=%s text=%r",
@@ -3070,25 +3067,6 @@ def api_chat():
         # If attachment text was already extracted into user_text, hand off to chat_service as plain text.
         # This prevents chat_service attachment guards from returning canned attachment responses.
         attachments_for_chat_service = list(attachments or [])
-
-        onboarding_intent = ""
-
-        onboarding_intent = ""
-
-        try:
-            onboarding_intent = str(
-                data.get("onboarding_intent") or ""
-            ).strip()
-        except Exception:
-            onboarding_intent = ""
-
-        if onboarding_intent and user_id:
-            onboarding_service.save_user_state(
-                user_id,
-                {
-                    "first_intent": onboarding_intent,
-                },
-            )
 
         image_command_user_text = user_text
 
@@ -3633,9 +3611,7 @@ def api_chat():
             )
 
 
-            
-
-
+          
             if image_attachments and _is_image_prehandle_analysis:
 
 
@@ -3846,129 +3822,31 @@ def api_chat():
                 attachments=attachments_for_chat_service,
             )
 
-
         try:
-            current_session = session_service.get_session(session_id) or {}
-            user_id = get_current_user_id()
-
-            user_onboarding = onboarding_service.load_user_state(
-                user_id
-            )
-
-
-            _nova_onboarding_text = str(
-                data.get("message")
-                or data.get("user_text")
-                or user_text
-                or ""
-            ).strip().lower()
-
-            _nova_onboarding_session = str(
-                data.get("session_id")
-                or session_id
-                or ""
-            ).strip().lower()
-
-            _nova_skip_onboarding = (
-                _nova_onboarding_text == "garbage_guard"
-                or _nova_onboarding_text.startswith("regression_")
-                or _nova_onboarding_session.startswith("regression_")
-            )
-
-
-            if (
-                not _nova_skip_onboarding
-                and onboarding_service.should_show_user_welcome(
-                    user_onboarding
-                )
-            ):
-
-                meta = current_session.get("meta") or {}
-
-                meta.update(
-                    onboarding_service.build_onboarding_patch()
-                )
-
-                for key, value in meta.items():
-                    session_service.set_session_meta(
-                        session_id,
-                        key,
-                        value,
-                    )
-
-                # NOVA_ONBOARDING_SHOWN_ONLY_20260726
-                # Do not complete onboarding until the user chooses an action.
-
-                user_onboarding_patch = {}
-
-                if onboarding_intent:
-                    user_onboarding_patch["first_intent"] = onboarding_intent
-
-                if user_onboarding_patch:
-                    onboarding_service.save_user_state(
-                        user_id,
-                        user_onboarding_patch,
-                    )
-
-                result = {
-                    "ok": True,
-                    "onboarding": True,
-                    "onboarding_state": "complete",
-                    "actions": onboarding_service.build_welcome_actions(),
-                    "assistant_message": {
-                        "role": "assistant",
-                        "text": onboarding_service.build_welcome_message(),
-                    },
-                }
-
-                result["_nova_onboarding_locked"] = True
-
-            elif onboarding_service.should_show_returning_message(current_session):
-                meta = current_session.get("meta") or {}
-
-                meta.setdefault(
-                    "onboarding",
-                    {},
-                )
-
-                meta["onboarding"]["returning_greeting_seen"] = True
-
-                session_service.set_session_meta(
-                    session_id,
-                    meta,
-                )
-
-                result = {
-                    "ok": True,
-                    "assistant_message": {
-                        "role": "assistant",
-                        "text": onboarding_service.build_returning_message(),
-                    },
-                }
-
-            else:
-                result = chat_service.handle(
-                    user_text=image_command_user_text,
-                    session_id=session_id,
-                    attachments=attachments_for_chat_service,
-                )
-
-        except Exception as onboarding_error:
-            print(
-                "[ONBOARDING FAILURE DEBUG]",
-                repr(onboarding_error),
-            )
-
-            app.logger.warning(
-                "[NOVA_ONBOARDING_SERVICE_GATE] failed: %s",
-                onboarding_error,
-            )
             result = chat_service.handle(
                 user_text=image_command_user_text,
                 session_id=session_id,
                 attachments=attachments_for_chat_service,
             )
 
+        except Exception as chat_error:
+            print(
+                "[CHAT SERVICE FAILURE DEBUG]",
+                repr(chat_error),
+            )
+
+            result = {
+                "ok": False,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": "Nova encountered an error processing that request.",
+                },
+            }
+
+            app.logger.warning(
+                "[CHAT_SERVICE_FAILURE] failed: %s",
+                chat_error,
+            )
         print(
             "[CHAT SERVICE RESULT DEBUG]",
             repr(result)[:3000],
@@ -4529,15 +4407,6 @@ def api_chat():
                     "normalized_list_result": True,
                     "route_taken": "list_result_contract_guard",
                 },
-            }
-
-        if (
-            isinstance(result, dict)
-            and result.get("_nova_onboarding_locked")
-        ):
-            result["assistant_message"] = {
-                "role": "assistant",
-                "text": onboarding_service.build_welcome_message(),
             }
 
         assistant_message = result.get("assistant_message") or {
