@@ -3587,26 +3587,6 @@ Rules:
 
         text_lc = original_user_text.lower().strip()
 
-        print(
-            "[NOVA EXECUTE GENERAL CHAT DEBUG]",
-            repr(session_id),
-            repr(user_text),
-        )
-
-        print(
-            "DEBUG EXECUTE GENERAL CHAT HIT =",
-            repr(user_text),
-        )
-
-        print(
-            "[NOVA WELCOME DEBUG]",
-            "session=",
-            repr(session_id),
-            "text=",
-            repr(text_lc),
-            flush=True,
-        )
-
         # NOVA_FIRST_RUN_WELCOME_GATE_20260726
 
         try:
