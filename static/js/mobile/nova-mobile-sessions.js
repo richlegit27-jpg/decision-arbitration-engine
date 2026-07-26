@@ -129,13 +129,17 @@ function activeIdFromStorage() {
         urlId ||
         localStorage.getItem("nova_mobile_active_session_id") ||
         localStorage.getItem("nova_active_session_id") ||
+        localStorage.getItem("novaMobileSessionId") ||
+        sessionStorage.getItem("nova_active_session_id") ||
+        window.__novaActiveSessionId ||
         window.novaActiveSessionId ||
         window.NOVA_ACTIVE_SESSION_ID ||
         ""
     );
 }
 
-    function sessionIdFromUrl() {
+function sessionIdFromUrl() {
+
         try {
             return new URL(window.location.href).searchParams.get("session_id") || "";
         } catch (_) {
@@ -799,44 +803,63 @@ function closePanel() {
         lockFinalGlobal("NovaMobileOpenSession", openSession);
     }
 
-    let __novaBooted = false;
+let __novaBooted = false;
+let bootSessionId = "";
 
-    function boot() {
-        console.trace("[NOVA BOOT TRACE]");
+function boot() {
+    console.trace("[NOVA BOOT TRACE]");
 
-        if (__novaBooted) {
-            return;
-        }
+    if (__novaBooted) {
+        return;
+    }
 
-        __novaBooted = true;
+    __novaBooted = true;
 
-        console.log("[NOVA] boot running once");
+    console.log("[NOVA] boot running once");
 
-        ensureButton();
-        ensurePanel();
-        bindHeaderButton();
+    ensureButton();
+    ensurePanel();
+    bindHeaderButton();
 
-        loadSessions().catch(function (error) {
-            setStatus("Error: " + (error && error.message ? error.message : String(error)));
-        });
+    loadSessions().catch(function (error) {
+        setStatus(
+            "Error: " +
+            (error && error.message
+                ? error.message
+                : String(error))
+        );
+    });
 
- const authReady =
-    window.NovaAuthState &&
-    window.NovaAuthState.authenticated === true;
-
-let bootSessionId =
-    authReady ? activeIdFromStorage() : "";
+    restoreBootSession().catch(function (error) {
+        console.warn(
+            "[NOVA BOOT RESTORE FAILED]",
+            error
+        );
+    });
+}
 
 async function restoreBootSession() {
     try {
-console.log(
-    "[BOOT RESTORE INPUTS]",
-    {
-        url: new URL(window.location.href).searchParams.get("session_id"),
-        local_active: localStorage.getItem("nova_active_session_id"),
-        mobile_active: localStorage.getItem("nova_mobile_active_session_id")
-    }
-);
+        const urlSessionId =
+            new URL(window.location.href)
+                .searchParams
+                .get("session_id");
+
+        console.log(
+            "[BOOT RESTORE INPUTS]",
+            {
+                url: urlSessionId,
+                local_active: localStorage.getItem("nova_active_session_id"),
+                mobile_active: localStorage.getItem("nova_mobile_active_session_id")
+            }
+        );
+
+        bootSessionId =
+            urlSessionId ||
+            localStorage.getItem("nova_active_session_id") ||
+            localStorage.getItem("nova_mobile_active_session_id") ||
+            activeIdFromStorage() ||
+            "";
 
         if (!bootSessionId && authReady) {
             const data = await jsonFetch(
@@ -866,6 +889,13 @@ console.log(
             setActiveId(bootSessionId);
 
             await openSession(bootSessionId);
+
+            console.log(
+                "[NOVA AFTER OPEN SESSION]",
+                bootSessionId
+            );
+        } else {
+            console.log("[NOVA NO BOOT SESSION]");
         }
 
     } catch (error) {
@@ -873,20 +903,11 @@ console.log(
             "[NOVA BOOT RESTORE FAILED]",
             error
         );
-
-        setStatus(
-            "Restore failed: " +
-            (error && error.message ? error.message : String(error))
-        );
     }
 }
 
-
-restoreBootSession();
-
 setTimeout(bindHeaderButton, 250);
 setTimeout(bindHeaderButton, 800);
-
 
     document.addEventListener("click", function (event) {
         const header = event.target.closest("#" + IDS.headerButton);
@@ -902,13 +923,14 @@ setTimeout(bindHeaderButton, 800);
         openPanel();
     }, true);
 
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", boot);
-    } else {
-        boot();
-    }
 
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+} else {
+    boot();
 }
+
 
 installFinalSessionGlobals();
 })();
