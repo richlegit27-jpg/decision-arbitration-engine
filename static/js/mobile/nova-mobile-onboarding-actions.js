@@ -26,6 +26,16 @@
             return;
         }
 
+
+if (payload.welcome_message) {
+    const welcome = document.createElement("div");
+
+    welcome.className = "nova-onboarding-welcome";
+    welcome.textContent = payload.welcome_message;
+
+    container.appendChild(welcome);
+}
+
         const row = document.createElement("div");
         row.className = "nova-onboarding-actions";
 
