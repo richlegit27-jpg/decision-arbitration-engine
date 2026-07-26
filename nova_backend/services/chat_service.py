@@ -5123,11 +5123,30 @@ Rules:
                     )
 
         if not assistant_text:
-            if "name" in text_lc:
+            if any(
+                phrase in text_lc
+                for phrase in [
+                    "my package",
+                    "my order",
+                    "my shipment",
+                    "my delivery",
+                    "where is my package",
+                    "where is my order",
+                    "track my package",
+                ]
+            ):
+                assistant_text = (
+                    "I can help with that, but I need some details first. "
+                    "Please provide the tracking number, carrier, or order "
+                    "information you have."
+                )
+
+            elif "name" in text_lc:
                 assistant_text = (
                     "I do not have your name in this session yet. "
                     "Tell me your name once and I ll use it for this chat."
                 )
+
             else:
                 assistant_text = "I m here. Send the next instruction."
 
