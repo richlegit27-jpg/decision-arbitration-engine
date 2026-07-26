@@ -1024,7 +1024,11 @@ class SessionService:
         title="New Chat",
         user_id="",
     ):
+        if not user_id:
+            user_id = self._current_owner_id()
+
         sessions = self._load_sessions()
+
         s = new_session(
             title,
             user_id=user_id,

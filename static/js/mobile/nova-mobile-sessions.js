@@ -861,7 +861,7 @@ async function restoreBootSession() {
             activeIdFromStorage() ||
             "";
 
-        if (!bootSessionId && window.authReady) {
+        if (!bootSessionId) {
             const data = await jsonFetch(
                 API.list + "?boot_restore=" + Date.now(),
                 {

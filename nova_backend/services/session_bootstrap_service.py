@@ -139,9 +139,23 @@ class SessionBootstrapService:
             or data.get("new_session")
         )
 
-        active_session_id = str(
+        active_session_id = ""
+
+        requested_session_id = str(
             session_id or ""
         ).strip()
+
+        if requested_session_id:
+            try:
+                existing = self.session_service.get_session(
+                    requested_session_id,
+                )
+
+                if existing:
+                    active_session_id = requested_session_id
+
+            except Exception:
+                active_session_id = ""
 
         if not active_session_id and not force_new_session:
             try:

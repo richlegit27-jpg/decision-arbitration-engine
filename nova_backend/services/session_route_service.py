@@ -216,14 +216,24 @@ class SessionRouteService:
 
             try:
                 active_session_id = str(
-                    request.cookies.get("nova_active_session_id")
-                    or request.cookies.get("active_session_id")
-                    or request.cookies.get("session_id")
+                    getattr(session_service, "active_session_id", "")
                     or ""
                 ).strip()
 
             except Exception:
                 active_session_id = ""
+
+            if not active_session_id:
+                try:
+                    active_session_id = str(
+                        request.cookies.get("nova_active_session_id")
+                        or request.cookies.get("active_session_id")
+                        or request.cookies.get("session_id")
+                        or ""
+                    ).strip()
+
+                except Exception:
+                    active_session_id = ""
 
             if not active_session_id and slim_sessions:
                 for candidate in slim_sessions:
