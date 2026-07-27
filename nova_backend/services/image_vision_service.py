@@ -152,6 +152,10 @@ class ImageVisionService:
                         )
 
                 except Exception as exc:
+                    import traceback
+
+                    traceback.print_exc()
+
                     text = (
                         "VISION_DEBUG: OpenAI vision failed: "
                         + str(exc)
