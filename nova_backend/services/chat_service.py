@@ -554,6 +554,17 @@ class ChatService:
         )
 
         parts.append(
+            "Nova identity: "
+            "You are a direct thinking partner, not a generic assistant. "
+            "Lead with the useful answer. "
+            "Avoid empty praise, filler acknowledgements, and unnecessary reassurance. "
+            "Do not assume the user's emotions or describe how they feel. "
+            "Be calm, precise, and honest about uncertainty. "
+            "Challenge weak assumptions respectfully when it improves the outcome. "
+            "Prioritize progress, clarity, and practical next actions."
+        )
+
+        parts.append(
             "When coding or project-building, "
             "be precise and operational. "
             "Keep outputs structured and grounded "
@@ -1131,6 +1142,7 @@ Rules:
             return self.execution_orchestrator_service.process_execution(
                 session_id=session_id,
                 state=selected_execution_state,
+                command=command,
             )
 
         if mission_type == "inspect":
@@ -8682,6 +8694,8 @@ Rules:
             command = "run_all"
 
         elif text in {
+            "k",
+            "kk",
             "next",
             "nex",
             "continue",
@@ -10120,7 +10134,11 @@ Rules:
                     session_id=session_id,
                     goal=mission.get("goal", goal),
                     steps=[
-                        step.get("title", "")
+                        {
+                            "title": step.get("title", ""),
+                            "action": step.get("title", ""),
+                            "status": step.get("status", "pending"),
+                        }
                         for step in mission.get("steps", [])
                         if isinstance(step, dict)
                     ],
@@ -10411,9 +10429,25 @@ Rules:
 
         # SINGLE DISPATCH AUTHORITY
         if route == "execution":
-            execution_state = {
-                "command": user_text,
-            }
+
+            if command == "start":
+                execution_state = self._process_goal_and_plan(
+                    user_text,
+                    session_id,
+                )
+
+                if not execution_state:
+                    return self._execute_general_chat(
+                        user_text=user_text,
+                        session_id=session_id,
+                        attachments=attachments,
+                        decision=decision,
+                    )
+
+            else:
+                execution_state = {
+                    "command": user_text,
+                }
 
             return self.execution_orchestrator_service.process_execution(
                 session_id=session_id,
@@ -10550,7 +10584,11 @@ Rules:
 
         execution_state = {
             "status": "running",
-            "goal": goal,
+            "goal": (
+                goal.get("goal", user_text)
+                if isinstance(goal, dict)
+                else goal
+            ),
             "original_user_text": user_text,
             "steps": normalized_steps,
             "plan": normalized_steps,
@@ -16388,12 +16426,39 @@ try:
         attachments = attachments or []
 
         try:
+            execution = {}
+
+            if hasattr(self, "_load_execution_state"):
+                execution = self._load_execution_state(session_id) or {}
+
+            if not execution and hasattr(self, "_get_session_meta"):
+                execution = self._get_session_meta(
+                    session_id,
+                    "execution_state",
+                ) or {}
+
+            # Do not erase an active mission.
+            if isinstance(execution, dict) and execution.get("steps"):
+                return self.execution_orchestrator_service.process_execution(
+                    session_id=session_id,
+                    state=execution,
+                    command=user_text,
+                )
+
             if hasattr(self, "_save_execution_state"):
                 self._save_execution_state(session_id, {})
 
             if hasattr(self, "_set_session_meta"):
-                self._set_session_meta(session_id, "execution_state", {})
-                self._set_session_meta(session_id, "active_execution", {})
+                self._set_session_meta(
+                    session_id,
+                    "execution_state",
+                    {},
+                )
+                self._set_session_meta(
+                    session_id,
+                    "active_execution",
+                    {},
+                )
 
             if hasattr(self, "_update_working_state"):
                 self._update_working_state(
@@ -16405,50 +16470,9 @@ try:
                         "execution_status": "idle",
                     },
                 )
+
         except Exception:
             pass
-
-        text = "No active execution mission. Start one with: auto-plan <goal>"
-
-        try:
-            user_msg = self._build_user_message(user_text, attachments=attachments)
-            assistant_msg = self._build_assistant_message(
-                text=text,
-                meta={
-                    "execution_idle": True,
-                    "post_complete_guard": True,
-                },
-                attachments=[],
-            )
-
-            return self._finalize_response(
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision={
-                    "route": "execution_idle",
-                    "mode": "execution",
-                    "save_artifact": False,
-                    "save_memory": False,
-                    "use_memory": False,
-                },
-                saved_artifact=None,
-                session_id=session_id,
-                attachments=attachments,
-            )
-        except Exception:
-            return {
-                "ok": True,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": text,
-                    "attachments": [],
-                    "meta": {
-                        "execution_idle": True,
-                        "post_complete_guard": True,
-                    },
-                },
-                "text": text,
-            }
 
     def _nova_advance_execution_request_post_complete_idle_20260609(
         self,
