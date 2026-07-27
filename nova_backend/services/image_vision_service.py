@@ -49,6 +49,18 @@ class ImageVisionService:
             filename = filename.replace("\\", "/").split("/")[-1].strip()
 
             candidates = [
+                Path(
+                    os.getenv(
+                        "UPLOADS_DIR",
+                        "",
+                    )
+                ) / filename,
+                Path(
+                    os.getenv(
+                        "RAILWAY_VOLUME_MOUNT_PATH",
+                        "",
+                    )
+                ) / "uploads" / filename,
                 Path.cwd() / "uploads" / filename,
                 Path.cwd() / "static" / "uploads" / filename,
                 Path(__file__).resolve().parents[2] / "uploads" / filename,
