@@ -2,6 +2,7 @@ from pathlib import Path
 import base64
 import mimetypes
 import os
+import traceback
 
 from nova_backend.services.model_gateway_service import (
     chat_completions_create,
@@ -40,13 +41,19 @@ class ImageVisionService:
                     .split("?", 1)[0]
                     .split("#", 1)[0]
                 )
+
             elif raw_url:
                 filename = Path(raw_url).name
 
             if not filename and raw_name:
                 filename = Path(raw_name).name
 
-            filename = filename.replace("\\", "/").split("/")[-1].strip()
+            filename = (
+                filename
+                .replace("\\", "/")
+                .split("/")[-1]
+                .strip()
+            )
 
             candidates = [
                 Path(
@@ -55,43 +62,66 @@ class ImageVisionService:
                         "",
                     )
                 ) / filename,
+
                 Path(
                     os.getenv(
                         "RAILWAY_VOLUME_MOUNT_PATH",
                         "",
                     )
                 ) / "uploads" / filename,
+
                 Path.cwd() / "uploads" / filename,
                 Path.cwd() / "static" / "uploads" / filename,
-                Path(__file__).resolve().parents[2] / "uploads" / filename,
-                Path(__file__).resolve().parents[2] / "static" / "uploads" / filename,
+
+                Path(__file__).resolve().parents[2]
+                / "uploads"
+                / filename,
+
+                Path(__file__).resolve().parents[2]
+                / "static"
+                / "uploads"
+                / filename,
             ]
 
             image_path = None
 
             for candidate in candidates:
                 try:
-                    if candidate.exists() and candidate.is_file():
+                    if (
+                        candidate.exists()
+                        and candidate.is_file()
+                    ):
                         image_path = candidate
                         break
+
                 except Exception:
                     continue
 
             if image_path is None:
                 text = (
                     "VISION_DEBUG: image file not found. "
-                    + "filename=" + str(filename)
-                    + " candidates=" + " | ".join(str(c) for c in candidates)
+                    + "filename="
+                    + str(filename)
+                    + " candidates="
+                    + " | ".join(
+                        str(c)
+                        for c in candidates
+                    )
                 )
-                vision_used = False
 
             else:
                 try:
-                    mime_type = mimetypes.guess_type(
-                        str(image_path)
-                    )[0] or "image/jpeg"
+                    mime_type = (
+                        mimetypes.guess_type(
+                            str(image_path)
+                        )[0]
+                        or "image/jpeg"
+                    )
 
-                    with open(image_path, "rb") as image_file:
+                    with open(
+                        image_path,
+                        "rb",
+                    ) as image_file:
                         encoded = base64.b64encode(
                             image_file.read()
                         ).decode("utf-8")
@@ -125,7 +155,10 @@ class ImageVisionService:
                                 "content": [
                                     {
                                         "type": "text",
-                                        "text": user_text or "What is this image?",
+                                        "text": (
+                                            user_text
+                                            or "What is this image?"
+                                        ),
                                     },
                                     {
                                         "type": "image_url",
@@ -141,38 +174,45 @@ class ImageVisionService:
                     )
 
                     text = str(
-                        response.choices[0].message.content or ""
+                        response.choices[0]
+                        .message
+                        .content
+                        or ""
                     ).strip()
 
                     if text:
                         vision_used = True
+
                     else:
                         text = (
-                            "VISION_DEBUG: OpenAI vision returned empty text."
+                            "VISION_DEBUG: "
+                            "OpenAI vision returned empty text."
                         )
 
                 except Exception as exc:
-                    import traceback
-
                     traceback.print_exc()
 
                     text = (
                         "VISION_DEBUG: OpenAI vision failed: "
                         + str(exc)
+                        + "\nTRACEBACK:\n"
+                        + traceback.format_exc()
                     )
-                    vision_used = False
+
             return {
                 "text": text,
                 "vision_used": vision_used,
             }
 
         except Exception as exc:
-            print(
-                "[NOVA_API_CHAT_IMAGE_VISION_GATE] failed:",
-                exc,
-            )
+            traceback.print_exc()
 
             return {
-                "text": "VISION_DEBUG: vision failed.",
+                "text": (
+                    "VISION_DEBUG: vision failed: "
+                    + str(exc)
+                    + "\nTRACEBACK:\n"
+                    + traceback.format_exc()
+                ),
                 "vision_used": False,
             }
