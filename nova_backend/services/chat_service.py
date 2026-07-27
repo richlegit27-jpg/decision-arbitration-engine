@@ -2775,14 +2775,12 @@ Rules:
         ):
             memory_text = clean_memory_user_text
 
-            assistant_msg = {
-                "role": "assistant",
-                "text": f"Stored memory: {memory_text}.",
-                "content": f"Stored memory: {memory_text}.",
-                "meta": {
-                    "sources": [],
-                    "source_urls": [],
-                },
+            return {
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": "Got it. I'll keep that in mind.",
+                    "content": "Got it. I'll keep that in mind.",
+                }
             }
 
             decision["route"] = "memory_save"
@@ -5133,6 +5131,7 @@ Rules:
             assistant_text = dedupe_repeated_answer_20260630(
                 self._extract_response_text(response)
             )
+
 
             print(
                 "DEBUG AFTER EXTRACTION =",
@@ -9248,22 +9247,38 @@ Rules:
         })
 
 
-    def handle(self, user_text: str, session_id: str = "", attachments=None):
+def handle(self, user_text: str, session_id: str = "", attachments=None):
 
-        try:
-            guard_result = self.accidental_input_guard_service.handle(
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-            )
+    try:
+        guard_result = self.accidental_input_guard_service.handle(
+            user_text=user_text,
+            session_id=session_id,
+            attachments=attachments,
+        )
 
-            if guard_result:
-                return guard_result
+        if guard_result:
+            return guard_result
 
-        except Exception:
-            pass
+    except Exception:
+        pass
 
-        # NOVA_CHAT_TURN_HANDLE_HELPER_SHADOW_20260705
+    # NOVA_FIRST_CONTACT_IDENTITY_20260727
+    try:
+        _nova_session = self._get_session(session_id)
+
+        _nova_messages = (
+            _nova_session.get("messages", [])
+            if isinstance(_nova_session, dict)
+            else []
+        )
+
+        _nova_first_message = not bool(_nova_messages)
+
+    except Exception:
+        _nova_first_message = False
+
+
+    # NOVA_CHAT_TURN_HANDLE_HELPER_SHADOW_20260705
         try:
             _nova_turn_payload = {
                 _key: _value
