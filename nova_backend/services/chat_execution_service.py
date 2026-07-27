@@ -258,15 +258,21 @@ class ChatExecutionService:
 
         if status == "complete":
             if goal:
-                return f"Execution complete: {goal}"
-            return "Execution complete."
-
+                return (
+                    "Done. I finished working on "
+                    + goal
+                    + " and checked the result."
+                )
+            return "Done. I finished the task and checked the result."
         if error:
             return error
 
         if current_step:
             step_number = min(current_index + 1, total) if total else current_index + 1
-            return f"Execution {status}. Step {step_number}/{total}: {current_step}"
+            return (
+                "I'm continuing with the next part.\n\n"
+                f"{current_step}"
+            )
 
         return f"Execution {status}."
 

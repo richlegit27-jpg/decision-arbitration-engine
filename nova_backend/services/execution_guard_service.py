@@ -95,17 +95,9 @@ class ExecutionGuardService:
             )
 
             reply = (
-                "Execution mission started: "
-                + goal
-                + "\n\n"
-                + "Step 1/3: "
-                + str(
-                    state.get("current_step")
-                    or steps[0]
-                )
-                + "\n\n"
-                + "Send k, next, continue, or run it to advance."
-            )
+                "I'll get started on that.\n\n"
+                "I'll keep track of the progress and let you know what I find."
+            )           
 
             return {
                 "ok": True,
@@ -177,8 +169,11 @@ class ExecutionGuardService:
                 session_id
             )
 
-            reply = self.chat_execution_service.format_reply(
+            reply = self.format_execution_response(
                 state
+            ).get(
+                "text",
+                "I'm continuing with the next part."
             )
 
             return {
@@ -257,6 +252,7 @@ class ExecutionGuardService:
         ).strip()
 
         steps = state.get("steps") or []
+
         current = str(
             state.get("current_step") or ""
         ).strip()
@@ -267,42 +263,37 @@ class ExecutionGuardService:
 
         if status in {"idle", "none", ""}:
             reply = error or (
-                "No active execution mission. "
-                "Start one with: auto-plan <goal>"
+                "I don't have an active task right now. "
+                "Tell me what you'd like to work on."
             )
 
         elif status in {"complete", "completed"}:
             reply = (
-                "Execution complete: "
+                "Done. I finished working on "
                 + goal
+                + "."
                 if goal
-                else "Execution complete."
+                else "Done. I finished the task."
             )
 
         elif status in {"failed", "error"}:
-            reply = error or "Execution failed."
+            reply = error or (
+                "I ran into a problem while working on this."
+            )
 
         else:
             total = len(steps)
-            step_num = min(
-                index + 1,
-                total
-            ) if total else 1
 
-        if not current and steps:
-            current = str(
-                steps[index]
-                if index < len(steps)
-                else steps[-1]
-            )
+            if not current and steps:
+                current = str(
+                    steps[index]
+                    if index < len(steps)
+                    else steps[-1]
+                )
 
             reply = (
-                "Execution waiting. Step "
-                + str(step_num)
-                + "/"
-                + str(total or "?")
-                + ": "
-                + (current or "Next step")
+                "I'm continuing with the next part.\n\n"
+                + (current or "Continuing the work.")
             )
 
         return {
@@ -323,5 +314,3 @@ class ExecutionGuardService:
             "skip_post_processing": True,
             "skip_rewrite": True,
         }
-
-        return None

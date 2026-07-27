@@ -52,16 +52,11 @@ class ExecutionStepService:
             )
 
             if approval.get("waiting"):
-                step["status"] = (
-                    "waiting_approval"
-                )
+                step["status"] = "waiting_approval"
                 step["result"] = ""
                 step["error"] = (
                     approval.get("reason")
-                    or (
-                        "Approval required "
-                        "before execution."
-                    )
+                    or "Approval required before execution."
                 )
                 return None
 
@@ -75,7 +70,13 @@ class ExecutionStepService:
                 step.get("target_file")
             ).strip()
 
-            if step_action == "implement" and target_file:
+            if step_action == "design":
+                step["result"] = (
+                    "Designed execution structure."
+                )
+                step["error"] = None
+
+            elif step_action == "implement" and target_file:
                 if (
                     self.python_runner is None
                     or not self.python_runner.is_path_allowed(
@@ -83,8 +84,7 @@ class ExecutionStepService:
                     )
                 ):
                     raise PermissionError(
-                        "Write blocked: target is outside "
-                        "Nova's execution sandbox."
+                        "Write blocked: target is outside Nova's execution sandbox."
                     )
 
                 content = self._implementation_content(
@@ -93,8 +93,7 @@ class ExecutionStepService:
 
                 if not content:
                     raise ValueError(
-                        "Implement step requires explicit "
-                        "file content."
+                        "Implement step requires explicit file content."
                     )
 
                 target_file = str(
@@ -140,12 +139,9 @@ class ExecutionStepService:
                 )
 
                 result = (
-                    f"STDOUT="
-                    f"{python_result.get('stdout')} | "
-                    f"STDERR="
-                    f"{python_result.get('stderr')} | "
-                    f"ERROR="
-                    f"{python_result.get('error')}"
+                    f"STDOUT={python_result.get('stdout')} | "
+                    f"STDERR={python_result.get('stderr')} | "
+                    f"ERROR={python_result.get('error')}"
                 )
 
                 step["result"] = result

@@ -17,7 +17,16 @@ class ExecutionBridgeService:
                 return None
 
             state = self.chat_execution_service.advance(session_id)
-            reply_text = self.chat_execution_service.format_reply(state)
+            reply_text = (
+                self._format_execution_response(
+                    state
+                )
+                if hasattr(
+                    self,
+                    "_format_execution_response"
+                )
+                else self.chat_execution_service.format_reply(state)
+            )
 
             return {
                 "ok": True,
@@ -84,13 +93,8 @@ class ExecutionBridgeService:
             )
 
             reply_text = (
-                "Execution mission started: "
-                + goal
-                + "\n\n"
-                + "Step 1/3: "
-                + str(current_step or "Understand the mission and identify the target files")
-                + "\n\n"
-                + "Send k, next, continue, or run it to advance."
+                "I'll get started on that.\n\n"
+                "I'll keep track of the progress and let you know what I find."
             )
 
             return {
@@ -160,15 +164,8 @@ class ExecutionBridgeService:
             )
 
             reply_text = (
-                "Mission started: "
-                + goal
-                + "\n\n"
-                + "Step 1/"
-                + str(len(steps))
-                + ": "
-                + str(state.get("current_step"))
-                + "\n\n"
-                + "Send k, next, continue, or run it to advance."
+                "I'll get started on that.\n\n"
+                "I'll keep track of the progress and let you know what I find."
             )
 
             return {
