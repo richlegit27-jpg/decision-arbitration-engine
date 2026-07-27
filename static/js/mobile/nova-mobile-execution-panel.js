@@ -136,7 +136,7 @@ No global page-wide search.
         const lastUpdate = getLastUpdate();
 
         if (statusEl) {
-            statusEl.textContent = message || "No active execution loaded.";
+            statusEl.textContent = message || "Ready for your next task.";
         }
 
         if (progressBar) {
@@ -164,7 +164,7 @@ No global page-wide search.
         }
 
         if (!execution) {
-            renderIdle("No active execution loaded. Start one with: auto-plan make a simple todo app");
+            renderIdle("No active task right now. Ask Nova to build, fix, or improve something.");
             return;
         }
 
@@ -208,8 +208,8 @@ No global page-wide search.
 
         [
             ["Status", status],
-            ["Goal", short(goal, 160)],
-            ["Step " + safeCurrent + "/" + safeTotal, short(currentStep, 220)]
+            ["Working on", short(goal, 160)],
+            ["Current focus", short(currentStep, 220)]
         ].forEach(function (row) {
             const line = document.createElement("div");
             line.className = "nova-mobile-execution-status-line";
@@ -232,7 +232,11 @@ No global page-wide search.
         }
 
         if (badge) {
-            badge.textContent = status;
+            badge.textContent =
+                status === "active" ? "Working" :
+                status === "complete" ? "Done" :
+                status;
+
             badge.dataset.status = status;
         }
 
@@ -502,7 +506,7 @@ No global page-wide search.
         patchNovaMobileState();
 
         if (getStatusEl()) {
-            renderIdle("No active execution loaded.");
+            renderIdle("Ready for your next task.");
         }
 
         console.log("[Nova Mobile Execution Panel Existing IDs] ready");

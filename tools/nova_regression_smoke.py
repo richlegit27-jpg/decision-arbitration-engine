@@ -113,7 +113,7 @@ def run():
     )
     assert_true(
         "execution_start",
-        "Execution mission started" in text_of(start),
+        "I'll get started on that" in text_of(start),
         text_of(start),
     )
 
@@ -121,8 +121,7 @@ def run():
     k_active = post_chat("k", exec_session)
     assert_true(
         "execution_k_active_advances",
-        "Step 2/3" in text_of(k_active)
-        or "Execution waiting" in text_of(k_active),
+        "I'm continuing with the next part" in text_of(k_active),
         text_of(k_active),
     )
 
