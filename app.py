@@ -895,7 +895,6 @@ if not app.secret_key:
     raise RuntimeError(
         "NOVA_SECRET_KEY is required"
     )
-
 # NOVA_SELF_IMPROVEMENT_REPORT_ROUTES_20260710
 try:
     register_improvement_routes(app)
@@ -6291,7 +6290,17 @@ try:
 
     @app.post("/api/admin/session-store/import-protected")
     def _npsr_import_protected_20260703():
-        expected = _npsr_os.environ.get("NOVA_SESSION_IMPORT_TOKEN", "richard-import-20260703")
+        expected = _npsr_os.environ.get(
+            "NOVA_SESSION_IMPORT_TOKEN"
+        )
+
+        if not expected:
+            return _npsr_jsonify(
+                {
+                    "ok": False,
+                    "error": "NOVA_SESSION_IMPORT_TOKEN is not configured."
+                }
+            ), 500
         provided = _npsr_request.headers.get("X-Nova-Import-Token", "")
 
         if provided != expected:
