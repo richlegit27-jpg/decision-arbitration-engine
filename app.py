@@ -940,7 +940,7 @@ def build_common_state_payload(session_id: str = "") -> dict:
 @app.get("/")
 def index():
     # NOVA_ROOT_PUBLIC_HOME_ALIGNMENT_20260709
-    return render_template("nova_landing_home.html")
+    return render_template("nova_landing.html")
 
 @app.get("/preview")
 def preview():
