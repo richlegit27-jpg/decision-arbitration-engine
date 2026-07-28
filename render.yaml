@@ -7,9 +7,18 @@
     envVars:
       - key: PYTHON_VERSION
         value: 3.13.13
+
       - key: FLASK_ENV
         value: production
+
       - key: NOVA_ENV
         value: production
+
       - key: OPENAI_API_KEY
+        sync: false
+
+      - key: NOVA_SECRET_KEY
+        sync: false
+
+      - key: NOVA_SESSION_IMPORT_TOKEN
         sync: false
