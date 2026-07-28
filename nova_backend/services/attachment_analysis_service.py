@@ -113,10 +113,20 @@ class AttachmentAnalysisService:
         if not path:
             return ""
 
-        text = self.read_attachment_text(
-            path
-        )
+            print(
+                "[ATTACHMENT DEBUG]",
+                {
+                    "attachment": attachment,
+                    "resolved_path": str(path) if path else None,
+                    "exists": bool(
+                        path and path.exists()
+                    ),
+                }
+            )
 
+            text = self.read_attachment_text(
+                path
+            )
         return str(text or "")[:limit].strip()
 
     def clean_extracted_attachment_text(

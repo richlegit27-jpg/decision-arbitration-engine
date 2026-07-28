@@ -125,9 +125,7 @@
 async function createNewChat() {
     console.log("[SESSION OWNER FINAL] disabled, backend creator owns New Chat");
     return;
-
-    try {
-        var response = await fetch("/api/sessions/new", {
+}
 
     function switchToSession(id) {
         if (!id) {

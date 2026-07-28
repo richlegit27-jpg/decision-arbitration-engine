@@ -2,6 +2,7 @@
     "use strict";
 
     if (window.__novaBridgeLoaded) return;
+
     window.__novaBridgeLoaded = true;
 
     const $ = (id) => document.getElementById(id);
@@ -9,8 +10,6 @@
     function hasCore() {
         return typeof window.Nova !== "undefined";
     }
-
-document.addEventListener("click", (e) => {
 
     setInterval(() => {
         try {
@@ -20,8 +19,14 @@ document.addEventListener("click", (e) => {
                     window.Nova.state.activeSessionId
                 );
             }
-        } catch {}
+        } catch (_) {}
     }, 2000);
+
+    document.addEventListener("click", () => {
+        if (!hasCore()) {
+            return;
+        }
+    });
 
     console.log("[Nova Bridge] dumb layer loaded");
 })();

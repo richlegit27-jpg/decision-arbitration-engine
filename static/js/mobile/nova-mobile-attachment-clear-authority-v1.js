@@ -386,6 +386,7 @@
             }
         }, true);
 
+    }
 
     window.NovaMobileAttachmentClearAuthorityV1 = {
         version: "NOVA_MOBILE_ATTACHMENT_CLEAR_AUTHORITY_V3_20260705",

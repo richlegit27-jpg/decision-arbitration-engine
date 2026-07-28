@@ -212,7 +212,7 @@ function NOVA_UI_ALLOWED() {
         });
     }
 
-function polish() {
+    function polish() {
     if (window.__NOVA_SESSION_PANEL_LOCK__ || window.__NOVA_POLISH_DISABLED__) return;
         cleanSummaryPanel();
         blurIfHiddenPanelHasFocus();
@@ -251,6 +251,8 @@ window.__novaMobileFinalPolishGuardObserver.observe(document.body, {
     attributeFilter: ["class", "style", "hidden", "aria-hidden"]
 });
 
+}
+
     function boot() {
         document.addEventListener("pointerdown", closeButtonBlurGuard, true);
         document.addEventListener("click", closeButtonBlurGuard, true);
@@ -258,9 +260,12 @@ window.__novaMobileFinalPolishGuardObserver.observe(document.body, {
         if (NOVA_UI_ALLOWED()) polish();
         installObserver();
 
-        window.clearInterval(window.__novaMobileFinalPolishGuardTimer);
-        window.__novaMobileFinalPolishGuardTimer = window.// disabled to prevent UI re-lock conflicts
-// setInterval(polish, 1500);
+window.clearInterval(
+    window.__novaMobileFinalPolishGuardTimer
+);
+
+// disabled to prevent UI re-lock conflicts
+window.__novaMobileFinalPolishGuardTimer = null;
 
         console.log("[" + FIX_ID + "] ready");
     }
@@ -666,7 +671,8 @@ if (window.__NOVA_SESSION_PANEL_LOCK__ || window.__NOVA_POLISH_DISABLED__) {
     setTimeout(shellCenterSessionsPanelV3, 1000);
     setTimeout(shellCenterSessionsPanelV3, 2500);
 
-    console.log("[NOVA_MOBILE_SESSIONS_PANEL_SHELL_CENTER_V3_20260624] ready");
+console.log("[NOVA_MOBILE_SESSIONS_PANEL_SHELL_CENTER_V3_20260624] ready");
+})();
 
 (function () {
     const TARGET_ID = "nova-mobile-sessions-panel";

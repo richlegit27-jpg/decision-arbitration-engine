@@ -26,6 +26,9 @@ class SessionSlimResponseService:
             if path != "/api/sessions":
                 return response
 
+            if request.args.get("full") == "1":
+                return response
+
             try:
                 payload = response.get_json(
                     silent=True
