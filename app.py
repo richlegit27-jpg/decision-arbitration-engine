@@ -1382,14 +1382,6 @@ def _nova_mobile_now_iso():
     except Exception:
         return ""
 
-
-
-
-
-
-
-
-
 def api_chat():
     from flask import session as flask_session
     # NOVA_API_CHAT_IMAGE_VISION_GATE_20260607
@@ -1507,83 +1499,35 @@ def api_chat():
                     + " raw_url=" + str(_nova_raw_url)
                     + " candidates=" + " | ".join(str(c) for c in _nova_candidates)
                 )
+
                 _nova_vision_used = False
+
             else:
                 try:
-                    from nova_backend.services.model_gateway_service import (
-                        chat_completions_create as _nova_chat_completions_create,
+                    _nova_vision_result = image_vision_service.handle(
+                        image_item=_nova_image_item,
+                        user_text=_nova_user_text,
                     )
 
-                    _nova_mime_type = _nova_mimetypes.guess_type(str(_nova_image_path))[0] or "image/jpeg"
+                    _nova_text = str(
+                        _nova_vision_result.get("text") or ""
+                    ).strip()
 
-                    with open(_nova_image_path, "rb") as _nova_file:
-                        _nova_encoded = _nova_base64.b64encode(_nova_file.read()).decode("utf-8")
-
-                    _nova_data_url = "data:" + _nova_mime_type + ";base64," + _nova_encoded
-
-
-                    _nova_response = _nova_chat_completions_create(
-                        nova_username=(
-                            getattr(
-                                getattr(g, "nova_auth_user", None),
-                                "username",
-                                None,
-                            )
-                            or (
-                                getattr(g, "nova_auth_user", None) or {}
-                            ).get("username")
-                            or _nova_os.getenv("NOVA_DEFAULT_USERNAME")
-                            or "richard"
-                        ),
-                        nova_session_id=str(
-                            locals().get("session_id")
-                            or locals().get("requested_session_id")
-                            or ""
-                        ),
-                        model=_nova_os.getenv("NOVA_VISION_MODEL", "gpt-4o-mini"),
-                        messages=[
-                            {
-                                "role": "system",
-                                "content": (
-                                    "You are Nova's image analysis module. "
-                                    "Describe the attached image directly. "
-                                    "Do not use web search. "
-                                    "Do not mention unrelated news. "
-                                    "If something cannot be identified, describe what is visible."
-                                ),
-                            },
-                            {
-                                "role": "user",
-                                "content": [
-                                    {
-                                        "type": "text",
-                                        "text": _nova_user_text or "What is this image?",
-                                    },
-                                    {
-                                        "type": "image_url",
-                                        "image_url": {
-                                            "url": _nova_data_url,
-                                        },
-                                    },
-                                ],
-                            },
-                        ],
-                        temperature=0.2,
-                        max_tokens=500,
+                    _nova_vision_used = bool(
+                        _nova_vision_result.get("vision_used")
                     )
-
-                    _nova_text = str(_nova_response.choices[0].message.content or "").strip()
-
-                    if not _nova_text:
-                        _nova_text = "VISION_DEBUG: OpenAI vision returned empty text."
-                        _nova_vision_used = False
-                    else:
-                        _nova_vision_used = True
 
                 except Exception as _nova_exc:
-                    _nova_text = "VISION_DEBUG: OpenAI vision failed: " + str(_nova_exc)
-                    _nova_vision_used = False
+                    import traceback
 
+                    _nova_text = (
+                        "VISION_DEBUG: vision service failed: "
+                        + str(_nova_exc)
+                        + "\nTRACEBACK:\n"
+                        + traceback.format_exc()
+                    )
+
+                    _nova_vision_used = False
             return jsonify({
                 "ok": True,
                 "active_session_id": _nova_session_id,
