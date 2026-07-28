@@ -142,14 +142,34 @@ async function openSession(sessionId) {
 
       const session = data.session || data;
 
-      if (session && Array.isArray(session.messages)) {
-        if (typeof window.renderDesktopChatMessages === "function") {
-          window.renderDesktopChatMessages(session.messages);
-        } else if (
-          typeof window.renderDesktopChatMessagesRescue === "function"
+      if (session) {
+
+        if (
+          Array.isArray(session.messages) &&
+          session.messages.length > 0
         ) {
-          window.renderDesktopChatMessagesRescue(session.messages);
+          if (typeof window.renderDesktopChatMessages === "function") {
+            window.renderDesktopChatMessages(session.messages);
+          } else if (
+            typeof window.renderDesktopChatMessagesRescue === "function"
+          ) {
+            window.renderDesktopChatMessagesRescue(session.messages);
+          }
         }
+
+if (
+  Array.isArray(session.messages) &&
+  session.messages.length === 0
+) {
+  setTimeout(function () {
+    if (
+      typeof window.renderDesktopOnboarding === "function"
+    ) {
+      window.renderDesktopOnboarding(session);
+    }
+  }, 100);
+}
+
       }
     }
 
@@ -295,12 +315,16 @@ const response = await fetch("/api/sessions/delete", {
   })
 });
 
+id="k7h8ma"
 if (!response.ok) {
   console.warn("delete failed", await response.text());
   return;
 }
 
 await loadDesktopSessionsExternal();
+    };
+  });
+}
 
 async function newSessionExternal() {
 
@@ -319,9 +343,9 @@ async function newSessionExternal() {
       data.session_id ||
       (data.session && data.session.id);
 
-    if (sid) {
-      setSessionId(sid);
-    }
+if (sid) {
+    setSessionId(sid);
+}
 
     window.NOVA_FORCE_NEW_SESSION_ON_NEXT_SEND = false;
     window.NOVA_PENDING_NEW_SESSION_ID = "";
@@ -331,11 +355,15 @@ async function newSessionExternal() {
       window.renderDesktopChatMessagesRescue([]);
     }
 
-    await loadDesktopSessionsExternal();
+await loadDesktopSessionsExternal();
 
-    window.setStatus?.("new session ready");
+if (sid) {
+    await openSession(sid);
+}
 
-    console.log("[Nova Desktop Sessions External] new session", sid);
+window.setStatus?.("new session ready");
+
+console.log("[Nova Desktop Sessions External] new session", sid);
 
   } catch (error) {
     console.warn("[Nova Desktop Sessions External] new session failed", error);

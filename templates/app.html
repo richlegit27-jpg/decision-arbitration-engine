@@ -2670,6 +2670,7 @@ function dedupeNovaMessages(messages) {
 function renderDesktopChatMessagesRescue(messages) {
 
     if (window.__NOVA_RESCUE_RENDER_LOCK__) return false;
+
     window.__NOVA_RESCUE_RENDER_LOCK__ = true;
 
     setTimeout(() => {
@@ -2677,6 +2678,7 @@ function renderDesktopChatMessagesRescue(messages) {
     }, 150);
 
     var box = getDesktopMessagesContainerRescue();
+
     if (!box) return false;
 
     messages = dedupeNovaMessages(messages);
@@ -2684,46 +2686,103 @@ function renderDesktopChatMessagesRescue(messages) {
     box.innerHTML = "";
 
     if (!messages || !messages.length) {
-        box.innerHTML = "<div class='message assistant'>No messages yet.</div>";
+
+        var session =
+            window.NovaCurrentSessionManager &&
+            window.NovaCurrentSessionManager.currentSession;
+
+        if (
+            session &&
+            session.meta &&
+            session.meta.onboarding &&
+            typeof window.renderDesktopOnboarding === "function"
+        ) {
+            window.renderDesktopOnboarding(session);
+            return true;
+        }
+
+        box.innerHTML = `
+            <div class="message assistant">
+                <strong>Welcome to Nova.</strong><br><br>
+                I'm your AI workspace. I can help you answer questions, plan projects, analyze files, work with files, and create things.
+            </div>
+        `;
+
         return true;
     }
 
     messages.forEach(function (msg, index) {
 
         var role = String(msg.role || "assistant");
-        var text = msg.content || msg.text || msg.message || "";
+
+        var text =
+            msg.content ||
+            msg.text ||
+            msg.message ||
+            "";
 
         text = String(text || "");
 
-        if (!String(text || "").trim() && !msg.image_url && !msg.image) {
+        if (
+            !String(text || "").trim() &&
+            !msg.image_url &&
+            !msg.image
+        ) {
             return;
         }
 
         var row = document.createElement("div");
-        row.className = "message " + (role.includes("user") ? "user" : "assistant");
+
+        row.className =
+            "message " +
+            (
+                role.includes("user")
+                    ? "user"
+                    : "assistant"
+            );
 
         row.setAttribute(
             "data-message-id",
-            msg.id || msg.message_id || "rescue_" + index
+            msg.id ||
+            msg.message_id ||
+            "rescue_" + index
         );
 
-        const bubble = document.createElement("div");
+        const bubble =
+            document.createElement("div");
+
         bubble.className = "bubble";
 
-        if (typeof renderMessageWithCodeBlocks === "function" && role.indexOf("user") === -1) {
-            renderMessageWithCodeBlocks(bubble, String(text));
+        if (
+            typeof renderMessageWithCodeBlocks === "function" &&
+            role.indexOf("user") === -1
+        ) {
+            renderMessageWithCodeBlocks(
+                bubble,
+                String(text)
+            );
         } else {
-            bubble.textContent = String(text);
+            bubble.textContent =
+                String(text);
         }
 
         row.appendChild(bubble);
 
         if (!role.includes("user")) {
-            var existingCards = row.querySelector(".nova-source-cards");
+
+            var existingCards =
+                row.querySelector(
+                    ".nova-source-cards"
+                );
 
             if (!existingCards) {
-                var cards = novaDesktopRescueSourceCards_20260611(msg);
-                if (cards) row.appendChild(cards);
+
+                var cards =
+                    novaDesktopRescueSourceCards_20260611(msg);
+
+                if (cards) {
+                    row.appendChild(cards);
+                }
             }
         }
 
@@ -4469,10 +4528,24 @@ if (
   return existingCount;
 }
 
-    if (!messages.length) {
-      box.innerHTML = '<div class="session-placeholder">No messages in this session.</div>';
-      return 0;
-    }
+if (!messages.length) {
+
+  if (
+    session &&
+    session.meta &&
+    session.meta.onboarding &&
+    typeof window.renderDesktopOnboarding === "function"
+  ) {
+    window.renderDesktopOnboarding(session);
+    return 0;
+  }
+
+  box.innerHTML =
+    '<div class="session-placeholder">No messages in this session.</div>';
+
+  return 0;
+}
+
 box.innerHTML = "";
 
 messages.forEach(function (message) {
@@ -4653,31 +4726,64 @@ try {
   }
 
 function renderSession(session) {
-  if (!session || !Array.isArray(session.messages)) return;
+    if (!session || !Array.isArray(session.messages)) return false;
 
-  console.log("[Nova RenderSession] rendering", session.id);
+    console.log(
+        "[Nova RenderSession] rendering",
+        session.id
+    );
 
-  try {
-    // PRIMARY renderer FIRST
-    if (typeof window.renderDesktopChatMessages === "function") {
-      window.renderDesktopChatMessages(session.messages);
-      return;
+    if (
+        session.messages.length === 0 &&
+        session.meta &&
+        session.meta.onboarding &&
+        typeof window.renderDesktopOnboarding === "function"
+    ) {
+        console.log(
+            "[Nova RenderSession] onboarding owns empty session"
+        );
+
+        window.renderDesktopOnboarding(session);
+        return true;
     }
-  } catch (err) {
-    console.warn("[Nova RenderSession] primary render failed", err);
-  }
 
-  try {
-    // RESCUE renderer ONLY if primary fails
-    if (typeof window.renderDesktopChatMessagesRescue === "function") {
-      window.renderDesktopChatMessagesRescue(session.messages);
-      return;
+    try {
+        if (
+            typeof window.renderDesktopChatMessages === "function"
+        ) {
+            window.renderDesktopChatMessages(
+                session.messages
+            );
+            return true;
+        }
+    } catch (err) {
+        console.warn(
+            "[Nova RenderSession] primary render failed",
+            err
+        );
     }
-  } catch (err) {
-    console.warn("[Nova RenderSession] rescue render failed", err);
-  }
 
-  console.warn("[Nova RenderSession] all renderers failed");
+    try {
+        if (
+            typeof window.renderDesktopChatMessagesRescue === "function"
+        ) {
+            window.renderDesktopChatMessagesRescue(
+                session.messages
+            );
+            return true;
+        }
+    } catch (err) {
+        console.warn(
+            "[Nova RenderSession] rescue render failed",
+            err
+        );
+    }
+
+    console.warn(
+        "[Nova RenderSession] all renderers failed"
+    );
+
+    return false;
 }
 
 function startSSE() {
@@ -4748,15 +4854,34 @@ if (response.status === 404 && data && data.active_session_id && data.active_ses
       return null;
     }
 
-    var session = normalizeSessionPayload(data);
-    if (session) {
-      session.id = session.id || session.session_id || sessionId;
-      storeSessionId(session.id);
-      ensureManager(session);
-      renderSession(session);
-      log("hydrated session", session.id, "messages:", Array.isArray(session.messages) ? session.messages.length : 0);
+var session = normalizeSessionPayload(data);
+
+if (session) {
+    session.id = session.id || session.session_id || sessionId;
+
+    storeSessionId(session.id);
+
+    ensureManager(session);
+
+     if (
+        Array.isArray(session.messages) &&
+        session.messages.length === 0 &&
+        session.meta &&
+        session.meta.onboarding &&
+        typeof window.renderDesktopOnboarding === "function"
+    ) {
+        window.renderDesktopOnboarding(session);
+    } else {
+        renderSession(session);
     }
 
+      log(
+        "hydrated session",
+        session.id,
+        "messages:",
+        Array.isArray(session.messages) ? session.messages.length : 0
+      );
+    }
     return session;
   }
 
@@ -6074,8 +6199,12 @@ console.log("[Nova Force New Chat] cleared chat");
     console.log("[Nova Left Artifacts] final controller ready");
 })();
 </script>
+
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
 <script src="/static/js/nova-desktop-sessions.js?v=session-open-fix-20260621-1"></script>
+
+<script src="/static/js/nova-chat-stream.js"></script>
 
 <script>
 (function () {
@@ -10349,7 +10478,17 @@ pre code {
 
         storeActiveSessionId(session.id || sid);
 
-        var rendered = renderMessagesDirectly(session);
+var rendered = renderMessagesDirectly(session);
+
+if (
+    Array.isArray(session.messages) &&
+    session.messages.length === 0 &&
+    session.meta &&
+    session.meta.onboarding &&
+    typeof window.renderDesktopOnboarding === "function"
+) {
+    window.renderDesktopOnboarding(session);
+}
 
         try {
             if (typeof window.loadDesktopSessions === "function") {

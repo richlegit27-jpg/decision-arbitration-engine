@@ -171,14 +171,21 @@
       };
     }
 
-    return {
-      id: safeString(session.id, uid("session")),
-      title: safeString(session.title, "New chat"),
-      created_at: safeString(session.created_at, nowIso()),
-      updated_at: safeString(session.updated_at || session.created_at, nowIso()),
-      pinned: !!session.pinned,
-      messages: safeArray(session.messages).map(normalizeMessage),
-    };
+return {
+  id: safeString(session.id, uid("session")),
+  title: safeString(session.title, "New chat"),
+  created_at: safeString(session.created_at, nowIso()),
+  updated_at: safeString(
+    session.updated_at || session.created_at,
+    nowIso()
+  ),
+  pinned: !!session.pinned,
+  messages: safeArray(session.messages).map(normalizeMessage),
+  meta:
+    session.meta && typeof session.meta === "object"
+      ? session.meta
+      : {},
+};
   }
 
   function renderInline(text) {
@@ -555,6 +562,98 @@
     els.modelSelect.value = getActiveModel();
   }
 
+function renderDesktopOnboarding(session) {
+
+  if (!session || !session.meta || !session.meta.onboarding) {
+    return;
+  }
+  const root = els.messagesRoot;
+
+  if (!root) {
+    return;
+  }
+
+  const onboarding =
+    session.meta.onboarding;
+
+  root.innerHTML = `
+    <div class="nova-onboarding-welcome">
+      ${escapeHtml(
+        onboarding.welcome_message || ""
+      )}
+    </div>
+    <div class="nova-onboarding-actions">
+      ${
+        safeArray(onboarding.actions)
+          .map(function (action) {
+            return `
+              <button
+                type="button"
+                class="nova-onboarding-button"
+                data-onboarding-prompt="${escapeHtml(
+                  action.prompt || action.label || ""
+                )}"
+              >
+                ${escapeHtml(
+                  action.label || "Start"
+                )}
+              </button>
+            `;
+          })
+          .join("")
+      }
+    </div>
+  `;
+
+root.querySelectorAll(
+  ".nova-onboarding-button"
+).forEach(function (button) {
+  button.onclick = function () {
+
+    const input =
+      document.querySelector(
+        "#input"
+      ) ||
+      document.querySelector(
+        "textarea"
+      );
+
+    if (!input) {
+      return;
+    }
+
+    input.value =
+      button.dataset.onboardingPrompt || "";
+
+    input.dispatchEvent(
+      new Event("input", {
+        bubbles: true
+      })
+    );
+
+    input.focus();
+
+    if (
+      typeof window.sendMessage === "function"
+    ) {
+      window.sendMessage();
+      return;
+    }
+
+    input.dispatchEvent(
+      new KeyboardEvent(
+        "keydown",
+        {
+          key: "Enter",
+          code: "Enter",
+          bubbles: true
+        }
+      )
+    );
+  };
+});
+}
+
   async function openSession(sessionId) {
     if (!sessionId) return;
 
@@ -568,10 +667,16 @@
       state.sessions.unshift(session);
     }
 
-    state.activeSessionId = session.id;
-    state.messages = safeArray(session.messages);
-    renderSessions();
-    renderMessages();
+state.activeSessionId = session.id;
+state.messages = safeArray(session.messages);
+
+renderSessions();
+
+if (state.messages.length === 0) {
+  renderDesktopOnboarding(session);
+} else {
+  renderMessages();
+}
   }
 
   function pushUserMessage(text) {
@@ -733,10 +838,12 @@
 
   function exposeApi() {
     Nova.chatStream.sendCurrentMessage = sendCurrentMessage;
-    Nova.chatStream.loadState = loadState;
-    Nova.chatStream.openSession = openSession;
+Nova.chatStream.loadState = loadState;
+Nova.chatStream.openSession = openSession;
 
-    Nova.chat.sendCurrentMessage = sendCurrentMessage;
+window.renderDesktopOnboarding = renderDesktopOnboarding;
+
+Nova.chat.sendCurrentMessage = sendCurrentMessage;
     Nova.chat.loadState = loadState;
     Nova.chat.openSession = openSession;
   }
