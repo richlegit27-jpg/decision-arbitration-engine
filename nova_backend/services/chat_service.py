@@ -2330,7 +2330,7 @@ Rules:
         self.uploads_dir = Path(
             os.getenv(
                 "UPLOADS_DIR",
-                r"C:\Users\Owner\nova\uploads",
+                Path(__file__).resolve().parents[2] / "uploads",
             )
         )
 
