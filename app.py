@@ -1406,6 +1406,10 @@ def api_chat():
         _nova_user_text = _nova_chat_context["user_text"]
         _nova_session_id = _nova_chat_context["session_id"]
         _nova_attachments = _nova_chat_context["attachments"]
+        print(
+            "[NOVA ATTACHMENT DEBUG]",
+            _nova_attachments,
+        )
 
         # ?? IMAGE FASTPATH SAFETY GUARD
         if str(_nova_user_text or "").strip().lower().startswith("/image"):
@@ -1449,6 +1453,36 @@ def api_chat():
                 if not isinstance(_nova_item, dict):
                     continue
 
+                _nova_item_type = str(
+                    _nova_item.get("type")
+                    or _nova_item.get("mime_type")
+                    or ""
+                ).lower()
+
+                _nova_item_url = str(
+                    _nova_item.get("url")
+                    or _nova_item.get("file_url")
+                    or ""
+                ).lower()
+
+                if (
+                    _nova_item_type.startswith("image")
+                    or any(
+                        _nova_item_url.endswith(ext)
+                        for ext in (
+                            ".png",
+                            ".jpg",
+                            ".jpeg",
+                            ".webp",
+                            ".gif",
+                        )
+                    )
+                ):
+                    _nova_image = _nova_item
+                    _nova_image_item = _nova_item
+                    break
+
+        _nova_image_item = _nova_image
         if _nova_image:
             _nova_raw_url = str(
                 _nova_image.get("url")

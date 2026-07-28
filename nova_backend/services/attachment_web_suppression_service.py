@@ -1,13 +1,4 @@
 
-
-
-
-
-
-
-
-
-
 # NOVA_CHAT_SERVICE_ATTACHMENT_WEB_SUPPRESSION_COMPAT_20260705
 def _nova_attachment_guard_payload_from_call(*args, **kwargs):
     payload = {}
