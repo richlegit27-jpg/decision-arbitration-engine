@@ -888,9 +888,14 @@ local_auth_route_service = LocalAuthRouteService(
 local_auth_route_service.install_routes()
 
 app.secret_key = os.environ.get(
-    "NOVA_SECRET_KEY",
-    "nova-local-development-secret-key-change-me"
+    "NOVA_SECRET_KEY"
 )
+
+if not app.secret_key:
+    raise RuntimeError(
+        "NOVA_SECRET_KEY is required"
+    )
+
 # NOVA_SELF_IMPROVEMENT_REPORT_ROUTES_20260710
 try:
     register_improvement_routes(app)
