@@ -1,0 +1,870 @@
+* {
+    box-sizing: border-box;
+}
+
+
+body {
+
+    margin: 0;
+
+    min-height: 100vh;
+
+    font-family:
+        Inter,
+        Arial,
+        sans-serif;
+
+    background:
+        radial-gradient(
+            circle at top,
+            #1f3b35,
+            #090b12 65%
+        );
+
+    color: white;
+
+}
+
+
+.nova-shell {
+
+    min-height: 100vh;
+
+    display: flex;
+
+    flex-direction: column;
+
+}
+
+
+.nova-header {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    padding:
+        28px 8%;
+
+}
+
+
+.nova-logo {
+
+    font-size:
+        32px;
+
+    font-weight:
+        900;
+
+    letter-spacing:
+        8px;
+
+}
+
+
+.nova-status {
+
+    display: flex;
+
+    align-items: center;
+
+    gap:
+        10px;
+
+    opacity:
+        0.85;
+
+}
+
+
+.status-dot {
+
+    width:
+        10px;
+
+    height:
+        10px;
+
+    background:
+        #4ade80;
+
+    border-radius:
+        50%;
+
+}
+
+
+.nova-main {
+
+    flex:
+        1;
+
+    padding:
+        40px 8%;
+
+}
+
+
+.nova-main::before {
+
+    content:
+        "";
+
+    position:
+        fixed;
+
+    top:
+        0;
+
+    left:
+        0;
+
+    width:
+        100%;
+
+    height:
+        100%;
+
+    pointer-events:
+        none;
+
+    background:
+        linear-gradient(
+            120deg,
+            transparent 0%,
+            rgba(
+                74,
+                222,
+                128,
+                0.08
+            )
+            50%,
+            transparent 100%
+        );
+
+    animation:
+        novaPulse 8s infinite;
+
+}
+
+
+@keyframes novaPulse {
+
+    0% {
+
+        opacity:
+            0.3;
+
+    }
+
+
+    50% {
+
+        opacity:
+            0.8;
+
+    }
+
+
+    100% {
+
+        opacity:
+            0.3;
+
+    }
+
+}
+
+
+.hero {
+
+    max-width:
+        850px;
+
+}
+
+
+.hero h1 {
+
+    font-size:
+        clamp(
+            42px,
+            6vw,
+            76px
+        );
+
+    line-height:
+        1.05;
+
+}
+
+
+.hero p {
+
+    font-size:
+        22px;
+
+    opacity:
+        0.8;
+
+}
+
+
+.hero-actions {
+
+    margin-top:
+        40px;
+
+    display:
+        flex;
+
+    gap:
+        18px;
+
+}
+
+
+.nova-button {
+
+    padding:
+        16px 30px;
+
+    border-radius:
+        14px;
+
+    text-decoration:
+        none;
+
+    font-weight:
+        800;
+
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+
+}
+
+
+.nova-button:hover {
+
+    transform:
+        translateY(-3px);
+
+}
+
+
+.primary {
+
+    background:
+        white;
+
+    color:
+        #111;
+
+    box-shadow:
+        0 0 35px rgba(
+            74,
+            222,
+            128,
+            0.25
+        );
+
+}
+
+
+.secondary {
+
+    border:
+        1px solid rgba(
+            255,
+            255,
+            255,
+            0.3
+        );
+
+    color:
+        white;
+
+}
+
+
+.capabilities {
+
+    margin-top:
+        80px;
+
+    display:
+        grid;
+
+    grid-template-columns:
+        repeat(
+            auto-fit,
+            minmax(
+                220px,
+                1fr
+            )
+        );
+
+    gap:
+        20px;
+
+}
+
+
+.cap-card {
+
+    padding:
+        28px;
+
+    border-radius:
+        20px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.08
+        );
+
+    backdrop-filter:
+        blur(15px);
+
+    border:
+        1px solid rgba(
+            255,
+            255,
+            255,
+            0.12
+        );
+
+    transition:
+
+        transform 0.25s ease,
+
+        border-color 0.25s ease,
+
+        background 0.25s ease;
+
+}
+
+
+.cap-card:hover {
+
+    transform:
+        translateY(-6px);
+
+    border-color:
+        rgba(
+            74,
+            222,
+            128,
+            0.5
+        );
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.12
+        );
+
+}
+
+
+footer {
+
+    padding:
+        30px 8%;
+
+    opacity:
+        0.5;
+
+}
+
+
+@media (
+    max-width: 700px
+) {
+
+    .nova-header {
+
+        padding:
+            22px;
+
+    }
+
+
+    .nova-main {
+
+        padding:
+            30px 22px;
+
+    }
+
+
+    .hero-actions {
+
+        flex-direction:
+            column;
+
+    }
+
+
+    .nova-button {
+
+        text-align:
+            center;
+
+    }
+
+}
+
+.telemetry {
+
+    margin-top:
+        70px;
+
+}
+
+
+.telemetry h2 {
+
+    font-size:
+        32px;
+
+}
+
+
+.telemetry-grid {
+
+    display:
+        grid;
+
+    grid-template-columns:
+        repeat(
+            auto-fit,
+            minmax(
+                180px,
+                1fr
+            )
+        );
+
+    gap:
+        18px;
+
+}
+
+
+.telemetry-card {
+
+    padding:
+        24px;
+
+    border-radius:
+        18px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.08
+        );
+
+    border:
+        1px solid rgba(
+            255,
+            255,
+            255,
+            0.15
+        );
+
+}
+
+
+.telemetry-card strong {
+
+    display:
+        block;
+
+    margin-top:
+        12px;
+
+    font-size:
+        36px;
+
+    color:
+        #4ade80;
+
+}
+
+.architecture {
+
+    margin-top:
+        90px;
+
+}
+
+
+
+.architecture h2 {
+
+    font-size:
+        32px;
+
+}
+
+
+
+.architecture-grid {
+
+    display:
+        grid;
+
+    grid-template-columns:
+        repeat(
+            auto-fit,
+            minmax(
+                220px,
+                1fr
+            )
+        );
+
+    gap:
+        20px;
+
+}
+
+
+
+.architecture-node {
+
+    position:
+        relative;
+
+    padding:
+        28px;
+
+
+    border-radius:
+        22px;
+
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.07
+        );
+
+
+    border:
+        1px solid rgba(
+            255,
+            255,
+            255,
+            0.12
+        );
+
+
+    overflow:
+        hidden;
+
+}
+
+
+
+.node-dot {
+
+    display:
+        block;
+
+
+    width:
+        12px;
+
+
+    height:
+        12px;
+
+
+    border-radius:
+        50%;
+
+
+    background:
+        #4ade80;
+
+
+    margin-bottom:
+        18px;
+
+
+    box-shadow:
+        0 0 20px
+        rgba(
+            74,
+            222,
+            128,
+            0.8
+        );
+
+
+    animation:
+        nodePulse 3s infinite;
+
+}
+
+
+
+@keyframes nodePulse {
+
+
+    0% {
+
+        opacity:
+            0.5;
+
+    }
+
+
+    50% {
+
+        opacity:
+            1;
+
+    }
+
+
+    100% {
+
+        opacity:
+            0.5;
+
+    }
+
+
+}
+
+
+.nova-shell {
+
+    animation:
+        novaEnter 0.8s ease-out;
+
+}
+
+
+
+@keyframes novaEnter {
+
+    from {
+
+        opacity:
+            0;
+
+        transform:
+            translateY(12px);
+
+    }
+
+
+    to {
+
+        opacity:
+            1;
+
+        transform:
+            translateY(0);
+
+    }
+
+}
+
+
+
+
+.hero {
+
+    animation:
+        heroReveal 1s ease-out;
+
+}
+
+
+
+@keyframes heroReveal {
+
+    from {
+
+        opacity:
+            0;
+
+        transform:
+            translateY(20px);
+
+    }
+
+
+    to {
+
+        opacity:
+            1;
+
+        transform:
+            translateY(0);
+
+    }
+
+}
+
+
+
+
+.identity-card,
+.cap-card,
+.telemetry-card,
+.architecture-node {
+
+    transition:
+        transform 0.25s ease,
+        box-shadow 0.25s ease,
+        border-color 0.25s ease;
+
+}
+
+
+
+.identity-card:hover,
+.cap-card:hover,
+.telemetry-card:hover,
+.architecture-node:hover {
+
+    transform:
+        translateY(-8px);
+
+
+    box-shadow:
+        0 18px 45px
+        rgba(
+            0,
+            0,
+            0,
+            0.25
+        );
+
+}
+
+
+
+
+.hero .nova-button {
+
+    position:
+        relative;
+
+    overflow:
+        hidden;
+
+}
+
+
+
+.hero .nova-button::after {
+
+    content:
+        "";
+
+    position:
+        absolute;
+
+    inset:
+        0;
+
+    background:
+        linear-gradient(
+            120deg,
+            transparent,
+            rgba(
+                255,
+                255,
+                255,
+                0.25
+            ),
+            transparent
+        );
+
+
+    transform:
+        translateX(-120%);
+
+
+    transition:
+        transform 0.5s ease;
+
+}
+
+
+
+.hero .nova-button:hover::after {
+
+    transform:
+        translateX(120%);
+
+}
+
+
+
+
+@media (
+    max-width: 700px
+) {
+
+
+    .hero h1 {
+
+        font-size:
+            42px;
+
+    }
+
+
+
+    .hero p {
+
+        font-size:
+            18px;
+
+    }
+
+
+
+    .identity h2,
+    .architecture h2,
+    .telemetry h2 {
+
+        font-size:
+            28px;
+
+    }
+
+
+
+    .identity-card,
+    .cap-card,
+    .telemetry-card,
+    .architecture-node {
+
+        padding:
+            22px;
+
+    }
+
+
+}
