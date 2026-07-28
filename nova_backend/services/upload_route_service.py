@@ -59,6 +59,7 @@ class UploadRouteService:
             "original_filename": original_name,
             "file_url": f"/api/uploads/{final_name}",
             "url": f"/api/uploads/{final_name}",
+            "path": str(save_path),
             "mime_type": mime_type,
             "size": size,
         }
