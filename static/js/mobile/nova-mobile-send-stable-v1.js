@@ -669,6 +669,43 @@ var reply =
             reply,
             assistantMessage
         );
+
+        try {
+            fetch("/api/mobile/session/persist", {
+                method: "POST",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    session_id: sid,
+                    user_text: text,
+                    assistant_text: reply
+                })
+            })
+            .then(function (response) {
+                return response.json();
+            })
+            .then(function (data) {
+                console.log(
+                    "[NOVA MOBILE SESSION PERSIST]",
+                    data
+                );
+            })
+            .catch(function (err) {
+                console.warn(
+                    "[NOVA MOBILE SESSION PERSIST FAILED]",
+                    err
+                );
+            });
+
+        } catch (err) {
+            console.warn(
+                "[NOVA MOBILE SESSION PERSIST ERROR]",
+                err
+            );
+        }
+
         forceLatestMessageVisible();
 
 try {
