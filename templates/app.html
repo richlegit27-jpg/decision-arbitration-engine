@@ -586,17 +586,21 @@
       color: var(--text);
       border-color: rgba(167,139,250,.65);
     }
-@media (max-width: 1100px) {
+
+@media (max-width: 1100px) and (min-width: 761px) {
   .shell {
-    grid-template-columns: 260px minmax(0, 1fr) 320px;
+    grid-template-columns:
+      minmax(220px, 260px)
+      minmax(300px, 1fr)
+      minmax(220px, 320px);
   }
 
   .tools {
     display: flex !important;
   }
 }
-
-    @media (max-width: 760px) {
+    
+    @media (max-width: 760px) and (pointer: coarse) {
       html,
       body {
         overflow: auto;
@@ -1091,7 +1095,53 @@ observer.observe(document.documentElement, {
       <div class="brand">
         <div class="brand-row">
           <h1 class="brand-title">Nova</h1>
-          <span class="pill"><span class="dot"></span> local</span>
+
+<div class="nova-menu-wrap">
+
+  <button
+    id="novaMenuBtn"
+    class="nova-menu-button"
+    type="button"
+    aria-label="Open Nova menu"
+  >
+    ☰
+  </button>
+
+<div
+  id="novaMenuPanel"
+  class="nova-menu-panel"
+  hidden
+>
+  <button
+    type="button"
+    onclick="window.location.href='/account'"
+  >
+    Account
+  </button>
+
+  <button
+    type="button"
+    id="novaSettingsBtn"
+  >
+    Settings
+  </button>
+
+  <button
+    type="button"
+    onclick="window.location.href='/help'"
+  >
+    Help
+  </button>
+
+  <button
+    type="button"
+    id="novaAboutBtn"
+  >
+    About Nova
+  </button>
+</div>
+
+</div>
         </div>
         <p class="brand-copy">Desktop workspace for streaming chat, session memory, summaries, and execution.</p>
       </div>
@@ -1125,7 +1175,7 @@ observer.observe(document.documentElement, {
 
 <div class="side-footer-links">
   <a href="/">Home</a>
-  <a href="/mobile">Mobile</a>
+  <a href="/help">Help</a>
 <button class="footer-mini-button" id="openArtifactsBtn" type="button">Artifacts</button>
 </div>
     </aside>
@@ -1137,7 +1187,7 @@ observer.observe(document.documentElement, {
           <div id="status">Ready</div>
           <div id="meta">No summary yet.</div>
         </div>
-        <span class="pill"><span class="dot"></span> ready</span>
+
       </header>
 
       <section id="chat" class="messages chat-messages desktop-rescue-messages" data-messages="true">
@@ -1239,19 +1289,18 @@ observer.observe(document.documentElement, {
 
       <section class="tools-section compact-system">
         <h3>System</h3>
+
         <div class="metric">
           <span>Backend</span>
-          <strong>shared</strong>
+          <strong>online</strong>
         </div>
+
         <div class="metric">
           <span>Desktop</span>
-          <strong>/app</strong>
-        </div>
-        <div class="metric">
-          <span>Mobile</span>
-          <strong>separate</strong>
+          <strong>active</strong>
         </div>
       </section>
+
     </aside>
   </div>
 
@@ -4857,6 +4906,7 @@ if (response.status === 404 && data && data.active_session_id && data.active_ses
 var session = normalizeSessionPayload(data);
 
 if (session) {
+window.__NOVA_ACTIVE_SESSION = session;
     session.id = session.id || session.session_id || sessionId;
 
     storeSessionId(session.id);
@@ -7030,8 +7080,26 @@ main {
     return !text && messageCount === 0;
   }
 
-  function renderSessionMessages(messages) {
+function renderSessionMessages(messages) {
     messages = Array.isArray(messages) ? messages : [];
+
+    if (
+        messages.length === 0 &&
+        window.__NOVA_ACTIVE_SESSION &&
+        window.__NOVA_ACTIVE_SESSION.meta &&
+        window.__NOVA_ACTIVE_SESSION.meta.onboarding &&
+        typeof window.renderDesktopOnboarding === "function"
+    ) {
+        console.log(
+            "[Nova Session Open Final] onboarding preserved"
+        );
+
+        window.renderDesktopOnboarding(
+            window.__NOVA_ACTIVE_SESSION
+        );
+
+        return true;
+    }
 
     window.__NOVA_RENDER_LOCK_GLOBAL = false;
     window.__NOVA_RESCUE_RENDER_LOCK__ = false;
@@ -9237,6 +9305,8 @@ body {
     } else {
         enforceMemoryOnlyStable();
     }
+
+
 
     document.addEventListener("click", function (event) {
         const tools = document.querySelector(".panel.tools") || document.querySelector(".tools");
@@ -11876,6 +11946,7 @@ if (
         input.focus();
     }
 
+
     function start() {
         document.querySelectorAll("#nova-desktop-execution-native [data-exec-fill]").forEach(button => {
             button.addEventListener("click", () => {
@@ -11891,11 +11962,233 @@ if (
     } else {
         start();
     }
+
+const novaSettingsClose =
+    document.getElementById(
+        "novaSettingsClose"
+    );
+
+
+if (novaSettingsClose) {
+
+    novaSettingsClose.onclick = function () {
+
+        const modal =
+            document.getElementById(
+                "novaSettingsModal"
+            );
+
+        if (modal) {
+
+            modal.setAttribute(
+                "hidden",
+                ""
+            );
+
+        }
+
+    };
+
+}
+
+const novaAboutClose =
+    document.getElementById(
+        "novaAboutClose"
+    );
+
+
 })();
 </script>
 
+<script>
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
+
+        console.log(
+            "[Nova Menu Controller] loaded"
+        );
 
 
+        const novaMenuBtn =
+            document.getElementById(
+                "novaMenuBtn"
+            );
+
+        const novaMenuPanel =
+            document.getElementById(
+                "novaMenuPanel"
+            );
+
+
+        const novaSettingsBtn =
+            document.getElementById(
+                "novaSettingsBtn"
+            );
+
+        const novaAboutBtn =
+            document.getElementById(
+                "novaAboutBtn"
+            );
+
+
+        if (novaMenuBtn) {
+
+            novaMenuBtn.onclick = function (event) {
+
+                event.stopPropagation();
+
+                console.log(
+                    "[Nova Menu] PANEL TOGGLE"
+                );
+
+                if (novaMenuPanel) {
+
+                    novaMenuPanel.hidden =
+                        !novaMenuPanel.hidden;
+
+                }
+
+            };
+
+        }
+
+
+        if (novaSettingsBtn) {
+
+            novaSettingsBtn.onclick = function () {
+
+                console.log(
+                    "[Nova Menu] Settings OPEN"
+                );
+
+                const modal =
+                    document.getElementById(
+                        "novaSettingsModal"
+                    );
+
+                if (modal) {
+
+                    modal.removeAttribute(
+                        "hidden"
+                    );
+
+                }
+
+            };
+
+        }
+
+
+        if (novaAboutBtn) {
+
+            novaAboutBtn.onclick = function () {
+
+                console.log(
+                    "[Nova Menu] About OPEN"
+                );
+
+                const modal =
+                    document.getElementById(
+                        "novaAboutModal"
+                    );
+
+                if (modal) {
+
+                    modal.removeAttribute(
+                        "hidden"
+                    );
+
+                }
+
+            };
+
+        }
+
+
+        document.addEventListener(
+            "click",
+            function (event) {
+
+                if (!novaMenuPanel) {
+                    return;
+                }
+
+
+                if (
+                    event.target.closest(
+                        "#novaMenuBtn"
+                    )
+                ) {
+                    return;
+                }
+
+
+                if (
+                    novaMenuPanel.contains(
+                        event.target
+                    )
+                ) {
+                    return;
+                }
+
+
+                novaMenuPanel.hidden = true;
+
+            }
+        );
+
+
+        const novaSettingsClose =
+            document.getElementById(
+                "novaSettingsClose"
+            );
+
+
+        if (novaSettingsClose) {
+
+            novaSettingsClose.onclick = function () {
+
+                document
+                    .getElementById(
+                        "novaSettingsModal"
+                    )
+                    .setAttribute(
+                        "hidden",
+                        ""
+                    );
+
+            };
+
+        }
+
+
+        if (novaAboutClose) {
+
+            novaAboutClose.onclick = function () {
+
+                console.log(
+                    "[Nova Menu] About CLOSE"
+                );
+
+                document
+                    .getElementById(
+                        "novaAboutModal"
+                    )
+                    .setAttribute(
+                        "hidden",
+                        ""
+                    );
+
+            };
+
+        }
+
+
+    }
+);
+</script>
+</script>
 <style id="nova-desktop-execution-native-panel-lock-20260702">
 /* NOVA_DESKTOP_EXECUTION_NATIVE_PANEL_LOCK_20260702
    Make native Execution behave like a real card inside the right tools panel.
@@ -12051,29 +12344,202 @@ aside.panel.tools > #nova-desktop-execution-native,
 
 
 <style id="nova-desktop-execution-native-bottom-tools-20260702">
-/* NOVA_DESKTOP_EXECUTION_NATIVE_BOTTOM_TOOLS_20260702
-   Keep Execution native inside the tools rail, but place it at the bottom.
-*/
-aside.panel.tools {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
+
+#nova-desktop-execution-native {
+    order: 0 !important;
+    margin: 0 !important;
+    flex: 0 0 auto !important;
 }
 
-aside.panel.tools > #nova-desktop-execution-native,
-#nova-desktop-execution-native {
-    order: 9999 !important;
-    margin-top: auto !important;
-    margin-bottom: 0 !important;
-    flex: 0 0 auto !important;
-    align-self: stretch !important;
-    position: static !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-}
 </style>
+
+<style id="nova-menu-modal-style-20260728">
+
+.nova-modal {
+    position: fixed !important;
+    inset: 0 !important;
+    display: flex;
+    align-items: center !important;
+    justify-content: center !important;
+    background: rgba(0,0,0,.55) !important;
+    z-index: 999999 !important;
+}
+
+.nova-modal[hidden] {
+    display: none !important;
+}
+
+
+.nova-modal-card {
+    position: relative !important;
+    width: 420px !important;
+    max-width: 90vw !important;
+    padding: 24px !important;
+    border-radius: 18px !important;
+    background: #0f172a !important;
+    color: #e5e7eb !important;
+    border: 1px solid rgba(255,255,255,.15) !important;
+}
+
+
+.nova-modal-close {
+    position: absolute !important;
+    top: 10px !important;
+    right: 12px !important;
+    z-index: 1000000 !important;
+    cursor: pointer !important;
+}
+
+
+.nova-setting-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    padding: 10px 0 !important;
+}
+
+</style>
+
+<!-- NOVA_MENU_MODALS_20260728 -->
+
+<div
+  id="novaSettingsModal"
+  class="nova-modal"
+  hidden
+>
+  <div class="nova-modal-card">
+
+    <button
+      id="novaSettingsClose"
+      class="nova-modal-close"
+      type="button"
+    >
+      ✕
+    </button>
+
+
+    <h2>
+      Nova Settings
+    </h2>
+
+
+    <div class="nova-setting-row">
+      <span>
+        Theme
+      </span>
+
+      <button type="button">
+        Dark
+      </button>
+    </div>
+
+
+    <div class="nova-setting-row">
+      <span>
+        Memory
+      </span>
+
+      <button type="button">
+        Enabled
+      </button>
+    </div>
+
+
+    <div class="nova-setting-row">
+      <span>
+        Voice
+      </span>
+
+      <button type="button">
+        Disabled
+      </button>
+    </div>
+
+
+    <div class="nova-setting-row">
+      <span>
+        Account
+      </span>
+
+      <span>
+        Developer
+      </span>
+    </div>
+
+
+  </div>
+</div>
+
+<div
+  id="novaAboutModal"
+  class="nova-modal"
+  hidden
+>
+  <div class="nova-modal-card">
+
+    <button
+      id="novaAboutClose"
+      class="nova-modal-close"
+      type="button"
+    >
+      ✕
+    </button>
+
+    <h2>About Nova</h2>
+
+    <p>
+      Nova is an AI workspace designed for:
+    </p>
+
+    <ul>
+      <li>Conversation</li>
+      <li>Project planning</li>
+      <li>File analysis</li>
+      <li>Memory</li>
+      <li>Execution workflows</li>
+    </ul>
+
+    <p>
+      Nova Desktop Workspace
+    </p>
+
+  </div>
+</div>
+
+<style id="NOVA_SIDEBAR_MENU_LAYOUT_FIX_20260728">
+
+aside.panel.sidebar {
+    min-height: 100vh !important;
+    height: 100% !important;
+    align-self: stretch !important;
+    overflow-y: auto !important;
+    flex: 1 1 auto !important;
+}
+
+
+.brand {
+    flex: 0 0 auto !important;
+}
+
+
+.brand-row {
+    position: relative !important;
+}
+
+
+.nova-menu-wrap {
+    position: relative !important;
+}
+
+
+.nova-menu-panel {
+    position: absolute !important;
+    top: 45px !important;
+    right: 0 !important;
+    z-index: 99999 !important;
+}
+
+</style>
+
 
 </body>
 </html>
-
