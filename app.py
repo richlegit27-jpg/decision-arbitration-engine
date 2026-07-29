@@ -1125,6 +1125,14 @@ def api_state():
         current_file=current_file,
         last_user_message=last_user_message,
         last_assistant_message=last_assistant_message,
+        models=[
+            "nova-fast",
+            "nova-smart",
+            "nova-vision",
+            "nova-coding",
+        ],
+        default_model="nova-fast",
+        selected_model="nova-fast",
         artifacts=artifact_service.build_list_payload(),
         memory=memory_service.build_list_payload(),
     )
