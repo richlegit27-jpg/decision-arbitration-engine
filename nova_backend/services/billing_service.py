@@ -210,13 +210,30 @@ def set_subscription(
         }
     )
 
+    plan = str(
+        plan or "free"
+    ).strip().lower()
+
+    plan_credits = {
+        "free": 1000,
+        "standard": 10000,
+        "pro": 50000,
+    }
+
+    monthly_credits = plan_credits.get(
+        plan,
+        1000,
+    )
+
     account["subscription_id"] = str(
         subscription_id or ""
     ).strip()
 
-    account["plan"] = str(
-        plan or "free"
-    ).strip()
+    account["plan"] = plan
+
+    account["monthly_credits"] = monthly_credits
+
+    account["credits"] = monthly_credits
 
     _save(data)
 
