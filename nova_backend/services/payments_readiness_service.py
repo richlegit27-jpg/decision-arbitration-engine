@@ -115,9 +115,14 @@ def _usage_enforcement_status() -> Dict[str, Any]:
     )
 
     chat_usage_enforced = (
-        "responses_create(" in chat_text
-        and "chat_completions_create(" in chat_text
-        and "self.client.responses.create(" not in chat_text
+        (
+            "responses_create(" in chat_text
+            or "chat_completions_create(" in chat_text
+        )
+        and (
+            "model_gateway_service" in chat_text
+            or "from nova_backend.services.model_gateway_service import" in chat_text
+        )
     )
 
     hosted_web_usage_enforced = (
@@ -133,10 +138,15 @@ def _usage_enforcement_status() -> Dict[str, Any]:
     )
 
     app_vision_usage_enforced = (
-        "_nova_response = _nova_chat_completions_create("
-        in app_text
-        and "_nova_client.chat.completions.create("
-        not in app_text
+        (
+            "image_vision_service" in app_text
+            or "handle(" in image_vision_text
+        )
+        and (
+            "chat_completions_create(" in image_vision_text
+            or "responses_create(" in image_vision_text
+        )
+        and "client.chat.completions.create(" not in image_vision_text
     )
 
     duplicate_finalize_billing = (
