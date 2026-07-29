@@ -4,6 +4,11 @@ class BlogRouteService:
         self.blog_service = blog_service
 
     def install_routes(self, app):
+
+        print(
+            "[BLOG ROUTES] INSTALLED"
+        )
+
         from flask import render_template, jsonify, request
 
         @app.route("/help")
