@@ -517,6 +517,18 @@ Close Account
 
 
 <div id="nova-mobile-composer" class="mobile-composer nova-mobile-composer" data-mobile-composer="true">
+
+<div id="nova-mobile-model-selector" class="nova-mobile-model-selector">
+    <label for="nova-mobile-model">Model</label>
+
+    <select id="nova-mobile-model">
+        <option value="nova-fast">Nova Fast</option>
+        <option value="nova-smart">Nova Smart</option>
+        <option value="nova-vision">Nova Vision</option>
+        <option value="nova-coding">Nova Coding</option>
+    </select>
+</div>
+
         <textarea
             id="nova-mobile-input"
             rows="1"
@@ -2839,6 +2851,28 @@ The final owner is NOVA_MOBILE_SCROLL_COMPOSER_GEOMETRY_FINAL_20260624.
     body.nova-mobile-generating #nova-mobile-stop-generation {
         display: inline-flex !important;
     }
+
+.nova-mobile-model-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    font-size: 11px;
+}
+
+.nova-mobile-model-selector label {
+    opacity: 0.7;
+    font-weight: 700;
+}
+
+#nova-mobile-model {
+    border-radius: 10px;
+    padding: 4px 8px;
+    background: rgba(15,23,42,.85);
+    color: white;
+    border: 1px solid rgba(255,255,255,.15);
+}
+
 </style>
 
 <script>
