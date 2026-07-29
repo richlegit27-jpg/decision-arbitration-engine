@@ -731,7 +731,7 @@ if (state.messages.length === 0) {
     return {
       session_id: state.activeSessionId,
       content: text,
-      model: getActiveModel(),
+      model: els.modelSelect ? els.modelSelect.value : state.defaultModel,
       attachments: safeArray(state.pendingAttachments),
     };
   }
