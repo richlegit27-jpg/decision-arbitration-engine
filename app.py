@@ -6759,21 +6759,21 @@ try:
                         )
                     )
 
+                price_id = ""
+
+                if getattr(
+                    session,
+                    "metadata",
+                    None,
+                ):
+                    price_id = str(
+                        session.metadata.get(
+                            "nova_price_id",
+                            "",
+                        )
+                    ).strip()
+
                 if username:
-                    price_id = ""
-
-                    if getattr(
-                        session,
-                        "metadata",
-                        None,
-                    ):
-                        price_id = str(
-                            session.metadata.get(
-                                "nova_price_id",
-                                "",
-                            )
-                        ).strip()
-
                     set_subscription(
                         username=username,
                         subscription_id=getattr(
@@ -6785,6 +6785,88 @@ try:
                             price_id,
                         ),
                     )
+
+                return _nova_payments_json_20260709({
+                    "ok": True,
+                    "received": True,
+                    "processed": True,
+                    "status": "checkout_completed",
+                    "username": username,
+                })
+
+
+            elif event_type == "customer.subscription.updated":
+                subscription = event.data.object
+
+                username = getattr(
+                    subscription,
+                    "metadata",
+                    {},
+                ).get(
+                    "nova_username",
+                    "",
+                )
+
+                price_id = getattr(
+                    subscription,
+                    "metadata",
+                    {},
+                ).get(
+                    "nova_price_id",
+                    "",
+                )
+
+                if username:
+                    set_subscription(
+                        username=username,
+                        subscription_id=getattr(
+                            subscription,
+                            "id",
+                            "",
+                        ),
+                        plan=plan_from_price_id(
+                            price_id,
+                        ),
+                    )
+
+                return _nova_payments_json_20260709({
+                    "ok": True,
+                    "received": True,
+                    "processed": True,
+                    "status": "subscription_updated",
+                    "username": username,
+                })
+
+
+            elif event_type == "customer.subscription.deleted":
+                from nova_backend.services.billing_service import (
+                    cancel_subscription,
+                )
+
+                subscription = event.data.object
+
+                username = getattr(
+                    subscription,
+                    "metadata",
+                    {},
+                ).get(
+                    "nova_username",
+                    "",
+                )
+
+                if username:
+                    cancel_subscription(
+                        username,
+                    )
+
+                return _nova_payments_json_20260709({
+                    "ok": True,
+                    "received": True,
+                    "processed": True,
+                    "status": "subscription_deleted",
+                    "username": username,
+                })
+
 
                 return _nova_payments_json_20260709({
                     "ok": True,

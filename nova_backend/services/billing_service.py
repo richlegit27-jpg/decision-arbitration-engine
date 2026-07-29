@@ -240,6 +240,34 @@ def set_subscription(
 
     return account
 
+def cancel_subscription(
+    username,
+):
+    data = _load()
+
+    username = str(
+        username or ""
+    ).strip().lower()
+
+    account = data["users"].setdefault(
+        username,
+        {
+            **DEFAULT_USER,
+            "created_at": _now(),
+        }
+    )
+
+    account["subscription_id"] = ""
+
+    account["plan"] = "free"
+
+    account["monthly_credits"] = 1000
+
+    account["credits"] = 1000
+
+    _save(data)
+
+    return account
 
 def plan_from_price_id(
     price_id,
