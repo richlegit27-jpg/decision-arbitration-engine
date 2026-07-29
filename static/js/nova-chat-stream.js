@@ -545,23 +545,43 @@ return {
     renderMessages();
   }
 
-  function renderModels() {
+function renderModels() {
     if (!els.modelSelect) return;
 
-    const models = state.models.length ? state.models : [getActiveModel()];
+    const models = [
+        {
+            value: "nova-fast",
+            label: "Nova Fast"
+        },
+        {
+            value: "nova-smart",
+            label: "Nova Smart"
+        },
+        {
+            value: "nova-vision",
+            label: "Nova Vision"
+        },
+        {
+            value: "nova-coding",
+            label: "Nova Coding"
+        }
+    ];
+
     els.modelSelect.innerHTML = "";
 
     models.forEach((model) => {
-      const option = document.createElement("option");
-      option.value = model;
-      option.textContent = model;
-      if (model === getActiveModel()) option.selected = true;
-      els.modelSelect.appendChild(option);
+        const option = document.createElement("option");
+
+        option.value = model.value;
+        option.textContent = model.label;
+
+        if (model.value === getActiveModel()) {
+            option.selected = true;
+        }
+
+        els.modelSelect.appendChild(option);
     });
-
-    els.modelSelect.value = getActiveModel();
-  }
-
+}
 function renderDesktopOnboarding(session) {
 
   if (!session || !session.meta || !session.meta.onboarding) {
