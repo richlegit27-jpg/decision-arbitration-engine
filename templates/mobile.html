@@ -1306,6 +1306,66 @@ if (/menu|tools|drawer|panel|more/i.test(String(el.id || "") + " " + String(el.c
         }
     }
 
+async function deleteMobileMemory(item) {
+    const id = String(
+        item.id ||
+        item.memory_id ||
+        item.uuid ||
+        item.key ||
+        ""
+    ).trim();
+
+    if (!id) {
+        console.warn(
+            "[" + FIX_ID + "] memory has no id",
+            item
+        );
+        return;
+    }
+
+    if (!confirm("Delete this memory?")) {
+        return;
+    }
+
+    try {
+        const response = await fetch(
+            "/api/memory/delete",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-api-key": getApiKey()
+                },
+                body: JSON.stringify({
+                    memory_id: id
+                })
+            }
+        );
+
+        const payload = await response.json();
+
+        console.log(
+            "[" + FIX_ID + "] delete result",
+            payload
+        );
+
+        if (!response.ok || payload.ok === false) {
+            throw new Error(
+                payload.error ||
+                "Delete failed"
+            );
+        }
+
+        loadMemory();
+
+    } catch (error) {
+        console.warn(
+            "[" + FIX_ID + "] delete failed",
+            error
+        );
+    }
+}
+
     function renderMemories(payload) {
         const overlay = ensureOverlay();
         const body = overlay.querySelector("#novaMobileMemoryV2Body");
@@ -1349,11 +1409,31 @@ if (/menu|tools|drawer|panel|more/i.test(String(el.id || "") + " " + String(el.c
                 text.className = "nova-mobile-memory-v2-text";
                 text.textContent = item.text || item.content || item.value || item.summary || "";
 
-                meta.appendChild(kind);
-                meta.appendChild(date);
-                card.appendChild(meta);
-                card.appendChild(text);
-                body.appendChild(card);
+const actions = document.createElement("div");
+actions.className = "nova-mobile-memory-v2-actions";
+
+const deleteButton = document.createElement("button");
+deleteButton.type = "button";
+deleteButton.textContent = "Delete";
+deleteButton.className = "nova-mobile-memory-delete";
+
+deleteButton.addEventListener(
+    "click",
+    function () {
+        deleteMobileMemory(item);
+    }
+);
+
+actions.appendChild(deleteButton);
+
+meta.appendChild(kind);
+meta.appendChild(date);
+
+card.appendChild(meta);
+card.appendChild(text);
+card.appendChild(actions);
+
+body.appendChild(card);
             });
     }
 
@@ -1509,6 +1589,23 @@ if (/menu|tools|drawer|panel|more/i.test(String(el.id || "") + " " + String(el.c
     font-size: 10.5px !important;
     line-height: 1.25 !important;
     font-weight: 800 !important;
+}
+
+.nova-mobile-memory-v2-actions {
+    display: flex !important;
+    justify-content: flex-end !important;
+    margin-top: 10px !important;
+}
+
+.nova-mobile-memory-delete {
+    border: 1px solid rgba(248,113,113,0.35) !important;
+    background: rgba(127,29,29,0.35) !important;
+    color: #fecaca !important;
+    border-radius: 12px !important;
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    cursor: pointer !important;
 }
 
 @media (max-width: 420px) {
