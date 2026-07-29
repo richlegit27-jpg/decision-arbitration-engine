@@ -9,11 +9,12 @@ const state = {
   messagesByChatId: {},
   attachedFiles: [],
   models: [
-    { value: "nova-default", label: "Nova Default" },
     { value: "nova-fast", label: "Nova Fast" },
-    { value: "nova-precise", label: "Nova Precise" }
+    { value: "nova-smart", label: "Nova Smart" },
+    { value: "nova-vision", label: "Nova Vision" },
+    { value: "nova-coding", label: "Nova Coding" }
   ],
-  selectedModel: "nova-default",
+  selectedModel: "nova-fast",
   isLoadingChat: false
 };
 
