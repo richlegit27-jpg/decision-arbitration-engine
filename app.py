@@ -700,6 +700,10 @@ ensure_dir(UPLOADS_DIR)
 app.config["UPLOAD_FOLDER"] = str(UPLOADS_DIR)
 
 memory_route_service.install_routes(app)
+blog_route_service.install_routes(
+    app
+)
+
 
 session_route_service.install_routes(
     app,

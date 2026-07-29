@@ -1,509 +1,280 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="utf-8">
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1"
-    >
+    <meta charset="UTF-8">
 
-    <title>Nova Blog | Project continuity, context, and AI work</title>
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
 
-    <meta
-        name="description"
-        content="Ideas and updates from Nova about project continuity, useful memory, files, planning, and long-running AI work."
-    >
+    <title>
+        Nova Updates
+    </title>
 
-    <link
-        rel="stylesheet"
-        href="/static/css/nova-blog.css?v=blog-route-family-endgame-20260711"
-    >
 
-    <link
-        rel="icon"
-        href="/static/favicon.svg"
-        type="image/svg+xml"
-    >
+    <style>
 
-    <link
-        rel="manifest"
-        href="/static/site.webmanifest"
-    >
+        body {
 
-    <meta
-        name="theme-color"
-        content="#8b5cf6"
-    >
+            margin: 0;
+            padding: 40px;
 
-    <meta
-        property="og:site_name"
-        content="Nova"
-    >
+            background:
+                radial-gradient(
+                    circle at top,
+                    #1e293b,
+                    #020617
+                );
 
-    <meta
-        property="og:type"
-        content="website"
-    >
+            color: #e5e7eb;
 
-    <meta
-        property="og:title"
-        content="Nova Blog"
-    >
+            font-family:
+                Inter,
+                Arial,
+                sans-serif;
 
-    <meta
-        property="og:description"
-        content="Ideas about project continuity, context, and long-running AI work."
-    >
+        }
 
-    <meta
-        property="og:url"
-        content="{{ request.url_root.rstrip('/') }}/blog"
-    >
 
-    <meta
-        property="og:image"
-        content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg"
-    >
+        .nova-blog-shell {
 
-    <meta
-        name="twitter:card"
-        content="summary_large_image"
-    >
+            max-width: 1000px;
+            margin: auto;
 
-    <meta
-        name="twitter:title"
-        content="Nova Blog"
-    >
+        }
 
-    <meta
-        name="twitter:description"
-        content="Ideas about project continuity, context, and long-running AI work."
-    >
 
-    <meta
-        name="twitter:image"
-        content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg"
-    >
+        .header {
 
-    <link
-        rel="canonical"
-        href="{{ request.url_root.rstrip('/') }}/blog"
-    >
+            margin-bottom: 35px;
+
+        }
+
+
+        h1 {
+
+            font-size: 42px;
+            color: #22c55e;
+
+        }
+
+
+        .subtitle {
+
+            color: #94a3b8;
+
+        }
+
+
+        .post-grid {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(
+                    auto-fit,
+                    minmax(
+                        280px,
+                        1fr
+                    )
+                );
+
+            gap: 20px;
+
+        }
+
+
+        .post {
+
+            background:
+                rgba(
+                    15,
+                    23,
+                    42,
+                    .85
+                );
+
+            border:
+                1px solid
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .12
+                );
+
+            border-radius: 18px;
+
+            padding: 24px;
+
+        }
+
+
+        .post h2 {
+
+            margin-top: 0;
+
+            color:
+                #f8fafc;
+
+        }
+
+
+        .date {
+
+            font-size: 13px;
+
+            color:
+                #64748b;
+
+        }
+
+
+        .empty {
+
+            padding: 30px;
+
+            background:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .05
+                );
+
+            border-radius: 18px;
+
+        }
+
+
+    </style>
+
 </head>
 
+
 <body>
-    <main class="nova-blog-shell">
-        <nav
-            class="nova-blog-nav"
-            aria-label="Nova blog navigation"
-        >
-            <a
-                class="nova-blog-brand"
-                href="/"
-                aria-label="Nova home"
-            >
-                <span>N</span>
-
-                <div>
-                    <strong>Nova</strong>
-                    <em>Blog</em>
-                </div>
-            </a>
 
 
-            <div class="nova-blog-actions">
-                <a href="/">Home</a>
-                <a href="/about">About</a>
-                <a href="/features">Features</a>
-                <a href="/roadmap">Roadmap</a>
-                <a href="/faq">FAQ</a>
-                <a href="/billing">Billing</a>
-
-                <a
-                    href="/contact#nova-contact-form-title"
-                >
-                    Request Access
-                </a>
-            </div>
-        </nav>
+<div class="nova-blog-shell">
 
 
-        <section class="nova-blog-hero">
-            <p class="nova-blog-kicker">
-                Nova Blog
-            </p>
+<div class="header">
 
-            <h1>
-                Ideas for work that lasts longer than one chat.
-            </h1>
+<h1>
+Nova Updates
+</h1>
 
-            <span>
-                Notes and thinking about project continuity, useful memory,
-                working context, files, planning, and the problem of keeping
-                long-running AI work connected.
-            </span>
-        </section>
+<p class="subtitle">
+Product updates, engineering notes, and Nova milestones.
+</p>
+
+</div>
 
 
-        <section class="nova-blog-intro">
-            <div>
-                <p>
-                    The working thread
-                </p>
+<div
+    id="posts"
+    class="post-grid"
+>
 
-                <h2>
-                    Context matters when it helps the project move.
-                </h2>
-
-                <span>
-                    Nova is being shaped around projects that accumulate decisions,
-                    files, history, changing priorities, and unfinished work.
-                    The Blog is where the ideas behind that direction can be explored.
-                </span>
-            </div>
+</div>
 
 
-            <div class="nova-blog-thread">
-                <div>
-                    <strong>Remember</strong>
-                    <span>Protect the durable project details.</span>
-                </div>
-
-                <div>
-                    <strong>Understand</strong>
-                    <span>Keep the current project state visible.</span>
-                </div>
-
-                <div>
-                    <strong>Move</strong>
-                    <span>Use context to improve the next action.</span>
-                </div>
-            </div>
-        </section>
+</div>
 
 
-        <section
-            class="nova-blog-post-section"
-            aria-labelledby="nova-blog-post-title"
-        >
-            <div class="nova-blog-section-head">
-                <p>
-                    Latest writing
-                </p>
 
-                <h2 id="nova-blog-post-title">
-                    Notes from the Nova project.
-                </h2>
+<script>
 
-                <span>
-                    Published posts appear here from Nova's Blog system.
-                </span>
-            </div>
+async function loadPosts() {
 
 
-            <div
-                id="nova-blog-posts"
-                class="nova-blog-posts"
-                aria-live="polite"
-            >
-                <div class="nova-blog-empty">
-                    Loading posts.
-                </div>
-            </div>
-        </section>
+    const container =
+        document.getElementById(
+            "posts"
+        );
 
 
-        <section class="nova-blog-cta">
-            <div>
-                <p>
-                    Keep the thread
-                </p>
-
-                <h2>
-                    Working on a project that keeps scattering itself?
-                </h2>
-
-                <span>
-                    Request access and tell us where the context
-                    usually disappears.
-                </span>
-            </div>
+    try {
 
 
-            <a
-                href="/contact#nova-contact-form-title"
-            >
-                Request Access
-            </a>
-        </section>
-
-
-        <footer class="nova-blog-footer">
-            <span>
-                Nova Blog ? Ideas about long-running AI work
-            </span>
-
-            <div>
-                <a href="/">Home</a>
-                <a href="/about">About</a>
-                <a href="/features">Features</a>
-                <a href="/roadmap">Roadmap</a>
-                <a href="/faq">FAQ</a>
-                <a href="/contact">Contact</a>
-                <a href="/billing">Billing</a>
-                <a href="/privacy">Privacy</a>
-                <a href="/terms">Terms</a>
-            </div>
-        </footer>
-    </main>
-
-
-    <script>
-        (function () {
-            "use strict";
-
-
-            const root = document.getElementById(
-                "nova-blog-posts"
+        const response =
+            await fetch(
+                "/api/blog/posts"
             );
 
 
-            function escapeHtml(
-                value
-            ) {
-
-                return String(
-                    value
-                    ||
-                    ""
-                ).replace(
-                    /[&<>"']/g,
-                    function (
-                        character
-                    ) {
-
-                        return {
-                            "&": "&amp;",
-                            "<": "&lt;",
-                            ">": "&gt;",
-                            '"': "&quot;",
-                            "'": "&#039;"
-                        }[
-                            character
-                        ];
-                    }
-                );
-            }
+        const data =
+            await response.json();
 
 
-            function formatDate(
-                value
-            ) {
+        if (
+            !data.ok ||
+            !data.posts.length
+        ) {
 
-                if (!value) {
+            container.innerHTML =
+                `
+                <div class="empty">
+                    No Nova updates yet.
+                </div>
+                `;
 
-                    return "Nova";
-                }
+            return;
 
-
-                try {
-
-                    return new Date(
-                        value
-                    ).toLocaleDateString(
-                        undefined,
-                        {
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric"
-                        }
-                    );
-
-                } catch (
-                    error
-                ) {
-
-                    return String(
-                        value
-                    );
-                }
-            }
+        }
 
 
-            function postMarkup(
-                post
-            ) {
+        container.innerHTML =
+            data.posts.map(
+                post =>
+                `
 
-                const tags = Array.isArray(
-                    post.tags
-                )
-                    ?
-                    post.tags
-                    :
-                    [];
+                <article class="post">
 
-
-                const tagMarkup = tags.map(
-                    function (
-                        tag
-                    ) {
-
-                        return (
-                            '<span class="nova-blog-tag">'
-                            +
-                            escapeHtml(
-                                tag
-                            )
-                            +
-                            "</span>"
-                        );
-                    }
-                ).join(
-                    ""
-                );
+                    <h2>
+                        ${post.title}
+                    </h2>
 
 
-                return [
-                    '<a class="nova-blog-post" href="/blog/'
-                    +
-                    encodeURIComponent(
-                        post.slug
-                        ||
-                        ""
-                    )
-                    +
-                    '">',
-
-                    '    <div class="nova-blog-post-meta">',
-
-                    "        <time>",
-                    escapeHtml(
-                        formatDate(
-                            post.created_at
-                            ||
-                            post.updated_at
-                        )
-                    ),
-                    "        </time>",
-
-                    '        <div class="nova-blog-tags">',
-                    tagMarkup,
-                    "        </div>",
-
-                    "    </div>",
-
-                    "    <h3>",
-                    escapeHtml(
-                        post.title
-                        ||
-                        "Untitled post"
-                    ),
-                    "    </h3>",
-
-                    "    <p>",
-                    escapeHtml(
-                        post.excerpt
-                        ||
-                        ""
-                    ),
-                    "    </p>",
-
-                    "    <strong>",
-                    "Read post",
-                    "    </strong>",
-
-                    "</a>"
-                ].join(
-                    "\n"
-                );
-            }
+                    <div class="date">
+                        ${post.created_at || ""}
+                    </div>
 
 
-            async function loadPosts() {
+                    <p>
+                        ${post.excerpt || post.body}
+                    </p>
 
-                if (!root) {
+                </article>
 
-                    return;
-                }
-
-
-                try {
-
-                    const response = await fetch(
-                        "/api/blog/posts",
-                        {
-                            method: "GET",
-                            headers: {
-                                "Accept": "application/json"
-                            }
-                        }
-                    );
+                `
+            ).join("");
 
 
-                    const data = await response.json();
+    }
+    catch(error) {
 
 
-                    if (
-                        !response.ok
-                        ||
-                        !data
-                        ||
-                        data.ok === false
-                    ) {
+        container.innerHTML =
+            `
+            <div class="empty">
+                Unable to load updates.
+            </div>
+            `;
 
-                        throw new Error(
-                            "Posts could not be loaded."
-                        );
-                    }
+    }
 
 
-                    const posts = Array.isArray(
-                        data.posts
-                    )
-                        ?
-                        data.posts
-                        :
-                        [];
+}
 
 
-                    if (!posts.length) {
-
-                        root.innerHTML = [
-                            '<div class="nova-blog-empty">',
-                            "No public posts have been published yet.",
-                            "</div>"
-                        ].join(
-                            ""
-                        );
-
-                        return;
-                    }
+loadPosts();
 
 
-                    root.innerHTML = posts.map(
-                        postMarkup
-                    ).join(
-                        ""
-                    );
-
-                } catch (
-                    error
-                ) {
-
-                    root.innerHTML = [
-                        '<div class="nova-blog-empty nova-blog-empty-error">',
-                        "Blog posts are temporarily unavailable.",
-                        "</div>"
-                    ].join(
-                        ""
-                    );
-                }
-            }
+</script>
 
 
-            loadPosts();
-        }());
-    </script>
 </body>
+
 </html>
