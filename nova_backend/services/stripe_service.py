@@ -45,37 +45,36 @@ def create_customer(
         **params
     )
 
+
 def create_checkout_session(
     price_id,
     success_url,
     cancel_url,
     customer_id=None,
+    username=None,
 ):
     stripe = get_stripe_client()
 
-    return stripe.checkout.Session.create(
-        mode="subscription",
-        customer=customer_id,
-        line_items=[
+    params = {
+        "mode": "subscription",
+        "customer": customer_id,
+        "line_items": [
             {
                 "price": price_id,
                 "quantity": 1,
             }
         ],
-        success_url=success_url,
-        cancel_url=cancel_url,
-    )
+        "success_url": success_url,
+        "cancel_url": cancel_url,
+    }
 
+    if username:
+        params["metadata"] = {
+            "nova_username": str(username),
+        }
 
-def create_customer_portal_session(
-    customer_id,
-    return_url,
-):
-    stripe = get_stripe_client()
-
-    return stripe.billing_portal.Session.create(
-        customer=customer_id,
-        return_url=return_url,
+    return stripe.checkout.Session.create(
+        **params
     )
 
 

@@ -6669,6 +6669,7 @@ try:
                 success_url="http://127.0.0.1:5001/billing/success",
                 cancel_url="http://127.0.0.1:5001/billing/cancel",
                 customer_id=stripe_customer_id,
+                username=username,
             )
 
             return _nova_payments_json_20260709({
@@ -6704,21 +6705,84 @@ try:
         @app.post("/api/stripe/webhook")
         def nova_stripe_webhook_staged_api_20260709():
             from flask import request
-            from nova_backend.services.payments_readiness_service import build_payments_readiness
 
-            username = _nova_payments_current_username_20260709()
-            data = build_payments_readiness(username=username)
+            from nova_backend.services.billing_service import (
+                set_subscription,
+            )
+
+            from nova_backend.services.stripe_service import (
+                verify_webhook,
+            )
+
+            payload = request.data
+
+            signature = request.headers.get(
+                "Stripe-Signature"
+            )
+
+            try:
+                event = verify_webhook(
+                    payload,
+                    signature,
+                )
+
+            except Exception as exc:
+                return _nova_payments_json_20260709({
+                    "ok": False,
+                    "received": True,
+                    "processed": False,
+                    "status": "webhook_verification_failed",
+                    "error": str(exc),
+                })
+
+            event_type = getattr(
+                event,
+                "type",
+                "",
+            )
+
+            if event_type == "checkout.session.completed":
+                session = event.data.object
+
+                username = ""
+
+                if getattr(
+                    session,
+                    "metadata",
+                    None,
+                ):
+                    username = (
+                        session.metadata.get(
+                            "nova_username",
+                            "",
+                        )
+                    )
+
+                if username:
+                    set_subscription(
+                        username=username,
+                        subscription_id=getattr(
+                            session,
+                            "subscription",
+                            "",
+                        ),
+                        plan="standard",
+                    )
+
+                return _nova_payments_json_20260709({
+                    "ok": True,
+                    "received": True,
+                    "processed": True,
+                    "status": "checkout_completed",
+                    "username": username,
+                })
 
             return _nova_payments_json_20260709({
                 "ok": True,
                 "received": True,
                 "processed": False,
-                "live": False,
-                "status": "staged_noop",
-                "route": "/api/stripe/webhook",
-                "stripe_signature_present": bool(request.headers.get("Stripe-Signature")),
-                "message": "Stripe webhook route exists, but event processing is intentionally disabled until live Stripe verification and account updates are wired.",
-                "readiness": data,
+                "status": "event_ignored",
+                "event_type": event_type,
             })
 
 
