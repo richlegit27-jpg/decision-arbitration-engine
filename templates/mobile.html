@@ -618,6 +618,34 @@ Close Account
 </button>
     </div>
 
+<script>
+(function () {
+    const selector = document.getElementById(
+        "nova-mobile-model"
+    );
+
+    if (!selector) {
+        return;
+    }
+
+    const saved =
+        localStorage.getItem("NOVA_MODEL") ||
+        "nova-fast";
+
+    selector.value = saved;
+
+    selector.addEventListener(
+        "change",
+        function () {
+            localStorage.setItem(
+                "NOVA_MODEL",
+                selector.value
+            );
+        }
+    );
+})();
+</script>
+
 </main>
 
 <!-- DISABLED_OLD_INLINE_SESSIONS_OPEN_CLOSE_20260606 -->
