@@ -6569,23 +6569,115 @@ try:
 
     if not _nova_payments_route_exists_20260709("/api/billing/checkout"):
         @app.post("/api/billing/checkout")
+
         def nova_billing_checkout_staged_api_20260709():
             from flask import request
-            from nova_backend.services.payments_readiness_service import build_payments_readiness
+
+            from nova_backend.services.billing_service import (
+                get_account,
+                set_stripe_customer_id,
+            )
+
+            from nova_backend.services.payments_readiness_service import (
+                build_payments_readiness,
+            )
+
+            from nova_backend.services.stripe_service import (
+                create_checkout_session,
+                create_customer,
+                stripe_is_configured,
+            )
 
             username = _nova_payments_current_username_20260709()
+
             payload = request.get_json(silent=True) or {}
-            data = build_payments_readiness(username=username)
+
+            plan_id = (
+                payload.get("plan")
+                or payload.get("plan_id")
+                or ""
+            )
+
+            data = build_payments_readiness(
+                username=username
+            )
+
+            if not stripe_is_configured():
+                return _nova_payments_json_20260709({
+                    "ok": False,
+                    "live": False,
+                    "processed": False,
+                    "status": "stripe_not_configured",
+                    "route": "/api/billing/checkout",
+                    "requested_plan": plan_id,
+                    "readiness": data,
+                })
+
+            plans = data.get("plans", [])
+
+            selected_plan = None
+
+            for plan in plans:
+                if plan.get("id") == plan_id:
+                    selected_plan = plan
+                    break
+
+            if not selected_plan:
+                return _nova_payments_json_20260709({
+                    "ok": False,
+                    "status": "invalid_plan",
+                    "requested_plan": plan_id,
+                })
+
+            price_env = selected_plan.get(
+                "stripe_price_env"
+            )
+
+            price_id = os.environ.get(
+                price_env,
+                "",
+            )
+
+            if not price_id:
+                return _nova_payments_json_20260709({
+                    "ok": False,
+                    "status": "stripe_price_missing",
+                    "plan": plan_id,
+                })
+
+            account = get_account(username)
+
+            stripe_customer_id = str(
+                account.get("stripe_customer_id")
+                or ""
+            ).strip()
+
+            if not stripe_customer_id:
+                customer = create_customer(
+                    username=username,
+                )
+
+                stripe_customer_id = customer.id
+
+                set_stripe_customer_id(
+                    username,
+                    stripe_customer_id,
+                )
+
+            session = create_checkout_session(
+                price_id=price_id,
+                success_url="http://127.0.0.1:5001/billing/success",
+                cancel_url="http://127.0.0.1:5001/billing/cancel",
+                customer_id=stripe_customer_id,
+            )
 
             return _nova_payments_json_20260709({
                 "ok": True,
-                "live": False,
-                "processed": False,
-                "status": "staged_planned",
-                "route": "/api/billing/checkout",
-                "message": "Checkout route exists, but live Stripe checkout is intentionally disabled until payments are configured and usage enforcement is wired.",
-                "requested_plan": payload.get("plan") or payload.get("plan_id") or "",
-                "readiness": data,
+                "live": True,
+                "processed": True,
+                "status": "checkout_created",
+                "checkout_url": session.url,
+                "session_id": session.id,
             })
 
 

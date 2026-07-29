@@ -9,9 +9,14 @@ BILLING_FILE = Path("data/nova_billing.json")
 MODEL_COSTS = {
     "gpt-4o-mini": 1,
     "gpt-4.1": 10,
-    "gpt-5": 25
-}
+    "gpt-5": 25,
+    "gpt-5.4": 25,
 
+    "nova-fast": 1,
+    "nova-smart": 25,
+    "nova-vision": 1,
+    "nova-coding": 25,
+}
 
 DEFAULT_USER = {
     "plan": "free",
@@ -158,3 +163,61 @@ def can_use_model(username, model):
         return False
 
     return True
+
+def set_stripe_customer_id(
+    username,
+    stripe_customer_id,
+):
+    data = _load()
+
+    username = str(
+        username or ""
+    ).strip().lower()
+
+    account = data["users"].setdefault(
+        username,
+        {
+            **DEFAULT_USER,
+            "created_at": _now(),
+        }
+    )
+
+    account["stripe_customer_id"] = str(
+        stripe_customer_id or ""
+    ).strip()
+
+    _save(data)
+
+    return account
+
+
+def set_subscription(
+    username,
+    subscription_id,
+    plan,
+):
+    data = _load()
+
+    username = str(
+        username or ""
+    ).strip().lower()
+
+    account = data["users"].setdefault(
+        username,
+        {
+            **DEFAULT_USER,
+            "created_at": _now(),
+        }
+    )
+
+    account["subscription_id"] = str(
+        subscription_id or ""
+    ).strip()
+
+    account["plan"] = str(
+        plan or "free"
+    ).strip()
+
+    _save(data)
+
+    return account
