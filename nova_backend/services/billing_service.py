@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -238,3 +239,33 @@ def set_subscription(
     _save(data)
 
     return account
+
+
+def plan_from_price_id(
+    price_id,
+):
+    price_id = str(
+        price_id or ""
+    ).strip()
+
+    standard_price = str(
+        os.environ.get(
+            "NOVA_STRIPE_STANDARD_PRICE_ID",
+            "",
+        )
+    ).strip()
+
+    pro_price = str(
+        os.environ.get(
+            "NOVA_STRIPE_PRO_PRICE_ID",
+            "",
+        )
+    ).strip()
+
+    if price_id and price_id == standard_price:
+        return "standard"
+
+    if price_id and price_id == pro_price:
+        return "pro"
+
+    return "free"

@@ -6708,6 +6708,7 @@ try:
 
             from nova_backend.services.billing_service import (
                 set_subscription,
+                plan_from_price_id,
             )
 
             from nova_backend.services.stripe_service import (
@@ -6759,6 +6760,20 @@ try:
                     )
 
                 if username:
+                    price_id = ""
+
+                    if getattr(
+                        session,
+                        "metadata",
+                        None,
+                    ):
+                        price_id = str(
+                            session.metadata.get(
+                                "nova_price_id",
+                                "",
+                            )
+                        ).strip()
+
                     set_subscription(
                         username=username,
                         subscription_id=getattr(
@@ -6766,7 +6781,9 @@ try:
                             "subscription",
                             "",
                         ),
-                        plan="standard",
+                        plan=plan_from_price_id(
+                            price_id,
+                        ),
                     )
 
                 return _nova_payments_json_20260709({

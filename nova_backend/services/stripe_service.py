@@ -66,12 +66,11 @@ def create_checkout_session(
         ],
         "success_url": success_url,
         "cancel_url": cancel_url,
+        "metadata": {
+            "nova_price_id": str(price_id),
+            "nova_username": str(username or ""),
+        },
     }
-
-    if username:
-        params["metadata"] = {
-            "nova_username": str(username),
-        }
 
     return stripe.checkout.Session.create(
         **params
