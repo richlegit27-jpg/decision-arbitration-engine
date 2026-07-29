@@ -190,6 +190,7 @@
                     ? session.messages
                     : [];
 
+
         console.trace("🚨 CHAT UI DIRECT RESTORE SOURCE");
 
 console.trace("🚨 CHAT UI DIRECT RESTORE SOURCE");
@@ -227,6 +228,25 @@ console.log("[CHAT UI DIRECT RESTORE]", {
 
         window.chatContainer.innerHTML = "";
         window.NOVA_MESSAGES = messages.slice();
+
+        if (
+            session &&
+            session.meta &&
+            session.meta.onboarding &&
+            window.NovaMobileOnboardingActions &&
+            typeof window.NovaMobileOnboardingActions.render === "function"
+        ) {
+            window.NovaMobileOnboardingActions.render({
+                onboarding: true,
+                welcome_message:
+                    session.meta.onboarding.welcome_message ||
+                    "",
+                actions:
+                    session.meta.onboarding.actions ||
+                    [],
+            });
+        }
+
 
         let renderedCount = 0;
 

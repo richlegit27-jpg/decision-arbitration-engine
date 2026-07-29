@@ -571,3 +571,409 @@ aside.panel.tools,
         max-height: 240px !important;
     }
 }
+
+/* NOVA DESKTOP ONBOARDING PREMIUM POLISH */
+
+.nova-onboarding-welcome {
+    max-width: 620px;
+
+    margin: 0 auto 18px;
+
+    font-size: 20px;
+    line-height: 1.65;
+
+    font-weight: 500;
+
+    color: rgba(255,255,255,0.92);
+
+    animation:
+        novaWelcomeFade .6s ease-out;
+}
+
+
+.nova-onboarding-actions {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, minmax(220px, 1fr));
+
+    gap: 16px;
+
+    max-width: 620px;
+
+    margin: 24px auto;
+
+}
+
+
+.nova-onboarding-button {
+
+    position: relative;
+
+    overflow: hidden;
+
+    min-height: 72px;
+
+    padding: 20px 24px;
+
+    border-radius: 20px;
+
+    border: 1px solid rgba(255,255,255,.22);
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(53,90,138,.95),
+            rgba(41,70,111,.95)
+        );
+
+    color:
+        rgba(255,255,255,.98)
+        !important;
+
+
+    font-size: 18px;
+
+    font-weight: 700;
+
+    letter-spacing: .2px;
+
+    cursor: pointer;
+
+    text-align: center;
+
+
+    box-shadow:
+
+        0 12px 30px rgba(0,0,0,.22),
+
+        inset 0 1px 0 rgba(255,255,255,.18);
+
+
+    transition:
+
+        transform .22s ease,
+
+        box-shadow .22s ease,
+
+        border-color .22s ease,
+
+        filter .22s ease;
+
+
+    animation:
+
+        novaOnboardingButtonIn .55s ease-out both;
+}
+
+
+/* moving shine effect */
+
+.nova-onboarding-button::before {
+
+    content:"";
+
+    position:absolute;
+
+    top:0;
+
+    left:-120%;
+
+    width:80%;
+
+    height:100%;
+
+
+    background:
+
+        linear-gradient(
+            90deg,
+            transparent,
+            rgba(255,255,255,.18),
+            transparent
+        );
+
+
+    transition:
+
+        left .5s ease;
+}
+
+
+.nova-onboarding-button:hover::before {
+
+    left:130%;
+}
+
+
+
+.nova-onboarding-button:hover {
+
+    transform:
+
+        translateY(-5px)
+
+        scale(1.02);
+
+
+    border-color:
+
+        rgba(255,255,255,.45);
+
+
+    filter:
+
+        brightness(1.12);
+
+
+    box-shadow:
+
+        0 18px 40px rgba(0,0,0,.32),
+
+        inset 0 1px 0 rgba(255,255,255,.25);
+}
+
+
+
+.nova-onboarding-button:active {
+
+    transform:
+
+        translateY(1px)
+
+        scale(.97);
+
+
+    box-shadow:
+
+        0 8px 18px rgba(0,0,0,.25);
+}
+
+
+
+/* stagger button entrance */
+
+.nova-onboarding-button:nth-child(1) {
+    animation-delay:.05s;
+}
+
+.nova-onboarding-button:nth-child(2) {
+    animation-delay:.12s;
+}
+
+.nova-onboarding-button:nth-child(3) {
+    animation-delay:.19s;
+}
+
+.nova-onboarding-button:nth-child(4) {
+    animation-delay:.26s;
+}
+
+
+
+@keyframes novaOnboardingButtonIn {
+
+    from {
+
+        opacity:0;
+
+        transform:
+
+            translateY(20px)
+
+            scale(.96);
+
+    }
+
+    to {
+
+        opacity:1;
+
+        transform:
+
+            translateY(0)
+
+            scale(1);
+
+    }
+}
+
+
+
+@keyframes novaWelcomeFade {
+
+    from {
+
+        opacity:0;
+
+        transform:
+
+            translateY(10px);
+
+    }
+
+    to {
+
+        opacity:1;
+
+        transform:
+
+            translateY(0);
+
+    }
+}
+
+
+
+/* mobile fallback */
+
+@media (max-width:700px) {
+
+    .nova-onboarding-actions {
+
+        grid-template-columns:
+
+            1fr;
+
+    }
+
+}
+
+/* NOVA MENU POLISH */
+
+.nova-menu-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+
+.nova-menu-panel {
+    position: absolute;
+
+    top: 45px;
+    right: 0;
+
+    width: 190px;
+
+    z-index: 9999;
+}
+
+.brand-row {
+    position: relative;
+}
+
+
+.nova-menu-button {
+    width: 42px;
+    height: 42px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 12px;
+
+    border: 1px solid rgba(255,255,255,.18);
+
+    background: rgba(255,255,255,.08);
+
+    color: white;
+
+    font-size: 22px;
+
+    cursor: pointer;
+
+    transition:
+        transform .18s ease,
+        background .18s ease;
+}
+
+
+.nova-menu-button:hover {
+    transform: translateY(-2px);
+
+    background:
+        rgba(255,255,255,.16);
+}
+
+
+.nova-menu-panel {
+    position: absolute;
+
+    top: 48px;
+    right: 0;
+
+    width: 190px;
+
+    padding: 10px;
+
+    border-radius: 14px;
+
+    background:
+        rgba(20,24,35,.96);
+
+    border:
+        1px solid rgba(255,255,255,.15);
+
+    box-shadow:
+        0 16px 40px rgba(0,0,0,.35);
+
+    animation:
+        novaMenuOpen .18s ease-out;
+}
+
+
+.nova-menu-panel button {
+    width: 100%;
+
+    padding: 12px 14px;
+
+    margin-bottom: 5px;
+
+    border-radius: 10px;
+
+    border: none;
+
+    background: transparent;
+
+    color: white;
+
+    text-align: left;
+
+    font-size: 15px;
+
+    cursor: pointer;
+}
+
+
+.nova-menu-panel button:hover {
+    background:
+        rgba(255,255,255,.10);
+}
+
+
+@keyframes novaMenuOpen {
+
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+}
+
+.nova-menu-panel button {
+    transition:
+        transform .15s ease,
+        background .15s ease;
+}
+
+.nova-menu-panel button:hover {
+    transform: translateX(4px);
+}

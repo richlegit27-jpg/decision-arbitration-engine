@@ -3139,7 +3139,35 @@ Rules:
                 e
             )
 
+        onboarding_payload = {}
+
+        if not session.get("meta", {}).get("onboarding"):
+
+            onboarding_payload = {
+                "onboarding": True,
+                "welcome_message": (
+                    "Welcome to your AI workspace.\n\n"
+                    "I can help you answer questions, plan projects, "
+                    "analyze files, work with documents, and create "
+                    "new things.\n\n"
+                    "For more information, check out Help in the menu."
+                ),
+                "actions": [
+                    {
+                        "label": "Start a project",
+                        "prompt": "Help me start a project",
+                        "intent": "project",
+                    },
+                    {
+                        "label": "Learn Nova",
+                        "prompt": "Show me how Nova works",
+                        "intent": "help",
+                    },
+                ],
+            }
+
         return {
+            **onboarding_payload,
             "ok": True,
             "assistant_message": assistant_msg,
             "session": {
@@ -9268,6 +9296,7 @@ Rules:
             pass
 
         # NOVA_FIRST_CONTACT_IDENTITY_20260727
+
         try:
             _nova_session = self._get_session(session_id)
 
@@ -9281,6 +9310,8 @@ Rules:
 
         except Exception:
             _nova_first_message = False
+
+
 
     # NOVA_CHAT_TURN_HANDLE_HELPER_SHADOW_20260705
         try:
@@ -17393,6 +17424,32 @@ try:
             "attachments": [],
             "meta": meta,
         }
+
+        if _nova_first_message:
+            onboarding_payload = {
+                "onboarding": True,
+                "welcome_message": (
+                    "Welcome to your AI workspace.\n\n"
+                    "I can help you answer questions, plan projects, "
+                    "analyze files, work with documents, and create "
+                    "new things.\n\n"
+                    "For more information, check out Help in the menu."
+                ),
+                "actions": [
+                    {
+                        "label": "Start a project",
+                        "prompt": "Help me start a project",
+                        "intent": "project",
+                    },
+                    {
+                        "label": "Learn Nova",
+                        "prompt": "Show me how Nova works",
+                        "intent": "help",
+                    },
+                ],
+            }
+        else:
+            onboarding_payload = {}
 
         return {
             "ok": True,

@@ -2230,11 +2230,17 @@ function fixChatTopSafeArea() {
         return index % 2 === 0 ? "user" : "assistant";
     }
 
-    function polishBubble(el) {
-        if (!el || el.nodeType !== 1) return;
+function polishBubble(el) {
+    if (!el || el.nodeType !== 1) return;
 
-        const role = detectRole(el);
+    if (
+        el.classList.contains("nova-onboarding-actions") ||
+        el.closest(".nova-onboarding-actions")
+    ) {
+        return;
+    }
 
+    const role = detectRole(el);
         el.classList.add("nova-mobile-polished-bubble");
         el.classList.toggle("nova-mobile-polished-user", role === "user");
         el.classList.toggle("nova-mobile-polished-assistant", role === "assistant");

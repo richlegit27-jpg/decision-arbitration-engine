@@ -96,7 +96,9 @@ def new_session(
         "created_at": now,
         "updated_at": now,
         "working_state": _new_working_state(),
+        "meta": {},
     }
+
 
 
 # NOVA_SESSION_BAD_TITLE_AUTOFIX_HELPERS_20260624
@@ -915,6 +917,8 @@ class SessionService:
 
         state = _normalize_working_state(sessions[i].get("working_state"))
 
+        return deepcopy(state)
+
     def update_working_state(self, session_id: str, patch: Dict[str, Any]):
         sessions = self._load_sessions()
         i = self._find(sessions, session_id)
@@ -986,6 +990,16 @@ class SessionService:
 
         session = sessions[i]
 
+        print(
+            "[GET SESSION DEBUG]",
+            {
+                "requested_id": session_id,
+                "passed_user_id": user_id,
+                "stored_id": session.get("id"),
+                "stored_user_id": session.get("user_id"),
+            },
+        )
+
         if not self._belongs_to_user(session, user_id):
             return None
 
@@ -1001,64 +1015,48 @@ class SessionService:
 
         return session
 
-    def get_active_session(self):
-        active_id = self.get_active_session_id()
-        if not active_id:
-            return None
-        return self.get_session(active_id)
-
-    def get_active(self):
-        return self.get_active_session()
-
-    def get_active_session(self):
-        active_id = self.get_active_session_id()
-        if not active_id:
-            return None
-        return self.get_session(active_id)
-
-    def get_active(self):
-        return self.get_active_session()
-
-    def create_session(
-        self,
-        title="New Chat",
-        user_id="",
-    ):
-        if not user_id:
-            user_id = self._current_owner_id()
-
-        sessions = self._load_sessions()
-
-        s = new_session(
-            title,
-            user_id=user_id,
-        )
-        sessions.insert(0, s)
-        self._save_sessions(sessions, s["id"])
-        return s
-
-    def get_active_session(self):
-        active_id = self.get_active_session_id()
-        if not active_id:
-            return None
-        return self.get_session(active_id)
-
-    def get_active(self):
-        return self.get_active_session()
-
     def create_session(
         self,
         title="New Chat",
         user_id="",
     ):
         sessions = self._load_sessions()
+
         s = new_session(
             title,
             user_id=user_id,
         )
+
+        try:
+            from nova_backend.services.onboarding_service import (
+                OnboardingService,
+            )
+
+            onboarding_service = OnboardingService()
+
+            onboarding_patch = (
+                onboarding_service.build_user_onboarding_patch()
+            )
+
+            if isinstance(onboarding_patch, dict):
+                s["meta"] = onboarding_patch
+
+        except Exception:
+            pass
+
         sessions.insert(0, s)
         self._save_sessions(sessions, s["id"])
+
         return s
+    def get_active_session(self):
+        active_id = self.get_active_session_id()
+        if not active_id:
+            return None
+        return self.get_session(active_id)
+
+    def get_active(self):
+        return self.get_active_session()
+
 
     def append_message(self, session_id, message):
         sessions = self._load_sessions()

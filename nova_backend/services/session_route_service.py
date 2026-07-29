@@ -298,6 +298,12 @@ class SessionRouteService:
         auth_user_id = ""
         auth_username = ""
 
+        print(
+            "[SESSION CREATE DEBUG]",
+            session.get("nova_user_id"),
+            dict(session),
+        )
+
         try:
             auth_user_id = str(
                 session.get("nova_user_id") or ""
@@ -843,6 +849,14 @@ class SessionRouteService:
 
         except Exception:
             auth_user_id = ""
+
+        print(
+            "[SESSION DETAIL DEBUG]",
+            {
+                "sid": sid,
+                "auth_user_id": auth_user_id,
+            },
+        )
 
         try:
             candidate = session_service.get_session(

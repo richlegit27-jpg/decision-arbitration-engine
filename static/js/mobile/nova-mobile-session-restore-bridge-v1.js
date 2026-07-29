@@ -80,6 +80,18 @@ function getMessageRole(message) {
             return false;
         }
 
+        const existingOnboarding =
+            document.querySelector(".nova-onboarding-actions");
+
+        if (existingOnboarding) {
+            existingOnboarding.classList.remove(
+                "nova-mobile-polished-bubble",
+                "nova-mobile-polished-assistant",
+                "nova-mobile-tools-menu-fixed",
+                "nova-mobile-menu-panel-fixed"
+            );
+        }
+
         box.innerHTML = "";
 
         messages.forEach((message) => {
@@ -87,9 +99,7 @@ function getMessageRole(message) {
 const bubble = document.createElement("div");
 
 bubble.className = [
-    "nova-mobile-visible-message-v1",
-    "nova-mobile-polished-bubble",
-    "nova-mobile-polished-" + role
+    "nova-mobile-visible-message-v1"
 ].join(" ");
 
 bubble.setAttribute(
@@ -118,6 +128,8 @@ bubble.setAttribute(
 
         return true;
     }
+
+
 
     function setActiveSession(sessionId, session) {
         localStorage.setItem("nova_mobile_active_session_id", sessionId);

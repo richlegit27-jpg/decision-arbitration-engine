@@ -8896,7 +8896,8 @@ html::after,
 
 #nova-mobile-tools-panel button,
 #nova-mobile-memory-panel button,
-#nova-mobile-execution-panel button {
+#nova-mobile-execution-panel button,
+#nova-mobile-menu-help {
     width: 100%;
     min-height: 46px;
     border: 1px solid rgba(255, 255, 255, 0.12);
@@ -8920,6 +8921,11 @@ html::after,
         background 150ms ease,
         border-color 150ms ease,
         box-shadow 150ms ease;
+}
+
+
+#nova-mobile-menu-help {
+    text-decoration: none !important;
 }
 
 #nova-mobile-tools-panel button:active,
@@ -14656,7 +14662,6 @@ button {
 .nova-final-message-actions button:active {
     transform: none !important;
 }
-<<<<<<< HEAD
 
 /* -------------------------------------------------
    NOVA MOBILE SESSION PANEL GOVERNOR
@@ -14692,8 +14697,6 @@ body.nova-mobile-session-single-open [class*="sessions-v2"][data-nova-session-ar
     opacity: 0 !important;
     pointer-events: none !important;
 }
-=======
->>>>>>> parent of d0bf57c (Stop duplicate mobile session panels from reopening)
 
 /* -------------------------------------------------
    NOVA MOBILE SAFE SESSION CLOSE ONLY
@@ -15306,4 +15309,230 @@ font-size: 18px !important;
     flex: 0 0 30px !important;
     width: 30px !important;
     height: 30px !important;
+}
+
+/* NOVA ONBOARDING POLISHED BUTTON EXPERIENCE */
+
+.nova-onboarding-welcome {
+    font-size: 18px;
+    line-height: 1.6;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+    padding: 16px;
+
+    animation: novaOnboardingFadeIn 0.5s ease-out;
+}
+
+.nova-onboarding-actions {
+    display: flex;
+    flex-direction: column;
+
+    width: 100%;
+    max-width: 520px;
+
+    margin: 20px auto;
+    gap: 14px;
+
+    padding: 16px;
+}
+
+.nova-onboarding-actions button {
+    width: 100%;
+    min-height: 58px;
+
+    background: linear-gradient(
+        135deg,
+        #355a8a,
+        #29466f
+    );
+
+    color: #ffffff !important;
+
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.4;
+
+    padding: 18px 22px;
+
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.28);
+
+    text-align: center;
+    letter-spacing: 0.3px;
+
+    cursor: pointer;
+
+    box-shadow:
+        0 8px 20px rgba(0,0,0,0.18);
+
+    transition:
+        transform 0.18s ease,
+        box-shadow 0.18s ease,
+        filter 0.18s ease;
+
+    animation: novaOnboardingButtonIn 0.45s ease-out both;
+
+    -webkit-font-smoothing: antialiased;
+}
+
+.nova-onboarding-actions button:nth-child(1) {
+    animation-delay: 0.05s;
+}
+
+.nova-onboarding-actions button:nth-child(2) {
+    animation-delay: 0.1s;
+}
+
+.nova-onboarding-actions button:nth-child(3) {
+    animation-delay: 0.15s;
+}
+
+.nova-onboarding-actions button:nth-child(4) {
+    animation-delay: 0.2s;
+}
+
+.nova-onboarding-actions button:hover {
+    transform: translateY(-3px);
+
+    filter: brightness(1.08);
+
+    box-shadow:
+        0 12px 28px rgba(0,0,0,0.28);
+}
+
+.nova-onboarding-actions button:active {
+    transform: translateY(1px) scale(0.98);
+
+    box-shadow:
+        0 5px 12px rgba(0,0,0,0.2);
+}
+
+
+@keyframes novaOnboardingButtonIn {
+
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+
+@keyframes novaOnboardingFadeIn {
+
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* NOVA DESKTOP ONBOARDING BUTTON POLISH */
+
+.nova-onboarding-welcome {
+    animation: novaWelcomeFade 0.45s ease-out;
+}
+
+.nova-onboarding-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 20px;
+}
+
+.nova-onboarding-button {
+    width: 100%;
+    min-height: 58px;
+
+    padding: 16px 22px;
+
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.25);
+
+    background: linear-gradient(
+        135deg,
+        #355a8a,
+        #29466f
+    );
+
+    color: white;
+
+    font-size: 18px;
+    font-weight: 700;
+
+    cursor: pointer;
+
+    box-shadow:
+        0 8px 20px rgba(0,0,0,0.18);
+
+    transition:
+        transform .18s ease,
+        box-shadow .18s ease,
+        filter .18s ease;
+
+    animation: novaOnboardingButtonIn .45s ease-out both;
+}
+
+
+.nova-onboarding-button:nth-child(1) {
+    animation-delay: .05s;
+}
+
+.nova-onboarding-button:nth-child(2) {
+    animation-delay: .1s;
+}
+
+.nova-onboarding-button:nth-child(3) {
+    animation-delay: .15s;
+}
+
+.nova-onboarding-button:nth-child(4) {
+    animation-delay: .2s;
+}
+
+
+.nova-onboarding-button:hover {
+    transform: translateY(-3px);
+
+    filter: brightness(1.1);
+
+    box-shadow:
+        0 14px 28px rgba(0,0,0,.3);
+}
+
+
+.nova-onboarding-button:active {
+    transform: translateY(1px) scale(.98);
+}
+
+
+@keyframes novaOnboardingButtonIn {
+
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+
+@keyframes novaWelcomeFade {
+
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }

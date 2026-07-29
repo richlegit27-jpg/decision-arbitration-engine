@@ -308,6 +308,13 @@
         Settings
     </button>
 
+<button
+    id="nova-mobile-menu-help"
+    type="button"
+>
+    Help
+</button>
+
     <button
         id="nova-mobile-menu-blog"
         type="button"
@@ -814,8 +821,11 @@ body {
      CHAT RENDERING LAYER
 ========================= -->
 
-<script src="/static/js/mobile/nova-mobile-chat-ui.js?v=image-attachment-render-20260722"></script>
+<script
+src="/static/js/mobile/nova-mobile-onboarding-actions.js?v=onboarding-v1-20260723"></script>
 
+<script
+src="/static/js/mobile/nova-mobile-chat-ui.js?v=image-attachment-render-20260722"></script>
 <script src="/static/js/mobile/nova-mobile-message-actions.js?v=mobile-actions-fix-007"></script>
 
 <script src="/static/js/mobile/nova-mobile-stream.js?v=mobile-stream-full-clean-20260604-001"></script>
@@ -918,9 +928,9 @@ filename='js/mobile/nova-mobile-auth.js') }}?v=auth-header-clean-final-20260716"
             score += 2;
         }
 
-        if (/menu|tools|drawer|panel|actions|more/i.test(String(el.id || "") + " " + String(el.className || ""))) {
-            score += 2;
-        }
+if (/menu|tools|drawer|panel|more/i.test(String(el.id || "") + " " + String(el.className || ""))) {
+    score += 2;
+}
 
         return score;
     }
@@ -932,7 +942,7 @@ filename='js/mobile/nova-mobile-auth.js') }}?v=auth-header-clean-final-20260716"
 
         candidates
             .filter(isVisible)
- .filter(function (el) {
+.filter(function (el) {
 
     if (
         el.id === "nova-mobile-sessions-final-panel-v1"
@@ -940,7 +950,18 @@ filename='js/mobile/nova-mobile-auth.js') }}?v=auth-header-clean-final-20260716"
         return false;
     }
 
-    if (el.closest(".nova-mobile-auth-dock, .nova-mobile-user-dock, .nova-mobile-backend-dock")) return false;
+    if (
+        el.classList.contains("nova-onboarding-actions") ||
+        el.closest(".nova-onboarding-actions")
+    ) {
+        return false;
+    }
+
+    if (
+        el.closest(".nova-mobile-auth-dock, .nova-mobile-user-dock, .nova-mobile-backend-dock")
+    ) {
+        return false;
+    }
 
     const rect = el.getBoundingClientRect();
                 if (rect.width < 100 || rect.height < 80) return false;
@@ -3648,7 +3669,6 @@ composer.style.setProperty("overflow", "visible", "important");
 <script src="/static/js/mobile/nova-mobile-attachment-boot-reset-v1.js?v=attachment-boot-reset-v1-20260705"></script>
 <!-- NOVA_CLEANUP_DISABLED_20260705: disabled plus-menu attach experiment :: <script src="/static/js/mobile/nova-mobile-plus-menu-reliability-v1.js?v=plus-menu-reliability-v1-20260705"></script> -->
 <script src="/static/js/mobile/nova-mobile-upload-change-authority-v1.js?v=upload-single-owner-20260714h"></script>
-<script src="/static/js/mobile/nova-mobile-onboarding-actions.js?v=onboarding-v1-20260723"></script>
 <script src="/static/js/mobile/nova-mobile-runtime.js?v=runtime-stop-wire-20260706"></script>
 <script src="/static/js/mobile/nova-mobile-send-stable-v1.js?v=latest-message-anchor-20260722"></script>
 <script src="/static/js/mobile/nova-mobile-attachment-send-cleanup-v1.js?v=attachment-send-cleanup-v2-20260706"></script>
@@ -3834,6 +3854,23 @@ const settings = document.getElementById("nova-mobile-menu-settings");
 if (settings) {
     settings.onclick = async function () {
         hideTools();
+
+const help = document.getElementById(
+    "nova-mobile-menu-help"
+);
+
+if (help) {
+
+    help.addEventListener(
+        "click",
+        function () {
+
+            window.location.href = "/help";
+
+        }
+    );
+
+}
 
         const panel = document.getElementById("nova-mobile-settings-panel");
 

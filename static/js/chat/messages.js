@@ -20,10 +20,12 @@
       if (!messagesEl) return;
 
       if (!messagesEl.querySelector(".msg-row")) {
+
         messagesEl.innerHTML = `
           <div class="empty-note">
-            <strong>Ready.</strong><br><br>
-            Start a new message, use one of the prompt shortcuts on the left, export chats, rename chats, delete chats, edit user messages, or press <strong>Esc</strong> while streaming to stop generation.
+            <strong>Welcome to your AI workspace.</strong><br><br>
+            I can help you answer questions, plan projects, analyze files, work with documents, and create new things.<br><br>
+            For more information, check out Help in the menu.
           </div>
         `;
       }

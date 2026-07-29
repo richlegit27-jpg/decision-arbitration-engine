@@ -1205,6 +1205,9 @@ def filter_raw_injection_attachments(
 def privacy():
     return render_template("privacy.html")
 
+@app.route("/help")
+def help_page():
+    return render_template("help.html")
 
 @app.route("/terms")
 def terms():

@@ -214,6 +214,19 @@ function NOVA_UI_ALLOWED() {
 
     function polish() {
     if (window.__NOVA_SESSION_PANEL_LOCK__ || window.__NOVA_POLISH_DISABLED__) return;
+        document.querySelectorAll(".nova-onboarding-actions").forEach(function (node) {
+            node.classList.remove(
+                "nova-mobile-polished-bubble",
+                "nova-mobile-polished-assistant",
+                "nova-mobile-tools-menu-fixed",
+                "nova-mobile-menu-panel-fixed"
+            );
+
+            node.setAttribute(
+                "data-nova-ignore-polish",
+                "1"
+            );
+        });
         cleanSummaryPanel();
         blurIfHiddenPanelHasFocus();
         hideStrayQuestionMarks();

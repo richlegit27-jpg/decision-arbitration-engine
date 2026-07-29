@@ -106,6 +106,12 @@ class OnboardingService:
 
     def build_user_onboarding_patch(self):
         return {
+            "onboarding": {
+                "state": "shown",
+                "version": self.VERSION,
+                "welcome_message": self.build_welcome_message(),
+                "actions": self.build_welcome_actions(),
+            },
             "onboarding_complete": False,
             "onboarding_version": self.VERSION,
         }

@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from flask import g, session as flask_session
+from nova_backend.services.onboarding_service import OnboardingService
 
 
 def _now_iso():
@@ -14,6 +15,7 @@ class SessionBootstrapService:
     def __init__(self, session_service, logger=None):
         self.session_service = session_service
         self.logger = logger
+        self.onboarding_service = OnboardingService()
 
 
     def ensure_requested_session(
@@ -86,6 +88,21 @@ class SessionBootstrapService:
             "active_execution": None,
         }
 
+        # NOVA_SESSION_BOOTSTRAP_ONBOARDING_ATTACH_20260728
+        try:
+            onboarding_patch = (
+                self.onboarding_service.build_user_onboarding_patch()
+            )
+
+            if isinstance(onboarding_patch, dict):
+                new_session["meta"] = onboarding_patch
+
+        except Exception:
+            if self.logger:
+                self.logger.exception(
+                    "[mobile-session-save] onboarding patch failed"
+                )
+
         try:
             store = self.session_service._read_store()
 
@@ -117,6 +134,7 @@ class SessionBootstrapService:
                 sessions,
                 active=target_session_id,
             )
+
             return new_session
 
         except Exception:
@@ -126,6 +144,7 @@ class SessionBootstrapService:
                 )
 
             return new_session
+
 
     def resolve_chat_session(
         self,

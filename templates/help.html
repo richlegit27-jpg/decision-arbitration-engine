@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="en">
+
 <head>
+
     <meta charset="utf-8">
 
     <meta
@@ -8,375 +10,566 @@
         content="width=device-width, initial-scale=1"
     >
 
-    <title>Nova Help | Project-aware AI work</title>
+    <title>
+        Nova Help Center
+    </title>
 
-    <meta
-        name="description"
-        content="Learn how to use Nova for project context, memory, sessions, files, planning, and practical next steps."
-    >
 
     <link
         rel="stylesheet"
-        href="/static/css/nova-help.css?v=help-route-endgame-20260711"
+        href="{{ url_for('static', filename='css/nova-help.css') }}?v=nova-help-guide-20260728"
     >
 
-    <link
-        rel="icon"
-        href="/static/favicon.svg"
-        type="image/svg+xml"
-    >
-
-    <link
-        rel="manifest"
-        href="/static/site.webmanifest"
-    >
-
-    <meta
-        name="theme-color"
-        content="#8b5cf6"
-    >
-
-    <meta
-        property="og:site_name"
-        content="Nova"
-    >
-
-    <meta
-        property="og:type"
-        content="website"
-    >
-
-    <meta
-        property="og:title"
-        content="Nova Help"
-    >
-
-    <meta
-        property="og:description"
-        content="Get started with project context, memory, sessions, files, and planning in Nova."
-    >
-
-    <meta
-        property="og:url"
-        content="{{ request.url_root.rstrip('/') }}/help"
-    >
-
-    <meta
-        property="og:image"
-        content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg"
-    >
-
-    <meta
-        name="twitter:card"
-        content="summary_large_image"
-    >
-
-    <meta
-        name="twitter:title"
-        content="Nova Help"
-    >
-
-    <meta
-        name="twitter:description"
-        content="Get started with project-aware AI work in Nova."
-    >
-
-    <meta
-        name="twitter:image"
-        content="{{ request.url_root.rstrip('/') }}/static/nova-og.svg"
-    >
-
-    <link
-        rel="canonical"
-        href="{{ request.url_root.rstrip('/') }}/help"
-    >
 </head>
 
+
 <body>
-    <main class="nova-help-shell">
-        <nav
-            class="nova-help-nav"
-            aria-label="Nova help navigation"
-        >
-            <a
-                class="nova-help-brand"
-                href="/"
-                aria-label="Nova home"
-            >
-                <span>N</span>
-
-                <div>
-                    <strong>Nova</strong>
-                    <em>Help</em>
-                </div>
-            </a>
-
-
-            <div class="nova-help-actions">
-                <a href="/">Home</a>
-                <a href="/about">About</a>
-                <a href="/features">Features</a>
-                <a href="/roadmap">Roadmap</a>
-                <a href="/faq">FAQ</a>
-                <a href="/blog">Blog</a>
-                <a href="/billing">Billing</a>
-
-                <a href="/app">
-                    Open Nova
-                </a>
-            </div>
-        </nav>
-
-
-        <section class="nova-help-hero">
-            <p class="nova-help-kicker">
-                Nova Help
-            </p>
-
-            <h1>
-                Give Nova the thread. Then keep moving.
-            </h1>
-
-            <span>
-                Nova works best when it understands the project, the current
-                state, and what matters next. Start with the real work, add
-                useful context, and continue the conversation.
-            </span>
-
-
-            <div class="nova-help-buttons">
-                <a href="/app">
-                    Open Nova
-                </a>
-
-                <a href="/contact#nova-contact-form-title">
-                    Contact Nova
-                </a>
-            </div>
-        </section>
-
-
-        <section
-            class="nova-help-grid"
-            aria-label="Nova help topics"
-        >
-            <article class="nova-help-card">
-                <p>01 ? Start with the project</p>
-
-                <h2>
-                    Tell Nova what you are working on.
-                </h2>
-
-                <span>
-                    Explain the real project, the current problem, or the result
-                    you are trying to reach. Useful project details beat a giant
-                    ceremonial prompt.
-                </span>
-
-                <div class="nova-help-command">
-                    I'm building a project and the current problem is...
-                </div>
-            </article>
-
-
-            <article class="nova-help-card">
-                <p>02 ? Keep useful context</p>
-
-                <h2>
-                    Say what should remain important.
-                </h2>
-
-                <span>
-                    Tell Nova when a decision, preference, constraint, or project
-                    fact should continue to matter across the work.
-                </span>
-
-                <div class="nova-help-command">
-                    Remember that this is the direction we chose.
-                </div>
-            </article>
 
 
-            <article class="nova-help-card">
-                <p>03 ? Work with files</p>
+<main class="nova-help-shell">
 
-                <h2>
-                    Attach the material the task depends on.
-                </h2>
 
-                <span>
-                    Add a file or image when the answer depends on its contents.
-                    Ask Nova directly to summarize, inspect, explain, compare, or
-                    use it as project context.
-                </span>
+<nav class="nova-help-nav">
 
-                <div class="nova-help-command">
-                    Summarize this file and tell me what matters for the project.
-                </div>
-            </article>
 
+<a
+    class="nova-help-brand"
+    href="/"
+>
 
-            <article class="nova-help-card">
-                <p>04 ? Continue across sessions</p>
+    <span>
+        N
+    </span>
 
-                <h2>
-                    Keep related work in a connected thread.
-                </h2>
 
-                <span>
-                    Stay in the same conversation when continuity matters.
-                    Start a new session when the project or purpose genuinely changes.
-                </span>
-
-                <div class="nova-help-command">
-                    What were we working on, and what is the next move?
-                </div>
-            </article>
+    <div>
 
+        <strong>
+            Nova
+        </strong>
 
-            <article class="nova-help-card">
-                <p>05 ? Ask for a plan</p>
 
-                <h2>
-                    Turn a larger goal into practical steps.
-                </h2>
+        <em>
+            Help Center
+        </em>
 
-                <span>
-                    Ask Nova to plan, build, fix, or repair a goal when the work
-                    has multiple steps. Review the direction and keep moving
-                    through the same project thread.
-                </span>
-
-                <div class="nova-help-command">
-                    Auto-plan the safest way to finish this feature.
-                </div>
-            </article>
-
+    </div>
 
-            <article class="nova-help-card">
-                <p>06 ? Continue naturally</p>
-
-                <h2>
-                    Short continuation commands are enough.
-                </h2>
 
-                <span>
-                    When Nova already understands the active task, short commands
-                    can continue the work without repeating the full goal.
-                </span>
+</a>
 
-                <div class="nova-help-pills">
-                    <span>k</span>
-                    <span>ok</span>
-                    <span>next</span>
-                    <span>continue</span>
-                    <span>run step</span>
-                </div>
-            </article>
-        </section>
-
-
-        <section class="nova-help-flow">
-            <div>
-                <p>
-                    A simple working rhythm
-                </p>
-
-                <h2>
-                    Context first. Judgment second. Action third.
-                </h2>
-
-                <span>
-                    Nova is most useful when the conversation stays connected
-                    to the project instead of becoming a pile of isolated prompts.
-                </span>
-            </div>
-
-
-            <div class="nova-help-flow-steps">
-                <div>
-                    <strong>1</strong>
-
-                    <span>
-                        Describe the project and current problem.
-                    </span>
-                </div>
-
-                <div>
-                    <strong>2</strong>
-
-                    <span>
-                        Add the decision, file, or constraint that matters.
-                    </span>
-                </div>
-
-                <div>
-                    <strong>3</strong>
-
-                    <span>
-                        Ask for the next move, plan, fix, or explanation.
-                    </span>
-                </div>
-
-                <div>
-                    <strong>4</strong>
-
-                    <span>
-                        Continue the thread and correct Nova when project reality changes.
-                    </span>
-                </div>
-            </div>
-        </section>
-
-
-        <section class="nova-help-support">
-            <div>
-                <p>
-                    Still stuck?
-                </p>
-
-                <h2>
-                    Describe what you expected and what happened instead.
-                </h2>
-
-                <span>
-                    Include the feature you were using, the task you gave Nova,
-                    and the result that felt wrong. A clear example makes the
-                    problem much easier to understand.
-                </span>
-            </div>
-
-
-            <div class="nova-help-buttons">
-                <a href="/contact#nova-contact-form-title">
-                    Contact Nova
-                </a>
-
-                <a href="/faq">
-                    Read FAQ
-                </a>
-            </div>
-        </section>
-
-
-        <footer class="nova-help-footer">
-            <span>
-                Nova Help ? Keep the project thread connected
-            </span>
-
-            <div>
-                <a href="/">Home</a>
-                <a href="/about">About</a>
-                <a href="/features">Features</a>
-                <a href="/roadmap">Roadmap</a>
-                <a href="/faq">FAQ</a>
-                <a href="/blog">Blog</a>
-                <a href="/contact">Contact</a>
-                <a href="/billing">Billing</a>
-                <a href="/privacy">Privacy</a>
-                <a href="/terms">Terms</a>
-            </div>
-        </footer>
-    </main>
+
+
+<div class="nova-help-buttons">
+
+    <a href="/">
+        Home
+    </a>
+
+    <a href="/app">
+        Open Nova
+    </a>
+
+</div>
+
+
+</nav>
+
+
+
+
+
+<section class="nova-help-hero">
+
+
+<p>
+    Welcome to Nova
+</p>
+
+
+<h1>
+    Learn how to use your AI workspace.
+</h1>
+
+
+<span>
+
+Nova helps you plan, create, organize,
+and continue your work without starting over.
+
+This guide explains every major feature
+and how to get the best results.
+
+</span>
+
+
+</section>
+
+
+
+
+
+
+
+<section class="nova-help-grid">
+
+
+
+<article class="nova-help-card">
+
+<p>
+01 • First Steps
+</p>
+
+
+<h2>
+Start by explaining your goal.
+</h2>
+
+
+<span>
+
+Nova works best when you explain:
+
+<br><br>
+
+• What you are building
+
+<br>
+
+• What problem you have
+
+<br>
+
+• What result you want
+
+<br><br>
+
+Example:
+
+<br>
+
+"I want to build an app. Help me plan the first version."
+
+</span>
+
+</article>
+
+
+
+
+
+
+<article class="nova-help-card">
+
+<p>
+02 • Chat
+</p>
+
+
+<h2>
+Ask Nova questions and solve problems.
+</h2>
+
+
+<span>
+
+Use Chat for:
+
+<br><br>
+
+• Learning
+
+<br>
+
+• Writing
+
+<br>
+
+• Debugging
+
+<br>
+
+• Brainstorming
+
+<br>
+
+• Making decisions
+
+<br><br>
+
+Example:
+
+<br>
+
+"Explain this error and help me fix it."
+
+</span>
+
+</article>
+
+
+
+
+
+
+<article class="nova-help-card">
+
+<p>
+03 • Memory
+</p>
+
+
+<h2>
+Let Nova remember important information.
+</h2>
+
+
+<span>
+
+Memory helps Nova remember useful things.
+
+<br><br>
+
+Good examples:
+
+<br>
+
+"Remember my project uses Python."
+
+<br>
+
+"Remember I prefer short answers."
+
+<br>
+
+"Remember our goal is launching this app."
+
+<br><br>
+
+Do not save passwords,
+API keys, or private information.
+
+</span>
+
+</article>
+
+
+
+
+
+
+
+<article class="nova-help-card">
+
+<p>
+04 • Sessions
+</p>
+
+
+<h2>
+Keep different work organized.
+</h2>
+
+
+<span>
+
+A session is like a separate workspace.
+
+<br><br>
+
+Use different sessions for:
+
+<br>
+
+• Different projects
+
+<br>
+
+• Research
+
+<br>
+
+• Learning
+
+<br>
+
+• Planning
+
+<br><br>
+
+Return later and continue where you stopped.
+
+</span>
+
+</article>
+
+
+
+
+
+
+
+<article class="nova-help-card">
+
+<p>
+05 • Files and Uploads
+</p>
+
+
+<h2>
+Give Nova information to analyze.
+</h2>
+
+
+<span>
+
+Upload:
+
+<br><br>
+
+• Screenshots
+
+<br>
+
+• Documents
+
+<br>
+
+• PDFs
+
+<br>
+
+• Code files
+
+<br>
+
+• Images
+
+<br><br>
+
+Example:
+
+<br>
+
+"Review this file and explain the important parts."
+
+</span>
+
+</article>
+
+
+
+
+
+
+
+<article class="nova-help-card">
+
+<p>
+06 • Project Brain
+</p>
+
+
+<h2>
+Keep your project direction clear.
+</h2>
+
+
+<span>
+
+Project Brain helps Nova understand:
+
+<br><br>
+
+• Your goal
+
+<br>
+
+• Important decisions
+
+<br>
+
+• Current problems
+
+<br>
+
+• Next steps
+
+<br><br>
+
+Example:
+
+<br>
+
+"What should I work on next?"
+
+</span>
+
+</article>
+
+
+
+
+
+
+
+<article class="nova-help-card">
+
+<p>
+07 • Planning
+</p>
+
+
+<h2>
+Turn ideas into steps.
+</h2>
+
+
+<span>
+
+Use planning when you need structure.
+
+<br><br>
+
+Examples:
+
+<br>
+
+"Create a launch plan."
+
+<br>
+
+"Break this project into steps."
+
+<br>
+
+"Help me choose the best approach."
+
+</span>
+
+</article>
+
+
+
+
+
+
+
+<article class="nova-help-card">
+
+<p>
+08 • Execution
+</p>
+
+
+<h2>
+Move from plans to action.
+</h2>
+
+
+<span>
+
+Execution helps you work through tasks.
+
+<br><br>
+
+Examples:
+
+<br>
+
+"Start the first step."
+
+<br>
+
+"Help me complete this task."
+
+<br>
+
+"Check my progress."
+
+</span>
+
+</article>
+
+
+
+</section>
+
+
+
+
+
+
+
+<section class="nova-help-support">
+
+
+<h2>
+Getting better answers from Nova
+</h2>
+
+
+<span>
+
+The best results come from giving Nova context.
+
+<br><br>
+
+Instead of:
+
+<br>
+
+"Fix this."
+
+<br><br>
+
+Try:
+
+<br>
+
+"Fix this login problem. My app uses Flask sessions and the problem started after an authentication update."
+
+<br><br>
+
+More information helps Nova understand what you need.
+
+</span>
+
+
+<div class="nova-help-buttons">
+
+<a href="/app">
+Start Using Nova
+</a>
+
+
+<a href="/contact">
+Contact Support
+</a>
+
+
+</div>
+
+
+</section>
+
+
+
+
+
+
+<footer>
+
+Nova Help Center
+
+</footer>
+
+
+
+</main>
+
+
 </body>
+
 </html>
