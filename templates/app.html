@@ -2547,30 +2547,11 @@ function normalizeMemoryPayload(data) {
   }
 
 async function loadMemory() {
-  try {
-    var res = await fetch("/api/memory", {
-      headers: { "Accept": "application/json" }
-    });
-
-    var data = await res.json();
-
-    renderMemoryFallback(data);
-    setStatusSafe("memory loaded");
-
-  } catch (error) {
-    if (list) {
-      list.innerHTML = "";
-
-      var failed = document.createElement("div");
-      failed.className = "session-placeholder";
-      failed.textContent = "Could not load memory.";
-
-      list.appendChild(failed);
-    }
-
-    setStatusSafe("memory failed");
-    console.warn("[Nova Desktop Rescue] memory failed", error);
+  if (typeof window.NovaMemoryV2Load === "function") {
+    return window.NovaMemoryV2Load();
   }
+
+  console.warn("[Nova Legacy Memory Loader Disabled]");
 }
 
   function normalizeSessionPayload(data) {
@@ -3436,20 +3417,7 @@ fetch("/api/memory", { cache: "no-store" })
     }, true);
   }
 
-  window.NovaOpenDesktopMemory = loadDesktopMemory;
-  window.NovaDesktopOpenMemoryRescue = loadDesktopMemory;
-  window.NovaLoadMemory = loadDesktopMemory;
-  window.loadMemory = loadDesktopMemory;
-  window.loadMemories = loadDesktopMemory;
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", wire);
-  } else {
-    wire();
-  }
-
 window.NovaLegacyMemoryFinalRendererDisabled = true;
-
   console.log("[Nova Desktop Memory Final Renderer] ready");
 })();
 (function () {
@@ -8360,72 +8328,13 @@ window.NovaLegacyMemoryBootDisabled = true;
         oldButton.replaceWith(newButton);
     }
 
-    function ensureMemoryTypedInput() {
-        const memory = document.querySelector(".memory-section");
-        const list = document.getElementById("desktopMemoryList");
+function ensureMemoryTypedInput() {
+    window.NovaLegacyTypedMemoryDisabled = true;
+    return;
+}
 
-        if (!memory || !list) return;
-
-        if (!document.getElementById("novaMemoryComposeBox")) {
-            const box = document.createElement("div");
-            box.id = "novaMemoryComposeBox";
-            box.className = "nova-memory-compose";
-
-            box.innerHTML = `
-                <textarea id="novaMemoryComposeInput" placeholder="Type what you want Nova to remember..."></textarea>
-
-                <div class="nova-memory-compose-row">
-                    <select id="novaMemoryComposeKind">
-                        <option value="preference">Preference</option>
-                        <option value="project">Project Note</option>
-                        <option value="people">People</option>
-                        <option value="general">General</option>
-                    </select>
-
-                    <button id="novaMemorySaveTypedBtn" type="button">Save Memory</button>
-                </div>
-
-                <div id="novaMemoryComposeStatus">Ctrl+Enter saves too.</div>
-            `;
-
-            list.parentNode.insertBefore(box, list);
-
-            const save = box.querySelector("#novaMemorySaveTypedBtn");
-            const input = box.querySelector("#novaMemoryComposeInput");
-            const kind = box.querySelector("#novaMemoryComposeKind");
-
-            if (save) {
-                save.addEventListener("click", function () {
-                    postTypedMemory(input ? input.value : "", kind ? kind.value : "general");
-                });
-            }
-
-            if (input) {
-                input.addEventListener("keydown", function (event) {
-                    if (event.ctrlKey && event.key === "Enter") {
-                        event.preventDefault();
-                        postTypedMemory(input.value, kind ? kind.value : "general");
-                    }
-                });
-            }
-        }
-
-        replacePromptButton("novaMemoryAddPreferenceBtn", "preference");
-        replacePromptButton("novaMemoryAddProjectBtn", "project");
-    }
-
-    window.NovaEnsureMemoryTypedInput = ensureMemoryTypedInput;
-    window.NovaSaveTypedMemory = postTypedMemory;
-
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", ensureMemoryTypedInput);
-    } else {
-        ensureMemoryTypedInput();
-    }
-
-    setTimeout(ensureMemoryTypedInput, 300);
-    setTimeout(ensureMemoryTypedInput, 900);
-    setTimeout(ensureMemoryTypedInput, 1600);
+window.NovaEnsureMemoryTypedInput = ensureMemoryTypedInput;
+window.NovaLegacyTypedMemoryDisabled = true;
 })();
 </script>
 
@@ -8505,9 +8414,7 @@ window.NovaLegacyMemoryBootDisabled = true;
             }
         }
 
-        if (typeof window.NovaEnsureMemoryTypedInput === "function") {
-            window.NovaEnsureMemoryTypedInput();
-        }
+window.NovaLegacyTypedMemoryBootDisabled = true;
 
 if (typeof window.NovaMemoryV2Boot === "function") {
     window.NovaMemoryV2Boot();
