@@ -3448,8 +3448,7 @@ fetch("/api/memory", { cache: "no-store" })
     wire();
   }
 
-  setTimeout(wire, 500);
-  setTimeout(wire, 1500);
+window.NovaLegacyMemoryFinalRendererDisabled = true;
 
   console.log("[Nova Desktop Memory Final Renderer] ready");
 })();
@@ -3699,9 +3698,7 @@ function render(payload) {
       }
     });
 
-    observer.observe(box, { childList: true, subtree: true, characterData: true });
-
-    load();
+observer.observe(box, { childList: true, subtree: true, characterData: true });
   }
 
   window.NovaDesktopMemoryHardlock = load;
@@ -3711,14 +3708,7 @@ function render(payload) {
   window.loadMemory = load;
   window.loadMemories = load;
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", hardlock);
-  } else {
-    hardlock();
-  }
-
-  setTimeout(hardlock, 500);
-  setTimeout(hardlock, 1500);
+window.NovaLegacyMemoryHardlockDisabled = true;
 
   console.log("[Nova Desktop Memory Hardlock] ready");
 })();
@@ -3816,14 +3806,6 @@ function render(payload) {
     });
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", wire);
-  } else {
-    wire();
-  }
-
-  setTimeout(wire, 500);
-  setTimeout(wire, 1500);
 
   console.log("[Nova Desktop Quick Buttons Final] ready");
 
@@ -4054,14 +4036,7 @@ function render(payload) {
     }
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", wire);
-  } else {
-    wire();
-  }
-
-  setTimeout(wire, 500);
-  setTimeout(wire, 1500);
+window.NovaLegacyMemoryFinalRendererDisabled = true;
 
   console.log("[Nova Desktop Voice/TTS Final] ready");
 })();
@@ -8361,8 +8336,8 @@ window.NovaLegacyMemoryBootDisabled = true;
             window.loadDesktopMemory();
         } else if (typeof window.NovaLoadDesktopMemory === "function") {
             window.NovaLoadDesktopMemory();
-        } else if (typeof window.NovaBootMemoryControlCenter === "function") {
-            window.NovaBootMemoryControlCenter();
+        } else if (typeof window.NovaMemoryV2Boot === "function") {
+            window.NovaMemoryV2Boot();
         }
 
         setTimeout(function () {
@@ -8548,9 +8523,9 @@ window.NovaLegacyMemoryBootDisabled = true;
             window.NovaEnsureMemoryTypedInput();
         }
 
-        if (typeof window.NovaBootMemoryControlCenter === "function") {
-            window.NovaBootMemoryControlCenter();
-        }
+if (typeof window.NovaMemoryV2Boot === "function") {
+    window.NovaMemoryV2Boot();
+}
     }
 
     window.NovaRightPanelMemoryOnlyCleanup = memoryOnlyCleanup;
@@ -9294,14 +9269,9 @@ window.NovaLegacyMemoryBootDisabled = true;
         }
     }, true);
 
-    window.addEventListener("resize", scheduleCleanup);
-
-    setTimeout(enforceMemoryOnlyStable, 300);
-    setTimeout(enforceMemoryOnlyStable, 1000);
-})();
+setTimeout(enforceMemoryOnlyStable, 300);
+setTimeout(enforceMemoryOnlyStable, 1000);
 </script>
-
-
 <!-- NOVA_CHAT_COMPOSER_LOCK_FINAL_20260622 -->
 <style>
 /* Lock the chat composer so messages scroll instead of pushing the bar down */
