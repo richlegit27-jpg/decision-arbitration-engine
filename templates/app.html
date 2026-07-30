@@ -9257,7 +9257,10 @@ body {
         if (!tools || !memory) return;
 
         Array.from(tools.children).forEach(function (child) {
-            if (child === memory) {
+            if (
+    child === memory ||
+    child.classList.contains("execution-section")
+) {
                 child.hidden = false;
                 child.removeAttribute("hidden");
 
