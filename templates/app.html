@@ -2175,11 +2175,11 @@ if (typeof loadDesktopSessions === "function") {
     refreshSummaryMeta();
     refreshDesktopPanels();
 
-    if (typeof window.NovaLoadMemory === "function") {
-      setTimeout(() => {
-        window.NovaLoadMemory();
-      }, 250);
-    }
+if (typeof window.NovaMemoryV2Load === "function") {
+  setTimeout(() => {
+    window.NovaMemoryV2Load();
+  }, 250);
+}
 
   } catch (e) {
     console.warn("sendText error:", e);
@@ -3693,13 +3693,6 @@ function render(payload) {
 
 window.NovaLegacyMemoryHardlockObserverDisabled = true;
   }
-
-  window.NovaDesktopMemoryHardlock = load;
-  window.NovaOpenDesktopMemory = load;
-  window.NovaDesktopOpenMemoryRescue = load;
-  window.NovaLoadMemory = load;
-  window.loadMemory = load;
-  window.loadMemories = load;
 
 window.NovaLegacyMemoryHardlockDisabled = true;
 
