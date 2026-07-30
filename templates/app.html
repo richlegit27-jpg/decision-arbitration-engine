@@ -9257,28 +9257,24 @@ body {
         if (!tools || !memory) return;
 
         Array.from(tools.children).forEach(function (child) {
-            if (
-    child === memory ||
-    child.classList.contains("execution-section")
-) {
-                child.hidden = false;
-                child.removeAttribute("hidden");
+    if (
+        child === memory ||
+        child.classList.contains("execution-section")
+    ) {
+        child.hidden = false;
+        child.removeAttribute("hidden");
+        child.style.display = "block";
+        child.style.visibility = "visible";
+        child.style.opacity = "1";
+        child.style.order = "";
 
-                if (child.style.display !== "block") child.style.display = "block";
-                if (child.style.visibility !== "visible") child.style.visibility = "visible";
-                if (child.style.opacity !== "1") child.style.opacity = "1";
-                if (child.style.order !== "-9999") child.style.order = "-9999";
+        return;
+    }
 
-                return;
-            }
+    child.hidden = false;
+    child.removeAttribute("hidden");
+});
 
-            if (!child.hidden) child.hidden = true;
-            if (child.style.display !== "none") child.style.display = "none";
-        });
-
-        if (tools.firstElementChild !== memory) {
-            tools.insertBefore(memory, tools.firstElementChild);
-        }
 
         tools.style.display = "flex";
         tools.style.flexDirection = "column";
