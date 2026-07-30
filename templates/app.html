@@ -3691,14 +3691,7 @@ function render(payload) {
 
     box.dataset.novaMemoryHardlock = "true";
 
-    var observer = new MutationObserver(function () {
-      var text = String(box.textContent || "").trim().toLowerCase();
-      if (text === "loading" || text === "loading..." || text.indexOf("loading memory") !== -1) {
-        load();
-      }
-    });
-
-observer.observe(box, { childList: true, subtree: true, characterData: true });
+window.NovaLegacyMemoryHardlockObserverDisabled = true;
   }
 
   window.NovaDesktopMemoryHardlock = load;
