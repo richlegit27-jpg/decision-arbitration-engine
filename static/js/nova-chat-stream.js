@@ -739,7 +739,12 @@ if (state.messages.length === 0) {
   async function sendCurrentMessage() {
     if (state.isSending) return;
 
-    const text = getComposerValue().trim();
+const text = getComposerValue().trim();
+
+if (text && typeof window.NovaAutoTitleSession === "function") {
+  window.NovaAutoTitleSession(text);
+}
+
     const hasAttachments = safeArray(state.pendingAttachments).length > 0;
 
     if (!text && !hasAttachments) return;
@@ -751,6 +756,10 @@ if (state.messages.length === 0) {
       setComposerValue("");
       state.pendingAttachments = [];
       setBusy(true);
+if (els.stopBtn) {
+  els.stopBtn.hidden = false;
+}
+
       syncSessionMessages();
 
       const data = await apiPost(CONFIG.chatEndpoint, buildPayload(text));
@@ -771,17 +780,45 @@ if (state.messages.length === 0) {
 
       patchOrInsertAssistantMessage(assistantMessage);
 
-      if (data.session) {
-        const session = normalizeSession(data.session);
-        const existingIndex = state.sessions.findIndex((item) => item.id === session.id);
-        if (existingIndex >= 0) {
-          state.sessions[existingIndex] = session;
-        } else {
-          state.sessions.unshift(session);
-        }
-        state.activeSessionId = session.id;
-        state.messages = safeArray(session.messages).map(normalizeMessage);
-      }
+if (data.session) {
+  const session = normalizeSession(data.session);
+
+  const existingIndex = state.sessions.findIndex(
+    (item) => item.id === session.id
+  );
+
+  if (existingIndex >= 0) {
+    state.sessions[existingIndex] = session;
+  } else {
+    state.sessions.unshift(session);
+  }
+
+  state.activeSessionId = session.id;
+
+  console.log(
+    "[NOVA SESSION REPLACE DEBUG]",
+    {
+      currentMessages: state.messages.length,
+      incomingMessages: safeArray(session.messages).length,
+      sessionId: session.id,
+      incomingSession: session,
+    }
+  );
+
+  const incomingMessages = safeArray(session.messages).map(normalizeMessage);
+
+if (incomingMessages.length > 0) {
+  state.messages = incomingMessages;
+} else {
+  console.warn(
+    "[NOVA SESSION SYNC] ignored empty session message snapshot",
+    {
+      existing: state.messages.length,
+      sessionId: session.id,
+    }
+  );
+}
+}
 
       syncSessionMessages();
       renderSessions();
@@ -798,8 +835,14 @@ if (state.messages.length === 0) {
       });
 
       syncSessionMessages();
+
     } finally {
       setBusy(false);
+
+      if (els.stopBtn) {
+        els.stopBtn.hidden = true;
+      }
+
       scrollMessagesToBottom(true);
     }
   }
@@ -814,6 +857,35 @@ if (state.messages.length === 0) {
   function wireDom() {
     els.composer = findComposer();
     els.sendBtn = findSendBtn();
+els.stopBtn = document.getElementById("stopBtn");
+
+if (els.stopBtn) {
+els.stopBtn.addEventListener("click", async function () {
+  if (state.abortController) {
+    state.abortController.abort();
+  }
+
+  try {
+    await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        content: "stop",
+        session_id: state.activeSessionId
+      })
+    });
+  } catch (error) {
+    console.warn("[NOVA stop] execution stop failed", error);
+  }
+
+  if (els.stopBtn) {
+    els.stopBtn.hidden = true;
+  }
+});
+}
+
     els.messagesRoot = findMessagesRoot();
     els.sessionRoot = findSessionRoot();
     els.modelSelect = findModelSelect();
