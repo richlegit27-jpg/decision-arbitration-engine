@@ -8227,18 +8227,7 @@ body {
         loadMemoryControlData();
     }
 
-    window.NovaBootMemoryControlCenter = bootMemoryControlCenter;
-    window.NovaLoadDesktopMemory = loadMemoryControlData;
-    window.loadDesktopMemory = loadMemoryControlData;
-
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", bootMemoryControlCenter);
-    } else {
-        bootMemoryControlCenter();
-    }
-
-    setTimeout(bootMemoryControlCenter, 400);
-    setTimeout(bootMemoryControlCenter, 1200);
+window.NovaLegacyMemoryBootDisabled = true;
 })();
 </script>
 
@@ -8569,6 +8558,7 @@ body {
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", function () {});
     }
+
 
 })();
 </script>
