@@ -9265,31 +9265,6 @@ body {
 })();
 </script>
 
-
-
-
-
-<!-- NOVA_TOOLS_PANEL_MEMORY_ONLY_STABLE_20260622 -->
-<style>
-/* Stable rule: right tools panel is Memory-only without re-render shaking */
-.panel.tools > :not(.memory-section),
-.tools > :not(.memory-section) {
-    display: none !important;
-}
-
-.panel.tools > .memory-section,
-.tools > .memory-section {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    height: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
-    order: -9999 !important;
-    flex: 0 0 auto !important;
-}
-</style>
-
 <script>
 (function () {
     "use strict";
