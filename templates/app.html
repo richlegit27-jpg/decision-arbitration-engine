@@ -1222,31 +1222,6 @@ observer.observe(document.documentElement, {
     </main>
 
     <aside class="panel tools">
-<section class="tools-section execution-section">
-        <h3>Execution</h3>
-        <div class="execution-card">
-          <div class="metric">
-            <span>Status</span>
-            <strong id="executionStatusLabel">loading</strong>
-          </div>
-          <div class="metric">
-            <span>Execution</span>
-            <strong id="executionPercentLabel">...</strong>
-          </div>
-          <div class="metric">
-            <span>Planner</span>
-            <strong id="plannerPercentLabel">...</strong>
-          </div>
-          <div class="metric">
-            <span>Overall</span>
-            <strong id="overallReadinessLabel">...</strong>
-          </div>
-          <div class="execution-note" id="executionNote">
-            Execution status is loading from backend readiness.
-          </div>
-        </div>
-      </section>
-
 <section class="tools-section memory-section">
   <h3>Memory</h3>
   <div class="memory-card-shell">
@@ -1299,6 +1274,32 @@ observer.observe(document.documentElement, {
           <span>Summarize Now</span>
           <span>&gt;</span>
         </button>
+      </section>
+
+
+<section class="tools-section execution-section">
+        <h3>Execution</h3>
+        <div class="execution-card">
+          <div class="metric">
+            <span>Status</span>
+            <strong id="executionStatusLabel">loading</strong>
+          </div>
+          <div class="metric">
+            <span>Execution</span>
+            <strong id="executionPercentLabel">...</strong>
+          </div>
+          <div class="metric">
+            <span>Planner</span>
+            <strong id="plannerPercentLabel">...</strong>
+          </div>
+          <div class="metric">
+            <span>Overall</span>
+            <strong id="overallReadinessLabel">...</strong>
+          </div>
+          <div class="execution-note" id="executionNote">
+            Execution status is loading from backend readiness.
+          </div>
+        </div>
       </section>
 
       <section class="tools-section compact-system">
