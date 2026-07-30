@@ -8567,15 +8567,9 @@ body {
     window.NovaRightPanelMemoryOnlyCleanup = memoryOnlyCleanup;
 
     if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", memoryOnlyCleanup);
-    } else {
-        memoryOnlyCleanup();
+        document.addEventListener("DOMContentLoaded", function () {});
     }
 
-    setTimeout(memoryOnlyCleanup, 250);
-    setTimeout(memoryOnlyCleanup, 800);
-    setTimeout(memoryOnlyCleanup, 1600);
-    window.addEventListener("resize", memoryOnlyCleanup);
 })();
 </script>
 
