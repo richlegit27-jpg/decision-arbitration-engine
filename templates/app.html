@@ -9235,14 +9235,7 @@ function filteredItems() {
     window.NovaLoadDesktopMemory = load;
     window.NovaBootMemoryControlCenter = boot;
 
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", boot);
-    } else {
-        boot();
-    }
-
-    setTimeout(boot, 400);
-    setTimeout(boot, 1200);
+// NOVA_MEMORY_CONTROL_CENTER_LEGACY_BOOT_DISABLED
 })();
 </script>
 
