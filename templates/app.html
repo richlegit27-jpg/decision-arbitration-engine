@@ -8176,33 +8176,29 @@ body {
             return;
         }
 
-        list.innerHTML = visible.map(function (item, index) {
-            const text = getMemoryText(item) || JSON.stringify(item, null, 2);
-            const kind = getMemoryKind(item);
-            const pinned = isPinned(item);
-            const id = getMemoryId(item);
+list.innerHTML = visible.map(function (item, index) {
+    const kind = kindOf(item);
+    const id = idOf(item);
+    const text = textOf(item) || JSON.stringify(item, null, 2);
 
-            return `
-                <article class="nova-memory-card" data-memory-index="${index}" data-memory-id="${escapeMemory(id)}">
-                    <div class="nova-memory-card-meta">
-                        <span>${escapeMemory(kind)}</span>
-                        ${pinned ? "<span>pinned</span>" : ""}
-                        ${id ? "<span>ID</span>" : ""}
-                    </div>
+    return `
+        <article class="nova-memory-card" data-memory-index="${index}">
+            <div class="nova-memory-card-top">
+                <div class="nova-memory-pill-row">
+                    <span class="nova-memory-pill">${esc(labelForKind(kind))}</span>
+                    ${id ? "<span class='nova-memory-pill'>ID</span>" : ""}
+                </div>
+            </div>
 
-                    <div class="nova-memory-card-text">${escapeMemory(text)}</div>
+            <div class="nova-memory-card-text">${esc(text)}</div>
 
-                    <div class="nova-memory-card-actions">
-                        <button class="nova-memory-item-btn" type="button" data-memory-action="pin" data-memory-index="${index}">
-                            ${pinned ? "Unpin" : "Pin"}
-                        </button>
-                        <button class="nova-memory-item-btn" type="button" data-memory-action="delete" data-memory-index="${index}">
-                            Delete
-                        </button>
-                    </div>
-                </article>
-            `;
-        }).join("");
+            <div class="nova-memory-card-actions">
+                <button class="nova-memory-card-action danger" type="button" data-action="delete" data-index="${index}">Delete</button>
+            </div>
+        </article>
+    `;
+}).join("");
+
 
         list.querySelectorAll("[data-memory-action]").forEach(function (button) {
             button.addEventListener("click", function () {
@@ -8211,13 +8207,9 @@ body {
 
                 if (!item) return;
 
-                if (button.dataset.memoryAction === "pin") {
-                    pinMemory(item);
-                }
-
-                if (button.dataset.memoryAction === "delete") {
-                    deleteMemory(item);
-                }
+if (button.dataset.memoryAction === "delete") {
+    deleteMemory(item);
+}
             });
         });
     }
@@ -8933,7 +8925,6 @@ body {
                 <button class="nova-memory-v2-filter" type="button" data-filter="preference">Preferences</button>
                 <button class="nova-memory-v2-filter" type="button" data-filter="project">Project</button>
                 <button class="nova-memory-v2-filter" type="button" data-filter="people">People</button>
-                <button class="nova-memory-v2-filter" type="button" data-filter="delete">Delete</button>
             </div>
         `;
 
@@ -8963,11 +8954,6 @@ body {
 
 shell.querySelectorAll("[data-filter]").forEach(function (button) {
     button.addEventListener("click", function () {
-
-        if (button.dataset.filter === "delete") {
-            status("Delete mode coming next.");
-            return;
-        }
 
         activeFilter = button.dataset.filter || "all";
 
@@ -9185,9 +9171,8 @@ function filteredItems() {
             return;
         }
 
-        list.innerHTML = visible.map(function (item, index) {
+                list.innerHTML = visible.map(function (item, index) {
             const kind = kindOf(item);
-            const pinned = pinnedOf(item);
             const id = idOf(item);
             const text = textOf(item) || JSON.stringify(item, null, 2);
 
@@ -9196,18 +9181,15 @@ function filteredItems() {
                     <div class="nova-memory-card-top">
                         <div class="nova-memory-pill-row">
                             <span class="nova-memory-pill">${esc(labelForKind(kind))}</span>
-                            ${pinned ? "<span class='nova-memory-pill pinned'>Pinned</span>" : ""}
-                            ${id ? "<span class='nova-memory-pill'>ID</span>" : ""}
+                            ${id ? "<span class="nova-memory-pill">ID</span>" : ""}
                         </div>
                     </div>
 
                     <div class="nova-memory-card-text">${esc(text)}</div>
 
-                    <div class="nova-memory-card-actions">
-                        <button class="nova-memory-card-action" type="button" data-action="edit" data-index="${index}">Edit</button>
-                        <button class="nova-memory-card-action" type="button" data-action="pin" data-index="${index}">${pinned ? "Unpin" : "Pin"}</button>
-                        <button class="nova-memory-card-action danger" type="button" data-action="delete" data-index="${index}">Delete</button>
-                    </div>
+<div class="nova-memory-card-actions">
+    <button class="nova-memory-card-action danger" type="button" data-action="delete" data-index="${index}">Delete</button>
+</div>
                 </article>
             `;
         }).join("");
@@ -9217,9 +9199,9 @@ function filteredItems() {
                 const index = Number(button.dataset.index || "-1");
                 const action = button.dataset.action;
 
-                if (action === "edit") startEdit(index);
-                if (action === "pin") togglePin(index);
-                if (action === "delete") removeMemory(index);
+                if (action === "delete") {
+                    removeMemory(index);
+                }
             });
         });
     }
@@ -9236,6 +9218,7 @@ function filteredItems() {
     window.NovaBootMemoryControlCenter = boot;
 
 // NOVA_MEMORY_CONTROL_CENTER_LEGACY_BOOT_DISABLED
+
 })();
 </script>
 
