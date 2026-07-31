@@ -143,8 +143,19 @@ def _nova_session_title_from_message_20260624(message) -> str:
     if low.startswith("http://") or low.startswith("https://"):
         return ""
 
-    return text[:60].rstrip(" .,-_:;") or ""
+        words = text.split()
 
+    if len(words) > 6:
+        title = " ".join(words[:6])
+    else:
+        title = text
+
+    title = title.strip(" .,-_:;")
+
+    if not title:
+        return ""
+
+    return title[:45]
 
 class SessionService:
     MAX_SESSION_MESSAGES = 80
@@ -866,6 +877,30 @@ class SessionService:
 
         return True
 
+    def delete_all(self, user_id=""):
+        if not user_id:
+            user_id = self._current_owner_id()
+
+        data = self._read_store()
+
+        sessions = data.get("sessions", [])
+
+        if not isinstance(sessions, list):
+            return 0
+
+        before = len(sessions)
+
+        data["sessions"] = [
+            session
+            for session in sessions
+            if str(session.get("user_id") or "") != str(user_id)
+        ]
+
+        deleted = before - len(data["sessions"])
+
+        self._write_store(data)
+
+        return deleted
     # -----------------------
     # WORKING STATE
     # -----------------------

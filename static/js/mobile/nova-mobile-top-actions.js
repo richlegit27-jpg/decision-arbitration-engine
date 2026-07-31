@@ -11,16 +11,17 @@
     window.__NOVA_MOBILE_TOP_ACTIONS_OWNER_V1__ = true;
 
 
-    const PARK_IDS = [
-        "mobileMenuButton",
-        "mobileMemoryButton",
-        "nova-mobile-copy-chat",
-        "nova-mobile-rail-copy",
-        "nova-mobile-rail-regen",
-        "nova-mobile-bottom-login",
-        "nova-mobile-account-fallback-menu",
-        "nova-mobile-real-menu-account"
-    ];
+const PARK_IDS = [
+    "mobileMenuButton",
+    "nova-mobile-memory-toggle",
+    "nova-mobile-copy-chat",
+    "nova-mobile-rail-copy",
+    "nova-mobile-rail-regen",
+    "nova-mobile-bottom-login",
+    "nova-mobile-account-fallback-menu",
+    "nova-mobile-real-menu-account"
+];
+
 
 
     function setImportant(el, prop, value) {
@@ -301,10 +302,11 @@
 
     function unparkRealHeaderButtons() {
 
-        [
-            "nova-mobile-new-chat",
-            "nova-mobile-sessions-toggle"
-        ]
+[
+    "nova-mobile-new-chat",
+    "nova-mobile-sessions-toggle",
+    "nova-mobile-memory-toggle"
+]
         .forEach(id => {
 
             const el =

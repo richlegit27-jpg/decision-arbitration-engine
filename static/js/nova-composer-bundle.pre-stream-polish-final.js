@@ -575,7 +575,8 @@ async function openArtifactFromStateOrBackend(artifactId) {
 
     setBusyUi(false);
 
-    const session = activeSession();
+    const session =
+ activeSession();
     const title = session && session.title ? session.title : "Nova";
     const subtitle =
       session && Number(session.message_count || safeArray(session.messages).length || 0) > 0
@@ -1727,6 +1728,12 @@ function handleStreamEvent(event) {
 
 async function consumeChatStreamStable(payload) {
 try {
+
+const stopBtn = document.getElementById("stopBtn");
+
+if (stopBtn) {
+    stopBtn.hidden = false;
+}
   const response = await fetch("/api/chat", {
     method: "POST",
     credentials: "same-origin",

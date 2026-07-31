@@ -224,7 +224,7 @@ document.addEventListener("DOMContentLoaded", () => {
         
         // NOVA_AUTH_SUCCESS_REDIRECT_REGEX_20260610
         if (data && data.authenticated) {
-          window.location.href = "/mobile";
+          window.location.href = "/app";
           return;
         }
 window.location.href = data.redirect_to || "/app";
@@ -252,7 +252,7 @@ window.location.href = data.redirect_to || "/app";
         
         // NOVA_AUTH_SUCCESS_REDIRECT_REGEX_20260610
         if (data && data.authenticated) {
-          window.location.href = "/mobile";
+          window.location.href = "/app";
           return;
         }
 window.location.href = data.redirect_to || "/app";

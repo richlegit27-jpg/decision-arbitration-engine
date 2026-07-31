@@ -328,6 +328,7 @@ function sessionIdFromUrl() {
             '<div style="display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid rgba(255,255,255,.1);">',
             '    <strong id="' + IDS.title + '" style="font-size:15px;flex:1;">Sessions</strong>',
             '    <button type="button" data-nova-action="new" style="height:34px;border-radius:10px;border:0;padding:0 10px;font-weight:800;">New</button>',
+            '    <button type="button" data-nova-action="delete-all" style="height:34px;border-radius:10px;border:0;padding:0 10px;font-weight:800;">Delete All</button>',
             '    <button type="button" data-nova-action="close" style="height:34px;border-radius:10px;border:0;padding:0 10px;font-weight:800;">Close</button>',
             "</div>",
             '<div id="' + IDS.status + '" style="min-height:20px;padding:8px 12px;color:rgba(255,255,255,.72);font-size:12px;"></div>',
@@ -360,6 +361,11 @@ function sessionIdFromUrl() {
                     await createNewSession();
                     return;
                 }
+
+if (action === "delete-all") {
+    await deleteAllSessions();
+    return;
+}
 
                 if (action === "open" && id) {
                     await openSession(id);
@@ -395,14 +401,18 @@ function sessionRow(session, activeId) {
 
     let title = String(session.title || "").trim();
 
-    if (!title) {
+    if (!title || title === "New Chat") {
         const count =
             session.message_count ??
             (Array.isArray(session.messages) ? session.messages.length : 0);
 
         title = count > 0
-            ? "Session " + String(session.id || session.session_id || "").slice(-8)
-            : "Empty session";
+            ? "Conversation"
+            : "Untitled Chat";
+    }
+
+    if (title.length > 32) {
+        title = title.slice(0, 32) + "...";
     }
 
     const pinned = !!session.pinned;
@@ -669,6 +679,40 @@ function renderSession(payload) {
 
         setStatus(pinned ? "Pinned" : "Unpinned");
     }
+
+async function deleteAllSessions() {
+    const sessions = window.NOVA_SESSION_CORE.sessions || [];
+
+    if (!sessions.length) {
+        setStatus("No sessions to delete");
+        return;
+    }
+
+    if (!confirm("Delete all sessions?\n\nThis cannot be undone.")) {
+        return;
+    }
+
+    setStatus("Deleting sessions...");
+
+    for (const session of sessions) {
+        const id = session.id || session.session_id;
+
+        if (!id) {
+            continue;
+        }
+
+        await jsonFetch(API.delete, {
+            method: "POST",
+            body: JSON.stringify({
+                session_id: id
+            })
+        });
+    }
+
+    setStatus("All sessions deleted");
+
+    await loadSessions();
+}
 
     async function deleteSession(id, row) {
         const title = row

@@ -6622,6 +6622,12 @@ async function consumeChatStreamStable(payload) {
   try {
     state.stream.controller = new AbortController();
 
+  const stopBtn = document.getElementById("stopBtn");
+
+  if (stopBtn) {
+    stopBtn.hidden = false;
+  }
+
     const response = await fetch("/api/chat", {
       method: "POST",
       credentials: "same-origin",
@@ -6690,9 +6696,17 @@ async function consumeChatStreamStable(payload) {
           statusState: "done",
         });
 
+
+
         state.stream.running = false;
         state.stream.targetMessageId = null;
         setBusyUi(false);
+
+    const stopBtn = document.getElementById("stopBtn");
+
+    if (stopBtn) {
+      stopBtn.hidden = true;
+    }
 
         return data;
       }

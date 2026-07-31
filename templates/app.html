@@ -384,6 +384,14 @@
       font-weight: 900;
     }
 
+.session-delete-all-button {
+  width: 100%;
+  text-align: center;
+  justify-content: center;
+  display: flex;
+  align-items: center;
+}
+
     .session-current-card,
     .session-list-shell {
       border: 1px solid var(--line);
@@ -1158,27 +1166,39 @@ observer.observe(document.documentElement, {
       <section class="workspace-section">
         <div class="section-title-row">
           <div>
-            <h2>Sessions</h2>
-            <p>Pick up, start, or organize conversations.</p>
+<h2>Conversations</h2>
+<p>Start new chats and manage your saved conversations.</p>
           </div>
         </div>
 
-        <button class="primary-side-button" id="newSessionBtn" type="button">
-          <span>New Chat</span>
-          <span>+</span>
-        </button>
+<button class="primary-side-button" id="newSessionBtn"
+type="button">
+  <span>New Chat</span>
+  <span>+</span>
+</button>
 
-        <div class="session-current-card">
-          <div class="session-label">Current Session</div>
-          <input id="sid" spellcheck="false" />
-        </div>
+<div class="session-current-card">
+  <div class="session-label">Current Conversation</div>
+  <div id="currentSessionTitle">
+    New Chat
+  </div>
+</div>
 
-        <div class="session-list-shell">
-          <div class="session-label">Recent</div>
-          <div id="desktopSessionList" class="desktop-session-list">
-            <div class="session-placeholder">Loading sessions...</div>
-          </div>
-        </div>
+<div class="session-list-shell">
+  <div class="session-label">Recent Conversations</div>
+
+  <div id="desktopSessionList" class="desktop-session-list">
+    <div class="session-placeholder">Loading conversations...</div>
+  </div>
+
+  <button
+    class="session-delete-all-button"
+    id="deleteAllSessionsBtn"
+    type="button">
+    Delete All Conversations
+  </button>
+</div>
+
       </section>
 
 <div class="side-footer-links">
@@ -1201,7 +1221,7 @@ observer.observe(document.documentElement, {
 
           <select id="modelSelect"></select>
         </div>
-
+app:2129 &#12820
       </header>
 
       <section id="chat" class="messages chat-messages desktop-rescue-messages" data-messages="true">
@@ -1213,11 +1233,44 @@ observer.observe(document.documentElement, {
 
       <div class="composer">
         <input id="desktopFileInput" type="file" hidden />
+
         <button id="attachBtn" class="attach-button" type="button" aria-label="Attach file">
-  <span class="attach-icon">&#128206;</span>
-</button>
+          <span class="attach-icon">&#128206;</span>
+        </button>
+
         <textarea id="input" placeholder="Message Nova... Enter sends, Shift+Enter makes a new line"></textarea>
-        <button id="sendBtn" type="button">Send</button>
+
+        <button
+          id="desktopVoiceBtn"
+          class="desktop-voice-tts-button"
+          type="button"
+          title="Dictate into the message box"
+        >
+          🎤
+        </button>
+
+        <button
+          id="desktopSpeakBtn"
+          class="desktop-voice-tts-button"
+          type="button"
+          title="Read the latest assistant reply aloud"
+        >
+          🔊
+        </button>
+
+<button
+  id="stopBtn"
+  class="desktop-stop-button"
+  data-stop-button
+  type="button"
+  hidden
+>
+  Stop
+</button>
+
+        <button id="sendBtn" type="button">
+          Send
+        </button>
       </div>
     </main>
 
@@ -1269,7 +1322,7 @@ observer.observe(document.documentElement, {
       </section>
 
       <section class="tools-section">
-        <h3>Session Tools</h3>
+        <h3>Conversation Tools</h3>
         <button class="utility-button" id="summarizeBtn" type="button">
           <span>Summarize Now</span>
           <span>&gt;</span>
@@ -1400,12 +1453,10 @@ function setSessionId(v) {
   const el = document.getElementById("sid");
   if (el) el.value = sid;
 
-  try {
-    localStorage.setItem(LS_SID, sid);
-    localStorage.setItem("nova_active_session_id", sid);
-    localStorage.setItem("nova_session_id", sid);
-    sessionStorage.setItem("nova_active_session_id", sid);
-  } catch (e) {}
+  localStorage.setItem(LS_SID, sid);
+  localStorage.setItem("nova_active_session_id", sid);
+  localStorage.setItem("nova_session_id", sid);
+  sessionStorage.setItem("nova_active_session_id", sid);
 
   window.__NOVA_ACTIVE_SESSION_ID = sid;
 }
@@ -1778,6 +1829,7 @@ async function newSession() {
         setMeta(j.summary || j.text || "");
         addMsg("assistant", j.summary || j.text || "Summary refreshed.");
         setStatus("idle");
+
       } finally {
         summarizeBtn.disabled = false;
       }
@@ -1818,7 +1870,7 @@ async function newSession() {
     // NOVA_DESKTOP_ATTACH_UPLOAD_20260610
 
 function showDesktopAttachmentChip(text) {
-  let chip = document.getElementById("desktopAttachmentChip") || desktopAttachmentChip;
+  let chip = document.getElementById("desktopAttachmentChip");
 
   if (!chip) {
     chip = document.createElement("div");
@@ -2092,9 +2144,17 @@ function showThinking(node) {
 }
 
 
-
 async function sendText(textOverride) {
-  console.log("&#128206; sendText TRIGGERED");
+  console.log("📎 sendText TRIGGERED");
+
+
+  console.log("[STOP DEBUG] sendText reached", stopBtn);
+
+  if (stopBtn) {
+
+    stopBtn.hidden = false;
+    console.log("[STOP DEBUG] MADE VISIBLE", stopBtn.hidden);
+}
 
   const liveInput = document.getElementById("input") || document.querySelector("textarea");
   const capturedText = window.__novaLastInputBeforeSend || "";
@@ -2123,7 +2183,12 @@ async function sendText(textOverride) {
 
 const forcingNewSession = window.NOVA_FORCE_NEW_SESSION_ON_NEXT_SEND === true;
 
-    const response = await fetch("/api/chat", {
+    const controller = new AbortController();
+
+window.NOVA_ACTIVE_CHAT_CONTROLLER = controller;
+
+const response = await fetch("/api/chat", {
+  signal: controller.signal,
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -2161,11 +2226,13 @@ window.NOVA_PENDING_NEW_SESSION_ID = "";
       setSessionId(String(freshSessionId));
       console.log("[NOVA sessions] adopted backend session", freshSessionId);
 
+/*
 console.log("[Nova Desktop Sessions Button] clicked");
 
 if (typeof loadDesktopSessions === "function") {
   loadDesktopSessions();
 }
+*/
     }
 
     renderAssistantMessage(assistantNode, data);
@@ -2175,23 +2242,28 @@ if (typeof loadDesktopSessions === "function") {
     refreshSummaryMeta();
     refreshDesktopPanels();
 
-    if (typeof window.NovaLoadMemory === "function") {
-      setTimeout(() => {
-        window.NovaLoadMemory();
-      }, 250);
-    }
+if (typeof window.NovaMemoryV2Load === "function") {
+  setTimeout(() => {
+    window.NovaMemoryV2Load();
+  }, 250);
+}
 
   } catch (e) {
     console.warn("sendText error:", e);
     assistantNode.textContent = "Error generating response";
     setStatus("error");
 
-  } finally {
+} finally {
     sendBtn.disabled = false;
+
+    if (stopBtn) {
+        stopBtn.hidden = true;
+    }
+
     setStatus("ready");
   }
 }
-
+ 
 function renderMessageWithCodeBlocks(container, text) {
     container.innerHTML = "";
 
@@ -2394,6 +2466,9 @@ function handleSendClick(prompt = "") {
     });
 }
 
+window.handleSendClick = handleSendClick;
+window.sendText = sendText;
+
     summarizeBtn.addEventListener("click", () => summarizeNow().catch(e => {
       setStatus("error");
       alert(e.message || e);
@@ -2420,6 +2495,22 @@ refreshDesktopPanels();
 // -------------------------
 // EVENT BINDING
 // -------------------------
+
+
+if (stopBtn) {
+    stopBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (window.NOVA_ACTIVE_CHAT_CONTROLLER) {
+            window.NOVA_ACTIVE_CHAT_CONTROLLER.abort();
+            window.NOVA_ACTIVE_CHAT_CONTROLLER = null;
+        }
+
+        stopBtn.hidden = true;
+        setStatus("stopped");
+    });
+}
 
 if (sendBtn && input) {
   sendBtn.addEventListener("mousedown", () => {
@@ -2547,30 +2638,11 @@ function normalizeMemoryPayload(data) {
   }
 
 async function loadMemory() {
-  try {
-    var res = await fetch("/api/memory", {
-      headers: { "Accept": "application/json" }
-    });
-
-    var data = await res.json();
-
-    renderMemoryFallback(data);
-    setStatusSafe("memory loaded");
-
-  } catch (error) {
-    if (list) {
-      list.innerHTML = "";
-
-      var failed = document.createElement("div");
-      failed.className = "session-placeholder";
-      failed.textContent = "Could not load memory.";
-
-      list.appendChild(failed);
-    }
-
-    setStatusSafe("memory failed");
-    console.warn("[Nova Desktop Rescue] memory failed", error);
+  if (typeof window.NovaMemoryV2Load === "function") {
+    return window.NovaMemoryV2Load();
   }
+
+  console.warn("[Nova Legacy Memory Loader Disabled]");
 }
 
   function normalizeSessionPayload(data) {
@@ -2635,6 +2707,9 @@ async function loadMemory() {
     if (data.session && Array.isArray(data.session.messages)) return data.session.messages;
     return [];
   }
+
+  window.handleSendClick = handleSendClick;
+  window.sendText = sendText;
 
 </script>
 
@@ -2869,52 +2944,10 @@ function renderDesktopChatMessagesRescue(messages) {
 (function () {
   "use strict";
 
-  function addDesktopSessionsButton() {
-    if (document.getElementById("openSessionsBtn")) return;
-
-    var newButton = document.getElementById("newSessionBtn");
-    var memoryButton = document.getElementById("openMemoryBtn");
-    var host =
-      (newButton && newButton.parentElement) ||
-      (memoryButton && memoryButton.parentElement) ||
-      document.querySelector("aside") ||
-      document.querySelector(".sidebar") ||
-      document.body;
-
-    var button = document.createElement("button");
-    button.id = "openSessionsBtn";
-    button.type = "button";
-    button.className = newButton ? newButton.className : "primary-side-button";
-    button.textContent = "Sessions";
-
-    button.onclick = function (event) {
-      event.preventDefault();
-      event.stopPropagation();
-
-      console.log("[NOVA sessions] refreshing sessions after send")
-
-      if (typeof window.NovaDesktopOpenSessionsRescue === "function") {
-        window.NovaDesktopOpenSessionsRescue().catch(console.error);
-      } else if (typeof window.loadDesktopSessions === "function") {
-        window.loadDesktopSessions();
-        console.log("[Nova Desktop Sessions Button] loaded sessions directly");
-      }
-    };
-
-    if (newButton && newButton.nextSibling) {
-      newButton.parentElement.insertBefore(button, newButton.nextSibling);
-    } else if (newButton) {
-      newButton.parentElement.appendChild(button);
-    } else {
-      host.insertBefore(button, host.firstChild);
-    }
-  }
 
   function bindExactDesktopButtons() {
     var memoryButton = document.getElementById("openMemoryBtn");
     var newButton = document.getElementById("newSessionBtn");
-
-    addDesktopSessionsButton();
 
     if (memoryButton && memoryButton.dataset.novaExactMemoryBound !== "true") {
       memoryButton.dataset.novaExactMemoryBound = "true";
@@ -2951,7 +2984,6 @@ function renderDesktopChatMessagesRescue(messages) {
     setTimeout(bindExactDesktopButtons, 0);
   }
 
-  window.NovaDesktopAddSessionsButton = addDesktopSessionsButton;
   console.log("[Nova Desktop Sessions Button] ready");
 })();
 </script>
@@ -3135,19 +3167,13 @@ try {
     return data.session || data.data || data;
   }
 
-  async function refreshSessionsIfPossible() {
-    try {
-      if (typeof window.loadDesktopSessions === "function") {
-        await window.loadDesktopSessions();
-      }
-    } catch (error) {}
-
+async function refreshSessionsIfPossible() {
     try {
       if (typeof window.NovaDesktopOpenSessionsRescue === "function") {
         await window.NovaDesktopOpenSessionsRescue();
       }
     } catch (error) {}
-  }
+}
 
   async function renameCurrentSession() {
     try {
@@ -3436,22 +3462,11 @@ fetch("/api/memory", { cache: "no-store" })
     }, true);
   }
 
-  window.NovaOpenDesktopMemory = loadDesktopMemory;
-  window.NovaDesktopOpenMemoryRescue = loadDesktopMemory;
-  window.NovaLoadMemory = loadDesktopMemory;
-  window.loadMemory = loadDesktopMemory;
-  window.loadMemories = loadDesktopMemory;
+window.NovaLegacyMemoryFinalRendererDisabled = true;
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", wire);
-  } else {
-    wire();
-  }
+wire();
 
-  setTimeout(wire, 500);
-  setTimeout(wire, 1500);
-
-  console.log("[Nova Desktop Memory Final Renderer] ready");
+console.log("[Nova Desktop Voice/TTS Final] ready");
 })();
 (function () {
   "use strict";
@@ -3692,33 +3707,10 @@ function render(payload) {
 
     box.dataset.novaMemoryHardlock = "true";
 
-    var observer = new MutationObserver(function () {
-      var text = String(box.textContent || "").trim().toLowerCase();
-      if (text === "loading" || text === "loading..." || text.indexOf("loading memory") !== -1) {
-        load();
-      }
-    });
-
-    observer.observe(box, { childList: true, subtree: true, characterData: true });
-
-    load();
+window.NovaLegacyMemoryHardlockObserverDisabled = true;
   }
 
-  window.NovaDesktopMemoryHardlock = load;
-  window.NovaOpenDesktopMemory = load;
-  window.NovaDesktopOpenMemoryRescue = load;
-  window.NovaLoadMemory = load;
-  window.loadMemory = load;
-  window.loadMemories = load;
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", hardlock);
-  } else {
-    hardlock();
-  }
-
-  setTimeout(hardlock, 500);
-  setTimeout(hardlock, 1500);
+window.NovaLegacyMemoryHardlockDisabled = true;
 
   console.log("[Nova Desktop Memory Hardlock] ready");
 })();
@@ -3816,14 +3808,6 @@ function render(payload) {
     });
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", wire);
-  } else {
-    wire();
-  }
-
-  setTimeout(wire, 500);
-  setTimeout(wire, 1500);
 
   console.log("[Nova Desktop Quick Buttons Final] ready");
 
@@ -3889,7 +3873,7 @@ function render(payload) {
     btn.textContent = text;
     btn.title = title || text;
     btn.className = "desktop-voice-tts-button";
-    btn.style.cssText = "min-height:38px;padding:0 12px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);color:inherit;cursor:pointer;";
+    btn.style.cssText = "";
 
     var host = composer();
     var send = sendButton();
@@ -4032,9 +4016,17 @@ function render(payload) {
   }
 
   function wire() {
-    var voice = ensureButton("desktopVoiceBtn", "Voice", "Dictate into the message box");
-    var speak = ensureButton("desktopSpeakBtn", "Speak", "Read the latest assistant reply aloud");
+var voice = ensureButton(
+    "desktopVoiceBtn",
+    "🎤",
+    "Dictate into the message box"
+);
 
+var speak = ensureButton(
+    "desktopSpeakBtn",
+    "🔊",
+    "Read the latest assistant reply aloud"
+);
     if (voice.dataset.novaVoiceWired !== "true") {
       voice.dataset.novaVoiceWired = "true";
       voice.addEventListener("click", function (event) {
@@ -4054,16 +4046,11 @@ function render(payload) {
     }
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", wire);
-  } else {
-    wire();
-  }
+window.NovaLegacyMemoryFinalRendererDisabled = true;
 
-  setTimeout(wire, 500);
-  setTimeout(wire, 1500);
+wire();
 
-  console.log("[Nova Desktop Voice/TTS Final] ready");
+console.log("[Nova Desktop Voice/TTS Final] ready");
 })();
 </script>
 
@@ -4093,13 +4080,29 @@ function render(payload) {
     }
   }
 
-  button,
-  .primary-side-button,
-  .footer-mini-button,
-  .nova-current-session-manager-btn,
-  .attach-button,
-  .desktop-voice-tts-button,
-  #sendBtn {
+.desktop-stop-button {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(220,38,38,.85);
+  color: white;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.desktop-stop-button:hover {
+  filter: brightness(1.1);
+}
+
+button,
+.primary-side-button,
+.footer-mini-button,
+.nova-current-session-manager-btn,
+.attach-button,
+.desktop-voice-tts-button,
+.desktop-stop-button,
+#sendBtn {
     transition:
       transform 140ms ease,
       box-shadow 180ms ease,
@@ -4126,6 +4129,7 @@ function render(payload) {
   .nova-current-session-manager-btn:active,
   .attach-button:active,
   .desktop-voice-tts-button:active,
+  .desktop-stop-button:active,
   #sendBtn:active {
     transform: translateY(0) scale(0.97) !important;
     opacity: 0.86 !important;
@@ -4137,6 +4141,7 @@ function render(payload) {
   .nova-current-session-manager-btn:focus-visible,
   .attach-button:focus-visible,
   .desktop-voice-tts-button:focus-visible,
+  .desktop-stop-button:focus-visible,
   #sendBtn:focus-visible {
     outline: 2px solid rgba(216, 180, 254, 0.85) !important;
     outline-offset: 2px !important;
@@ -4171,6 +4176,29 @@ function render(payload) {
       animation: none !important;
     }
   }
+
+.desktop-voice-tts-button {
+    min-width: 42px;
+    height: 38px;
+    padding: 0 10px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,.08);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.desktop-voice-tts-button:hover {
+    background: rgba(168,85,247,.18);
+}
+
+#desktopVoiceBtn,
+#desktopSpeakBtn {
+    flex: 0 0 auto;
+}
+
 </style>
 
 <script>
@@ -4797,6 +4825,22 @@ try {
     return null;
   }
 
+if (
+    session &&
+    Array.isArray(session.messages) &&
+    session.messages.length === 0 &&
+    window.NovaCurrentSessionManager &&
+    window.NovaCurrentSessionManager.currentSession &&
+    Array.isArray(window.NovaCurrentSessionManager.currentSession.messages) &&
+    window.NovaCurrentSessionManager.currentSession.messages.length > 0
+) {
+    console.warn(
+        "[Nova Recovery] ignored empty session replacement",
+        session.id
+    );
+    return window.NovaCurrentSessionManager.currentSession;
+}
+
   function ensureManager(session) {
     if (!session || typeof session !== "object") return null;
 
@@ -4959,8 +5003,9 @@ window.__NOVA_ACTIVE_SESSION = session;
     ensureManager(session);
 
      if (
-        Array.isArray(session.messages) &&
-        session.messages.length === 0 &&
+session &&
+Array.isArray(session.messages) &&
+session.messages.length === 0 &&
         session.meta &&
         session.meta.onboarding &&
         typeof window.renderDesktopOnboarding === "function"
@@ -6297,7 +6342,7 @@ console.log("[Nova Force New Chat] cleared chat");
 
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
-<script src="/static/js/nova-desktop-sessions.js?v=session-open-fix-20260621-1"></script>
+<script src="/static/js/nova-desktop-sessions.js?v=session-open-fix-20260730-4"></script>
 
 <script src="/static/js/nova-chat-stream.js"></script>
 
@@ -7589,9 +7634,38 @@ body {
         }
     }
 
-    function wire() {
-        const button = document.getElementById("openMemoryBtn");
-        if (!button || button.dataset.novaRealPanelScrollFixed === "true") return;
+function wire() {
+
+var host =
+    document.querySelector(".composer") ||
+    document.getElementById("input")?.parentElement ||
+    document.body;
+    var send = document.getElementById("sendBtn");
+
+    console.log(
+        "[VOICE DEBUG] composer:",
+        host,
+        "send:",
+        send
+    );
+
+    var voice = ensureButton(
+        "desktopVoiceBtn",
+        "Voice",
+        "Dictate into the message box"
+    );
+
+    var speak = ensureButton(
+        "desktopSpeakBtn",
+        "Speak",
+        "Read the latest assistant reply aloud"
+    );
+
+    console.log(
+        "[VOICE DEBUG] created:",
+        voice,
+        speak
+    );
 
         button.dataset.novaRealPanelScrollFixed = "true";
 
@@ -7617,6 +7691,10 @@ body {
 
     setTimeout(wire, 300);
     setTimeout(wire, 1000);
+})();
+</script>
+
+
 })();
 </script>
 
@@ -8227,18 +8305,7 @@ body {
         loadMemoryControlData();
     }
 
-    window.NovaBootMemoryControlCenter = bootMemoryControlCenter;
-    window.NovaLoadDesktopMemory = loadMemoryControlData;
-    window.loadDesktopMemory = loadMemoryControlData;
-
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", bootMemoryControlCenter);
-    } else {
-        bootMemoryControlCenter();
-    }
-
-    setTimeout(bootMemoryControlCenter, 400);
-    setTimeout(bootMemoryControlCenter, 1200);
+window.NovaLegacyMemoryBootDisabled = true;
 })();
 </script>
 
@@ -8372,8 +8439,8 @@ body {
             window.loadDesktopMemory();
         } else if (typeof window.NovaLoadDesktopMemory === "function") {
             window.NovaLoadDesktopMemory();
-        } else if (typeof window.NovaBootMemoryControlCenter === "function") {
-            window.NovaBootMemoryControlCenter();
+        } else if (typeof window.NovaMemoryV2Boot === "function") {
+            window.NovaMemoryV2Boot();
         }
 
         setTimeout(function () {
@@ -8410,72 +8477,13 @@ body {
         oldButton.replaceWith(newButton);
     }
 
-    function ensureMemoryTypedInput() {
-        const memory = document.querySelector(".memory-section");
-        const list = document.getElementById("desktopMemoryList");
+function ensureMemoryTypedInput() {
+    window.NovaLegacyTypedMemoryDisabled = true;
+    return;
+}
 
-        if (!memory || !list) return;
-
-        if (!document.getElementById("novaMemoryComposeBox")) {
-            const box = document.createElement("div");
-            box.id = "novaMemoryComposeBox";
-            box.className = "nova-memory-compose";
-
-            box.innerHTML = `
-                <textarea id="novaMemoryComposeInput" placeholder="Type what you want Nova to remember..."></textarea>
-
-                <div class="nova-memory-compose-row">
-                    <select id="novaMemoryComposeKind">
-                        <option value="preference">Preference</option>
-                        <option value="project">Project Note</option>
-                        <option value="people">People</option>
-                        <option value="general">General</option>
-                    </select>
-
-                    <button id="novaMemorySaveTypedBtn" type="button">Save Memory</button>
-                </div>
-
-                <div id="novaMemoryComposeStatus">Ctrl+Enter saves too.</div>
-            `;
-
-            list.parentNode.insertBefore(box, list);
-
-            const save = box.querySelector("#novaMemorySaveTypedBtn");
-            const input = box.querySelector("#novaMemoryComposeInput");
-            const kind = box.querySelector("#novaMemoryComposeKind");
-
-            if (save) {
-                save.addEventListener("click", function () {
-                    postTypedMemory(input ? input.value : "", kind ? kind.value : "general");
-                });
-            }
-
-            if (input) {
-                input.addEventListener("keydown", function (event) {
-                    if (event.ctrlKey && event.key === "Enter") {
-                        event.preventDefault();
-                        postTypedMemory(input.value, kind ? kind.value : "general");
-                    }
-                });
-            }
-        }
-
-        replacePromptButton("novaMemoryAddPreferenceBtn", "preference");
-        replacePromptButton("novaMemoryAddProjectBtn", "project");
-    }
-
-    window.NovaEnsureMemoryTypedInput = ensureMemoryTypedInput;
-    window.NovaSaveTypedMemory = postTypedMemory;
-
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", ensureMemoryTypedInput);
-    } else {
-        ensureMemoryTypedInput();
-    }
-
-    setTimeout(ensureMemoryTypedInput, 300);
-    setTimeout(ensureMemoryTypedInput, 900);
-    setTimeout(ensureMemoryTypedInput, 1600);
+window.NovaEnsureMemoryTypedInput = ensureMemoryTypedInput;
+window.NovaLegacyTypedMemoryDisabled = true;
 })();
 </script>
 
@@ -8555,27 +8563,20 @@ body {
             }
         }
 
-        if (typeof window.NovaEnsureMemoryTypedInput === "function") {
-            window.NovaEnsureMemoryTypedInput();
-        }
+window.NovaLegacyTypedMemoryBootDisabled = true;
 
-        if (typeof window.NovaBootMemoryControlCenter === "function") {
-            window.NovaBootMemoryControlCenter();
-        }
+if (typeof window.NovaMemoryV2Boot === "function") {
+    window.NovaMemoryV2Boot();
+}
     }
 
     window.NovaRightPanelMemoryOnlyCleanup = memoryOnlyCleanup;
 
     if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", memoryOnlyCleanup);
-    } else {
-        memoryOnlyCleanup();
+        document.addEventListener("DOMContentLoaded", function () {});
     }
 
-    setTimeout(memoryOnlyCleanup, 250);
-    setTimeout(memoryOnlyCleanup, 800);
-    setTimeout(memoryOnlyCleanup, 1600);
-    window.addEventListener("resize", memoryOnlyCleanup);
+
 })();
 </script>
 
@@ -9310,14 +9311,9 @@ body {
         }
     }, true);
 
-    window.addEventListener("resize", scheduleCleanup);
-
-    setTimeout(enforceMemoryOnlyStable, 300);
-    setTimeout(enforceMemoryOnlyStable, 1000);
-})();
+setTimeout(enforceMemoryOnlyStable, 300);
+setTimeout(enforceMemoryOnlyStable, 1000);
 </script>
-
-
 <!-- NOVA_CHAT_COMPOSER_LOCK_FINAL_20260622 -->
 <style>
 /* Lock the chat composer so messages scroll instead of pushing the bar down */
@@ -10545,6 +10541,7 @@ pre code {
 var rendered = renderMessagesDirectly(session);
 
 if (
+    session &&
     Array.isArray(session.messages) &&
     session.messages.length === 0 &&
     session.meta &&
@@ -10575,7 +10572,7 @@ if (
 
     window.NovaDesktopOpenSession = openSessionForceRender;
     window.openDesktopSession = openSessionForceRender;
-    window.openSession = openSessionForceRender;
+    // window.openSession = openSessionForceRender;
     window.NovaDesktopFetchSession = openSessionForceRender;
 
     document.addEventListener("click", function (event) {
@@ -12532,10 +12529,6 @@ aside.panel.sidebar {
     z-index: 99999 !important;
 }
 
-/* NOVA_EXECUTION_BOTTOM_ORDER_FIX_20260731 */
-#nova-desktop-execution-native {
-    order: 9999 !important;
-}
 </style>
 
 

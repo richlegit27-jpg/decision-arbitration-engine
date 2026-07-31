@@ -4697,6 +4697,10 @@ def api_sessions_pin():
 @app.post("/api/sessions/delete")
 def api_sessions_delete():
     return session_route_service.api_sessions_delete()
+
+@app.post("/api/sessions/delete-all")
+def api_sessions_delete_all():
+    return session_route_service.api_sessions_delete_all()
 # -----------------------
 # ARTIFACTS
 # -----------------------

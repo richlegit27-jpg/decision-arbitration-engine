@@ -210,9 +210,11 @@
 
       const sid = data.session_id || data.active_session_id || data.session?.id;
 
-      if (sid) {
-        setSessionId(sid);
-        renderSession({ messages: [] });
+if (sid) {
+    setSessionId(sid);
+}
+    messages: []
+});
       }
 
       await loadSessions();

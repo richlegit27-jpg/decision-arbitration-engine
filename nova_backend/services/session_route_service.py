@@ -752,6 +752,19 @@ class SessionRouteService:
             self.json_ok,
         )
 
+    def api_sessions_delete_all(self):
+        try:
+            deleted = self.session_service.delete_all()
+
+            return self.json_ok(
+                deleted=deleted
+            )
+
+        except Exception as error:
+            return self.json_error(
+                str(error)
+            )
+
     def handle_sessions_rename(
         self,
         payload,

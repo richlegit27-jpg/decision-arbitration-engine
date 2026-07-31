@@ -193,9 +193,13 @@ if (
 
 async function loadDesktopSessionsExternal() {
   const list = $("desktopSessionList");
+
   if (!list) return;
 
-  const data = await fetchJson("/api/sessions", { cache: "no-store" });
+  const data = await fetchJson("/api/sessions", {
+    cache: "no-store",
+  });
+
   const sessions = data.sessions || data.items || [];
 
   list.innerHTML = "";
@@ -208,26 +212,21 @@ async function loadDesktopSessionsExternal() {
 
   const active = getSessionId();
 
-  sessions.slice(0, 30).forEach(session => {
+  sessions.slice(0, 30).forEach((session) => {
     const sid = session.id || session.session_id;
+
     if (!sid) return;
 
     const btn = document.createElement("div");
-    btn.className = "desktop-session-item" + (sid === active ? " is-active" : "");
+
+    btn.className =
+      "desktop-session-item" +
+      (sid === active ? " is-active" : "");
+
     btn.dataset.sessionId = sid;
 
-btn.setAttribute("role", "button");
-btn.tabIndex = 0;
-
-btn.addEventListener("mouseenter", function () {
-  const actions = btn.querySelector(".desktop-session-actions");
-  if (actions) actions.style.display = "flex";
-});
-
-btn.addEventListener("mouseleave", function () {
-  const actions = btn.querySelector(".desktop-session-actions");
-  if (actions) actions.style.display = "none";
-});
+    btn.setAttribute("role", "button");
+    btn.tabIndex = 0;
 
     btn.innerHTML = `
       <div class="desktop-session-title">
@@ -235,94 +234,15 @@ btn.addEventListener("mouseleave", function () {
       </div>
 
       <div class="desktop-session-meta">
-        ${sid}
-      </div>
-
-      <div class="desktop-session-actions" style="display:none;">
-        <button type="button" data-action="rename">Rename</button>
-        <button type="button" data-action="pin">
-          ${session.pinned ? "Unpin" : "Pin"}
-        </button>
-        <button type="button" data-action="delete">Delete</button>
+        ${session.updated_at || ""}
       </div>
     `;
 
-btn.onclick = (event) => {
-  if (event.target.closest("[data-action]")) {
-    return;
-  }
-
-  openSession(sid);
-};
-
-    btn.querySelector('[data-action="rename"]').onclick = async (event) => {
-      event.stopPropagation();
-
-      const title = prompt(
-        "Rename session:",
-        session.title || "Untitled"
-      );
-
-      if (!title || !title.trim()) return;
-
-      await fetch("/api/sessions/rename", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          session_id: sid,
-          title: title.trim()
-        })
-      });
-
-      await loadDesktopSessionsExternal();
+    btn.onclick = () => {
+      openSession(sid);
     };
 
-
-    btn.querySelector('[data-action="pin"]').onclick = async (event) => {
-      event.stopPropagation();
-
-      await fetch("/api/sessions/pin", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          session_id: sid,
-          pinned: !session.pinned
-        })
-      });
-
-      await loadDesktopSessionsExternal();
-    };
-
-
-    btn.querySelector('[data-action="delete"]').onclick = async (event) => {
-      event.stopPropagation();
-
-      if (!confirm("Delete this session?")) {
-        return;
-      }
-
-const response = await fetch("/api/sessions/delete", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    session_id: sid
-  })
-});
-
-id="k7h8ma"
-if (!response.ok) {
-  console.warn("delete failed", await response.text());
-  return;
-}
-
-await loadDesktopSessionsExternal();
-    };
+    list.appendChild(btn);
   });
 }
 
@@ -335,7 +255,7 @@ async function newSessionExternal() {
         "Content-Type": "application/json",
         "x-api-key": window.API_KEY || "dev"
       },
-      body: JSON.stringify({ title: "New Chat" })
+      body: JSON.stringify({ title: "" })
     });
 
     const sid =
@@ -355,6 +275,18 @@ if (sid) {
       window.renderDesktopChatMessagesRescue([]);
     }
 
+function generateSessionTitle(text) {
+  if (!text) {
+    return "New Chat";
+  }
+
+  return String(text)
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 45)
+    .replace(/[.,!?;:]+$/, "");
+}
+
 await loadDesktopSessionsExternal();
 
 if (sid) {
@@ -371,29 +303,154 @@ console.log("[Nova Desktop Sessions External] new session", sid);
   }
 }
 
-function wireButtons() {
-    const sessionsBtn =
-      $("desktopSessionsButton") ||
-      $("openSessionsBtn") ||
-      $("sessionsBtn");
+async function NovaAutoTitleSession(text) {
+  try {
+    const sid = getSessionId();
 
-    if (sessionsBtn && sessionsBtn.dataset.novaExternalSessionsBound !== "true") {
-      sessionsBtn.dataset.novaExternalSessionsBound = "true";
-      sessionsBtn.addEventListener("click", function () {
-        loadDesktopSessionsExternal();
-      }, true);
+    if (!sid || !text) {
+      return;
     }
 
-    const newBtn = $("newSessionBtn");
-    if (newBtn && newBtn.dataset.novaExternalNewSessionBound !== "true") {
-      newBtn.dataset.novaExternalNewSessionBound = "true";
-      newBtn.onclick = function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-        newSessionExternal();
-      };
+    const clean = text
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!clean) {
+      return;
     }
+
+    const title = clean
+      .slice(0, 45)
+      .replace(/[.,!?;:]+$/, "")
+      .trim();
+
+    if (!title) {
+      return;
+    }
+
+    await fetch("/api/sessions/rename", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        session_id: sid,
+        title: title
+      })
+    });
+
+    await loadDesktopSessionsExternal();
+
+    console.log(
+      "[Nova Auto Session Title]",
+      title
+    );
+
+  } catch (error) {
+    console.warn(
+      "[Nova Auto Session Title Failed]",
+      error
+    );
   }
+}
+
+window.NovaAutoTitleSession = NovaAutoTitleSession;
+
+function wireButtons() {
+
+  const deleteAllBtn = document.getElementById(
+    "deleteAllSessionsBtn"
+  );
+
+  if (
+    deleteAllBtn &&
+    deleteAllBtn.dataset.novaDeleteAllBound !== "true"
+  ) {
+    deleteAllBtn.dataset.novaDeleteAllBound = "true";
+
+    deleteAllBtn.onclick = async function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (!confirm("Delete all sessions?")) {
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          "/api/sessions/delete-all",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            }
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || data.ok === false) {
+          throw new Error(
+            data.error || "Delete all failed"
+          );
+        }
+
+        console.log(
+          "[Nova Sessions] deleted all",
+          data.deleted
+        );
+
+        await loadDesktopSessionsExternal();
+
+        await newSessionExternal();
+
+      } catch (error) {
+        console.warn(
+          "[Nova Sessions] delete all failed",
+          error
+        );
+      }
+    };
+  }
+
+
+  const sessionsBtn =
+    $("desktopSessionsButton") ||
+    $("openSessionsBtn") ||
+    $("sessionsBtn");
+
+  if (
+    sessionsBtn &&
+    sessionsBtn.dataset.novaExternalSessionsBound !== "true"
+  ) {
+    sessionsBtn.dataset.novaExternalSessionsBound = "true";
+
+    sessionsBtn.addEventListener(
+      "click",
+      function () {
+        loadDesktopSessionsExternal();
+      },
+      true
+    );
+  }
+
+
+  const newBtn = $("newSessionBtn");
+
+  if (
+    newBtn &&
+    newBtn.dataset.novaExternalNewSessionBound !== "true"
+  ) {
+    newBtn.dataset.novaExternalNewSessionBound = "true";
+
+    newBtn.onclick = function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      newSessionExternal();
+    };
+  }
+}
 
   window.getSessionId = window.getSessionId || getSessionId;
   window.setSessionId = window.setSessionId || setSessionId;
