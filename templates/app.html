@@ -8933,7 +8933,7 @@ body {
                 <button class="nova-memory-v2-filter" type="button" data-filter="preference">Preferences</button>
                 <button class="nova-memory-v2-filter" type="button" data-filter="project">Project</button>
                 <button class="nova-memory-v2-filter" type="button" data-filter="people">People</button>
-                <button class="nova-memory-v2-filter" type="button" data-filter="pinned">Pinned</button>
+                <button class="nova-memory-v2-filter" type="button" data-filter="delete">Delete</button>
             </div>
         `;
 
@@ -8961,15 +8961,23 @@ body {
             render();
         });
 
-        shell.querySelectorAll("[data-filter]").forEach(function (button) {
-            button.addEventListener("click", function () {
-                activeFilter = button.dataset.filter || "all";
-                shell.querySelectorAll("[data-filter]").forEach(function (b) {
-                    b.classList.toggle("active", b === button);
-                });
-                render();
-            });
+shell.querySelectorAll("[data-filter]").forEach(function (button) {
+    button.addEventListener("click", function () {
+
+        if (button.dataset.filter === "delete") {
+            status("Delete mode coming next.");
+            return;
+        }
+
+        activeFilter = button.dataset.filter || "all";
+
+        shell.querySelectorAll("[data-filter]").forEach(function (b) {
+            b.classList.toggle("active", b === button);
         });
+
+        render();
+    });
+});
 
         return shell;
     }
@@ -9146,22 +9154,20 @@ body {
         }
     }
 
-    function filteredItems() {
-        const q = String(searchText || "").trim().toLowerCase();
+function filteredItems() {
+    const q = String(searchText || "").trim().toLowerCase();
 
-        return items.filter(function (item) {
-            const kind = kindOf(item);
-            const pinned = pinnedOf(item);
-            const text = textOf(item);
-            const haystack = (text + " " + kind + " " + JSON.stringify(item)).toLowerCase();
+    return items.filter(function (item) {
+        const kind = kindOf(item);
+        const text = textOf(item);
+        const haystack = (text + " " + kind + " " + JSON.stringify(item)).toLowerCase();
 
-            if (activeFilter === "pinned" && !pinned) return false;
-            if (activeFilter !== "all" && activeFilter !== "pinned" && kind !== activeFilter) return false;
-            if (q && !haystack.includes(q)) return false;
+        if (activeFilter !== "all" && kind !== activeFilter) return false;
+        if (q && !haystack.includes(q)) return false;
 
-            return true;
-        });
-    }
+        return true;
+    });
+}
 
     function render() {
         const list = document.getElementById("desktopMemoryList");
