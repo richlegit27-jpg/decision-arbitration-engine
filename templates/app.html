@@ -3961,9 +3961,14 @@ window.loadMemoriesLegacy = load;
     return "";
   }
 
-  function ensureButton(id, text, title) {
+function ensureButton(id, text, title) {
     var existing = $(id);
-    if (existing) return existing;
+
+    if (existing) {
+        existing.textContent = text;
+        existing.title = title || text;
+        return existing;
+    }
 
     var btn = document.createElement("button");
     btn.type = "button";
@@ -3977,13 +3982,13 @@ window.loadMemoriesLegacy = load;
     var send = sendButton();
 
     if (send && send.parentElement === host) {
-      host.insertBefore(btn, send);
+        host.insertBefore(btn, send);
     } else {
-      host.appendChild(btn);
+        host.appendChild(btn);
     }
 
     return btn;
-  }
+}
 
 function setVoiceButtonState(btn) {
   if (!btn) return;
