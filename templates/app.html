@@ -7964,15 +7964,11 @@ body {
                     <button class="nova-memory-filter" type="button" data-memory-filter="preferences">Preferences</button>
                     <button class="nova-memory-filter" type="button" data-memory-filter="project">Project</button>
                     <button class="nova-memory-filter" type="button" data-memory-filter="people">People</button>
-                    <button class="nova-memory-filter" type="button" data-memory-filter="pinned">Pinned</button>
                 </div>
 
                 <div class="nova-memory-actions">
-                    <button id="novaMemoryAddPreferenceBtn" class="nova-memory-btn" type="button">+ Preference</button>
-                    <button id="novaMemoryAddProjectBtn" class="nova-memory-btn" type="button">+ Project Note</button>
                     <button id="novaMemoryRefreshBtn" class="nova-memory-btn" type="button">Refresh</button>
                 </div>
-            </div>
         `;
 
         list.parentNode.insertBefore(shell, list);
@@ -7998,21 +7994,7 @@ body {
             });
         });
 
-        const addPref = document.getElementById("novaMemoryAddPreferenceBtn");
-        const addProject = document.getElementById("novaMemoryAddProjectBtn");
         const refresh = document.getElementById("novaMemoryRefreshBtn");
-
-        if (addPref) {
-            addPref.addEventListener("click", function () {
-                addMemoryPrompt("preference");
-            });
-        }
-
-        if (addProject) {
-            addProject.addEventListener("click", function () {
-                addMemoryPrompt("project");
-            });
-        }
 
         if (refresh) {
             refresh.addEventListener("click", loadMemoryControlData);
@@ -8154,10 +8136,9 @@ body {
             const text = getMemoryText(item);
             const kind = getMemoryKind(item);
 
-            if (novaMemoryFilter !== "all") {
-                if (novaMemoryFilter === "pinned" && !isPinned(item)) return false;
-                if (novaMemoryFilter !== "pinned" && kind !== novaMemoryFilter) return false;
-            }
+if (novaMemoryFilter !== "all" && kind !== novaMemoryFilter) {
+    return false;
+}
 
             if (q) {
                 const haystack = (text + " " + kind + " " + JSON.stringify(item)).toLowerCase();
@@ -8177,9 +8158,9 @@ body {
         }
 
 list.innerHTML = visible.map(function (item, index) {
-    const kind = kindOf(item);
-    const id = idOf(item);
-    const text = textOf(item) || JSON.stringify(item, null, 2);
+const text = getMemoryText(item) || JSON.stringify(item, null, 2);
+const kind = getMemoryKind(item);
+const id = getMemoryId(item);
 
     return `
         <article class="nova-memory-card" data-memory-index="${index}">
@@ -8200,14 +8181,14 @@ list.innerHTML = visible.map(function (item, index) {
 }).join("");
 
 
-        list.querySelectorAll("[data-memory-action]").forEach(function (button) {
+        list.querySelectorAll("[data-action]").forEach(function (button) {
             button.addEventListener("click", function () {
-                const index = Number(button.dataset.memoryIndex || "-1");
+                const index = Number(button.dataset.index || "-1");
                 const item = visible[index];
 
                 if (!item) return;
 
-if (button.dataset.memoryAction === "delete") {
+if (button.dataset.action === "delete") {
     deleteMemory(item);
 }
             });
@@ -8364,8 +8345,6 @@ if (button.dataset.memoryAction === "delete") {
             window.loadDesktopMemory();
         } else if (typeof window.NovaLoadDesktopMemory === "function") {
             window.NovaLoadDesktopMemory();
-        } else if (typeof window.NovaBootMemoryControlCenter === "function") {
-            window.NovaBootMemoryControlCenter();
         }
 
         setTimeout(function () {
@@ -8551,9 +8530,6 @@ if (button.dataset.memoryAction === "delete") {
             window.NovaEnsureMemoryTypedInput();
         }
 
-        if (typeof window.NovaBootMemoryControlCenter === "function") {
-            window.NovaBootMemoryControlCenter();
-        }
     }
 
     window.NovaRightPanelMemoryOnlyCleanup = memoryOnlyCleanup;
@@ -9171,10 +9147,10 @@ function filteredItems() {
             return;
         }
 
-                list.innerHTML = visible.map(function (item, index) {
-            const kind = kindOf(item);
-            const id = idOf(item);
-            const text = textOf(item) || JSON.stringify(item, null, 2);
+        list.innerHTML = visible.map(function (item, index) {
+            const text = getMemoryText(item) || JSON.stringify(item, null, 2);
+            const kind = getMemoryKind(item);
+            const id = getMemoryId(item);
 
             return `
                 <article class="nova-memory-card" data-memory-index="${index}">
