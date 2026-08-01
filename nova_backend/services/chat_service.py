@@ -1231,6 +1231,36 @@ Rules:
                 e,
             )
             return False
+
+    def _should_auto_title_session(self, title):
+        title = self.safe_str(title).strip().lower()
+
+        return title in (
+            "",
+            "new chat",
+            "untitled session",
+        )
+
+    def _build_session_title_from_message(self, user_msg):
+        text = ""
+
+        if isinstance(user_msg, dict):
+            text = self.safe_str(
+                user_msg.get("text")
+                or user_msg.get("content")
+                or ""
+            ).strip()
+
+        if not text:
+            return ""
+
+        words = text.split()
+
+        title = " ".join(words[:8])
+
+        return title[:60]
+
+
     def _maybe_write_memory(
         self,
         decision=None,
@@ -3028,76 +3058,6 @@ Rules:
         session["id"] = session_id
         session["messages"] = messages
 
-        # NOVA_SESSION_AUTO_TITLE_FINALIZE_FIX
-        try:
-            print(
-                "[AUTO TITLE ENTERED]",
-                {
-                    "title": session.get("title"),
-                    "user_msg": user_msg,
-                },
-            )
-
-            print(
-                "[AUTO TITLE CONDITION DEBUG]",
-                {
-                    "title": session.get("title"),
-                    "title_manual": session.get("title_manual"),
-                    "not_manual": not session.get("title_manual"),
-                    "bad_title_check": _nova_session_should_auto_title_20260624(
-                        session.get("title")
-                    ),
-                    "user_msg_dict": isinstance(user_msg, dict),
-                },
-            )
-
-            if (
-                not session.get("title_manual")
-                and _nova_session_should_auto_title_20260624(
-                    session.get("title")
-                )
-                and isinstance(user_msg, dict)
-            ):
-
-                candidate = _nova_session_title_from_message_20260624(
-                    user_msg
-                )
-
-                print(
-                    "[AUTO TITLE CANDIDATE DEBUG]",
-                    {
-                        "candidate": candidate,
-                        "user_msg": user_msg,
-                    },
-                )
-
-                print(
-                    "[AUTO TITLE RESULT]",
-                    {
-                        "candidate": candidate,
-                        "old_title": session.get("title"),
-                        "manual": session.get("title_manual"),
-                    },
-                )
-
-
-                print(
-                    "[AUTO TITLE RESULT]",
-                    {
-                        "old_title": session.get("title"),
-                        "user_msg": user_msg,
-                        "candidate": candidate,
-                    },
-                )
-
-                if candidate:
-                    session["title"] = candidate
-
-        except Exception as exc:
-            exec_debug(
-                "SESSION AUTO TITLE FAILED:",
-                exc,
-            )
 
         try:
             from flask import g, session as flask_session
@@ -3184,10 +3144,32 @@ Rules:
                 },
             )
 
-            self.session_service.replace_session(
-                session_id,
-                session,
-            )
+            # NOVA_SESSION_AUTO_TITLE_ON_FIRST_MESSAGE
+            try:
+                if (
+                    not session.get("title_manual")
+                    and self._should_auto_title_session(
+                        session.get("title")
+                    )
+                    and isinstance(user_msg, dict)
+                ):
+                    candidate = self._build_session_title_from_message(
+                        user_msg
+                    )
+
+                    print(
+                        "[AUTO TITLE FINAL CANDIDATE]",
+                        candidate,
+                    )
+
+                    if candidate:
+                        session["title"] = candidate
+
+            except Exception as exc:
+                exec_debug(
+                    "AUTO TITLE FINAL FAILED:",
+                    exc,
+                )
 
             self.session_service.replace_session(
                 session_id,
