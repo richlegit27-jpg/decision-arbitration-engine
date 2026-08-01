@@ -1336,23 +1336,26 @@ observer.observe(document.documentElement, {
   </div>
 
   <script>
-    const API_KEY = "testkey123";
-    const LS_SID = "nova.session_id";
+const API_KEY = "testkey123";
+const LS_SID = "nova.session_id";
 
-    const $ = (id) => document.getElementById(id);
-    const chat = $("chat");
-    const input = $("input");
-    const status = $("status");
-    const meta = $("meta");
-    const sidEl = $("sid");
-    const sendBtn = $("sendBtn");
-    const attachBtn = $("attachBtn");
-    const desktopFileInput = $("desktopFileInput");
-    const desktopAttachmentChip = $("desktopAttachmentChip");
-    let pendingDesktopAttachments = [];
-    const newSessionBtn = $("newSessionBtn");
-    const summarizeBtn = $("summarizeBtn");
-    const openMemoryBtn = $("openMemoryBtn");
+const $ = (id) => document.getElementById(id);
+const chat = $("chat");
+const input = $("input");
+const status = $("status");
+const meta = $("meta");
+const sidEl = $("sid");
+const sendBtn = $("sendBtn");
+const attachBtn = $("attachBtn");
+const desktopFileInput = $("desktopFileInput");
+const desktopAttachmentChip = $("desktopAttachmentChip");
+
+let novaChatAbortController = null;
+
+let pendingDesktopAttachments = [];
+const newSessionBtn = $("newSessionBtn");
+const summarizeBtn = $("summarizeBtn");
+const openMemoryBtn = $("openMemoryBtn");
 
 let __nova_send_lock = false;
 
@@ -2133,25 +2136,31 @@ async function sendText(textOverride) {
   input.value = "";
   input.style.height = "auto";
 
-  setStatus("loading...");
-  sendBtn.disabled = true;
+setStatus("loading...");
 
-  addMsg("user", text);
-  const assistantNode = addMsg("assistant", "");
+novaChatAbortController = new AbortController();
 
-  try {
-    console.log("&#128206; CHAT REQUEST START", { text, attachments });
+sendBtn.disabled = false;
+sendBtn.textContent = "Stop";
+sendBtn.dataset.mode = "stop";
 
-const forcingNewSession = window.NOVA_FORCE_NEW_SESSION_ON_NEXT_SEND === true;
+addMsg("user", text);
+const assistantNode = addMsg("assistant", "");
 
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": API_KEY
-      },
-      body: JSON.stringify(buildDesktopChatPayload(text, attachments))
-    });
+try {
+  console.log("&#128206; CHAT REQUEST START", { text, attachments });
+
+  const forcingNewSession = window.NOVA_FORCE_NEW_SESSION_ON_NEXT_SEND === true;
+
+  const response = await fetch("/api/chat", {
+    signal: novaChatAbortController.signal,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": API_KEY
+    },
+    body: JSON.stringify(buildDesktopChatPayload(text, attachments))
+  });
 
 if (forcingNewSession) {
   window.NOVA_FORCE_NEW_SESSION_ON_NEXT_SEND = false;
@@ -2204,9 +2213,12 @@ if (typeof loadDesktopSessions === "function") {
     setStatus("error");
 
   } finally {
+    novaChatAbortController = null;
     sendBtn.disabled = false;
+    sendBtn.textContent = "Send";
+    sendBtn.dataset.mode = "send";
     setStatus("ready");
-  }
+    }
 }
 
 function renderMessageWithCodeBlocks(container, text) {
@@ -2434,9 +2446,6 @@ function handleSendClick(prompt = "") {
 refreshSummaryMeta();
 refreshDesktopPanels();
 
-// -------------------------
-// EVENT BINDING
-// -------------------------
 
 if (sendBtn && input) {
   sendBtn.addEventListener("mousedown", () => {
@@ -2450,6 +2459,7 @@ sendBtn.addEventListener("click", (e) => {
   e.stopPropagation();
 
   if (window.__NOVA_SEND_CLICK_LOCK__) return;
+
   window.__NOVA_SEND_CLICK_LOCK__ = true;
 
   handleSendClick();
@@ -2458,6 +2468,7 @@ sendBtn.addEventListener("click", (e) => {
     window.__NOVA_SEND_CLICK_LOCK__ = false;
   }, 1200);
 }, true);
+
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -12564,6 +12575,55 @@ aside.panel.sidebar {
 #nova-desktop-execution-native {
     order: 9999 !important;
 }
+
+/* NOVA_EXECUTION_BOTTOM_ORDER_FIX_20260731 */
+#nova-desktop-execution-native {
+    order: 9999 !important;
+}
+
+.composer {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+}
+
+.composer-controls {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: auto !important;
+}
+.composer-left-controls {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+}
+
+
+/* NOVA_COMPOSER_STACKED_FINAL */
+.composer {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+}
+
+.composer-controls {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+}
+
+.composer-left-controls {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+}
+
+.composer-controls #sendBtn {
+    margin-left: auto !important;
+}
+
 </style>
 
 
