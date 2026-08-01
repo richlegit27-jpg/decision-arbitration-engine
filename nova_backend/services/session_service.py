@@ -143,7 +143,7 @@ def _nova_session_title_from_message_20260624(message) -> str:
     if low.startswith("http://") or low.startswith("https://"):
         return ""
 
-        words = text.split()
+    words = text.split()
 
     if len(words) > 6:
         title = " ".join(words[:6])
@@ -1113,18 +1113,49 @@ class SessionService:
 
         sessions[i]["updated_at"] = iso_now()
 
+        print(
+            "[AUTO TITLE DEBUG]",
+            {
+                "title": sessions[i].get("title"),
+                "manual": sessions[i].get("title_manual"),
+                "message": normalized,
+            },
+        )
 
         # NOVA_SESSION_BAD_TITLE_AUTOFIX_20260624
         try:
+            print(
+                "[AUTO TITLE CHECK]",
+                {
+                    "title": sessions[i].get("title"),
+                    "manual": sessions[i].get("title_manual"),
+                    "should_change": _nova_session_should_auto_title_20260624(
+                        sessions[i].get("title")
+                    ),
+                    "message": normalized,
+                },
+            )
+
             if (
-    not session.get("title_manual")
-    and _nova_session_should_auto_title_20260624(session.get("title"))
-):
-                candidate = _nova_session_title_from_message_20260624(message)
+                not sessions[i].get("title_manual")
+                and _nova_session_should_auto_title_20260624(
+                    sessions[i].get("title")
+                )
+            ):
+                candidate = _nova_session_title_from_message_20260624(
+                    normalized
+                )
+
+                print(
+                    "[AUTO TITLE CANDIDATE]",
+                    candidate,
+                )
+
                 if candidate:
-                    session["title"] = candidate
-        except Exception:
-            pass
+                    sessions[i]["title"] = candidate
+
+        except Exception as exc:
+            print("[AUTO TITLE ERROR]", repr(exc))
 
         self._save_sessions(
             sessions,

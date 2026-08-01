@@ -2725,6 +2725,16 @@ Rules:
         **extra,
     ) -> dict:
 
+        print(
+            "[FINALIZE RESPONSE ENTERED]",
+            {
+                "session_id": session_id,
+                "user_text": user_text,
+                "has_user_msg": isinstance(user_msg, dict),
+                "has_assistant_msg": isinstance(assistant_msg, dict),
+            },
+        )
+
         decision = decision if isinstance(decision, dict) else {}
 
         session_id = self._ensure_session_id(session_id)
@@ -2940,6 +2950,13 @@ Rules:
 
         session = self._get_session_payload(session_id) or {}
 
+        print(
+            "[SESSION BEFORE TITLE]",
+            {
+                "title": session.get("title"),
+                "id": session.get("id"),
+            },
+        )
         verified_exchange = (
             decision.get("last_verified_web_exchange")
             if isinstance(decision, dict)
@@ -3010,6 +3027,77 @@ Rules:
 
         session["id"] = session_id
         session["messages"] = messages
+
+        # NOVA_SESSION_AUTO_TITLE_FINALIZE_FIX
+        try:
+            print(
+                "[AUTO TITLE ENTERED]",
+                {
+                    "title": session.get("title"),
+                    "user_msg": user_msg,
+                },
+            )
+
+            print(
+                "[AUTO TITLE CONDITION DEBUG]",
+                {
+                    "title": session.get("title"),
+                    "title_manual": session.get("title_manual"),
+                    "not_manual": not session.get("title_manual"),
+                    "bad_title_check": _nova_session_should_auto_title_20260624(
+                        session.get("title")
+                    ),
+                    "user_msg_dict": isinstance(user_msg, dict),
+                },
+            )
+
+            if (
+                not session.get("title_manual")
+                and _nova_session_should_auto_title_20260624(
+                    session.get("title")
+                )
+                and isinstance(user_msg, dict)
+            ):
+
+                candidate = _nova_session_title_from_message_20260624(
+                    user_msg
+                )
+
+                print(
+                    "[AUTO TITLE CANDIDATE DEBUG]",
+                    {
+                        "candidate": candidate,
+                        "user_msg": user_msg,
+                    },
+                )
+
+                print(
+                    "[AUTO TITLE RESULT]",
+                    {
+                        "candidate": candidate,
+                        "old_title": session.get("title"),
+                        "manual": session.get("title_manual"),
+                    },
+                )
+
+
+                print(
+                    "[AUTO TITLE RESULT]",
+                    {
+                        "old_title": session.get("title"),
+                        "user_msg": user_msg,
+                        "candidate": candidate,
+                    },
+                )
+
+                if candidate:
+                    session["title"] = candidate
+
+        except Exception as exc:
+            exec_debug(
+                "SESSION AUTO TITLE FAILED:",
+                exc,
+            )
 
         try:
             from flask import g, session as flask_session
@@ -3087,6 +3175,19 @@ Rules:
                 },
             )
 
+            print(
+                "[TITLE RIGHT BEFORE SAVE]",
+                {
+                    "title": session.get("title"),
+                    "title_manual": session.get("title_manual"),
+                    "message_count": len(session.get("messages") or []),
+                },
+            )
+
+            self.session_service.replace_session(
+                session_id,
+                session,
+            )
 
             self.session_service.replace_session(
                 session_id,
@@ -17408,7 +17509,11 @@ try:
             "Current task: fix Nova project brain answer quality."
         )
 
-    def _nova_project_brain_response_20260701(text, session_id):
+    def _nova_project_brain_response_20260701(
+        text,
+        session_id,
+        first_message=False,
+    ):
         meta = {
             "route": "project_brain_general_intelligence",
             "strategy": "project_brain_general_intelligence",
@@ -17425,7 +17530,7 @@ try:
             "meta": meta,
         }
 
-        if _nova_first_message:
+        if first_message:
             onboarding_payload = {
                 "onboarding": True,
                 "welcome_message": (
@@ -17591,13 +17696,13 @@ try:
                     )
                 )
 
-                if answer:
-                    return (
-                        _nova_project_brain_response_20260701(
-                            answer,
-                            session_id,
-                        )
-                    )
+            return (
+                _nova_project_brain_response_20260701(
+                    answer,
+                    session_id,
+                    first_message=_nova_first_message,
+                )
+            )
 
             print(
                 "ANSWER KIND:",
@@ -17605,20 +17710,15 @@ try:
                 repr(user_text),
             )
 
-            answer = (
-                _nova_project_brain_answer_20260701(
-                    kind,
-                    session_id,
-                    user_text,
-                )
-            )
 
-            return (
-                _nova_project_brain_response_20260701(
-                    answer,
-                    session_id,
+            if answer:
+                return (
+                    _nova_project_brain_response_20260701(
+                        answer,
+                        session_id,
+                        first_message=_nova_first_message,
+                    )
                 )
-            )
 
         return (
             _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701(

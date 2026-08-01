@@ -495,6 +495,20 @@
       white-space: nowrap;
     }
 
+.desktop-session-rename-btn {
+  margin-top: 8px !important;
+  padding: 5px 10px !important;
+  border-radius: 10px !important;
+  border: 1px solid var(--line) !important;
+  background: rgba(255,255,255,.08) !important;
+  color: var(--text) !important;
+  cursor: pointer !important;
+}
+
+.desktop-session-rename-btn:hover {
+  background: rgba(255,255,255,.16) !important;
+}
+
     /* NOVA_DESKTOP_MEMORY_PANEL_20260610 */
     .desktop-memory-list {
       display: grid;
@@ -1626,7 +1640,41 @@ sessions.forEach(session => {
 btn.innerHTML = `
   <div class="desktop-session-title">${getSessionTitle(session)}</div>
   <div class="desktop-session-meta">${sid}</div>
+  <button
+    type="button"
+    class="desktop-session-rename-btn"
+    data-session-id="${sid}">
+    Rename
+  </button>
 `;
+
+const renameBtn = btn.querySelector(".desktop-session-rename-btn");
+
+renameBtn.onclick = async (event) => {
+  event.stopPropagation();
+
+  const oldTitle = getSessionTitle(session);
+  const nextTitle = prompt("Rename session:", oldTitle);
+
+  if (!nextTitle || !nextTitle.trim()) return;
+
+  try {
+    await postJson("/api/sessions/rename", {
+      session_id: sid,
+      title: nextTitle.trim()
+    });
+
+    await loadDesktopSessions();
+
+    if (sid === getSessionId()) {
+      setStatus("Renamed to: " + nextTitle.trim());
+    }
+
+  } catch (error) {
+    console.warn("[session rename failed]", error);
+    setStatus("Rename failed");
+  }
+};
 
   btn.onclick = async () => {
     setSessionId(sid);

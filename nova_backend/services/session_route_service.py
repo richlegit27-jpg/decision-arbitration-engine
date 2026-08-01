@@ -754,7 +754,15 @@ class SessionRouteService:
 
     def api_sessions_delete_all(self):
         try:
-            deleted = self.session_service.delete_all()
+            user_id = str(
+                session.get("nova_user_id")
+                or session.get("user_id")
+                or ""
+            ).strip()
+
+            deleted = self.session_service.delete_all(
+                user_id=user_id,
+            )
 
             return self.json_ok(
                 deleted=deleted
@@ -764,7 +772,6 @@ class SessionRouteService:
             return self.json_error(
                 str(error)
             )
-
     def handle_sessions_rename(
         self,
         payload,
