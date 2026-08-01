@@ -1175,9 +1175,20 @@ observer.observe(document.documentElement, {
 
         <div class="session-list-shell">
           <div class="session-label">Recent</div>
+
           <div id="desktopSessionList" class="desktop-session-list">
             <div class="session-placeholder">Loading sessions...</div>
           </div>
+        </div>
+
+        <div id="nova-delete-all-sessions-panel">
+          <button
+            id="nova-manage-delete-all-sessions"
+            class="nova-current-session-manager-btn"
+            type="button"
+          >
+            Delete All Conversations
+          </button>
         </div>
       </section>
 
@@ -1463,16 +1474,21 @@ async function fetchJsonOrNull(url, options) {
       return [];
     }
 
-    function getSessionTitle(session) {
-      return session.title
-        || session.name
-        || session.summary
-        || session.last_message
-        || session.preview
-        || session.id
-        || session.session_id
-        || "Untitled session";
-    }
+function getSessionTitle(session) {
+  var title = String(session.title || "").trim();
+
+  if (title && title.toLowerCase() !== "new chat") {
+    return title;
+  }
+
+  return session.name
+    || session.summary
+    || session.last_message
+    || session.preview
+    || session.id
+    || session.session_id
+    || "Untitled session";
+}
 
     function getSessionIdFromObject(session) {
       return session.id
@@ -1594,10 +1610,10 @@ sessions.forEach(session => {
   btn.type = "button";
   btn.className = "desktop-session-item";
 
-  btn.innerHTML = `
-    <div class="desktop-session-title">${session.title || "Untitled"}</div>
-    <div class="desktop-session-meta">${sid}</div>
-  `;
+btn.innerHTML = `
+  <div class="desktop-session-title">${getSessionTitle(session)}</div>
+  <div class="desktop-session-meta">${sid}</div>
+`;
 
   btn.onclick = async () => {
     setSessionId(sid);
@@ -2995,7 +3011,8 @@ function renderDesktopChatMessagesRescue(messages) {
 .nova-current-session-manager-row {
   display: flex !important;
   gap: 6px !important;
-  flex-wrap: wrap !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
 }
 
 .nova-current-session-manager-btn {
@@ -3230,11 +3247,13 @@ localStorage.removeItem("active_session_id");
   function installManager() {
     if (document.getElementById("nova-current-session-manager")) return;
 
-    var host =
+var host =
+      document.querySelector(".session-current-card") ||
       document.querySelector(".session-list-shell") ||
-      document.querySelector(".desktop-session-list") ||
       document.querySelector("aside") ||
       document.querySelector(".sidebar") ||
+      document.querySelector(".side-panel") ||
+      document.querySelector(".panel") ||
       document.body;
 
     var box = document.createElement("div");
@@ -3244,7 +3263,7 @@ localStorage.removeItem("active_session_id");
       '<div class="nova-current-session-manager-row">' +
         '<button id="nova-manage-rename-session" class="nova-current-session-manager-btn" type="button">Rename</button>' +
         '<button id="nova-manage-pin-session" class="nova-current-session-manager-btn" type="button">Pin/Unpin</button>' +
-        '<button id="nova-manage-delete-session" class="nova-current-session-manager-btn" type="button">Delete</button>' +
+        '<button id="nova-manage-delete-session" class="nova-current-session-manager-btn" type="button">Delete</button>' + 																						
       '</div>' +
       '<div id="nova-current-session-manager-status"></div>';
 
@@ -3257,9 +3276,34 @@ localStorage.removeItem("active_session_id");
     document.getElementById("nova-manage-rename-session").onclick = renameCurrentSession;
     document.getElementById("nova-manage-pin-session").onclick = togglePinCurrentSession;
     document.getElementById("nova-manage-delete-session").onclick = deleteCurrentSession;
+    document.getElementById("nova-manage-delete-all-sessions").onclick =
+      deleteAllSessions;
 
     console.log("[Nova Current Session Manager] ready");
   }
+
+async function deleteAllSessions() {
+  if (!confirm("Delete all conversations?\n\nThis cannot be undone.")) {
+    return;
+  }
+
+  try {
+    await postJson("/api/sessions/delete-all", {});
+
+    localStorage.removeItem("nova.session_id");
+    localStorage.removeItem("nova_session_id");
+    localStorage.removeItem("nova_active_session_id");
+
+    if (typeof window.loadDesktopSessions === "function") {
+      await window.loadDesktopSessions();
+    }
+
+    setStatus("All conversations deleted.");
+  } catch (error) {
+    console.warn("[delete all sessions failed]", error);
+    setStatus("Delete all failed.");
+  }
+}
 
   installManager();
 
@@ -9953,7 +9997,7 @@ pre code {
 .assistant-message-actions {
     position: static !important;
     display: flex !important;
-    flex-wrap: wrap !important;
+    flex-wrap: nowrap !important;
     gap: 8px !important;
     margin-top: 8px !important;
     transform: none !important;
