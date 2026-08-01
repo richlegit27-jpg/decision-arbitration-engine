@@ -1222,14 +1222,24 @@ observer.observe(document.documentElement, {
         </div>
       </section>
 
-      <div class="composer">
-        <input id="desktopFileInput" type="file" hidden />
-        <button id="attachBtn" class="attach-button" type="button" aria-label="Attach file">
-  <span class="attach-icon">&#128206;</span>
-</button>
-        <textarea id="input" placeholder="Message Nova... Enter sends, Shift+Enter makes a new line"></textarea>
-        <button id="sendBtn" type="button">Send</button>
-      </div>
+<div class="composer">
+  <input id="desktopFileInput" type="file" hidden />
+
+  <textarea
+    id="input"
+    placeholder="Message Nova... Enter sends, Shift+Enter makes a new line"
+  ></textarea>
+
+  <div class="composer-controls">
+    <div class="composer-left-controls">
+      <button id="attachBtn" class="attach-button" type="button" aria-label="Attach file">
+        <span class="attach-icon">&#128206;</span>
+      </button>
+    </div>
+
+    <button id="sendBtn" type="button">Send</button>
+  </div>
+</div>
     </main>
 
     <aside class="panel tools">
