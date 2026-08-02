@@ -1203,17 +1203,10 @@ observer.observe(document.documentElement, {
             <div class="session-placeholder">Loading sessions...</div>
           </div>
         </div>
-
-        <div id="nova-delete-all-sessions-panel">
-          <button
-            id="nova-manage-delete-all-sessions"
-            class="nova-current-session-manager-btn"
-            type="button"
-          >
-            Delete All Conversations
-          </button>
-        </div>
       </section>
+
+
+
 
 <div class="side-footer-links">
   <a href="/">Home</a>
@@ -3278,14 +3271,16 @@ var host =
 
     var box = document.createElement("div");
     box.id = "nova-current-session-manager";
-    box.innerHTML =
-      '<div id="nova-current-session-manager-title">Manage current session</div>' +
-      '<div class="nova-current-session-manager-row">' +
-        '<button id="nova-manage-rename-session" class="nova-current-session-manager-btn" type="button">Rename</button>' +
-        '<button id="nova-manage-pin-session" class="nova-current-session-manager-btn" type="button">Pin/Unpin</button>' +
-        '<button id="nova-manage-delete-session" class="nova-current-session-manager-btn" type="button">Delete</button>' + 																						
-      '</div>' +
-      '<div id="nova-current-session-manager-status"></div>';
+
+box.innerHTML =
+  '<div id="nova-current-session-manager-title">Manage current session</div>' +
+  '<div class="nova-current-session-manager-row">' +
+    '<button id="nova-manage-rename-session" class="nova-current-session-manager-btn" type="button">Rename</button>' +
+    '<button id="nova-manage-pin-session" class="nova-current-session-manager-btn" type="button">Pin/Unpin</button>' +
+    '<button id="nova-manage-delete-session" class="nova-current-session-manager-btn" type="button">Delete</button>' +
+    '<button id="nova-manage-delete-all-sessions" class="nova-current-session-manager-btn" type="button">Delete All Conversations</button>' +
+  '</div>' +
+  '<div id="nova-current-session-manager-status"></div>';
 
     if (host.firstChild) {
       host.insertBefore(box, host.firstChild);
@@ -13231,10 +13226,6 @@ aside.panel.tools,
 
 /* MEMORY FILLS SPACE ABOVE QUICK ACTIONS */
 
-.panel.tools > .memory-section {
-    flex: 1 1 auto !important;
-    min-height: 350px !important;
-
     border: 1px solid rgba(255,255,255,.18) !important;
     border-radius: 18px !important;
 
@@ -13276,9 +13267,8 @@ aside.panel.tools,
 
 .panel.tools > .quick-actions-section {
     flex: 0 0 auto !important;
-    margin-top: auto !important;
+    margin-top: 10px !important;
 }
-
 
 .panel.tools > .memory-section #novaMemoryV2 {
     height: 100% !important;
@@ -13301,26 +13291,7 @@ aside.panel.tools,
 
     padding-right: 8px !important;
 }
-.sidebar .nova-current-session-manager-btn {
-    flex: 1 1 0 !important;
-    height: 38px !important;
-    padding: 0 12px !important;
-    box-sizing: border-box !important;
-    border-radius: 10px !important;
-    margin: 0 !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-}
 
-.session-current-card .nova-current-session-manager-btn {
-    flex: 1 !important;
-    width: auto !important;
-    height: 36px !important;
-    padding: 0 10px !important;
-    margin: 0 !important;
-    box-sizing: border-box !important;
-}
 
 </style>
 
