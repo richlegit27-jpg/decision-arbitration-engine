@@ -1012,11 +1012,6 @@ max-width: none !important;
 /* MEMORY PANEL */
 
 .panel.tools > .memory-section {
-    flex: 0 0 340px !important;
-    height: 340px !important;
-    min-height: 340px !important;
-    max-height: 340px !important;
-
     border: 1px solid rgba(255,255,255,.18) !important;
     border-radius: 18px !important;
 

@@ -1,0 +1,47 @@
+/* NOVA DESKTOP CLEAN LAYOUT RESET */
+
+.panel.tools {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+
+.panel.tools > .memory-section {
+    flex: 1 1 auto !important;
+
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+
+    margin: 0 !important;
+
+    border: 1px solid rgba(255,255,255,.18) !important;
+    border-radius: 18px !important;
+
+    padding: 14px !important;
+    box-sizing: border-box !important;
+
+    overflow: hidden !important;
+}
+
+
+.panel.tools > .memory-section #novaMemoryV2 {
+    height: 100% !important;
+
+    display: flex !important;
+    flex-direction: column !important;
+
+    overflow: hidden !important;
+}
+
+
+.panel.tools > .memory-section #desktopMemoryList {
+    flex: 1 1 auto !important;
+
+    min-height: 0 !important;
+
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
