@@ -13,8 +13,6 @@ body{
 }
 
 .sidebar{
-  width:320px;
-  min-width:320px;
   border-right:1px solid rgba(255,255,255,0.06);
   padding:16px;
   display:flex;
@@ -827,8 +825,6 @@ body:not(.sidebar-open) #appShell{
 }
 
 body.sidebar-open #sidebar{
-  width: 320px !important;
-  min-width: 320px !important;
   opacity: 1 !important;
   pointer-events: auto !important;
   transform: translateX(0) !important;

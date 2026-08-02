@@ -48,14 +48,13 @@
       cursor: pointer;
     }
 
-    .shell {
-      height: 100%;
-      display: grid;
-      grid-template-columns: 300px minmax(0, 1fr) 320px;
-      gap: 14px;
-      padding: 14px;
-    }
-
+.shell {
+    height: 100%;
+    display: grid;
+    grid-template-columns: 300px minmax(300px, 1fr) 240px;
+    gap: 14px;
+    padding: 14px;
+}
     .panel {
       min-height: 0;
       border: 1px solid var(--line);
@@ -350,11 +349,13 @@
 
 
     /* NOVA_DESKTOP_WORKSPACE_PANEL_REORG_20260610 */
-    .workspace-section {
-      padding: 16px 14px;
-      display: grid;
-      gap: 14px;
-    }
+.workspace-section {
+    padding: 16px 14px;
+    display: grid;
+    gap: 14px;
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+}
 
     .section-title-row h2 {
       margin: 0;
@@ -601,6 +602,15 @@
       border-color: rgba(167,139,250,.65);
     }
 
+/* NOVA_SESSION_MANAGER_ROW_FILL */
+
+.sidebar .nova-current-session-manager-row {
+    width: 266px !important;
+    max-width: 266px !important;
+    flex: 0 0 266px !important;
+    box-sizing: border-box !important;
+}
+
 @media (max-width: 1100px) and (min-width: 761px) {
   .shell {
     grid-template-columns:
@@ -639,7 +649,6 @@
 
 <style>
 /* NOVA_DESKTOP_SCROLL_OVERLAY_FIX_20260610 */
-
 /* Let the page actually scroll instead of clipping the bottom. */
 html,
 body {
@@ -1257,6 +1266,7 @@ observer.observe(document.documentElement, {
     </main>
 
     <aside class="panel tools">
+
 <section class="tools-section memory-section">
   <h3>Memory</h3>
 
@@ -1265,86 +1275,6 @@ observer.observe(document.documentElement, {
   </div>
 </section>
 
-<section class="tools-section">
-        <h3>Quick Actions</h3>
-        <div class="quick">
-          <button type="button" data-prompt="Continue from where we left off. Keep it direct and tell me the next move.">
-            <span>
-              Continue
-              <small>Pick up the thread</small>
-            </span>
-          </button>
-
-          <button type="button" data-prompt="Summarize the current situation in plain English and tell me what matters most.">
-            <span>
-              Summarize
-              <small>Plain-English recap</small>
-            </span>
-          </button>
-
-          <button type="button" data-prompt="Improve this and make it cleaner, more direct, and more useful.">
-            <span>
-              Improve
-              <small>Clean up the current work</small>
-            </span>
-          </button>
-
-          <button type="button" data-prompt="What should I do next? Give me the best next step only.">
-            <span>
-              Next
-              <small>Best next move only</small>
-            </span>
-          </button>
-        </div>
-      </section>
-
-      <section class="tools-section">
-        <h3>Session Tools</h3>
-        <button class="utility-button" id="summarizeBtn" type="button">
-          <span>Summarize Now</span>
-          <span>&gt;</span>
-        </button>
-      </section>
-
-
-<section class="tools-section execution-section">
-        <h3>Execution</h3>
-        <div class="execution-card">
-          <div class="metric">
-            <span>Status</span>
-            <strong id="executionStatusLabel">loading</strong>
-          </div>
-          <div class="metric">
-            <span>Execution</span>
-            <strong id="executionPercentLabel">...</strong>
-          </div>
-          <div class="metric">
-            <span>Planner</span>
-            <strong id="plannerPercentLabel">...</strong>
-          </div>
-          <div class="metric">
-            <span>Overall</span>
-            <strong id="overallReadinessLabel">...</strong>
-          </div>
-          <div class="execution-note" id="executionNote">
-            Execution status is loading from backend readiness.
-          </div>
-        </div>
-      </section>
-
-      <section class="tools-section compact-system">
-        <h3>System</h3>
-
-        <div class="metric">
-          <span>Backend</span>
-          <strong>online</strong>
-        </div>
-
-        <div class="metric">
-          <span>Desktop</span>
-          <strong>active</strong>
-        </div>
-      </section>
 
     </aside>
   </div>
@@ -3078,10 +3008,13 @@ function renderDesktopChatMessagesRescue(messages) {
 }
 
 .nova-current-session-manager-row {
-  display: flex !important;
-  gap: 6px !important;
-  flex-wrap: nowrap !important;
-  align-items: center !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    width: 266px !important;
+    max-width: 266px !important;
+    flex: 0 0 266px !important;
+    box-sizing: border-box !important;
 }
 
 .nova-current-session-manager-btn {
@@ -7716,35 +7649,35 @@ body {
 
 .panel.tools,
 .tools {
-    height: auto !important;
-    max-height: calc(100vh - 28px) !important;
+    height: 100% !important;
+    max-height: none !important;
     min-height: 0 !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
+    overflow: hidden !important;
     display: flex !important;
     flex-direction: column !important;
     padding-bottom: 42px !important;
-    scrollbar-gutter: stable !important;
+}
+
+.panel.tools .memory-section {
+    overflow: hidden !important;
+}
+
+.panel.tools .desktop-memory-list {
+    overflow-y: auto !important;
 }
 
 .tools-section {
     flex: 0 0 auto !important;
 }
 
-.memory-section {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    flex: 0 0 auto !important;
-    scroll-margin-top: 12px !important;
-    scroll-margin-bottom: 90px !important;
-}
+
 
 #desktopMemoryList,
 .desktop-memory-list {
-    min-height: 90px !important;
-    max-height: none !important;
-    overflow-y: visible !important;
+    height: 260px !important;
+    max-height: 260px !important;
+    min-height: 220px !important;
+    overflow-y: auto !important;
 }
 
 @media (max-height: 820px) {
@@ -7774,9 +7707,7 @@ body {
 
         if (tools) {
             tools.style.display = "flex";
-            tools.style.overflowY = "auto";
-            tools.style.overflowX = "hidden";
-            tools.style.maxHeight = "calc(100vh - 28px)";
+            tools.style.flexDirection = "column";
         }
 
         if (memory) {
@@ -7837,7 +7768,7 @@ body {
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
-    flex: 0 0 auto !important;
+    flex: 0 0 260px !important;
     position: relative !important;
     z-index: 5 !important;
 }
@@ -7943,21 +7874,6 @@ body {
 </script>
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 <!-- NOVA_MEMORY_CONTROL_CENTER_V1_20260622 -->
 <style>
 .memory-section {
@@ -8034,11 +7950,12 @@ body {
 
 .nova-memory-card {
     border: 1px solid var(--line);
-    border-radius: 14px;
+    border-radius: 16px;
     background: rgba(0,0,0,.16);
-    padding: 10px;
+    padding: 20px !important;
+    min-height: 130px !important;
     display: grid;
-    gap: 7px;
+    gap: 14px !important;
 }
 
 .nova-memory-card-text {
@@ -8052,15 +7969,14 @@ body {
 .nova-memory-card-meta {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    color: var(--muted);
-    font-size: 11px;
+    gap: 8px;
+    font-size: 12px !important;
 }
 
 .nova-memory-card-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 10px !important;
 }
 
 @media (max-height: 720px) {
@@ -8633,8 +8549,6 @@ setTimeout(ensureMemoryTypedInput, 1600);
         });
 
         if (tools) {
-            tools.style.overflowY = "auto";
-            tools.style.overflowX = "hidden";
             tools.style.display = "flex";
             tools.style.flexDirection = "column";
         }
@@ -8801,9 +8715,10 @@ setTimeout(ensureMemoryTypedInput, 1600);
     border: 1px solid var(--line);
     border-radius: 14px;
     background: rgba(0,0,0,.16);
-    padding: 10px;
+    padding: 16px !important;
+    min-height: 90px !important;
     display: grid;
-    gap: 8px;
+    gap: 12px !important;
 }
 
 .nova-memory-card-top {
@@ -8841,8 +8756,8 @@ setTimeout(ensureMemoryTypedInput, 1600);
 
 .nova-memory-card-text {
     color: var(--text);
-    font-size: 13px;
-    line-height: 1.42;
+    font-size: 15px !important;
+    line-height: 1.5 !important;
     white-space: pre-wrap;
     word-break: break-word;
 }
@@ -9507,7 +9422,7 @@ function filteredItems() {
 .shell {
     height: 100vh !important;
     max-height: 100vh !important;
-    overflow: hidden !important;
+    overflow: visible !important;
 }
 
 .panel.chat-panel,
@@ -12619,32 +12534,10 @@ aside.panel.sidebar {
     z-index: 99999 !important;
 }
 
-/* NOVA_EXECUTION_BOTTOM_ORDER_FIX_20260731 */
-#nova-desktop-execution-native {
-    order: 9999 !important;
-}
 
 /* NOVA_EXECUTION_BOTTOM_ORDER_FIX_20260731 */
 #nova-desktop-execution-native {
     order: 9999 !important;
-}
-
-.composer {
-    display: grid !important;
-    grid-template-columns: 1fr !important;
-    gap: 10px !important;
-}
-
-.composer-controls {
-    display: flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-    width: auto !important;
-}
-.composer-left-controls {
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
 }
 
 
@@ -12655,6 +12548,7 @@ aside.panel.sidebar {
     gap: 8px !important;
 }
 
+
 .composer-controls {
     display: flex !important;
     align-items: center !important;
@@ -12662,18 +12556,790 @@ aside.panel.sidebar {
     width: 100% !important;
 }
 
+
 .composer-left-controls {
     display: flex !important;
     align-items: center !important;
     gap: 6px !important;
 }
 
+
 .composer-controls #sendBtn {
     margin-left: auto !important;
 }
 
-</style>
 
+/* NOVA_QUICK_ACTIONS_HEIGHT_POLISH */
+.utility-panel,
+.desktop-quick-prompts,
+.quick-prompts-container {
+    flex: 0 0 auto !important;
+    max-height: 180px !important;
+    overflow-y: auto !important;
+}
+
+
+.quick,
+.prompt-grid,
+.desktop-quick-prompts {
+    gap: 8px !important;
+}
+
+/* NOVA_TOOLS_PANEL_SECTION_HEIGHT_FIX */
+aside.panel.tools {
+    overflow-y: auto !important;
+    min-height: 0 !important;
+}
+
+aside.panel.tools > .tools-section {
+    flex: 0 0 auto !important;
+}
+
+aside.panel.tools .execution-section {
+    flex: 0 0 auto !important;
+}
+
+aside.panel.tools .quick {
+    display: grid !important;
+    gap: 8px !important;
+}
+
+/* NOVA RIGHT PANEL CLEAN */
+
+aside.panel.tools {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+/* Memory takes available space */
+aside.panel.tools > .memory-section {
+    flex: 1 1 auto !important;
+    min-height: 300px !important;
+
+    border: 1px solid rgba(255,255,255,.18) !important;
+    border-radius: 18px !important;
+
+    padding: 14px !important;
+    box-sizing: border-box !important;
+
+    overflow: hidden !important;
+}
+
+/* Memory cards scroll inside */
+aside.panel.tools > .memory-section .desktop-memory-list {
+    height: calc(100% - 120px) !important;
+    max-height: none !important;
+
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+
+/* Bottom sections stay below */
+aside.panel.tools > .compact-system {
+    flex: 0 0 120px !important;
+    display: block !important;
+}
+
+aside.panel.tools > .quick-actions-section {
+    flex: 0 0 auto !important;
+}
+
+/* NOVA_DESKTOP_NARROW_WINDOW_FIX */
+
+@media (max-width: 1100px) {
+
+.shell {
+    grid-template-columns: 300px minmax(300px, 1fr) 240px !important;
+}
+
+    .chat-panel {
+        min-width: 0 !important;
+    }
+
+}
+@media (max-width: 600px) {
+
+
+/* NOVA_RIGHT_PANEL_HEIGHT_FIX */
+
+.shell {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    align-items: stretch !important;
+}
+
+.panel.tools,
+aside.panel.tools,
+.tools {
+    height: calc(100vh - 28px) !important;
+    max-height: calc(100vh - 28px) !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    align-self: stretch !important;
+}
+
+/* NOVA_RIGHT_PANEL_WIDTH_SYNC */
+
+aside.panel.tools,
+.panel.tools,
+.tools {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.shell > .tools {
+    min-width: 0 !important;
+}
+
+/* NOVA_RIGHT_PANEL_MIN_WIDTH_FIX */
+
+aside.panel.tools,
+.panel.tools,
+.tools {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* NOVA_RIGHT_PANEL_MATCH_LEFT */
+
+aside.panel.tools,
+.panel.tools,
+.tools {
+    min-width: 200px !important;
+    width: auto !important;
+    max-width: 240px !important;
+}
+
+/* NOVA_RIGHT_PANEL_WIDTH_RESET */
+
+aside.panel.tools,
+.panel.tools,
+.tools {
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: 240px !important;
+    box-sizing: border-box !important;
+}
+
+/* NOVA_RIGHT_PANEL_SPECIFIC_WIDTH_RESET */
+
+aside.panel.tools,
+.panel.tools {
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: 240px !important;
+    box-sizing: border-box !important;
+}
+
+
+
+/* NOVA_MEMORY_LIST_SPACE_FIX */
+
+.panel.tools > .memory-section .nova-memory-v2 {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+}
+
+.panel.tools > .memory-section #desktopMemoryList {
+    flex: 1 1 auto !important;
+    min-height: 150px !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+}
+
+/* NOVA_MEMORY_V2_SPACE_FINAL */
+
+.panel.tools > .memory-section .nova-memory-v2 {
+    height: 100% !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.panel.tools > .memory-section .nova-memory-v2-compose {
+    flex: 0 0 auto !important;
+}
+
+.panel.tools > .memory-section #desktopMemoryList {
+    flex: 1 1 auto !important;
+    min-height: 140px !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+}
+
+/* NOVA_MEMORY_COMPOSE_COMPACT */
+
+.panel.tools > .memory-section .nova-memory-v2-compose {
+    flex: 0 0 auto !important;
+    max-height: 95px !important;
+    overflow: hidden !important;
+}
+
+.panel.tools > .memory-section .nova-memory-v2-compose textarea {
+    min-height: 45px !important;
+    height: 45px !important;
+}
+
+.panel.tools > .memory-section #desktopMemoryList {
+    flex: 1 1 auto !important;
+    min-height: 120px !important;
+}
+
+
+
+/* NOVA_MEMORY_COMPOSE_SHRINK */
+
+.panel.tools > .memory-section .nova-memory-v2-compose {
+    gap: 4px !important;
+    padding: 8px !important;
+}
+
+.panel.tools > .memory-section #novaMemoryV2Input {
+    min-height: 45px !important;
+    height: 45px !important;
+    padding: 8px !important;
+}
+
+.panel.tools > .memory-section .nova-memory-v2-row {
+    gap: 6px !important;
+}
+
+.panel.tools > .memory-section #novaMemoryV2Status {
+    font-size: 10px !important;
+    line-height: 1.1 !important;
+}
+/* NOVA_SHELL_FINAL_WIDTH_REPAIR */
+
+@media (max-width: 1100px) and (min-width: 761px) {
+
+.shell {
+    grid-template-columns: 300px minmax(300px, 1fr) 240px !important;
+}
+
+
+/* NOVA SIDEBAR WIDTH NORMALIZE */
+
+.sidebar > * {
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* NOVA SIDEBAR CONTENT WIDTH FIX */
+
+.sidebar > .brand,
+.sidebar > .workspace-section,
+.sidebar > .side-footer-links,
+.sidebar > .panel-section {
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* NOVA SIDEBAR STRETCH FIX */
+
+.sidebar {
+    align-items: stretch !important;
+}
+
+.sidebar > * {
+    width: 100% !important;
+}
+
+.sidebar > .brand,
+.sidebar > .panel-section,
+.sidebar > .workspace-section,
+.sidebar > .side-footer-links {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 auto !important;
+    box-sizing: border-box !important;
+}
+
+/* NOVA_LEFT_PANEL_FULL_WIDTH_FIX */
+
+.sidebar > .brand,
+.sidebar > .panel-section,
+.sidebar > .workspace-section,
+.sidebar > .side-footer-links {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* NOVA_LEFT_PANEL_FORCE_STRETCH */
+
+.sidebar {
+    align-items: stretch !important;
+}
+
+
+/* NOVA_LEFT_PANEL_VISUAL_FILL */
+
+.sidebar > .brand,
+.sidebar > .panel-section,
+.sidebar > .workspace-section,
+.sidebar > .side-footer-links {
+    width: 100% !important;
+    align-self: stretch !important;
+    box-sizing: border-box !important;
+}
+/* NOVA_LEFT_PANEL_BUTTON_SPACE */
+
+.sidebar > .brand,
+.sidebar > .workspace-section,
+.sidebar > .side-footer-links,
+.sidebar > .panel-section {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+}
+
+/* NOVA_PANEL_ALIGNMENT_CLEANUP */
+
+.sidebar,
+.tools {
+    box-sizing: border-box !important;
+}
+
+.sidebar > *,
+.tools > * {
+    box-sizing: border-box !important;
+}
+
+.sidebar > .brand,
+.sidebar > .panel-section,
+.sidebar > .workspace-section,
+.sidebar > .side-footer-links {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+.tools > .tools-section {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+/* NOVA_SESSION_BUTTON_WIDTH_ALIGNMENT */
+
+.sidebar .nova-current-session-manager-btn {
+    width: 100% !important;
+    max-width: 266px !important;
+    box-sizing: border-box !important;
+}
+
+/* NOVA_LEFT_CONTENT_ALIGNMENT */
+
+.sidebar .nova-current-session-manager-btn {
+    width: 100% !important;
+    max-width: 266px !important;
+    box-sizing: border-box !important;
+}
+/* NOVA_SESSION_BUTTON_FULL_WIDTH_FIX */
+
+.sidebar .nova-current-session-manager-btn {
+    width: 100% !important;
+    max-width: 266px !important;
+    flex: 0 0 266px !important;
+    box-sizing: border-box !important;
+}
+
+/* NOVA_SESSION_BUTTON_ALIGNMENT_FINAL */
+
+.sidebar .nova-current-session-manager-btn {
+    width: 266px !important;
+    max-width: 266px !important;
+    flex: 0 0 266px !important;
+    box-sizing: border-box !important;
+}
+/* NOVA_SESSION_MANAGER_ROW_WIDTH_FIX */
+
+.sidebar .nova-current-session-manager-row {
+    width: 100% !important;
+    max-width: 266px !important;
+    flex: 0 0 266px !important;
+    box-sizing: border-box !important;
+}
+
+/* NOVA_SESSION_CARD_INNER_WIDTH_FIX */
+
+.session-current-card > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.session-current-card .nova-current-session-manager-row {
+    width: 100% !important;
+    max-width: 266px !important;
+    box-sizing: border-box !important;
+}
+
+/* NOVA_SESSION_CURRENT_CARD_INNER_FILL */
+
+.session-current-card > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.session-current-card .nova-current-session-manager-row {
+    width: 100% !important;
+    max-width: 266px !important;
+    flex: 0 0 auto !important;
+    box-sizing: border-box !important;
+}
+
+/* NOVA_SESSION_CARD_WRAPPER_FORCE */
+
+.session-current-card div {
+    width: 100% !important;
+    max-width: 266px !important;
+    box-sizing: border-box !important;
+}
+
+.session-current-card .nova-current-session-manager-row {
+    width: 266px !important;
+    max-width: 266px !important;
+    flex: 0 0 266px !important;
+}
+
+/* NOVA_SESSION_CARD_GRID_WIDTH_FIX */
+
+.session-current-card {
+    grid-template-columns: minmax(0, 1fr) !important;
+    width: 266px !important;
+    max-width: 266px !important;
+    box-sizing: border-box !important;
+}
+
+.session-current-card > * {
+    min-width: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* NOVA_SESSION_CARD_WIDE_LAYOUT */
+
+.session-current-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    box-sizing: border-box !important;
+}
+
+.session-current-card > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.session-current-card .nova-current-session-manager-row {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 1 auto !important;
+    box-sizing: border-box !important;
+}
+
+/* NOVA_SESSION_ROW_FILL_CARD */
+
+.session-current-card .nova-current-session-manager-row {
+    width: 100% !important;
+    max-width: none !important;
+    flex: 0 0 auto !important;
+    box-sizing: border-box !important;
+}
+/* NOVA_SESSION_ROW_FORCE_WIDE_FINAL */
+
+.session-current-card .nova-current-session-manager-row {
+    width: 100% !important;
+    max-width: none !important;
+    flex: 1 1 auto !important;
+    box-sizing: border-box !important;
+}
+
+/* NOVA_LEFT_PANEL_FINAL_FILL */
+
+.sidebar,
+.workspace-section,
+.session-current-card {
+    box-sizing: border-box !important;
+}
+
+.workspace-section {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+.session-current-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.nova-current-session-manager-row {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* NOVA_SESSION_CARD_ALIGN_FINAL */
+
+.sidebar .session-current-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* NOVA_WORKSPACE_GRID_OVERFLOW_FIX */
+
+.workspace-section {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.session-current-card {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* NOVA_WORKSPACE_GRID_HARD_FIX */
+
+.workspace-section {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    box-sizing: border-box !important;
+}
+
+.workspace-section > * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* NOVA_WORKSPACE_CHILD_GRID_SHRINK_FIX */
+
+.workspace-section {
+    min-width: 0 !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.workspace-section > * {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.session-current-card {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* NOVA_WORKSPACE_GRID_CHILD_CONSTRAINT_FIX */
+
+.workspace-section {
+    min-width: 0 !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    overflow: hidden !important;
+}
+
+.workspace-section > * {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* NOVA_WORKSPACE_GRID_MIN_RESET */
+
+.workspace-section {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    grid-template-columns: minmax(0, 100%) !important;
+}
+
+.workspace-section > * {
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: 100% !important;
+    justify-self: stretch !important;
+    box-sizing: border-box !important;
+}
+
+
+
+/* NOVA RIGHT PANEL FINAL CLEAN */
+
+.panel.tools {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+
+.panel.tools > .memory-section {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+
+    border: 1px solid rgba(255,255,255,.18) !important;
+    border-radius: 18px !important;
+
+    padding: 14px !important;
+    box-sizing: border-box !important;
+
+    overflow: hidden !important;
+}
+
+
+.panel.tools > .memory-section #novaMemoryV2 {
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+
+.panel.tools > .memory-section .desktop-memory-list {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+
+
+.panel.tools > .quick-actions-section {
+    flex: 0 0 auto !important;
+}
+
+/* NOVA MEMORY PANEL FINAL */
+
+.panel.tools {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+
+/* MEMORY FILLS SPACE ABOVE QUICK ACTIONS */
+
+.panel.tools > .memory-section {
+    flex: 1 1 auto !important;
+    min-height: 350px !important;
+
+    border: 1px solid rgba(255,255,255,.18) !important;
+    border-radius: 18px !important;
+
+    padding: 14px !important;
+    box-sizing: border-box !important;
+
+    overflow: hidden !important;
+}
+
+
+/* MEMORY INTERNAL CONTENT */
+
+.panel.tools > .memory-section #novaMemoryV2 {
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+
+    overflow: hidden !important;
+}
+
+
+/* MEMORY CARDS SCROLL */
+
+.panel.tools > .memory-section .desktop-memory-list,
+.panel.tools > .memory-section #desktopMemoryList {
+
+    flex: 1 1 auto !important;
+
+    min-height: 0 !important;
+
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+
+    padding-right: 8px !important;
+}
+
+
+/* QUICK ACTIONS STAYS AT BOTTOM */
+
+.panel.tools > .quick-actions-section {
+    flex: 0 0 auto !important;
+    margin-top: auto !important;
+}
+
+/* NOVA MEMORY ONLY PANEL */
+
+.panel.tools {
+    display: block !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+
+.panel.tools > .memory-section {
+    width: 100% !important;
+    height: 100% !important;
+
+    border: 1px solid rgba(255,255,255,.18) !important;
+    border-radius: 18px !important;
+
+    padding: 14px !important;
+    box-sizing: border-box !important;
+
+    overflow: hidden !important;
+}
+
+
+.panel.tools > .memory-section #novaMemoryV2 {
+    height: 100% !important;
+
+    display: flex !important;
+    flex-direction: column !important;
+
+    overflow: hidden !important;
+}
+
+
+.panel.tools > .memory-section .desktop-memory-list,
+.panel.tools > .memory-section #desktopMemoryList {
+
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+
+    padding-right: 8px !important;
+}
+
+</style>
 
 </body>
 </html>

@@ -1,5 +1,5 @@
 /* NOVA_DESKTOP_POLISH_COMPRESSED_20260621 */
-:root{--nova-text-main:#f8f4ff;--nova-text-soft:#d9c8ff;--nova-text-muted:#a998c9;--nova-purple:#a855f7;--nova-purple-soft:rgba(168,85,247,0.28);--nova-code-bg:#12081f;--nova-code-border:rgba(168,85,247,0.34);}
+.error,.statu:root{--nova-text-main:#f8f4ff;--nova-text-soft:#d9c8ff;--nova-text-muted:#a998c9;--nova-purple:#a855f7;--nova-purple-soft:rgba(168,85,247,0.28);--nova-code-bg:#12081f;--nova-code-border:rgba(168,85,247,0.34);}
 .assistant-bubble,.assistant-message,.message.assistant,.msg.assistant,.desktop-message.assistant,[data-role="assistant"]{color:var(--nova-text-main) !important;line-height:1.58 !important;letter-spacing:0.01em;}
 .user-bubble,.user-message,.message.user,.msg.user,.desktop-message.user,[data-role="user"]{color:#ffffff !important;line-height:1.5 !important;}
 .assistant-bubble p,.assistant-message p,.message.assistant p,.msg.assistant p,.desktop-message.assistant p{margin:0.45rem 0 !important;}
@@ -112,7 +112,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 50%{opacity:1;transform:scale(1);}
 100%{opacity:0.45;transform:scale(0.82);}
 }
-.error,.status-error,.send-error,.danger,.warning{background:rgba(127,29,29,0.22) !important;border:1px solid rgba(248,113,113,0.32) !important;color:#fecaca !important;border-radius:14px !important;padding:0.65rem 0.78rem !important;}
+s-error,.send-error,.danger,.warning{background:rgba(127,29,29,0.22) !important;border:1px solid rgba(248,113,113,0.32) !important;color:#fecaca !important;border-radius:14px !important;padding:0.65rem 0.78rem !important;}
 .success,.status-success,.ready,.status-ready{color:#bbf7d0 !important;}
 button,.button,.icon-button,.quick-button,.session-item,.desktop-session-item,.memory-item,.artifact-item,.execution-item,.source-card,.assistant-bubble,.user-bubble,.message.assistant,.message.user,.msg.assistant,.msg.user,.desktop-message.assistant,.desktop-message.user{transition:background 0.16s ease,border-color 0.16s ease,box-shadow 0.16s ease,transform 0.16s ease,opacity 0.16s ease !important;}
 button:hover,.button:hover,.icon-button:hover,.quick-button:hover{transform:translateY(-1px) !important;}
@@ -141,7 +141,12 @@ table{max-width:100% !important;border-collapse:collapse !important;overflow-x:a
 @media (max-width:760px){.assistant-bubble,.assistant-message,.message.assistant,.msg.assistant,.desktop-message.assistant,[data-role="assistant"],.user-bubble,.user-message,.message.user,.msg.user,.desktop-message.user,[data-role="user"]{max-width:calc(100vw - 32px) !important;border-radius:15px !important;}
 .composer,.chat-composer,.desktop-composer,.input-row,.composer-row,.chat-input-row{margin-left:0.35rem !important;margin-right:0.35rem !important;}
 }
-.quick-actions,.quick-prompts,.prompt-actions,.tools,.tool-row,.action-row,.desktop-quick-actions{display:flex !important;flex-wrap:wrap !important;gap:0.45rem !important;align-items:center !important;}
+.quick-actions,.quick-prompts,.prompt-actions,.tool-row,.action-row,.desktop-quick-actions{
+    display:flex !important;
+    flex-wrap:wrap !important;
+    gap:0.45rem !important;
+    align-items:center !important;
+}
 .quick-actions button,.quick-prompts button,.prompt-actions button,.tools button,.tool-row button,.action-row button,.desktop-quick-actions button,[data-prompt],.quick-button,.prompt-chip,.tool-chip{background:rgba(168,85,247,0.12) !important;border:1px solid rgba(216,180,254,0.24) !important;color:#f8f4ff !important;border-radius:999px !important;padding:0.42rem 0.76rem !important;min-height:34px !important;font-size:12px !important;font-weight:750 !important;letter-spacing:0.01em !important;box-shadow:0 8px 18px rgba(0,0,0,0.16) !important;}
 .quick-actions button:hover,.quick-prompts button:hover,.prompt-actions button:hover,.tools button:hover,.tool-row button:hover,.action-row button:hover,.desktop-quick-actions button:hover,[data-prompt]:hover,.quick-button:hover,.prompt-chip:hover,.tool-chip:hover{background:rgba(168,85,247,0.24) !important;border-color:rgba(216,180,254,0.42) !important;box-shadow:0 12px 26px rgba(168,85,247,0.16) !important;}
 .quick-actions button:active,.quick-prompts button:active,.prompt-actions button:active,.tools button:active,.tool-row button:active,.action-row button:active,.desktop-quick-actions button:active,[data-prompt]:active,.quick-button:active,.prompt-chip:active,.tool-chip:active{transform:translateY(0) scale(0.985) !important;}
@@ -284,9 +289,9 @@ aside.panel.tools,
     align-items: stretch !important;
     justify-content: flex-start !important;
     gap: 14px !important;
-    width: 320px !important;
-    min-width: 320px !important;
-    max-width: 320px !important;
+width: auto !important;
+min-width: 0 !important;
+max-width: none !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
 }
@@ -297,7 +302,7 @@ aside.panel.tools,
 .panel.tools .artifacts-section {
     width: 100% !important;
     max-width: 100% !important;
-    flex: 0 0 auto !important;
+    flex: 0 1 auto !important;
     position: relative !important;
     left: auto !important;
     right: auto !important;
@@ -321,9 +326,9 @@ aside.panel.tools,
     flex-direction: column !important;
     align-items: stretch !important;
     justify-content: flex-start !important;
-    width: 320px !important;
-    min-width: 320px !important;
-    max-width: 320px !important;
+width: auto !important;
+min-width: 0 !important;
+max-width: none !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
 }
@@ -332,7 +337,7 @@ aside.panel.tools,
 .panel.tools .tools-section {
     width: 100% !important;
     max-width: 100% !important;
-    flex: 0 0 auto !important;
+    flex: 0 1 auto !important;
     position: static !important;
     inset: auto !important;
     left: auto !important;
@@ -976,4 +981,102 @@ aside.panel.tools,
 
 .nova-menu-panel button:hover {
     transform: translateX(4px);
+}
+
+/* FIX EXECUTION PANEL SIZE ONLY */
+
+.panel.tools > .execution-section {
+    flex: 0 0 220px !important;
+    height: 220px !important;
+    max-height: 220px !important;
+    overflow-y: auto !important;
+    box-sizing: border-box !important;
+}
+
+/* QUICK ACTIONS BOTTOM DOCK */
+.panel.tools > .quick-actions-section {
+    margin-top: auto !important;
+    flex: 0 0 auto !important;
+    order: 99 !important;
+}
+
+/* RIGHT PANEL CLEAN MEMORY LAYOUT */
+
+.panel.tools {
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+
+/* MEMORY PANEL */
+
+.panel.tools > .memory-section {
+    flex: 0 0 340px !important;
+    height: 340px !important;
+    min-height: 340px !important;
+    max-height: 340px !important;
+
+    border: 1px solid rgba(255,255,255,.18) !important;
+    border-radius: 18px !important;
+
+    padding: 14px !important;
+    box-sizing: border-box !important;
+
+    overflow: hidden !important;
+}
+
+
+/* MEMORY CONTENT */
+
+.panel.tools > .memory-section #novaMemoryV2 {
+    height: 100% !important;
+
+    display: flex !important;
+    flex-direction: column !important;
+
+    overflow: hidden !important;
+}
+
+
+/* MEMORY INPUT AREA */
+
+.panel.tools > .memory-section .nova-memory-v2-compose {
+    flex: 0 0 auto !important;
+}
+
+
+/* MEMORY CARDS SCROLL AREA */
+
+.panel.tools > .memory-section .desktop-memory-list {
+    flex: 1 1 auto !important;
+
+    min-height: 0 !important;
+
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+
+    padding-right: 8px !important;
+}
+
+
+/* SYSTEM CARD BELOW MEMORY */
+
+.panel.tools > .compact-system {
+    flex: 0 0 auto !important;
+    height: auto !important;
+    min-height: 120px !important;
+}
+
+
+
+/* MEMORY CONTENT */
+
+.panel.tools > .memory-section #desktopMemoryList {
+    max-height: 200px !important;
+
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+
+    padding-right: 8px !important;
 }
