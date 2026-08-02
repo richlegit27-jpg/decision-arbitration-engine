@@ -1275,8 +1275,26 @@ observer.observe(document.documentElement, {
   </div>
 </section>
 
+<section class="tools-section quick-actions-section">
+  <h3>Quick Actions</h3>
 
-    </aside>
+  <div class="quick">
+    <button type="button" data-nova-quick-action="summarize">
+      Summarize
+    </button>
+
+    <button type="button" data-nova-quick-action="plan">
+      Plan
+    </button>
+
+    <button type="button" data-nova-quick-action="write">
+      Write
+    </button>
+  </div>
+</section>
+
+</aside>
+
   </div>
 
   <script>
@@ -6852,8 +6870,8 @@ console.log("[Nova Force New Chat] cleared chat");
 
 <!-- NOVA_DESKTOP_POLISH_CSS_LINK_20260620 -->
 <link rel="stylesheet"
-href="/static/css/nova-desktop-polish.css?v=recent-session-cards-final-20260621-1">
-
+<link rel="stylesheet" href="/static/css/nova-desktop-polish.css?v=recent-session-cards-final-20260621-1">
+<link rel="stylesheet" href="/static/css/nova-desktop-clean.css?v=1">
 
 
 
@@ -7762,16 +7780,6 @@ body {
 
 <!-- NOVA_MEMORY_TOP_PRIORITY_FINAL_20260622 -->
 <style>
-/* Keep Memory as a first-class right panel section */
-.memory-section {
-    order: -999 !important;
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    flex: 0 0 260px !important;
-    position: relative !important;
-    z-index: 5 !important;
-}
 
 .memory-card-shell {
     display: block !important;
@@ -7876,13 +7884,6 @@ body {
 
 <!-- NOVA_MEMORY_CONTROL_CENTER_V1_20260622 -->
 <style>
-.memory-section {
-    order: -999 !important;
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    flex: 0 0 auto !important;
-}
 
 .nova-memory-control {
     display: grid;
@@ -8501,14 +8502,6 @@ setTimeout(ensureMemoryTypedInput, 1600);
 #novaRightPanelTabs,
 
 
-.memory-section {
-    order: -9999 !important;
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    flex: 0 0 auto !important;
-}
-
 .panel.tools,
 .tools {
     overflow-y: auto !important;
@@ -8595,14 +8588,7 @@ setTimeout(ensureMemoryTypedInput, 1600);
 
 <!-- NOVA_MEMORY_CONTROL_CENTER_V2_20260622 -->
 <style>
-/* Memory V2: cleaner cards + edit mode */
-.memory-section {
-    order: -9999 !important;
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    flex: 0 0 auto !important;
-}
+
 
 .nova-memory-v2 {
     display: grid;
