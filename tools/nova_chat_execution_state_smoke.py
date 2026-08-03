@@ -120,7 +120,45 @@ def main():
             complete_again,
         )
 
+        restarted_service = ChatExecutionService(
+            state_path=str(state_path)
+        )
+
+        restarted_complete = (
+            restarted_service.get_state(
+                session_id
+            )
+        )
+
+        assert_true(
+            "complete_survives_restart",
+            restarted_complete.get("status")
+            == "complete",
+            restarted_complete,
+        )
+
+        assert_true(
+            "restart_preserves_goal",
+            restarted_complete.get("goal")
+            == "Test execution reliability",
+            restarted_complete,
+        )
+
+        assert_true(
+            "restart_preserves_history",
+            len(
+                restarted_complete.get(
+                    "history",
+                    [],
+                )
+            )
+            == 2,
+            restarted_complete,
+        )
+
         reset = service.reset(session_id)
+
+
 
         assert_true(
             "reset_returns_idle",
