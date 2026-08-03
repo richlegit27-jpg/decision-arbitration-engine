@@ -1,3 +1,7 @@
+from nova_backend.services.project_brain_context_builder import (
+    build_project_brain_context,
+)
+
 class ExecutionGuardService:
 
     def __init__(self, chat_execution_service):
@@ -88,10 +92,25 @@ class ExecutionGuardService:
                     "Verify auto-plan, k, next, continue, and completion behavior",
                 ]
 
+            project_context = build_project_brain_context()
+
+            brain_context = {
+                "project_name": project_context.project_name,
+                "active_checkpoint": project_context.active_checkpoint,
+                "blocker": project_context.blocker,
+                "next_move": project_context.next_move,
+            }
+
             state = self.chat_execution_service.start(
                 session_id,
                 goal,
                 steps,
+                context={
+                    "source": "execution_guard",
+                    "task_goal": goal,
+                    "project": "Nova",
+                    "project_brain": brain_context,
+                },
             )
 
             reply = (

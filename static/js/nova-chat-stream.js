@@ -1,4 +1,5 @@
 ﻿(function () {
+console.log("[NOVA CHAT STREAM LOADED - INPUT FIX TEST]");
   "use strict";
 
   const Nova = (window.Nova = window.Nova || {});
@@ -65,8 +66,9 @@
     return null;
   }
 
-  function findComposer() {
+function findComposer() {
     return pickOne([
+      "#input",
       "#composerInput",
       "#composer",
       "#messageInput",
@@ -74,8 +76,7 @@
       ".composer-input",
       "textarea",
     ]);
-  }
-
+}
   function findSendBtn() {
     return pickOne([
       "#sendBtn",
@@ -736,10 +737,17 @@ if (state.messages.length === 0) {
     };
   }
 
-  async function sendCurrentMessage() {
+async function sendCurrentMessage() {
     if (state.isSending) return;
 
 const text = getComposerValue().trim();
+
+console.log("[NOVA SEND COMPOSER CHECK]", {
+  composer: els.composer,
+  id: els.composer?.id,
+  value: els.composer?.value,
+  direct: document.getElementById("input")?.value,
+});
 
 if (text && typeof window.NovaAutoTitleSession === "function") {
   window.NovaAutoTitleSession(text);
@@ -763,6 +771,10 @@ if (els.stopBtn) {
       syncSessionMessages();
 
       const data = await apiPost(CONFIG.chatEndpoint, buildPayload(text));
+console.log(
+  "[NOVA CHAT RESPONSE DEBUG JSON]",
+  JSON.stringify(data, null, 2)
+);
 
       const assistantMessage = normalizeMessage(
         data.message ||
@@ -856,6 +868,12 @@ if (incomingMessages.length > 0) {
 
   function wireDom() {
     els.composer = findComposer();
+console.log("[NOVA COMPOSER DEBUG]", {
+  composer: els.composer,
+  id: els.composer?.id,
+  value: els.composer?.value,
+  tag: els.composer?.tagName,
+});
     els.sendBtn = findSendBtn();
 els.stopBtn = document.getElementById("stopBtn");
 

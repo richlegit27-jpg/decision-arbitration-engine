@@ -1,6 +1,8 @@
 from typing import Any
 
-
+from nova_backend.services.project_brain_context_builder import (
+    build_project_brain_context,
+)
 class ExecutionBridgeService:
 
     def __init__(
@@ -17,14 +19,10 @@ class ExecutionBridgeService:
                 return None
 
             state = self.chat_execution_service.advance(session_id)
+
             reply_text = (
-                self._format_execution_response(
-                    state
-                )
-                if hasattr(
-                    self,
-                    "_format_execution_response"
-                )
+                self._format_execution_response(state)
+                if hasattr(self, "_format_execution_response")
                 else self.chat_execution_service.format_reply(state)
             )
 
@@ -44,6 +42,7 @@ class ExecutionBridgeService:
 
         except Exception as exc:
             self.logger.exception("[NovaExecutionBridge] failed")
+
             reply_text = "Execution bridge failed: " + str(exc)
 
             return {
@@ -56,74 +55,6 @@ class ExecutionBridgeService:
             }
 
 
-
-    # NOVA_AUTO_PLAN_EXECUTION_START_20260607
-    def try_auto_plan_execution_start(self, session_id, user_text):
-        try:
-            raw_text = str(user_text or "").strip()
-            clean_text = " ".join(raw_text.lower().split())
-
-            if not clean_text.startswith("auto-plan "):
-                return None
-
-            goal = (
-                raw_text[len("auto-plan "):].strip()
-                or "Untitled execution mission"
-            )
-
-            steps = [
-                "Understand the mission and identify the target files",
-                "Make the smallest safe implementation change",
-                "Verify the result and report the next move",
-            ]
-
-            state = self.chat_execution_service.start(
-                session_id,
-                goal,
-                steps,
-            )
-
-            if not isinstance(state, dict):
-                state = self.chat_execution_service.get_state(session_id)
-
-            current_step = (
-                state.get("current_step")
-                if isinstance(state, dict)
-                else None
-            )
-
-            reply_text = (
-                "I'll get started on that.\n\n"
-                "I'll keep track of the progress and let you know what I find."
-            )
-
-            return {
-                "ok": True,
-            }
-
-        except Exception as exc:
-            self.logger.exception(
-                "[NovaAutoPlanExecutionStart] failed"
-            )
-        reply_text = "Auto-plan execution start failed: " + str(exc)
-        return {
-            "ok": True,
-            "skip_cleanup": True,
-            "skip_post_processing": True,
-            "skip_rewrite": True,
-            "assistant_message": {
-                "role": "assistant",
-                "text": reply_text,
-                "content": reply_text,
-            },
-            "execution_state": {
-                "status": "failed",
-                "error": str(exc),
-            },
-        }
-
-
-    # NOVA_EXECUTION_AUTOPLAN_START_20260607
     # NOVA_EXECUTION_AUTOPLAN_START_20260607
     def try_execution_autoplan_start(self, session_id, user_text):
         try:
@@ -152,20 +83,50 @@ class ExecutionBridgeService:
                 goal = "Untitled mission"
 
             steps = [
-                "Inspect the current target and identify the smallest safe change",
-                "Apply the implementation without disturbing working systems",
-                "Verify the result and report the next move",
+                f"Understand the goal and define the best approach for: {goal}",
+                "Work through the implementation or solution in the correct order",
+                "Review the result, verify quality, and determine the next move",
             ]
+
+            project_context = build_project_brain_context()
+
+            brain_context = {
+                "project_name": project_context.project_name,
+                "active_checkpoint": project_context.active_checkpoint,
+                "blocker": project_context.blocker,
+                "next_move": project_context.next_move,
+            }
 
             state = self.chat_execution_service.start(
                 session_id=session_id,
                 goal=goal,
                 steps=steps,
+                context={
+                    "source": "auto_plan",
+                    "task_goal": goal,
+                    "step_count": len(steps),
+                    "steps": steps,
+                    "project": "Nova",
+                    "execution_reason": (
+                        "Complete the user's requested task "
+                        "through a guided execution workflow."
+                    ),
+                    "project_brain": brain_context,
+                },
             )
 
             reply_text = (
-                "I'll get started on that.\n\n"
-                "I'll keep track of the progress and let you know what I find."
+                "Mission created.\n\n"
+                f"Goal: {goal}\n\n"
+                "Steps:\n"
+                + "\n".join(
+                    [
+                        f"{index + 1}. {step}"
+                        for index, step in enumerate(steps)
+                    ]
+                )
+                + "\n\n"
+                "Send `next` to run the first step."
             )
 
             return {
@@ -231,72 +192,52 @@ class ExecutionBridgeService:
             if clean not in status_questions:
                 return None
 
-            refresh_states = getattr(
-                self.chat_execution_service,
-                "_load_states",
-                None,
-            )
-
-            if callable(refresh_states):
-                try:
-                    refresh_states()
-                except Exception:
-                    pass
-
-            state = (
-                self.chat_execution_service.get_state(
-                    session_id
-                )
+            state = self.chat_execution_service.get_state(
+                session_id
             )
 
             if (
                 not isinstance(state, dict)
                 or state.get("status") == "idle"
-                or state.get("complete") is True
             ):
                 return None
 
             goal = str(
                 state.get("goal")
                 or "Untitled mission"
-            ).strip()
+            )
 
             status = str(
                 state.get("status")
                 or "ready"
-            ).strip()
-
-            steps = state.get("steps") or []
-
-            current_index = int(
-                state.get("current_index")
-                or 0
             )
 
-            current_step = str(
-                state.get("current_step")
-                or ""
-            ).strip()
+            task_type = str(
+                state.get("task_type")
+                or "general"
+            )
 
-            lines = [
-                f"Active mission: {goal}",
-                f"Status: {status}",
-            ]
+            project_brain = (
+                state.get("context", {})
+                .get("project_brain", {})
+                if isinstance(state, dict)
+                else {}
+            )
 
-            if current_step and steps:
-                lines.append(
-                    f"Step {current_index + 1}/{len(steps)}: "
-                    f"{current_step}"
-                )
+            next_action = state.get(
+                "next_action",
+                {},
+            )
 
-            if state.get("waiting"):
-                lines.append(
-                    "Next: send next, k, continue, "
-                    "or run it to advance."
-                )
-
-            reply_text = "\n".join(lines)
-
+            reply_text = (
+                f"Active mission: {goal}\n"
+                f"Type: {task_type}\n"
+                f"Status: {status}\n"
+                f"Checkpoint: {project_brain.get('active_checkpoint', 'Not available')}\n"
+                f"Blocker: {project_brain.get('blocker', 'None')}\n"
+                f"Next move: {project_brain.get('next_move', 'Continue execution')}\n"
+                f"Next action: {next_action.get('step', 'Continue mission')}\n"
+            )
             return {
                 "ok": True,
                 "text": reply_text,
@@ -309,25 +250,9 @@ class ExecutionBridgeService:
                     "text": reply_text,
                     "content": reply_text,
                     "execution_state": state,
-                    "attachments": [],
-                    "meta": {
-                        "route": "active_execution_status",
-                    },
                 },
                 "execution_state": state,
-                "session_id": session_id,
-                "active_session_id": session_id,
-                "debug": {
-                    "route": "active_execution_status",
-                    "route_taken": "active_execution_status",
-                    "suppressed_project_state_recall": True,
-                },
             }
 
-        except Exception as exc:
-            if self.logger is not None:
-                self.logger.exception(
-                    "[NovaExecutionStatus] failed"
-                )
-
+        except Exception:
             return None

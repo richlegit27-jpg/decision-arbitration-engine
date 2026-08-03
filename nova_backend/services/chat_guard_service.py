@@ -42,6 +42,17 @@ class ChatGuardService:
             if execution_result is not None:
                 return execution_result
 
+            autoplan_result = (
+                execution_bridge_service
+                .try_execution_autoplan_start(
+                    session_id,
+                    user_text,
+                )
+            )
+
+            if autoplan_result is not None:
+                return autoplan_result
+
             return None
 
         except Exception:

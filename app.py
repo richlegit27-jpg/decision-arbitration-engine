@@ -3834,11 +3834,27 @@ def api_chat():
             )
 
         except Exception as chat_error:
+            import traceback
+
             print(
                 "[CHAT SERVICE FAILURE DEBUG]",
                 repr(chat_error),
             )
 
+            traceback.print_exc()
+
+            result = {
+                "ok": False,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": "Nova encountered an error processing that request.",
+                },
+            }
+
+            app.logger.warning(
+                "[CHAT_SERVICE_FAILURE] failed: %s",
+                chat_error,
+            )
             result = {
                 "ok": False,
                 "assistant_message": {

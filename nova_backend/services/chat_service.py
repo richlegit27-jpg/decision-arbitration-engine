@@ -8876,6 +8876,9 @@ Rules:
 
         text = self.safe_str(user_text)
         lowered = text.lower().strip()
+        # AUTO PLAN EXECUTION START
+        if lowered.startswith("auto-plan"):
+            return ("execution", "start")
         attachments = attachments or []
 
         # LOAD EXECUTION STATE
@@ -9011,11 +9014,8 @@ Rules:
             writing_request
             and not explicit_writing_research
         ):
-            return {
-                "route": "chat",
-                "mode": "writing",
-                "intent": "writing",
-            }
+            return ("chat", "writing")
+
 
         # CENTRAL WEB DECISION AUTHORITY
         # Reuse Nova's full route decision instead of maintaining
@@ -9044,11 +9044,7 @@ Rules:
                 isinstance(central_decision, dict)
                 and central_decision.get("intent") == "writing"
             ):
-                return {
-                    "route": "chat",
-                    "mode": "writing",
-                    "intent": "writing",
-                }
+                return ("chat", "writing")
 
         except Exception as exc:
             exec_debug(
@@ -9896,11 +9892,30 @@ Rules:
                 decision["strategy"] = "direct_writing_request"
                 decision["source_urls"] = []
                 decision["sources"] = []
-            writing_result = self._execute_general_chat(
+
+            writing_text = self._run_chat_model(
                 user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
                 decision=decision,
+                session_id=session_id,
+            )
+
+            writing_result = self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=self._build_user_message(
+                    user_text,
+                    attachments=attachments,
+                ),
+                assistant_msg=self._build_assistant_message(
+                    text=writing_text,
+                    meta={
+                        "writing": True,
+                        "direct_writing_request": True,
+                    },
+                    attachments=[],
+                ),
+                decision=decision,
+                saved_artifact=None,
             )
 
             if isinstance(writing_result, list):
@@ -10236,10 +10251,8 @@ Rules:
             "auto-plan",
             "build ",
             "implement ",
-            "fix ",
             "upgrade ",
             "repair ",
-            "upgrade ",
         )
 
         exec_debug(
@@ -10263,19 +10276,15 @@ Rules:
 
                 mission = planner_service.create_mission(goal)
 
-                execution_state = chat_execution_service.start(
-                    session_id=session_id,
-                    goal=mission.get("goal", goal),
-                    steps=[
-                        {
-                            "title": step.get("title", ""),
-                            "action": step.get("title", ""),
-                            "status": step.get("status", "pending"),
-                        }
-                        for step in mission.get("steps", [])
-                        if isinstance(step, dict)
-                    ],
-                )
+                project_context = build_project_brain_context()
+
+                brain_context = {
+                    "project_name": project_context.project_name,
+                    "active_checkpoint": project_context.active_checkpoint,
+                    "blocker": project_context.blocker,
+                    "next_move": project_context.next_move,
+                }
+
 
                 execution_state["mission_id"] = mission.get("id")
                 execution_state["mission"] = mission
@@ -10427,12 +10436,17 @@ Rules:
                 return {
                     "ok": True,
                     "assistant_message": self._build_assistant_message(
-                        "No active work to resume."
+                        (
+                            "Mission created.\n\n"
+                            f"Goal: {execution_state.get('goal', user_text)}\n\n"
+                            "Nova is ready to work through this task and track progress.\n\n"
+                            "Use Run All to continue, or Stop to pause."
+                        )
                     ),
-                    "skip_rewrite": True,
-                    "session": self._get_session_payload(session_id),
+
+                    "session": session_payload,
                     "debug": {
-                        "route_taken": "resume_empty_state_guard",
+                        "route": "execution_plan_created",
                     },
                 }
 
@@ -12742,15 +12756,39 @@ Rules:
             "k",
         }
 
-        if lower_text.strip() in simple_chat_inputs:
+        if text in simple_chat_inputs:
             return {
                 "route": self.ROUTE_GENERAL_CHAT,
                 "mode": "chat",
+                "intent": "chat",
                 "confidence": 1.0,
-                "reasons": ["simple_chat_input_guard"],
+                "reasons": ["simple_chat_input"],
                 "save_artifact": False,
                 "save_memory": False,
-                "use_memory": True,
+                "use_memory": False,
+            }
+
+        continue_commands = {
+            "continue",
+            "continue execution",
+            "continue mission",
+            "keep going",
+            "next",
+            "next step",
+            "proceed",
+            "resume",
+        }
+
+        if text in continue_commands and has_working_mission:
+            return {
+                "route": self.ROUTE_EXECUTION,
+                "mode": "execution",
+                "intent": "execution_continue",
+                "confidence": 0.95,
+                "reasons": ["active_mission_continue_command"],
+                "save_artifact": False,
+                "save_memory": False,
+                "use_memory": False,
             }
 
         normalized_web_text = lower_text.strip()
@@ -12943,17 +12981,20 @@ Rules:
                     "use_memory": False,
                 }
 
-            if text in continue_commands and has_working_mission:
+        if text in continue_commands and (
+            has_working_mission
+            or has_active_execution
+        ):
 
-                return {
-                    "route": self.ROUTE_GENERAL_CHAT,
-                    "mode": "writing",
-                    "confidence": 1.0,
-                    "reasons": ["working_state_continue_override"],
-                    "save_artifact": False,
-                    "save_memory": False,
-                    "use_memory": True,
-                }
+            return {
+                "route": "execution_command",
+                "mode": "execution",
+                "confidence": 1.0,
+                "reasons": ["working_state_continue_override"],
+                "save_artifact": False,
+                "save_memory": False,
+                "use_memory": True,
+            }
 
             return {
                 "route": "execution_command",
@@ -14859,6 +14900,30 @@ Rules:
 
         return "\n".join(lines).strip()
 
+    def _format_memory_context(self, memory_items=None) -> str:
+        memory_items = memory_items or []
+        lines = []
+
+        for item in memory_items:
+            if isinstance(item, dict):
+                text = (
+                    item.get("text")
+                    or item.get("content")
+                    or item.get("value")
+                    or item.get("memory")
+                    or ""
+                )
+            else:
+                text = str(item or "")
+
+            text = str(text).strip()
+
+            if text:
+                lines.append(f"- {text}")
+
+        return "\n".join(lines).strip()
+
+
     def _rank_memory_context(
         self,
         memories=None,
@@ -15657,7 +15722,7 @@ Rules:
                 repr(prompt)[:2000],
             )
 
-            response = self.client.responses.create(
+            response = responses_create(
                 model=self.chat_model,
                 input=prompt,
             )

@@ -9,6 +9,7 @@ class ChatRequestContextService:
 
         user_text = str(
             payload.get("user_text")
+            or payload.get("content")
             or payload.get("text")
             or payload.get("message")
             or ""

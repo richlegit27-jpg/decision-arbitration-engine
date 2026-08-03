@@ -605,9 +605,9 @@
 /* NOVA_SESSION_MANAGER_ROW_FILL */
 
 .sidebar .nova-current-session-manager-row {
-    width: 266px !important;
-    max-width: 266px !important;
-    flex: 0 0 266px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 auto !important;
     box-sizing: border-box !important;
 }
 
@@ -1098,22 +1098,6 @@ observer.observe(document.documentElement, {
 <body>
   <div class="shell">
     <aside class="panel sidebar">
-<!-- NOVA_DESKTOP_EXECUTION_NATIVE_TOOLS_PANEL_20260702 -->
-<section id="nova-desktop-execution-native" class="panel-section nova-desktop-execution-native" aria-label="Execution Panel">
-    <div class="panel-section-title">Execution</div>
-
-    <div data-execution-panel>
-        <div class="nova-panel-muted">
-            No steps yet. Start with <strong>auto-plan &lt;goal&gt;</strong>, then use Run Step.
-        </div>
-    </div>
-
-    <div class="nova-desktop-execution-native-actions">
-        <button type="button" data-exec-fill="run step">Run Step</button>
-        <button type="button" data-exec-fill="run all">Run All</button>
-        <button type="button" data-exec-fill="stop">Stop</button>
-    </div>
-</section>
 
       <div class="brand">
         <div class="brand-row">
@@ -1206,12 +1190,26 @@ observer.observe(document.documentElement, {
       </section>
 
 
-
-
 <div class="side-footer-links">
   <a href="/">Home</a>
   <a href="/help">Help</a>
 <button class="footer-mini-button" id="openArtifactsBtn" type="button">Artifacts</button>
+</div>
+
+<!-- NOVA_DESKTOP_EXECUTION_NATIVE_TOOLS_PANEL_20260702 -->
+<section id="nova-desktop-execution-native" class="panel-section nova-desktop-execution-native" aria-label="Execution Panel">
+    <div class="panel-section-title">Execution</div>
+
+<div data-execution-panel>
+    <div class="nova-panel-muted">
+        No active mission yet. Start with <strong>auto-plan &lt;goal&gt;</strong>.
+    </div>
+</div>
+
+<div class="nova-desktop-execution-native-actions">
+    <button type="button" data-exec-fill="continue">Continue</button>
+    <button type="button" data-exec-fill="run all">Run All</button>
+    <button type="button" data-exec-fill="stop">Pause</button>
 </div>
     </aside>
 
@@ -2104,8 +2102,6 @@ function showThinking(node) {
   return () => clearInterval(interval);
 }
 
-
-
 async function sendText(textOverride) {
   console.log("&#128206; sendText TRIGGERED");
 
@@ -2412,16 +2408,33 @@ function handleSendClick(prompt = "") {
     });
 }
 
-    summarizeBtn.addEventListener("click", () => summarizeNow().catch(e => {
+if (summarizeBtn) {
+  summarizeBtn.addEventListener("click", () =>
+    summarizeNow().catch(e => {
       setStatus("error");
       alert(e.message || e);
-    }));
+    })
+  );
+}
 
     document.querySelectorAll("[data-prompt]").forEach((button) => {
       button.addEventListener("click", () => {
         handleSendClick(button.getAttribute("data-prompt") || "");
       });
     });
+
+document.querySelectorAll("[data-nova-quick-action]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const action = button.getAttribute("data-nova-quick-action");
+
+    const prompts = {
+      plan: "I want to plan something. Help me organize the next steps.",
+      write: "Help me write something."
+    };
+
+    handleSendClick(prompts[action] || "");
+  });
+});
 
     try {
       const saved = localStorage.getItem(LS_SID);
@@ -2469,13 +2482,27 @@ sendBtn.addEventListener("click", (e) => {
 // disabled duplicate newSessionBtn listener
 
 if (summarizeBtn) {
-  summarizeBtn.addEventListener("click", () =>
+  summarizeBtn.addEventListener("click", () => {
     summarizeNow().catch(e => {
       setStatus("error");
       alert(e.message || e);
-    })
-  );
+    });
+  });
 }
+
+document.querySelectorAll("[data-nova-quick-action]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const action = button.getAttribute("data-nova-quick-action");
+
+    const prompts = {
+      summarize: "Summarize this.",
+      plan: "I want to plan something. Help me organize the next steps.",
+      write: "Help me write something.",
+    };
+
+    handleSendClick(prompts[action] || "");
+  });
+});
 
 if (attachBtn && desktopFileInput) {
   attachBtn.addEventListener("click", () => {
@@ -3020,12 +3047,12 @@ function renderDesktopChatMessagesRescue(messages) {
 
 .nova-current-session-manager-row {
     display: flex !important;
-    flex-wrap: wrap !important;
+    flex-wrap: nowrap !important;
     align-items: center !important;
-    width: 266px !important;
-    max-width: 266px !important;
-    flex: 0 0 266px !important;
+    width: 100% !important;
+    max-width: 100% !important;
     box-sizing: border-box !important;
+    gap: 8px !important;
 }
 
 .nova-current-session-manager-btn {
@@ -3274,11 +3301,14 @@ var host =
 
 box.innerHTML =
   '<div id="nova-current-session-manager-title">Manage current session</div>' +
-  '<div class="nova-current-session-manager-row">' +
-    '<button id="nova-manage-rename-session" class="nova-current-session-manager-btn" type="button">Rename</button>' +
-    '<button id="nova-manage-pin-session" class="nova-current-session-manager-btn" type="button">Pin/Unpin</button>' +
-    '<button id="nova-manage-delete-session" class="nova-current-session-manager-btn" type="button">Delete</button>' +
-    '<button id="nova-manage-delete-all-sessions" class="nova-current-session-manager-btn" type="button">Delete All Conversations</button>' +
+'<div class="nova-current-session-manager-row">' +
+  '<button id="nova-manage-rename-session" class="nova-current-session-manager-btn" type="button">Rename</button>' +
+  '<button id="nova-manage-pin-session" class="nova-current-session-manager-btn" type="button">Pin/Unpin</button>' +
+  '<button id="nova-manage-delete-session" class="nova-current-session-manager-btn" type="button">Delete</button>' +
+'</div>' +
+'<div id="nova-delete-all-sessions-panel">' +
+  '<button id="nova-manage-delete-all-sessions" class="nova-current-session-manager-btn" type="button">Delete All Conversations</button>' +
+'</div>' +
   '</div>' +
   '<div id="nova-current-session-manager-status"></div>';
 
@@ -3553,10 +3583,9 @@ window.loadMemoriesLegacy = loadDesktopMemoryLegacy;
 (function () {
   "use strict";
 
-  function executionSection() {
-    return document.querySelector(".tools-section.execution-section");
-  }
-
+function executionSection() {
+    return document.querySelector("#nova-desktop-execution-native");
+}
   function executionNote() {
     return document.getElementById("executionNote");
   }
@@ -6458,6 +6487,24 @@ console.log("[Nova Force New Chat] cleared chat");
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
 <script src="/static/js/nova-desktop-sessions.js?v=session-open-fix-20260621-1"></script>
+<script src="/static/js/nova-render.js"></script>
+
+<script>
+  window.Nova = window.Nova || {};
+  window.Nova.render = window.Nova.render || {};
+
+  if (
+    window.NovaRender &&
+    typeof window.NovaRender.renderMessages === "function"
+  ) {
+    window.Nova.render.renderMessages =
+      window.NovaRender.renderMessages;
+
+    console.log(
+      "[Nova Render Bridge] Nova.render.renderMessages connected"
+    );
+  }
+</script>
 
 <script src="/static/js/nova-chat-stream.js"></script>
 
@@ -8488,6 +8535,7 @@ setTimeout(ensureMemoryTypedInput, 300);
 setTimeout(ensureMemoryTypedInput, 900);
 setTimeout(ensureMemoryTypedInput, 1600);
 
+</script>
 
 <!-- NOVA_RIGHT_PANEL_MEMORY_ONLY_CLEANUP_20260622 -->
 <style>
@@ -11925,11 +11973,23 @@ if (
 
 
     function start() {
-        document.querySelectorAll("#nova-desktop-execution-native [data-exec-fill]").forEach(button => {
-            button.addEventListener("click", () => {
-                setInput(button.getAttribute("data-exec-fill") || "");
-            });
-        });
+document.querySelectorAll("#nova-desktop-execution-native [data-exec-fill]").forEach(button => {
+    button.addEventListener("click", () => {
+        const command = button.getAttribute("data-exec-fill") || "";
+
+        console.log("[NOVA EXECUTION BUTTON]", command);
+
+        handleSendClick(command);
+    });
+});
+
+        console.log("[NOVA EXECUTION ACTION]", action);
+
+        if (typeof handleSendClick === "function") {
+            handleSendClick(action);
+        }
+    });
+});
 
         console.log("[NOVA_DESKTOP_EXECUTION_NATIVE_TOOLS_PANEL_20260702] active");
     }
@@ -12518,7 +12578,6 @@ aside.panel.sidebar {
 
 /* NOVA_EXECUTION_BOTTOM_ORDER_FIX_20260731 */
 #nova-desktop-execution-native {
-    order: 9999 !important;
 }
 
 
@@ -12914,383 +12973,42 @@ aside.panel.tools,
     margin-right: 0 !important;
 }
 
-/* NOVA_SESSION_BUTTON_WIDTH_ALIGNMENT */
+/* CLEAN SESSION CARD LAYOUT */
 
-.sidebar .nova-current-session-manager-btn {
-    width: 100% !important;
-    max-width: 266px !important;
+.sidebar .session-current-card {
     box-sizing: border-box !important;
-}
-
-/* NOVA_LEFT_CONTENT_ALIGNMENT */
-
-.sidebar .nova-current-session-manager-btn {
-    width: 100% !important;
-    max-width: 266px !important;
-    box-sizing: border-box !important;
-}
-/* NOVA_SESSION_BUTTON_FULL_WIDTH_FIX */
-
-.sidebar .nova-current-session-manager-btn {
-    width: 100% !important;
-    max-width: 266px !important;
-    flex: 0 0 266px !important;
-    box-sizing: border-box !important;
-}
-
-/* NOVA_SESSION_BUTTON_ALIGNMENT_FINAL */
-
-.sidebar .nova-current-session-manager-btn {
-    width: 266px !important;
-    max-width: 266px !important;
-    flex: 0 0 266px !important;
-    box-sizing: border-box !important;
-}
-/* NOVA_SESSION_MANAGER_ROW_WIDTH_FIX */
-
-.sidebar .nova-current-session-manager-row {
-    width: 100% !important;
-    max-width: 266px !important;
-    flex: 0 0 266px !important;
-    box-sizing: border-box !important;
-}
-
-/* NOVA_SESSION_CARD_INNER_WIDTH_FIX */
-
-.session-current-card > div {
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-}
-
-.session-current-card .nova-current-session-manager-row {
-    width: 100% !important;
-    max-width: 266px !important;
-    box-sizing: border-box !important;
-}
-
-/* NOVA_SESSION_CURRENT_CARD_INNER_FILL */
-
-.session-current-card > div {
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-}
-
-.session-current-card .nova-current-session-manager-row {
-    width: 100% !important;
-    max-width: 266px !important;
-    flex: 0 0 auto !important;
-    box-sizing: border-box !important;
-}
-
-/* NOVA_SESSION_CARD_WRAPPER_FORCE */
-
-.session-current-card div {
-    width: 100% !important;
-    max-width: 266px !important;
-    box-sizing: border-box !important;
-}
-
-.session-current-card .nova-current-session-manager-row {
-    width: 266px !important;
-    max-width: 266px !important;
-    flex: 0 0 266px !important;
-}
-
-/* NOVA_SESSION_CARD_GRID_WIDTH_FIX */
-
-.session-current-card {
-    grid-template-columns: minmax(0, 1fr) !important;
-    width: 266px !important;
-    max-width: 266px !important;
-    box-sizing: border-box !important;
-}
-
-.session-current-card > * {
-    min-width: 0 !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-}
-
-/* NOVA_SESSION_CARD_WIDE_LAYOUT */
-
-.session-current-card {
-    width: 100% !important;
-    max-width: 100% !important;
-    grid-template-columns: minmax(0, 1fr) !important;
-    box-sizing: border-box !important;
-}
-
-.session-current-card > div {
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-}
-
-.session-current-card .nova-current-session-manager-row {
-    width: 100% !important;
-    max-width: 100% !important;
-    flex: 1 1 auto !important;
-    box-sizing: border-box !important;
-}
-
-/* NOVA_SESSION_ROW_FILL_CARD */
-
-.session-current-card .nova-current-session-manager-row {
-    width: 100% !important;
-    max-width: none !important;
-    flex: 0 0 auto !important;
-    box-sizing: border-box !important;
-}
-/* NOVA_SESSION_ROW_FORCE_WIDE_FINAL */
-
-.session-current-card .nova-current-session-manager-row {
-    width: 100% !important;
-    max-width: none !important;
-    flex: 1 1 auto !important;
-    box-sizing: border-box !important;
-}
-
-/* NOVA_LEFT_PANEL_FINAL_FILL */
-
-.sidebar,
-.workspace-section,
-.session-current-card {
-    box-sizing: border-box !important;
-}
-
-.workspace-section {
     width: 100% !important;
     max-width: 100% !important;
 }
 
-.session-current-card {
+#nova-current-session-manager {
+    box-sizing: border-box !important;
     width: 100% !important;
     max-width: 100% !important;
-    box-sizing: border-box !important;
+    overflow: hidden !important;
 }
 
 .nova-current-session-manager-row {
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-}
-
-/* NOVA_SESSION_CARD_ALIGN_FINAL */
-
-.sidebar .session-current-card {
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-}
-
-/* NOVA_WORKSPACE_GRID_OVERFLOW_FIX */
-
-.workspace-section {
-    min-width: 0 !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-    grid-template-columns: minmax(0, 1fr) !important;
-}
-
-.session-current-card {
-    min-width: 0 !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-}
-
-/* NOVA_WORKSPACE_GRID_HARD_FIX */
-
-.workspace-section {
-    min-width: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    grid-template-columns: minmax(0, 1fr) !important;
-    box-sizing: border-box !important;
-}
-
-.workspace-section > * {
-    min-width: 0 !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-}
-
-/* NOVA_WORKSPACE_CHILD_GRID_SHRINK_FIX */
-
-.workspace-section {
-    min-width: 0 !important;
-    grid-template-columns: minmax(0, 1fr) !important;
-}
-
-.workspace-section > * {
-    min-width: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-}
-
-.session-current-card {
-    min-width: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-}
-
-/* NOVA_WORKSPACE_GRID_CHILD_CONSTRAINT_FIX */
-
-.workspace-section {
-    min-width: 0 !important;
-    grid-template-columns: minmax(0, 1fr) !important;
-    overflow: hidden !important;
-}
-
-.workspace-section > * {
-    min-width: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-}
-
-/* NOVA_WORKSPACE_GRID_MIN_RESET */
-
-.workspace-section {
-    min-width: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    grid-template-columns: minmax(0, 100%) !important;
-}
-
-.workspace-section > * {
-    min-width: 0 !important;
-    width: auto !important;
-    max-width: 100% !important;
-    justify-self: stretch !important;
-    box-sizing: border-box !important;
-}
-
-
-
-/* NOVA RIGHT PANEL FINAL CLEAN */
-
-.panel.tools {
     display: flex !important;
-    flex-direction: column !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-}
-
-
-.panel.tools > .memory-section {
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-
-    border: 1px solid rgba(255,255,255,.18) !important;
-    border-radius: 18px !important;
-
-    padding: 14px !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    width: 100% !important;
+    max-width: 100% !important;
     box-sizing: border-box !important;
-
-    overflow: hidden !important;
 }
 
-
-.panel.tools > .memory-section #novaMemoryV2 {
-    height: 100% !important;
-    display: flex !important;
-    flex-direction: column !important;
-}
-
-
-.panel.tools > .memory-section .desktop-memory-list {
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-}
-
-
-.panel.tools > .quick-actions-section {
-    flex: 0 0 auto !important;
-}
-
-/* NOVA MEMORY PANEL FINAL */
-
-.panel.tools {
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-}
-
-
-/* MEMORY FILLS SPACE ABOVE QUICK ACTIONS */
-
-    border: 1px solid rgba(255,255,255,.18) !important;
-    border-radius: 18px !important;
-
-    padding: 14px !important;
+.nova-current-session-manager-btn {
     box-sizing: border-box !important;
-
-    overflow: hidden !important;
 }
 
+/* ALIGN MANAGE SESSION WITH CARD EDGE */
 
-/* MEMORY INTERNAL CONTENT */
+.session-current-card #nova-current-session-manager {
+    margin-left: -13px !important;
+    width: calc(100% + 26px) !important;
+    box-sizing: border-box !important;
+}sendBtn.addEventListener("click", (e) => {
 
-.panel.tools > .memory-section #novaMemoryV2 {
-    height: 100% !important;
-    display: flex !important;
-    flex-direction: column !important;
-
-    overflow: hidden !important;
-}
-
-
-/* MEMORY CARDS SCROLL */
-
-.panel.tools > .memory-section .desktop-memory-list,
-.panel.tools > .memory-section #desktopMemoryList {
-
-    flex: 1 1 auto !important;
-
-    min-height: 0 !important;
-
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-
-    padding-right: 8px !important;
-}
-
-
-/* QUICK ACTIONS STAYS AT BOTTOM */
-
-.panel.tools > .quick-actions-section {
-    flex: 0 0 auto !important;
-    margin-top: 10px !important;
-}
-
-.panel.tools > .memory-section #novaMemoryV2 {
-    height: 100% !important;
-
-    display: flex !important;
-    flex-direction: column !important;
-
-    overflow: hidden !important;
-}
-
-
-.panel.tools > .memory-section .desktop-memory-list,
-.panel.tools > .memory-section #desktopMemoryList {
-
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-
-    padding-right: 8px !important;
-}
 
 
 </style>

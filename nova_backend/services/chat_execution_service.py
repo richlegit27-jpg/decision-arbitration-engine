@@ -72,17 +72,38 @@ class ChatExecutionService:
         session_id: str,
         goal: str,
         steps: Optional[List[Any]] = None,
+        context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         safe_session_id = self._safe_session_id(session_id)
-        safe_goal = str(goal or "Untitled mission").strip() or "Untitled mission"
-        safe_steps = self._normalize_steps(steps)
+
+        safe_goal = (
+            str(goal or "Untitled mission")
+            .strip()
+            or "Untitled mission"
+        )
+
+        safe_steps = self._normalize_steps(
+            steps
+        )
+
+        safe_context = (
+            context
+            if isinstance(context, dict)
+            else {}
+        )
 
         state = {
             "status": "ready",
             "goal": safe_goal,
+            "context": safe_context,
+            "task_type": safe_context.get("task_type", "general"),
             "steps": safe_steps,
             "current_index": 0,
-            "current_step": safe_steps[0] if safe_steps else None,
+            "current_step": (
+                safe_steps[0]
+                if safe_steps
+                else None
+            ),
             "history": [],
             "waiting": True,
             "complete": False,
@@ -99,7 +120,10 @@ class ChatExecutionService:
             safe_goal,
             len(safe_steps),
         )
-        return self.get_state(safe_session_id)
+
+        return self.get_state(
+            safe_session_id
+        )
 
     def get_state(self, session_id: str) -> Dict[str, Any]:
         safe_session_id = self._safe_session_id(session_id)
@@ -157,6 +181,16 @@ class ChatExecutionService:
         steps = state.get("steps") or []
         current_index = int(state.get("current_index") or 0)
 
+        task_type = state.get(
+            "task_type",
+            "general",
+        )
+
+        context = state.get(
+            "context",
+            {},
+        )
+
         if current_index >= len(steps):
             state["status"] = "complete"
             state["waiting"] = False
@@ -202,7 +236,14 @@ class ChatExecutionService:
                     "status": "advanced",
                 },
             )
-            
+
+        state["next_action"] = {
+            "task_type": task_type,
+            "step": state.get(
+                "current_step",
+            ),
+            "reason": "Continue current mission step.",
+        }
 
         self._save_states()
 
@@ -268,10 +309,18 @@ class ChatExecutionService:
             return error
 
         if current_step:
-            step_number = min(current_index + 1, total) if total else current_index + 1
+            step_number = (
+                min(current_index + 1, total)
+                if total
+                else current_index + 1
+            )
+
             return (
-                "I'm continuing with the next part.\n\n"
-                f"{current_step}"
+                f"Continuing mission:\n\n"
+                f"Goal: {goal}\n\n"
+                f"Step {step_number}/{total}:\n"
+                f"{current_step}\n\n"
+                f"Status: {status}"
             )
 
         return f"Execution {status}."
@@ -348,13 +397,19 @@ class ChatExecutionService:
         return {
             "status": state.get("status"),
             "goal": state.get("goal"),
+            "task_type": state.get("task_type", "general"),
+            "context": state.get("context", {}),
+            "execution_decision": state.get(
+                "execution_decision",
+                {},
+            ),
             "steps": list(state.get("steps") or []),
             "current_index": int(state.get("current_index") or 0),
             "current_step": state.get("current_step"),
             "history": list(state.get("history") or []),
             "waiting": bool(state.get("waiting")),
             "complete": bool(state.get("complete")),
-	    "mission_id": state.get("mission_id"),
+            "mission_id": state.get("mission_id"),
             "error": state.get("error"),
         }
 

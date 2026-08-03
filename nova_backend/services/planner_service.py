@@ -59,26 +59,227 @@ class PlannerService:
 
         return mission
 
+    def _generate_steps(
+        self,
+        goal: str,
+    ) -> List[Dict[str, Any]]:
+
+        text = str(goal or "").lower()
+
+        if any(
+            word in text
+            for word in (
+                "python",
+                "code",
+                "project",
+                "app",
+                "software",
+                "bug",
+                "fix",
+                "feature",
+            )
+        ):
+            return [
+                {
+                    "step": "analyze",
+                    "status": "pending",
+                    "description": (
+                        f"Analyze the current state and requirements for {goal}."
+                    ),
+                },
+                {
+                    "step": "implement",
+                    "status": "pending",
+                    "description": (
+                        f"Make the required changes for {goal}."
+                    ),
+                },
+                {
+                    "step": "verify",
+                    "status": "pending",
+                    "description": (
+                        f"Verify the result and check for problems with {goal}."
+                    ),
+                },
+            ]
+
+        if any(
+            word in text
+            for word in (
+                "write",
+                "email",
+                "document",
+                "article",
+            )
+        ):
+            return [
+                {
+                    "step": "understand",
+                    "status": "pending",
+                    "description": (
+                        f"Understand the purpose and requirements for {goal}."
+                    ),
+                },
+                {
+                    "step": "draft",
+                    "status": "pending",
+                    "description": (
+                        f"Create a first version of {goal}."
+                    ),
+                },
+                {
+                    "step": "review",
+                    "status": "pending",
+                    "description": (
+                        f"Review and improve the final result for {goal}."
+                    ),
+                },
+            ]
+
+        return [
+            {
+                "step": "plan",
+                "status": "pending",
+                "description": (
+                    f"Plan the best approach for {goal}."
+                ),
+            },
+            {
+                "step": "execute",
+                "status": "pending",
+                "description": (
+                    f"Complete the main work for {goal}."
+                ),
+            },
+            {
+                "step": "review",
+                "status": "pending",
+                "description": (
+                    f"Review the completed work for {goal}."
+                ),
+            },
+        ]
+
     def build_plan(self, mission_name: str) -> Dict[str, Any]:
         safe_mission = str(mission_name or "generic").strip() or "generic"
 
-        steps = [
-            {
-                "step": "design",
-                "status": "pending",
-                "description": f"Design the approach for {safe_mission}.",
-            },
-            {
-                "step": "implement",
-                "status": "pending",
-                "description": f"Implement the solution for {safe_mission}.",
-            },
-            {
-                "step": "test",
-                "status": "pending",
-                "description": f"Test and verify {safe_mission}.",
-            },
-        ]
+        task_type = "general"
+
+        mission_lower = safe_mission.lower()
+
+        if any(
+            word in mission_lower
+            for word in (
+                "python",
+                "code",
+                "project",
+                "app",
+                "software",
+                "bug",
+                "fix",
+            )
+        ):
+            task_type = "coding"
+
+        elif any(
+            word in mission_lower
+            for word in (
+                "write",
+                "email",
+                "document",
+                "report",
+                "essay",
+            )
+        ):
+            task_type = "writing"
+
+        elif any(
+            word in mission_lower
+            for word in (
+                "research",
+                "learn",
+                "study",
+                "analyze",
+            )
+        ):
+            task_type = "research"
+
+
+        if task_type == "coding":
+            steps = [
+                {
+                    "step": "understand",
+                    "status": "pending",
+                    "description": (
+                        f"Understand the current structure and goal "
+                        f"for {safe_mission}."
+                    ),
+                },
+                {
+                    "step": "analyze",
+                    "status": "pending",
+                    "description": (
+                        "Analyze the current files, problems, "
+                        "and possible improvements."
+                    ),
+                },
+                {
+                    "step": "implement",
+                    "status": "pending",
+                    "description": (
+                        "Apply the safest useful changes "
+                        "without breaking working systems."
+                    ),
+                },
+                {
+                    "step": "verify",
+                    "status": "pending",
+                    "description": (
+                        "Verify the result and summarize "
+                        "the next move."
+                    ),
+                },
+            ]
+
+        elif task_type == "writing":
+            steps = [
+                {
+                    "step": "understand",
+                    "status": "pending",
+                    "description": "Understand the purpose and audience.",
+                },
+                {
+                    "step": "draft",
+                    "status": "pending",
+                    "description": "Create the first draft.",
+                },
+                {
+                    "step": "review",
+                    "status": "pending",
+                    "description": "Review and improve the writing.",
+                },
+            ]
+
+        else:
+            steps = [
+                {
+                    "step": "understand",
+                    "status": "pending",
+                    "description": (
+                        f"Understand the goal: {safe_mission}."
+                    ),
+                },
+                {
+                    "step": "plan",
+                    "status": "pending",
+                    "description": "Create the best approach.",
+                },
+                {
+                    "step": "complete",
+                    "status": "pending",
+                    "description": "Complete the task and review the result.",
+                },
+            ]
 
         project_brain_decision = (
             build_operator_plan_dict(
@@ -89,6 +290,7 @@ class PlannerService:
         plan = {
             "mission": safe_mission,
             "goal": safe_mission,
+            "task_type": task_type,
             "steps": steps,
             "current_index": 0,
             "status": "pending",

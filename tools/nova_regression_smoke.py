@@ -113,7 +113,10 @@ def run():
     )
     assert_true(
         "execution_start",
-        "I'll get started on that" in text_of(start),
+        (
+            "Mission created." in text_of(start)
+            and "Send `next`" in text_of(start)
+        ),
         text_of(start),
     )
 
@@ -121,7 +124,11 @@ def run():
     k_active = post_chat("k", exec_session)
     assert_true(
         "execution_k_active_advances",
-        "I'm continuing with the next part" in text_of(k_active),
+        (
+            "Continuing mission:" in text_of(k_active)
+            and "Step 2/3:" in text_of(k_active)
+            and "Status: waiting" in text_of(k_active)
+        ),
         text_of(k_active),
     )
 
@@ -207,9 +214,11 @@ def run():
     )
     assert_true(
         "debugging_intent_safe",
-        "error" in text_of(debugging).lower()
-        or "debug" in json.dumps(debugging.get("debug", {})).lower(),
-        json.dumps(debugging.get("debug", {}), indent=2),
+        (
+            debugging.get("debug", {}).get("route")
+            != "execution_plan_created"
+        ),
+        json.dumps(debugging, indent=2),
     )
 
     # 12. Planning intent stays available.
