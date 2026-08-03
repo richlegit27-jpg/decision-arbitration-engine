@@ -1,0 +1,144 @@
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from nova_backend.services.chat_execution_service import (
+    ChatExecutionService,
+)
+
+
+def assert_true(name, condition, detail=""):
+    if not condition:
+        raise AssertionError(
+            f"{name} FAILED {detail}"
+        )
+
+    print(f"PASS {name}")
+
+
+def main():
+    with TemporaryDirectory() as temp_dir:
+        state_path = (
+            Path(temp_dir)
+            / "execution_state.json"
+        )
+
+        service = ChatExecutionService(
+            state_path=str(state_path)
+        )
+
+        session_id = "execution_state_smoke"
+
+        idle = service.get_state(session_id)
+
+        assert_true(
+            "initial_state_idle",
+            idle.get("status") == "idle",
+            idle,
+        )
+
+        started = service.start(
+            session_id=session_id,
+            goal="Test execution reliability",
+            steps=[
+                "first step",
+                "second step",
+            ],
+        )
+
+        assert_true(
+            "start_state_ready",
+            started.get("status") == "ready",
+            started,
+        )
+
+        assert_true(
+            "start_waiting_true",
+            started.get("waiting") is True,
+            started,
+        )
+
+        assert_true(
+            "start_current_step_first",
+            started.get("current_step")
+            == "first step",
+            started,
+        )
+
+        first = service.advance(session_id)
+
+        assert_true(
+            "first_advance_waiting",
+            first.get("status") == "waiting",
+            first,
+        )
+
+        assert_true(
+            "first_advance_index",
+            first.get("current_index") == 1,
+            first,
+        )
+
+        assert_true(
+            "first_advance_current_step",
+            first.get("current_step")
+            == "second step",
+            first,
+        )
+
+        second = service.advance(session_id)
+
+        assert_true(
+            "second_advance_complete",
+            second.get("status") == "complete",
+            second,
+        )
+
+        assert_true(
+            "complete_flag_true",
+            second.get("complete") is True,
+            second,
+        )
+
+        assert_true(
+            "complete_waiting_false",
+            second.get("waiting") is False,
+            second,
+        )
+
+        assert_true(
+            "complete_current_step_none",
+            second.get("current_step") is None,
+            second,
+        )
+
+        complete_again = service.advance(session_id)
+
+        assert_true(
+            "complete_is_idempotent",
+            complete_again.get("status")
+            == "complete",
+            complete_again,
+        )
+
+        reset = service.reset(session_id)
+
+        assert_true(
+            "reset_returns_idle",
+            reset.get("status") == "idle",
+            reset,
+        )
+
+        assert_true(
+            "reset_clears_goal",
+            reset.get("goal") is None,
+            reset,
+        )
+
+        print(
+            "\nNOVA CHAT EXECUTION STATE "
+            "SMOKE PASSED"
+        )
+
+
+if __name__ == "__main__":
+    main()
