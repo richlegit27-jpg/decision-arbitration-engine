@@ -1008,6 +1008,13 @@ def api_health():
             "RAILWAY_GIT_BRANCH",
             "",
         ),
+        attachment_pipeline_ready=True,
+        attachment_pipeline={
+            "status": "ready",
+            "response_contract": True,
+            "response_finalizer": True,
+            "ownership_guard": True,
+        },
     )
     
 
