@@ -1093,7 +1093,15 @@ class SessionService:
         return self.get_active_session()
 
 
-    def append_message(self, session_id, message):
+    def append_message(
+        self,
+        session_id,
+        message,
+        user_id="",
+    ):
+        if not user_id:
+            user_id = self._current_owner_id()
+
         sessions = self._load_sessions()
 
         i = self._find(sessions, session_id)
@@ -1103,7 +1111,7 @@ class SessionService:
 
         if not self._belongs_to_user(
             sessions[i],
-            self._current_owner_id(),
+            user_id,
         ):
             return None
 
