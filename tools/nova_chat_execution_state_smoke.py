@@ -64,6 +64,41 @@ def main():
             started,
         )
 
+        waiting_restart_service = ChatExecutionService(
+            state_path=str(state_path)
+        )
+
+        waiting_restart_state = (
+            waiting_restart_service.get_state(
+                session_id
+            )
+        )
+
+        assert_true(
+            "ready_survives_restart",
+            waiting_restart_state.get("status")
+            == "ready",
+            waiting_restart_state,
+        )
+
+        assert_true(
+            "ready_restart_preserves_index",
+            waiting_restart_state.get(
+                "current_index"
+            )
+            == 0,
+            waiting_restart_state,
+        )
+
+        assert_true(
+            "ready_restart_preserves_step",
+            waiting_restart_state.get(
+                "current_step"
+            )
+            == "first step",
+            waiting_restart_state,
+        )
+
         first = service.advance(session_id)
 
         assert_true(
@@ -83,6 +118,55 @@ def main():
             first.get("current_step")
             == "second step",
             first,
+        )
+
+        restarted_waiting_service = (
+            ChatExecutionService(
+                state_path=str(state_path)
+            )
+        )
+
+        restarted_waiting = (
+            restarted_waiting_service.get_state(
+                session_id
+            )
+        )
+
+        assert_true(
+            "waiting_survives_restart",
+            restarted_waiting.get("status")
+            == "waiting",
+            restarted_waiting,
+        )
+
+        assert_true(
+            "waiting_restart_preserves_index",
+            restarted_waiting.get(
+                "current_index"
+            )
+            == 1,
+            restarted_waiting,
+        )
+
+        assert_true(
+            "waiting_restart_preserves_step",
+            restarted_waiting.get(
+                "current_step"
+            )
+            == "second step",
+            restarted_waiting,
+        )
+
+        assert_true(
+            "waiting_restart_preserves_history",
+            len(
+                restarted_waiting.get(
+                    "history",
+                    [],
+                )
+            )
+            == 1,
+            restarted_waiting,
         )
 
         second = service.advance(session_id)
