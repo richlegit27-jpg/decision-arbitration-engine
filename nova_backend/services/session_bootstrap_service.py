@@ -158,25 +158,57 @@ class SessionBootstrapService:
             or data.get("new_session")
         )
 
-        active_session_id = ""
-
         requested_session_id = str(
             session_id or ""
         ).strip()
 
-        if requested_session_id:
+        if requested_session_id and not force_new_session:
             try:
                 existing = self.session_service.get_session(
                     requested_session_id,
+                    user_id=auth_user_id,
                 )
-
-                if existing:
-                    active_session_id = requested_session_id
-
+            except TypeError:
+                existing = self.session_service.get_session(
+                    requested_session_id
+                )
             except Exception:
-                active_session_id = ""
+                existing = None
 
-        if not active_session_id and not force_new_session:
+            if existing:
+                try:
+                    self.session_service.set_active(
+                        requested_session_id,
+                        user_id=auth_user_id,
+                    )
+                except TypeError:
+                    try:
+                        self.session_service.set_active(
+                            requested_session_id
+                        )
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+
+                return requested_session_id
+
+            created = self.ensure_requested_session(
+                requested_session_id,
+                title="New Chat",
+            )
+
+            if isinstance(created, dict):
+                created_id = str(
+                    created.get("id") or ""
+                ).strip()
+
+                if created_id:
+                    return created_id
+
+            return requested_session_id
+
+        if not force_new_session:
             try:
                 active = self.session_service.get_active()
 
@@ -185,20 +217,22 @@ class SessionBootstrapService:
                         active.get("id") or ""
                     ).strip()
 
+                    if active_session_id:
+                        return active_session_id
+
             except Exception:
                 if self.logger:
                     self.logger.exception(
-                        "[session-bootstrap] active session lookup failed"
+                        "[session-bootstrap] active "
+                        "session lookup failed"
                     )
 
-        if not active_session_id:
-            created = self.session_service.create_session(
-                "New Chat",
-                user_id=auth_user_id,
-            )
+        created = self.session_service.create_session(
+            "New Chat",
+            user_id=auth_user_id,
+        )
 
-            active_session_id = str(
-                created.get("id") or ""
-            ).strip()
+        return str(
+            created.get("id") or ""
+        ).strip()
 
-        return active_session_id
