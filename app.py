@@ -5,6 +5,9 @@ import re
 import shutil
 import hashlib
 import uuid
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from nova_backend.services.auth_context import get_current_user_id
 from nova_backend.services.image_vision_service import ImageVisionService
@@ -2331,7 +2334,12 @@ def api_chat():
     attachments = chat_attachment_guard_service.handle_web_attachment_guard(
         request,
         data,
-        user_text,
+        chat_service,
+        attachments,
+    )
+
+    print(
+        "[DEBUG AFTER ATTACHMENT GUARD]",
         attachments,
     )
 
@@ -2510,6 +2518,11 @@ def api_chat():
                 route="early_image_attachment_gate",
                 clean_text=attachment_text_service.strip_project_context_from_visible_text,
                 logger=app.logger,
+            )
+
+            print(
+                "[DEBUG FINAL CHAT ATTACHMENTS]",
+                attachments,
             )
 
             return jsonify({
@@ -3871,18 +3884,7 @@ def api_chat():
                 "[CHAT_SERVICE_FAILURE] failed: %s",
                 chat_error,
             )
-            result = {
-                "ok": False,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": "Nova encountered an error processing that request.",
-                },
-            }
 
-            app.logger.warning(
-                "[CHAT_SERVICE_FAILURE] failed: %s",
-                chat_error,
-            )
         print(
             "[CHAT SERVICE RESULT DEBUG]",
             repr(result)[:3000],

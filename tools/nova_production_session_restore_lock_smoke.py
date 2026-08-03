@@ -90,6 +90,7 @@ def main():
             "listed session message count",
             str(match),
         )
+
     ok("session appears in list")
 
     detail = get_json(f"/api/sessions/{sid}")

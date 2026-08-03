@@ -1,5 +1,7 @@
+import json
 import requests
 import sys
+import json
 from pathlib import Path
 
 BASE = "http://127.0.0.1:5001"
@@ -54,9 +56,13 @@ try:
     attachment = {
         "filename": upload_data.get("filename") or "smoke_attachment.txt",
         "name": upload_data.get("filename") or "smoke_attachment.txt",
+        "original_filename": upload_data.get("original_filename") or "smoke_attachment.txt",
         "url": upload_data.get("url") or upload_data.get("file_url") or "",
+        "file_url": upload_data.get("file_url") or upload_data.get("url") or "",
         "path": upload_data.get("path") or "",
         "type": upload_data.get("mime_type") or "text/plain",
+        "mime_type": upload_data.get("mime_type") or "text/plain",
+        "size": upload_data.get("size") or 0,
     }
 
     payload = {
@@ -84,6 +90,15 @@ try:
         raise SystemExit(1)
 
     data = r.json()
+
+    print(
+        "FULL CHAT RESPONSE:",
+        json.dumps(
+            data,
+            indent=2,
+            ensure_ascii=False,
+        ),
+    )
 
     print("SYNC HEADER:", r.headers.get("X-Nova-Attachment-Sync"))
 

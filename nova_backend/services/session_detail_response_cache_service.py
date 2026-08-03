@@ -114,7 +114,7 @@ class SessionDetailResponseCacheService:
                         "id": session_id,
                         "title": "New Chat",
                         "messages": [],
-                        "session_attachments": [],
+                        "attachments": [],
                         "meta": {},
                     }
 
@@ -167,19 +167,30 @@ class SessionDetailResponseCacheService:
                     messages,
                     user_text,
                 ):
+                    payload_attachments = []
+
+                    payload = request.get_json(
+                        silent=True
+                    ) or {}
+
+                    if isinstance(payload, dict):
+                        payload_attachments = payload.get(
+                            "attachments",
+                            [],
+                        )
+
                     messages.append(
                         {
                             "role": "user",
                             "text": user_text,
                             "content": user_text,
-                            "attachments": [],
+                            "attachments": payload_attachments,
                             "meta": {
                                 "route": "final_session_detail_response_cache",
                                 "session_id": session_id,
                             },
                         }
                     )
-
                 assistant_id = ""
 
                 if isinstance(assistant_message, dict):
