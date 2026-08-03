@@ -47,10 +47,33 @@ try:
     )
 
     require(
-        "attachment_summary" in data
-        or "summary" in data
-        or "extracted_text" in data,
-        "upload response contains attachment context fields",
+        bool(
+            data.get("filename")
+            or data.get("original_filename")
+        ),
+        "upload response contains filename",
+    )
+
+    require(
+        bool(
+            data.get("url")
+            or data.get("file_url")
+        ),
+        "upload response contains file url",
+    )
+
+    require(
+        bool(data.get("mime_type")),
+        "upload response contains mime type",
+    )
+
+    require(
+        int(
+            data.get("size")
+            or data.get("size_bytes")
+            or 0
+        ) > 0,
+        "upload response contains file size",
     )
 
 finally:

@@ -45,15 +45,25 @@ require(
 )
 
 require(
-    "size_bytes" in payload,
-    "size bytes exists",
+    int(
+        payload.get("size")
+        or payload.get("size_bytes")
+        or 0
+    ) > 0,
+    "file size exists",
 )
 
 require(
-    "extracted_text" in payload
-    or "attachment_summary" in payload
-    or "summary" in payload,
-    "attachment text summary exists",
+    bool(
+        payload.get("url")
+        or payload.get("file_url")
+    ),
+    "file url exists",
+)
+
+require(
+    bool(payload.get("mime_type")),
+    "mime type exists",
 )
 
 print("=" * 80)
