@@ -1000,7 +1000,16 @@ def api_health():
         artifacts_file=str(ARTIFACTS_FILE),
         memory_file=str(MEMORY_FILE),
         route_build="backend-memory-recall-fix-phase-1-001",
+        git_commit=os.getenv(
+            "RAILWAY_GIT_COMMIT_SHA",
+            "",
+        ),
+        git_branch=os.getenv(
+            "RAILWAY_GIT_BRANCH",
+            "",
+        ),
     )
+    
 
 
 # -----------------------
