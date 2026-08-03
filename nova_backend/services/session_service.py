@@ -554,7 +554,7 @@ class SessionService:
 
         # Anonymous sessions may continue anonymously.
         if not current_user_id:
-            return False
+            return not session_user_id
 
         if not session_user_id:
             return False

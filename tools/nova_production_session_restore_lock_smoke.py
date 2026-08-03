@@ -78,9 +78,18 @@ def main():
     if not match:
         fail("session appears in list", str([s.get("id") for s in sessions[:10]]))
 
-    if int(match.get("message_count") or 0) < 1:
-        fail("listed session message count", str(match))
+    listed_messages = match.get("messages") or []
 
+    listed_message_count = int(
+        match.get("message_count")
+        or len(listed_messages)
+    )
+
+    if listed_message_count < 1:
+        fail(
+            "listed session message count",
+            str(match),
+        )
     ok("session appears in list")
 
     detail = get_json(f"/api/sessions/{sid}")

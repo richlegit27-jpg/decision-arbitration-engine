@@ -162,6 +162,15 @@ class SessionBootstrapService:
             session_id or ""
         ).strip()
 
+        print(
+            "[SESSION BOOTSTRAP RESOLVE]",
+            {
+                "requested": requested_session_id,
+                "force_new": force_new_session,
+                "auth_user_id": auth_user_id,
+            },
+        )
+
         if requested_session_id and not force_new_session:
             try:
                 existing = self.session_service.get_session(
@@ -196,6 +205,14 @@ class SessionBootstrapService:
             created = self.ensure_requested_session(
                 requested_session_id,
                 title="New Chat",
+            )
+
+            print(
+                "[SESSION BOOTSTRAP CREATED]",
+                {
+                    "requested": requested_session_id,
+                    "created": created,
+                },
             )
 
             if isinstance(created, dict):

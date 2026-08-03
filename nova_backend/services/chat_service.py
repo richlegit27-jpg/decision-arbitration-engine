@@ -1379,15 +1379,11 @@ Rules:
     def _ensure_session_id(self, session_id):
         sid = str(session_id or "").strip()
 
+        # A non-empty caller-provided session ID is authoritative.
+        # SessionBootstrapService already ensures requested chat sessions
+        # exist before ChatService handles the request.
         if sid:
-            try:
-                existing = self.session_service.get_session(sid)
-
-                if isinstance(existing, dict):
-                    return sid
-
-            except Exception:
-                pass
+            return sid
 
         try:
             created = self.session_service.create_session()
