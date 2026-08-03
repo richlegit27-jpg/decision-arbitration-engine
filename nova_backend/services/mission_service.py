@@ -18,9 +18,10 @@ This only owns mission state.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
+import json
 import uuid
-
 
 class MissionService:
     """
@@ -38,8 +39,25 @@ class MissionService:
         "cancelled",
     }
 
-    def __init__(self):
-        self._missions: Dict[str, Dict[str, Any]] = {}
+    def __init__(
+        self,
+        state_path: Optional[str] = None,
+    ):
+        self.state_path = (
+            Path(state_path)
+            if state_path
+            else Path(
+                "C:/Users/Owner/nova/data/"
+                "nova_missions.json"
+            )
+        )
+
+        self._missions: Dict[
+            str,
+            Dict[str, Any],
+        ] = {}
+
+        self._load_missions()
 
     # ---------------------------------------------------------
     # Mission creation
@@ -101,9 +119,9 @@ class MissionService:
             mission["status"] = "ready"
 
         self._missions[mission_id] = mission
+        self._save_missions()
 
         return mission
-
 
     # ---------------------------------------------------------
     # Retrieval
@@ -137,6 +155,7 @@ class MissionService:
         mission["status"] = "running"
 
         self._touch(mission)
+        self._save_missions()
 
         return mission
 
@@ -237,6 +256,7 @@ class MissionService:
 
 
         self._touch(mission)
+        self._save_missions()
 
         return mission
 
@@ -330,9 +350,9 @@ class MissionService:
                     ),
                 )
 
+        self._save_missions()
+
         return mission
-
-
 
     def add_tool(
         self,
@@ -351,6 +371,7 @@ class MissionService:
 
 
         self._touch(mission)
+        self._save_missions()
 
         return mission
 
@@ -359,6 +380,38 @@ class MissionService:
     # ---------------------------------------------------------
     # Helpers
     # ---------------------------------------------------------
+
+    def _load_missions(self) -> None:
+        try:
+            if not self.state_path.exists():
+                return
+
+            data = json.loads(
+                self.state_path.read_text(
+                    encoding="utf-8"
+                )
+            )
+
+            if isinstance(data, dict):
+                self._missions = data
+
+        except Exception:
+            self._missions = {}
+
+    def _save_missions(self) -> None:
+        self.state_path.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        self.state_path.write_text(
+            json.dumps(
+                self._missions,
+                indent=2,
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
 
     def _touch(
         self,
