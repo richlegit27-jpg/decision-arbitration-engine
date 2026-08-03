@@ -111,6 +111,89 @@ def main():
             working_state,
         )
 
+        session_a = service.create_session(
+            title="Session A",
+            user_id="user_test",
+        )
+
+        session_b = service.create_session(
+            title="Session B",
+            user_id="user_test",
+        )
+
+        session_a_id = session_a["id"]
+        session_b_id = session_b["id"]
+
+        active_b = service.set_active(
+            session_b_id,
+            user_id="user_test",
+        )
+
+        assert_true(
+            "session_b_set_active",
+            isinstance(active_b, dict),
+            active_b,
+        )
+
+        restarted_active_service = SessionService(
+            sessions_file=sessions_file
+        )
+
+        assert_true(
+            "active_session_survives_restart",
+            restarted_active_service.get_active_session_id()
+            == session_b_id,
+            restarted_active_service.get_active_session_id(),
+        )
+
+        deleted = restarted_active_service.delete(
+            session_b_id,
+            user_id="user_test",
+        )
+
+        assert_true(
+            "active_session_deleted",
+            deleted is True,
+            deleted,
+        )
+
+        restarted_after_delete = SessionService(
+            sessions_file=sessions_file
+        )
+
+        assert_true(
+            "deleted_session_stays_deleted",
+            restarted_after_delete.get_session(
+                session_b_id,
+                user_id="user_test",
+            )
+            is None,
+            session_b_id,
+        )
+
+        fallback_active_id = (
+            restarted_after_delete.get_active_session_id()
+        )
+
+        assert_true(
+            "active_session_falls_back",
+            fallback_active_id != session_b_id,
+            fallback_active_id,
+        )
+
+        restored_session_a = (
+            restarted_after_delete.get_session(
+                session_a_id,
+                user_id="user_test",
+            )
+        )
+
+        assert_true(
+            "fallback_session_exists",
+            isinstance(restored_session_a, dict),
+            restored_session_a,
+        )
+
         print(
             "\nNOVA SESSION PERSISTENCE "
             "SMOKE PASSED"
