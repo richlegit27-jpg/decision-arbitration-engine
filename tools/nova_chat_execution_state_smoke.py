@@ -256,6 +256,74 @@ def main():
             reset,
         )
 
+        failed_session_id = "execution_failed_state_smoke"
+
+        failed_service = ChatExecutionService(
+            state_path=str(state_path)
+        )
+
+        failed_state = failed_service.start(
+            session_id=failed_session_id,
+            goal="Test failed execution reliability",
+            steps=[
+                "failing step",
+            ],
+        )
+
+        failed_state["status"] = "failed"
+        failed_state["waiting"] = False
+        failed_state["complete"] = False
+        failed_state["error"] = "Simulated execution failure."
+
+        failed_service._states[
+            failed_session_id
+        ] = failed_state
+
+        failed_service._save_states()
+
+        failed_again = failed_service.advance(
+            failed_session_id
+        )
+
+        assert_true(
+            "failed_is_idempotent",
+            failed_again.get("status") == "failed",
+            failed_again,
+        )
+
+        assert_true(
+            "failed_preserves_error",
+            failed_again.get("error")
+            == "Simulated execution failure.",
+            failed_again,
+        )
+
+        restarted_failed_service = (
+            ChatExecutionService(
+                state_path=str(state_path)
+            )
+        )
+
+        restarted_failed = (
+            restarted_failed_service.get_state(
+                failed_session_id
+            )
+        )
+
+        assert_true(
+            "failed_survives_restart",
+            restarted_failed.get("status")
+            == "failed",
+            restarted_failed,
+        )
+
+        assert_true(
+            "failed_restart_preserves_error",
+            restarted_failed.get("error")
+            == "Simulated execution failure.",
+            restarted_failed,
+        )
+
         print(
             "\nNOVA CHAT EXECUTION STATE "
             "SMOKE PASSED"
