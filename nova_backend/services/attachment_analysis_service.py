@@ -100,33 +100,39 @@ class AttachmentAnalysisService:
 
         return text[:limit].strip()
 
-
     def extracted_file_text(
         self,
-        attachment,
-        limit=6000,
+        item,
+        limit=12000,
     ):
-        path = self.resolve_attachment_path(
-            attachment
-        )
+        text = ""
 
-        if not path:
-            return ""
+        try:
+            attachment = self.normalize_attachment(
+                item
+            )
 
+            path = self.resolve_attachment_path(
+                attachment
+            )
+
+            if not path:
+                return ""
+
+            if not path.exists():
+                return ""
+
+            text = path.read_text(
+                encoding="utf-8",
+                errors="ignore",
+            )
+
+        except Exception as exc:
             print(
-                "[ATTACHMENT DEBUG]",
-                {
-                    "attachment": attachment,
-                    "resolved_path": str(path) if path else None,
-                    "exists": bool(
-                        path and path.exists()
-                    ),
-                }
+                "[ATTACHMENT TEXT EXTRACTION FAILED]",
+                exc,
             )
 
-            text = self.read_attachment_text(
-                path
-            )
         return str(text or "")[:limit].strip()
 
     def clean_extracted_attachment_text(

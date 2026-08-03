@@ -3716,15 +3716,7 @@ Rules:
                 "Remaining issue: project status answers still need a real work-log system so Nova does not guess from old memories."
             )
 
-            assistant_msg = self._build_assistant_message(
-                text=assistant_text,
-                meta={
-                    "project_status_direct": True,
-                    "route_taken": "project_status_direct",
-                    "memory_bypassed": True,
-                },
-                attachments=[],
-            )
+
 
             return self._finalize_response(
                 session_id=session_id,
@@ -4471,9 +4463,10 @@ Rules:
 
                     clean_fallback.append(line_str)
 
-                assistant_msg = self._build_assistant_message(
-                    text="\n".join(clean_fallback)
-                    or ("No active working state " "is currently tracked.")
+            if _nova_has_image_attachment:
+                text = (
+                    "\n".join(clean_fallback)
+                    or "No active working state is currently tracked."
                 )
 
                 return self._finalize_response(
@@ -4750,6 +4743,10 @@ Rules:
                 "what have we done today",
             ]
         )
+
+
+
+
 
         if project_status_query:
             memory_context = ""
