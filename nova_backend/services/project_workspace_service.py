@@ -57,14 +57,25 @@ class ProjectWorkspaceService:
         project = {
             "id": f"project_{uuid.uuid4().hex[:12]}",
             "name": str(name or "New Project"),
+            "title": str(name or "New Project"),
             "description": str(description or ""),
+            "status": "active",
             "created_at": datetime.now(
                 timezone.utc
             ).isoformat(),
+            "updated_at": datetime.now(
+                timezone.utc
+            ).isoformat(),
+            "metadata": {},
             "sessions": [],
             "files": [],
             "tasks": [],
             "decisions": [],
+            "goals": [],
+            "deadlines": [],
+            "documents": [],
+            "workflows": [],
+            "knowledge": [],
         }
 
         projects.append(project)
