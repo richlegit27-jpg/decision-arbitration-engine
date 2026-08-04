@@ -12382,6 +12382,18 @@ Rules:
                 "what changed recently" in text_lc
                 and "nova" in text_lc
             )
+            or any(
+                phrase in text_lc
+                for phrase in (
+                    "what is the current blocker",
+                    "what's the current blocker",
+                    "current blocker",
+                    "what is the blocker",
+                    "what blocker do we have",
+                    "what are we blocked on",
+                    "what is blocking nova",
+                )
+            )
         ):
             intent = "current_project_state"
             route = "project_brain_general_intelligence"
@@ -12390,7 +12402,28 @@ Rules:
             confidence = 0.95
             reasons.append("local_nova_project_context_priority")
 
+        # PROJECT_BRAIN_BLOCKER_PRIORITY_LOCK_20260803
+        elif any(
+            phrase in text_lc
+            for phrase in (
+                "what is the current blocker",
+                "what's the current blocker",
+                "current blocker",
+                "what is the blocker",
+                "what blocker do we have",
+                "what are we blocked on",
+                "what is blocking nova",
+            )
+        ):
+            intent = "actual_blocker"
+            route = "project_brain_general_intelligence"
+            strategy = "project_brain_general_intelligence"
+            priority = "high"
+            confidence = 0.95
+            reasons.append("project_brain_actual_blocker_priority")
+
         # LATEST_NEWS_BEFORE_FULL_FILE_INTENT_LOCK
+
         elif any(
             marker in text_lc.split()
             for marker in (
@@ -16848,6 +16881,32 @@ try:
                 "prompt": user_text,
             }
 
+        # PROJECT_BRAIN_BLOCKER_INTENT_AUTHORITY_PRIORITY_20260803
+        blocker_signal = (
+            "what is the current blocker" in text_lower
+            or "what's the current blocker" in text_lower
+            or "current blocker" in text_lower
+            or "what are we blocked on" in text_lower
+            or "what is blocking nova" in text_lower
+        )
+
+        if blocker_signal:
+            return {
+                "route": "project_brain_general_intelligence",
+                "mode": "project_brain_general_intelligence",
+                "intent": "actual_blocker",
+                "confidence": 1.0,
+                "reasons": [
+                    "project_brain_blocker_intent_authority",
+                ],
+                "save_artifact": False,
+                "save_memory": False,
+                "use_memory": True,
+                "source_urls": [],
+                "sources": [],
+                "prompt": user_text,
+            }
+
         # existing function body stays here
 
         # Real attachments always stay attachment-analysis.
@@ -17313,6 +17372,14 @@ try:
             return "mission_control"
 
         if (
+            "current blocker" in bare
+            or "what is the current blocker" in bare
+            or "what's the current blocker" in bare
+            or bare == "blocker"
+        ):
+            return "actual_blocker"
+
+        if (
             bare in {
                 "what are we working on",
                 "what are we working on now",
@@ -17454,6 +17521,25 @@ try:
                 )
 
             elif kind == "mission_control":
+                from nova_backend.services.project_brain_general_intelligence import (
+                    build_project_brain_general_answer,
+                )
+
+                fresh_answer = build_project_brain_general_answer(
+                    question,
+                    user_id="",
+                )
+
+                answer = str(
+                    getattr(
+                        fresh_answer,
+                        "text",
+                        fresh_answer,
+                    )
+                    or ""
+                ).strip()
+
+            elif kind == "actual_blocker":
                 from nova_backend.services.project_brain_general_intelligence import (
                     build_project_brain_general_answer,
                 )
