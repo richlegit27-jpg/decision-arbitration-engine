@@ -248,6 +248,14 @@ def classify_intent(user_text: str, attachments: list[AttachmentItem]) -> str:
     if re.search(r"\b(auto-plan|plan|build|implement|fix|repair|upgrade)\b", text):
         return "build_or_plan"
 
+    if re.search(
+        r"\b(current blocker|actual blocker|what is the blocker|"
+        r"what are we blocked on|what is blocking nova|"
+        r"what are we working on|nova status|current checkpoint)\b",
+        text,
+    ):
+        return "chat"
+
     if re.search(r"\b(search|latest|today|news|web|look up)\b", text):
         return "fresh_info"
 

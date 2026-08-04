@@ -12382,18 +12382,7 @@ Rules:
                 "what changed recently" in text_lc
                 and "nova" in text_lc
             )
-            or any(
-                phrase in text_lc
-                for phrase in (
-                    "what is the current blocker",
-                    "what's the current blocker",
-                    "current blocker",
-                    "what is the blocker",
-                    "what blocker do we have",
-                    "what are we blocked on",
-                    "what is blocking nova",
-                )
-            )
+
         ):
             intent = "current_project_state"
             route = "project_brain_general_intelligence"
@@ -12895,6 +12884,19 @@ Rules:
             or (
                 "what changed recently" in normalized_web_text
                 and "nova" in normalized_web_text
+            )
+            or any(
+                phrase in normalized_web_text
+                for phrase in (
+                    "what is the current blocker",
+                    "what's the current blocker",
+                    "current blocker",
+                    "what is the blocker",
+                    "what blocker do we have",
+                    "what are we blocked on",
+                    "what is blocking nova",
+                    "actual blocker",
+                )
             )
         )
 
@@ -17473,14 +17475,6 @@ try:
         return low.startswith(bad_starts)
 
 
-
-
-
-
-
-
-
-
     def _nova_project_brain_answer_20260701(
         kind,
         session_id,
@@ -17611,6 +17605,12 @@ try:
 
         print(
             "[FINAL PROJECT BRAIN ANSWER DEBUG]",
+            repr(answer),
+        )
+
+        print(
+            "[BLOCKER FINAL ANSWER DEBUG]",
+            repr(kind),
             repr(answer),
         )
 
@@ -17805,6 +17805,20 @@ try:
             ):
                 fresh_priority_predicate = None
 
+            blocker_question = any(
+                phrase in str(user_text or "").lower()
+                for phrase in (
+                    "what is the current blocker",
+                    "what's the current blocker",
+                    "current blocker",
+                    "what is the blocker",
+                    "what blocker do we have",
+                    "what are we blocked on",
+                    "what is blocking nova",
+                    "actual blocker",
+                )
+            )
+
             if (
                 callable(
                     fresh_priority_predicate
@@ -17812,6 +17826,7 @@ try:
                 and fresh_priority_predicate(
                     user_text
                 )
+                and not blocker_question
             ):
 
                 from nova_backend.services.project_state_service import (

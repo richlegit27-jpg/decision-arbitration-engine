@@ -696,6 +696,18 @@ try:
                 "what are we working on right now?",
             }
 
+            blocker_prompts = {
+                "what is the current blocker",
+                "what's the current blocker",
+                "current blocker",
+                "what is the blocker",
+                "what are we blocked on",
+                "what is blocking nova",
+            }
+
+            if normalized in blocker_prompts:
+                return None
+
             if normalized in direct_recall_prompts:
                 return None
 

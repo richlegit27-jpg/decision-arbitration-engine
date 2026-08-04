@@ -131,6 +131,7 @@ def build_project_brain_freshness_snapshot() -> ProjectBrainFreshnessSnapshot:
     checkpoint = state_bridge.current_checkpoint
 
     blocker = (
+        "No active Project Brain intelligence blocker is open. "
         "No active Decision Engine blocker is open, no active Mission Control blocker is open, "
         "no active Failure Interpreter blocker is open, and no active Decision Log blocker is open. "
         "The remaining risk is cleanup/consolidation: app.py still has many historical guards and wrappers, "
@@ -173,6 +174,7 @@ try:
     )
 
     _NOVA_CLEAN_BLOCKER_20260702 = (
+        "No active Project Brain intelligence blocker is open. "
         "No active Decision Engine blocker is open, no active Mission Control blocker is open, "
         "no active Failure Interpreter blocker is open, and no active Decision Log blocker is open. "
         "The remaining risk is cleanup/consolidation: app.py still has many historical guards and wrappers, "
