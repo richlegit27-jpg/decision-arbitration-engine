@@ -1190,6 +1190,35 @@ observer.observe(document.documentElement, {
       </section>
 
 
+      <!-- NOVA_WORKPLACE_PROJECTS_PANEL_V1 -->
+      <section class="workspace-section">
+        <div class="section-title-row">
+          <div>
+            <h2>Projects</h2>
+            <p>Organize workplace tasks and goals.</p>
+          </div>
+        </div>
+
+        <button
+          class="primary-side-button"
+          id="newProjectBtn"
+          type="button"
+        >
+          <span>New Project</span>
+          <span>+</span>
+        </button>
+
+        <div
+          id="desktopProjectList"
+          class="desktop-project-list"
+        >
+          <div class="session-placeholder">
+            Loading projects...
+          </div>
+        </div>
+      </section>
+
+
 <div class="side-footer-links">
   <a href="/">Home</a>
   <a href="/help">Help</a>
@@ -1307,6 +1336,91 @@ let novaChatAbortController = null;
 
 let pendingDesktopAttachments = [];
 const newSessionBtn = $("newSessionBtn");
+const newProjectBtn = $("newProjectBtn");
+const desktopProjectList = $("desktopProjectList");
+
+
+async function loadDesktopProjects() {
+  if (!desktopProjectList) {
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      "/api/projects"
+    );
+
+    const data = await response.json();
+
+    const projects = data.projects || [];
+
+    if (!projects.length) {
+      desktopProjectList.innerHTML = `
+        <div class="session-placeholder">
+          No projects yet.
+        </div>
+      `;
+      return;
+    }
+
+    desktopProjectList.innerHTML = projects.map(
+      (project) => `
+        <div class="session-current-card">
+          <div class="session-label">
+            ${project.name}
+          </div>
+
+          <div>
+            ${project.description || ""}
+          </div>
+        </div>
+      `
+    ).join("");
+
+  } catch (error) {
+    console.error(
+      "Project loading failed",
+      error
+    );
+
+    desktopProjectList.innerHTML = `
+      <div class="session-placeholder">
+        Failed loading projects.
+      </div>
+    `;
+  }
+}
+
+
+if (newProjectBtn) {
+  newProjectBtn.addEventListener(
+    "click",
+    async () => {
+      const name = prompt(
+        "Project name:"
+      );
+
+      if (!name) {
+        return;
+      }
+
+      await fetch(
+        "/api/projects/new",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name,
+          }),
+        }
+      );
+
+      loadDesktopProjects();
+    }
+  );
+}
 const summarizeBtn = $("summarizeBtn");
 const openMemoryBtn = $("openMemoryBtn");
 
@@ -1652,6 +1766,65 @@ if (typeof renderDesktopChatMessagesRescue === "function" && !window.__NOVA_REND
   }
 }
 window.loadDesktopSessions = loadDesktopSessions;
+
+
+async function loadDesktopProjects() {
+  const list = document.getElementById(
+    "desktopProjectList"
+  );
+
+  if (!list) {
+    return;
+  }
+
+  try {
+    const data = await fetch(
+      "/api/projects"
+    ).then(
+      r => r.json()
+    );
+
+    const projects = data.projects || [];
+
+    if (!projects.length) {
+      list.innerHTML = `
+        <div class="session-placeholder">
+          No projects yet.
+        </div>
+      `;
+      return;
+    }
+
+    list.innerHTML = projects.map(
+      project => `
+        <div class="session-current-card">
+          <div class="session-label">
+            ${project.name}
+          </div>
+
+          <div>
+            ${project.description || ""}
+          </div>
+        </div>
+      `
+    ).join("");
+
+  } catch (error) {
+    console.warn(
+      "[loadDesktopProjects failed]",
+      error
+    );
+
+    list.innerHTML = `
+      <div class="session-placeholder">
+        Failed loading projects.
+      </div>
+    `;
+  }
+}
+
+window.loadDesktopProjects = loadDesktopProjects;
+
 
 function startDesktopSessionSync() {
   window.__novaEvents = window.__novaEvents || {
@@ -2181,6 +2354,11 @@ console.log("[Nova Desktop Sessions Button] clicked");
 if (typeof loadDesktopSessions === "function") {
   loadDesktopSessions();
 }
+
+if (typeof loadDesktopProjects === "function") {
+  loadDesktopProjects();
+}
+
     }
 
     renderAssistantMessage(assistantNode, data);
