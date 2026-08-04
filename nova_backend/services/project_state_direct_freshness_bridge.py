@@ -101,7 +101,11 @@ def build_project_state_direct_fresh_response(payload):
 
     answer_source = SOURCE
 
-    if intent in {"next_move", "general_project_answer"}:
+    if intent in {
+        "next_move",
+        "general_project_answer",
+        "current_blocker",
+    }:
         from nova_backend.services.project_brain_general_intelligence import (
             build_project_brain_general_answer,
         )
