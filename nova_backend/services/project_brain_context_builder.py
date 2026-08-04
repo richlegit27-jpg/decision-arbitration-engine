@@ -17,7 +17,10 @@ class ProjectBrainContext:
     validation: List[str]
     recent_commits: List[str]
     user_first_intent: str = ""
-
+    active_project_id: str = ""
+    active_project_title: str = ""
+    active_project_status: str = ""
+    active_project_description: str = ""
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
@@ -57,6 +60,56 @@ def build_project_brain_context(user_id=None) -> ProjectBrainContext:
 
     snapshot = build_project_brain_freshness_snapshot()
 
+    active_project_id = ""
+    active_project_title = ""
+    active_project_status = ""
+    active_project_description = ""
+
+    try:
+        from nova_backend.services.project_workspace_service import (
+            ProjectWorkspaceService,
+        )
+
+        active_project = (
+            ProjectWorkspaceService()
+            .get_active_project()
+        )
+
+        if active_project:
+            active_project_id = str(
+                active_project.get(
+                    "id",
+                    ""
+                )
+            )
+
+            active_project_title = str(
+                active_project.get(
+                    "title",
+                    active_project.get(
+                        "name",
+                        ""
+                    )
+                )
+            )
+
+            active_project_status = str(
+                active_project.get(
+                    "status",
+                    ""
+                )
+            )
+
+            active_project_description = str(
+                active_project.get(
+                    "description",
+                    ""
+                )
+            )
+
+    except Exception:
+        pass
+
     user_first_intent = ""
 
     try:
@@ -82,6 +135,10 @@ def build_project_brain_context(user_id=None) -> ProjectBrainContext:
         validation=snapshot.validation,
         recent_commits=snapshot.recent_commits,
         user_first_intent=user_first_intent,
+        active_project_id=active_project_id,
+        active_project_title=active_project_title,
+        active_project_status=active_project_status,
+        active_project_description=active_project_description,
     )
 
 
@@ -109,9 +166,16 @@ def build_current_project_answer(user_id=None) -> str:
         user_id=user_id
     )
 
+    active_project_text = ""
+
+    if context.active_project_title:
+        active_project_text = (
+            f" Active project: {context.active_project_title}."
+        )
+
     return (
         "Source: Project Brain freshness snapshot. "
-        f"Current {context.project_name} project state: Richard is working on the "
+        f"Current {context.project_name} project state:{active_project_text} Richard is working on the "
         f"{context.local_app} with Joe. Completed/protected pieces: {_completed_text(context)}. "
         f"Current checkpoint: {context.active_checkpoint} "
         f"Current blocker: {context.blocker} "
