@@ -772,7 +772,7 @@ def build_project_brain_general_answer(
                 "Current blocker: "
                 "No active Project Brain intelligence blocker is open.\n"
                 "Current checkpoint: "
-                "Project Brain state is loaded from the freshness snapshot.\n"
+                "Project Brain state is loaded from the context builder using the freshness snapshot and active workspace context.\n"
                 "Protected capabilities: "
                 "Command Center, Project Brain Upgrade Radar, and "
                 "Project Brain Operator Memory Writer are locked.\n"
