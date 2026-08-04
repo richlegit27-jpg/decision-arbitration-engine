@@ -19,6 +19,9 @@ from pathlib import Path
 from nova_backend.services.memory_route_service import MemoryRouteService
 from werkzeug.utils import secure_filename
 from nova_backend.services.web_preview_route_service import WebPreviewRouteService
+from nova_backend.services.project_workspace_service import (
+    ProjectWorkspaceService,
+)
 
 from nova_backend.services.debug_route_service import DebugRouteService
 
@@ -892,6 +895,10 @@ local_auth_route_service = LocalAuthRouteService(
     session,
 )
 
+project_workspace_service = ProjectWorkspaceService(
+    data_dir="data"
+)
+
 local_auth_route_service.install_routes()
 
 app.secret_key = os.environ.get(
@@ -902,6 +909,8 @@ if not app.secret_key:
     raise RuntimeError(
         "NOVA_SECRET_KEY is required"
     )
+
+
 # NOVA_SELF_IMPROVEMENT_REPORT_ROUTES_20260710
 try:
     register_improvement_routes(app)
@@ -1313,6 +1322,34 @@ def api_runtime_cycle():
                 "error": str(e),
             }
         ), 500
+
+@app.route("/api/projects", methods=["GET"])
+def api_projects():
+    return jsonify(
+        {
+            "ok": True,
+            "projects": project_workspace_service.list_projects(),
+        }
+    )
+
+
+@app.route("/api/projects/new", methods=["POST"])
+def api_projects_new():
+    data = request.get_json(
+        silent=True
+    ) or {}
+
+    project = project_workspace_service.create_project(
+        data.get("name"),
+        data.get("description", ""),
+    )
+
+    return jsonify(
+        {
+            "ok": True,
+            "project": project,
+        }
+    )
 
 @app.post("/api/fetch")
 def api_fetch():
