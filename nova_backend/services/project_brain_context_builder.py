@@ -174,7 +174,7 @@ def build_current_project_answer(user_id=None) -> str:
         )
 
     return (
-        "Source: Project Brain freshness snapshot. "
+        "Source: Project Brain context builder with freshness snapshot. "
         f"Current {context.project_name} project state:{active_project_text} Richard is working on the "
         f"{context.local_app} with Joe. Completed/protected pieces: {_completed_text(context)}. "
         f"Current checkpoint: {context.active_checkpoint} "
