@@ -76,6 +76,38 @@ def main():
         ),
     )
 
+    created_task = request_json(
+        f"/api/projects/{project_id}/tasks",
+        method="POST",
+        body={
+            "title": "Finish workplace dashboard",
+            "priority": "high",
+        },
+    )
+
+    assert_true(
+        "task_created",
+        created_task.get("ok") is True
+        and created_task.get("task", {}).get("id"),
+    )
+
+    task_id = created_task["task"]["id"]
+
+    updated_task = request_json(
+        f"/api/projects/{project_id}/tasks/{task_id}",
+        method="PATCH",
+        body={
+            "status": "completed",
+        },
+    )
+
+    assert_true(
+        "task_status_updated",
+        updated_task.get("ok") is True
+        and updated_task.get("task", {}).get("status")
+        == "completed",
+    )
+
     print()
     print(
         "NOVA PROJECT API SMOKE PASSED"

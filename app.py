@@ -1351,6 +1351,37 @@ def api_projects_new():
         }
     )
 
+
+
+    data = request.get_json(
+        silent=True
+    ) or {}
+
+    task = project_workspace_service.add_task(
+        project_id,
+        data.get("title", ""),
+        data.get(
+            "priority",
+            "medium",
+        ),
+    )
+
+    if not task:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "task": task,
+        }
+    )
+
+
 @app.post("/api/fetch")
 def api_fetch():
     data = request.get_json(silent=True) or {}
@@ -5077,7 +5108,72 @@ def api_uploads(filename: str):
 def execution_control():
     return execution_route_service.execution_control()
 
+@app.route(
+    "/api/projects/<project_id>/summary",
+    methods=["GET"],
+)
+def api_project_summary(
+    project_id,
+):
+    summary = project_workspace_service.get_project_summary(
+        project_id
+    )
 
+    if not summary:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "summary": summary,
+        }
+    )
+
+@app.route(
+    "/api/projects/<project_id>/tasks",
+    methods=["POST"],
+)
+
+@app.route(
+    "/api/projects/<project_id>/tasks/<task_id>",
+    methods=["PATCH"],
+)
+def api_project_update_task(
+    project_id,
+    task_id,
+):
+    data = request.get_json(
+        silent=True
+    ) or {}
+
+    task = project_workspace_service.update_task_status(
+        project_id,
+        task_id,
+        data.get(
+            "status",
+            "open",
+        ),
+    )
+
+    if not task:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Task not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "task": task,
+        }
+    )
 
 @app.route("/api/execution/stream", methods=["POST"])
 def execution_stream():

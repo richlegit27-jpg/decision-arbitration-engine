@@ -87,3 +87,109 @@ class ProjectWorkspaceService:
                 return project
 
         return None
+
+    def get_project_summary(
+        self,
+        project_id,
+    ):
+        project = self.get_project(
+            project_id
+        )
+
+        if not project:
+            return None
+
+        tasks = project.get(
+            "tasks",
+            [],
+        )
+
+        files = project.get(
+            "files",
+            [],
+        )
+
+        return {
+            "id": project.get("id"),
+            "name": project.get("name", ""),
+            "description": project.get(
+                "description",
+                "",
+            ),
+            "status": project.get(
+                "status",
+                "active",
+            ),
+            "task_count": len(tasks),
+            "file_count": len(files),
+            "last_activity": project.get(
+                "updated_at",
+                "",
+            ),
+            "next_move": project.get(
+                "next_move",
+                "",
+            ),
+        }
+
+    def add_task(
+        self,
+        project_id,
+        title,
+        priority="medium",
+    ):
+        project = self.get_project(
+            project_id
+        )
+
+        if not project:
+            return None
+
+        tasks = project.setdefault(
+            "tasks",
+            []
+        )
+
+        task = {
+            "id": str(uuid.uuid4()),
+            "title": title,
+            "status": "open",
+            "priority": priority,
+        }
+
+        tasks.append(task)
+
+        self.save_project(
+            project
+        )
+
+        return task
+
+
+    def update_task_status(
+        self,
+        project_id,
+        task_id,
+        status,
+    ):
+        project = self.get_project(
+            project_id
+        )
+
+        if not project:
+            return None
+
+        for task in project.get(
+            "tasks",
+            []
+        ):
+            if task.get("id") == task_id:
+                task["status"] = status
+
+                self.save_project(
+                    project
+                )
+
+                return task
+
+        return None
