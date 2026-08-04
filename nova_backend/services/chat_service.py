@@ -17617,6 +17617,7 @@ try:
         if kind in {
             "mission_control",
             "failure_interpreter",
+            "actual_blocker",
         }:
             return answer
 
@@ -17748,6 +17749,8 @@ try:
                 )
             )
 
+            answer = ""
+
             print(
                 "[EXECUTION CHECK DEBUG]",
                 repr(session_id),
@@ -17822,13 +17825,14 @@ try:
                     )
                 )
 
-            return (
-                _nova_project_brain_response_20260701(
-                    answer,
-                    session_id,
-                    first_message=_nova_first_message,
+            if answer:
+                return (
+                    _nova_project_brain_response_20260701(
+                        answer,
+                        session_id,
+                        first_message=_nova_first_message,
+                    )
                 )
-            )
 
             print(
                 "ANSWER KIND:",
@@ -17836,6 +17840,75 @@ try:
                 repr(user_text),
             )
 
+
+            if kind in {
+                "actual_blocker",
+                "mission_control",
+                "next",
+            } and not answer:
+                from nova_backend.services.project_brain_general_intelligence import (
+                    build_project_brain_general_answer,
+                )
+
+                fresh_answer = build_project_brain_general_answer(
+                    user_text,
+                    user_id="",
+                )
+
+                answer = str(
+                    getattr(
+                        fresh_answer,
+                        "text",
+                        fresh_answer,
+                    )
+                    or ""
+                ).strip()
+
+            if kind in {
+                "actual_blocker",
+                "mission_control",
+                "next",
+            } and not answer:
+                from nova_backend.services.project_brain_general_intelligence import (
+                    build_project_brain_general_answer,
+                )
+
+                fresh_answer = build_project_brain_general_answer(
+                    user_text,
+                    user_id="",
+                )
+
+                answer = str(
+                    getattr(
+                        fresh_answer,
+                        "text",
+                        fresh_answer,
+                    )
+                    or ""
+                ).strip()
+
+            if kind in {
+                "actual_blocker",
+                "mission_control",
+                "next",
+            } and not answer:
+                from nova_backend.services.project_brain_general_intelligence import (
+                    build_project_brain_general_answer,
+                )
+
+                fresh_answer = build_project_brain_general_answer(
+                    user_text,
+                    user_id="",
+                )
+
+                answer = str(
+                    getattr(
+                        fresh_answer,
+                        "text",
+                        fresh_answer,
+                    )
+                    or ""
+                ).strip()
 
             if answer:
                 return (
