@@ -204,3 +204,39 @@ class ProjectWorkspaceService:
                 return task
 
         return None
+
+    def set_active_project(
+        self,
+        project_id,
+    ):
+        projects = self._load_projects()
+
+        for project in projects:
+            if project.get("id") == project_id:
+                for item in projects:
+                    item["active"] = (
+                        item.get("id") == project_id
+                    )
+
+                self._save_projects(
+                    projects
+                )
+
+                return project
+
+        return None
+
+
+    def get_active_project(
+        self,
+    ):
+        projects = self._load_projects()
+
+        for project in projects:
+            if project.get(
+                "active",
+                False,
+            ):
+                return project
+
+        return None

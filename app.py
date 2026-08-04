@@ -5135,6 +5135,47 @@ def api_project_summary(
     )
 
 @app.route(
+    "/api/projects/<project_id>/activate",
+    methods=["POST"],
+)
+def api_project_activate(
+    project_id,
+):
+    project = project_workspace_service.set_active_project(
+        project_id
+    )
+
+    if not project:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "project": project,
+        }
+    )
+
+
+@app.route(
+    "/api/projects/active",
+    methods=["GET"],
+)
+def api_project_active():
+    project = project_workspace_service.get_active_project()
+
+    return jsonify(
+        {
+            "ok": True,
+            "project": project,
+        }
+    )
+
+@app.route(
     "/api/projects/<project_id>/tasks",
     methods=["POST"],
 )
