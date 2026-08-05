@@ -95,6 +95,9 @@ from nova_backend.services.attachment_utils_service import (
 from nova_backend.services.execution_stream_service import (
     ExecutionStreamService,
 )
+from nova_backend.services.coding_judgment_service import (
+    get_coding_judgment_answer,
+)
 
 from nova_backend.services.chat_stream_service import (
     ChatStreamService,
@@ -6216,8 +6219,6 @@ except Exception as _nova_next_fixed_install_error_20260701:
     except Exception:
         pass
 
-
-
 # NOVA_CODING_JUDGMENT_DIRECT_ANSWER_20260701
 # Direct answer-quality guard for coding judgment questions.
 # Keeps Nova from suggesting broad tests while omitting py_compile.
@@ -6226,9 +6227,11 @@ try:
     from flask import jsonify as _nova_coding_judgment_jsonify_20260701
 
     @_nova_app.before_request if False else app.before_request
-    def _nova_coding_judgment_direct_answer_20260701():
-        try:
-            if _nova_coding_judgment_request_20260701.path != "/api/chat":
+            answer = get_coding_judgment_answer(
+                user_text
+            )
+
+            if not answer:
                 return None
 
             if _nova_coding_judgment_request_20260701.method != "POST":
@@ -6468,7 +6471,7 @@ try:
         if isinstance(value, dict):
             out = {}
             for key, item in value.items():
-                lk = str(key).lower()
+                lk = str(key).lower(),lh
 
                 if lk in ("owner", "owner_name") and item in (None, "", "joe", "Joe", "JOE", "blank"):
                     out[key] = "richard"
