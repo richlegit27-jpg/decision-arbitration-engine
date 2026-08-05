@@ -28,6 +28,9 @@ from nova_backend.services.debug_route_service import DebugRouteService
 from nova_backend.services.attachment_shape_normalizer_service import (
     AttachmentShapeNormalizerService,
 )
+from nova_backend.services.chat_response_contract_service import (
+    normalize_assistant_message,
+)
 from nova_backend.services.execution_guard_service import (
     ExecutionGuardService,
 )
@@ -4513,14 +4516,11 @@ def api_chat():
 
             assistant_text = "Nova completed the request but returned an empty assistant response."
 
-        assistant_text = response_quality_service.prevent_bad_exact_pong_response(
-            assistant_text,
+        assistant_message = normalize_assistant_message(
+            result,
             user_text,
+            response_quality_service,
         )
-
-
-        assistant_message["text"] = assistant_text
-        assistant_message["content"] = assistant_text
 
         payload = {
             "ok": result.get("ok", True),
