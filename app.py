@@ -1444,9 +1444,7 @@ def _nova_casual_chat_guard():
         payload = request.get_json(silent=True) or {}
         user_text = str(payload.get("user_text") or "").strip()
         # NOVA_AUTO_PLAN_EXECUTION_START_GUARD_20260607
-        auto_plan_execution_result = None
-        if auto_plan_execution_result is not None:
-            return jsonify(auto_plan_execution_result)
+
 
         chat_guard_result = chat_guard_service.handle_casual_chat_guard(
             payload,
