@@ -5978,12 +5978,11 @@ try:
 
         return answer
 
-    def _nova_next_fixed_make_response_20260701(session_id):
-    fixed_text = get_project_next_answer(
-        _nova_next_fixed_request_20260711.get_json(
-            silent=True
-        ).get("message", "")
-    )
+    def _nova_next_fixed_make_response_20260701(
+        session_id,
+        fixed_text,
+    ):
+
         meta = {
             "route": "api_chat_project_next_endpoint_wrapper_fixed",
             "strategy": "api_chat_project_next_endpoint_wrapper_fixed",
@@ -6030,7 +6029,6 @@ try:
             status=200,
             mimetype="application/json",
         )
-
     def _nova_next_fixed_wrap_endpoint_20260701(endpoint_name, original_view):
         if not callable(original_view):
             return False
