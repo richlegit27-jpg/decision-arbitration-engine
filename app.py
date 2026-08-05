@@ -43,7 +43,9 @@ from nova_backend.services.autonomy_route_guard_service import (
 from nova_backend.services.project_brain_general_intelligence_priority_service import (
     ProjectBrainGeneralIntelligencePriorityService,
 )
-
+from nova_backend.services.chat_response_normalizer_service import (
+    normalize_chat_result,
+)
 from nova_backend.services.execution_priority_guard_service import (
     ExecutionPriorityGuardService,
 )
@@ -4479,59 +4481,15 @@ def api_chat():
         # Some attachment/DOCX paths return a plain string from chat_service.handle.
         # Normalize it into Nova's expected /api/chat dict contract before result.get(...).
 
-        if isinstance(result, str):
-            result = {
-                "ok": True,
-                "assistant_message": {
-                    "role": "assistant",
-                    "content": result,
-                    "text": result,
-                },
-                "text": result,
-                "session_id": session_id,
-                "active_session_id": session_id,
-                "debug": {
-                    "normalized_string_result": True,
-                    "route_taken": "attachment_analysis",
-                },
-            }
-
-        if isinstance(result, list):
-            list_text = "\n".join(
-                str(item)
-                for item in result
-            )
-
-            result = {
-                "ok": True,
-                "assistant_message": {
-                    "role": "assistant",
-                    "content": list_text,
-                    "text": list_text,
-                },
-                "text": list_text,
-                "session_id": session_id,
-                "active_session_id": session_id,
-                "debug": {
-                    "normalized_list_result": True,
-                    "route_taken": "list_result_contract_guard",
-                },
-            }
+        result = normalize_chat_result(
+            result,
+            session_id,
+        )
 
         assistant_message = result.get("assistant_message") or {
             "role": "assistant",
             "text": "",
         }
-
-
-        # API_CHAT_RESPONSE_CONTRACT_LOCK
-        if not isinstance(assistant_message, dict):
-            assistant_message = {
-                "role": "assistant",
-                "text": str(assistant_message or "").strip(),
-            }
-
-        assistant_message.setdefault("role", "assistant")
 
         assistant_text = str(
             assistant_message.get("text")
