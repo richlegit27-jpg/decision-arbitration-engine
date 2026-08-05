@@ -46,7 +46,9 @@ from nova_backend.services.chat_response_contract_service import (
 from nova_backend.services.chat_response_payload_service import (
     build_chat_response_payload,
 )
-
+from nova_backend.services.weak_response_guard_service import (
+    apply_weak_response_guard,
+)
 from nova_backend.services.chat_assistant_message_builder_service import (
     build_assistant_message,
 )
