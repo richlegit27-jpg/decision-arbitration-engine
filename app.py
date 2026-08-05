@@ -2289,46 +2289,12 @@ def api_chat():
             },
         })
 
-
-    # NOVA_EXECUTION_COMMAND_TOP_GUARD_20260611
-    # Explicit execution controls must beat web/news/search routing.
-    try:
-        _nova_exec_payload2 = request.get_json(silent=True) or {}
-        _nova_exec_text2 = str(
-            _nova_exec_payload2.get("user_text")
-            or _nova_exec_payload2.get("text")
-            or _nova_exec_payload2.get("message")
-            or ""
-        ).strip()
-        _nova_exec_clean2 = " ".join(_nova_exec_text2.lower().split())
-
-        _nova_exec_session_id2 = str(
-            _nova_exec_payload2.get("session_id")
-            or _nova_exec_payload2.get("client_session_id")
-            or _nova_exec_payload2.get("conversation_id")
-            or "default"
-        ).strip() or "default"
-
-        execution_action_result = execution_guard_service.handle_execution_action(
-            _nova_exec_clean2,
-            _nova_exec_session_id2,
+        execution_command_guard_result = (
+            execution_command_guard_service.handle()
         )
 
-        if execution_action_result:
-            _nova_exec_state2 = execution_action_result.get("state")
-            _nova_exec_action2 = execution_action_result.get("action")
-        else:
-            _nova_exec_state2 = None
-            _nova_exec_action2 = None
-
-        if execution_action_result:
-            return jsonify(
-                execution_guard_service.format_execution_response(
-                    _nova_exec_state2,
-                    _nova_exec_clean2,
-                    _nova_exec_action2,
-                )
-            )
+        if execution_command_guard_result:
+            return execution_command_guard_result
 
     except Exception as exc:
         return jsonify({
