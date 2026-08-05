@@ -25,6 +25,10 @@ from nova_backend.services.project_workspace_service import (
 
 from nova_backend.services.debug_route_service import DebugRouteService
 
+from nova_backend.services.project_next_answer_service import (
+    get_project_next_answer,
+    is_project_next_question,
+)
 from nova_backend.services.attachment_shape_normalizer_service import (
     AttachmentShapeNormalizerService,
 )
@@ -5975,8 +5979,11 @@ try:
         return answer
 
     def _nova_next_fixed_make_response_20260701(session_id):
-        fixed_text = _nova_next_fixed_answer_20260701()
-
+    fixed_text = get_project_next_answer(
+        _nova_next_fixed_request_20260711.get_json(
+            silent=True
+        ).get("message", "")
+    )
         meta = {
             "route": "api_chat_project_next_endpoint_wrapper_fixed",
             "strategy": "api_chat_project_next_endpoint_wrapper_fixed",
@@ -6099,7 +6106,7 @@ try:
                                     mimetype="application/json",
                                 )
 
-                        if _nova_next_fixed_is_question_20260701(user_text):
+                        if is_project_next_question(user_text):
                             session_id = str(
                                 payload.get("session_id")
                                 or payload.get("active_session_id")
