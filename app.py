@@ -31,6 +31,9 @@ from nova_backend.services.project_next_answer_service import (
     get_project_next_answer,
     is_project_next_question,
 )
+from nova_backend.services.pending_execution_cleanup_service import (
+    clear_pending_execution_actions,
+)
 from nova_backend.services.attachment_summary_lock_service import (
     apply_attachment_summary_lock,
 )
@@ -4199,22 +4202,12 @@ def api_chat():
             }
 
         try:
-            if isinstance(result, dict):
-                session = result.get("session") or {}
-                meta = session.get("meta") or {}
-
-                if meta.get("pending_execution_action"):
-                    meta["pending_execution_action"] = ""
-
-                assistant_message = result.get("assistant_message") or {}
-                assistant_meta = assistant_message.get("meta") or {}
-
-                if assistant_meta.get("pending_execution_action"):
-                    assistant_meta["pending_execution_action"] = ""
-
+            result = clear_pending_execution_actions(result)
         except Exception as cleanup_error:
-            print("PENDING EXECUTION CLEANUP FAILED:", cleanup_error)
-
+            print(
+                "PENDING EXECUTION CLEANUP FAILED:",
+                cleanup_error,
+            )
         result, assistant_message = build_assistant_message(
             result,
             user_text,
