@@ -29,6 +29,10 @@ from nova_backend.services.project_next_answer_service import (
     get_project_next_answer,
     is_project_next_question,
 )
+
+from nova_backend.services.empty_request_response_service import (
+    build_empty_request_response,
+)
 from nova_backend.services.attachment_shape_normalizer_service import (
     AttachmentShapeNormalizerService,
 )
@@ -2357,19 +2361,13 @@ def api_chat():
     # NOVA_EMPTY_SESSION_CREATE_GUARD_EXACT_20260610
     # Normalize attachments before session creation so blank frontend pings do not create stored sessions.
     attachments = normalize_attachments(data.get("attachments"))
-    if not user_text and not attachments:
-        return jsonify({
-            "ok": True,
-            "session_id": session_id,
-            "active_session_id": session_id,
-            "assistant_message": {
-                "role": "assistant",
-                "text": "",
-            },
-            "text": "",
-            "empty_request": True,
-            "no_session_created": True,
-        })
+
+        if not user_text and not attachments:
+            return jsonify(
+                build_empty_request_response(
+                    session_id
+                )
+            )
 
         result["session_id"] = result.get("session_id") or session_id
         result["active_session_id"] = result.get("active_session_id") or result.get("session_id") or session_id
@@ -4502,44 +4500,6 @@ def api_chat():
             user_text,
             response_quality_service,
         )
-
-        payload = {
-            "ok": result.get("ok", True),
-            "assistant_message": assistant_message,
-            # ATTACHMENT_CONTEXT_RESPONSE_FIX_LOCK
-            "session_attachments": (
-                result.get("session_attachments")
-                if isinstance(result, dict)
-                else []
-            ) or [],
-            "attachment_debug": {
-                "requested_session_id": requested_session_id,
-                "active_session_id": (
-                    result.get("active_session_id")
-                    if isinstance(result, dict)
-                    else session_id
-                ),
-                "session_attachments_count": len(
-                    (
-                        result.get("session_attachments")
-                        if isinstance(result, dict)
-                        else []
-                    ) or []
-                ),
-            },
-            "active_session_id": (
-                result.get("active_session_id")
-                or result.get("session_id")
-                or session_id
-            ),
-            "session": (
-                result.get("session")
-                or session_service.get_session(session_id)
-            ),
-            "saved_artifact": result.get("saved_artifact"),
-            "runtime": {},
-            "debug": result.get("debug") or {},
-        }
 
         return json_ok(
             **{
