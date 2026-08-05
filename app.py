@@ -4316,17 +4316,31 @@ def api_chat():
                             ).strip()
             
                             # NOVA_DISABLE_ATTACHMENT_RECURSIVE_WRAPPER_REWRITE_20260611
-                            _nova_existing_attachment_content = str(assistant_message.get("content") or "").strip()
-                            _nova_replacement_text_value = str(replacement_text or "").strip()
+                            _nova_existing_attachment_content = str(
+                                assistant_message.get("content") or ""
+                            ).strip()
+
+                            _nova_replacement_text_value = str(
+                                replacement_text or ""
+                            ).strip()
 
                             if (
-                                _nova_existing_attachment_content.startswith("Attachment analysis:")
+                                _nova_existing_attachment_content.startswith(
+                                    "Attachment analysis:"
+                                )
                                 and "Attachment " in _nova_existing_attachment_content
                                 and " content:" in _nova_existing_attachment_content
-                                and "This uploaded attachment contains readable text about:" in _nova_replacement_text_value
+                                and (
+                                    "This uploaded attachment contains readable text about:"
+                                    in _nova_replacement_text_value
+                                )
                             ):
-                                assistant_message["text"] = _nova_existing_attachment_content
-                                assistant_message["content"] = _nova_existing_attachment_content
+                                assistant_message["text"] = (
+                                    _nova_existing_attachment_content
+                                )
+                                assistant_message["content"] = (
+                                    _nova_existing_attachment_content
+                                )
                             else:
                                 assistant_message["text"] = replacement_text
                                 assistant_message["content"] = replacement_text
@@ -4342,6 +4356,7 @@ def api_chat():
                                 len(key_points or []),
                                 session_id,
                             )
+
             except Exception as _nova_after_weak_guard_attachment_error:
                 app.logger.warning(
                     "[AttachmentContentGate] after weak guard attachment summary failed error=%s",
