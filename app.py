@@ -4493,10 +4493,6 @@ def api_chat():
         except Exception as cleanup_error:
             print("PENDING EXECUTION CLEANUP FAILED:", cleanup_error)
 
-        # NOVA_NORMALIZE_RESULT_BEFORE_ASSISTANT_MESSAGE_20260608
-        # Some attachment/DOCX paths return a plain string from chat_service.handle.
-        # Normalize it into Nova's expected /api/chat dict contract before result.get(...).
-
         result, assistant_message = build_assistant_message(
             result,
             user_text,
