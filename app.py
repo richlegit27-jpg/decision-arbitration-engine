@@ -61,6 +61,9 @@ from nova_backend.services.lead_route_service import LeadRouteService
 from nova_backend.routes.memory_panel_routes import (
     register_memory_panel_routes,
 )
+from nova_backend.services.project_next_response_service import (
+    build_project_next_response,
+)
 
 from nova_backend.services.mobile_session_persist_service import (
     MobileSessionPersistService,
@@ -5965,38 +5968,10 @@ try:
             "sources": [],
         }
 
-        assistant_message = {
-            "role": "assistant",
-            "content": fixed_text,
-            "text": fixed_text,
-            "attachments": [],
-            "meta": meta,
-        }
-
-        data = {
-            "ok": True,
-            "success": True,
-            "assistant_message": assistant_message,
-            "assistant_text": fixed_text,
-            "text": fixed_text,
-            "saved_artifact": None,
-            "session": {
-                "id": session_id,
-                "session_id": session_id,
-                "messages": [assistant_message],
-                "attachments": [],
-                "meta": meta,
-            },
-            "route": "api_chat_project_next_endpoint_wrapper_fixed",
-            "route_taken": "api_chat_project_next_endpoint_wrapper_fixed",
-            "debug": {
-                "route": "api_chat_project_next_endpoint_wrapper_fixed",
-                "route_taken": "api_chat_project_next_endpoint_wrapper_fixed",
-            },
-            "meta": meta,
-            "session_id": session_id,
-            "active_session_id": session_id,
-        }
+        data = build_project_next_response(
+            fixed_text,
+            session_id,
+        )
 
         return _nova_next_fixed_flask_response_20260701(
             _nova_next_fixed_json_20260701.dumps(data, ensure_ascii=False),
