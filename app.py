@@ -2362,12 +2362,12 @@ def api_chat():
     # Normalize attachments before session creation so blank frontend pings do not create stored sessions.
     attachments = normalize_attachments(data.get("attachments"))
 
-        if not user_text and not attachments:
-            return jsonify(
-                build_empty_request_response(
-                    session_id
-                )
+    if not user_text and not attachments:
+        return jsonify(
+            build_empty_request_response(
+                session_id
             )
+        )
 
         result["session_id"] = result.get("session_id") or session_id
         result["active_session_id"] = result.get("active_session_id") or result.get("session_id") or session_id
