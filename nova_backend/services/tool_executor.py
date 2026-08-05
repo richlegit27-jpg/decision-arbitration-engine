@@ -1,120 +1,139 @@
-from nova_backend.services.tools.email_tool import EmailTool
-from nova_backend.services.tools.calendar_tool import CalendarTool
+from __future__ import annotations
 
 
 class ToolExecutor:
     """
-    Central Tool Gate for Nova.
-    SAFETY LAYER + TOOL ROUTER
+    Central execution gate for registered Nova tools.
+
+    Internal tools execute through ActionRouter.
+    Planned external tools fail safely until their adapters exist.
     """
 
-    def __init__(self, action_router):
+    INTERNAL_TOOLS = {
+        "chat.send",
+        "session.rename",
+        "session.pin",
+        "session.delete",
+        "attachment.upload",
+        "attachment.analyze",
+    }
+
+    PLANNED_EXTERNAL_TOOLS = {
+        "email.send",
+        "calendar.create",
+    }
+
+    REQUIRES_CONFIRMATION = {
+        "email.send",
+        "calendar.create",
+    }
+
+    INTENT_MAP = {
+        "rename": "session.rename",
+        "pin": "session.pin",
+        "delete": "session.delete",
+        "upload": "attachment.upload",
+        "analyze": "attachment.analyze",
+        "chat": "chat.send",
+        "email": "email.send",
+        "calendar": "calendar.create",
+    }
+
+    def __init__(self, action_router=None):
         self.action_router = action_router
 
-        # internal tools (system actions)
-        self.internal_tools = {
-            "chat.send",
-            "session.rename",
-            "session.pin",
-            "session.delete",
-            "attachment.upload",
-            "attachment.analyze",
-        }
+    def run(
+        self,
+        tool_name: str,
+        payload: dict | None = None,
+        confirm: bool = False,
+    ) -> dict:
+        normalized_name = str(tool_name or "").lower().strip()
+        safe_payload = payload if isinstance(payload, dict) else {}
 
-        # external tools (real-world actions)
-        self.email_tool = EmailTool()
-        self.calendar_tool = CalendarTool()
+        if not normalized_name:
+            return {
+                "ok": False,
+                "error": "Missing tool name",
+            }
 
-        self.external_tools = {
-            "email.send",
-            "calendar.create",
-        }
-
-        # tools requiring confirmation
-        self.requires_confirmation = {
-            "email.send",
-            "calendar.create",
-        }
-
-    # =========================================================
-    # MAIN ENTRY
-    # =========================================================
-    def run(self, tool_name: str, payload: dict, confirm: bool = False):
-        tool_name = (tool_name or "").lower().strip()
-
-        if not tool_name:
-            return {"ok": False, "error": "Missing tool name"}
-
-        # -------------------------
-        # CONFIRMATION GATE
-        # -------------------------
-        if tool_name in self.requires_confirmation and not confirm:
+        if (
+            normalized_name in self.REQUIRES_CONFIRMATION
+            and not confirm
+        ):
             return {
                 "ok": False,
                 "requires_confirmation": True,
-                "tool": tool_name,
-                "payload": payload
+                "tool": normalized_name,
+                "payload": safe_payload,
             }
 
-        # -------------------------
-        # INTERNAL TOOLS
-        # -------------------------
-        if tool_name in self.internal_tools:
-            result = self.action_router.execute(tool_name, payload)
+        if normalized_name in self.INTERNAL_TOOLS:
+            if self.action_router is None:
+                return {
+                    "ok": False,
+                    "tool": normalized_name,
+                    "error": "Action router is not configured.",
+                }
+
+            try:
+                result = self.action_router.execute(
+                    normalized_name,
+                    safe_payload,
+                )
+            except Exception as error:
+                return {
+                    "ok": False,
+                    "tool": normalized_name,
+                    "error": str(error),
+                }
+
+            if isinstance(result, dict):
+                return {
+                    "tool": normalized_name,
+                    **result,
+                }
+
             return {
                 "ok": True,
-                "tool": tool_name,
-                "result": result
+                "tool": normalized_name,
+                "result": result,
             }
 
-        # -------------------------
-        # EMAIL TOOL
-        # -------------------------
-        if tool_name == "email.send":
-            return self.email_tool.send(
-                to=payload.get("to"),
-                subject=payload.get("subject"),
-                body=payload.get("body")
-            )
-
-        # -------------------------
-        # CALENDAR TOOL
-        # -------------------------
-        if tool_name == "calendar.create":
-            return self.calendar_tool.create_event(
-                title=payload.get("title"),
-                time=payload.get("time"),
-                description=payload.get("description", "")
-            )
+        if normalized_name in self.PLANNED_EXTERNAL_TOOLS:
+            return {
+                "ok": False,
+                "tool": normalized_name,
+                "implemented": False,
+                "error": (
+                    f"Tool is registered but not implemented yet: "
+                    f"{normalized_name}"
+                ),
+            }
 
         return {
             "ok": False,
-            "error": f"Tool not registered: {tool_name}"
+            "tool": normalized_name,
+            "error": f"Tool not registered: {normalized_name}",
         }
 
-    # =========================================================
-    # INTENT → TOOL MAPPER
-    # =========================================================
-    def auto_decide_and_run(self, intent: str, payload: dict):
-        intent_map = {
-            "rename": "session.rename",
-            "pin": "session.pin",
-            "delete": "session.delete",
-            "upload": "attachment.upload",
-            "analyze": "attachment.analyze",
-            "chat": "chat.send",
+    def auto_decide_and_run(
+        self,
+        intent: str,
+        payload: dict | None = None,
+        confirm: bool = False,
+    ) -> dict:
+        normalized_intent = str(intent or "").lower().strip()
+        tool_name = self.INTENT_MAP.get(normalized_intent)
 
-            # external tools
-            "email": "email.send",
-            "calendar": "calendar.create",
-        }
-
-        tool = intent_map.get((intent or "").lower())
-
-        if not tool:
+        if not tool_name:
             return {
                 "ok": False,
-                "error": f"No tool mapped for intent: {intent}"
+                "error": f"No tool mapped for intent: {intent}",
             }
 
-        return self.run(tool, payload)
+        return self.run(
+            tool_name,
+            payload or {},
+            confirm=confirm,
+        )
