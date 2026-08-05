@@ -1,89 +1,78 @@
+from __future__ import annotations
+
+
 class ToolBridge:
     """
-    External Tool Gateway for Nova.
+    Compatibility gateway for Nova tool execution.
 
-    THIS is the ONLY place allowed to talk to external systems:
-    - email
-    - calendar
-    - web APIs
-    - future integrations
+    Tool discovery, aliases, and confirmation metadata belong to
+    ToolRegistry. ToolBridge only forwards validated requests.
     """
 
-    def __init__(self, tool_executor):
+    INTENT_MAP = {
+        "chat": "chat.send",
+        "rename": "session.rename",
+        "pin": "session.pin",
+        "delete": "session.delete",
+        "upload": "attachment.upload",
+        "analyze": "attachment.analyze",
+        "email": "email.send",
+        "calendar": "calendar.create",
+    }
+
+    def __init__(
+        self,
+        tool_registry=None,
+        tool_executor=None,
+    ):
+        self.tool_registry = tool_registry
         self.tool_executor = tool_executor
 
-        # safe tool registry (start locked down)
-        self.allowed_external_tools = {
-            "web.search",
-            "file.read",
-            "file.write",
+    def run_tool(
+        self,
+        tool_name: str,
+        payload: dict | None = None,
+        confirm: bool = False,
+    ) -> dict:
+        safe_payload = payload if isinstance(payload, dict) else {}
+
+        if self.tool_registry is not None:
+            return self.tool_registry.execute(
+                tool_name,
+                safe_payload,
+                confirm=confirm,
+            )
+
+        if self.tool_executor is not None:
+            return self.tool_executor.run(
+                tool_name,
+                safe_payload,
+                confirm=confirm,
+            )
+
+        return {
+            "ok": False,
+            "tool": str(tool_name or "").strip().lower(),
+            "error": "Tool bridge is not configured.",
         }
 
-        # sensitive tools (require confirmation later)
-        self.sensitive_tools = {
-            "email.send",
-            "calendar.create",
-        }
-
-    # =========================================================
-    # MAIN ENTRY
-    # =========================================================
-    def run_tool(self, tool_name: str, payload: dict, confirm: bool = False):
-        tool_name = (tool_name or "").strip().lower()
+    def auto_route(
+        self,
+        intent: str,
+        payload: dict | None = None,
+        confirm: bool = False,
+    ) -> dict:
+        normalized_intent = str(intent or "").lower().strip()
+        tool_name = self.INTENT_MAP.get(normalized_intent)
 
         if not tool_name:
-            return {"ok": False, "error": "Missing tool name"}
-
-        # -------------------------
-        # BLOCK UNKNOWN TOOLS
-        # -------------------------
-        if (
-            tool_name not in self.allowed_external_tools
-            and tool_name not in self.sensitive_tools
-        ):
             return {
                 "ok": False,
-                "error": f"Tool not registered: {tool_name}"
+                "error": f"No tool mapping for intent: {intent}",
             }
 
-        # -------------------------
-        # CONFIRMATION GATE
-        # -------------------------
-        if tool_name in self.sensitive_tools and not confirm:
-            return {
-                "ok": False,
-                "requires_confirmation": True,
-                "tool": tool_name,
-                "payload": payload
-            }
-
-        # -------------------------
-        # EXECUTE THROUGH TOOL EXECUTOR
-        # -------------------------
-        return self.tool_executor.run(tool_name, payload)
-
-    # =========================================================
-    # FUTURE: AI DECISION ENTRY POINT
-    # =========================================================
-    def auto_route(self, intent: str, payload: dict):
-        """
-        AI → intent → tool routing layer
-        """
-
-        mapping = {
-            "search": "web.search",
-            "email": "email.send",
-            "calendar": "calendar.create",
-            "read_file": "file.read",
-            "write_file": "file.write",
-        }
-
-        tool = mapping.get(intent.lower())
-
-        if not tool:
-            return {
-                "ok": False,
-                "error": f"No tool mapping for intent: {intent}"
-            }
-
-        return self.run_tool(tool, payload)
+        return self.run_tool(
+            tool_name,
+            payload or {},
+            confirm=confirm,
+        )
