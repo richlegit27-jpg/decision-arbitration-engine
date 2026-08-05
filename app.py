@@ -24,7 +24,9 @@ from nova_backend.services.project_workspace_service import (
 )
 
 from nova_backend.services.debug_route_service import DebugRouteService
-
+from nova_backend.services.attachment_response_guard_service import (
+    normalize_attachment_response,
+)
 from nova_backend.services.project_next_answer_service import (
     get_project_next_answer,
     is_project_next_question,
@@ -4314,36 +4316,11 @@ def api_chat():
                                 + ("\n\nKey points:\n" + points_text if points_text else "")
                                 + ("\n\nPreview:\n" + preview[:1200] if preview else "")
                             ).strip()
-            
-                            # NOVA_DISABLE_ATTACHMENT_RECURSIVE_WRAPPER_REWRITE_20260611
-                            _nova_existing_attachment_content = str(
-                                assistant_message.get("content") or ""
-                            ).strip()
 
-                            _nova_replacement_text_value = str(
-                                replacement_text or ""
-                            ).strip()
-
-                            if (
-                                _nova_existing_attachment_content.startswith(
-                                    "Attachment analysis:"
-                                )
-                                and "Attachment " in _nova_existing_attachment_content
-                                and " content:" in _nova_existing_attachment_content
-                                and (
-                                    "This uploaded attachment contains readable text about:"
-                                    in _nova_replacement_text_value
-                                )
-                            ):
-                                assistant_message["text"] = (
-                                    _nova_existing_attachment_content
-                                )
-                                assistant_message["content"] = (
-                                    _nova_existing_attachment_content
-                                )
-                            else:
-                                assistant_message["text"] = replacement_text
-                                assistant_message["content"] = replacement_text
+                            assistant_message = normalize_attachment_response(
+                                assistant_message,
+                                replacement_text,
+                            )        
 
                             result["assistant_message"] = assistant_message
                             result["skip_cleanup"] = True
