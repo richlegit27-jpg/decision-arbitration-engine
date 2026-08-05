@@ -31,7 +31,9 @@ from nova_backend.services.project_next_answer_service import (
     get_project_next_answer,
     is_project_next_question,
 )
-
+from nova_backend.services.attachment_summary_lock_service import (
+    apply_attachment_summary_lock,
+)
 from nova_backend.services.empty_request_response_service import (
     build_empty_request_response,
 )
@@ -4141,206 +4143,27 @@ def api_chat():
                 image_command_user_text,
                 result,
             )
+
             # AFTER_WEAK_GUARD_ATTACHMENT_SUMMARY_LOCK
-            # Final safety: if attachment text was extracted but the reply is still the old canned
-            # attachment response, replace it with a local summary after weak-reply cleanup.
-            try:
-                if attachment_content_lines and isinstance(result, dict):
-                    assistant_message = result.get("assistant_message")
-                    if isinstance(assistant_message, dict):
-                        current_reply = str(
-                            assistant_message.get("text")
-                            or assistant_message.get("content")
-                            or ""
-                        ).strip()
-            
-                        lower_reply = current_reply.lower()
-                        is_canned_attachment_reply = (
-                            "i received the attachment" in lower_reply
-                            and "instead of generating an image" in lower_reply
-                        )
-            
-                        if is_canned_attachment_reply:
-                            extracted_text = "\n\n".join(str(item or "") for item in attachment_content_lines).strip()
-            
-                            try:
-                                summary_payload = attachment_analysis_service.local_summary_from_text(
-                                    extracted_text
-                                )
-                            except Exception:
-                                summary_payload = None
-            
-                            if isinstance(summary_payload, dict):
-                                summary = str(summary_payload.get("summary") or "").strip()
-                                key_points = summary_payload.get("key_points") or []
-                                preview = str(summary_payload.get("preview") or "").strip()
-                            else:
-                                summary = "I extracted readable text from the attachment."
-                                key_points = []
-                                seen = set()
-                                for raw_line in extracted_text.splitlines():
-                                    cleaned = " ".join(str(raw_line or "").strip().split())
-                                    lowered = cleaned.lower()
-                                    if not cleaned or lowered in seen or len(cleaned) < 8:
-                                        continue
-                                    seen.add(lowered)
-                                    key_points.append(cleaned)
-                                    if len(key_points) >= 10:
-                                        break
-                                preview = "\n".join(key_points[:6])
-            
-                            # WEAK_GUARD_CLEAN_BEFORE_FORMAT_LOCK
-                            # Clean weak-guard attachment text before formatting final response.
-                            # Prevents double summaries like:
-                            # "This attachment appears... This attachment appears... Key points..."
-                            import re as _nova_weak_guard_re
+            result = attachment_summary_lock_service.apply_attachment_summary_lock(
+                result,
+                attachment_content_lines,
+                attachment_analysis_service,
+            )
 
-                            def _nova_weak_guard_clean_line(value):
-                                line = str(value or "").strip()
-                                line = _nova_weak_guard_re.sub(r"^\\s*\\d+\\.\\s*", "", line).strip()
-                                line = line.replace("", "").strip()
-                                line = line.replace("Attachment <unknown>", "uploaded attachment")
-                                line = _nova_weak_guard_re.sub(r"\\s+", " ", line).strip()
-                                return line
+            if isinstance(result, dict):
+                active_attachment_session_id = str(
+                    result.get("active_session_id")
+                    or session_id
+                    or ""
+                ).strip()
 
-                            _nova_weak_bad_exact = {
-                                "attachment analysis:",
-                                "key points:",
-                                "preview:",
-            "copy",
-            "regen",
-            "regenerate",
-                                "uploaded attachment content:",
-                                "attachment content:",
-                                "attachment <unknown> content:",
-                                "keypoints",
-            "copy",
-            "regen",
-            "regenerate",
-                                "summarize",
-                                "summary",
-                                "continue",
-                            }
-
-                            _nova_weak_bad_starts = (
-                                "this attachment appears to contain extracted image/pdf content about:",
-                                "this attachment appears to contain image/search/pdf extraction text about:",
-                                "this attachment appears to be about:",
-                            )
-
-                            _nova_weak_bad_contains = (
-                                "uploaded attachment content:",
-                                "attachment <unknown> content:",
-                                "key points:;",
-                                "preview:;",
-                            )
-
-                            def _nova_weak_keep_line(value):
-                                line = _nova_weak_guard_clean_line(value)
-                                if not line:
-                                    return ""
-
-                                low = line.lower().strip(" :;-•*|")
-                                compact = _nova_weak_guard_re.sub(r"[^a-z0-9]+", " ", low).strip()
-
-                                if low in _nova_weak_bad_exact or compact in _nova_weak_bad_exact:
-                                    return ""
-
-                                if any(low.startswith(prefix) for prefix in _nova_weak_bad_starts):
-                                    return ""
-
-                                if any(bad in low for bad in _nova_weak_bad_contains):
-                                    return ""
-
-                                if line.isdigit():
-                                    return ""
-
-                                if len(line) <= 2:
-                                    return ""
-
-                                return line
-
-                            cleaned_key_points = []
-                            seen_weak_points = set()
-
-                            if isinstance(key_points, list):
-                                for raw_point in key_points:
-                                    clean_point = _nova_weak_keep_line(raw_point)
-                                    if not clean_point:
-                                        continue
-
-                                    key = _nova_weak_guard_re.sub(
-                                        r"[^a-z0-9]+",
-                                        " ",
-                                        clean_point.lower(),
-                                    ).strip()[:160]
-
-                                    if not key or key in seen_weak_points:
-                                        continue
-
-                                    seen_weak_points.add(key)
-                                    cleaned_key_points.append(clean_point)
-
-                                    if len(cleaned_key_points) >= 10:
-                                        break
-
-                            key_points = cleaned_key_points
-
-                            cleaned_preview_lines = []
-                            for raw_preview_line in str(preview or "").splitlines():
-                                clean_preview_line = _nova_weak_keep_line(raw_preview_line)
-                                if clean_preview_line:
-                                    cleaned_preview_lines.append(clean_preview_line)
-
-                            preview = "\n".join(cleaned_preview_lines[:6])
-
-                            if key_points:
-                                summary = (
-                                    "This uploaded attachment contains readable text about: "
-                                    + "; ".join(key_points[:3])
-                                    + "."
-                                )
-                            else:
-                                summary = "The attachment was received and processed, but the extracted text is too limited or noisy to summarize cleanly."
-
-                            points_text = ""
-                            if isinstance(key_points, list) and key_points:
-                                points_text = "\n".join(
-                                    f"{index + 1}. {point}"
-                                    for index, point in enumerate(key_points[:10])
-                                )
-            
-                            replacement_text = (
-                                "Attachment analysis:\n"
-                                + (summary or "I extracted readable text from the attachment.")
-                                + ("\n\nKey points:\n" + points_text if points_text else "")
-                                + ("\n\nPreview:\n" + preview[:1200] if preview else "")
-                            ).strip()
-
-                            assistant_message = normalize_attachment_response(
-                                assistant_message,
-                                replacement_text,
-                            )        
-
-                            result["assistant_message"] = assistant_message
-                            result["skip_cleanup"] = True
-                            result["skip_post_processing"] = True
-                            result["skip_rewrite"] = True
-            
-                            app.logger.info(
-                                "[AttachmentContentGate] after weak guard replaced canned attachment reply chars=%s key_points=%s session_id=%s",
-                                len(replacement_text),
-                                len(key_points or []),
-                                session_id,
-                            )
-
-            except Exception as _nova_after_weak_guard_attachment_error:
-                app.logger.warning(
-                    "[AttachmentContentGate] after weak guard attachment summary failed error=%s",
-                    _nova_after_weak_guard_attachment_error,
+                result["session_attachments"] = summarize_attachments_for_session(
+                    active_attachment_session_id,
+                    limit=25,
+                    client_session_id=requested_session_id,
                 )
-
-
+            
 
             if isinstance(result, dict):
                 active_attachment_session_id = str(
