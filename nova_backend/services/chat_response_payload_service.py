@@ -1,7 +1,6 @@
 def build_chat_response_payload(
     result,
     assistant_message,
-    requested_session_id,
     session_id,
     session_service,
 ):
@@ -14,7 +13,6 @@ def build_chat_response_payload(
             else []
         ) or [],
         "attachment_debug": {
-            "requested_session_id": requested_session_id,
             "active_session_id": (
                 result.get("active_session_id")
                 if isinstance(result, dict)

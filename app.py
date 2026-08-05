@@ -39,6 +39,14 @@ from nova_backend.services.attachment_shape_normalizer_service import (
 from nova_backend.services.chat_response_contract_service import (
     normalize_assistant_message,
 )
+from nova_backend.services.chat_response_payload_service import (
+    build_chat_response_payload,
+)
+
+from nova_backend.services.chat_assistant_message_builder_service import (
+    build_assistant_message,
+)
+
 from nova_backend.services.execution_guard_service import (
     ExecutionGuardService,
 )
@@ -4494,11 +4502,17 @@ def api_chat():
             session_id,
         )
 
-
         assistant_message = normalize_assistant_message(
             result,
             user_text,
             response_quality_service,
+        )
+
+        payload = build_chat_response_payload(
+            result,
+            assistant_message,
+            session_id,
+            session_service,
         )
 
         return json_ok(
