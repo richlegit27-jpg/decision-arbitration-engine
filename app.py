@@ -4181,31 +4181,19 @@ def api_chat():
                 )
 
 
-                # REAL_RESPONSE_ATTACHMENT_COUNT_LOCK
-                # Force returned attachment payload/count to current request only.
-                try:
-                    if isinstance(result, dict):
-                        result["session_attachments"] = list(attachments or [])
-                        result_session = result.get("session")
-                        if isinstance(result_session, dict):
-                            result_session["session_attachments"] = list(attachments or [])
-                            result_session["attachment_memory"] = list(attachments or [])
-                            result_session["attachments"] = list(attachments or [])
-                    app.logger.info(
-                        "[AttachmentContentGate] real response attachment payload forced current-only count=%s session_id=%s",
-                        len(attachments or []),
-                        requested_session_id,
-                    )
-                except Exception as _nova_real_response_attachment_error:
-                    app.logger.warning(
-                        "[AttachmentContentGate] real response attachment payload cleanup failed error=%s",
-                        _nova_real_response_attachment_error,
-                    )
+                result = apply_real_response_attachment_lock(
+                    result,
+                    attachments,
+                    requested_session_id,
+                    app.logger,
+                )
+
                 app.logger.info(
                     "[api_chat] returned session attachment memory count=%s session_id=%s",
                     len(result.get("session_attachments") or []),
                     active_attachment_session_id,
                 )
+
         except Exception:
             app.logger.exception("[api_chat] failed while logging chat_service result")
 
