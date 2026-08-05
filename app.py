@@ -6227,9 +6227,24 @@ try:
     from flask import jsonify as _nova_coding_judgment_jsonify_20260701
 
     @_nova_app.before_request if False else app.before_request
-            answer = get_coding_judgment_answer(
-                user_text
-            )
+    def _nova_coding_judgment_direct_answer_20260701():
+        try:
+            if _nova_coding_judgment_request_20260701.path != "/api/chat":
+                return None
+
+            if _nova_coding_judgment_request_20260701.method != "POST":
+                return None
+
+            data = _nova_coding_judgment_request_20260701.get_json(silent=True) or {}
+
+            user_text = str(
+                data.get("message")
+                or data.get("user_text")
+                or data.get("text")
+                or ""
+            ).strip()
+
+            answer = get_coding_judgment_answer(user_text)
 
             if not answer:
                 return None
