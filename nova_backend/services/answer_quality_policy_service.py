@@ -8,6 +8,20 @@ def _clean_question(value):
 
 
 _ANSWER_QUALITY_POLICY = {
+
+    "what test should we run before touching code": (
+        "Before touching code, run the smallest checks that prove the current behavior is safe:\n\n"
+        "1. `python -m py_compile` on the Python files you may touch.\n"
+        "2. The most relevant focused smoke test.\n"
+        "3. `git status --short` before staging or committing.\n\n"
+        "For Nova intelligence/memory work, use:\n\n"
+        "python -m py_compile .\\app.py\n"
+        "python .\\tools\\nova_answer_quality_smoke.py\n"
+        "python .\\tools\\nova_project_state_memory_api_smoke.py\n"
+        "python .\\tools\\nova_phase_4i_guard_stack_audit_smoke.py\n"
+        "git status --short"
+    ),
+
     "what is the difference between memory and execution in nova": (
         "Memory is what Nova knows and retains: project facts, Richard's preferences, "
         "current checkpoint, and durable decisions. "
@@ -26,6 +40,28 @@ _ANSWER_QUALITY_POLICY = {
 
 
 def get_answer_quality_policy_answer(user_text):
-    return _ANSWER_QUALITY_POLICY.get(
-        _clean_question(user_text)
-    )
+    clean = _clean_question(user_text)
+
+    direct = _ANSWER_QUALITY_POLICY.get(clean)
+
+    if direct:
+        return direct
+
+    if any(
+        trigger in clean
+        for trigger in (
+            "what test should we run before touching code",
+            "what tests should we run before touching code",
+            "what should we run before touching code",
+            "what test before touching code",
+            "what tests before touching code",
+            "before touching code",
+            "before patching",
+            "before we patch",
+        )
+    ):
+        return _ANSWER_QUALITY_POLICY[
+            "what test should we run before touching code"
+        ]
+
+    return None
