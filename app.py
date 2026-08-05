@@ -4497,14 +4497,10 @@ def api_chat():
         # Some attachment/DOCX paths return a plain string from chat_service.handle.
         # Normalize it into Nova's expected /api/chat dict contract before result.get(...).
 
-        result = normalize_chat_result(
-            result,
-            session_id,
-        )
-
-        assistant_message = normalize_assistant_message(
+        result, assistant_message = build_assistant_message(
             result,
             user_text,
+            session_id,
             response_quality_service,
         )
 
@@ -4522,7 +4518,6 @@ def api_chat():
                 if v is not None
             }
         )
-
     except Exception as exc:
         import traceback
         traceback.print_exc()
