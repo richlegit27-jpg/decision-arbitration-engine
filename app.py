@@ -2253,39 +2253,6 @@ def api_chat():
             "skip_post_processing": True,
             "skip_rewrite": True,
         })
-    # NOVA_AUTO_PLAN_TOP_OF_API_CHAT_GUARD_20260607
-    try:
-        _nova_early_payload = request.get_json(silent=True) or {}
-        _nova_early_user_text = str(
-            _nova_early_payload.get("user_text")
-            or _nova_early_payload.get("text")
-            or _nova_early_payload.get("message")
-            or ""
-        ).strip()
-        _nova_early_session_id = str(
-            _nova_early_payload.get("session_id")
-            or _nova_early_payload.get("client_session_id")
-            or "default"
-        ).strip() or "default"
-
-        _nova_early_auto_plan_result = None
-
-        if _nova_early_auto_plan_result is not None:
-            return jsonify(_nova_early_auto_plan_result)
-    except Exception as exc:
-        logger.exception("[NovaAutoPlanTopGuard] failed")
-        return jsonify({
-            "ok": True,
-            "assistant_message": {
-                "role": "assistant",
-                "text": "Auto-plan top guard failed: " + str(exc),
-                "content": "Auto-plan top guard failed: " + str(exc),
-            },
-            "execution_state": {
-                "status": "failed",
-                "error": str(exc),
-            },
-        })
 
         execution_command_guard_result = (
             execution_command_guard_service.handle()
