@@ -4165,20 +4165,6 @@ def api_chat():
                     limit=25,
                     client_session_id=requested_session_id,
                 )
-            
-
-            if isinstance(result, dict):
-                active_attachment_session_id = str(
-                    result.get("active_session_id")
-                    or session_id
-                    or ""
-                ).strip()
-
-                result["session_attachments"] = summarize_attachments_for_session(
-                    active_attachment_session_id,
-                    limit=25,
-                    client_session_id=requested_session_id,
-                )
 
 
                 result = apply_real_response_attachment_lock(
