@@ -4493,32 +4493,6 @@ def api_chat():
             session_id,
         )
 
-        assistant_message = result.get("assistant_message") or {
-            "role": "assistant",
-            "text": "",
-        }
-
-        assistant_text = str(
-            assistant_message.get("text")
-            or assistant_message.get("content")
-            or assistant_message.get("message")
-            or ""
-        ).strip()
-
-        print(
-            "[EMPTY RESPONSE DEBUG]",
-            {
-                "result_keys": list(result.keys()) if isinstance(result, dict) else None,
-                "assistant_message": assistant_message,
-                "result_preview": repr(result)[:1000],
-            },
-        )
-
-        print("[EMPTY RESPONSE DEBUG RESULT]", repr(result)[:3000])
-
-        if not assistant_text and result.get("ok", True):
-
-            assistant_text = "Nova completed the request but returned an empty assistant response."
 
         assistant_message = normalize_assistant_message(
             result,
