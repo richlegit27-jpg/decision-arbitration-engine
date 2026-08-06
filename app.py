@@ -4179,7 +4179,7 @@ def api_chat():
         except Exception:
             pass
 
-            # NOVA_SAFE_API_CHAT_WEAK_GUARD_AFTER_HANDLE_LOCK
+        # NOVA_SAFE_API_CHAT_WEAK_GUARD_AFTER_HANDLE_LOCK
             result = response_quality_service.replace_weak_backend_reply(
                 image_command_user_text,
                 result,
@@ -4207,11 +4207,11 @@ def api_chat():
                 app.logger,
             )
 
-                app.logger.info(
-                    "[api_chat] returned session attachment memory count=%s session_id=%s",
-                    len(result.get("session_attachments") or []),
-                    active_attachment_session_id,
-                )
+            app.logger.info(
+                "[api_chat] returned session attachment memory count=%s session_id=%s",
+                len(result.get("session_attachments") or []),
+                session_id,
+            )
 
         except Exception:
             app.logger.exception("[api_chat] failed while logging chat_service result")

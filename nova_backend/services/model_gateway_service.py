@@ -455,10 +455,14 @@ def _nova_consume_and_record_usage(
             )
 
             if not billing_result.get("ok"):
-                raise RuntimeError(
-                    "Nova billing usage consume failed after model call: "
-                    + str(billing_result)
-                )
+                try:
+                    print(
+                        "[NOVA BILLING WARNING] usage consume failed after successful model response:",
+                        billing_result,
+                    )
+                except Exception:
+                    pass
+
         except RuntimeError:
             raise
         except Exception as exc:
