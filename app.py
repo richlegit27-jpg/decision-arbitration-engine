@@ -322,6 +322,13 @@ from nova_backend.services.session_detail_response_cache_service import (
 from nova_backend.services.session_detail_response_cache_service import (
     SessionDetailResponseCacheService,
 )
+from nova_backend.services.attachment_action_service import (
+    AttachmentActionService,
+)
+
+from nova_backend.services.tool_runtime_factory import (
+    build_tool_runtime,
+)
 
 from nova_backend.services.session_slim_response_service import (
     SessionSlimResponseService,
@@ -864,6 +871,30 @@ chat_service = ChatService(
     working_state_service=working_state_service,
     execution_state_service=execution_state_service,
 )
+
+attachment_action_service = AttachmentActionService(
+    upload_route_service=upload_route_service,
+    attachment_analysis_service=attachment_analysis_service,
+    logger=app.logger,
+    secure_filename=secure_filename,
+)
+
+tool_runtime = build_tool_runtime(
+    session_service=session_service,
+    chat_service=chat_service,
+    attachment_service=attachment_action_service,
+)
+
+if not tool_runtime.get("ok"):
+    raise RuntimeError(
+        "Tool runtime failed to initialize: "
+        f"{tool_runtime.get('error')}"
+    )
+
+action_router = tool_runtime["action_router"]
+tool_executor = tool_runtime["tool_executor"]
+tool_registry = tool_runtime["tool_registry"]
+tool_bridge = tool_runtime["tool_bridge"]
 
 from nova_backend.services.chat_service import (
     install_chat_service_runtime_patches,
