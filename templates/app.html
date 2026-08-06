@@ -1095,7 +1095,7 @@ observer.observe(document.documentElement, {
 </script>
 
 </head>
-<body>
+<body data-nova-desktop-inline-send="true">
   <div class="shell">
     <aside class="panel sidebar">
 
@@ -2540,6 +2540,7 @@ document.querySelectorAll("[data-nova-quick-action]").forEach((button) => {
 refreshSummaryMeta();
 refreshDesktopPanels();
 
+window.NOVA_DESKTOP_INLINE_SEND_ACTIVE = true;
 
 if (sendBtn && input) {
   sendBtn.addEventListener("mousedown", () => {
@@ -6129,17 +6130,35 @@ document.addEventListener("nova:message:rendered", renderForcedSourceCards);
 
   function initButtons() {
     const sendBtn = resolve("desktopSendButton");
+    const input = resolve("desktopChatInput");
     const memoryBtn = resolve("desktopMemoryButton");
 
-    bindOnce(sendBtn, "sendClickLog", "click", function () {
+    bindOnce(sendBtn, "sendClickAction", "click", function (event) {
+      event.preventDefault();
+
       console.log("[NOVA] send clicked");
+
+      if (typeof handleSendClick === "function") {
+        handleSendClick();
+      }
+    });
+
+    bindOnce(input, "sendEnterAction", "keydown", function (event) {
+      if (event.key !== "Enter" || event.shiftKey) {
+        return;
+      }
+
+      event.preventDefault();
+
+      if (typeof handleSendClick === "function") {
+        handleSendClick();
+      }
     });
 
     bindOnce(memoryBtn, "memoryClickLog", "click", function () {
       console.log("[NOVA] memory clicked");
     });
   }
-
   function initObserver() {
     if (window.__NOVA_OBSERVER__) return;
 

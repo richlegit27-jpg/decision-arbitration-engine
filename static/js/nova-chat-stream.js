@@ -910,17 +910,31 @@ els.stopBtn.addEventListener("click", async function () {
     els.newChatBtn = findNewChatBtn();
     els.emptyState = findEmptyState();
 
+    const desktopInlineComposerOwnsSend =
+      document.body?.dataset?.novaDesktopInlineSend === "true" ||
+      window.NOVA_DESKTOP_INLINE_SEND_ACTIVE === true;
+
     if (els.composer) {
       els.composer.addEventListener("input", autoResizeComposer);
-      els.composer.addEventListener("keydown", handleComposerKeydown);
+
+      if (!desktopInlineComposerOwnsSend) {
+        els.composer.addEventListener(
+          "keydown",
+          handleComposerKeydown,
+        );
+      }
+
       autoResizeComposer();
     }
 
-    if (els.sendBtn) {
-      els.sendBtn.addEventListener("click", function (event) {
-        event.preventDefault();
-        sendCurrentMessage();
-      });
+    if (els.sendBtn && !desktopInlineComposerOwnsSend) {
+      els.sendBtn.addEventListener(
+        "click",
+        function (event) {
+          event.preventDefault();
+          sendCurrentMessage();
+        },
+      );
     }
 
     if (els.modelSelect) {

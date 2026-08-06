@@ -846,15 +846,6 @@ Rules:
                 session_id
             ) or {}
 
-            has_real_execution = any(
-                [
-                    working_state.get("active_task"),
-                    working_state.get("current_file"),
-                    working_state.get("current_bug"),
-                    working_state.get("next_move"),
-                    working_state.get("checkpoint"),
-                ]
-            )
 
             self._update_working_state(
                 session_id,
@@ -976,6 +967,10 @@ Rules:
                 ]
             )
 
+
+
+
+
             has_real_execution = any(
                 [
                     bool(execution_state.get("steps")),
@@ -985,7 +980,17 @@ Rules:
                 ]
             )
 
-            if not has_real_state and not has_real_execution:
+            execution_is_idle = (
+                self.safe_str(
+                    execution_state.get("status")
+                ).strip().lower()
+                == "idle"
+            )
+
+            if execution_is_idle or (
+                not has_real_state
+                and not has_real_execution
+            ):
                 message = (
                     "No active work to resume."
                     if text == "resume"
@@ -4229,6 +4234,8 @@ Rules:
             "next step",
             "what next",
             "what now",
+            "stop",
+            "cancel",
         }:
             exec_debug(
                 "EXECUTION INTERCEPT HIT",
@@ -10141,9 +10148,9 @@ Rules:
             working_state = working_state if isinstance(working_state, dict) else {}
 
             execution_state = (
-                self._get_session_meta(session_id, "execution_state")
-                or working_state.get("execution_state")
-                or {}
+                execution_state
+                if isinstance(execution_state, dict)
+                else {}
             )
             execution_state = (
                 execution_state if isinstance(execution_state, dict) else {}
@@ -10168,14 +10175,52 @@ Rules:
                 ]
             )
 
-            if has_real_state or has_real_execution:
-                command = "run_step" if lowered in {"k", "kk", "go"} else lowered
+            has_real_execution = any(
+                [
+                    bool(execution_state.get("steps")),
+                    execution_state.get("current_step"),
+                    execution_state.get("current_step_title"),
+                    execution_state.get("status") in {
+                        "running",
+                        "waiting",
+                        "paused",
+                    },
+                ]
+            )
+
+            execution_is_idle = (
+                self.safe_str(
+                    execution_state.get("status")
+                ).strip().lower()
+                == "idle"
+            )
+
+            if has_real_execution or (
+                has_real_state
+                and not execution_is_idle
+            ):
+                command = "run_step"
                 execution_state["command"] = command
 
                 return self.execution_orchestrator_service.process_execution(
                     session_id=session_id,
                     state=execution_state,
                 )
+
+            message = "No active execution mission"
+
+            return {
+                "ok": True,
+                "assistant_message": self._build_assistant_message(message),
+                "session": self._get_session_payload(session_id),
+                "debug": {
+                    "route_taken": "top_level_short_command_intercept",
+                    "command": lowered,
+                    "has_real_state": has_real_state,
+                    "has_real_execution": has_real_execution,
+                    "execution_is_idle": execution_is_idle,
+                },
+            }
 
             next_move = self.safe_str(working_state.get("next_move")).strip()
             message = (
@@ -12881,6 +12926,7 @@ Rules:
                 "what changed" in normalized_web_text
                 and "nova" in normalized_web_text
             )
+
             or (
                 "what changed recently" in normalized_web_text
                 and "nova" in normalized_web_text
@@ -12899,6 +12945,8 @@ Rules:
                 )
             )
         )
+
+
 
         if (
             (has_url or wants_explicit_web or wants_live_web or wants_web_topic)

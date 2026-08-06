@@ -135,20 +135,25 @@ class ExecutionOrchestratorService:
             or {}
         )
 
-        persisted_has_state = bool(persisted_execution_state.get("steps"))
+        persisted_state_available = (
+            isinstance(
+                persisted_execution_state,
+                dict,
+            )
+            and bool(persisted_execution_state)
+        )
 
-        incoming_has_state = bool(execution_state.get("steps"))
+        incoming_has_state = bool(
+            execution_state.get("steps")
+        )
 
-        if persisted_has_state:
-
+        if persisted_state_available:
             execution_state = persisted_execution_state
 
         elif incoming_has_state:
-
             execution_state = execution_state
 
         else:
-
             execution_state = {}
 
         steps = execution_state.get("steps") or []
@@ -958,6 +963,7 @@ class ExecutionOrchestratorService:
         # =========================
         # CANCEL
         # =========================
+
         if command == "cancel":
             execution_state = (
                 self.execution_mutation_service.cancel(
@@ -975,6 +981,20 @@ class ExecutionOrchestratorService:
                 session_id,
                 execution_state,
             )
+
+            try:
+                from nova_backend.services.chat_execution_service import (
+                    chat_execution_service,
+                )
+
+                chat_execution_service.reset(
+                    session_id
+                )
+            except Exception as legacy_reset_error:
+                print(
+                    "LEGACY EXECUTION RESET FAILED:",
+                    legacy_reset_error,
+                )
 
             return {
                 "ok": True,

@@ -248,7 +248,7 @@ class ExecutionGuardService:
         if action == "run_all":
             state = self.chat_execution_service.run_all(session_id)
         elif action == "cancel":
-            state = self.chat_execution_service.cancel(session_id)
+            state = self.chat_execution_service.reset(session_id)
         else:
             state = self.chat_execution_service.advance(session_id)
 
