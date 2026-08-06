@@ -2,492 +2,409 @@
 <html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
 
     <meta name="viewport"
           content="width=device-width, initial-scale=1.0">
 
-
     <title>
         Nova | Intelligent Workspace
     </title>
 
-
     <link rel="stylesheet"
           href="{{ url_for('static',
           filename='css/nova-command-center.css') }}">
-
 </head>
 
 
 <body>
 
-
 <div class="nova-shell">
 
+<header class="nova-header">
 
-    <header class="nova-header">
+    <div class="nova-logo">
+        NOVA
+    </div>
+
+    <div class="nova-status">
+
+        <span class="status-dot"></span>
+
+        Systems Online
+
+        <a href="/help">
+            Help
+        </a>
+
+    </div>
+
+</header>
 
 
-        <div class="nova-logo">
+<main class="nova-main">
 
-            NOVA
 
-        </div>
+<section class="hero">
 
-<div class="nova-status">
+    <h1>
+        Persistent intelligence for serious projects.
 
-    <span class="status-dot"></span>
+        <br>
 
-    Systems Online
+        Nova remembers why.
+    </h1>
 
-    <a href="/help">
-        Help
-    </a>
+
+    <p>
+        Nova connects memory, reasoning,
+        planning, and execution into one
+        continuous workspace built for
+        projects that last.
+    </p>
+
+
+    <div class="hero-actions">
+
+        <a href="/login?mode=register"
+           class="nova-button primary">
+
+            Request Access
+
+        </a>
+
+
+        <a href="/app"
+           class="nova-button secondary">
+
+            Open Nova
+
+        </a>
+
+    </div>
+
+</section>
+
+
+
+<section class="identity">
+
+<div class="identity-content">
+
+
+<h2>
+    More than a chatbot.
+
+    <br>
+
+    A project intelligence system.
+</h2>
+
+
+<p>
+    Nova combines memory, reasoning,
+    planning, execution, and learning
+    into one connected workspace.
+
+    It understands ongoing goals,
+    preserves important context,
+    and helps turn ideas into completed work.
+</p>
+
+
+
+<div class="identity-grid">
+
+
+<div class="identity-card">
+
+<h3>
+    Memory
+</h3>
+
+<p>
+    Nova keeps important project context,
+    decisions, and goals available across
+    conversations.
+</p>
 
 </div>
 
-    </header>
 
 
+<div class="identity-card">
 
+<h3>
+    Reasoning
+</h3>
 
-    <main class="nova-main">
+<p>
+    Nova analyzes problems, evaluates options,
+    and helps make better decisions.
+</p>
 
+</div>
 
 
 
-        <section class="hero">
+<div class="identity-card">
 
+<h3>
+    Planning
+</h3>
 
-            <h1>
+<p>
+    Nova helps choose the next move,
+    organize priorities, and create a path
+    forward.
+</p>
 
-                Your intelligence system.
+</div>
 
-                <br>
 
-                Built around your goals.
 
-            </h1>
+<div class="identity-card">
 
+<h3>
+    Execution
+</h3>
 
+<p>
+    Nova turns plans into structured actions,
+    tracks progress, and helps move work
+    forward.
+</p>
 
-            <p>
+</div>
 
-                Nova connects memory, reasoning,
-                planning, and execution into
-                one continuous workspace.
 
-            </p>
 
+<div class="identity-card">
 
-            <div class="hero-actions">
+<h3>
+    Learning
+</h3>
 
+<p>
+    Nova improves from outcomes,
+    decisions, and completed work.
+</p>
 
-                <a href="/login"
-                   class="nova-button primary">
+</div>
 
-                    Log In
 
-                </a>
+</div>
 
+</div>
 
-                <a href="/login?mode=register"
-                   class="nova-button secondary">
+</section>
 
-                    Create Account
-
-                </a>
-
-
-            </div>
-
-
-            </div>
-
-
-        </section>
-
-
-
-
-
-        <section class="identity">
-
-
-            <div class="identity-content">
-
-
-                <h2>
-
-                    More than a chatbot.
-
-                    <br>
-
-                    A personal intelligence system.
-
-                </h2>
-
-
-
-                <p>
-
-                    Nova combines memory, reasoning,
-                    planning, and execution into one
-                    connected workspace.
-
-                    It is designed to understand
-                    ongoing goals, preserve context,
-                    and help turn ideas into completed work.
-
-                </p>
-
-
-
-
-
-                <div class="identity-grid">
-
-
-
-                    <div class="identity-card">
-
-
-                        <h3>
-
-                            Remember
-
-                        </h3>
-
-
-                        <p>
-
-                            Nova keeps important context
-                            available so conversations can
-                            build over time.
-
-                        </p>
-
-
-                    </div>
-
-
-
-
-
-                    <div class="identity-card">
-
-
-                        <h3>
-
-                            Reason
-
-                        </h3>
-
-
-                        <p>
-
-                            Nova analyzes problems,
-                            compares paths, and helps
-                            make better decisions.
-
-                        </p>
-
-
-                    </div>
-
-
-
-
-
-                    <div class="identity-card">
-
-
-                        <h3>
-
-                            Execute
-
-                        </h3>
-
-
-                        <p>
-
-                            Nova turns plans into
-                            structured actions and
-                            tracks progress.
-
-                        </p>
-
-
-                    </div>
-
-
-
-                </div>
-
-
-            </div>
-
-
-        </section>
 
 
 
 <section class="architecture">
 
-    <h2>
-        Nova Architecture
-    </h2>
+<h2>
+    Nova Architecture
+</h2>
 
 
-    <div class="architecture-grid">
+<div class="architecture-grid">
 
 
-        <div class="architecture-node">
+<div class="architecture-node">
 
-            <span class="node-dot"></span>
+<span class="node-dot"></span>
 
-            <h3>
-                Memory Core
-            </h3>
+<h3>
+    Memory Core
+</h3>
 
-            <p>
-                Maintains context and knowledge.
-            </p>
-
-        </div>
-
-
-
-
-        <div class="architecture-node">
-
-            <span class="node-dot"></span>
-
-            <h3>
-                Project Brain
-            </h3>
-
-            <p>
-                Tracks goals, decisions, and direction.
-            </p>
-
-        </div>
-
-
-
-
-        <div class="architecture-node">
-
-            <span class="node-dot"></span>
-
-            <h3>
-                Reasoning Engine
-            </h3>
-
-            <p>
-                Analyzes problems and evaluates paths.
-            </p>
-
-        </div>
-
-
-
-
-        <div class="architecture-node">
-
-            <span class="node-dot"></span>
-
-            <h3>
-                Execution Layer
-            </h3>
-
-            <p>
-                Converts plans into structured actions.
-            </p>
-
-        </div>
-
-
-    </div>
-
-
-</section>
-
-
-        <section class="telemetry">
-
-
-            <h2>
-
-                Nova System Status
-
-            </h2>
-
-
-
-
-            <div id="nova-status-grid"
-                 class="telemetry-grid">
-
-
-                <div class="telemetry-card">
-
-
-                    <h3>
-
-                        Loading
-
-                    </h3>
-
-
-                    <strong>
-
-                        ...
-
-                    </strong>
-
-
-                </div>
-
-
-            </div>
-
-
-        </section>
-
-
-
-
-
-
-
-        <section class="capabilities">
-
-
-            <div class="cap-card">
-
-
-                <h3>
-
-                    Memory
-
-                </h3>
-
-
-                <p>
-
-                    Context that follows your work.
-
-                </p>
-
-
-            </div>
-
-
-
-
-
-            <div class="cap-card">
-
-
-                <h3>
-
-                    Reasoning
-
-                </h3>
-
-
-                <p>
-
-                    Understand goals and problems.
-
-                </p>
-
-
-            </div>
-
-
-
-
-
-            <div class="cap-card">
-
-
-                <h3>
-
-                    Execution
-
-                </h3>
-
-
-                <p>
-
-                    Turn plans into action.
-
-                </p>
-
-
-            </div>
-
-
-
-
-
-            <div class="cap-card">
-
-
-                <h3>
-
-                    Project Brain
-
-                </h3>
-
-
-                <p>
-
-                    Maintain direction across
-                    complex builds.
-
-                </p>
-
-
-            </div>
-
-
-
-        </section>
-
-
-
-
-    </main>
-
-
-
-
-
-    <footer>
-
-        Nova Intelligence Platform
-
-    </footer>
-
-
-
+<p>
+    Maintains context and knowledge.
+</p>
 
 </div>
 
 
 
+<div class="architecture-node">
+
+<span class="node-dot"></span>
+
+<h3>
+    Project Brain
+</h3>
+
+<p>
+    Tracks goals, decisions, and direction.
+</p>
+
+</div>
+
+
+
+<div class="architecture-node">
+
+<span class="node-dot"></span>
+
+<h3>
+    Reasoning Engine
+</h3>
+
+<p>
+    Analyzes problems and evaluates paths.
+</p>
+
+</div>
+
+
+
+<div class="architecture-node">
+
+<span class="node-dot"></span>
+
+<h3>
+    Execution Layer
+</h3>
+
+<p>
+    Converts plans into structured actions.
+</p>
+
+</div>
+
+
+
+<div class="architecture-node">
+
+<span class="node-dot"></span>
+
+<h3>
+    Learning Loop
+</h3>
+
+<p>
+    Learns from outcomes and decisions
+    to improve future choices.
+</p>
+
+</div>
+
+
+</div>
+
+</section>
+
+
+
+<section class="telemetry">
+
+<h2>
+    Nova System Status
+</h2>
+
+
+<div id="nova-status-grid"
+     class="telemetry-grid">
+
+<div class="telemetry-card">
+
+<h3>
+    Loading
+</h3>
+
+<strong>
+    ...
+</strong>
+
+</div>
+
+</div>
+
+</section>
+
+
+
+
+<section class="capabilities">
+
+
+<div class="cap-card">
+
+<h3>
+    Memory
+</h3>
+
+<p>
+    Context that follows your work.
+</p>
+
+</div>
+
+
+
+<div class="cap-card">
+
+<h3>
+    Reasoning
+</h3>
+
+<p>
+    Understand goals and problems.
+</p>
+
+</div>
+
+
+
+<div class="cap-card">
+
+<h3>
+    Execution
+</h3>
+
+<p>
+    Turn plans into action.
+</p>
+
+</div>
+
+
+
+<div class="cap-card">
+
+<h3>
+    Project Brain
+</h3>
+
+<p>
+    Maintain direction across
+    complex builds.
+</p>
+
+</div>
+
+
+</section>
+
+
+</main>
+
+
+<footer>
+
+    Nova Intelligence Platform
+
+</footer>
+
+
+</div>
 
 
 <script src="{{ url_for('static',
 filename='js/nova-command-center.js') }}">
-
 </script>
-
 
 
 </body>
