@@ -55,7 +55,9 @@ from nova_backend.services.weak_response_guard_service import (
 from nova_backend.services.chat_assistant_message_builder_service import (
     build_assistant_message,
 )
-
+from nova_backend.services.final_attachment_response_service import (
+    apply_final_attachment_response,
+)
 from nova_backend.services.execution_guard_service import (
     ExecutionGuardService,
 )
@@ -4181,10 +4183,11 @@ def api_chat():
             )
 
             # AFTER_WEAK_GUARD_ATTACHMENT_SUMMARY_LOCK
-            result = attachment_summary_lock_service.apply_attachment_summary_lock(
+            result = apply_final_attachment_response(
                 result,
                 attachment_content_lines,
                 attachment_analysis_service,
+                attachment_summary_lock_service,
             )
 
             if isinstance(result, dict):
