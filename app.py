@@ -1326,7 +1326,7 @@ def help_page():
 
 @app.route("/terms")
 def terms():
-    return render_template("terms.html")
+    return render_template("nova_terms.html")
 
 @app.route("/api/chat", methods=["POST"])
 def api_chat_route():
