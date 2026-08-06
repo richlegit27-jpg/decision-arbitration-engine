@@ -27,6 +27,9 @@ from nova_backend.services.debug_route_service import DebugRouteService
 from nova_backend.services.attachment_response_guard_service import (
     normalize_attachment_response,
 )
+from nova_backend.services.session_attachment_response_service import (
+    apply_session_attachment_response,
+)
 from nova_backend.services.project_next_answer_service import (
     get_project_next_answer,
     is_project_next_question,
@@ -4190,26 +4193,19 @@ def api_chat():
                 attachment_summary_lock_service,
             )
 
-            if isinstance(result, dict):
-                active_attachment_session_id = str(
-                    result.get("active_session_id")
-                    or session_id
-                    or ""
-                ).strip()
+            result = apply_session_attachment_response(
+                result,
+                summarize_attachments_for_session,
+                session_id,
+                requested_session_id,
+            )
 
-                result["session_attachments"] = summarize_attachments_for_session(
-                    active_attachment_session_id,
-                    limit=25,
-                    client_session_id=requested_session_id,
-                )
-
-
-                result = apply_real_response_attachment_lock(
-                    result,
-                    attachments,
-                    requested_session_id,
-                    app.logger,
-                )
+            result = apply_real_response_attachment_lock(
+                result,
+                attachments,
+                requested_session_id,
+                app.logger,
+            )
 
                 app.logger.info(
                     "[api_chat] returned session attachment memory count=%s session_id=%s",

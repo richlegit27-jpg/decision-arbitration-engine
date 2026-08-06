@@ -1,8 +1,8 @@
 def apply_session_attachment_response(
     result,
+    summarize_attachments_for_session,
     session_id,
     requested_session_id,
-    summarize_attachments_for_session,
 ):
     if not isinstance(result, dict):
         return result
