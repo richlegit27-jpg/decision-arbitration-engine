@@ -8991,6 +8991,55 @@ Rules:
             ):
                 return ("web", "fetch")
 
+        # REWRITE FOLLOW-UP DETECTION
+        # Handles natural follow-ups after a writing response.
+        rewrite_followup_request = any(
+            phrase in lowered
+            for phrase in (
+                "make it shorter",
+                "make this shorter",
+                "make it longer",
+                "make this longer",
+                "make it better",
+                "make this better",
+                "make it more exciting",
+                "make it professional",
+                "make it more professional",
+                "make it casual",
+                "make it more casual",
+                "change the tone",
+                "improve this",
+                "improve it",
+            )
+        )
+
+        if rewrite_followup_request and session_id:
+            session_payload = (
+                self._get_session_payload(session_id)
+                or {}
+            )
+
+            session_messages = (
+                session_payload.get("messages")
+                if isinstance(session_payload, dict)
+                else []
+            ) or []
+
+            has_previous_assistant = any(
+                isinstance(message, dict)
+                and message.get("role") == "assistant"
+                and str(
+                    message.get("text")
+                    or message.get("content")
+                    or ""
+                ).strip()
+                for message in session_messages[-6:]
+            )
+
+            if has_previous_assistant:
+                return ("chat", "writing")
+
+
         # WRITING INTENT MUST BEAT FRESH-WEB WORDS
         writing_request = bool(
             re.match(
@@ -9506,11 +9555,12 @@ Rules:
                 ):
                     _nova_pn_answer_20260701 = (
                         "Current Nova project context:\n"
-                        "Current task: Decision Engine v1, broad Project Brain routing, Mission Control v1.2 / Failure Interpreter API, and Decision Log API route are locked.\n"
-                        "Next move: start Project Brain cleanup/consolidation while preserving direct recall, "
-                        "broad Project Brain routing, and avoiding another app.py guard."
+                        "Current task: Nova pre-launch quality pass — validate core user flows, "
+                        "desktop/mobile experience, onboarding, reliability, and launch readiness.\n"
+                        "Next move: continue pre-launch stabilization while preserving the locked "
+                        "Decision Engine v1, Project Brain routing, Mission Control v1.2 / Failure Interpreter API, "
+                        "and Decision Log API behavior."
                     )
-
                 _nova_pn_meta_20260701 = {
                     "route": "project_next_handle_early_return",
                     "strategy": "project_next_handle_early_return",

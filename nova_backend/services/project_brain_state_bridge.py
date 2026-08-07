@@ -161,11 +161,11 @@ def build_direct_recall_state_text(
     )
 
     return (
-        "Current Nova project state: Richard is working on the local Nova Flask app with Joe. "
-        f"Current checkpoint: {record.current_checkpoint} "
-        f"Current blocker: {record.current_blocker} "
-        f"Next move: {record.next_move}. "
-        "Direct project-state recall should use this State Bridge record instead of stale cleanup wording."
+        "Nova is currently being prepared for launch. "
+        "The main focus is improving the product, polishing the user experience, "
+        "fixing remaining issues, and getting the app ready for early users. "
+        f"Current focus: {record.current_checkpoint} "
+        f"Next step: {record.next_move}."
     )
 
 
@@ -276,7 +276,6 @@ def write_state_bridge_memory(
         data["memories"] = [item]
 
     data["project_brain_state_bridge"] = item
-    data["current_project_state"] = item
     data["updated_at_utc"] = _utc_now()
 
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")

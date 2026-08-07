@@ -1328,6 +1328,30 @@ def help_page():
 def terms():
     return render_template("nova_terms.html")
 
+@app.route("/features")
+def features():
+    return render_template("nova_features.html")
+
+
+@app.route("/billing")
+def billing():
+    return render_template("nova_billing.html")
+
+
+@app.route("/contact")
+def contact():
+    return render_template("nova_contact.html")
+
+
+@app.route("/about")
+def about():
+    return render_template("nova_about.html")
+
+
+@app.route("/faq")
+def faq():
+    return render_template("nova_faq.html")
+
 @app.route("/api/chat", methods=["POST"])
 def api_chat_route():
     return api_chat()

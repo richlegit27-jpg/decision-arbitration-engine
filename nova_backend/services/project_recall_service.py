@@ -101,6 +101,27 @@ class ProjectRecallService:
                     or memory_id
                     == "memory_nova_project_state_current"
                 ):
+                    stale_markers = (
+                        "gangster intelligence stack",
+                        "Nova Conversation Quality Field Test v1",
+                        "Project Brain Upgrade Radar v1",
+                        "Auto-Debug Brain v1",
+                        "Operator Command Launcher v1",
+                    )
+
+                    if any(
+                        marker.lower() in value.lower()
+                        for marker in stale_markers
+                    ):
+                        continue
+
+                    try:
+                        weight = float(
+                            item.get("weight") or 0.0
+                        )
+                    except Exception:
+                        weight = 0.0
+
                     try:
                         weight = float(
                             item.get("weight") or 0.0

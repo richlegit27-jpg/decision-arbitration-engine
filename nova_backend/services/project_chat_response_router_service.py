@@ -882,17 +882,21 @@ try:
                         reply = (
                             "Current Nova project state:\n"
                             f"{context}\n\n"
-                            f"Current blocker: {context.blocker}\n"
                             "This is the compact Project Brain state view for the current Nova work."
                         )
 
                         payload = _nova_compact_project_payload_20260701(reply, data)
-                        encoded = _nova_compact_project_json_20260701.dumps(payload, ensure_ascii=False)
+                        encoded = _nova_compact_project_json_20260701.dumps(
+                            payload,
+                            ensure_ascii=False,
+                        )
+
                         return _NovaCompactProjectResponse20260701(
                             encoded,
                             status=200,
                             mimetype="application/json",
                         )
+
             except Exception as _nova_compact_project_route_error_20260701:
                 try:
                     print(

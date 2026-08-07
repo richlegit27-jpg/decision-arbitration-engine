@@ -42,32 +42,30 @@ ACTIVE_EXECUTION_STATUSES = {
 
 DEFAULT_PROJECT_STATE: Dict[str, Any] = {
     "project": "Nova",
-    "checkpoint": "f046754 Add Nova project state recall",
-    "current_focus": "Nova brain / memory quality upgrade: memory + project-state recall",
+    "checkpoint": "Nova pre-launch polish and readiness phase",
+    "current_focus": "Improving reliability, user experience, and launch readiness",
     "last_completed": [
-        "Router cleanup locked",
-        "Web/live price routing locked",
-        "Image text polish locked",
-        "Attachment cleanup locked",
-        "Execution safety locked",
-        "Regression runner committed and working tree clean",
+        "Core chat routing stabilized",
+        "Memory and project recall systems built",
+        "Desktop and mobile experiences improved",
+        "Attachment handling integrated",
+        "Regression testing framework working",
     ],
     "locked": [
-        "Router cleanup",
-        "Web/live price",
-        "Image text polish",
-        "Attachment cleanup",
+        "Chat routing",
         "Execution safety",
-        "Regression runner",
+        "Session handling",
+        "Attachment pipeline",
+        "Regression coverage",
     ],
     "remaining": [
-        "Repair project-state recall service export",
-        "Smoke test project-state answers",
-        "Amend the project-state recall commit",
-        "Move to memory quality upgrade phase two",
+        "Finish frontend polish",
+        "Complete launch readiness checks",
+        "Improve onboarding experience",
+        "Prepare early user testing",
     ],
-    "next_move": "Repair project-state service export, then run both smoke tests.",
-    "blocker": "No active Project Brain intelligence blocker is open.",
+    "next_move": "Complete final polish and launch preparation.",
+    "blocker": "No active blocker.",
 }
 
 def _repo_root() -> Path:
@@ -549,8 +547,9 @@ def compact_project_state_context(max_locked: int = 6) -> str:
         parts.append(f"Locked: {', '.join(locked)}")
 
     parts.append(
-        "Capability: answer-quality contract is protected."
+        "Nova is in pre-launch stabilization: validating user flows, desktop/mobile reliability, onboarding, and launch readiness."
     )
+
 
     text = ". ".join(parts).strip()
 
@@ -803,7 +802,7 @@ try:
             )
 
         lines.append(
-            "- Capability: answer-quality contract is protected."
+            "- Nova is in pre-launch stabilization: validating user flows, desktop/mobile reliability, onboarding, and launch readiness."
         )
 
         if len(lines) == 1:
@@ -860,17 +859,17 @@ try:
             return _nova_ps_fresh_format_update_20260701(state, updates)
 
         if _nova_ps_fresh_is_recall_20260701(text_value):
-            state = _nova_ps_fresh_get_state_20260701(sid)
+            state = _nova_ps_fresh_get_state_20260701(session_id)
             fresh_answer = _nova_ps_fresh_format_state_20260701(state)
 
             if fresh_answer:
                 return fresh_answer
 
-        return _NOVA_PRE_PROJECT_STATE_ANSWER_FRESH_SESSION_OWNER_20260701(
-            user_text,
-            *args,
-            **kwargs,
-        )
+            return _NOVA_PRE_PROJECT_STATE_ANSWER_FRESH_SESSION_OWNER_20260701(
+                user_text,
+                *args,
+                **kwargs,
+            )
 
 except Exception as _nova_project_state_fresh_session_owner_error_20260701:
     try:

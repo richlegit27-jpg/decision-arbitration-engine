@@ -131,7 +131,7 @@ def build_project_brain_context(user_id=None) -> ProjectBrainContext:
         completed=snapshot.completed,
         active_checkpoint=snapshot.checkpoint,
         blocker=snapshot.blocker,
-        next_move=snapshot.next_move,
+        next_move=snapshot.next_move.replace("Next move: ", ""),
         validation=snapshot.validation,
         recent_commits=snapshot.recent_commits,
         user_first_intent=user_first_intent,
@@ -179,7 +179,7 @@ def build_current_project_answer(user_id=None) -> str:
         f"{context.local_app} with Joe. Completed/protected pieces: {_completed_text(context)}. "
         f"Current checkpoint: {context.active_checkpoint} "
         f"Current blocker: {context.blocker} "
-        f"Next move: {context.next_move} "
+        f"Next move: {context.next_move.replace('Next move: ', '')} "
         f"{_recent_commit_text(context)}"
         f"{_first_intent_text(context)}"
     )
@@ -226,7 +226,7 @@ def build_practical_project_answer() -> str:
         "route contract, and classifier broadening are green. "
         f"Current checkpoint: {context.active_checkpoint} "
         f"Current blocker: {context.blocker} "
-        f"Next move: {context.next_move} "
+        f"Next move: {context.next_move.replace('Next move: ', '')} "
         "Safe move: continue focused cleanup, validation, and bounded changes through the existing Project Brain smoke stack. "
         "Safe validation: run the context-builder smoke, project-state memory API smoke, general-intelligence smoke, "
         "route-contract smoke, classifier-broadening smoke, answer-quality smoke, and guard-stack audit. "

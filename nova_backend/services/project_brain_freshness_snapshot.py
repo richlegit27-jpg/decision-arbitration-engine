@@ -134,32 +134,18 @@ def build_project_brain_freshness_snapshot() -> ProjectBrainFreshnessSnapshot:
         "No active Project Brain intelligence blocker is open. "
         "No active Decision Engine blocker is open, no active Mission Control blocker is open, "
         "no active Failure Interpreter blocker is open, and no active Decision Log blocker is open. "
-        "The remaining risk is cleanup/consolidation: app.py still has many historical guards and wrappers, "
-        "so future work should avoid new route-layer patches and move intelligence into services."
+        "The remaining work is pre-launch stabilization: validate user flows, desktop/mobile reliability, onboarding, and launch readiness."
     )
 
     next_move = (
-        "Start Project Brain cleanup/consolidation: keep the locked Decision Engine v1 and "
+        "Complete the Nova pre-launch quality pass while preserving the locked Decision Engine v1 and "
         "Mission Control v1.2 / Failure Interpreter API behavior, preserve direct recall, "
-        "broad Project Brain routing, and explicit operator prompts, and consolidate stale "
-        "route/context wording without adding another app.py guard."
+        "broad Project Brain routing, and explicit operator prompts."
     )
 
     return ProjectBrainFreshnessSnapshot(
-        version=SNAPSHOT_VERSION,
-        checkpoint=checkpoint,
-        blocker=blocker,
-        next_move=next_move,
-        completed=_completed_items(available_smokes),
-        validation=_validation_commands(available_smokes),
-        available_smoke_files=available_smokes,
-        missing_smoke_files=_missing_smoke_files(),
-        recent_commits=_recent_commits(),
+        ...
     )
-
-
-try:
-    from dataclasses import replace as _nova_freshness_snapshot_replace_20260702
 
     _NOVA_PRE_SANITIZED_BUILD_PROJECT_BRAIN_FRESHNESS_SNAPSHOT_20260702 = (
         build_project_brain_freshness_snapshot
@@ -173,19 +159,17 @@ try:
         "quality is 100%, and regression now protects the route contracts."
     )
 
-    _NOVA_CLEAN_BLOCKER_20260702 = (
-        "No active Project Brain intelligence blocker is open. "
-        "No active Decision Engine blocker is open, no active Mission Control blocker is open, "
-        "no active Failure Interpreter blocker is open, and no active Decision Log blocker is open. "
-        "The remaining risk is cleanup/consolidation: app.py still has many historical guards and wrappers, "
-        "so future work should avoid new route-layer patches and move intelligence into services."
-    )
+_NOVA_CLEAN_BLOCKER_20260702 = (
+    "No active Project Brain intelligence blocker is open. "
+    "No active Decision Engine blocker is open, no active Mission Control blocker is open, "
+    "no active Failure Interpreter blocker is open, and no active Decision Log blocker is open. "
+    "The remaining work is pre-launch stabilization: validate user flows, desktop/mobile reliability, onboarding, and launch readiness."
+)
 
-    _NOVA_CLEAN_NEXT_MOVE_20260702 = (
-        "Start Project Brain cleanup/consolidation: keep the locked Decision Engine v1 and Mission Control "
-        "v1.1 behavior, preserve direct recall, broad Project Brain routing, and explicit operator Mission "
-        "Control prompts, and consolidate stale route/context wording without adding another app.py guard."
-    )
+_NOVA_CLEAN_NEXT_MOVE_20260702 = (
+    "Complete the Nova pre-launch quality pass while preserving the locked Decision Engine v1 "
+    "and Mission Control v1.2 / Failure Interpreter API behavior."
+)
 
 except Exception as _nova_project_brain_freshness_snapshot_sanitizer_error_20260702:
     try:
