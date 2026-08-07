@@ -139,7 +139,7 @@ class LocalAuthRouteService:
 
             email = clean(
                 payload.get("email")
-            )
+            ).lower()
 
             password = str(
                 payload.get("password")
@@ -155,10 +155,16 @@ class LocalAuthRouteService:
                     "error": "Username is required.",
                 }), 400
 
-            if len(password) < 4:
+            if not email or "@" not in email:
                 return jsonify({
                     "ok": False,
-                    "error": "Password must be at least 4 characters.",
+                    "error": "A valid email is required.",
+                }), 400
+
+            if len(password) < 8:
+                return jsonify({
+                    "ok": False,
+                    "error": "Password must be at least 8 characters.",
                 }), 400
 
             data = load_users()
