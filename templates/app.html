@@ -2037,9 +2037,15 @@ const attachment = normalizeUploadedAttachment
     };
 
 console.log("&#128206; NORMALIZED ATTACHMENT", attachment);
-  pendingDesktopAttachments = pendingDesktopAttachments || [];
+pendingDesktopAttachments = pendingDesktopAttachments || [];
 pendingDesktopAttachments.push(attachment);
-console.log("&#128206; ATTACHMENT STORED", pendingDesktopAttachments);
+
+if (window.Nova && window.Nova.chat && window.Nova.chat.state) {
+    window.Nova.chat.state.pendingAttachments =
+        pendingDesktopAttachments.slice();
+}
+
+console.log("📎 ATTACHMENT STORED", pendingDesktopAttachments);
 
   showDesktopAttachmentChip(
     "Attached: <strong>" + (file.name || "file") + "</strong>"
@@ -13125,5 +13131,41 @@ aside.panel.tools,
 
 </style>
 
+<script>
+(function () {
+    function initDesktopAttachments() {
+        const btn = document.getElementById("attachBtn");
+        const input = document.getElementById("desktopFileInput");
+
+        if (!btn || !input || btn.dataset.novaAttachmentBound) {
+            return;
+        }
+
+        btn.dataset.novaAttachmentBound = "true";
+
+        btn.addEventListener("click", () => {
+            input.value = "";
+            input.click();
+        });
+
+        input.addEventListener("change", () => {
+            const file = input.files && input.files[0];
+
+            if (!file) {
+                return;
+            }
+
+            uploadDesktopAttachment(file).catch((error) => {
+                console.error("[Nova Desktop Upload Error]", error);
+            });
+        });
+
+        console.log("[Nova Desktop Attachments] bound");
+    }
+
+    initDesktopAttachments();
+    setTimeout(initDesktopAttachments, 500);
+})();
+</script>
 </body>
 </html>
