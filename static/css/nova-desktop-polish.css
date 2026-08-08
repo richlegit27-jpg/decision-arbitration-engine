@@ -1000,3 +1000,57 @@ max-width: none !important;
     order: 99 !important;
 }
 
+.project-panel-card {
+    background: #1f1f1f;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 14px;
+    transition: all .18s ease;
+}
+
+.project-panel-card:hover {
+    border-color: rgba(255,255,255,.18);
+    transform: translateY(-1px);
+}
+
+.project-panel-card h3 {
+    margin: 0 0 8px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    opacity: .7;
+}
+
+.project-panel-card p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.nova-project-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.nova-project-status-active {
+    color: #3ddc84;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.nova-project-card-description {
+    opacity: .8;
+    margin-bottom: 12px;
+}
+
+.nova-project-card-footer {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    opacity: .65;
+}
+

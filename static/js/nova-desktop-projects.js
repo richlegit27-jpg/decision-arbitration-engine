@@ -149,25 +149,37 @@ console.log("[Nova Projects] FILE LOADED");
                 project.description ||
                 "No description";
 
-            button.innerHTML = `
-                <strong>
-                    ${escapeHtml(name)}
-                </strong>
+button.innerHTML = `
+    <div class="nova-project-card-header">
+        <strong>
+            ${escapeHtml(name)}
+        </strong>
 
-                <span>
-                    ${escapeHtml(description)}
-                </span>
+        ${
+            isActive
+                ? `
+                    <span class="nova-project-status-active">
+                        ● Active
+                    </span>
+                `
+                : ""
+        }
+    </div>
 
-                ${
-                    isActive
-                        ? `
-                            <small class="nova-project-active-label">
-                                Active
-                            </small>
-                        `
-                        : ""
-                }
-            `;
+    <div class="nova-project-card-description">
+        ${escapeHtml(description)}
+    </div>
+
+    <div class="nova-project-card-footer">
+        <span>
+            ${project.status || "Ready"}
+        </span>
+
+        <span>
+            ${project.updated_at || "Just now"}
+        </span>
+    </div>
+`;
 
             button.addEventListener(
                 "click",
@@ -189,37 +201,272 @@ console.log("[Nova Projects] FILE LOADED");
     }
 
 
-    function openProjectWorkspace(project) {
-        if (!project) {
+function openProjectWorkspace(project) {
+    const status = $("desktopProjectStatus");
+    const mission = $("desktopProjectMission");
+    const progress = $("desktopProjectProgress");
+    const health = $("desktopProjectHealth");
+    const focus = $("desktopProjectFocus");
+    const nextAction = $("desktopProjectNextAction");
+    const recommendation = $("desktopProjectRecommendation");
+    const activity = $("desktopProjectRecentActivity");
+
+    if (status) {
+        status.textContent = "Workspace ready";
+    }
+
+    if (mission) {
+        mission.innerHTML = `
+            <h3>Mission</h3>
+            <p>${project.description || "No mission defined."}</p>
+        `;
+    }
+
+    if (progress) {
+        progress.innerHTML = `
+            <h3>Progress</h3>
+            <p>0%</p>
+        `;
+    }
+
+    if (health) {
+        health.innerHTML = `
+            <h3>Health</h3>
+            <p>🟢 Healthy</p>
+        `;
+    }
+
+    if (focus) {
+        focus.innerHTML = `
+            <h3>Current Focus</h3>
+            <p>No active work.</p>
+        `;
+    }
+
+    if (nextAction) {
+        nextAction.innerHTML = `
+            <h3>Next Action</h3>
+            <p>Create your first task.</p>
+        `;
+    }
+
+    if (recommendation) {
+        recommendation.innerHTML = `
+            <h3>AI Recommendation</h3>
+            <p>Start organizing this project.</p>
+        `;
+    }
+
+    if (activity) {
+        activity.innerHTML = `
+            <h3>Recent Activity</h3>
+            <p>Project opened.</p>
+        `;
+    }
+}
+
+async function loadProjectIntelligence(projectId) {
+    try {
+        const data = await fetchJson(
+            `/api/projects/${projectId}/intelligence`
+        );
+
+        const brain = data.intelligence || {};
+
+const todayPlan =
+    $("desktopTodayPlan");
+
+if (todayPlan) {
+    const plan = [
+        brain.current_focus,
+        brain.next_action,
+        brain.recommendation,
+    ].filter(Boolean);
+
+    todayPlan.innerHTML = plan.length
+        ? plan
+            .slice(0, 3)
+            .map(
+                (item) =>
+                    `<li>${escapeHtml(item)}</li>`
+            )
+            .join("")
+        : `
+            <li>Review the current project status</li>
+            <li>Complete the next action</li>
+            <li>Check the recommendation</li>
+        `;
+}
+
+        $("desktopProjectMission").innerHTML = `
+            <h3>Mission</h3>
+            <p>${brain.mission || "No mission yet."}</p>
+        `;
+
+        $("desktopProjectProgress").innerHTML = `
+            <h3>Progress</h3>
+            <p>${brain.progress || 0}%</p>
+        `;
+
+        $("desktopProjectHealth").innerHTML = `
+            <h3>Health</h3>
+            <p>${brain.health || 0}%</p>
+        `;
+
+        $("desktopProjectFocus").innerHTML = `
+            <h3>Current Focus</h3>
+            <p>${brain.current_focus || "No active work."}</p>
+        `;
+
+        $("desktopProjectNextAction").innerHTML = `
+            <h3>Next Action</h3>
+            <p>${brain.next_action || "Nothing planned."}</p>
+        `;
+
+        $("desktopProjectRecommendation").innerHTML = `
+            <h3>AI Recommendation</h3>
+            <p>${brain.recommendation || "No recommendation."}</p>
+        `;
+
+const resume =
+    $("desktopProjectResume");
+
+if (resume) {
+    const focus =
+        brain.current_focus ||
+        "No active work.";
+
+    const next =
+        brain.next_action ||
+        "Nothing planned.";
+
+    const recommendation =
+        brain.recommendation ||
+        "No recommendation.";
+
+    resume.innerHTML = `
+        <h3>📋 Resume Summary</h3>
+
+        <p>
+            <strong>Current Focus:</strong>
+            ${escapeHtml(focus)}
+        </p>
+
+        <p>
+            <strong>Next Action:</strong>
+            ${escapeHtml(next)}
+        </p>
+
+        <p>
+            <strong>AI Recommendation:</strong>
+            ${escapeHtml(recommendation)}
+        </p>
+    `;
+}
+
+    } catch (error) {
+        console.error(
+            "[Nova Projects] intelligence failed",
+            error
+        );
+    }
+}
+
+    function renderProjectOverview(data) {
+        const project =
+            data.project ||
+            data.summary?.project ||
+            {};
+
+        const summary =
+            data.summary ||
+            {};
+
+        const container =
+            $("desktopProjectOverview");
+
+        if (!container) {
             return;
         }
 
-        const title =
-            $("desktopProjectTitle");
+        const tasks =
+            data.tasks ||
+            project.tasks ||
+            [];
+
+        const taskCount =
+            summary.task_count ??
+            (Array.isArray(tasks) ? tasks.length : 0);
+
+        const artifactCount =
+            summary.artifact_count ??
+            0;
+
+        const fileCount =
+            summary.file_count ??
+            0;
+
+        const chatCount =
+            summary.chat_count ??
+            summary.session_count ??
+            0;
+
+        const name =
+            project.name ||
+            project.title ||
+            "Untitled Project";
 
         const description =
-            $("desktopProjectDescription");
+            project.description ||
+            "No description provided.";
 
-        if (title) {
-            title.textContent =
-                project.name ||
-                project.title ||
-                "Untitled Project";
-        }
+        const active =
+            project.active === true ||
+            project.id ===
+                window.__NOVA_PROJECT_STATE.activeProjectId;
 
-        if (description) {
-            description.textContent =
-                project.description ||
-                "No description provided.";
-        }
+        container.innerHTML = `
+            <div class="nova-project-overview-card">
+                <div class="nova-project-overview-header">
+                    <div>
+                        <strong>
+                            ${escapeHtml(name)}
+                        </strong>
 
-        setProjectStatus(
-            project.active
-                ? "Active project"
-                : "Opening project..."
-        );
+                        <p>
+                            ${escapeHtml(description)}
+                        </p>
+                    </div>
+
+                    <span class="nova-project-status-badge">
+                        ${active ? "Active" : "Inactive"}
+                    </span>
+                </div>
+
+                <div class="nova-project-stats">
+                    <div>
+                        <strong>${taskCount}</strong>
+                        <span>Tasks</span>
+                    </div>
+
+                    <div>
+                        <strong>${artifactCount}</strong>
+                        <span>Artifacts</span>
+                    </div>
+
+                    <div>
+                        <strong>${fileCount}</strong>
+                        <span>Files</span>
+                    </div>
+
+                    <div>
+                        <strong>${chatCount}</strong>
+                        <span>Chats</span>
+                    </div>
+                </div>
+            </div>
+        `;
     }
-
 
     function renderProjectTasks(data) {
         const tasksContainer =
@@ -309,6 +556,7 @@ console.log("[Nova Projects] FILE LOADED");
                     `/api/projects/${projectId}/summary`
                 );
 
+            renderProjectOverview(data);
             renderProjectTasks(data);
 
             setProjectStatus(
@@ -463,6 +711,20 @@ console.log("[Nova Projects] FILE LOADED");
         renderProjects,
     };
 
+const continueButton =
+    $("desktopContinueProject");
+
+if (continueButton) {
+    continueButton.addEventListener(
+        "click",
+        async () => {
+            await continueProject(
+                window.__NOVA_PROJECT_STATE
+                    .activeProjectId
+            );
+        }
+    );
+}
 
     document.addEventListener(
         "DOMContentLoaded",
@@ -470,5 +732,65 @@ console.log("[Nova Projects] FILE LOADED");
             loadProjects();
         }
     );
+
+async function continueProject(projectId) {
+    if (!projectId) {
+        return;
+    }
+
+    setProjectStatus(
+        "Loading workspace..."
+    );
+
+    await loadProjectWorkspace(
+        projectId
+    );
+
+    setProjectStatus(
+        "Analyzing project..."
+    );
+
+    await loadProjectIntelligence(
+        projectId
+    );
+
+const todayPlan =
+    $("desktopTodayPlan");
+
+if (todayPlan) {
+    todayPlan.innerHTML = `
+        <li>Review the current project status</li>
+        <li>Complete the Next Action</li>
+        <li>Check the AI Recommendation</li>
+    `;
+}
+
+    const resume =
+        $("desktopProjectResume");
+
+    if (resume) {
+        resume.innerHTML = `
+            <h3>Resume Summary</h3>
+            <p>
+                Your workspace is loaded. Review the Next Action
+                and continue where you left off.
+            </p>
+        `;
+    }
+
+    const nextAction =
+        $("desktopProjectNextAction");
+
+    if (nextAction) {
+        nextAction.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+        });
+    }
+
+    setProjectStatus(
+        "Ready to continue"
+    );
+}
 
 })();

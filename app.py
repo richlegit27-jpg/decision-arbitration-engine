@@ -22,6 +22,9 @@ from nova_backend.services.web_preview_route_service import WebPreviewRouteServi
 from nova_backend.services.project_workspace_service import (
     ProjectWorkspaceService,
 )
+from nova_backend.services.project_intelligence_service import (
+    project_intelligence_service,
+)
 
 from nova_backend.services.debug_route_service import DebugRouteService
 from nova_backend.services.attachment_response_guard_service import (
@@ -4846,6 +4849,7 @@ def api_project_active():
     "/api/projects/<project_id>/tasks/<task_id>",
     methods=["PATCH"],
 )
+
 def api_project_update_task(
     project_id,
     task_id,
@@ -4875,6 +4879,39 @@ def api_project_update_task(
         {
             "ok": True,
             "task": task,
+        }
+    )
+
+@app.route(
+    "/api/projects/<project_id>/intelligence",
+    methods=["GET"],
+)
+
+def api_project_intelligence(
+    project_id,
+):
+    print("[PROJECT INTELLIGENCE]", project_id)
+
+    summary = project_workspace_service.get_project_summary(
+        project_id
+    )
+
+    if not summary:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found",
+            }
+        ), 404
+
+    intelligence = project_intelligence_service.build(
+        project=summary,
+    )
+
+    return jsonify(
+        {
+            "ok": True,
+            "intelligence": intelligence,
         }
     )
 

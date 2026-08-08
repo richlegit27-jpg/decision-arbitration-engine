@@ -1234,13 +1234,62 @@ observer.observe(document.documentElement, {
   <div class="project-workspace-card">
     <h3>Project Overview</h3>
 
-    <p id="desktopProjectStatus">
-      No active project.
-    </p>
+<p id="desktopProjectStatus">
+  Workspace ready
+</p>
 
-    <div id="desktopProjectTasks">
-      No tasks loaded.
-    </div>
+<div id="desktopProjectMission" class="project-panel-card">
+  <h3>Mission</h3>
+  <p>Build something amazing.</p>
+</div>
+
+<div id="desktopProjectProgress" class="project-panel-card">
+  <h3>Progress</h3>
+  <p>0%</p>
+</div>
+
+<div id="desktopProjectHealth" class="project-panel-card">
+  <h3>Health</h3>
+  <p>🟢 Healthy</p>
+</div>
+
+<div id="desktopProjectFocus" class="project-panel-card">
+  <h3>Current Focus</h3>
+  <p>No active work.</p>
+</div>
+
+<div id="desktopProjectNextAction" class="project-panel-card">
+  <h3>Next Action</h3>
+  <p>Create your first task.</p>
+</div>
+
+<div id="desktopProjectRecommendation" class="project-panel-card">
+  <h3>AI Recommendation</h3>
+  <p>Start organizing this project.</p>
+</div>
+
+<div id="desktopProjectRecentActivity" class="project-panel-card">
+  <h3>Recent Activity</h3>
+  <p>No activity yet.</p>
+</div>
+
+<div id="desktopProjectToday" class="project-panel-card">
+  <h3>📅 Today's Plan</h3>
+
+  <ol id="desktopTodayPlan">
+    <li>Loading...</li>
+  </ol>
+</div>
+
+<div class="project-workspace-actions">
+    <button
+        id="desktopContinueProject"
+        class="primary-button"
+        type="button">
+        Continue Project
+    </button>
+</div>
+
   </div>
 </section>
 
