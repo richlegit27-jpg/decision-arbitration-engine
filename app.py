@@ -4619,7 +4619,42 @@ def api_upload():
             secure_filename=secure_filename,
         )
 
+        project_id = str(
+            request.form.get("project_id")
+            or ""
+        ).strip()
+
+        if (
+            project_id
+            and isinstance(result, dict)
+            and result.get("ok")
+        ):
+            file_record = project_workspace_service.add_file(
+                project_id,
+                result.get("original_filename")
+                or result.get("filename")
+                or file.filename,
+                result.get("path")
+                or result.get("file_url")
+                or "",
+                result.get("size")
+                or 0,
+                result.get("mime_type")
+                or "",
+            )
+
+            if file_record:
+                file_record["url"] = (
+                    result.get("file_url")
+                    or result.get("url")
+                    or ""
+                )
+
+                result["project_file"] = file_record
+                result["project_id"] = project_id
+
         return jsonify(result)
+
 
     except Exception as e:
         app.logger.exception("api_upload failed")
@@ -4875,6 +4910,111 @@ def api_project_add_task(
         {
             "ok": True,
             "task": task,
+        }
+    )
+
+@app.route(
+    "/api/projects/<project_id>/files",
+    methods=["GET"],
+)
+def api_project_files(
+    project_id,
+):
+    project = project_workspace_service.get_project(
+        project_id
+    )
+
+    if not project:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found",
+            }
+        ), 404
+
+    files = project_workspace_service.list_files(
+        project_id
+    )
+
+    return jsonify(
+        {
+            "ok": True,
+            "files": files,
+        }
+    )
+
+@app.route(
+    "/api/projects/<project_id>/files",
+    methods=["POST"],
+)
+def api_project_add_file(
+    project_id,
+):
+    data = request.get_json(
+        silent=True
+    ) or {}
+
+    file_record = project_workspace_service.add_file(
+        project_id,
+        data.get(
+            "name",
+            "Untitled file",
+        ),
+        data.get(
+            "path",
+            "",
+        ),
+        data.get(
+            "size",
+            0,
+        ),
+        data.get(
+            "type",
+            "",
+        ),
+    )
+
+    if not file_record:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "file": file_record,
+        }
+    )
+
+@app.route(
+    "/api/projects/<project_id>/files/<file_id>",
+    methods=["DELETE"],
+)
+def api_project_delete_file(
+    project_id,
+    file_id,
+):
+    deleted = project_workspace_service.delete_file(
+        project_id,
+        file_id,
+    )
+
+    if not deleted:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "File not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "deleted": True,
+            "file_id": file_id,
         }
     )
 
