@@ -185,3 +185,48 @@ class ResponseQualityService:
             return "pong"
 
         return clean_answer
+
+def format_public_response(
+    user_text="",
+    answer="",
+):
+    """
+    Converts internal Nova responses into user-facing responses.
+
+    Keeps intelligence hidden while preserving useful information.
+    """
+
+    text = str(answer or "").strip()
+
+    if not text:
+        return text
+
+    internal_terms = [
+        "Decision Engine",
+        "Command Center",
+        "Operator Planner",
+        "Freshness Snapshot",
+        "Project Brain context builder",
+        "Project Brain decision context",
+        "Target files:",
+        "Validation:",
+        "Avoid rules:",
+        "Exact Next Command:",
+    ]
+
+    contains_internal_language = any(
+        term.lower() in text.lower()
+        for term in internal_terms
+    )
+
+    if not contains_internal_language:
+        return text
+
+    cleaned = (
+        text
+        .replace("Decision Engine recommendation:", "")
+        .replace("Project Brain decision context:", "")
+        .replace("Project Brain context:", "")
+    )
+
+    return cleaned.strip()

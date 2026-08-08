@@ -147,7 +147,7 @@ def build_project_brain_live_answer(
         pasted_output=pasted_output,
     )
 
-    if reason == "project_status_general_intelligence":
+    if reason == "plain_project_status_general_intelligence":
         try:
             from nova_backend.services.project_brain_general_intelligence import (
                 build_project_brain_general_answer,

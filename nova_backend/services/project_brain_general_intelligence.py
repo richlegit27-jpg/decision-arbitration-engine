@@ -768,20 +768,10 @@ def build_project_brain_general_answer(
         return ProjectBrainAnswer(
             intent="actual_blocker",
             text=(
-                "Nova general intelligence blocker analysis:\n"
-                "Current blocker: "
-                "No active Project Brain intelligence blocker is open.\n"
-                "Current checkpoint: "
-                "Project Brain state is loaded from the context builder using the freshness snapshot and active workspace context.\n"
-                "Protected capabilities: "
-                "Command Center, Project Brain Upgrade Radar, and "
-                "Project Brain Operator Memory Writer are locked.\n"
-                "Next move: "
-                "continue focused validation through the Project Brain smoke stack.\n"
-                "Fallback: "
-                "If the blocker changes, return to the latest failing command, "
-                "file path, error output, or smoke result and reclassify from "
-                "the current project state."
+                "Current blocker: No active blocker is open.\n\n"
+                "Nova is currently in the pre-launch stabilization phase. "
+                "The main focus is validating user flows, reliability, "
+                "onboarding, and launch readiness."
             ),
         )
 

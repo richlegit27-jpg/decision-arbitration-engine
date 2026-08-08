@@ -174,14 +174,11 @@ def build_current_project_answer(user_id=None) -> str:
         )
 
     return (
-        "Source: Project Brain context builder with freshness snapshot. "
-        f"Current {context.project_name} project state:{active_project_text} Richard is working on the "
-        f"{context.local_app} with Joe. Completed/protected pieces: {_completed_text(context)}. "
-        f"Current checkpoint: {context.active_checkpoint} "
-        f"Current blocker: {context.blocker} "
-        f"Next move: {context.next_move.replace('Next move: ', '')} "
-        f"{_recent_commit_text(context)}"
-        f"{_first_intent_text(context)}"
+        f"Nova is currently working on {context.project_name}.{active_project_text}\n\n"
+        f"The current focus is: {context.active_checkpoint}\n\n"
+        f"Current status: {context.blocker}\n\n"
+        f"The next step is to continue the pre-launch quality pass, "
+        "including user flows, reliability, onboarding, and launch readiness."
     )
 
 
@@ -250,26 +247,24 @@ def build_project_brain_decision_context_answer(
             format_project_brain_decision,
         )
 
-        from nova_backend.services.project_brain_command_center import (
-            build_project_brain_command_center_answer,
-        )
-
         decision = decide_project_brain_next_move(
             user_text=user_text,
             pasted_output=pasted_output,
             intent=intent,
         )
 
-        command_answer = build_project_brain_command_center_answer(
-            user_text=user_text,
-            pasted_output=pasted_output,
+        decision_text = format_project_brain_decision(
+            decision
         )
 
         return (
-            "Project Brain decision context:\n"
-            + command_answer
-            + "\n\nDecision Engine recommendation:\n"
-            + format_project_brain_decision(decision)
+            "Nova is currently in the pre-launch stabilization phase.\n\n"
+            "The core systems are built. The current focus is validating "
+            "user experience, reliability, onboarding, and launch readiness.\n\n"
+            "Next step: continue the quality pass and fix any remaining "
+            "user-facing issues before opening Nova to testers.\n\n"
+            "Decision guidance:\n"
+            f"{decision_text}"
         )
 
     except Exception as exc:

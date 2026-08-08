@@ -91,6 +91,18 @@ class LocalAuthRouteService:
                 "id": user.get("id"),
                 "username": user.get("username"),
                 "email": user.get("email"),
+                "plan": user.get(
+                    "plan",
+                    "free",
+                ),
+                "credits": user.get(
+                    "credits",
+                    0,
+                ),
+                "subscription_status": user.get(
+                    "subscription_status",
+                    "inactive",
+                ),
             }
 
         def find_user(identifier):
@@ -188,6 +200,13 @@ class LocalAuthRouteService:
                     password,
                     salt,
                 ),
+
+                # Billing
+                "plan": "free",
+                "credits": 100000,
+                "stripe_customer_id": "",
+                "stripe_subscription_id": "",
+                "subscription_status": "inactive",
             }
 
             data["users"].append(user)

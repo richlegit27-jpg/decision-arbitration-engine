@@ -258,130 +258,215 @@
         </section>
 
 
-        <section class="nova-billing-truth">
-            <div>
-                <p>Payment status</p>
-
-                <h2>
-                    Billing is staged, not live payment collection.
-                </h2>
-
-                <span>
-                    There is no live checkout, customer payment portal,
-                    invoice purchasing flow, or paid plan upgrade on Nova today.
-                    Request Access does not charge a card.
-                </span>
-            </div>
-
-
-            <div class="nova-billing-truth-grid">
-                <article>
-                    <strong>Active now</strong>
-
-                    <h3>
-                        Usage visibility
-                    </h3>
-
-                    <p>
-                        Nova can display plan labels, credit balances,
-                        monthly allowances, and current usage.
-                    </p>
-                </article>
-
-
-                <article>
-                    <strong>Not active</strong>
-
-                    <h3>
-                        Paid upgrades
-                    </h3>
-
-                    <p>
-                        Nova is not currently selling paid plan upgrades
-                        through this page.
-                    </p>
-                </article>
-
-
-                <article>
-                    <strong>Not active</strong>
-
-                    <h3>
-                        Live payment collection
-                    </h3>
-
-                    <p>
-                        Checkout and customer payment management remain unavailable
-                        until the payment system is intentionally launched.
-                    </p>
-                </article>
-            </div>
-        </section>
-
 
         <section class="nova-tier-section">
             <div class="nova-section-head">
-                <p>Model choices</p>
+                <p>Nova Plans</p>
 
                 <h2>
-                    Different model options are planned, not active billing tiers.
+                    Choose the plan that fits your workflow.
                 </h2>
 
                 <span>
-                    Nova may later offer different model choices with different usage
-                    costs. Model selection, pricing rules, and account access are still
-                    planned work and are not being sold on this page today.
+                    Nova plans provide different usage limits
+                    for conversations, projects, and advanced AI work.
                 </span>
             </div>
 
 
             <div class="nova-tier-grid">
                 <article>
-                    <strong>Fast</strong>
+                    <strong>Free</strong>
 
                     <h3>
-                        Lighter everyday work
+                        $0 / month
                     </h3>
 
                     <p>
-                        A future lower-cost option for quicker conversations
-                        and simpler tasks.
+                        Try Nova with basic AI assistance,
+                        planning, and everyday tasks.
                     </p>
 
-                    <em>Planned</em>
+                    <em>
+                        Current
+                    </em>
                 </article>
 
 
                 <article class="featured">
-                    <strong>Balanced</strong>
+                    <strong>Plus</strong>
 
                     <h3>
-                        General project work
+                        $10 / month
                     </h3>
 
                     <p>
-                        A future middle option for project conversations,
-                        files, planning, and normal building.
+                        More credits for coding, projects,
+                        writing, and longer conversations.
                     </p>
 
-                    <em>Planned</em>
+                    <button
+                        type="button"
+                        onclick="window.location.href='/api/billing/checkout?plan=plus'"
+                    >
+                        Upgrade
+                    </button>
                 </article>
 
 
                 <article>
-                    <strong>Advanced</strong>
+                    <strong>Pro</strong>
 
                     <h3>
-                        Heavier reasoning
+                        $25 / month
                     </h3>
 
                     <p>
-                        A future higher-cost option for more demanding
-                        reasoning and complex project work.
+                        Higher limits for heavy users,
+                        advanced workflows, and large projects.
                     </p>
 
-                    <em>Planned</em>
+                    <button
+                        type="button"
+                        onclick="window.location.href='/api/billing/checkout?plan=pro'"
+                    >
+                        Upgrade
+                    </button>
                 </article>
+            </div>
+        </section>
+                <article>
+                    <strong>Free</strong>
+
+                    <h3>
+                        $0 / month
+                    </h3>
+
+                    <p>
+                        Try Nova with basic AI assistance,
+                        planning, and everyday tasks.
+                    </p>
+
+                    <em>
+                        Current
+                    </em>
+                </article>
+
+
+                <article class="featured">
+                    <strong>Plus</strong>
+
+                    <h3>
+                        $10 / month
+                    </h3>
+
+                    <p>
+                        More credits for coding, projects,
+                        writing, and longer conversations.
+                    </p>
+
+                    <button
+                        type="button"
+                        onclick="window.location.href='/api/billing/checkout?plan=plus'"
+                    >
+                        Upgrade
+                    </button>
+                </article>
+
+
+                <article>
+                    <strong>Pro</strong>
+
+                    <h3>
+                        $25 / month
+                    </h3>
+
+                    <p>
+                        Higher limits for heavy users,
+                        advanced workflows, and large projects.
+                    </p>
+
+                    <button
+                        type="button"
+                        onclick="window.location.href='/api/billing/checkout?plan=pro'"
+                    >
+                        Upgrade
+                    </button>
+                </article>
+            </div>
+        </section>
+
+            <div class="nova-tier-grid">
+
+                <article>
+                    <strong>Free</strong>
+
+                    <h3>
+                        $0 / month
+                    </h3>
+
+                    <p>
+                        Try Nova with basic AI assistance and limited monthly usage.
+                    </p>
+
+                    <ul>
+                        <li>10,000 credits/month</li>
+                        <li>Basic chat</li>
+                        <li>Writing and planning help</li>
+                    </ul>
+
+                    <em>Current</em>
+                </article>
+
+
+                <article class="featured">
+                    <strong>Plus</strong>
+
+                    <h3>
+                        $10 / month
+                    </h3>
+
+                    <p>
+                        More usage for everyday AI work, projects, and productivity.
+                    </p>
+
+                    <ul>
+                        <li>500,000 credits/month</li>
+                        <li>Higher usage limits</li>
+                        <li>Project assistance</li>
+                    </ul>
+
+                    <button type="button">
+                        Upgrade
+                    </button>
+                </article>
+
+
+                <article>
+                    <strong>Pro</strong>
+
+                    <h3>
+                        $25 / month
+                    </h3>
+
+                    <p>
+                        Built for heavy users building projects with Nova.
+                    </p>
+
+                    <ul>
+                        <li>2,000,000 credits/month</li>
+                        <li>Priority usage</li>
+                        <li>Advanced workflows</li>
+                    </ul>
+
+                    <button
+                        type="button"
+                        onclick="window.location.href='/api/billing/checkout?plan=plus'"
+                    >
+                        Upgrade
+                    </button>
+                </article>
+
             </div>
         </section>
 

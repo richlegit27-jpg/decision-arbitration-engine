@@ -880,9 +880,8 @@ try:
 
                     if context:
                         reply = (
-                            "Current Nova project state:\n"
-                            f"{context}\n\n"
-                            "This is the compact Project Brain state view for the current Nova work."
+                            "Here is the current Nova project status:\n\n"
+                            f"{context}"
                         )
 
                         payload = _nova_compact_project_payload_20260701(reply, data)

@@ -1,37 +1,54 @@
-﻿Nova Launch Checklist
+﻿\# Nova Beta Launch Checklist
 
 
 
-1\. Start server
+\## Infrastructure
 
-&nbsp;  .\\run\_nova.ps1
+\- \[ ] Railway deployment working
 
+\- \[ ] Environment variables configured
 
+\- \[ ] Domain connected
 
-2\. Open browser
-
-&nbsp;  http://127.0.0.1:8000
-
-
-
-3\. Test chat message
+\- \[ ] HTTPS working
 
 
 
-4\. Test memory panel
+\## Core Product
+
+\- \[ ] Landing page explains workplace AI
+
+\- \[ ] User signup works
+
+\- \[ ] Login works
+
+\- \[ ] Chat works
+
+\- \[ ] Sessions work
+
+\- \[ ] Files/artifacts work
+
+\- \[ ] Projects foundation works
 
 
 
-5\. Test file attachment
+\## User Experience
+
+\- \[ ] New user understands what Nova does
+
+\- \[ ] First project creation flow works
+
+\- \[ ] Mobile experience usable
+
+\- \[ ] Desktop experience usable
 
 
 
-6\. Test sidebar chats
+\## Beta Testing
 
+\- \[ ] Invite first testers
 
+\- \[ ] Collect feedback
 
-7\. Confirm uploads appear in runtime/uploads
-
-
-
+\- \[ ] Fix biggest problems
 
