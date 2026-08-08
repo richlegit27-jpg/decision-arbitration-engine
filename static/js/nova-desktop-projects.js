@@ -273,6 +273,7 @@ async function loadProjectIntelligence(projectId) {
 
         const brain = data.intelligence || {};
 
+
 const todayPlan =
     $("desktopTodayPlan");
 
@@ -754,29 +755,10 @@ async function continueProject(projectId) {
         projectId
     );
 
-const todayPlan =
-    $("desktopTodayPlan");
-
-if (todayPlan) {
-    todayPlan.innerHTML = `
-        <li>Review the current project status</li>
-        <li>Complete the Next Action</li>
-        <li>Check the AI Recommendation</li>
-    `;
-}
 
     const resume =
         $("desktopProjectResume");
 
-    if (resume) {
-        resume.innerHTML = `
-            <h3>Resume Summary</h3>
-            <p>
-                Your workspace is loaded. Review the Next Action
-                and continue where you left off.
-            </p>
-        `;
-    }
 
     const nextAction =
         $("desktopProjectNextAction");

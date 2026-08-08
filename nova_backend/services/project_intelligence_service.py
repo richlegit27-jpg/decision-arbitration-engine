@@ -24,6 +24,16 @@ class ProjectIntelligenceService:
             "current_focus": self._build_focus(tasks),
             "next_action": self._build_next_action(tasks),
             "recommendation": self._build_recommendation(tasks),
+            "resume_summary": self._build_resume_summary(
+                project,
+                tasks,
+            ),
+            "today_plan": self._build_today_plan(
+                tasks,
+            ),
+            "estimated_time": self._build_estimated_time(
+                tasks,
+            ),
             "progress": self._build_progress(tasks),
             "health": self._build_health(tasks),
             "risk": self._build_risk(tasks),
@@ -118,6 +128,80 @@ class ProjectIntelligenceService:
             return "Plan the next milestone."
 
         return "Continue the next unfinished task."
+
+    def _build_resume_summary(
+        self,
+        project,
+        tasks,
+    ):
+        name = (
+            project.get("name")
+            or project.get("title")
+            or "This project"
+        )
+
+        focus = self._build_focus(tasks)
+
+        next_action = self._build_next_action(
+            tasks
+        )
+
+        return (
+            f"{name} is ready to continue. "
+            f"Current focus: {focus}. "
+            f"Next action: {next_action}."
+        )
+
+    def _build_today_plan(
+        self,
+        tasks,
+    ):
+        unfinished = [
+            task
+            for task in tasks
+            if not task.get("completed")
+        ]
+
+        plan = []
+
+        for task in unfinished[:3]:
+            title = (
+                task.get("title")
+                or task.get("name")
+                or "Continue project work"
+            )
+
+            plan.append(title)
+
+        if plan:
+            return plan
+
+        return [
+            "Review the current project state.",
+            "Choose the next milestone.",
+            "Continue project work.",
+        ]
+
+    def _build_estimated_time(
+        self,
+        tasks,
+    ):
+        unfinished = sum(
+            1
+            for task in tasks
+            if not task.get("completed")
+        )
+
+        if unfinished == 0:
+            return "5 minutes"
+
+        if unfinished <= 2:
+            return "15 minutes"
+
+        if unfinished <= 5:
+            return "30 minutes"
+
+        return "45+ minutes"
 
     def _build_recent_activity(
         self,
