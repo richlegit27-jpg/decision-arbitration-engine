@@ -1,0 +1,291 @@
+/* DEBUG DISABLE */
+#desktopProjectWorkspace {
+    display: none !important;
+}
+
+.nova-project-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.nova-project-section-header h3 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.nova-project-section-subtitle {
+    margin: 4px 0 0;
+    opacity: 0.7;
+    font-size: 13px;
+}
+
+.nova-project-primary-button,
+#desktopProjectUploadButton {
+    border: none;
+    border-radius: 10px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.project-panel-card {
+    border-radius: 14px;
+    padding: 18px;
+    min-height: 92px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.project-panel-card h3 {
+    margin: 0 0 8px;
+    font-size: 16px;
+}
+
+.project-panel-card p {
+    margin: 0;
+    line-height: 1.5;
+}
+
+.workspace-section .section-title-row {
+    margin-bottom: 20px;
+}
+
+#desktopProjectTitle {
+    margin: 0;
+    font-size: 26px;
+    line-height: 1.2;
+}
+
+#desktopProjectDescription {
+    margin: 6px 0 0;
+    opacity: 0.7;
+    font-size: 14px;
+}
+
+.project-workspace-card {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 18px;
+}
+
+.project-workspace-card > h3,
+.project-workspace-card > #desktopProjectStatus {
+    grid-column: 1 / -1;
+}
+
+#desktopProjectHealth p {
+    font-weight: 600;
+}
+
+#desktopProjectNextAction,
+#desktopProjectRecommendation,
+#desktopProjectFocus {
+    border-left: 3px solid currentColor;
+}
+
+.nova-project-files-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.nova-project-files-header h3 {
+    margin: 0;
+}
+
+#desktopProjectFileList {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+#desktopProjectFileList p {
+    margin: 0;
+    opacity: 0.7;
+}
+
+#desktopProjectFileList > div {
+    padding: 12px 14px;
+    border-radius: 10px;
+}
+
+#desktopProjectFileList a {
+    font-weight: 600;
+    text-decoration: none;
+}
+
+#desktopProjectFileList small {
+    display: block;
+    margin-top: 4px;
+    opacity: 0.65;
+    font-size: 12px;
+}
+
+#desktopProjectNoteEditor {
+    margin-top: 14px;
+    padding: 16px;
+    border-radius: 12px;
+}
+
+#desktopProjectNoteTitle,
+#desktopProjectNoteContent {
+    width: 100%;
+    box-sizing: border-box;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    font: inherit;
+}
+
+#desktopProjectNoteContent {
+    min-height: 120px;
+    resize: vertical;
+}
+
+.nova-project-note-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.nova-project-note-actions button {
+    border: none;
+    border-radius: 9px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+#desktopProjectNoteList {
+    margin-top: 16px;
+}
+
+.nova-project-note-card {
+    padding: 16px;
+    border-radius: 12px;
+    margin-top: 12px;
+}
+
+.nova-project-note-card h4 {
+    margin: 0 0 6px;
+    font-size: 15px;
+}
+
+.nova-project-note-card p {
+    margin: 0;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+.nova-project-note-card .note-meta {
+    margin-top: 10px;
+    font-size: 12px;
+    opacity: 0.6;
+}
+
+.nova-project-note-card .note-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.nova-project-note-card .note-actions button {
+    border: none;
+    border-radius: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+#desktopProjectRecentActivity {
+    margin-top: 18px;
+}
+
+#desktopProjectRecentActivity p {
+    opacity: 0.7;
+}
+
+#desktopProjectToday {
+    margin-top: 14px;
+}
+
+#desktopTodayPlan {
+    margin: 0;
+    padding-left: 22px;
+}
+
+#desktopTodayPlan li {
+    padding: 6px 0;
+    line-height: 1.45;
+}
+
+.project-workspace-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 18px;
+}
+
+.project-workspace-actions button {
+    border: none;
+    border-radius: 10px;
+    padding: 10px 16px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+#desktopProjectWorkspace {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#desktopProjectWorkspace .project-workspace-card,
+#desktopProjectWorkspace .nova-project-section-header,
+#desktopProjectWorkspace #desktopProjectFiles,
+#desktopProjectWorkspace #desktopProjectNoteEditor,
+#desktopProjectWorkspace #desktopProjectNoteList,
+#desktopProjectWorkspace #desktopProjectRecentActivity,
+#desktopProjectWorkspace #desktopProjectToday,
+#desktopProjectWorkspace .project-workspace-actions {
+    box-sizing: border-box;
+}
+
+@media (max-width: 800px) {
+    .project-workspace-card {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    #desktopProjectTitle {
+        font-size: 22px;
+    }
+
+    .nova-project-section-header,
+    .nova-project-files-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .nova-project-primary-button,
+    #desktopProjectUploadButton {
+        width: 100%;
+    }
+
+    .project-workspace-actions {
+        justify-content: stretch;
+    }
+
+    .project-workspace-actions button {
+        width: 100%;
+    }
+}

@@ -5070,6 +5070,150 @@ def api_project_update_task(
         ), 404
 
 @app.route(
+    "/api/projects/<project_id>/notes",
+    methods=["GET"],
+)
+def api_project_notes(
+    project_id,
+):
+    project = project_workspace_service.get_project(
+        project_id
+    )
+
+    if not project:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found",
+            }
+        ), 404
+
+    notes = project_workspace_service.list_notes(
+        project_id
+    )
+
+    return jsonify(
+        {
+            "ok": True,
+            "notes": notes,
+        }
+    )
+
+
+@app.route(
+    "/api/projects/<project_id>/notes",
+    methods=["POST"],
+)
+def api_project_add_note(
+    project_id,
+):
+    data = request.get_json(
+        silent=True
+    ) or {}
+
+    note = project_workspace_service.add_note(
+        project_id,
+        data.get(
+            "title",
+            "Untitled Note",
+        ),
+        data.get(
+            "content",
+            "",
+        ),
+    )
+
+    if not note:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "note": note,
+        }
+    )
+
+@app.route(
+    "/api/projects/<project_id>/notes/<note_id>",
+    methods=["PATCH"],
+)
+def api_project_update_note(
+    project_id,
+    note_id,
+):
+    print(
+        "[PROJECT NOTE PATCH]",
+        project_id,
+        note_id,
+    )
+    data = request.get_json(
+        silent=True
+    ) or {}
+
+    note = project_workspace_service.update_note(
+        project_id,
+        note_id,
+        title=data.get("title"),
+        content=data.get("content"),
+    )
+
+    if not note:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Note not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "note": note,
+        }
+    )
+
+
+@app.route(
+    "/api/projects/<project_id>/notes/<note_id>",
+    methods=["DELETE"],
+)
+def api_project_delete_note(
+    project_id,
+    note_id,
+):
+    print(
+        "[PROJECT NOTE DELETE]",
+        project_id,
+        note_id,
+    )
+
+    deleted = project_workspace_service.delete_note(
+        project_id,
+        note_id,
+    )
+
+    if not deleted:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Note not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "deleted": True,
+            "note_id": note_id,
+        }
+    )
+
+@app.route(
     "/api/projects/<project_id>/intelligence",
     methods=["GET"],
 )

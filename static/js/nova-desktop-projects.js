@@ -151,10 +151,9 @@ console.log("[Nova Projects] FILE LOADED");
 
 button.innerHTML = `
     <div class="nova-project-card-header">
-        <strong>
-            ${escapeHtml(name)}
-        </strong>
-
+<div>
+    ${escapeHtml(name)}
+</div>
         ${
             isActive
                 ? `
@@ -638,6 +637,10 @@ async function loadProjectIntelligence(projectId) {
             renderProjectOverview(data);
             renderProjectTasks(data);
 
+await loadProjectFiles(
+    projectId
+);
+
             setProjectStatus(
                 "Active project"
             );
@@ -665,6 +668,261 @@ async function loadProjectIntelligence(projectId) {
         }
     }
 
+async function deleteProjectFile(
+    projectId,
+    fileId
+) {
+    if (
+        !projectId ||
+        !fileId
+    ) {
+        return;
+    }
+
+    try {
+        setProjectStatus(
+            "Deleting file..."
+        );
+
+        const response =
+            await fetch(
+                `/api/projects/${projectId}/files/${fileId}`,
+                {
+                    method: "DELETE",
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if (
+            !response.ok ||
+            !data.ok
+        ) {
+            throw new Error(
+                data.error ||
+                "Delete failed"
+            );
+        }
+
+        await loadProjectFiles(
+            projectId
+        );
+
+        setProjectStatus(
+            "File deleted"
+        );
+
+    } catch (error) {
+        console.error(
+            "[Nova Projects] file delete failed",
+            error
+        );
+
+        setProjectStatus(
+            error.message ||
+            "File delete failed"
+        );
+    }
+}
+
+async function loadProjectFiles(projectId) {
+    if (!projectId) {
+        return;
+    }
+
+    const container =
+        $("desktopProjectFileList");
+
+    if (!container) {
+        return;
+    }
+
+    container.innerHTML = `
+        <p>Loading files...</p>
+    `;
+
+    try {
+        const data = await fetchJson(
+            `/api/projects/${projectId}/files`
+        );
+
+        const files =
+            Array.isArray(data.files)
+                ? data.files
+                : [];
+
+        if (!files.length) {
+            container.innerHTML = `
+                <p>No files yet.</p>
+            `;
+            return;
+        }
+
+        container.innerHTML = files
+            .map(
+                (file) => {
+                    const name =
+                        file.name ||
+                        "Untitled file";
+
+                    const size =
+                        Number(file.size || 0);
+
+                    return `
+                        <div
+                            class="nova-project-file"
+                            data-project-file-id="${escapeHtml(
+                                file.id || ""
+                            )}"
+                        >
+                            <div class="nova-project-file-info">
+<a
+    href="${escapeHtml(file.url || "#")}"
+    target="_blank"
+    rel="noopener"
+>
+    ${escapeHtml(name)}
+</a>
+
+                                <span>
+                                    ${size} bytes
+                                </span>
+                            </div>
+
+                            <button
+                                type="button"
+                                class="nova-project-file-delete"
+                                data-project-file-delete="${escapeHtml(
+                                    file.id || ""
+                                )}"
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    `;
+                }
+            )
+            .join("");
+
+container
+    .querySelectorAll(
+        "[data-project-file-delete]"
+    )
+    .forEach(
+        (button) => {
+            button.addEventListener(
+                "click",
+                async () => {
+                    const fileId =
+                        button.dataset
+                            .projectFileDelete;
+
+                    await deleteProjectFile(
+                        projectId,
+                        fileId
+                    );
+                }
+            );
+        }
+    );
+
+    } catch (error) {
+        console.error(
+            "[Nova Projects] file load failed",
+            error
+        );
+
+        container.innerHTML = `
+            <p>
+                ${escapeHtml(
+                    error.message ||
+                    "Could not load files."
+                )}
+            </p>
+        `;
+    }
+}
+
+async function loadProjectNotes(projectId) {
+    if (!projectId) {
+        return;
+    }
+
+    const container =
+        $("desktopProjectNoteList");
+
+    if (!container) {
+        return;
+    }
+
+    container.innerHTML = `
+        <p>Loading notes...</p>
+    `;
+
+    try {
+        const data = await fetchJson(
+            `/api/projects/${projectId}/notes`
+        );
+
+        const notes =
+            Array.isArray(data.notes)
+                ? data.notes
+                : [];
+
+        if (!notes.length) {
+            container.innerHTML = `
+                <p>No notes yet.</p>
+            `;
+            return;
+        }
+
+        container.innerHTML = notes
+            .map(
+                (note) => `
+                    <div
+                        class="nova-project-note"
+                        data-project-note-id="${escapeHtml(
+                            note.id || ""
+                        )}"
+                    >
+                        <strong>
+                            ${escapeHtml(
+                                note.title ||
+                                "Untitled Note"
+                            )}
+                        </strong>
+
+                        <p>
+                            ${escapeHtml(
+                                note.content || ""
+                            )}
+                        </p>
+
+                        <button
+                            type="button"
+                            data-project-note-delete="${escapeHtml(
+                                note.id || ""
+                            )}"
+                        >
+                            Delete
+                        </button>
+                    </div>
+                `
+            )
+            .join("");
+
+    } catch (error) {
+        console.error(
+            "[Nova Projects] notes load failed",
+            error
+        );
+
+        container.innerHTML = `
+            <p>Could not load notes.</p>
+        `;
+    }
+}
 
     async function loadProjects() {
         if (
@@ -850,6 +1108,244 @@ async function continueProject(projectId) {
 
     setProjectStatus(
         "Ready to continue"
+    );
+}
+
+const projectUploadButton =
+    $("desktopProjectUploadButton");
+
+const projectFileInput =
+    $("desktopProjectFileInput");
+
+if (
+    projectUploadButton &&
+    projectFileInput
+) {
+    projectUploadButton.addEventListener(
+        "click",
+        () => {
+            projectFileInput.click();
+        }
+    );
+
+    projectFileInput.addEventListener(
+        "change",
+        async () => {
+            const file =
+                projectFileInput.files?.[0];
+
+            const projectId =
+                window.__NOVA_PROJECT_STATE
+                    .activeProjectId;
+
+            if (
+                !file ||
+                !projectId
+            ) {
+                return;
+            }
+
+            const formData =
+                new FormData();
+
+            formData.append(
+                "file",
+                file
+            );
+
+            formData.append(
+                "project_id",
+                projectId
+            );
+
+            try {
+                setProjectStatus(
+                    "Uploading file..."
+                );
+
+                const response =
+                    await fetch(
+                        "/api/upload",
+                        {
+                            method: "POST",
+                            body: formData,
+                        }
+                    );
+
+                const data =
+                    await response.json();
+
+                if (
+                    !response.ok ||
+                    !data.ok
+                ) {
+                    throw new Error(
+                        data.error ||
+                        "Upload failed"
+                    );
+                }
+
+                await loadProjectFiles(
+                    projectId
+                );
+
+await loadProjectNotes(
+    projectId
+);
+
+                setProjectStatus(
+                    "File uploaded"
+                );
+
+            } catch (error) {
+                console.error(
+                    "[Nova Projects] file upload failed",
+                    error
+                );
+
+                setProjectStatus(
+                    error.message ||
+                    "File upload failed"
+                );
+            } finally {
+                projectFileInput.value = "";
+            }
+        }
+    );
+}
+
+const addNoteButton =
+    $("desktopProjectAddNoteButton");
+
+const noteEditor =
+    $("desktopProjectNoteEditor");
+
+const noteTitle =
+    $("desktopProjectNoteTitle");
+
+const noteContent =
+    $("desktopProjectNoteContent");
+
+const saveNoteButton =
+    $("desktopProjectSaveNote");
+
+const cancelNoteButton =
+    $("desktopProjectCancelNote");
+
+if (
+    addNoteButton &&
+    noteEditor &&
+    noteTitle &&
+    noteContent &&
+    saveNoteButton &&
+    cancelNoteButton
+) {
+    addNoteButton.addEventListener(
+        "click",
+        () => {
+            noteTitle.value = "";
+            noteContent.value = "";
+
+            noteEditor.hidden = false;
+
+            noteTitle.focus();
+        }
+    );
+
+    cancelNoteButton.addEventListener(
+        "click",
+        () => {
+            noteEditor.hidden = true;
+
+            noteTitle.value = "";
+            noteContent.value = "";
+        }
+    );
+
+    saveNoteButton.addEventListener(
+        "click",
+        async () => {
+            const projectId =
+                window.__NOVA_PROJECT_STATE
+                    .activeProjectId;
+
+            if (!projectId) {
+                return;
+            }
+
+            const title =
+                noteTitle.value.trim();
+
+            const content =
+                noteContent.value.trim();
+
+            if (
+                !title &&
+                !content
+            ) {
+                return;
+            }
+
+            try {
+                setProjectStatus(
+                    "Saving note..."
+                );
+
+                const response =
+                    await fetch(
+                        `/api/projects/${projectId}/notes`,
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type":
+                                    "application/json",
+                            },
+                            body: JSON.stringify({
+                                title:
+                                    title ||
+                                    "Untitled Note",
+                                content,
+                            }),
+                        }
+                    );
+
+                const data =
+                    await response.json();
+
+                if (
+                    !response.ok ||
+                    !data.ok
+                ) {
+                    throw new Error(
+                        data.error ||
+                        "Could not save note"
+                    );
+                }
+
+                noteEditor.hidden = true;
+                noteTitle.value = "";
+                noteContent.value = "";
+
+                await loadProjectNotes(
+                    projectId
+                );
+
+                setProjectStatus(
+                    "Note saved"
+                );
+
+            } catch (error) {
+                console.error(
+                    "[Nova Projects] note save failed",
+                    error
+                );
+
+                setProjectStatus(
+                    error.message ||
+                    "Note save failed"
+                );
+            }
+        }
     );
 }
 

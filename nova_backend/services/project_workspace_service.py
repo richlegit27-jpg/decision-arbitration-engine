@@ -448,3 +448,165 @@ class ProjectWorkspaceService:
                 return project
 
         return None
+
+    def add_note(
+        self,
+        project_id,
+        title,
+        content="",
+    ):
+        projects = self._load_projects()
+
+        for project in projects:
+            if project.get("id") != project_id:
+                continue
+
+            notes = project.setdefault(
+                "notes",
+                [],
+            )
+
+            note = {
+                "id": str(
+                    uuid.uuid4()
+                ),
+                "title": str(
+                    title or "Untitled Note"
+                ),
+                "content": str(
+                    content or ""
+                ),
+                "created_at": datetime.now(
+                    timezone.utc
+                ).isoformat(),
+                "updated_at": datetime.now(
+                    timezone.utc
+                ).isoformat(),
+            }
+
+            notes.append(
+                note
+            )
+
+            project["updated_at"] = datetime.now(
+                timezone.utc
+            ).isoformat()
+
+            self._save_projects(
+                projects
+            )
+
+            return note
+
+        return None
+
+    def list_notes(
+        self,
+        project_id,
+    ):
+        project = self.get_project(
+            project_id
+        )
+
+        if not project:
+            return []
+
+        notes = project.get(
+            "notes",
+            [],
+        )
+
+        return (
+            notes
+            if isinstance(notes, list)
+            else []
+        )
+
+
+    def update_note(
+        self,
+        project_id,
+        note_id,
+        title=None,
+        content=None,
+    ):
+        projects = self._load_projects()
+
+        for project in projects:
+            if project.get("id") != project_id:
+                continue
+
+            for note in project.get(
+                "notes",
+                [],
+            ):
+                if note.get("id") != note_id:
+                    continue
+
+                if title is not None:
+                    note["title"] = str(
+                        title or "Untitled Note"
+                    )
+
+                if content is not None:
+                    note["content"] = str(
+                        content or ""
+                    )
+
+                note["updated_at"] = datetime.now(
+                    timezone.utc
+                ).isoformat()
+
+                project["updated_at"] = datetime.now(
+                    timezone.utc
+                ).isoformat()
+
+                self._save_projects(
+                    projects
+                )
+
+                return note
+
+            return None
+
+        return None
+
+
+    def delete_note(
+        self,
+        project_id,
+        note_id,
+    ):
+        projects = self._load_projects()
+
+        for project in projects:
+            if project.get("id") != project_id:
+                continue
+
+            notes = project.get(
+                "notes",
+                [],
+            )
+
+            original_count = len(notes)
+
+            project["notes"] = [
+                note
+                for note in notes
+                if note.get("id") != note_id
+            ]
+
+            if len(project["notes"]) == original_count:
+                return False
+
+            project["updated_at"] = datetime.now(
+                timezone.utc
+            ).isoformat()
+
+            self._save_projects(
+                projects
+            )
+
+            return True
+
+        return False
