@@ -56,11 +56,22 @@ class ProjectIntelligenceService:
         chats,
         executions,
     ):
-        completed = sum(
-            1
-            for task in tasks
-            if task.get("completed")
-        )
+        completed = 0
+
+        for task in tasks:
+            status = str(
+                task.get("status") or ""
+            ).lower()
+
+            if (
+                task.get("completed") is True
+                or status in {
+                    "done",
+                    "complete",
+                    "completed",
+                }
+            ):
+                completed += 1
 
         return {
             "tasks": len(tasks),
@@ -70,15 +81,29 @@ class ProjectIntelligenceService:
             "executions": len(executions),
         }
 
-    def _build_progress(self, tasks):
+    def _build_progress(
+        self,
+        tasks,
+    ):
         if not tasks:
             return 0
 
-        completed = sum(
-            1
-            for task in tasks
-            if task.get("completed")
-        )
+        completed = 0
+
+        for task in tasks:
+            status = str(
+                task.get("status") or ""
+            ).lower()
+
+            if (
+                task.get("completed") is True
+                or status in {
+                    "done",
+                    "complete",
+                    "completed",
+                }
+            ):
+                completed += 1
 
         return round(
             completed / len(tasks) * 100
@@ -98,36 +123,154 @@ class ProjectIntelligenceService:
 
         return 40
 
-    def _build_risk(self, tasks):
+    def _build_risk(
+        self,
+        tasks,
+    ):
         if not tasks:
             return "low"
 
-        if any(
-            not task.get("completed")
-            for task in tasks
-        ):
+        unfinished = self._unfinished_tasks(
+            tasks
+        )
+
+        if unfinished:
             return "medium"
 
         return "low"
 
-    def _build_focus(self, tasks):
+    def _unfinished_tasks(
+        self,
+        tasks,
+    ):
+        unfinished = []
+
         for task in tasks:
-            if not task.get("completed"):
-                return task.get(
-                    "title",
-                    "Continue project",
-                )
+            status = str(
+                task.get("status") or ""
+            ).lower()
 
-        return "No active work"
+            completed = (
+                task.get("completed") is True
+                or status in {
+                    "done",
+                    "complete",
+                    "completed",
+                }
+            )
 
-    def _build_next_action(self, tasks):
-        return self._build_focus(tasks)
+            if not completed:
+                unfinished.append(task)
 
-    def _build_recommendation(self, tasks):
-        if self._build_progress(tasks) == 100:
-            return "Plan the next milestone."
+        priority_rank = {
+            "critical": 0,
+            "high": 1,
+            "medium": 2,
+            "low": 3,
+        }
 
-        return "Continue the next unfinished task."
+        unfinished.sort(
+            key=lambda task: (
+                priority_rank.get(
+                    str(
+                        task.get("priority")
+                        or "medium"
+                    ).lower(),
+                    2,
+                ),
+                str(
+                    task.get("title")
+                    or task.get("name")
+                    or ""
+                ).lower(),
+            )
+        )
+
+        return unfinished
+
+
+    def _build_focus(
+        self,
+        tasks,
+    ):
+        unfinished = self._unfinished_tasks(
+            tasks
+        )
+
+        if not unfinished:
+            return "No active work"
+
+        task = unfinished[0]
+
+        return (
+            task.get("title")
+            or task.get("name")
+            or "Continue project"
+        )
+
+
+    def _build_next_action(
+        self,
+        tasks,
+    ):
+        unfinished = self._unfinished_tasks(
+            tasks
+        )
+
+        if not unfinished:
+            return "Plan the next milestone"
+
+        task = unfinished[0]
+
+        title = (
+            task.get("title")
+            or task.get("name")
+            or "Continue project"
+        )
+
+        return f"Complete: {title}"
+
+
+    def _build_recommendation(
+        self,
+        tasks,
+    ):
+        unfinished = self._unfinished_tasks(
+            tasks
+        )
+
+        if not unfinished:
+            return (
+                "The current task list is complete. "
+                "Define the next milestone."
+            )
+
+        task = unfinished[0]
+
+        priority = str(
+            task.get("priority")
+            or "medium"
+        ).lower()
+
+        title = (
+            task.get("title")
+            or task.get("name")
+            or "the next task"
+        )
+
+        if priority in {
+            "critical",
+            "high",
+        }:
+            return (
+                f"Prioritize {title}. "
+                f"It is marked {priority} priority."
+            )
+
+        return (
+            f"Continue with {title}. "
+            "It is the highest-priority unfinished task."
+        )
 
     def _build_resume_summary(
         self,
@@ -156,11 +299,9 @@ class ProjectIntelligenceService:
         self,
         tasks,
     ):
-        unfinished = [
-            task
-            for task in tasks
-            if not task.get("completed")
-        ]
+        unfinished = self._unfinished_tasks(
+            tasks
+        )
 
         plan = []
 
@@ -177,19 +318,19 @@ class ProjectIntelligenceService:
             return plan
 
         return [
-            "Review the current project state.",
-            "Choose the next milestone.",
-            "Continue project work.",
+            "Review completed work.",
+            "Define the next milestone.",
+            "Choose the next priority.",
         ]
 
     def _build_estimated_time(
         self,
         tasks,
     ):
-        unfinished = sum(
-            1
-            for task in tasks
-            if not task.get("completed")
+        unfinished = len(
+            self._unfinished_tasks(
+                tasks
+            )
         )
 
         if unfinished == 0:
@@ -202,7 +343,6 @@ class ProjectIntelligenceService:
             return "30 minutes"
 
         return "45+ minutes"
-
     def _build_recent_activity(
         self,
         project,
