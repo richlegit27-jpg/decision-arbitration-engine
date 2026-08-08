@@ -4844,6 +4844,39 @@ def api_project_active():
     "/api/projects/<project_id>/tasks",
     methods=["POST"],
 )
+def api_project_add_task(
+    project_id,
+):
+    data = request.get_json(
+        silent=True
+    ) or {}
+
+    task = project_workspace_service.add_task(
+        project_id,
+        data.get(
+            "title",
+            "New Task",
+        ),
+        data.get(
+            "priority",
+            "medium",
+        ),
+    )
+
+    if not task:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "task": task,
+        }
+    )
 
 @app.route(
     "/api/projects/<project_id>/tasks/<task_id>",
@@ -4882,11 +4915,24 @@ def api_project_update_task(
         }
     )
 
+    print("[PROJECT INTELLIGENCE]", project_id)
+
+    summary = project_workspace_service.get_project_summary(
+        project_id
+    )
+
+    if not summary:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found",
+            }
+        ), 404
+
 @app.route(
     "/api/projects/<project_id>/intelligence",
     methods=["GET"],
 )
-
 def api_project_intelligence(
     project_id,
 ):
@@ -4904,8 +4950,19 @@ def api_project_intelligence(
             }
         ), 404
 
+    project = project_workspace_service.get_project(
+        project_id
+    )
+
+    tasks = (
+        project.get("tasks", [])
+        if isinstance(project, dict)
+        else []
+    )
+
     intelligence = project_intelligence_service.build(
         project=summary,
+        tasks=tasks,
     )
 
     return jsonify(
@@ -4917,124 +4974,6 @@ def api_project_intelligence(
 
 @app.route("/api/execution/stream", methods=["POST"])
 def execution_stream():
-    data = request.get_json(silent=True) or {}
-
-    return Response(
-        execution_stream_route_service.stream(data),
-        mimetype="text/event-stream",
-    )
-    data = request.get_json(silent=True) or {}
-
-    session_id = str(data.get("session_id") or "").strip()
-
-    action = str(
-        data.get("action") or ""
-    ).strip()
-
-    action = execution_loop_service.command_alias(
-        action
-    )
-
-    def generate():
-        import time
-
-        if not session_id:
-            yield execution_stream_service.send_event("error", {"ok": False, "error": "missing session_id", "done": True})
-            return
-
-        if not action:
-            yield execution_stream_service.send_event("error", {"ok": False, "error": "missing action", "done": True})
-            return
-
-        session = session_service.get_session(
-            session_id
-        )
-
-        if not isinstance(
-            session,
-            dict,
-        ):
-            session = {}
-
-        execution = (
-            (session or {})
-            .get("working_state", {})
-            .get("execution")
-            or {}
-        )
-
-        execution = execution_service.normalize_execution(
-            execution
-        )
-
-
-        yield execution_stream_service.send_event("start", {
-            "ok": True,
-            "action": action,
-            "session_id": session_id,
-            "execution_state": execution,
-            "done": False,
-        })
-
-        if action == "fix_file":
-
-            result = execution_fix_service.apply_fix(
-                session_id,
-                session,
-                execution,
-                action,
-            )
-
-            execution = result["execution"]
-            step = result["step"]
-            ok = result["ok"]
-
-            execution_stream_service.save_execution(
-                session_id,
-                execution,
-            )
-
-            yield execution_stream_service.send_event("step_start", {
-                "step": step,
-                "execution_state": execution,
-                "done": False,
-            })
-
-            yield execution_stream_service.send_event("step_done", {
-                "step": step,
-                "execution_state": execution,
-                "done": False,
-            })
-
-            yield execution_stream_service.send_event("done", {
-                "ok": ok,
-                "execution_state": execution,
-                "done": True,
-            })
-
-            return
-
-        else:
-            execution = execution_service.apply_control_action(
-                execution,
-                action,
-            )
-
-            execution_stream_service.save_execution(
-                session_id,
-                execution,
-            )
-
-        yield execution_stream_service.send_event("done", {
-            "ok": True,
-            "execution_state": execution,
-            "done": True,
-        })
-
-    return Response(generate(), mimetype="text/event-stream")
-
-@app.route("/api/debug/execution", methods=["GET"])
-def api_debug_execution():
     try:
         session_id = str(request.args.get("session_id") or "").strip()
 

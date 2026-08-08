@@ -271,104 +271,182 @@ async function loadProjectIntelligence(projectId) {
             `/api/projects/${projectId}/intelligence`
         );
 
-        const brain = data.intelligence || {};
+        const brain =
+            data.intelligence || {};
 
+        const todayPlan =
+            $("desktopTodayPlan");
 
-const todayPlan =
-    $("desktopTodayPlan");
+        if (todayPlan) {
+            const plan =
+                Array.isArray(brain.today_plan)
+                    ? brain.today_plan
+                    : [];
 
-if (todayPlan) {
-    const plan = [
-        brain.current_focus,
-        brain.next_action,
-        brain.recommendation,
-    ].filter(Boolean);
+            todayPlan.innerHTML =
+                plan.length
+                    ? plan
+                        .map(
+                            (step) =>
+                                `<li>${escapeHtml(step)}</li>`
+                        )
+                        .join("")
+                    : `
+                        <li>No plan available.</li>
+                    `;
+        }
 
-    todayPlan.innerHTML = plan.length
-        ? plan
-            .slice(0, 3)
-            .map(
-                (item) =>
-                    `<li>${escapeHtml(item)}</li>`
-            )
-            .join("")
-        : `
-            <li>Review the current project status</li>
-            <li>Complete the next action</li>
-            <li>Check the recommendation</li>
-        `;
-}
+        const mission =
+            $("desktopProjectMission");
 
-        $("desktopProjectMission").innerHTML = `
-            <h3>Mission</h3>
-            <p>${brain.mission || "No mission yet."}</p>
-        `;
+        if (mission) {
+            mission.innerHTML = `
+                <h3>Mission</h3>
+                <p>
+                    ${escapeHtml(
+                        brain.mission ||
+                        "No mission yet."
+                    )}
+                </p>
+            `;
+        }
 
-        $("desktopProjectProgress").innerHTML = `
-            <h3>Progress</h3>
-            <p>${brain.progress || 0}%</p>
-        `;
+        const progress =
+            $("desktopProjectProgress");
 
-        $("desktopProjectHealth").innerHTML = `
-            <h3>Health</h3>
-            <p>${brain.health || 0}%</p>
-        `;
+        if (progress) {
+            progress.innerHTML = `
+                <h3>Progress</h3>
+                <p>
+                    ${Number(brain.progress || 0)}%
+                </p>
+            `;
+        }
 
-        $("desktopProjectFocus").innerHTML = `
-            <h3>Current Focus</h3>
-            <p>${brain.current_focus || "No active work."}</p>
-        `;
+        const health =
+            $("desktopProjectHealth");
 
-        $("desktopProjectNextAction").innerHTML = `
-            <h3>Next Action</h3>
-            <p>${brain.next_action || "Nothing planned."}</p>
-        `;
+        if (health) {
+            health.innerHTML = `
+                <h3>Health</h3>
+                <p>
+                    ${Number(brain.health || 0)}%
+                </p>
+            `;
+        }
 
-        $("desktopProjectRecommendation").innerHTML = `
-            <h3>AI Recommendation</h3>
-            <p>${brain.recommendation || "No recommendation."}</p>
-        `;
+        const focus =
+            $("desktopProjectFocus");
 
-const resume =
-    $("desktopProjectResume");
+        if (focus) {
+            focus.innerHTML = `
+                <h3>Current Focus</h3>
+                <p>
+                    ${escapeHtml(
+                        brain.current_focus ||
+                        "No active work."
+                    )}
+                </p>
+            `;
+        }
 
-if (resume) {
-    const focus =
-        brain.current_focus ||
-        "No active work.";
+        const nextAction =
+            $("desktopProjectNextAction");
 
-    const next =
-        brain.next_action ||
-        "Nothing planned.";
+        if (nextAction) {
+            nextAction.innerHTML = `
+                <h3>Next Action</h3>
+                <p>
+                    ${escapeHtml(
+                        brain.next_action ||
+                        "Nothing planned."
+                    )}
+                </p>
+            `;
+        }
 
-    const recommendation =
-        brain.recommendation ||
-        "No recommendation.";
+        const recommendation =
+            $("desktopProjectRecommendation");
 
-    resume.innerHTML = `
-        <h3>📋 Resume Summary</h3>
+        if (recommendation) {
+            recommendation.innerHTML = `
+                <h3>AI Recommendation</h3>
+                <p>
+                    ${escapeHtml(
+                        brain.recommendation ||
+                        "No recommendation."
+                    )}
+                </p>
+            `;
+        }
 
-        <p>
-            <strong>Current Focus:</strong>
-            ${escapeHtml(focus)}
-        </p>
+        const resume =
+            $("desktopProjectResume");
 
-        <p>
-            <strong>Next Action:</strong>
-            ${escapeHtml(next)}
-        </p>
+        if (resume) {
+            resume.innerHTML = `
+                <h3>📋 Resume Summary</h3>
 
-        <p>
-            <strong>AI Recommendation:</strong>
-            ${escapeHtml(recommendation)}
-        </p>
-    `;
-}
+                <p>
+                    ${escapeHtml(
+                        brain.resume_summary ||
+                        "Ready to continue."
+                    )}
+                </p>
+
+                <p>
+                    <strong>Estimated time:</strong>
+                    ${escapeHtml(
+                        brain.estimated_time ||
+                        "Unknown"
+                    )}
+                </p>
+            `;
+        }
+
+        const activity =
+            $("desktopProjectRecentActivity");
+
+        if (activity) {
+            const recentActivity =
+                Array.isArray(brain.recent_activity)
+                    ? brain.recent_activity
+                    : [];
+
+            activity.innerHTML = `
+                <h3>Recent Activity</h3>
+
+                ${
+                    recentActivity.length
+                        ? recentActivity
+                            .slice(0, 5)
+                            .map(
+                                (item) => `
+                                    <p>
+                                        ${escapeHtml(
+                                            item.message ||
+                                            "Project activity"
+                                        )}
+                                    </p>
+                                `
+                            )
+                            .join("")
+                        : `
+                            <p>No activity yet.</p>
+                        `
+                }
+            `;
+        }
 
     } catch (error) {
         console.error(
             "[Nova Projects] intelligence failed",
             error
+        );
+
+        setProjectStatus(
+            error.message ||
+            "Project intelligence unavailable"
         );
     }
 }
