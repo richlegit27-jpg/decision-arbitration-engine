@@ -149,36 +149,35 @@ console.log("[Nova Projects] FILE LOADED");
                 project.description ||
                 "No description";
 
-button.innerHTML = `
-    <div class="nova-project-card-header">
-<div>
-    ${escapeHtml(name)}
-</div>
-        ${
-            isActive
-                ? `
-                    <span class="nova-project-status-active">
-                        ● Active
-                    </span>
-                `
-                : ""
-        }
-    </div>
 
-    <div class="nova-project-card-description">
-        ${escapeHtml(description)}
-    </div>
+        button.innerHTML = `
+            <div class="nova-project-card-header">
+                <strong>
+                    ${escapeHtml(name)}
+                </strong>
 
-    <div class="nova-project-card-footer">
-        <span>
-            ${project.status || "Ready"}
-        </span>
+                ${
+                    isActive
+                        ? `<span class="nova-project-active-badge">Active</span>`
+                        : ""
+                }
+            </div>
 
-        <span>
-            ${project.updated_at || "Just now"}
-        </span>
-    </div>
-`;
+            <div class="nova-project-card-description">
+                ${escapeHtml(description)}
+            </div>
+
+            <div class="nova-project-card-footer">
+                <span>
+                    ${project.status || "Ready"}
+                </span>
+
+                <span>
+                    ${project.updated_at || "Just now"}
+                </span>
+            </div>
+        `;
+
 
             button.addEventListener(
                 "click",
@@ -493,6 +492,10 @@ async function loadProjectIntelligence(projectId) {
             project.name ||
             project.title ||
             "Untitled Project";
+
+
+
+
 
         const description =
             project.description ||
