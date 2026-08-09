@@ -20,6 +20,13 @@
     border: 1px solid rgba(255,255,255,.18) !important;
     border-radius: 18px !important;
 
+#nova-desktop-execution-native {
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
     padding: 14px !important;
     box-sizing: border-box !important;
 
@@ -50,4 +57,8 @@
 
 .panel.tools > .memory-section {
     margin-top: 60px !important;
+}
+
+#nova-desktop-execution-native {
+    display: none !important;
 }
