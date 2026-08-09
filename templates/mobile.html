@@ -342,30 +342,10 @@ onclick="
     >Memory</button>
 
 <button
-    id="nova-mobile-projects-toggle"
-    type="button"
-    onclick="
-        const toolsPanel = document.getElementById('nova-mobile-tools-panel');
-        const projectsPanel = document.getElementById('nova-mobile-projects-panel');
-
-        if (toolsPanel) {
-            toolsPanel.classList.add('hidden');
-            toolsPanel.style.cssText = 'display:none !important;';
-        }
-
-        if (projectsPanel) {
-            projectsPanel.classList.remove('hidden');
-            projectsPanel.style.cssText = 'display:flex !important; position:fixed !important; left:10px !important; right:10px !important; top:90px !important; z-index:999999 !important; flex-direction:column !important; gap:10px !important; padding:14px !important; background:#111827 !important; border:1px solid rgba(255,255,255,.18) !important; border-radius:18px !important;';
-        }
-
-if (window.NovaLoadMobileProjects) {
-    window.NovaLoadMobileProjects();
-}
-
-    "
-
+id="nova-mobile-projects-toggle"
+type="button"
 >
-    Projects
+Projects
 </button>
 
     <button
