@@ -1127,22 +1127,68 @@ await loadProjectNotes(
         }
     }
 
+
 const newProjectButton =
     $("newProjectBtn");
+
+const newProjectModal =
+    $("newProjectModal");
+
+const newProjectName =
+    $("newProjectName");
+
+const newProjectDescription =
+    $("newProjectDescription");
+
+const createNewProjectButton =
+    $("createNewProject");
+
+const cancelNewProjectButton =
+    $("cancelNewProject");
+
 
 if (newProjectButton) {
     newProjectButton.addEventListener(
         "click",
+        () => {
+            if (newProjectModal) {
+                newProjectModal.hidden = false;
+            }
+
+            if (newProjectName) {
+                newProjectName.focus();
+            }
+        }
+    );
+}
+
+
+if (cancelNewProjectButton) {
+    cancelNewProjectButton.addEventListener(
+        "click",
+        () => {
+            if (newProjectModal) {
+                newProjectModal.hidden = true;
+            }
+        }
+    );
+}
+
+
+if (createNewProjectButton) {
+    createNewProjectButton.addEventListener(
+        "click",
         async () => {
+
             const name =
-                prompt("Project name:");
+                newProjectName?.value.trim();
 
             if (!name) {
                 return;
             }
 
             const description =
-                prompt("Project description:") ||
+                newProjectDescription?.value.trim() ||
                 "";
 
             try {
@@ -1164,12 +1210,22 @@ if (newProjectButton) {
                 const data =
                     await response.json();
 
-                if (!response.ok || !data.ok) {
+                if (
+                    !response.ok ||
+                    !data.ok
+                ) {
                     throw new Error(
                         data.error ||
                         "Project creation failed"
                     );
                 }
+
+                if (newProjectModal) {
+                    newProjectModal.hidden = true;
+                }
+
+                newProjectName.value = "";
+                newProjectDescription.value = "";
 
                 await loadProjects();
 

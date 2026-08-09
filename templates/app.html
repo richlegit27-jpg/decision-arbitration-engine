@@ -1192,26 +1192,66 @@ observer.observe(document.documentElement, {
 
       <!-- NOVA_WORKPLACE_PROJECTS_PANEL_V1 -->
       <section class="workspace-section">
-        <div class="section-title-row">
-          <div>
-            <h2>Projects</h2>
-            <p>Organize workplace tasks and goals.</p>
-          </div>
-        </div>
+<div class="section-title-row">
+  <div>
+    <h2>Projects</h2>
+    <p>Organize workplace tasks and goals.</p>
+  </div>
 
-        <button
-          class="primary-side-button"
-          id="newProjectBtn"
-          type="button"
-        >
-          <span>New Project</span>
-          <span>+</span>
-        </button>
-
-        <div
+  <button
+    class="primary-side-button"
+    id="newProjectBtn"
+    type="button"
+  >
+    <span>New Project</span>
+    <span>+</span>
+  </button>
+</div>
+</div>
           id="desktopProjectList"
           class="desktop-project-list"
         >
+<div
+  id="newProjectModal"
+  class="nova-modal"
+  hidden
+>
+  <div class="nova-modal-card">
+
+    <h3>Create Project</h3>
+
+    <input
+      id="newProjectName"
+      type="text"
+      placeholder="Project name"
+    />
+
+    <textarea
+      id="newProjectDescription"
+      placeholder="Project description"
+    ></textarea>
+
+    <div class="nova-modal-actions">
+
+      <button
+        id="cancelNewProject"
+        type="button"
+      >
+        Cancel
+      </button>
+
+      <button
+        id="createNewProject"
+        type="button"
+        class="primary-side-button"
+      >
+        Create Project
+      </button>
+
+    </div>
+
+  </div>
+</div>
           <div class="session-placeholder">
             Loading projects...
           </div>
