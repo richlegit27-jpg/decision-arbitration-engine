@@ -490,6 +490,78 @@ Close Account
     >
         Close
     </button>
+
+<section
+    id="nova-mobile-project-workspace"
+    class="mobile-panel hidden"
+    aria-label="Project workspace"
+>
+    <h3 id="nova-mobile-project-title">
+        Project
+    </h3>
+
+    <div id="nova-mobile-project-status">
+        Status
+    </div>
+
+<button
+    id="nova-mobile-project-notes"
+    type="button"
+>
+    Notes
+</button>
+
+<button
+    id="nova-mobile-project-files"
+    type="button"
+>
+    Files
+</button>
+
+<button
+    id="nova-mobile-project-tasks"
+    type="button"
+>
+    Tasks
+</button>
+
+    <button
+        type="button"
+        onclick="
+            const panel = document.getElementById('nova-mobile-project-workspace');
+            if (panel) {
+                panel.classList.add('hidden');
+                panel.style.cssText = 'display:none !important;';
+            }
+        "
+    >
+        Close Project
+    </button>
+</section>
+
+<section
+    id="nova-mobile-project-workspace"
+    class="mobile-panel hidden"
+    aria-label="Project workspace"
+>
+    <h3 id="nova-mobile-project-title">
+        Project
+    </h3>
+
+    <div id="nova-mobile-project-status">
+        Status
+    </div>
+
+            if (panel) {
+                panel.classList.add('hidden');
+                panel.style.cssText = 'display:none !important;';
+            }
+        "
+    >
+        Close Project
+    </button>
+</section>
+
 </section>
 
 <section id="nova-mobile-execution-panel" class="mobile-panel hidden" aria-label="Mobile execution">
