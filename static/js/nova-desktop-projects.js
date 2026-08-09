@@ -249,12 +249,12 @@ function openProjectWorkspace(project) {
         `;
     }
 
-    if (recommendation) {
-        recommendation.innerHTML = `
-            <h3>AI Recommendation</h3>
-            <p>Start organizing this project.</p>
-        `;
-    }
+if (recommendation) {
+    recommendation.innerHTML = `
+        <h3>AI Recommendation</h3>
+        <p>Start organizing this project.</p>
+    `;
+}
 
     if (activity) {
         activity.innerHTML = `
@@ -636,6 +636,59 @@ async function loadProjectIntelligence(projectId) {
 
             renderProjectOverview(data);
             renderProjectTasks(data);
+
+const workspace =
+    document.querySelector(
+        ".project-workspace-card"
+    );
+
+if (
+    workspace &&
+    !document.getElementById("desktopProjectFiles")
+) {
+    const filesPanel =
+        document.createElement("div");
+
+    filesPanel.id =
+        "desktopProjectFiles";
+
+    filesPanel.className =
+        "project-panel-card";
+
+    filesPanel.innerHTML = `
+        <div class="nova-project-files-header">
+            <h3>Project Files</h3>
+
+            <button
+                id="desktopProjectUploadButton"
+                type="button"
+            >
+                Upload File
+            </button>
+        </div>
+
+        <input
+            id="desktopProjectFileInput"
+            type="file"
+            hidden
+        />
+
+        <div id="desktopProjectFileList">
+            <p>No files yet.</p>
+        </div>
+    `;
+
+    const notes =
+        document.getElementById(
+            "desktopProjectNotes"
+        );
+
+    if (notes) {
+        notes.before(filesPanel);
+    } else {
+        workspace.appendChild(filesPanel);
+    }
+}
 
 await loadProjectFiles(
     projectId
@@ -1164,6 +1217,7 @@ if (
             projectFileInput.click();
         }
     );
+}
 
     projectFileInput.addEventListener(
         "change",
@@ -1249,7 +1303,6 @@ await loadProjectNotes(
             }
         }
     );
-}
 
 const addNoteButton =
     $("desktopProjectAddNoteButton");

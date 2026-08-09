@@ -1268,6 +1268,29 @@ observer.observe(document.documentElement, {
   <p>Start organizing this project.</p>
 </div>
 
+<div id="desktopProjectFiles" class="project-panel-card">
+  <div class="nova-project-files-header">
+    <h3>Project Files</h3>
+
+    <button
+      id="desktopProjectUploadButton"
+      type="button"
+    >
+      Upload File
+    </button>
+  </div>
+
+  <input
+    id="desktopProjectFileInput"
+    type="file"
+    hidden
+  />
+
+  <div id="desktopProjectFileList">
+    <p>No files yet.</p>
+  </div>
+</div>
+
 <div id="desktopProjectNotes" class="project-panel-card">
   <h3>Notes</h3>
 
