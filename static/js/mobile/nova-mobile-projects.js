@@ -32,17 +32,26 @@ const projects =
             container.innerHTML = "";
 
             projects.forEach((project) => {
-                const button =
-                    document.createElement("button");
+const button =
+    document.createElement("button");
 
-                button.type = "button";
-                button.className =
-                    "mobile-quick-action";
+button.type = "button";
+button.className =
+    "nova-mobile-project-card";
 
-                button.textContent =
-                    project.name ||
-                    project.title ||
-                    "Untitled Project";
+const name =
+    project.name ||
+    project.title ||
+    "Untitled Project";
+
+const description =
+    project.description ||
+    "No description";
+
+button.innerHTML = `
+    <strong>${name}</strong>
+    <span>${description}</span>
+`;
 
                 button.addEventListener(
                     "click",
