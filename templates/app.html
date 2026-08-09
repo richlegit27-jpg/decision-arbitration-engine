@@ -1268,80 +1268,6 @@ observer.observe(document.documentElement, {
   <p>Start organizing this project.</p>
 </div>
 
-<div id="desktopProjectFiles" class="project-panel-card">
-    <div class="nova-project-files-header">
-        <h3>Project Files</h3>
-
-        <button
-            id="desktopProjectUploadButton"
-            type="button"
-        >
-            Upload File
-        </button>
-    </div>
-
-    <input
-        id="desktopProjectFileInput"
-        type="file"
-        hidden
-    />
-
-    <div id="desktopProjectFileList">
-        <p>No files yet.</p>
-    </div>
-</div>
-
-<div class="nova-project-section-header">
-    <div>
-        <h3>Notes</h3>
-        <p class="nova-project-section-subtitle">
-            Capture ideas, decisions, and important context.
-        </p>
-    </div>
-
-    <button
-        id="desktopProjectAddNoteButton"
-        class="nova-project-primary-button"
-        type="button"
-    >
-        + Add Note
-    </button>
-</div>
-
-    <div id="desktopProjectNoteEditor" hidden>
-        <input
-            id="desktopProjectNoteTitle"
-            type="text"
-            placeholder="Note title"
-        />
-
-        <textarea
-            id="desktopProjectNoteContent"
-            placeholder="Write a project note..."
-        ></textarea>
-
-        <div class="nova-project-note-actions">
-            <button
-                id="desktopProjectSaveNote"
-                type="button"
-            >
-                Save Note
-            </button>
-
-            <button
-                id="desktopProjectCancelNote"
-                type="button"
-            >
-                Cancel
-            </button>
-        </div>
-    </div>
-
-    <div id="desktopProjectNoteList">
-        <p>No notes yet.</p>
-    </div>
-</div>
-
 <div id="desktopProjectRecentActivity" class="project-panel-card">
   <h3>Recent Activity</h3>
   <p>No activity yet.</p>
@@ -7178,8 +7104,8 @@ console.log("[Nova Force New Chat] cleared chat");
 </script>
 
 <!-- NOVA_DESKTOP_POLISH_CSS_LINK_20260620 -->
+<link rel="stylesheet"
 <link rel="stylesheet" href="/static/css/nova-desktop-polish.css?v=recent-session-cards-final-20260621-1">
-<!-- <link rel="stylesheet" href="/static/css/nova-desktop-projects.css"> -->
 <link rel="stylesheet" href="/static/css/nova-desktop-clean.css?v=1">
 
 
@@ -12960,6 +12886,7 @@ aside.panel.tools > .quick-actions-section {
 .shell {
     grid-template-columns: 300px minmax(300px, 1fr) 240px !important;
 }
+
     .chat-panel {
         min-width: 0 !important;
     }
