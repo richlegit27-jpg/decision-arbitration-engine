@@ -1,7 +1,3 @@
-/* DEBUG DISABLE */
-#desktopProjectWorkspace {
-    display: none !important;
-}
 
 .nova-project-section-header {
     display: flex;
@@ -363,4 +359,25 @@
     border-radius: 999px;
     font-size: 12px;
     font-weight: 600;
+}
+
+#desktopProjectWorkspace .project-workspace-card {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#desktopProjectWorkspace .project-panel-card {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+#desktopProjectWorkspace .project-panel-card:first-of-type {
+    grid-column: span 2;
+}
+
+#desktopProjectWorkspace .project-panel-card h3 {
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+#desktopProjectWorkspace .project-panel-card p {
+    font-size: 15px;
 }
