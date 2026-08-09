@@ -381,3 +381,38 @@
 #desktopProjectWorkspace .project-panel-card p {
     font-size: 15px;
 }
+
+#desktopProjectFileList > div,
+.nova-project-note-card {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: transform 0.15s ease;
+}
+
+#desktopProjectFileList > div:hover,
+.nova-project-note-card:hover {
+    transform: translateY(-2px);
+}
+
+.nova-project-file {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.nova-project-file-delete {
+    border: none;
+    border-radius: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.nova-project-note-card h4 {
+    margin: 0 0 8px;
+}
+
+.nova-project-note-card p {
+    margin: 0;
+    line-height: 1.5;
+}
