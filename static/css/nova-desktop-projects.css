@@ -416,3 +416,32 @@
     margin: 0;
     line-height: 1.5;
 }
+
+#desktopProjectRecentActivity {
+    position: relative;
+}
+
+#desktopProjectRecentActivity p {
+    opacity: 0.7;
+}
+
+#desktopProjectToday ol {
+    margin: 12px 0 0;
+    padding-left: 22px;
+}
+
+#desktopProjectToday li {
+    padding: 8px 0;
+    line-height: 1.4;
+}
+
+#desktopProjectToday li::marker {
+    font-weight: 700;
+}
+
+.project-workspace-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 16px;
+}
