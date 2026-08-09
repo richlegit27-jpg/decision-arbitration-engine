@@ -75,11 +75,43 @@ button.innerHTML = `
         }
     }
 
-    window.NovaLoadMobileProjects =
-        loadMobileProjects;
+window.NovaLoadMobileProjects =
+    loadMobileProjects;
 
-    document.addEventListener(
-        "DOMContentLoaded",
-        loadMobileProjects
-    );
+document.addEventListener(
+    "DOMContentLoaded",
+    loadMobileProjects
+);
+
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
+        const button =
+            document.getElementById(
+                "nova-mobile-projects-toggle"
+            );
+
+        const panel =
+            document.getElementById(
+                "nova-mobile-projects-panel"
+            );
+
+        if (!button || !panel) {
+            return;
+        }
+
+        button.addEventListener(
+            "click",
+            function () {
+                panel.classList.remove("hidden");
+                panel.style.cssText =
+                    "display:flex !important; position:fixed !important; left:10px !important; right:10px !important; top:90px !important; z-index:999999 !important; flex-direction:column !important; gap:10px !important; padding:14px !important; background:#111827 !important; border:1px solid rgba(255,255,255,.18) !important; border-radius:18px !important;";
+
+                if (window.NovaLoadMobileProjects) {
+                    window.NovaLoadMobileProjects();
+                }
+            }
+        );
+    }
+);
 })();
