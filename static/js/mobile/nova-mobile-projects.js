@@ -75,13 +75,16 @@ button.innerHTML = `
         }
     }
 
-window.NovaLoadMobileProjects =
-    loadMobileProjects;
+window.NovaLoadMobileProjects = loadMobileProjects;
 
 document.addEventListener(
     "DOMContentLoaded",
-    loadMobileProjects
+    function () {
+        loadMobileProjects();
+    }
 );
+
+})();
 
 document.addEventListener(
     "DOMContentLoaded",
@@ -114,4 +117,3 @@ document.addEventListener(
         );
     }
 );
-})();
