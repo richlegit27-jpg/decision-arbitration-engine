@@ -2647,13 +2647,18 @@ function handleSendClick(prompt = "") {
     });
 }
 
+const summarizeBtn =
+    $("summarizeBtn");
+
 if (summarizeBtn) {
-  summarizeBtn.addEventListener("click", () =>
-    summarizeNow().catch(e => {
-      setStatus("error");
-      alert(e.message || e);
-    })
-  );
+    summarizeBtn.addEventListener(
+        "click",
+        () =>
+            summarizeNow().catch(e => {
+                setStatus("error");
+                alert(e.message || e);
+            })
+    );
 }
 
     document.querySelectorAll("[data-prompt]").forEach((button) => {
@@ -2719,16 +2724,7 @@ sendBtn.addEventListener("click", (e) => {
   });
 }
 
-// disabled duplicate newSessionBtn listener
 
-if (summarizeBtn) {
-  summarizeBtn.addEventListener("click", () => {
-    summarizeNow().catch(e => {
-      setStatus("error");
-      alert(e.message || e);
-    });
-  });
-}
 
 document.querySelectorAll("[data-nova-quick-action]").forEach((button) => {
   button.addEventListener("click", () => {
@@ -12243,13 +12239,6 @@ document.querySelectorAll("#nova-desktop-execution-native [data-exec-fill]").for
     });
 });
 
-        console.log("[NOVA EXECUTION ACTION]", action);
-
-        if (typeof handleSendClick === "function") {
-            handleSendClick(action);
-        }
-    });
-});
 
         console.log("[NOVA_DESKTOP_EXECUTION_NATIVE_TOOLS_PANEL_20260702] active");
     }
