@@ -18,10 +18,10 @@
             const data =
                 await response.json();
 
-            const projects =
-                Array.isArray(data.projects)
-                    ? data.projects
-                    : [];
+const projects =
+    data.projects ||
+    data.items ||
+    [];
 
             if (!projects.length) {
                 container.innerHTML =
