@@ -1271,14 +1271,43 @@ observer.observe(document.documentElement, {
 <div id="desktopProjectNotes" class="project-panel-card">
   <h3>Notes</h3>
 
+<button
+  id="desktopProjectAddNoteButton"
+  type="button"
+>
+  + Add Note
+</button>
+
+<div id="desktopProjectNoteEditor" hidden>
+
+  <input
+    id="desktopProjectNoteTitle"
+    type="text"
+    placeholder="Note title"
+  />
+
+  <textarea
+    id="desktopProjectNoteContent"
+    placeholder="Write a project note..."
+  ></textarea>
+
   <button
-    id="desktopProjectAddNoteButton"
+    id="desktopProjectSaveNote"
     type="button"
   >
-    + Add Note
+    Save Note
   </button>
 
-  <div id="desktopProjectNoteList">
+  <button
+    id="desktopProjectCancelNote"
+    type="button"
+  >
+    Cancel
+  </button>
+
+</div>
+
+<div id="desktopProjectNoteList">
     <p>No notes yet.</p>
   </div>
 </div>
