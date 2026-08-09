@@ -337,3 +337,30 @@
     justify-content: flex-end;
     gap: 12px;
 }
+
+.nova-project-workspace-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.nova-project-workspace-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nova-project-workspace-actions button {
+    border: none;
+    border-radius: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+.nova-project-status-badge {
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+}
