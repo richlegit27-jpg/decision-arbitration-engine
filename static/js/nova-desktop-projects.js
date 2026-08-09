@@ -912,6 +912,37 @@ async function loadProjectNotes(projectId) {
             )
             .join("");
 
+container
+    .querySelectorAll("[data-project-note-delete]")
+    .forEach((button) => {
+        button.addEventListener(
+            "click",
+            async () => {
+                const noteId =
+                    button.dataset.projectNoteDelete;
+
+                const projectId =
+                    window.__NOVA_PROJECT_STATE
+                        .activeProjectId;
+
+                if (!projectId || !noteId) {
+                    return;
+                }
+
+                await fetch(
+                    `/api/projects/${projectId}/notes/${noteId}`,
+                    {
+                        method: "DELETE",
+                    }
+                );
+
+                await loadProjectNotes(
+                    projectId
+                );
+            }
+        );
+    });
+
     } catch (error) {
         console.error(
             "[Nova Projects] notes load failed",
@@ -968,6 +999,9 @@ async function loadProjectNotes(projectId) {
                 await loadProjectWorkspace(
                     activeProject.id
                 );
+await loadProjectNotes(
+    activeProject.id
+);
             }
 
         } catch (error) {
@@ -1087,10 +1121,13 @@ async function continueProject(projectId) {
         "Analyzing project..."
     );
 
-    await loadProjectIntelligence(
-        projectId
-    );
+await loadProjectIntelligence(
+    projectId
+);
 
+await loadProjectNotes(
+    projectId
+);
 
     const resume =
         $("desktopProjectResume");
