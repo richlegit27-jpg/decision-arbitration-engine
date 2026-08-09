@@ -1127,6 +1127,66 @@ await loadProjectNotes(
         }
     }
 
+const newProjectButton =
+    $("newProjectBtn");
+
+if (newProjectButton) {
+    newProjectButton.addEventListener(
+        "click",
+        async () => {
+            const name =
+                prompt("Project name:");
+
+            if (!name) {
+                return;
+            }
+
+            const description =
+                prompt("Project description:") ||
+                "";
+
+            try {
+                const response =
+                    await fetch(
+                        "/api/projects/new",
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify({
+                                name,
+                                description,
+                            }),
+                        }
+                    );
+
+                const data =
+                    await response.json();
+
+                if (!response.ok || !data.ok) {
+                    throw new Error(
+                        data.error ||
+                        "Project creation failed"
+                    );
+                }
+
+                await loadProjects();
+
+            } catch (error) {
+                console.error(
+                    "[Nova Projects] create failed",
+                    error
+                );
+
+                setProjectStatus(
+                    error.message ||
+                    "Project creation failed"
+                );
+            }
+        }
+    );
+}
 
     window.NovaDesktopProjects = {
         loadProjects,
