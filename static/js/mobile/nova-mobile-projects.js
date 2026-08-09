@@ -51,6 +51,7 @@ const description =
 button.innerHTML = `
     <strong>${name}</strong>
     <span>${description}</span>
+    <small>Status: ${project.status || "active"}</small>
 `;
 
                 button.addEventListener(
@@ -76,13 +77,6 @@ button.innerHTML = `
     }
 
 window.NovaLoadMobileProjects = loadMobileProjects;
-
-document.addEventListener(
-    "DOMContentLoaded",
-    function () {
-        loadMobileProjects();
-    }
-);
 
 })();
 
