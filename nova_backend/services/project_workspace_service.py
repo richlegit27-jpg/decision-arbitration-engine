@@ -265,6 +265,8 @@ class ProjectWorkspaceService:
         project_id,
         filename,
         path="",
+        size=0,
+        file_type="",
     ):
         projects = self._load_projects()
 
@@ -273,9 +275,15 @@ class ProjectWorkspaceService:
                 continue
 
             file_record = {
-                "id": str(uuid.uuid4()),
+                "id": str(
+                    uuid.uuid4()
+                ),
                 "filename": filename,
                 "path": path,
+                "size": int(
+                    size or 0
+                ),
+                "type": file_type,
                 "created_at": datetime.now(
                     timezone.utc
                 ).isoformat(),
@@ -284,9 +292,13 @@ class ProjectWorkspaceService:
             project.setdefault(
                 "files",
                 [],
-            ).append(file_record)
+            ).append(
+                file_record
+            )
 
-            self._save_projects(projects)
+            self._save_projects(
+                projects
+            )
 
             return file_record
 
