@@ -1232,6 +1232,16 @@ observer.observe(document.documentElement, {
   </div>
 
   <div class="project-workspace-card">
+<div
+    id="desktopProjectTasks"
+    class="project-panel-card"
+>
+    <h3>Tasks</h3>
+
+    <div class="session-placeholder">
+        Loading tasks...
+    </div>
+</div>
     <h3>Project Overview</h3>
 
 <p id="desktopProjectStatus">
@@ -1266,6 +1276,17 @@ observer.observe(document.documentElement, {
 <div id="desktopProjectRecommendation" class="project-panel-card">
   <h3>AI Recommendation</h3>
   <p>Start organizing this project.</p>
+</div>
+
+<div
+    id="desktopProjectTasks"
+    class="project-panel-card"
+>
+    <h3>Tasks</h3>
+
+    <div class="session-placeholder">
+        Loading tasks...
+    </div>
 </div>
 
 <div id="desktopProjectFiles" class="project-panel-card">
@@ -7109,7 +7130,8 @@ console.log("[Nova Force New Chat] cleared chat");
 <link rel="stylesheet" href="/static/css/nova-desktop-polish.css?v=recent-session-cards-final-20260621-1">
 <link rel="stylesheet" href="/static/css/nova-desktop-clean.css?v=1">
 
-
+<link rel="stylesheet"
+href="/static/css/nova-desktop-projects.css?v=projects-v1">
 
 <!-- NOVA_CODE_BLOCK_VISUAL_POLISH_FINAL_20260622 -->
 <style>
