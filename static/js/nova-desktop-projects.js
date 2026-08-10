@@ -851,12 +851,15 @@ async function loadProjectFiles(projectId) {
             return;
         }
 
-        container.innerHTML = files
-            .map(
-                (file) => {
-                    const name =
-                        file.name ||
-                        "Untitled file";
+console.log("[NOVA FILE DEBUG]", files);
+
+    container.innerHTML = files
+        .map(
+            (file) => {
+                const name =
+                    file.filename ||
+                    file.name ||
+                    "Untitled file";
 
                     const size =
                         Number(file.size || 0);
