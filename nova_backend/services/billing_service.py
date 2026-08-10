@@ -20,9 +20,9 @@ MODEL_COSTS = {
 }
 
 DEFAULT_USER = {
-    "plan": "free",
-    "credits": 1000,
-    "monthly_credits": 1000,
+"plan": "free",
+"credits": 10000,
+"monthly_credits": 10000,
     "created_at": "",
     "stripe_customer_id": ""
 }
@@ -215,16 +215,16 @@ def set_subscription(
         plan or "free"
     ).strip().lower()
 
-    plan_credits = {
-        "free": 1000,
-        "standard": 10000,
-        "pro": 50000,
-    }
+plan_credits = {
+    "free": 10000,
+    "plus": 500000,
+    "pro": 2000000,
+}
 
-    monthly_credits = plan_credits.get(
-        plan,
-        1000,
-    )
+monthly_credits = plan_credits.get(
+    plan,
+    10000,
+)
 
     account["subscription_id"] = str(
         subscription_id or ""
@@ -276,24 +276,24 @@ def plan_from_price_id(
         price_id or ""
     ).strip()
 
-    standard_price = str(
-        os.environ.get(
-            "NOVA_STRIPE_STANDARD_PRICE_ID",
-            "",
-        )
-    ).strip()
+plus_price = str(
+    os.environ.get(
+        "NOVA_STRIPE_PLUS_PRICE_ID",
+        "",
+    )
+).strip()
 
-    pro_price = str(
-        os.environ.get(
-            "NOVA_STRIPE_PRO_PRICE_ID",
-            "",
-        )
-    ).strip()
+pro_price = str(
+    os.environ.get(
+        "NOVA_STRIPE_PRO_PRICE_ID",
+        "",
+    )
+).strip()
 
-    if price_id and price_id == standard_price:
-        return "standard"
+if price_id and price_id == plus_price:
+    return "plus"
 
-    if price_id and price_id == pro_price:
-        return "pro"
+if price_id and price_id == pro_price:
+    return "pro"
 
     return "free"

@@ -1192,66 +1192,26 @@ observer.observe(document.documentElement, {
 
       <!-- NOVA_WORKPLACE_PROJECTS_PANEL_V1 -->
       <section class="workspace-section">
-<div class="section-title-row">
-  <div>
-    <h2>Projects</h2>
-    <p>Organize workplace tasks and goals.</p>
-  </div>
+        <div class="section-title-row">
+          <div>
+            <h2>Projects</h2>
+            <p>Organize workplace tasks and goals.</p>
+          </div>
+        </div>
 
-  <button
-    class="primary-side-button"
-    id="newProjectBtn"
-    type="button"
-  >
-    <span>New Project</span>
-    <span>+</span>
-  </button>
-</div>
-</div>
+        <button
+          class="primary-side-button"
+          id="newProjectBtn"
+          type="button"
+        >
+          <span>New Project</span>
+          <span>+</span>
+        </button>
+
+        <div
           id="desktopProjectList"
           class="desktop-project-list"
         >
-<div
-  id="newProjectModal"
-  class="nova-modal"
-  hidden
->
-  <div class="nova-modal-card">
-
-    <h3>Create Project</h3>
-
-    <input
-      id="newProjectName"
-      type="text"
-      placeholder="Project name"
-    />
-
-    <textarea
-      id="newProjectDescription"
-      placeholder="Project description"
-    ></textarea>
-
-    <div class="nova-modal-actions">
-
-      <button
-        id="cancelNewProject"
-        type="button"
-      >
-        Cancel
-      </button>
-
-      <button
-        id="createNewProject"
-        type="button"
-        class="primary-side-button"
-      >
-        Create Project
-      </button>
-
-    </div>
-
-  </div>
-</div>
           <div class="session-placeholder">
             Loading projects...
           </div>
@@ -1259,40 +1219,18 @@ observer.observe(document.documentElement, {
       </section>
 
 <section
-<div class="section-title-row nova-project-workspace-header">
-  <div>
-    <h2 id="desktopProjectTitle">
-      No project selected
-    </h2>
-
-    <p id="desktopProjectDescription">
-      Select a project to open workspace.
-    </p>
+  id="desktopProjectWorkspace"
+  class="workspace-section"
+>
+  <div class="section-title-row">
+    <div>
+      <h2 id="desktopProjectTitle">No project selected</h2>
+      <p id="desktopProjectDescription">
+        Select a project to open workspace.
+      </p>
+    </div>
   </div>
 
-  <div class="nova-project-workspace-actions">
-    <span
-      id="desktopProjectStatusBadge"
-      class="nova-project-status-badge"
-    >
-      Ready
-    </span>
-
-    <button
-      id="desktopProjectRenameButton"
-      type="button"
-    >
-      Rename
-    </button>
-
-    <button
-      id="desktopProjectArchiveButton"
-      type="button"
-    >
-      Archive
-    </button>
-  </div>
-</div>
   <div class="project-workspace-card">
     <h3>Project Overview</h3>
 
@@ -1328,73 +1266,6 @@ observer.observe(document.documentElement, {
 <div id="desktopProjectRecommendation" class="project-panel-card">
   <h3>AI Recommendation</h3>
   <p>Start organizing this project.</p>
-</div>
-
-<div id="desktopProjectFiles" class="project-panel-card">
-  <div class="nova-project-files-header">
-    <h3>Project Files</h3>
-
-    <button
-      id="desktopProjectUploadButton"
-      type="button"
-    >
-      Upload File
-    </button>
-  </div>
-
-  <input
-    id="desktopProjectFileInput"
-    type="file"
-    hidden
-  />
-
-  <div id="desktopProjectFileList">
-    <p>No files yet.</p>
-  </div>
-</div>
-
-<div id="desktopProjectNotes" class="project-panel-card">
-  <h3>Notes</h3>
-
-  <button
-    id="desktopProjectAddNoteButton"
-    type="button"
-  >
-    + Add Note
-  </button>
-
-  <div id="desktopProjectNoteEditor" hidden>
-
-    <input
-      id="desktopProjectNoteTitle"
-      type="text"
-      placeholder="Note title"
-    />
-
-    <textarea
-      id="desktopProjectNoteContent"
-      placeholder="Write a project note..."
-    ></textarea>
-
-    <button
-      id="desktopProjectSaveNote"
-      type="button"
-    >
-      Save Note
-    </button>
-
-    <button
-      id="desktopProjectCancelNote"
-      type="button"
-    >
-      Cancel
-    </button>
-
-  </div>
-
-  <div id="desktopProjectNoteList">
-    <p>No notes yet.</p>
-  </div>
 </div>
 
 <div id="desktopProjectRecentActivity" class="project-panel-card">
@@ -2709,18 +2580,13 @@ function handleSendClick(prompt = "") {
     });
 }
 
-const summarizeBtn =
-    $("summarizeBtn");
-
 if (summarizeBtn) {
-    summarizeBtn.addEventListener(
-        "click",
-        () =>
-            summarizeNow().catch(e => {
-                setStatus("error");
-                alert(e.message || e);
-            })
-    );
+  summarizeBtn.addEventListener("click", () =>
+    summarizeNow().catch(e => {
+      setStatus("error");
+      alert(e.message || e);
+    })
+  );
 }
 
     document.querySelectorAll("[data-prompt]").forEach((button) => {
@@ -2786,7 +2652,16 @@ sendBtn.addEventListener("click", (e) => {
   });
 }
 
+// disabled duplicate newSessionBtn listener
 
+if (summarizeBtn) {
+  summarizeBtn.addEventListener("click", () => {
+    summarizeNow().catch(e => {
+      setStatus("error");
+      alert(e.message || e);
+    });
+  });
+}
 
 document.querySelectorAll("[data-nova-quick-action]").forEach((button) => {
   button.addEventListener("click", () => {
@@ -12301,6 +12176,13 @@ document.querySelectorAll("#nova-desktop-execution-native [data-exec-fill]").for
     });
 });
 
+        console.log("[NOVA EXECUTION ACTION]", action);
+
+        if (typeof handleSendClick === "function") {
+            handleSendClick(action);
+        }
+    });
+});
 
         console.log("[NOVA_DESKTOP_EXECUTION_NATIVE_TOOLS_PANEL_20260702] active");
     }

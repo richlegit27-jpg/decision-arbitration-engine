@@ -1,12 +1,26 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-
+from nova_backend.services.auth_context import get_current_user_id
 
 class ProjectWorkspaceService:
+
+    def _current_owner_id(self):
+        return get_current_user_id()
+
+    def _same_project_owner(self, project):
+        owner_id = self._current_owner_id()
+
+        if not owner_id:
+            return False
+
+        return str(
+            project.get("owner_id") or ""
+        ) == str(owner_id)
+
     def __init__(self, data_dir="data"):
         self.data_dir = Path(data_dir)
 
@@ -60,6 +74,7 @@ class ProjectWorkspaceService:
 
         project = {
             "id": f"project_{uuid.uuid4().hex[:12]}",
+            "owner_id": self._current_owner_id(),
             "name": str(
                 name or "New Project"
             ),
@@ -101,14 +116,21 @@ class ProjectWorkspaceService:
     def list_projects(
         self,
     ):
-        return self._load_projects()
+        return [
+            project
+            for project in self._load_projects()
+            if self._same_project_owner(project)
+        ]
 
     def get_project(
         self,
         project_id,
     ):
         for project in self._load_projects():
-            if project.get("id") == project_id:
+            if (
+                project.get("id") == project_id
+                and self._same_project_owner(project)
+            ):
                 return project
 
         return None
@@ -168,15 +190,20 @@ class ProjectWorkspaceService:
     ):
         projects = self._load_projects()
 
+
+
+
         for project in projects:
             if project.get("id") != project_id:
                 continue
+
+            if not self._same_project_owner(project):
+                return None
 
             tasks = project.setdefault(
                 "tasks",
                 [],
             )
-
             task = {
                 "id": str(
                     uuid.uuid4()
@@ -218,6 +245,9 @@ class ProjectWorkspaceService:
             if project.get("id") != project_id:
                 continue
 
+            if not self._same_project_owner(project):
+                return None
+
             for task in project.get(
                 "tasks",
                 [],
@@ -254,6 +284,9 @@ class ProjectWorkspaceService:
             if project.get("id") != project_id:
                 continue
 
+            if not self._same_project_owner(project):
+                return False
+
             tasks = project.get(
                 "tasks",
                 [],
@@ -282,99 +315,6 @@ class ProjectWorkspaceService:
 
         return False
 
-    def add_file(
-        self,
-        project_id,
-        name,
-        path,
-        size=0,
-        file_type="",
-    ):
-        projects = self._load_projects()
-
-        for project in projects:
-            if project.get("id") != project_id:
-                continue
-
-            files = project.setdefault(
-                "files",
-                [],
-            )
-
-            file_record = {
-                "id": str(
-                    uuid.uuid4()
-                ),
-                "name": str(
-                    name or "Untitled file"
-                ),
-                "path": str(
-                    path or ""
-                ),
-                "size": int(
-                    size or 0
-                ),
-                "type": str(
-                    file_type or ""
-                ),
-                "uploaded_at": datetime.now(
-                    timezone.utc
-                ).isoformat(),
-            }
-
-            files.append(
-                file_record
-            )
-
-            project["updated_at"] = datetime.now(
-                timezone.utc
-            ).isoformat()
-
-            self._save_projects(
-                projects
-            )
-
-            return file_record
-
-        return None
-
-    def list_files(
-        self,
-        project_id,
-    ):
-        project = self.get_project(
-            project_id
-        )
-
-        if not project:
-            return []
-
-        files = project.get(
-            "files",
-            [],
-        )
-
-        return (
-            files
-            if isinstance(files, list)
-            else []
-        )
-
-
-    def get_file(
-        self,
-        project_id,
-        file_id,
-    ):
-        for file_record in self.list_files(
-            project_id
-        ):
-            if file_record.get("id") == file_id:
-                return file_record
-
-        return None
-
-
     def delete_file(
         self,
         project_id,
@@ -385,6 +325,9 @@ class ProjectWorkspaceService:
         for project in projects:
             if project.get("id") != project_id:
                 continue
+
+            if not self._same_project_owner(project):
+                return False
 
             files = project.get(
                 "files",
@@ -421,17 +364,23 @@ class ProjectWorkspaceService:
         projects = self._load_projects()
 
         for project in projects:
-            if project.get("id") == project_id:
-                for item in projects:
+            if project.get("id") != project_id:
+                continue
+
+            if not self._same_project_owner(project):
+                return None
+
+            for item in projects:
+                if self._same_project_owner(item):
                     item["active"] = (
                         item.get("id") == project_id
                     )
 
-                self._save_projects(
-                    projects
-                )
+            self._save_projects(
+                projects
+            )
 
-                return project
+            return project
 
         return None
 
@@ -441,11 +390,68 @@ class ProjectWorkspaceService:
         projects = self._load_projects()
 
         for project in projects:
-            if project.get(
-                "active",
-                False,
+            if (
+                self._same_project_owner(project)
+                and project.get(
+                    "active",
+                    False,
+                )
             ):
                 return project
+
+        return None
+
+    def add_note(
+        self,
+        project_id,
+        title,
+        content="",
+    ):
+        projects = self._load_projects()
+
+        for project in projects:
+            if project.get("id") != project_id:
+                continue
+
+            if not self._same_project_owner(project):
+                return None
+
+            notes = project.setdefault(
+                "notes",
+                [],
+            )
+
+            note = {
+                "id": str(
+                    uuid.uuid4()
+                ),
+                "title": str(
+                    title or "Untitled Note"
+                ),
+                "content": str(
+                    content or ""
+                ),
+                "created_at": datetime.now(
+                    timezone.utc
+                ).isoformat(),
+                "updated_at": datetime.now(
+                    timezone.utc
+                ).isoformat(),
+            }
+
+            notes.append(
+                note
+            )
+
+            project["updated_at"] = datetime.now(
+                timezone.utc
+            ).isoformat()
+
+            self._save_projects(
+                projects
+            )
+
+            return note
 
         return None
 
@@ -522,7 +528,6 @@ class ProjectWorkspaceService:
             else []
         )
 
-
     def update_note(
         self,
         project_id,
@@ -536,10 +541,15 @@ class ProjectWorkspaceService:
             if project.get("id") != project_id:
                 continue
 
-            for note in project.get(
+            if not self._same_project_owner(project):
+                return None
+
+            notes = project.get(
                 "notes",
                 [],
-            ):
+            )
+
+            for note in notes:
                 if note.get("id") != note_id:
                     continue
 
@@ -567,10 +577,7 @@ class ProjectWorkspaceService:
 
                 return note
 
-            return None
-
         return None
-
 
     def delete_note(
         self,
@@ -582,6 +589,9 @@ class ProjectWorkspaceService:
         for project in projects:
             if project.get("id") != project_id:
                 continue
+
+            if not self._same_project_owner(project):
+                return False
 
             notes = project.get(
                 "notes",
