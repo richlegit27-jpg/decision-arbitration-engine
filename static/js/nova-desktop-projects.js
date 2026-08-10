@@ -494,12 +494,23 @@ async function loadProjectIntelligence(projectId) {
             "Untitled Project";
 
 
-
-
-
         const description =
             project.description ||
             "No description provided.";
+
+const titleElement =
+    $("desktopProjectTitle");
+
+if (titleElement) {
+    titleElement.textContent = name;
+}
+
+const descriptionElement =
+    $("desktopProjectDescription");
+
+if (descriptionElement) {
+    descriptionElement.textContent = description;
+}
 
         const active =
             project.active === true ||
@@ -639,6 +650,31 @@ async function loadProjectIntelligence(projectId) {
 
             renderProjectOverview(data);
             renderProjectTasks(data);
+
+
+const project =
+    data.project ||
+    data.summary?.project ||
+    {};
+
+const title =
+    $("desktopProjectTitle");
+
+if (title) {
+    title.textContent =
+        project.name ||
+        project.title ||
+        "Untitled Project";
+}
+
+const description =
+    $("desktopProjectDescription");
+
+if (description) {
+    description.textContent =
+        project.description ||
+        "";
+}
 
 const workspace =
     document.querySelector(
