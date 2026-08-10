@@ -25,7 +25,6 @@ from nova_backend.services.project_workspace_service import (
 from nova_backend.services.project_intelligence_service import (
     project_intelligence_service,
 )
-
 from nova_backend.services.debug_route_service import DebugRouteService
 from nova_backend.services.attachment_response_guard_service import (
     normalize_attachment_response,
