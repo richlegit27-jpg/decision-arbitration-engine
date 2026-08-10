@@ -872,8 +872,9 @@ console.log("[NOVA FILE DEBUG]", files);
                             )}"
                         >
                             <div class="nova-project-file-info">
+
 <a
-    href="${escapeHtml(file.url || "#")}"
+    href="/api/projects/${projectId}/files/${file.id}/download"
     target="_blank"
     rel="noopener"
 >

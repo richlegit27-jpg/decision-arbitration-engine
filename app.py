@@ -18,6 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from nova_backend.services.memory_route_service import MemoryRouteService
 from werkzeug.utils import secure_filename
+from flask import send_file
 from nova_backend.services.web_preview_route_service import WebPreviewRouteService
 from nova_backend.services.project_workspace_service import (
     ProjectWorkspaceService,
@@ -95,62 +96,48 @@ from nova_backend.routes.memory_panel_routes import (
 from nova_backend.services.project_next_response_service import (
     build_project_next_response,
 )
-
 from nova_backend.services.mobile_session_persist_service import (
     MobileSessionPersistService,
 )
-
 from nova_backend.services.chat_attachment_guard_service import (
     ChatAttachmentGuardService,
 )
-
 from nova_backend.routes.improvement_routes import (
 
     register_improvement_routes,
 )
-
 from nova_backend.services.session_route_service import SessionRouteService
 from nova_backend.services.error_reporting_service import ErrorReportingService
 from nova_backend.services.stale_working_state_history_service import (
     clean_response_stale_working_state_history,
 )
-
 from nova_backend.services.upload_ownership_service import (
     UploadOwnershipService,
 )
-
 from nova_backend.services.execution_bridge_service import (
     ExecutionBridgeService,
 )
-
 from nova_backend.services.upload_route_service import (
     UploadRouteService,
 )
-
 from nova_backend.services.attachment_text_service import (
     AttachmentTextService,
 )
-
 from nova_backend.services.attachment_utils_service import (
     AttachmentUtilsService,
 )
-
 from nova_backend.services.execution_stream_service import (
     ExecutionStreamService,
 )
 from nova_backend.services.coding_judgment_service import (
     get_coding_judgment_answer,
 )
-
 from nova_backend.services.chat_stream_service import (
     ChatStreamService,
 )
-
 from nova_backend.services.execution_fix_service import (
     ExecutionFixService,
 )
-
-
 from nova_backend.services.chat_guard_service import (
     ChatGuardService,
 )
@@ -160,7 +147,6 @@ from nova_backend.services.project_state_route_guard_service import (
 from nova_backend.services.chat_request_context_service import (
     ChatRequestContextService,
 )
-
 from nova_backend.services.execution_route_service import ExecutionRouteService
 from nova_backend.services import session_auth_scope_service
 from nova_backend.services import attachment_gate_service
@@ -226,101 +212,78 @@ from nova_backend.services.safe_unified_runtime import (
 from nova_backend.services.runtime_bootstrap import (
     RuntimeBootstrap,
 )
-
 from nova_backend.services.runtime_response_sanitizer_service import (
     RuntimeResponseSanitizerService,
 )
-
 from nova_backend.services.session_response_cleanup import (
     cleanup_session_response,
 )
-
 from nova_backend.services.title_guard_service import (
     clean_title,
     persist_title,
 )
-
 from nova_backend.services.chat_attachment_memory_service import (
     ChatAttachmentMemoryService,
 )
-
 from nova_backend.services.project_recall_service import (
     ProjectRecallService,
 )
-
 from nova_backend.services.project_chat_response_router_service import (
     install_project_chat_response_router,
 )
-
 from nova_backend.services.session_response_finalizer_service import (
     assistant_message_already_saved,
     assistant_same_text_already_saved,
     user_message_already_saved,
 )
-
 from nova_backend.services.answer_quality_policy_service import (
     get_answer_quality_policy_answer,
 )
-
 from nova_backend.services.memory_context_service import (
     MemoryContextService,
 )
 from nova_backend.services.chat_attachment_context_service import (
     ChatAttachmentContextService,
 )
-
 from nova_backend.services.project_focus_memory_service import (
     ProjectFocusMemoryService,
 )
-
 from nova_backend.services.project_aware_context_service import (
     ProjectAwareContextService,
 )
-
 from nova_backend.services.project_state_memory_service import (
     ProjectStateMemoryService,
 )
-
 PROJECT_STATE_MEMORY_KINDS = (
     ProjectStateMemoryService.PROJECT_STATE_MEMORY_KINDS
 )
-
 from nova_backend.services.attachment_context_service import (
     AttachmentContextService,
 )
-
 from nova_backend.services.attachment_keypoints_service import (
     AttachmentKeypointsService,
 )
-
 from nova_backend.services.attachment_analysis_service import (
     AttachmentAnalysisService,
 )
-
 from nova_backend.services.response_quality_service import (
     ResponseQualityService,
 )
-
 from nova_backend.services.memory_command_service import (
     MemoryCommandService,
 )
-
 from nova_backend.services.attachment_summary_service import (
     AttachmentSummaryService,
 )
-
 from nova_backend.services.memory_guard_service import (
     MemoryGuardService,
 )
-
 from nova_backend.services.session_response_cache_service import (
     SessionResponseCacheService,
 )
-
 from nova_backend.services.attachment_endpoint_service import (
     AttachmentEndpointService,
 )
-
 from nova_backend.services.web_fetch_bridge_service import (
     WebFetchBridgeService,
 )
@@ -328,68 +291,61 @@ from nova_backend.services import session_title_guard_service
 from nova_backend.services.session_detail_response_cache_service import (
     SessionDetailResponseCacheService,
 )
-
 from nova_backend.services.session_detail_response_cache_service import (
     SessionDetailResponseCacheService,
 )
 from nova_backend.services.attachment_action_service import (
     AttachmentActionService,
 )
-
 from nova_backend.services.tool_runtime_factory import (
     build_tool_runtime,
 )
-
 from nova_backend.services.session_slim_response_service import (
     SessionSlimResponseService,
 )
-
 from nova_backend.services.account_profile_service import (
     AccountProfileService,
 )
-
 from nova_backend.services.attachment_route_service import AttachmentRouteService
-
 from nova_backend.services.login_page_route_service import (
     LoginPageRouteService,
 )
 from nova_backend.services.local_auth_route_service import (
     LocalAuthRouteService,
 )
+from nova_backend.services.google_auth_service import (
+    GoogleAuthService,
+)
+from nova_backend.services.google_auth_route_service import (
+    GoogleAuthRouteService,
+)
 from nova_backend.services.project_state_direct_freshness_priority_service import (
     ProjectStateDirectFreshnessPriorityService,
 )
-
 from nova_backend.services.auth_compat_route_service import (
     AuthCompatRouteService,
 )
-
 from nova_backend.services.session_auth_scope_service import (
     SessionAuthScopeService,
 )
-
 from nova_backend.services.admin_route_service import (
     AdminRouteService,
 )
 from nova_backend.services.execution_stream_route_service import (
     ExecutionStreamRouteService,
 )
-
 from nova_backend.services.attachment_memory_gate_service import (
     AttachmentMemoryGateService,
 )
-
 from nova_backend.services.blog_service import (
     BlogService,
 )
 from nova_backend.services.blog_route_service import (
     BlogRouteService,
 )
-
 from nova_backend.services.public_route_service import (
     PublicRouteService,
 )
-
 from nova_backend.services.history_route_service import (
     HistoryRouteService,
 )
@@ -399,28 +355,21 @@ from nova_backend.services.chat_attachment_selector_service import (
 from nova_backend.services.chat_response_cleanup_service import (
     ChatResponseCleanupService,
 )
-
 from nova_backend.services.session_history_persistence_guard_service import (
     SessionHistoryPersistenceGuardService,
 )
-
 session_history_persistence_guard_service = (
     SessionHistoryPersistenceGuardService()
 )
-
-
 from nova_backend.services.execution_state_service import ExecutionStateService
 from nova_backend.services import empty_session_pruner_service
 from nova_backend.services.chat_stream_service import ChatStreamService
 from nova_backend.services.command_route_service import (
     CommandRouteService,
 )
-
 # -----------------------
 # SERVICES
 # -----------------------
-
-
 session_service = SessionService(
     DATA_DIR / "nova_sessions.json"
 )
@@ -442,59 +391,44 @@ session_bootstrap_service = None
 mobile_exchange_service = MobileExchangeService(
     session_service
 )
-
 session_history_service = SessionHistoryService(
     BASE_DIR
 )
-
 autonomy_route_guard_service = AutonomyRouteGuardService(
     session_service,
 )
-
 history_service = HistoryService(
     session_history_service
 )
-
-
 project_state_memory_service = ProjectStateMemoryService(
     DATA_DIR / "nova_project_state.json"
 )
-
 memory_context_service = MemoryContextService(
     DATA_DIR,
     session_service,
 )
-
 artifact_service = ArtifactService(
     str(DATA_DIR / "nova_artifacts.json")
 )
-
 upload_ownership_service = UploadOwnershipService(
     "data/nova_upload_ownership.json"
 )
-
 upload_route_service = UploadRouteService(
     uploads_dir=UPLOADS_DIR,
     upload_ownership_service=upload_ownership_service,
 )
-
 project_aware_context_service = ProjectAwareContextService(
     memory_context_service,
     session_service,
 )
-
 attachment_memory_gate_service = AttachmentMemoryGateService(
     attachment_gate_service,
     attachment_memory_service,
 )
-
 attachment_context_service = AttachmentContextService(
     UPLOADS_DIR,
 )
-
 local_auth_route_service = None
-
-
 repair_plan_priority_guard_service = RepairPlanPriorityGuardService()
 chat_attachment_memory_service = ChatAttachmentMemoryService()
 chat_response_cleanup_service = ChatResponseCleanupService()
@@ -504,16 +438,13 @@ execution_route_service = ExecutionRouteService(
     chat_execution_service,
     chat_execution_service,
 )
-
 execution_bridge_service = ExecutionBridgeService(
     chat_execution_service,
     None,
 )
-
 execution_guard_service = ExecutionGuardService(
     chat_execution_service
 )
-
 execution_priority_guard_service = ExecutionPriorityGuardService()
 web_preview_route_service = WebPreviewRouteService()
 error_reporting_service = ErrorReportingService()
@@ -531,11 +462,9 @@ memory_service = MemoryService(
 memory_route_service = MemoryRouteService(
     memory_service
 )
-
 memory_recall_service = MemoryRecallService(
     memory_service
 )
-
 project_focus_memory_service = ProjectFocusMemoryService(
     memory_service,
     session_service,
@@ -546,10 +475,7 @@ project_recall_service = ProjectRecallService(
     PROJECT_STATE_MEMORY_KINDS,
     DATA_DIR,
 )
-
-
 memory_guard_service = MemoryGuardService()
-
 memory_guard_route_service = MemoryGuardRouteService(
     memory_service,
     session_service,
@@ -570,7 +496,6 @@ session_response_cache_service = SessionResponseCacheService(
     session_detail_cache_service,
     attachment_context_service,
 )
-
 chat_attachment_guard_service = ChatAttachmentGuardService()
 image_vision_service = ImageVisionService()
 chat_guard_service = ChatGuardService()
@@ -595,13 +520,9 @@ debug_route_service = DebugRouteService()
 blog_route_service = BlogRouteService(
     blog_service
 )
-
 RuntimeBootstrap.save(
     runtime_brain
 )
-
-
-
 # -----------------------
 # HELPERS
 # -----------------------
@@ -977,7 +898,15 @@ project_workspace_service = ProjectWorkspaceService(
 )
 
 local_auth_route_service.install_routes()
+google_auth_service = GoogleAuthService(
+    app
+)
+google_auth_route_service = GoogleAuthRouteService(
+    app,
+    google_auth_service,
+)
 
+google_auth_route_service.install_routes()
 app.secret_key = os.environ.get(
     "NOVA_SECRET_KEY"
 )
@@ -1433,6 +1362,31 @@ def api_projects():
         }
     )
 
+@app.route(
+    "/api/projects/<project_id>",
+    methods=["GET"],
+)
+def api_project_get(
+    project_id,
+):
+    project = project_workspace_service.get_project(
+        project_id
+    )
+
+    if not project:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "project": project,
+        }
+    )
 
 @app.route("/api/projects/new", methods=["POST"])
 def api_projects_new():
@@ -4949,31 +4903,70 @@ def api_project_files(
 def api_project_add_file(
     project_id,
 ):
-    data = request.get_json(
-        silent=True
-    ) or {}
+    if "file" in request.files:
+        uploaded = request.files["file"]
 
-    file_record = project_workspace_service.add_file(
-        project_id,
-        data.get(
-            "name",
-            "Untitled file",
-        ),
-        data.get(
-            "path",
+        file_record = project_workspace_service.add_file(
+            project_id,
+            uploaded.filename,
             "",
-        ),
-        data.get(
-            "size",
             0,
-        ),
-        data.get(
-            "type",
-            "",
-        ),
-    )
+            uploaded.content_type or "",
+        )
+
+    else:
+        data = request.get_json(
+            silent=True
+        ) or {}
+
+        file_record = project_workspace_service.add_file(
+            project_id,
+            data.get(
+                "name",
+                "Untitled file",
+            ),
+            data.get(
+                "path",
+                "",
+            ),
+            data.get(
+                "size",
+                0,
+            ),
+            data.get(
+                "type",
+                "",
+            ),
+        )
 
     if not file_record:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Could not add file",
+            }
+        ), 400
+
+    return jsonify(
+        {
+            "ok": True,
+            "file": file_record,
+        }
+    )
+
+@app.route(
+    "/api/projects/<project_id>/files/<file_id>/download",
+    methods=["GET"],
+)
+def api_project_download_file(
+    project_id,
+    file_id,
+):
+    project = project_workspace_service.get_project(
+        project_id
+    )
+
+    if not project:
         return jsonify(
             {
                 "ok": False,
@@ -4981,11 +4974,47 @@ def api_project_add_file(
             }
         ), 404
 
-    return jsonify(
-        {
-            "ok": True,
-            "file": file_record,
-        }
+    files = project_workspace_service.list_files(
+        project_id
+    )
+
+    file_record = next(
+        (
+            item
+            for item in files
+            if item.get("id") == file_id
+        ),
+        None,
+    )
+
+    if not file_record:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "File not found",
+            }
+        ), 404
+
+    path = file_record.get(
+        "path",
+        "",
+    )
+
+    if not path or not os.path.exists(path):
+        return jsonify(
+            {
+                "ok": False,
+                "error": "File missing",
+            }
+        ), 404
+
+    return send_file(
+        path,
+        as_attachment=False,
+        download_name=file_record.get(
+            "filename",
+            "file",
+        ),
     )
 
 @app.route(
