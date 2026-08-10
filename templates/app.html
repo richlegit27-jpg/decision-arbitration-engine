@@ -1823,64 +1823,6 @@ if (typeof renderDesktopChatMessagesRescue === "function" && !window.__NOVA_REND
 window.loadDesktopSessions = loadDesktopSessions;
 
 
-async function loadDesktopProjects() {
-  const list = document.getElementById(
-    "desktopProjectList"
-  );
-
-  if (!list) {
-    return;
-  }
-
-  try {
-    const data = await fetch(
-      "/api/projects"
-    ).then(
-      r => r.json()
-    );
-
-    const projects = data.projects || [];
-
-    if (!projects.length) {
-      list.innerHTML = `
-        <div class="session-placeholder">
-          No projects yet.
-        </div>
-      `;
-      return;
-    }
-
-    list.innerHTML = projects.map(
-      project => `
-        <div class="session-current-card">
-          <div class="session-label">
-            ${project.name}
-          </div>
-
-          <div>
-            ${project.description || ""}
-          </div>
-        </div>
-      `
-    ).join("");
-
-  } catch (error) {
-    console.warn(
-      "[loadDesktopProjects failed]",
-      error
-    );
-
-    list.innerHTML = `
-      <div class="session-placeholder">
-        Failed loading projects.
-      </div>
-    `;
-  }
-}
-
-window.loadDesktopProjects = loadDesktopProjects;
-
-
 function startDesktopSessionSync() {
   window.__novaEvents = window.__novaEvents || {
     listeners: {},
@@ -2414,10 +2356,6 @@ console.log("[Nova Desktop Sessions Button] clicked");
 
 if (typeof loadDesktopSessions === "function") {
   loadDesktopSessions();
-}
-
-if (typeof loadDesktopProjects === "function") {
-  loadDesktopProjects();
 }
 
     }

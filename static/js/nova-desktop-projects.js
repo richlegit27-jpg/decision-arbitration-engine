@@ -1338,6 +1338,7 @@ if (
     );
 }
 
+if (projectFileInput) {
     projectFileInput.addEventListener(
         "change",
         async () => {
@@ -1407,21 +1408,23 @@ await loadProjectNotes(
                     "File uploaded"
                 );
 
-            } catch (error) {
-                console.error(
-                    "[Nova Projects] file upload failed",
-                    error
-                );
+        } catch (error) {
+            console.error(
+                "[Nova Projects] file upload failed",
+                error
+            );
 
-                setProjectStatus(
-                    error.message ||
-                    "File upload failed"
-                );
-            } finally {
-                projectFileInput.value = "";
-            }
+            setProjectStatus(
+                error.message ||
+                "File upload failed"
+            );
+
+        } finally {
+            projectFileInput.value = "";
         }
-    );
+    }
+);
+}
 
 const addNoteButton =
     $("desktopProjectAddNoteButton");
@@ -1557,5 +1560,72 @@ if (
         }
     );
 }
+
+function bindProjectButtons() {
+
+    const newProjectBtn =
+        $("newProjectBtn");
+
+    if (newProjectBtn) {
+        newProjectBtn.addEventListener(
+            "click",
+            async () => {
+
+                const name =
+                    prompt(
+                        "Project name"
+                    );
+
+                if (!name) {
+                    return;
+                }
+
+                await fetch(
+                    "/api/projects/new",
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type":
+                                "application/json",
+                        },
+                        body: JSON.stringify({
+                            name,
+                            description: "",
+                        }),
+                    }
+                );
+
+                await window.NovaDesktopProjects.loadProjects();
+            }
+        );
+    }
+
+
+    const continueButton =
+        $("desktopContinueProject");
+
+    if (continueButton) {
+        continueButton.addEventListener(
+            "click",
+            () => {
+
+                const id =
+                    window.__NOVA_PROJECT_STATE
+                        .activeProjectId;
+
+                if (id) {
+                    window.NovaDesktopProjects
+                        .loadProjectWorkspace(id);
+                }
+            }
+        );
+    }
+}
+
+
+document.addEventListener(
+    "DOMContentLoaded",
+    bindProjectButtons
+);
 
 })();
