@@ -1199,108 +1199,35 @@ observer.observe(document.documentElement, {
           </div>
         </div>
 
-    <button
-      class="primary-side-button"
-      id="newProjectBtn"
-      type="button"
-    >
-      <span>New Project</span>
-      <span>+</span>
-    </button>
+        <button
+          class="primary-side-button"
+          id="newProjectBtn"
+          type="button"
+        >
+          <span>New Project</span>
+          <span>+</span>
+        </button>
 
-    <div
-      id="desktopProjectList"
-      class="desktop-project-list"
-    >
-      <div class="session-placeholder">
-        Loading projects...
-      </div>
-    </div>
-
-    <!-- ADD THE NEW PROJECT FEATURES HERE -->
-
-<div
-  id="newProjectModal"
-  class="nova-modal"
-  hidden
->
-  <h3>Create Project</h3>
-
-  <input
-    id="newProjectName"
-    type="text"
-    placeholder="Project name"
-  />
-
-  <textarea
-    id="newProjectDescription"
-    placeholder="Project description"
-  ></textarea>
-
-  <div class="nova-modal-actions">
-
-    <button
-      id="cancelNewProject"
-      type="button"
-    >
-      Cancel
-    </button>
-
-    <button
-      id="createNewProject"
-      type="button"
-      class="primary-side-button"
-    >
-      Create Project
-    </button>
-
-  </div>
-</div>
-
-  </section>
+        <div
+          id="desktopProjectList"
+          class="desktop-project-list"
+        >
+          <div class="session-placeholder">
+            Loading projects...
+          </div>
+        </div>
+      </section>
 
 <section
   id="desktopProjectWorkspace"
   class="workspace-section"
 >
-<div class="section-title-row">
-  <div>
-    <h2 id="desktopProjectTitle">No project selected</h2>
-    <p id="desktopProjectDescription">
-      Select a project to open workspace.
-    </p>
-  </div>
-</div>
-
-<button
-  id="desktopProjectRenameButton"
-  type="button"
->
-  Rename
-</button>
-
-<button
-  id="desktopProjectArchiveButton"
-  type="button"
->
-  Archive
-</button>
-
-<button
-  id="desktopProjectUploadButton"
-  type="button"
->
-  Upload File
-</button>
-
-
-<button
-  id="desktopProjectAddNoteButton"
-  type="button"
->
-  + Add Note
-</button>
-
+  <div class="section-title-row">
+    <div>
+      <h2 id="desktopProjectTitle">No project selected</h2>
+      <p id="desktopProjectDescription">
+        Select a project to open workspace.
+      </p>
     </div>
   </div>
 
@@ -1339,6 +1266,73 @@ observer.observe(document.documentElement, {
 <div id="desktopProjectRecommendation" class="project-panel-card">
   <h3>AI Recommendation</h3>
   <p>Start organizing this project.</p>
+</div>
+
+<div id="desktopProjectFiles" class="project-panel-card">
+  <div class="nova-project-files-header">
+    <h3>Project Files</h3>
+
+    <button
+      id="desktopProjectUploadButton"
+      type="button"
+    >
+      Upload File
+    </button>
+  </div>
+
+  <input
+    id="desktopProjectFileInput"
+    type="file"
+    hidden
+  />
+
+  <div id="desktopProjectFileList">
+    <p>No files yet.</p>
+  </div>
+</div>
+
+<div id="desktopProjectNotes" class="project-panel-card">
+  <h3>Notes</h3>
+
+  <button
+    id="desktopProjectAddNoteButton"
+    type="button"
+  >
+    + Add Note
+  </button>
+
+  <div id="desktopProjectNoteEditor" hidden>
+
+    <input
+      id="desktopProjectNoteTitle"
+      type="text"
+      placeholder="Note title"
+    />
+
+    <textarea
+      id="desktopProjectNoteContent"
+      placeholder="Write a project note..."
+    ></textarea>
+
+    <button
+      id="desktopProjectSaveNote"
+      type="button"
+    >
+      Save Note
+    </button>
+
+    <button
+      id="desktopProjectCancelNote"
+      type="button"
+    >
+      Cancel
+    </button>
+
+  </div>
+
+  <div id="desktopProjectNoteList">
+    <p>No notes yet.</p>
+  </div>
 </div>
 
 <div id="desktopProjectRecentActivity" class="project-panel-card">
@@ -2653,15 +2647,18 @@ function handleSendClick(prompt = "") {
     });
 }
 
-const summarizeBtn = $("summarizeBtn");
+const summarizeBtn =
+    $("summarizeBtn");
 
 if (summarizeBtn) {
-  summarizeBtn.addEventListener("click", () =>
-    summarizeNow().catch(e => {
-      setStatus("error");
-      alert(e.message || e);
-    })
-  );
+    summarizeBtn.addEventListener(
+        "click",
+        () =>
+            summarizeNow().catch(e => {
+                setStatus("error");
+                alert(e.message || e);
+            })
+    );
 }
 
     document.querySelectorAll("[data-prompt]").forEach((button) => {
@@ -2727,16 +2724,7 @@ sendBtn.addEventListener("click", (e) => {
   });
 }
 
-// disabled duplicate newSessionBtn listener
 
-if (summarizeBtn) {
-  summarizeBtn.addEventListener("click", () => {
-    summarizeNow().catch(e => {
-      setStatus("error");
-      alert(e.message || e);
-    });
-  });
-}
 
 document.querySelectorAll("[data-nova-quick-action]").forEach((button) => {
   button.addEventListener("click", () => {
