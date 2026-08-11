@@ -1,6 +1,7 @@
 import json
 import secrets
 import hashlib
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -18,10 +19,14 @@ class LocalAuthRouteService:
         self.jsonify = jsonify
         self.session = session
 
-        self.data_dir = Path(__file__).resolve().parents[2] / "data"
+        self.data_dir = (
+            Path(__file__).resolve().parents[2]
+            / "data"
+        )
 
         self.users_path = (
-            self.data_dir / "nova_auth_users.json"
+            self.data_dir
+            / "nova_auth_users.json"
         )
 
     def install_routes(self):
@@ -29,6 +34,7 @@ class LocalAuthRouteService:
         from nova_backend.services.mfa_service import (
             generate_secret,
             build_provisioning_uri,
+            verify_code,
         )
 
         app = self.app
@@ -91,14 +97,8 @@ class LocalAuthRouteService:
                 "id": user.get("id"),
                 "username": user.get("username"),
                 "email": user.get("email"),
-                "plan": user.get(
-                    "plan",
-                    "free",
-                ),
-                "credits": user.get(
-                    "credits",
-                    0,
-                ),
+                "plan": user.get("plan", "free"),
+                "credits": user.get("credits", 0),
                 "subscription_status": user.get(
                     "subscription_status",
                     "inactive",
@@ -181,9 +181,7 @@ class LocalAuthRouteService:
 
             data = load_users()
 
-            if find_user(username) or (
-                email and find_user(email)
-            ):
+            if find_user(username) or find_user(email):
                 return jsonify({
                     "ok": False,
                     "error": "User already exists.",
@@ -200,22 +198,15 @@ class LocalAuthRouteService:
                     password,
                     salt,
                 ),
-
-                # Billing
                 "plan": "free",
                 "credits": 100000,
-                "stripe_customer_id": "",
-                "stripe_subscription_id": "",
                 "subscription_status": "inactive",
             }
 
             data["users"].append(user)
-
             save_users(data)
 
             session["nova_user_id"] = user["id"]
-            session.pop("user_id", None)
-            session.pop("username", None)
             session["authenticated"] = True
             session["auth_mode"] = "local"
 
@@ -260,8 +251,6 @@ class LocalAuthRouteService:
                 }), 401
 
             session["nova_user_id"] = user["id"]
-            session.pop("user_id", None)
-            session.pop("username", None)
             session["authenticated"] = True
             session["auth_mode"] = "local"
 
@@ -270,6 +259,104 @@ class LocalAuthRouteService:
                 "authenticated": True,
                 "user": public_user(user),
             })
+
+        def auth_password_reset_request():
+            payload = request.get_json(
+                silent=True
+            ) or {}
+
+            email = clean(
+                payload.get("email")
+            ).lower()
+
+            user = find_user(email)
+
+            if not user:
+                return jsonify({
+                    "ok": True,
+                    "message": "If the account exists, a reset token was created.",
+                })
+
+            token = secrets.token_urlsafe(32)
+
+            user["password_reset_token"] = token
+            user["password_reset_expires"] = (
+                datetime.now(
+                    timezone.utc
+                ).timestamp()
+                + 3600
+            )
+
+            data = load_users()
+
+            for item in data["users"]:
+                if item["id"] == user["id"]:
+                    item.update(user)
+
+            save_users(data)
+
+            return jsonify({
+                "ok": True,
+                "token": token,
+            })
+
+        def auth_password_reset_confirm():
+            payload = request.get_json(
+                silent=True
+            ) or {}
+
+            token = clean(
+                payload.get("token")
+            )
+
+            password = str(
+                payload.get("password")
+                or ""
+            )
+
+            if len(password) < 8:
+                return jsonify({
+                    "ok": False,
+                    "error": "Password must be at least 8 characters.",
+                }), 400
+
+            data = load_users()
+
+            for user in data["users"]:
+                if user.get("password_reset_token") == token:
+
+                    if datetime.now(
+                        timezone.utc
+                    ).timestamp() > float(
+                        user.get(
+                            "password_reset_expires",
+                            0,
+                        )
+                    ):
+                        return jsonify({
+                            "ok": False,
+                            "error": "Reset token expired.",
+                        }), 400
+
+                    user["password_hash"] = hash_password(
+                        password,
+                        user.get("salt", ""),
+                    )
+
+                    user["password_reset_token"] = ""
+                    user["password_reset_expires"] = ""
+
+                    save_users(data)
+
+                    return jsonify({
+                        "ok": True,
+                        "message": "Password updated.",
+                    })
+
+            return jsonify({
+                "ok": False,
+                "error": "Invalid reset token.",
+            }), 400
 
         def auth_logout():
             session.pop(
@@ -284,6 +371,7 @@ class LocalAuthRouteService:
             })
 
         def auth_mfa_setup():
+
             user_id = session.get(
                 "nova_user_id"
             )
@@ -294,15 +382,30 @@ class LocalAuthRouteService:
                     "error": "Not authenticated",
                 }), 401
 
-            for user in load_users().get("users", []):
+            data = load_users()
+
+            for user in data.get(
+                "users",
+                [],
+            ):
+
                 if user.get("id") == user_id:
+
                     secret = generate_secret()
+
+                    user["mfa_secret"] = secret
+                    user["mfa_enabled"] = False
+
+                    save_users(data)
 
                     return jsonify({
                         "ok": True,
                         "secret": secret,
                         "uri": build_provisioning_uri(
-                            user.get("username", "Nova"),
+                            user.get(
+                                "username",
+                                "Nova",
+                            ),
                             secret,
                         ),
                     })
@@ -312,15 +415,92 @@ class LocalAuthRouteService:
                 "error": "User not found",
             }), 404
 
+        def auth_mfa_verify_setup():
+
+            user_id = session.get(
+                "nova_user_id"
+            )
+
+            payload = request.get_json(
+                silent=True
+            ) or {}
+
+            code = clean(
+                payload.get("code")
+            )
+
+            data = load_users()
+
+            for user in data.get(
+                "users",
+                [],
+            ):
+
+                if user.get("id") == user_id:
+
+                    if not verify_code(
+                        user.get(
+                            "mfa_secret",
+                            "",
+                        ),
+                        code,
+                    ):
+                        return jsonify({
+                            "ok": False,
+                            "error": "Invalid MFA code.",
+                        }), 400
+
+                    user["mfa_enabled"] = True
+
+                    save_users(data)
+
+                    return jsonify({
+                        "ok": True,
+                        "mfa_enabled": True,
+                    })
+
+            return jsonify({
+                "ok": False,
+                "error": "User not found",
+            }), 404
+
         routes = [
-            ("/api/auth/status", "nova_auth_status_20260610", auth_status, ["GET"]),
-            ("/api/auth/register", "nova_auth_register_20260610", auth_register, ["POST"]),
-            ("/api/auth/login", "nova_auth_login_20260610", auth_login, ["POST"]),
-            ("/api/auth/logout", "nova_auth_logout_20260610", auth_logout, ["POST"]),
-            ("/api/auth/mfa/setup", "nova_auth_mfa_setup_20260716", auth_mfa_setup, ["GET"]),
-            ("/api/login", "nova_api_login_20260610", auth_login, ["POST"]),
-            ("/api/logout", "nova_api_logout_20260610", auth_logout, ["POST"]),
-            ("/api/register", "nova_api_register_20260610", auth_register, ["POST"]),
+            (
+                "/api/auth/status",
+                "nova_auth_status_20260610",
+                auth_status,
+                ["GET"],
+            ),
+            (
+                "/api/auth/register",
+                "nova_auth_register_20260610",
+                auth_register,
+                ["POST"],
+            ),
+            (
+                "/api/auth/login",
+                "nova_auth_login_20260610",
+                auth_login,
+                ["POST"],
+            ),
+            (
+                "/api/auth/logout",
+                "nova_auth_logout_20260610",
+                auth_logout,
+                ["POST"],
+            ),
+            (
+                "/api/auth/mfa/setup",
+                "nova_auth_mfa_setup_20260716",
+                auth_mfa_setup,
+                ["GET"],
+            ),
+            (
+                "/api/auth/mfa/verify-setup",
+                "nova_auth_mfa_verify_setup_20260810",
+                auth_mfa_verify_setup,
+                ["POST"],
+            ),
         ]
 
         for rule, name, handler, methods in routes:

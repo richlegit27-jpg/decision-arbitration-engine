@@ -361,26 +361,6 @@
     font-weight: 600;
 }
 
-#desktopProjectWorkspace .project-workspace-card {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-#desktopProjectWorkspace .project-panel-card {
-    background: rgba(255, 255, 255, 0.04);
-}
-
-#desktopProjectWorkspace .project-panel-card:first-of-type {
-    grid-column: span 2;
-}
-
-#desktopProjectWorkspace .project-panel-card h3 {
-    font-size: 14px;
-    opacity: 0.8;
-}
-
-#desktopProjectWorkspace .project-panel-card p {
-    font-size: 15px;
-}
 
 #desktopProjectFileList > div,
 .nova-project-note-card {
@@ -474,4 +454,59 @@
     padding: 12px;
     margin-bottom: 8px;
     border-radius: 8px;
+}
+
+#desktopProjectTasks .nova-project-task {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#desktopProjectTasks .nova-project-task strong {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+#desktopProjectTasks .nova-project-task span {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    opacity: 0.75;
+}
+
+#desktopProjectTasks .nova-project-task:hover {
+    transform: translateY(-1px);
+}
+
+.nova-project-task {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    padding: 12px 14px;
+    margin-bottom: 10px;
+
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+
+    min-height: 44px;
+    box-sizing: border-box;
+
+    color: inherit;
+}
+
+.nova-project-task strong {
+    font-weight: 600;
+}
+
+.nova-project-task span {
+    opacity: 0.7;
+    font-size: 0.85rem;
 }

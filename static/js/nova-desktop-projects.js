@@ -437,8 +437,7 @@ async function loadProjectIntelligence(projectId) {
                         `
                 }
             `;
-        }
-
+    }
     } catch (error) {
         console.error(
             "[Nova Projects] intelligence failed",
@@ -452,7 +451,7 @@ async function loadProjectIntelligence(projectId) {
     }
 }
 
-    function renderProjectOverview(data) {
+function renderProjectOverview(data) {
         const project =
             data.project ||
             data.summary?.project ||
@@ -564,18 +563,13 @@ if (descriptionElement) {
     }
 
 function renderProjectTasks(data) {
-    console.log(
-        "[TASK RENDER INPUT]",
-        JSON.stringify(data, null, 2)
-    );
-console.log("[TASK ARRAY]", data.tasks, data.tasks?.length);
 
-const tasksContainer =
-    $("desktopProjectTaskList");
+    const tasksContainer =
+        $("desktopProjectTaskList");
 
-        if (!tasksContainer) {
-            return;
-        }
+    if (!tasksContainer) {
+        return;
+    }
 
         const tasks =
             data.tasks ||
@@ -632,7 +626,6 @@ console.log(
                 }
             `;
 
-console.log("[APPENDING TASK]", title);
 
 tasksContainer.appendChild(
     taskElement
@@ -644,6 +637,7 @@ tasksContainer.appendChild(
     async function loadProjectWorkspace(
         projectId
     ) {
+
         if (!projectId) {
             return;
         }
@@ -651,19 +645,20 @@ tasksContainer.appendChild(
 const tasksContainer =
     $("desktopProjectTaskList");
 
-        if (tasks) {
-            tasks.innerHTML = `
-                <div class="session-placeholder">
-                    Loading project...
-                </div>
-            `;
-        }
+if (tasksContainer) {
+    tasksContainer.innerHTML = `
+        <div class="session-placeholder">
+            Loading project...
+        </div>
+    `;
+}
 
         try {
 const summary =
-    await fetchJson(
-        `/api/projects/${projectId}/summary`
-    );
+await fetchJson(
+`/api/projects/${projectId}/summary`
+);
+
 
 const projectData =
     await fetchJson(
@@ -676,19 +671,7 @@ const data = {
     tasks: projectData.project?.tasks || []
 };
 
-renderProjectOverview(data);
 
-console.log(
-    "[BEFORE TASK CALL]",
-    JSON.stringify(data, null, 2)
-);
-
-console.log(
-    "[TASK FUNCTION]",
-    renderProjectTasks.toString().slice(0,200)
-);
-
-console.log("[ABOUT TO CALL TASK RENDER]");
 renderProjectTasks(data);
 
 
@@ -891,7 +874,6 @@ async function loadProjectFiles(projectId) {
             return;
         }
 
-console.log("[NOVA FILE DEBUG]", files);
 
     container.innerHTML = files
         .map(
@@ -1127,18 +1109,19 @@ container
 
             renderProjects(projects);
 
-            if (activeProject) {
-                openProjectWorkspace(
-                    activeProject
-                );
+if (activeProject) {
+    openProjectWorkspace(
+        activeProject
+    );
 
-                await loadProjectWorkspace(
-                    activeProject.id
-                );
-await loadProjectNotes(
-    activeProject.id
-);
-            }
+    await loadProjectWorkspace(
+        activeProject.id
+    );
+
+    await loadProjectNotes(
+        activeProject.id
+    );
+}
 
         } catch (error) {
             console.error(
@@ -1178,7 +1161,9 @@ await loadProjectNotes(
             "Activating project..."
         );
 
+
         try {
+
             await fetchJson(
                 `/api/projects/${projectId}/activate`,
                 {
@@ -1197,19 +1182,18 @@ await loadProjectNotes(
                 projectId
             );
 
-        } catch (error) {
-            console.error(
-                "[Nova Projects] activation failed",
-                error
-            );
+    } catch (error) {
+        console.error(
+            "[Nova Projects] activation failed",
+            error
+        );
 
-            setProjectStatus(
-                error.message ||
-                "Project activation failed"
-            );
-        }
+        setProjectStatus(
+            error.message ||
+            "Project activation failed"
+        );
     }
-
+}
 
 const newProjectButton =
     $("newProjectBtn");

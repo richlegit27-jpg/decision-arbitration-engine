@@ -144,18 +144,8 @@ class AuthCompatRouteService:
                     auth_logout_alias,
                     ["POST", "GET"],
                 ),
-                (
-                    "/api/auth/login",
-                    "nova_api_auth_login_safe_20260611",
-                    auth_login_alias,
-                    ["POST"],
-                ),
-                (
-                    "/api/auth/register",
-                    "nova_api_auth_register_safe_20260611",
-                    auth_register_alias,
-                    ["POST"],
-                ),
+
+
                 (
                     "/login",
                     "nova_login_post_safe_20260611",
