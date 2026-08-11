@@ -178,21 +178,24 @@ console.log("[Nova Projects] FILE LOADED");
             </div>
         `;
 
+button.addEventListener(
+    "click",
+    async () => {
+        if (!projectId) {
+            return;
+        }
 
-            button.addEventListener(
-                "click",
-                async () => {
-                    if (!projectId) {
-                        return;
-                    }
+        openProjectWorkspace(project);
 
-                    openProjectWorkspace(project);
+        await activateProject(
+            projectId
+        );
 
-                    await activateProject(
-                        projectId
-                    );
-                }
-            );
+        await loadProjectWorkspace(
+            projectId
+        );
+    }
+);
 
             container.appendChild(button);
         });
@@ -560,9 +563,15 @@ if (descriptionElement) {
         `;
     }
 
-    function renderProjectTasks(data) {
-        const tasksContainer =
-            $("desktopProjectTasks");
+function renderProjectTasks(data) {
+    console.log(
+        "[TASK RENDER INPUT]",
+        JSON.stringify(data, null, 2)
+    );
+console.log("[TASK ARRAY]", data.tasks, data.tasks?.length);
+
+const tasksContainer =
+    $("desktopProjectTaskList");
 
         if (!tasksContainer) {
             return;
@@ -584,6 +593,12 @@ if (descriptionElement) {
             `;
             return;
         }
+
+console.log(
+    "[TASK LOOP START]",
+    tasks.length,
+    tasks
+);
 
         tasks.forEach((task) => {
             const taskElement =
@@ -617,9 +632,11 @@ if (descriptionElement) {
                 }
             `;
 
-            tasksContainer.appendChild(
-                taskElement
-            );
+console.log("[APPENDING TASK]", title);
+
+tasksContainer.appendChild(
+    taskElement
+);
         });
     }
 
@@ -631,8 +648,8 @@ if (descriptionElement) {
             return;
         }
 
-        const tasks =
-            $("desktopProjectTasks");
+const tasksContainer =
+    $("desktopProjectTaskList");
 
         if (tasks) {
             tasks.innerHTML = `
@@ -643,13 +660,36 @@ if (descriptionElement) {
         }
 
         try {
-            const data =
-                await fetchJson(
-                    `/api/projects/${projectId}/summary`
-                );
+const summary =
+    await fetchJson(
+        `/api/projects/${projectId}/summary`
+    );
 
-            renderProjectOverview(data);
-            renderProjectTasks(data);
+const projectData =
+    await fetchJson(
+        `/api/projects/${projectId}`
+    );
+
+const data = {
+    ...summary,
+    project: projectData.project,
+    tasks: projectData.project?.tasks || []
+};
+
+renderProjectOverview(data);
+
+console.log(
+    "[BEFORE TASK CALL]",
+    JSON.stringify(data, null, 2)
+);
+
+console.log(
+    "[TASK FUNCTION]",
+    renderProjectTasks.toString().slice(0,200)
+);
+
+console.log("[ABOUT TO CALL TASK RENDER]");
+renderProjectTasks(data);
 
 
 const project =
