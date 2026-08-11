@@ -144,7 +144,15 @@ def build_project_brain_freshness_snapshot() -> ProjectBrainFreshnessSnapshot:
     )
 
     return ProjectBrainFreshnessSnapshot(
-        ...
+        version=SNAPSHOT_VERSION,
+        checkpoint=checkpoint,
+        blocker=blocker,
+        next_move=next_move,
+        completed=[],
+        validation=[],
+        available_smoke_files=available_smokes,
+        missing_smoke_files=_missing_smoke_files(),
+        recent_commits=_recent_commits(),
     )
 
     _NOVA_PRE_SANITIZED_BUILD_PROJECT_BRAIN_FRESHNESS_SNAPSHOT_20260702 = (
@@ -171,12 +179,4 @@ _NOVA_CLEAN_NEXT_MOVE_20260702 = (
     "and Mission Control v1.2 / Failure Interpreter API behavior."
 )
 
-except Exception as _nova_project_brain_freshness_snapshot_sanitizer_error_20260702:
-    try:
-        print(
-            "[NOVA_PROJECT_BRAIN_FRESHNESS_SNAPSHOT_SANITIZER_20260702] failed:",
-            _nova_project_brain_freshness_snapshot_sanitizer_error_20260702,
-        )
-    except Exception:
-        pass
 

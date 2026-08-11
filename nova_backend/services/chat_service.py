@@ -17815,6 +17815,8 @@ try:
             )
         )
 
+        _nova_first_message = user_text
+
         print(
             "[QUESTION TEXT DEBUG]",
             repr(user_text),
