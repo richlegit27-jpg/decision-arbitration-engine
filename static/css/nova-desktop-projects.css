@@ -510,3 +510,188 @@
     opacity: 0.7;
     font-size: 0.85rem;
 }
+
+/* Nova Project Workspace Visual Polish */
+
+.project-panel-card {
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 16px;
+}
+
+.nova-project-task {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+}
+
+.nova-project-task strong {
+    font-size: 14px;
+}
+
+.nova-project-task span {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.nova-project-task-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+#desktopProjectTaskInput {
+    flex: 1;
+}
+
+#desktopProjectAddTaskButton {
+    white-space: nowrap;
+}
+
+#desktopProjectTaskList {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Project workspace polish */
+
+.project-panel-card {
+    border-radius: 14px;
+}
+
+.nova-project-task {
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+}
+
+#desktopProjectTaskList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Project overview card polish */
+
+.project-workspace-card {
+    padding: 18px;
+    border-radius: 16px;
+}
+
+.project-workspace-card h3 {
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+
+.project-panel-card {
+    padding: 14px;
+    margin-bottom: 12px;
+    border-radius: 12px;
+}
+
+.project-panel-card p {
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Project files polish */
+
+.nova-project-files-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+#desktopProjectUploadButton {
+    padding: 8px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.nova-project-file {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+}
+
+.nova-project-file-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Project notes polish */
+
+#desktopProjectNotes {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+#desktopProjectNotes input,
+#desktopProjectNotes textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+}
+
+#desktopProjectNotes textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+#desktopProjectAddNoteButton {
+    padding: 8px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.nova-project-note {
+    padding: 12px 14px;
+    border-radius: 10px;
+}
+
+.nova-project-note h4 {
+    margin-bottom: 6px;
+}
+
+/* Final Project Workspace Rhythm */
+
+.project-workspace-card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.nova-project-section-header {
+    margin-bottom: 10px;
+}
+
+.nova-project-section-header h3 {
+    margin: 0;
+}
+
+.nova-project-task-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.nova-project-task-actions input {
+    flex: 1;
+    padding: 10px 12px;
+    border-radius: 10px;
+}
+
+.nova-project-task {
+    border-radius: 10px;
+    padding: 12px 14px;
+}
