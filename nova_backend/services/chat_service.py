@@ -9402,6 +9402,19 @@ Rules:
             "verified": False,
         })
 
+    def _get_project_context(
+        self,
+        project_id,
+    ):
+        if not self.project_workspace_service:
+            return {}
+
+        if not project_id:
+            return {}
+
+        return self.project_workspace_service.get_project_ai_context(
+            project_id
+        )
 
     def handle(
         self,
