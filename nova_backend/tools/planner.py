@@ -7,15 +7,16 @@ def plan_tool_request(
     text = (user_text or "").lower()
 
     if (
-        "what do you remember" in text
-        or "show my memories" in text
-        or "what memories" in text
-        or "what do you know about me" in text
+        "forget" in text
+        or "delete memory" in text
+        or "remove memory" in text
     ):
         return {
             "ok": True,
-            "tool": "memory_read",
-            "payload": {},
+            "tool": "memory_delete",
+            "payload": {
+                "memory_id": "",
+            },
         }
 
     if (
