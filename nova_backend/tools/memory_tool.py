@@ -30,9 +30,9 @@ class MemoryWriteTool(NovaTool):
             memory_file=str(memory_file)
         )
 
-return service.add_memory(
-    {
-        "content": content,
-        "type": "user_fact",
-    }
-)
+        return service.add_memory(
+            {
+                "content": content,
+                "type": "user_fact",
+            }
+        )
