@@ -11,7 +11,13 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from typing import Any, Dict, List
+
+from nova_backend.utils.file_utils import (
+    load_json_file,
+    save_json_file,
+)
 from nova_backend.services.mission_service import mission_service
 from nova_backend.services.project_brain_operator_planner import (
     build_operator_plan_dict,
@@ -19,7 +25,30 @@ from nova_backend.services.project_brain_operator_planner import (
 
 class PlannerService:
     def __init__(self) -> None:
-        self.plans: Dict[str, Dict[str, Any]] = {}
+        self.plans_path = Path(
+            "runtime/planner_plans.json"
+        )
+
+        self.plans: Dict[str, Dict[str, Any]] = (
+            self._load_plans()
+        )
+
+    def _load_plans(self) -> Dict[str, Dict[str, Any]]:
+        data = load_json_file(
+            self.plans_path,
+            default={},
+        )
+
+        if isinstance(data, dict):
+            return data
+
+        return {}
+
+    def _save_plans(self) -> None:
+        save_json_file(
+            self.plans_path,
+            self.plans,
+        )
 
     def create_mission(self, mission_name: str) -> Dict[str, Any]:
         """
@@ -299,6 +328,8 @@ class PlannerService:
         }
 
         self.plans[safe_mission] = plan
+        self._save_plans()
+
         return plan
 
     def build_execution_steps(self, mission_name: str) -> List[str]:
@@ -329,6 +360,8 @@ class PlannerService:
 
         plan["current_index"] = current_index
         plan["status"] = "complete" if current_index >= len(steps) else "running"
+
+        self._save_plans()
 
         return plan
 

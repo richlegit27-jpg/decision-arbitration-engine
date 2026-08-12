@@ -11,7 +11,6 @@ from dotenv import load_dotenv
 load_dotenv(
     Path(__file__).resolve().parent / ".env"
 )
-
 from nova_backend.services.auth_context import get_current_user_id
 from nova_backend.services.image_vision_service import ImageVisionService
 from flask import Flask, Response, jsonify, render_template, request, send_from_directory, session
@@ -113,6 +112,9 @@ from nova_backend.services.session_route_service import SessionRouteService
 from nova_backend.services.error_reporting_service import ErrorReportingService
 from nova_backend.services.stale_working_state_history_service import (
     clean_response_stale_working_state_history,
+)
+from nova_backend.routes.planner_routes import (
+    register_planner_routes,
 )
 from nova_backend.services.upload_ownership_service import (
     UploadOwnershipService,
@@ -697,6 +699,8 @@ blog_route_service.install_routes(
     app
 )
 
+register_planner_routes(app)
+print("[NOVA_PLANNER_ROUTES_20260812] installed")
 
 session_route_service.install_routes(
     app,
@@ -705,7 +709,6 @@ session_route_service.install_routes(
     memory_service,
     DATA_DIR,
 )
-
 
 autonomy_route_guard_service.install(app)
 execution_priority_guard_service.install(app)
@@ -931,12 +934,31 @@ if not app.secret_key:
 
 
 # NOVA_SELF_IMPROVEMENT_REPORT_ROUTES_20260710
+
 try:
     register_improvement_routes(app)
     print("[NOVA_SELF_IMPROVEMENT_REPORT_ROUTES_20260710] installed")
 except Exception as exc:
     print(
         "[NOVA_SELF_IMPROVEMENT_REPORT_ROUTES_20260710] failed:",
+        exc,
+    )
+
+
+# NOVA_PLANNER_ROUTES_20260812
+
+try:
+    from nova_backend.routes.planner_routes import (
+        register_planner_routes,
+    )
+
+    register_planner_routes(app)
+
+    print("[NOVA_PLANNER_ROUTES_20260812] installed")
+
+except Exception as exc:
+    print(
+        "[NOVA_PLANNER_ROUTES_20260812] failed:",
         exc,
     )
 
