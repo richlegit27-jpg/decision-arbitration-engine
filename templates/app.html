@@ -5224,19 +5224,29 @@ function renderSession(session) {
         session.id
     );
 
-    if (
-        session.messages.length === 0 &&
-        session.meta &&
-        session.meta.onboarding &&
-        typeof window.renderDesktopOnboarding === "function"
-    ) {
-        console.log(
-            "[Nova RenderSession] onboarding owns empty session"
-        );
+if (
+    session.messages.length === 0
+) {
+    console.log(
+        "[Nova RenderSession] empty session fallback"
+    );
 
+    if (typeof window.renderDesktopOnboarding === "function") {
         window.renderDesktopOnboarding(session);
-        return true;
+    } else if (
+        typeof window.renderDesktopChatMessagesRescue === "function"
+    ) {
+        window.renderDesktopChatMessagesRescue([
+            {
+                role: "assistant",
+                content:
+                    "Welcome to Nova.\n\nStart a conversation and your workspace will appear here."
+            }
+        ]);
     }
+
+    return true;
+}
 
     try {
         if (
@@ -13211,7 +13221,20 @@ aside.panel.tools,
     box-sizing: border-box !important;
 }sendBtn.addEventListener("click", (e) => {
 
+<style>
+.chat-panel {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+}
 
+.chat-messages {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
 
 </style>
 
