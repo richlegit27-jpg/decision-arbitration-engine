@@ -9446,6 +9446,27 @@ Rules:
             pass
 
         # NOVA_FIRST_CONTACT_IDENTITY_20260727
+        # NOVA_TOOL_PIPELINE_BRIDGE_V1
+        try:
+            from nova_backend.tools.chat_tool_bridge import (
+                maybe_run_tool,
+            )
+
+            tool_result = maybe_run_tool(
+                user_text
+            )
+
+            if tool_result:
+                return tool_result
+
+        except Exception as _nova_tool_bridge_error:
+            try:
+                print(
+                    "[NOVA TOOL BRIDGE ERROR]",
+                    _nova_tool_bridge_error,
+                )
+            except Exception:
+                pass
 
         try:
             _nova_session = self._get_session(session_id)
