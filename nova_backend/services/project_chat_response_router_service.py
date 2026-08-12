@@ -335,6 +335,7 @@ try:
             return "next"
 
         return ""
+
     def _nova_natural_project_request_json_20260701():
         try:
             data = _nova_natural_project_request_20260701.get_json(silent=True) or {}
@@ -342,21 +343,24 @@ try:
         except Exception:
             return {}
 
+
     def _nova_natural_project_request_text_20260701(data):
         for key in ("message", "user_text", "text", "prompt"):
             value = data.get(key)
             if isinstance(value, str) and value.strip():
                 return value.strip()
+
         return ""
+
 
     def _nova_natural_project_load_answer_20260701(mapped_prompt):
         try:
-            from nova_backend.services.project_brain_general_intelligence import (
-                build_project_brain_general_answer,
+            from nova_backend.services.project_brain_live_answer_selector import (
+                build_project_brain_live_answer,
             )
 
-            answer = build_project_brain_general_answer(
-                mapped_prompt
+            answer = build_project_brain_live_answer(
+                user_text=mapped_prompt,
             )
 
             if hasattr(answer, "text"):
@@ -375,6 +379,7 @@ try:
                 pass
 
         return None
+
 
     def _nova_natural_project_payload_20260701(reply, data):
         session_id = ""

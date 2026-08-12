@@ -7,8 +7,9 @@ No app.py wiring.
 No runtime mutation.
 
 Phase 3 goal:
+
 - Decision-style questions use Decision Engine context.
-- Plain project status questions use freshness/context builder answer.
+- Project status questions use context builder answer.
 """
 
 from __future__ import annotations
@@ -41,98 +42,111 @@ def _contains_any(text: str, terms: list[str]) -> bool:
     return any(term.lower() in text for term in terms)
 
 
-def should_use_project_brain_decision_context(user_text: str = "", pasted_output: str = "") -> tuple[bool, str]:
-    """Decide whether a Project Brain answer should use the Decision Engine context."""
+def should_use_project_brain_decision_context(
+    user_text: str = "",
+    pasted_output: str = "",
+) -> tuple[bool, str]:
+    """Decide whether Project Brain should use Decision Engine context."""
 
     user = _lower(user_text)
     output = _lower(pasted_output)
     combined = f"{user}\n{output}"
 
-    if _contains_any(combined, [
-        "make nova smarter",
-        "decision engine",
-        "intelligence upgrade",
-        "behavior upgrade",
-        "real behavior upgrade",
-        "judgment layer",
-        "improve nova decision making",
-        "choose a better move",
-    ]):
+    if _contains_any(
+        combined,
+        [
+            "make nova smarter",
+            "decision engine",
+            "intelligence upgrade",
+            "behavior upgrade",
+            "real behavior upgrade",
+            "judgment layer",
+            "improve nova decision making",
+            "choose a better move",
+        ],
+    ):
         return True, "intelligence_upgrade"
 
-    if _contains_any(combined, [
-        "app.py dangerous",
-        "touch app.py",
-        "patch app.py",
-        "another guard",
-        "late hook",
-        "before_request",
-        "after_request",
-        "route stealing",
-        "wrapper",
-    ]):
+    if _contains_any(
+        combined,
+        [
+            "app.py dangerous",
+            "touch app.py",
+            "patch app.py",
+            "another guard",
+            "late hook",
+            "before_request",
+            "after_request",
+            "route stealing",
+            "wrapper",
+        ],
+    ):
         return True, "safety_route_layer_risk"
 
-    if _contains_any(combined, [
-        "should we patch",
-        "should we test",
-        "test first",
-        "safe to code",
-        "safest next move",
-        "before touching code",
-        "what test should we run",
-    ]):
+    if _contains_any(
+        combined,
+        [
+            "should we patch",
+            "should we test",
+            "test first",
+            "safe to code",
+            "safest next move",
+            "before touching code",
+            "what test should we run",
+        ],
+    ):
         return True, "safety_or_validation_judgment"
 
-
-    if _contains_any(combined, [
-        "stale memory",
-        "old memory",
-        "memory hijacking",
-        "source of truth",
-        "data/nova_memory.json",
-        "data/nova_sessions.json",
-    ]):
+    if _contains_any(
+        combined,
+        [
+            "stale memory",
+            "old memory",
+            "memory hijacking",
+            "source of truth",
+            "data/nova_memory.json",
+            "data/nova_sessions.json",
+        ],
+    ):
         return True, "memory_freshness_judgment"
 
-    if _contains_any(combined, [
-        "make nova smarter",
-        "decision engine",
-        "intelligence",
-        "smarter",
-        "judgment layer",
-    ]):
-        return True, "intelligence_upgrade"
-
-    if _contains_any(user, [
-        "what should we do next",
-        "what's next",
-        "next concrete move",
-        "next move",
-        "what now",
-    ]):
+    if _contains_any(
+        user,
+        [
+            "what should we do next",
+            "what's next",
+            "next concrete move",
+            "next move",
+            "what now",
+        ],
+    ):
         return True, "next_move_judgment"
 
-    if _contains_any(user, [
-        "where are we at",
-        "where is nova at",
-        "where is the project at",
-        "nova status",
-        "project status",
-    ]):
-        return False, "plain_project_status_general_intelligence"
-
-    if _contains_any(combined, [
-        "failure",
-        "failed",
-        "assertionerror",
-        "traceback",
-        "exception",
-        "error",
-    ]):
+    if _contains_any(
+        user,
+        [
+            "failure",
+            "failed",
+            "assertionerror",
+            "traceback",
+            "exception",
+            "error",
+        ],
+    ):
         return True, "failure_interpretation"
 
-    return False, "plain_project_context"
+    if _contains_any(
+        user,
+        [
+            "where are we at",
+            "where is nova at",
+            "where is the project at",
+            "nova status",
+            "project status",
+            "status without hype",
+        ],
+    ):
+        return False, "plain_project_status_context"
 
 def build_project_brain_live_answer(
     user_text: str = "",
@@ -147,39 +161,6 @@ def build_project_brain_live_answer(
         pasted_output=pasted_output,
     )
 
-    if reason == "plain_project_status_general_intelligence":
-        try:
-            from nova_backend.services.project_brain_general_intelligence import (
-                build_project_brain_general_answer,
-            )
-
-            answer = build_project_brain_general_answer(
-                user_text
-            )
-
-            if answer:
-                return ProjectBrainLiveAnswer(
-                    text=str(
-                        getattr(answer, "text", answer)
-                    ),
-                    route="project_brain_general_intelligence",
-                    source="project_brain_general_intelligence",
-                    used_decision_engine=False,
-                    reason=reason,
-                )
-
-        except Exception as exc:
-            return ProjectBrainLiveAnswer(
-                text=(
-                    "Project Brain general intelligence unavailable. "
-                    f"Reason: {type(exc).__name__}: {exc}"
-                ),
-                route="project_brain_general_intelligence_error",
-                source="project_brain_live_answer_selector",
-                used_decision_engine=False,
-                reason=reason,
-            )
-
     if use_decision:
         try:
             from nova_backend.services.project_brain_context_builder import (
@@ -191,13 +172,18 @@ def build_project_brain_live_answer(
                 pasted_output=pasted_output,
                 intent=reason,
             )
+
             return ProjectBrainLiveAnswer(
                 text=text,
                 route="project_brain_decision_context",
-                source="project_brain_context_builder.build_project_brain_decision_context_answer",
+                source=(
+                    "project_brain_context_builder."
+                    "build_project_brain_decision_context_answer"
+                ),
                 used_decision_engine=True,
                 reason=reason,
             )
+
         except Exception as exc:
             return ProjectBrainLiveAnswer(
                 text=(
@@ -216,23 +202,28 @@ def build_project_brain_live_answer(
         )
 
         text = build_current_project_answer(
-            user_id=user_id
+            user_id=user_id,
         )
 
         return ProjectBrainLiveAnswer(
             text=text,
-            route="project_brain_freshness_context",
-            source="project_brain_context_builder.build_current_project_answer",
+            route="project_brain_context_builder",
+            source=(
+                "project_brain_context_builder."
+                "build_current_project_answer"
+            ),
             used_decision_engine=False,
             reason=reason,
         )
+
     except Exception as exc:
         return ProjectBrainLiveAnswer(
             text=(
-                "Current Nova project state is unavailable from the context builder. "
+                "Current Nova project state is unavailable from the "
+                "context builder. "
                 f"Reason: {type(exc).__name__}: {exc}"
             ),
-            route="project_brain_freshness_context_error",
+            route="project_brain_context_builder_error",
             source="project_brain_live_answer_selector",
             used_decision_engine=False,
             reason=reason,

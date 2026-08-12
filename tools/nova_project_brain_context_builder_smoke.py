@@ -102,6 +102,8 @@ def ask(question):
 
     assert_true("answer exists", bool(answer), f"keys={list(data.keys())}")
     assert_true("route", route == "project_brain_general_intelligence", route)
+    print("DEBUG PAYLOAD:")
+    print(json.dumps(data, indent=2))
 
     return answer
 

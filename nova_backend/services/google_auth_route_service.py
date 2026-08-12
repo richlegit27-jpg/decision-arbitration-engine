@@ -2,7 +2,7 @@ import json
 import secrets
 from pathlib import Path
 
-from flask import jsonify, redirect, session
+from flask import jsonify, session
 
 
 class GoogleAuthRouteService:
@@ -21,6 +21,7 @@ class GoogleAuthRouteService:
             / "nova_auth_users.json"
         )
 
+
     def install_routes(self):
 
         google = self.google_auth_service.google
@@ -30,6 +31,7 @@ class GoogleAuthRouteService:
                 "[GOOGLE AUTH ROUTES] skipped"
             )
             return
+
 
         def load_users():
 
@@ -44,7 +46,13 @@ class GoogleAuthRouteService:
                 )
             )
 
+
         def save_users(data):
+
+            self.users_path.parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
 
             self.users_path.write_text(
                 json.dumps(
@@ -53,6 +61,7 @@ class GoogleAuthRouteService:
                 ),
                 encoding="utf-8",
             )
+
 
         def find_email(email):
 
@@ -67,16 +76,18 @@ class GoogleAuthRouteService:
 
             return None
 
+
         @self.app.route(
             "/api/auth/google",
             methods=["GET"],
         )
         def google_login():
 
-            return google.authorize_redirect(
-                "/api/auth/google/callback"
+            redirect_response = google.authorize_redirect(
+                "http://127.0.0.1:5001/api/auth/google/callback"
             )
 
+            return redirect_response
 
         @self.app.route(
             "/api/auth/google/callback",
@@ -87,7 +98,10 @@ class GoogleAuthRouteService:
             token = google.authorize_access_token()
 
             profile = google.parse_id_token(
-                token
+                token,
+                nonce=session.get(
+                    "oauth_nonce"
+                ),
             )
 
             email = profile.get(
@@ -102,9 +116,11 @@ class GoogleAuthRouteService:
                 1,
             )[0]
 
+
             user = find_email(
                 email
             )
+
 
             if not user:
 

@@ -128,8 +128,19 @@ class ProjectWorkspaceService:
             "notes": [],
             "documents": [],
             "knowledge": [],
-            "workflows": [],
-            "active": True,
+"workflows": [],
+
+"brain": {
+    "goal": "",
+    "decisions": [],
+    "blockers": [],
+    "next_actions": [],
+    "milestones": [],
+},
+
+"timeline": [],
+
+"active": True,
         }
 
         projects.append(project)
@@ -139,6 +150,159 @@ class ProjectWorkspaceService:
         )
 
         return project
+
+def update_project(
+    self,
+    project_id,
+    name=None,
+    description=None,
+    status=None,
+):
+    projects = self._load_projects()
+
+    for project in projects:
+        if (
+            project.get("id") != project_id
+            or not self._same_project_owner(project)
+        ):
+            continue
+
+        if name is not None:
+            project["name"] = str(
+                name
+            )
+
+            project["title"] = str(
+                name
+            )
+
+        if description is not None:
+            project["description"] = str(
+                description
+            )
+
+        if status is not None:
+            project["status"] = str(
+                status
+            )
+
+        project["updated_at"] = datetime.now(
+            timezone.utc
+        ).isoformat()
+
+        self._save_projects(
+            projects
+        )
+
+        return project
+
+    return None
+
+def archive_project(
+    self,
+    project_id,
+):
+    projects = self._load_projects()
+
+    for project in projects:
+        if (
+            project.get("id") != project_id
+            or not self._same_project_owner(project)
+        ):
+            continue
+
+        project["status"] = "archived"
+        project["active"] = False
+
+        project["updated_at"] = datetime.now(
+            timezone.utc
+        ).isoformat()
+
+        self._save_projects(
+            projects
+        )
+
+        return project
+
+    return None
+
+
+def restore_project(
+    self,
+    project_id,
+):
+    projects = self._load_projects()
+
+    for project in projects:
+        if (
+            project.get("id") != project_id
+            or not self._same_project_owner(project)
+        ):
+            continue
+
+        project["status"] = "active"
+        project["active"] = True
+
+        project["updated_at"] = datetime.now(
+            timezone.utc
+        ).isoformat()
+
+        self._save_projects(
+            projects
+        )
+
+        return project
+
+    return None
+
+def add_activity(
+    self,
+    project_id,
+    action,
+    details="",
+):
+    projects = self._load_projects()
+
+    for project in projects:
+        if (
+            project.get("id") != project_id
+            or not self._same_project_owner(project)
+        ):
+            continue
+
+        activity = {
+            "id": str(
+                uuid.uuid4()
+            ),
+            "action": str(
+                action
+            ),
+            "details": str(
+                details
+            ),
+            "created_at": datetime.now(
+                timezone.utc
+            ).isoformat(),
+        }
+
+        project.setdefault(
+            "timeline",
+            [],
+        ).append(
+            activity
+        )
+
+        project["updated_at"] = datetime.now(
+            timezone.utc
+        ).isoformat()
+
+        self._save_projects(
+            projects
+        )
+
+        return activity
+
+    return None
 
     def get_project_summary(
         self,
@@ -171,161 +335,164 @@ class ProjectWorkspaceService:
             ),
         }
 
-    def add_task(
-        self,
-        project_id,
-        title,
-        priority="medium",
-    ):
-        projects = self._load_projects()
+def add_task(
+    self,
+    project_id,
+    title,
+    priority="medium",
+):
+    projects = self._load_projects()
 
-        for project in projects:
-            if project.get("id") != project_id:
-                continue
+    for project in projects:
+        if (
+            project.get("id") != project_id
+            or not self._same_project_owner(project)
+        ):
+            continue
 
-            tasks = project.setdefault(
-                "tasks",
-                [],
-            )
-
-            task = {
-                "id": str(uuid.uuid4()),
-                "title": str(title or "New Task"),
-                "priority": str(priority),
-                "status": "open",
-            }
-
-            tasks.append(task)
-
-            self._save_projects(projects)
-
-            return task
-
-        return None
-
-    def update_task_status(
-        self,
-        project_id,
-        task_id,
-        status,
-    ):
-        projects = self._load_projects()
-
-        for project in projects:
-            if project.get("id") != project_id:
-                continue
-
-            for task in project.get("tasks", []):
-                if task.get("id") == task_id:
-                    task["status"] = status
-                    self._save_projects(projects)
-                    return task
-
-        return None
-
-    def delete_task(
-        self,
-        project_id,
-        task_id,
-    ):
-        projects = self._load_projects()
-
-        for project in projects:
-            if project.get("id") != project_id:
-                continue
-
-            project["tasks"] = [
-                task
-                for task in project.get("tasks", [])
-                if task.get("id") != task_id
-            ]
-
-            self._save_projects(projects)
-
-            return True
-
-        return False
-
-    def list_files(
-        self,
-        project_id,
-    ):
-        project = self.get_project(project_id)
-
-        if not project:
-            return []
-
-        return project.get(
-            "files",
+        tasks = project.setdefault(
+            "tasks",
             [],
         )
 
-    def add_file(
-        self,
-        project_id,
-        filename,
-        path="",
-        size=0,
-        file_type="",
-    ):
-        projects = self._load_projects()
+        task = {
+            "id": str(
+                uuid.uuid4()
+            ),
+            "title": str(
+                title or "New Task"
+            ),
+            "priority": str(
+                priority
+            ),
+            "status": "open",
+            "created_at": datetime.now(
+                timezone.utc
+            ).isoformat(),
+        }
 
-        for project in projects:
-            if project.get("id") != project_id:
-                continue
+        tasks.append(
+            task
+        )
 
-            file_record = {
-                "id": str(
-                    uuid.uuid4()
-                ),
-                "filename": filename,
-                "path": path,
-                "size": int(
-                    size or 0
-                ),
-                "type": file_type,
-                "created_at": datetime.now(
+        project["updated_at"] = datetime.now(
+            timezone.utc
+        ).isoformat()
+
+        self._save_projects(
+            projects
+        )
+
+        return task
+
+    return None
+
+
+def update_task_status(
+    self,
+    project_id,
+    task_id,
+    status,
+):
+    projects = self._load_projects()
+
+    for project in projects:
+        if (
+            project.get("id") != project_id
+            or not self._same_project_owner(project)
+        ):
+            continue
+
+        for task in project.get(
+            "tasks",
+            [],
+        ):
+            if task.get("id") == task_id:
+                task["status"] = str(
+                    status
+                )
+
+                project["updated_at"] = datetime.now(
                     timezone.utc
-                ).isoformat(),
-            }
+                ).isoformat()
 
-            project.setdefault(
+                self._save_projects(
+                    projects
+                )
+
+                return task
+
+    return None
+
+def delete_task(
+    self,
+    project_id,
+    task_id,
+):
+    projects = self._load_projects()
+
+    for project in projects:
+        if (
+            project.get("id") != project_id
+            or not self._same_project_owner(project)
+        ):
+            continue
+
+        project["tasks"] = [
+            task
+            for task in project.get(
+                "tasks",
+                [],
+            )
+            if task.get("id") != task_id
+        ]
+
+        project["updated_at"] = datetime.now(
+            timezone.utc
+        ).isoformat()
+
+        self._save_projects(
+            projects
+        )
+
+        return True
+
+    return False
+
+def delete_file(
+    self,
+    project_id,
+    file_id,
+):
+    projects = self._load_projects()
+
+    for project in projects:
+        if (
+            project.get("id") != project_id
+            or not self._same_project_owner(project)
+        ):
+            continue
+
+        project["files"] = [
+            item
+            for item in project.get(
                 "files",
                 [],
-            ).append(
-                file_record
             )
+            if item.get("id") != file_id
+        ]
 
-            self._save_projects(
-                projects
-            )
+        project["updated_at"] = datetime.now(
+            timezone.utc
+        ).isoformat()
 
-            return file_record
+        self._save_projects(
+            projects
+        )
 
-        return None
+        return True
 
-    def delete_file(
-        self,
-        project_id,
-        file_id,
-    ):
-        projects = self._load_projects()
-
-        for project in projects:
-            if project.get("id") != project_id:
-                continue
-
-            project["files"] = [
-                item
-                for item in project.get("files", [])
-                if item.get("id") != file_id
-            ]
-
-            self._save_projects(projects)
-
-            return True
-
-        return False
+    return False
 
     def list_notes(
         self,
@@ -469,3 +636,333 @@ class ProjectWorkspaceService:
                 return project
 
         return None
+
+def add_next_action(
+    self,
+    project_id,
+    action,
+):
+    projects = self._load_projects()
+
+    for project in projects:
+        if (
+            project.get("id") != project_id
+            or not self._same_project_owner(project)
+        ):
+            continue
+
+        brain = project.setdefault(
+            "brain",
+            {},
+        )
+
+        actions = brain.setdefault(
+            "next_actions",
+            [],
+        )
+
+        item = {
+            "id": str(
+                uuid.uuid4()
+            ),
+            "action": str(
+                action
+            ),
+            "status": "open",
+            "created_at": datetime.now(
+                timezone.utc
+            ).isoformat(),
+        }
+
+        actions.append(
+            item
+        )
+
+        self._save_projects(
+            projects
+        )
+
+        return item
+
+    return None
+
+def get_project_brain_summary(
+    self,
+    project_id,
+):
+    project = self.get_project(
+        project_id
+    )
+
+    if not project:
+        return None
+
+    brain = project.get(
+        "brain",
+        {},
+    )
+
+    return {
+        "project_id": project.get(
+            "id"
+        ),
+        "name": project.get(
+            "name"
+        ),
+        "goal": brain.get(
+            "goal",
+            "",
+        ),
+        "decisions": brain.get(
+            "decisions",
+            [],
+        ),
+        "blockers": brain.get(
+            "blockers",
+            [],
+        ),
+        "next_actions": brain.get(
+            "next_actions",
+            [],
+        ),
+        "milestones": brain.get(
+            "milestones",
+            [],
+        ),
+        "tasks_open": len(
+            [
+                task
+                for task in project.get(
+                    "tasks",
+                    [],
+                )
+                if task.get(
+                    "status"
+                ) == "open"
+            ]
+        ),
+        "files": len(
+            project.get(
+                "files",
+                [],
+            )
+        ),
+        "notes": len(
+            project.get(
+                "notes",
+                [],
+            )
+        ),
+    }
+
+def add_project_decision(
+    self,
+    project_id,
+    decision,
+):
+    projects = self._load_projects()
+
+    for project in projects:
+        if (
+            project.get("id") != project_id
+            or not self._same_project_owner(project)
+        ):
+            continue
+
+        brain = project.setdefault(
+            "brain",
+            {},
+        )
+
+        decisions = brain.setdefault(
+            "decisions",
+            [],
+        )
+
+        item = {
+            "id": str(
+                uuid.uuid4()
+            ),
+            "decision": str(
+                decision
+            ),
+            "created_at": datetime.now(
+                timezone.utc
+            ).isoformat(),
+        }
+
+        decisions.append(
+            item
+        )
+
+        self._save_projects(
+            projects
+        )
+
+        return item
+
+    return None
+
+def update_project_brain(
+    self,
+    project_id,
+    goal=None,
+):
+    projects = self._load_projects()
+
+    for project in projects:
+        if (
+            project.get("id") != project_id
+            or not self._same_project_owner(project)
+        ):
+            continue
+
+        brain = project.setdefault(
+            "brain",
+            {
+                "goal": "",
+                "decisions": [],
+                "blockers": [],
+                "next_actions": [],
+                "milestones": [],
+            },
+        )
+
+        if goal is not None:
+            brain["goal"] = str(
+                goal
+            )
+
+        project["updated_at"] = datetime.now(
+            timezone.utc
+        ).isoformat()
+
+        self._save_projects(
+            projects
+        )
+
+        return brain
+
+    return None
+
+def get_project_ai_context(
+    self,
+    project_id,
+):
+    project = self.get_project(
+        project_id
+    )
+
+    if not project:
+        return {}
+
+    brain = project.get(
+        "brain",
+        {},
+    )
+
+    return {
+        "project": {
+            "id": project.get(
+                "id"
+            ),
+            "name": project.get(
+                "name",
+                "",
+            ),
+            "description": project.get(
+                "description",
+                "",
+            ),
+            "status": project.get(
+                "status",
+                "",
+            ),
+        },
+
+        "goal": brain.get(
+            "goal",
+            "",
+        ),
+
+        "decisions": brain.get(
+            "decisions",
+            [],
+        ),
+
+        "blockers": brain.get(
+            "blockers",
+            [],
+        ),
+
+        "next_actions": brain.get(
+            "next_actions",
+            [],
+        ),
+
+        "tasks": project.get(
+            "tasks",
+            [],
+        ),
+
+        "files": [
+            file.get(
+                "filename",
+            )
+            for file in project.get(
+                "files",
+                [],
+            )
+        ],
+    }
+
+def get_project_context(
+    self,
+    project_id,
+):
+    project = self.get_project(
+        project_id
+    )
+
+    if not project:
+        return {}
+
+    brain = project.get(
+        "brain",
+        {},
+    )
+
+    return {
+        "project_name": project.get(
+            "name",
+            "",
+        ),
+        "description": project.get(
+            "description",
+            "",
+        ),
+        "goal": brain.get(
+            "goal",
+            "",
+        ),
+        "decisions": brain.get(
+            "decisions",
+            [],
+        ),
+        "blockers": brain.get(
+            "blockers",
+            [],
+        ),
+        "next_actions": brain.get(
+            "next_actions",
+            [],
+        ),
+        "tasks": project.get(
+            "tasks",
+            [],
+        ),
+        "files": project.get(
+            "files",
+            [],
+        ),
+    }

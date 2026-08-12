@@ -5,9 +5,12 @@ import re
 import shutil
 import hashlib
 import uuid
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(
+    Path(__file__).resolve().parent / ".env"
+)
 
 from nova_backend.services.auth_context import get_current_user_id
 from nova_backend.services.image_vision_service import ImageVisionService
@@ -672,6 +675,16 @@ app = Flask(
     static_folder=str(BASE_DIR / "static"),
 )
 
+app.secret_key = os.environ.get(
+    "NOVA_SECRET_KEY"
+)
+
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = False
+
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_NAME"] = "nova_session"
+
 CORS(app)
 
 ensure_dir(DATA_DIR)
@@ -897,19 +910,19 @@ project_workspace_service = ProjectWorkspaceService(
     data_dir="data"
 )
 
+
 local_auth_route_service.install_routes()
+
 google_auth_service = GoogleAuthService(
     app
 )
+
 google_auth_route_service = GoogleAuthRouteService(
     app,
     google_auth_service,
 )
 
 google_auth_route_service.install_routes()
-app.secret_key = os.environ.get(
-    "NOVA_SECRET_KEY"
-)
 
 if not app.secret_key:
     raise RuntimeError(
