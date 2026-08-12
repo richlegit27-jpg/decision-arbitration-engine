@@ -594,16 +594,23 @@ class MemoryService:
 
         owner_id = self._current_owner_id()
 
-        if not owner_id:
-            return False
+        kept = []
 
-        kept = [
-            item for item in memory
-            if not (
-                str(item.get("id") or "").strip() == target
-                and item.get("owner_id") == owner_id
-            )
-        ]
+        for item in memory:
+            item_id = str(item.get("id") or "").strip()
+
+            if item_id != target:
+                kept.append(item)
+                continue
+
+            if owner_id:
+                if item.get("owner_id") == owner_id:
+                    continue
+                kept.append(item)
+                continue
+
+            # local tool execution without auth context
+            continue
 
         if len(kept) == len(memory):
             return False
