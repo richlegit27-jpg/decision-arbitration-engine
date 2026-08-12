@@ -15,7 +15,7 @@ def plan_tool_request(
 
         match = re.search(
             r"memory_[a-zA-Z0-9]+",
-            user_text
+            user_text,
         )
 
         memory_id = match.group(0) if match else ""

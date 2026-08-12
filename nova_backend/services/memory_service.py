@@ -209,21 +209,23 @@ class MemoryService:
     def all(self) -> List[Dict[str, Any]]:
         items = self._read_store().get("memory", [])
 
-        owner_id = self._current_owner_id()
-
-        if not owner_id:
-            return []
-
-        items = [
-            item
-            for item in items
-            if item.get("owner_id") == owner_id
-        ]
-
         if not isinstance(items, list):
             return []
 
-        items = [self._apply_memory_decay(dict(x or {})) for x in items]
+        owner_id = self._current_owner_id()
+
+        if owner_id:
+            items = [
+                item
+                for item in items
+                if not item.get("owner_id")
+                or item.get("owner_id") == owner_id
+            ]
+
+        items = [
+            self._apply_memory_decay(dict(x or {}))
+            for x in items
+        ]
 
         items.sort(
             key=lambda x: (
