@@ -5998,6 +5998,33 @@ Rules:
 
         user_text_lc = self.safe_str(user_text).lower().strip()
 
+        explanation_request = any(
+            x in user_text_lc
+            for x in [
+                "what is",
+                "what does",
+                "explain",
+                "meaning of",
+                "how does",
+            ]
+        )
+
+        code_explanation_request = (
+            "what is" in user_text_lc
+            or "what does" in user_text_lc
+            or "explain" in user_text_lc
+            or "meaning of" in user_text_lc
+        )
+
+        quoted_code_request = (
+            '"' in user_text
+            or "'" in user_text
+            or "`" in user_text
+            or "print(" in user_text_lc
+            or "def " in user_text_lc
+            or "class " in user_text_lc
+        )
+
         if any(
             marker in user_text_lc
             for marker in [
@@ -6057,22 +6084,59 @@ Rules:
         debugging_request = any(
             x in user_text_lc
             for x in [
-                "fix this",
-                "fix it",
-                "error",
+                "fix",
                 "bug",
-                "not working",
-                "broken",
-                "stuck",
+                "error",
                 "traceback",
                 "exception",
                 "failed",
+                "debug this",
+                "debug the",
+                "debug issue",
+                "debug error",
                 "test fail",
             ]
-        )
+        ) and not explanation_request
+
+        if (
+            code_explanation_request
+            or quoted_code_request
+        ):
+            has_file_path = False
+            debugging_request = False
+
+        if not debugging_request:
+            has_file_path = False
 
         if not debugging_request:
             return None
+
+        explanation_request = any(
+            x in user_text_lc
+            for x in [
+                "what is",
+                "what does",
+                "explain",
+                "meaning of",
+                "how does",
+            ]
+        )
+
+        code_explanation_request = (
+            "what is" in user_text_lc
+            or "what does" in user_text_lc
+            or "explain" in user_text_lc
+            or "meaning of" in user_text_lc
+        )
+
+        quoted_code_request = (
+            '"' in user_text
+            or "'" in user_text
+            or "`" in user_text
+            or "print(" in user_text_lc
+            or "def " in user_text_lc
+            or "class " in user_text_lc
+        )
 
         if debugging_request:
 
@@ -6119,10 +6183,13 @@ Rules:
                     "traceback",
                     "exception",
                     "failed",
-                    "debug",
+                    "debug this",
+                    "debug the",
+                    "debug issue",
+                    "debug error",
                     "test fail",
                 ]
-            )
+            ) and not explanation_request
 
             if not debugging_request:
                 has_file_path = False
@@ -9949,6 +10016,8 @@ Rules:
             attachments=attachments,
             session_id=session_id,
         )
+        print("CHAT ROUTE DEBUG:", decision)
+
 
         exec_debug(
             "WRITING ROUTE DEBUG:",
@@ -17996,15 +18065,17 @@ try:
                     )
                 )
 
-            return (
-                _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701(
-                    self,
-                    *args,
-                    **kwargs,
-                )
+        return (
+            _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701(
+                self,
+                *args,
+                **kwargs,
             )
+        )
+
 
     if hasattr(ChatService, "handle"):
+
         ChatService.handle = _nova_project_brain_question_top_priority_handle_20260701
 
         ChatService._NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701 = True

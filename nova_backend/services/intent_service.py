@@ -246,6 +246,29 @@ class IntentService:
                 save_memory=False,
             )
 
+        # Code explanation should not become debugging
+        if (
+            (
+                "what is" in lower
+                or "what does" in lower
+                or "explain" in lower
+                or "meaning of" in lower
+            )
+            and (
+                "print(" in lower
+                or "def " in lower
+                or "class " in lower
+                or "function" in lower
+            )
+        ):
+            return self._result(
+                self.INTENT_GENERAL_CHAT,
+                self.ROUTE_GENERAL_CHAT,
+                "code_explanation",
+                0.95,
+                ["code_explanation_request"],
+            )
+
         # 6. Debugging
         if self._has_any(
             lower,
