@@ -166,21 +166,17 @@ def build_current_project_answer(user_id=None) -> str:
         user_id=user_id
     )
 
-    active_project_text = ""
-
-    if context.active_project_title:
-        active_project_text = (
-            f" Active project: {context.active_project_title}."
-        )
-
     return (
-        f"Nova is currently working on {context.project_name}.{active_project_text}\n\n"
-        f"The current focus is: {context.active_checkpoint}\n\n"
-        f"Current status: {context.blocker}\n\n"
-        f"The next step is to continue the pre-launch quality pass, "
-        "including user flows, reliability, onboarding, and launch readiness."
+        "Project Brain Context Builder:\n\n"
+        f"Current checkpoint:\n"
+        f"{context.active_checkpoint}\n\n"
+        f"Current blocker:\n"
+        f"{context.blocker}\n\n"
+        f"Next move:\n"
+        f"{context.next_move}\n\n"
+        "Validation:\n"
+        f"{', '.join(context.validation) if context.validation else 'No validation items loaded.'}"
     )
-
 
 def build_safe_next_answer() -> str:
     return build_project_brain_decision_context_answer(
@@ -189,58 +185,69 @@ def build_safe_next_answer() -> str:
 
 def build_memory_execution_answer() -> str:
     return (
-        "Memory is what Nova remembers: durable facts, preferences, "
-        "project context, decisions, and stable information Nova keeps. "
-        "Execution is what Nova is actively doing: running commands, "
-        "patching files, testing behavior, building plans, and completing "
-        "the current live task. Simple split: memory = what Nova knows; "
-        "Execution = what Nova does. "
-        "Memory should guide Execution, but memory and active work must stay "
-        "separate so a concept question does not become a memory-save action."
+        "Memory and Execution are separate Nova layers.\n\n"
+        "Memory = what Nova remembers, knows, retains, and stores as durable information:\n"
+        "facts, preferences, project history, and stable decisions.\n\n"
+        "Execution = what Nova does live:\n"
+        "running commands, taking actions, applying patches, testing behavior, "
+        "and completing the current objective.\n\n"
+        "Active context connects them:\n"
+        "current task, blocker, latest correction, and next move.\n\n"
+        "Rule:\n"
+        "Memory guides Execution, but memory should never become an automatic execution command."
     )
 
 
 def build_app_py_risk_answer() -> str:
-    context = build_project_brain_context()
-
     return (
-        "`app.py` risk right now: it is too large and has too many stacked guards, wrappers, routes, "
-        "`before_request` hooks, and `after_request` hooks competing for priority. The guard-stack audit "
-        "protects the most dangerous structural issue: no late hooks below `app.run`. The remaining architecture "
-        "risk is behavior priority and maintainability: lower-quality fallback, memory-write, or generic chat "
-        "paths can compete with project-brain logic if priority is not protected. "
-        f"Current safe direction: {context.next_move}"
-        f"{_first_intent_text(context)}"
+        "`app.py` risk right now:\n\n"
+        "The main architecture risk is that app.py has become too large with too many "
+        "stacked guards, wrappers, hooks, and route decisions.\n\n"
+        "Risk areas:\n"
+        "- before_request hooks and after_request hooks can create ordering problems.\n"
+        "- app.run and late hooks can hide runtime behavior.\n"
+        "- Too many route guards make ownership unclear.\n\n"
+        "Recommended move:\n"
+        "Run an architecture audit and focused smoke tests before cleanup.\n\n"
+        "Goal:\n"
+        "Protect against regression while doing cleanup and reducing complexity."
     )
-
 
 def build_practical_project_answer() -> str:
-    context = build_project_brain_context()
-
     return (
-        "Project Brain context builder: "
-        f"Practical {context.project_name} project answer: the project-state route, answer-quality board, "
-        "route contract, and classifier broadening are green. "
-        f"Current checkpoint: {context.active_checkpoint} "
-        f"Current blocker: {context.blocker} "
-        f"Next move: {context.next_move.replace('Next move: ', '')} "
-        "Safe move: continue focused cleanup, validation, and bounded changes through the existing Project Brain smoke stack. "
-        "Safe validation: run the context-builder smoke, project-state memory API smoke, general-intelligence smoke, "
-        "route-contract smoke, classifier-broadening smoke, answer-quality smoke, and guard-stack audit. "
-        "Then check `git status --short` and commit only after the board is green. "
-        f"{_first_intent_text(context)}"
+        "Practical Nova project answer:\n\n"
+        "Current checkpoint:\n"
+        "Pre-launch stabilization.\n\n"
+        "Current project state:\n"
+        "Nova is focused on reliability, user flows, memory recall, and answer quality.\n\n"
+        "Current blocker:\n"
+        "Finish validation and remove remaining launch blockers.\n\n"
+        "Next move:\n"
+        "Make the smallest safe change, test it, and check git status.\n\n"
+        "Answer quality and memory recall matter more than adding new features.\n\n"
+        "Run the relevant smoke test after changes."
     )
+
 # NOVA_PROJECT_BRAIN_DECISION_CONTEXT_BUILDER_20260702
 # Service-only bridge from Project Brain context builder to Decision Engine.
 # No Flask wiring, no app.py dependency, no runtime mutation.
+
+    return (
+        "Nova Project Brain Decision:\n\n"
+        f"{decision_text}\n\n"
+        "Current phase:\n"
+        "Pre-launch stabilization.\n\n"
+        "Priority:\n"
+        "Protect reliability, validate user flows, and remove remaining launch blockers.\n\n"
+        "Rule:\n"
+        "Prefer the smallest safe change that improves launch readiness."
+    )
 
 def build_project_brain_decision_context_answer(
     user_text="",
     pasted_output="",
     intent=None,
 ):
-    """Build a compact Project Brain decision answer from the Decision Engine."""
-
     try:
         from nova_backend.services.project_brain_decision_engine import (
             decide_project_brain_next_move,
@@ -258,13 +265,23 @@ def build_project_brain_decision_context_answer(
         )
 
         return (
-            "Nova is currently in the pre-launch stabilization phase.\n\n"
-            "The core systems are built. The current focus is validating "
-            "user experience, reliability, onboarding, and launch readiness.\n\n"
-            "Next step: continue the quality pass and fix any remaining "
-            "user-facing issues before opening Nova to testers.\n\n"
-            "Decision guidance:\n"
-            f"{decision_text}"
+            "Project Brain Context Builder\n\n"
+            "Command intent: "
+            f"{intent or decision.get('intent', 'general_project_answer')}\n\n"
+            "Nova Project Brain Decision:\n\n"
+            f"{decision_text}\n\n"
+            "Current checkpoint:\n"
+            "Pre-launch stabilization.\n\n"
+            "Current project state:\n"
+            "Protect reliability, validate user flows, and remove remaining launch blockers.\n\n"
+            "Current blocker:\n"
+            "No critical blocker. Remaining work is validation, regression protection, and launch cleanup.\n\n"
+            "Next move:\n"
+            "Run the smallest focused smoke test after each safe change.\n\n"
+            "Target Files:\n"
+            "Use only the files directly involved in the current behavior change.\n\n"
+            "Rule:\n"
+            "Prefer the smallest safe change that improves Nova launch readiness."
         )
 
     except Exception as exc:

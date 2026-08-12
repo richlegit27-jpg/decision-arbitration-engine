@@ -8876,9 +8876,26 @@ Rules:
 
         text = self.safe_str(user_text)
         lowered = text.lower().strip()
+
+        # PROJECT BRAIN PRIORITY ROUTES
+        if lowered in {
+            "what is the next step",
+            "what should we do next",
+            "next step",
+            "next move",
+        }:
+            return (
+                "project_brain_general_intelligence",
+                None,
+            )
+
         # AUTO PLAN EXECUTION START
         if lowered.startswith("auto-plan"):
-            return ("execution", "start")
+            return (
+                "execution",
+                "start",
+            )
+
         attachments = attachments or []
 
         # LOAD EXECUTION STATE
@@ -8895,9 +8912,14 @@ Rules:
         )
 
         execution_commands = {
-            "next", "continue", "resume",
-            "run step", "run all", "execute",
-            "retry", "run it"
+            "next",
+            "continue",
+            "resume",
+            "run step",
+            "run all",
+            "execute",
+            "retry",
+            "run it",
         }
 
  # 1. EXECUTION MODE
@@ -17110,26 +17132,44 @@ try:
                     "prompt": user_text,
                 }
 
-            if (
-                intent_route
-                and (
-                    intent_confidence >= 0.94
-                    or intent_decision.get("intent") in trusted_intents
-                )
-            ):
+        if (
+            intent_route
+            and (
+                intent_confidence >= 0.94
+                or intent_decision.get("intent") in trusted_intents
+            )
+        ):
+
+            if intent_decision.get("intent") == "planning":
                 return {
-                    "route": intent_route,
-                    "mode": intent_decision.get("mode") or intent_decision.get("intent") or "chat",
-                    "intent": intent_decision.get("intent") or "",
+                    "route": "project_brain_general_intelligence",
+                    "mode": "project_brain_general_intelligence",
+                    "intent": "planning",
                     "confidence": intent_confidence,
-                    "reasons": list(intent_decision.get("reasons") or []) + ["intent_authority"],
-                    "save_artifact": bool(intent_decision.get("save_artifact", False)),
-                    "save_memory": bool(intent_decision.get("save_memory", True)),
-                    "use_memory": bool(intent_decision.get("use_memory", True)),
+                    "reasons": list(intent_decision.get("reasons") or []) + [
+                        "planning_to_project_brain"
+                    ],
+                    "save_artifact": False,
+                    "save_memory": False,
+                    "use_memory": True,
                     "source_urls": [],
                     "sources": [],
-                    "prompt": intent_decision.get("prompt") or user_text,
+                    "prompt": user_text,
                 }
+
+            return {
+                "route": intent_route,
+                "mode": intent_decision.get("mode") or intent_decision.get("intent") or "chat",
+                "intent": intent_decision.get("intent") or "",
+                "confidence": intent_confidence,
+                "reasons": list(intent_decision.get("reasons") or []) + ["intent_authority"],
+                "save_artifact": bool(intent_decision.get("save_artifact", False)),
+                "save_memory": bool(intent_decision.get("save_memory", True)),
+                "use_memory": bool(intent_decision.get("use_memory", True)),
+                "source_urls": [],
+                "sources": [],
+                "prompt": intent_decision.get("prompt") or user_text,
+            }
 
         decision = _nova_previous_decide_route_intent_authority_20260630(
             self,
@@ -17437,6 +17477,15 @@ try:
         text = text.replace("?", "'").replace("`", "")
         text = " ".join(text.split())
         bare = text.rstrip("?!.")
+        
+        if (
+            "nova status" in bare
+            or "give me the nova status" in bare
+            or "status without hype" in bare
+            or "where are we at with nova" in bare
+            or "where are we at" in bare
+        ):
+            return "current_project_state"
 
         if (
             "what does this failure mean" in bare
@@ -17572,7 +17621,6 @@ try:
 
         return low.startswith(bad_starts)
 
-
     def _nova_project_brain_answer_20260701(
         kind,
         session_id,
@@ -17590,6 +17638,8 @@ try:
             if kind == "working"
             else user_text
             if kind == "failure_interpreter"
+            else "give me the Nova status without hype"
+            if kind == "current_project_state"
             else "what's next?"
         )
 
@@ -17629,6 +17679,7 @@ try:
                         fresh_answer,
                     )
                     or ""
+
                 ).strip()
 
             elif kind == "actual_blocker":
@@ -17650,6 +17701,36 @@ try:
                     or ""
                 ).strip()
 
+            elif kind == "current_project_state":
+                from nova_backend.services.project_brain_general_intelligence import (
+                    build_project_brain_general_answer,
+                )
+
+                print(
+                    "[CHAT SERVICE CALLING PBGI]",
+                    repr(user_text),
+                    "kind=",
+                    repr(kind),
+                )
+
+                fresh_answer = build_project_brain_general_answer(
+                    question,
+                    user_id="",
+                )
+
+                answer = str(
+                    getattr(
+                        fresh_answer,
+                        "text",
+                        fresh_answer,
+                    )
+                    or ""
+                ).strip()
+
+                print(
+                    "[CURRENT PROJECT ANSWER DEBUG]",
+                    repr(answer[:300]),
+                )
             elif kind == "working":
                 from nova_backend.services.project_state_service import (
                     answer_project_state_question,
@@ -17681,6 +17762,7 @@ try:
                         or general_answer.get("answer")
                         or ""
                     ).strip()
+
                 else:
                     answer = str(
                         getattr(
@@ -17716,6 +17798,7 @@ try:
             "mission_control",
             "failure_interpreter",
             "actual_blocker",
+            "current_project_state",
         }:
             return answer
 
@@ -17733,7 +17816,6 @@ try:
             "Current Nova project context:\n"
             "Current task: fix Nova project brain answer quality."
         )
-
     def _nova_project_brain_response_20260701(
         text,
         session_id,
@@ -17841,7 +17923,6 @@ try:
         )
 
         if kind:
-
             session_id = (
                 _nova_project_brain_question_session_20260701(
                     args,
@@ -17860,6 +17941,22 @@ try:
                 ),
             )
 
+            if kind == "current_project_state":
+                from nova_backend.services.project_brain_general_intelligence import (
+                    build_project_brain_general_answer,
+                )
+
+                fresh_answer = build_project_brain_general_answer(
+                    user_text,
+                    user_id="",
+                )
+
+                return _nova_project_brain_response_20260701(
+                    fresh_answer.text,
+                    session_id,
+                    first_message=False,
+                )
+
             if (
                 _nova_project_brain_has_active_execution_20260711(
                     self,
@@ -17870,183 +17967,28 @@ try:
                     "_NOVA_PRE_PROJECT_STATE_FRESH_PRIORITY_HANDLE_20260701"
                 )
 
-                if callable(
-                    pre_project_state_handle
-                ):
-                    return pre_project_state_handle(
+                return (
+                    _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701(
                         self,
                         *args,
                         **kwargs,
                     )
-
-            def _nova_ps_fresh_priority_should_handle_20260701(user_text):
-                text = str(user_text or "").strip().lower()
-
-                return any(
-                    phrase in text
-                    for phrase in (
-                        "where are we at",
-                        "where is nova at",
-                        "nova status",
-                        "give me the nova status",
-                        "status without hype",
-                    )
                 )
 
-            fresh_priority_predicate = (
-                _nova_ps_fresh_priority_should_handle_20260701
-            )
-
-            if (
-                str(user_text or "")
-                .strip()
-                .lower()
-                == "what should we work on next"
-            ):
-                fresh_priority_predicate = None
-
-            blocker_question = any(
-                phrase in str(user_text or "").lower()
-                for phrase in (
-                    "what is the current blocker",
-                    "what's the current blocker",
-                    "current blocker",
-                    "what is the blocker",
-                    "what blocker do we have",
-                    "what are we blocked on",
-                    "what is blocking nova",
-                    "actual blocker",
+            return (
+                _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701(
+                    self,
+                    *args,
+                    **kwargs,
                 )
             )
-
-            if (
-                callable(
-                    fresh_priority_predicate
-                )
-                and fresh_priority_predicate(
-                    user_text
-                )
-                and not blocker_question
-            ):
-
-                from nova_backend.services.project_state_service import (
-                    answer_project_state_question,
-                )
-
-                answer = (
-                    answer_project_state_question(
-                        user_text,
-                        session_id=session_id,
-                    )
-                )
-
-            if answer:
-                return (
-                    _nova_project_brain_response_20260701(
-                        answer,
-                        session_id,
-                        first_message=_nova_first_message,
-                    )
-                )
-
-            print(
-                "ANSWER KIND:",
-                repr(kind),
-                repr(user_text),
-            )
-
-
-            if kind in {
-                "actual_blocker",
-                "mission_control",
-                "next",
-            } and not answer:
-                from nova_backend.services.project_brain_general_intelligence import (
-                    build_project_brain_general_answer,
-                )
-
-                fresh_answer = build_project_brain_general_answer(
-                    user_text,
-                    user_id="",
-                )
-
-                answer = str(
-                    getattr(
-                        fresh_answer,
-                        "text",
-                        fresh_answer,
-                    )
-                    or ""
-                ).strip()
-
-            if kind in {
-                "actual_blocker",
-                "mission_control",
-                "next",
-            } and not answer:
-                from nova_backend.services.project_brain_general_intelligence import (
-                    build_project_brain_general_answer,
-                )
-
-                fresh_answer = build_project_brain_general_answer(
-                    user_text,
-                    user_id="",
-                )
-
-                answer = str(
-                    getattr(
-                        fresh_answer,
-                        "text",
-                        fresh_answer,
-                    )
-                    or ""
-                ).strip()
-
-            if kind in {
-                "actual_blocker",
-                "mission_control",
-                "next",
-            } and not answer:
-                from nova_backend.services.project_brain_general_intelligence import (
-                    build_project_brain_general_answer,
-                )
-
-                fresh_answer = build_project_brain_general_answer(
-                    user_text,
-                    user_id="",
-                )
-
-                answer = str(
-                    getattr(
-                        fresh_answer,
-                        "text",
-                        fresh_answer,
-                    )
-                    or ""
-                ).strip()
-
-            if answer:
-                return (
-                    _nova_project_brain_response_20260701(
-                        answer,
-                        session_id,
-                        first_message=_nova_first_message,
-                    )
-                )
-
-        return (
-            _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701(
-                self,
-                *args,
-                **kwargs,
-            )
-        )
 
     if hasattr(ChatService, "handle"):
         ChatService.handle = _nova_project_brain_question_top_priority_handle_20260701
 
         ChatService._NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701 = True
         print("[NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701] installed")
+
 except Exception as _nova_project_brain_question_top_priority_error_20260701:
     try:
         print(
@@ -18056,9 +17998,9 @@ except Exception as _nova_project_brain_question_top_priority_error_20260701:
     except Exception:
         pass
 
-install_token_usage_finalize_wrapper(ChatService)
 
-install_attachment_web_suppression()
+def _nova_attachment_guard_method_looks_like_result_web_route(name):
+    lowered = str(name or "").lower()
 
 def _nova_attachment_guard_method_looks_like_result_web_route(name):
     lowered = str(name or "").lower()
@@ -18086,6 +18028,5 @@ def _nova_attachment_guard_method_looks_like_result_web_route(name):
 
     if any(word in lowered for word in blocked):
         return False
-
 
     return True

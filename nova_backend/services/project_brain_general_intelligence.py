@@ -25,6 +25,32 @@ def classify_project_brain_intent(user_text: object) -> Optional[str]:
 
     if not text:
         return None
+
+    if _has_any(
+        text,
+        (
+            "what is risky about app.py",
+            "risky about app.py",
+            "app.py risk",
+            "what is the app.py risk",
+        ),
+    ):
+        return "app_py_risk"
+
+    if _has_any(
+        text,
+        (
+            "where are we at with nova",
+            "where are we at",
+            "where is nova at",
+            "nova status",
+            "project status",
+            "current project",
+            "current checkpoint",
+        ),
+    ):
+        return "current_project_state"
+
     if _has_any(
         text,
         (
@@ -90,7 +116,6 @@ def classify_project_brain_intent(user_text: object) -> Optional[str]:
             "smallest safe patch strategy",
             "commit plan",
             "rollback plan",
-            "next step",
         ),
     ):
         return "autonomy_plan"
@@ -98,133 +123,18 @@ def classify_project_brain_intent(user_text: object) -> Optional[str]:
     if _has_any(
         text,
         (
-            "autonomy memory",
-            "autonomy task",
-            "memory task",
-            "create memory task",
-            "nova autonomy task brief",
-            "stale checkpoint",
-            "nova_memory_quality_smoke.py",
-            "project_state_service.py",
-        ),
-    ):
-        return "autonomy_task"
-
-    if _has_any(
-        text,
-        (
-            "autonomy task",
-            "autonomy memory",
-            "safe autonomy",
-            "improve project memory recall",
-            "nova autonomy task brief",
-            "stale checkpoint",
-            "nova_memory_quality_smoke.py",
-            "project_state_service.py",
-        ),
-    ):
-        return "autonomy_task"
-
-
-    if _has_any(
-        text,
-        (
-            "memory",
-            "execution",
-            "difference between memory and execution",
-            "memory vs execution",
-            "what nova remembers",
-            "what nova is actively doing",
-            "separate what nova remembers",
-            "remembered from active",
-        ),
-    ):
-        return "memory_execution_distinction"
-
-    if _has_any(
-        text,
-        (
-            "where are we at",
-            "where are we at with nova",
-            "where are we at with nova right now",
-            "where is nova at",
-            "current project",
-            "project status",
-            "project context",
-            "nova context",
-        ),
-    ):
-        return "current_project_state"
-
-    if _has_any(
-        text,
-        (
+            "what is the next step",
             "what should we do next",
             "what do we do next",
             "next move",
             "safest next",
             "safe next",
-            "what test should we run",
-            "which test should we run",
-            "should we test first",
-            "test first",
-            "safe to code",
-            "should we patch or test",
+            "what now",
         ),
     ):
         return "safe_next_action"
 
-    if _has_any(
-        text,
-        (
-            "blocker",
-            "blocking",
-            "stuck",
-            "current blocker",
-        ),
-    ):
-        return "actual_blocker"
-
-    if _has_any(
-        text,
-        (
-            "what is risky about app.py",
-            "what's risky about app.py",
-            "risk about app.py",
-            "should we patch app.py",
-            "app.py risk",
-            "app py risk",
-        ),
-    ):
-        return "app_py_risk"
-
-    if _has_any(
-        text,
-        (
-            "give me the project answer",
-            "practical project answer",
-            "not a pep talk",
-            "project answer in practical terms",
-            "practical terms",
-        ),
-    ):
-        return "practical_project_answer"
-
     return None
-
-def _current_project_answer(
-    user_text=""
-) -> str:
-    from nova_backend.services.project_brain_context_builder import (
-        build_project_brain_decision_context_answer,
-    )
-
-    return build_project_brain_decision_context_answer(
-        user_text=str(user_text or ""),
-        intent="current_project_state",
-    )
-
-
 
 def _safe_next_answer() -> str:
     from nova_backend.services.project_brain_context_builder import (
@@ -411,13 +321,24 @@ def _observe_project_brain_answer(
             exc,
         )
 
-def _legacy_build_project_brain_general_answer_initial(user_text: object) -> Optional[ProjectBrainAnswer]:
+def _legacy_build_project_brain_general_answer_initial(
+    user_text: object,
+) -> Optional[ProjectBrainAnswer]:
+    text = _lower(user_text)
     intent = classify_project_brain_intent(user_text)
 
-    if intent == "locked_state":
+    if _has_any(
+        text,
+        (
+            "what is risky about app.py",
+            "risky about app.py",
+            "app.py risk",
+            "what is the app.py risk",
+        ),
+    ):
         return ProjectBrainAnswer(
-            intent="locked_state",
-            text=_current_project_answer(user_text),
+            intent="app_py_risk",
+            text=_app_py_risk_answer(),
         )
 
     if intent == "mission_control":
@@ -435,38 +356,11 @@ def _legacy_build_project_brain_general_answer_initial(user_text: object) -> Opt
             text=answer,
         )
 
-    if intent == "current_project_state":
-        q = _nova_project_brain_general_live_selector_normalize_20260702(
-            user_text
-        )
-
-        broad_project_status = (
-            "where are we at" in q
-            or "where is nova at" in q
-            or "nova status" in q
-            or "project status" in q
-        )
-
-        if broad_project_status:
-            answer = _current_project_answer(
-                user_text
-            )
-
-            return ProjectBrainAnswer(
-                intent="current_project_state",
-                text=str(answer),
-            )
 
     if intent == "safe_next_action":
         return ProjectBrainAnswer(
             intent=intent,
             text=_safe_next_answer(),
-        )
-
-    if intent == "autonomy_task":
-        return ProjectBrainAnswer(
-            intent=intent,
-            text=_autonomy_task_answer(),
         )
 
     if intent == "autonomy_task":
@@ -510,62 +404,75 @@ try:
         lambda user_text: False
     )
 
-    def _nova_project_brain_live_selector_general_phrase_20260702(user_text):
-        q = str(user_text or "").strip().lower()
-        q = " ".join(
-            q.replace("?", " ")
-            .replace("!", " ")
-            .split()
-        )
+except Exception:
+    _NOVA_PRE_LIVE_SELECTOR_PROJECT_BRAIN_GENERAL_CLASSIFIER_20260702 = (
+        lambda user_text: False
+    )
 
-        exact_direct_project_state = {
-            "what are we working on",
-            "what are we working on now",
-            "what are we working on right now",
-        }
 
-        if q in exact_direct_project_state:
-            return False
+def _nova_project_brain_live_selector_general_phrase_20260702(user_text):
+    q = str(user_text or "").strip().lower()
+    q = " ".join(
+        q.replace("?", " ")
+        .replace("!", " ")
+        .split()
+    )
 
-        phrases = [
-            "where are we at with nova right now",
-            "where are we at with nova",
-            "where are we at",
-            "where is nova at",
-            "where's nova at",
-            "where is the project at",
-            "where's the project at",
-            "give me the nova status",
-            "nova status without hype",
-            "what should we do next",
-            "what should we do",
-            "what's next",
-            "next concrete move",
-            "next move",
-            "what now",
-            "should we patch app.py",
-            "should we patch or test",
-            "should we test first",
-            "test first",
-            "safe to code",
-            "what test should we run",
-            "what does this failure mean",
-            "why did this fail",
-            "stale memory",
-            "memory hijacking",
+    exact_direct_project_state = {
+        "what are we working on",
+        "what are we working on now",
+        "what are we working on right now",
+    }
+
+    if q in exact_direct_project_state:
+        return False
+
+    phrases = [
+        "where are we at with nova right now",
+        "where are we at with nova",
+        "where are we at",
+        "where is nova at",
+        "where's nova at",
+        "where is the project at",
+        "where's the project at",
+        "give me the nova status",
+        "nova status without hype",
+
+        "what is the next step",
+        "what should we do next",
+        "what should we do",
+        "what's next",
+        "next concrete move",
+        "next move",
+        "what now",
+
+        "should we patch app.py",
+        "should we patch or test",
+        "should we test first",
+        "test first",
+        "safe to code",
+        "what test should we run",
+
+        "what does this failure mean",
+        "why did this fail",
+
+        "stale memory",
+        "memory hijacking",
+
         "what did we lock recently",
         "what got locked recently",
         "what is locked",
         "what's locked",
         "what got locked",
         "what did we lock",
-        "next upgrade",
-        ]
 
-        return any(
-            phrase in q
-            for phrase in phrases
-        )
+        "next upgrade",
+    ]
+
+    return any(
+        phrase in q
+        for phrase in phrases
+    )
 
 
     def should_handle_project_brain_general_question(user_text):
@@ -582,14 +489,6 @@ try:
             return True
 
         return False
-
-except Exception as _nova_project_brain_general_live_selector_classifier_error_20260702:
-    print(
-        "[NOVA_PROJECT_BRAIN_GENERAL_LIVE_SELECTOR_CLASSIFIER_20260702] failed:",
-        _nova_project_brain_general_live_selector_classifier_error_20260702,
-    )
-
-
 
 # NOVA_PROJECT_BRAIN_GENERAL_LIVE_SELECTOR_EXPORTED_CLASSIFIER_20260702
 # Exports a stable Project Brain general classifier and routes matched questions
@@ -613,6 +512,13 @@ def _legacy_build_project_brain_general_answer_497(user_text=""):
         user_text,
     )
     intent = classify_project_brain_intent(user_text)
+
+    print(
+        "[DEBUG PROJECT BRAIN FINAL INTENT]",
+        repr(user_text),
+        "=>",
+        intent,
+    )
 
     if intent == "mission_control":
         from nova_backend.services.project_brain_mission_control import (
@@ -748,8 +654,31 @@ def _nova_project_brain_command_center_question_20260702(user_text):
 def build_project_brain_general_answer(
     user_text="",
     user_id=None,
+    project_context=None,
 ):
+    print("🔥 USING NEW PROJECT BRAIN GENERAL ANSWER")
+
     intent = classify_project_brain_intent(user_text)
+    print(
+        "[PBGI FINAL DEBUG]",
+        "intent=",
+        intent,
+        "text=",
+        repr(user_text),
+    )
+
+    print(
+        "[DEBUG PROJECT BRAIN ROUTE HIT]",
+        intent,
+        repr(user_text),
+    )
+    intent = classify_project_brain_intent(user_text)
+
+    if project_context:
+        print(
+            "[PROJECT BRAIN CONTEXT]",
+            project_context,
+        )
 
     print(
         "[NOVA AUTONOMY DEBUG]",
@@ -759,9 +688,13 @@ def build_project_brain_general_answer(
     )
 
     if intent == "locked_state":
+        from nova_backend.services.project_brain_context_builder import (
+            build_current_project_answer,
+        )
+
         return ProjectBrainAnswer(
-            intent="locked_state",
-            text=_current_project_answer(user_text),
+            intent="current_project_state",
+            text=build_current_project_answer(),
         )
 
     if intent == "actual_blocker":
@@ -792,32 +725,24 @@ def build_project_brain_general_answer(
         )
 
     if intent == "current_project_state":
-        q = _nova_project_brain_general_live_selector_normalize_20260702(
-            user_text
+        print(
+            "[PBGI CURRENT PROJECT STATE BRANCH HIT]"
         )
 
-        broad_project_status = (
-            "where are we at" in q
-            or "where is nova at" in q
-            or "nova status" in q
-            or "project status" in q
+        from nova_backend.services.project_brain_context_builder import (
+            build_current_project_answer,
         )
 
-        if broad_project_status:
-            answer = _current_project_answer(
-                user_text
-            )
+        result = build_current_project_answer()
 
-            return ProjectBrainAnswer(
-                intent="current_project_state",
-                text=str(answer),
-            )
-
-        answer = _current_project_answer()
+        print(
+            "[PBGI CONTEXT BUILDER RESULT]",
+            result,
+    	)
 
         return ProjectBrainAnswer(
             intent="current_project_state",
-            text=str(answer),
+            text=build_current_project_answer(),
         )
 
     if intent == "safe_next_action":
@@ -850,59 +775,61 @@ def build_project_brain_general_answer(
             text=_practical_project_answer(),
         )
 
-
     if (
-    _nova_project_brain_command_center_question_20260702(user_text)
-    and not (
-        "where are we at with nova" in _nova_project_brain_general_live_selector_normalize_20260702(user_text)
-        or "where are we at" in _nova_project_brain_general_live_selector_normalize_20260702(user_text)
-        or "where is nova at" in _nova_project_brain_general_live_selector_normalize_20260702(user_text)
-    )
-):
-
+        _nova_project_brain_command_center_question_20260702(user_text)
+        and not (
+            "where are we at with nova"
+            in _nova_project_brain_general_live_selector_normalize_20260702(user_text)
+            or "where are we at"
+            in _nova_project_brain_general_live_selector_normalize_20260702(user_text)
+            or "where is nova at"
+            in _nova_project_brain_general_live_selector_normalize_20260702(user_text)
+        )
+    ):
         from nova_backend.services.project_state_service import (
             answer_project_state_question,
         )
 
-        return ProjectBrainAnswer(
-            intent="current_project_state",
-            text=answer_project_state_question(user_text),
-        )
+# live_answer = build_project_brain_live_answer(
+#     user_text=user_text,
+#     user_id=user_id,
+# )
 
-        live_answer = build_project_brain_live_answer(
-            user_text=user_text,
-            user_id=user_id,
-        )
+# if live_answer:
+#     live_text = str(
+#         getattr(
+#             live_answer,
+#             "text",
+#             "",
+#         )
+#         or ""
+#     ).strip()
 
-        if live_answer:
-            live_text = str(
-                getattr(
-                    live_answer,
-                    "text",
-                    "",
-                )
-                or ""
-            ).strip()
+#     if live_text:
+#         return ProjectBrainAnswer(
+#             intent=str(
+#                 getattr(
+#                     live_answer,
+#                     "intent",
+#                     "",
+#                 )
+#                 or "project_brain_general"
+#             ),
+#             text=live_text,
+#         )
 
-            if live_text:
-                return ProjectBrainAnswer(
-                    intent=str(
-                        getattr(
-                            live_answer,
-                            "intent",
-                            "",
-                        )
-                        or "project_brain_general"
-                    ),
-                    text=live_text,
-                )
-
-    if callable(_NOVA_PRE_LIVE_SELECTOR_PROJECT_BRAIN_GENERAL_BUILD_20260702):
-        return _NOVA_PRE_LIVE_SELECTOR_PROJECT_BRAIN_GENERAL_BUILD_20260702(
-            user_text
-        )
-
-    return None
+    return ProjectBrainAnswer(
+        intent="current_project_state",
+        text=(
+            "Project Brain Context Builder:\n\n"
+            "Current checkpoint:\n"
+            "Pre-launch stabilization.\n\n"
+            "Current blocker:\n"
+            "Finish validation and remove remaining launch blockers.\n\n"
+            "Next move:\n"
+            "Run focused smoke tests and protect regressions."
+        ),
+    )
 
 def _nova_decision_log_user_text_20260701(*args, **kwargs):
         if args:
@@ -951,10 +878,17 @@ def _nova_is_decision_log_question_20260701(user_text):
             for needle in needles
         )
 
+def _current_project_answer(user_text="") -> str:
+    from nova_backend.services.project_brain_context_builder import (
+        build_current_project_answer,
+    )
+
+    return build_current_project_answer()
+
+
 _NOVA_DECISION_LOG_PREVIOUS__CURRENT_PROJECT_ANSWER_20260701 = _current_project_answer
 
-
-def _current_project_answer(*args, **kwargs):
+def _decision_log_current_project_answer(*args, **kwargs):
     user_text = _nova_decision_log_user_text_20260701(
         *args,
         **kwargs
@@ -996,7 +930,6 @@ print("[NOVA_PROJECT_BRAIN_DECISION_LOG_GENERAL_WIRE_20260701] installed on _cur
 _NOVA_PRE_COMMAND_CENTER_ROUTE_GATE_SHOULD_HANDLE_20260702 = (
     _NOVA_PRE_LIVE_SELECTOR_PROJECT_BRAIN_GENERAL_CLASSIFIER_20260702
 )
-
 
 def should_handle_project_brain_general_question(user_text):
     try:
