@@ -766,7 +766,7 @@ await loadProjectFiles(
                 error
             );
 
-            if (tasks) {
+            if (tasksContainer) {
                 tasks.innerHTML = `
                     <div class="session-placeholder">
                         ${escapeHtml(

@@ -488,7 +488,6 @@ class ChatService:
         )
 
     def _is_control_command_value(self, value):
-
         text = self.safe_str(value).strip().lower()
 
         blocked = {
@@ -529,58 +528,22 @@ class ChatService:
             patch,
         )
 
-
     def _build_system_prompt(
         self,
         decision=None,
     ):
-
         parts = []
 
         parts.append(
-            "You are Nova, an intelligent "
-            "continuity-aware AI workspace assistant. "
-            "Track conversational order carefully "
-            "and prioritize the latest user corrections "
-            "and facts. "
-            "Do not contradict recent conversation "
-            "context. "
-            "Avoid robotic one-word replies unless "
-            "explicitly requested. "
-            "Respond naturally, directly, and with "
-            "conversational continuity. "
-            "Preserve the user's momentum and active "
-            "context."
+            "You are Nova, an intelligent continuity-aware AI workspace assistant. "
+            "Track conversational order carefully. "
+            "Prioritize the latest user corrections and facts. "
+            "Respond naturally, directly, and practically."
         )
 
         parts.append(
-            "Nova identity: "
-            "You are a direct thinking partner, not a generic assistant. "
-            "Lead with the useful answer. "
-            "Avoid empty praise, filler acknowledgements, and unnecessary reassurance. "
-            "Do not assume the user's emotions or describe how they feel. "
-            "Be calm, precise, and honest about uncertainty. "
-            "Challenge weak assumptions respectfully when it improves the outcome. "
-            "Prioritize progress, clarity, and practical next actions."
-        )
-
-        parts.append(
-            "When coding or project-building, "
-            "be precise and operational. "
-            "Keep outputs structured and grounded "
-            "in the user's active work."
-        )
-
-        parts.append(
-            "Response style rules: "
-            "be concise, confident, and practical. "
-            "Prefer direct answers first. "
-            "Avoid generic assistant filler. "
-            "When relevant, anchor the reply to the "
-            "user's active file, bug, or next move. "
-            "Do not repeat the working context unless "
-            "it improves the reply. "
-            "Use it quietly to stay aligned."
+            "When coding or project-building, be precise and operational. "
+            "Use the user's active work context."
         )
 
         if decision and isinstance(decision, dict):
@@ -588,35 +551,33 @@ class ChatService:
             mode = (decision.get("mode") or "").strip()
 
             if mode:
-                parts.append(f"Current operating mode: " f"{mode}.")
+                parts.append(
+                    f"Current operating mode: {mode}."
+                )
 
-        intent = self.safe_str((decision or {}).get("intent")).lower()
+            intent = self.safe_str(
+                decision.get("intent")
+            ).lower()
 
-        if intent == "debugging":
+            if intent == "next":
+                parts.append(
+                    "NEXT STEP MODE: "
+                    "Give the concrete next action using known Nova project context. "
+                    "Do not ask for information already available."
+                )
 
-            parts.append(
-                "DEBUGGING MODE: "
-                "Do not give generic debugging "
-                "checklists. "
-                "Do not list frameworks. "
-                "Do not say 'check logs' without "
-                "giving the exact command. "
-                "Prefer PowerShell commands, exact "
-                "file paths, search anchors, and "
-                "full-file fixes. "
-                "If the exact file is unknown, ask "
-                "for ONE specific missing item: "
-                "the file path or error log. "
-                "Use the user's style: direct, "
-                "endgame, no filler."
-            )
+            if intent == "debugging":
+                parts.append(
+                    "DEBUGGING MODE: "
+                    "Give exact files, commands, and fixes."
+                )
 
-        return "\n\n".join([p for p in parts if p]).strip()
+        return "\n\n".join(
+            p for p in parts if p
+        ).strip()
 
     def _auto_advance_execution(self, session_id):
         return None
-
-
 
     def _resume_execution_if_needed(self, session_id):
         session = self.sessions.get(session_id)
@@ -1688,6 +1649,8 @@ Rules:
             return "continue"
 
         return "default"
+
+
 
     def _agent_context(self, brain_state):
 
@@ -8876,26 +8839,9 @@ Rules:
 
         text = self.safe_str(user_text)
         lowered = text.lower().strip()
-
-        # PROJECT BRAIN PRIORITY ROUTES
-        if lowered in {
-            "what is the next step",
-            "what should we do next",
-            "next step",
-            "next move",
-        }:
-            return (
-                "project_brain_general_intelligence",
-                None,
-            )
-
         # AUTO PLAN EXECUTION START
         if lowered.startswith("auto-plan"):
-            return (
-                "execution",
-                "start",
-            )
-
+            return ("execution", "start")
         attachments = attachments or []
 
         # LOAD EXECUTION STATE
@@ -8912,14 +8858,9 @@ Rules:
         )
 
         execution_commands = {
-            "next",
-            "continue",
-            "resume",
-            "run step",
-            "run all",
-            "execute",
-            "retry",
-            "run it",
+            "next", "continue", "resume",
+            "run step", "run all", "execute",
+            "retry", "run it"
         }
 
  # 1. EXECUTION MODE
@@ -9446,27 +9387,6 @@ Rules:
             pass
 
         # NOVA_FIRST_CONTACT_IDENTITY_20260727
-        # NOVA_TOOL_PIPELINE_BRIDGE_V1
-        try:
-            from nova_backend.tools.chat_tool_bridge import (
-                maybe_run_tool,
-            )
-
-            tool_result = maybe_run_tool(
-                user_text
-            )
-
-            if tool_result:
-                return tool_result
-
-        except Exception as _nova_tool_bridge_error:
-            try:
-                print(
-                    "[NOVA TOOL BRIDGE ERROR]",
-                    _nova_tool_bridge_error,
-                )
-            except Exception:
-                pass
 
         try:
             _nova_session = self._get_session(session_id)
@@ -10650,120 +10570,106 @@ Rules:
         if auto_fix_result is not None:
             return auto_fix_result
 
+    # ================================
+    # NOVA SINGLE ROUTER ENFORCEMENT
+    # ================================
 
+    execution_state = (
+        self._get_session_meta(session_id, "execution_state")
+        or self._get_session_meta(session_id, "active_execution")
+        or {}
+    )
 
+    execution_active = bool(
+        execution_state.get("steps")
+        or execution_state.get("current_step")
+        or execution_state.get("status") in {"running", "waiting"}
+    )
 
+    # SAFE ROUTE DISPATCH (FIXED)
 
+    decision = self._decide_route(
+        user_text=user_text,
+        attachments=attachments,
+        session_id=session_id,
+    )
 
-        # ================================
-        # NOVA SINGLE ROUTER ENFORCEMENT
-        # ================================
+    route, command = self._single_router(
+        user_text,
+        session_id,
+        attachments,
+    )
 
-        execution_state = (
-            self._get_session_meta(session_id, "execution_state")
-            or self._get_session_meta(session_id, "active_execution")
-            or {}
+    print(
+        "[ROUTER DEBUG]",
+        user_text,
+        route,
+        command,
+    )
+
+    if execution_active and route != "execution":
+        route = "chat"
+
+    if route == "execution":
+
+        if command == "start":
+            execution_state = self._process_goal_and_plan(
+                user_text,
+                session_id,
+            )
+
+            if not execution_state:
+                return self._execute_general_chat(
+                    user_text=user_text,
+                    session_id=session_id,
+                    attachments=attachments,
+                    decision=decision,
+                )
+
+        else:
+            execution_state = {
+                "command": user_text,
+            }
+
+        return self.execution_orchestrator_service.process_execution(
+            session_id=session_id,
+            state=execution_state,
         )
 
-        execution_active = bool(
-            execution_state.get("steps")
-            or execution_state.get("current_step")
-            or execution_state.get("status") in {"running", "waiting"}
-        )
+    elif route == "attachment":
 
-        execution_commands = {
-            "next", "continue", "resume",
-            "run step", "run all", "execute",
-            "retry", "run it"
-        }
-
-        lowered = self.safe_str(user_text).lower().strip()
-
-        # SAFE ROUTE DISPATCH (FIXED)
-
-        decision = self._decide_route(
+        return self._handle_attachment(
             user_text=user_text,
             attachments=attachments,
             session_id=session_id,
         )
 
+    elif route == "image":
 
-        route, command = self._single_router(
-            user_text,
-            session_id,
-            attachments
+        return self._handle_image_generation(
+            prompt=user_text,
+            session_id=session_id,
         )
 
-        print(
-            "[ROUTER DEBUG]",
-            user_text,
-            route,
-            command,
+    elif route == "web":
+
+        return self._execute_web_fetch(
+            user_text=user_text,
+            session_id=session_id,
+            attachments=attachments,
+            decision={
+                "route": "web_fetch",
+                "mode": "web_fetch",
+                "query": user_text,
+            },
         )
 
-        # HARD RULE: execution must not leak into chat fallback
-        if execution_active and route != "execution":
-            route = "chat"
-
-        # SINGLE DISPATCH AUTHORITY
-        if route == "execution":
-
-            if command == "start":
-                execution_state = self._process_goal_and_plan(
-                    user_text,
-                    session_id,
-                )
-
-                if not execution_state:
-                    return self._execute_general_chat(
-                        user_text=user_text,
-                        session_id=session_id,
-                        attachments=attachments,
-                        decision=decision,
-                    )
-
-            else:
-                execution_state = {
-                    "command": user_text,
-                }
-
-            return self.execution_orchestrator_service.process_execution(
-                session_id=session_id,
-                state=execution_state,
-            )
-
-        elif route == "attachment":
-            return self._handle_attachment(
-                user_text=user_text,
-                attachments=attachments,
-                session_id=session_id
-            )
-
-        elif route == "image":
-            return self._handle_image_generation(
-                prompt=user_text,
-                session_id=session_id,
-            )
-
-        elif route == "web":
-            return self._execute_web_fetch(
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-                decision={
-                    "route": "web_fetch",
-                    "mode": "web_fetch",
-                    "query": user_text,
-                },
-            )
-        else:
-            return self._execute_general_chat(
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-                decision=decision,
-            )
-
+    return self._execute_general_chat(
+        user_text=user_text,
+        session_id=session_id,
+        attachments=attachments,
+        decision=decision,
+    )
     def _process_goal_and_plan(self, user_text: str, session_id: str):
         user_text = self.safe_str(user_text).strip()
 
@@ -11176,6 +11082,7 @@ Rules:
             return ""
 
         return text[:limit].strip()
+
 
     def _truncate_web_text(
         self,
@@ -17050,6 +16957,32 @@ try:
                 "prompt": user_text,
             }
 
+        next_step_signal = (
+            "what is the next step" in text_lower
+            or "what's the next step" in text_lower
+            or text_lower.strip() == "next step"
+            or "what should we do next" in text_lower
+            or "what should we work on next" in text_lower
+            or text_lower.strip() == "what's next"
+            or text_lower.strip() == "whats next"
+        )
+
+        if next_step_signal:
+            return {
+                "route": "project_brain_general_intelligence",
+                "mode": "project_brain_general_intelligence",
+                "intent": "next",
+                "confidence": 1.0,
+                "reasons": [
+                    "next_step_intent_authority",
+                ],
+                "save_artifact": False,
+                "save_memory": False,
+                "use_memory": True,
+                "source_urls": [],
+                "sources": [],
+                "prompt": user_text,
+            }
         # existing function body stays here
 
         # Real attachments always stay attachment-analysis.
@@ -17153,44 +17086,26 @@ try:
                     "prompt": user_text,
                 }
 
-        if (
-            intent_route
-            and (
-                intent_confidence >= 0.94
-                or intent_decision.get("intent") in trusted_intents
-            )
-        ):
-
-            if intent_decision.get("intent") == "planning":
+            if (
+                intent_route
+                and (
+                    intent_confidence >= 0.94
+                    or intent_decision.get("intent") in trusted_intents
+                )
+            ):
                 return {
-                    "route": "project_brain_general_intelligence",
-                    "mode": "project_brain_general_intelligence",
-                    "intent": "planning",
+                    "route": intent_route,
+                    "mode": intent_decision.get("mode") or intent_decision.get("intent") or "chat",
+                    "intent": intent_decision.get("intent") or "",
                     "confidence": intent_confidence,
-                    "reasons": list(intent_decision.get("reasons") or []) + [
-                        "planning_to_project_brain"
-                    ],
-                    "save_artifact": False,
-                    "save_memory": False,
-                    "use_memory": True,
+                    "reasons": list(intent_decision.get("reasons") or []) + ["intent_authority"],
+                    "save_artifact": bool(intent_decision.get("save_artifact", False)),
+                    "save_memory": bool(intent_decision.get("save_memory", True)),
+                    "use_memory": bool(intent_decision.get("use_memory", True)),
                     "source_urls": [],
                     "sources": [],
-                    "prompt": user_text,
+                    "prompt": intent_decision.get("prompt") or user_text,
                 }
-
-            return {
-                "route": intent_route,
-                "mode": intent_decision.get("mode") or intent_decision.get("intent") or "chat",
-                "intent": intent_decision.get("intent") or "",
-                "confidence": intent_confidence,
-                "reasons": list(intent_decision.get("reasons") or []) + ["intent_authority"],
-                "save_artifact": bool(intent_decision.get("save_artifact", False)),
-                "save_memory": bool(intent_decision.get("save_memory", True)),
-                "use_memory": bool(intent_decision.get("use_memory", True)),
-                "source_urls": [],
-                "sources": [],
-                "prompt": intent_decision.get("prompt") or user_text,
-            }
 
         decision = _nova_previous_decide_route_intent_authority_20260630(
             self,
@@ -17494,19 +17409,14 @@ try:
         return False
 
     def _nova_project_brain_question_kind_20260701(user_text):
-        text = str(user_text or "").strip().lower()
+
+        text = str(user_text or "").split(
+            "\n\nProject-aware context for Nova:"
+        )[0].strip().lower()
+
         text = text.replace("?", "'").replace("`", "")
         text = " ".join(text.split())
         bare = text.rstrip("?!.")
-        
-        if (
-            "nova status" in bare
-            or "give me the nova status" in bare
-            or "status without hype" in bare
-            or "where are we at with nova" in bare
-            or "where are we at" in bare
-        ):
-            return "current_project_state"
 
         if (
             "what does this failure mean" in bare
@@ -17572,25 +17482,19 @@ try:
         ):
             return "working"
 
-        if bare in {
-            "what's next",
-            "whats next",
-            "what is next",
-            "what should we work on next",
-            "what should we do next",
-            "next move",
-        }:
-            return "next"
-
-        if bare in {
-            "what's next",
-            "whats next",
-            "what is next",
-            "what should we work on next",
-            "what should we do next",
-            "next move",
-        }:
-            return "next"
+            if bare in {
+                "what's next",
+                "whats next",
+                "what is next",
+                "what is the next step",
+                "what should we work on next",
+                "what should we do next",
+                "next move",
+                "next step",
+                "tell me the next step",
+                "what happens next",
+            }:
+                return "next"
 
         if (
             "indentationerror" in bare
@@ -17640,9 +17544,13 @@ try:
             "no active execution mission",
         )
 
-        return low.startswith(bad_starts)
+        if low.startswith(bad_starts):
+            return True
+
+        return False
 
     def _nova_project_brain_answer_20260701(
+        self,
         kind,
         session_id,
         user_text="",
@@ -17659,8 +17567,6 @@ try:
             if kind == "working"
             else user_text
             if kind == "failure_interpreter"
-            else "give me the Nova status without hype"
-            if kind == "current_project_state"
             else "what's next?"
         )
 
@@ -17683,75 +17589,28 @@ try:
                     pasted_output=user_text,
                 )
 
-            elif kind == "mission_control":
+            elif kind in {
+                "mission_control",
+                "actual_blocker",
+            }:
                 from nova_backend.services.project_brain_general_intelligence import (
                     build_project_brain_general_answer,
                 )
 
-                fresh_answer = build_project_brain_general_answer(
+                result = build_project_brain_general_answer(
                     question,
                     user_id="",
                 )
 
                 answer = str(
                     getattr(
-                        fresh_answer,
+                        result,
                         "text",
-                        fresh_answer,
-                    )
-                    or ""
-
-                ).strip()
-
-            elif kind == "actual_blocker":
-                from nova_backend.services.project_brain_general_intelligence import (
-                    build_project_brain_general_answer,
-                )
-
-                fresh_answer = build_project_brain_general_answer(
-                    question,
-                    user_id="",
-                )
-
-                answer = str(
-                    getattr(
-                        fresh_answer,
-                        "text",
-                        fresh_answer,
+                        result,
                     )
                     or ""
                 ).strip()
 
-            elif kind == "current_project_state":
-                from nova_backend.services.project_brain_general_intelligence import (
-                    build_project_brain_general_answer,
-                )
-
-                print(
-                    "[CHAT SERVICE CALLING PBGI]",
-                    repr(user_text),
-                    "kind=",
-                    repr(kind),
-                )
-
-                fresh_answer = build_project_brain_general_answer(
-                    question,
-                    user_id="",
-                )
-
-                answer = str(
-                    getattr(
-                        fresh_answer,
-                        "text",
-                        fresh_answer,
-                    )
-                    or ""
-                ).strip()
-
-                print(
-                    "[CURRENT PROJECT ANSWER DEBUG]",
-                    repr(answer[:300]),
-                )
             elif kind == "working":
                 from nova_backend.services.project_state_service import (
                     answer_project_state_question,
@@ -17767,32 +17626,16 @@ try:
                     ).strip()
 
             elif kind == "next":
-                from nova_backend.services.project_brain_general_intelligence import (
-                    build_project_brain_general_answer,
+                answer = (
+                    "Next move:\n"
+                    "Continue the Nova pre-launch stabilization pass.\n\n"
+                    "Current priority:\n"
+                    "Validate user flows, reliability, onboarding, "
+                    "and launch readiness.\n\n"
+                    "Action:\n"
+                    "Run the next regression checks and fix any "
+                    "remaining blockers before launch."
                 )
-
-                general_answer = build_project_brain_general_answer(
-                    question,
-                    user_id="",
-                )
-
-                if isinstance(general_answer, dict):
-                    answer = str(
-                        general_answer.get("content")
-                        or general_answer.get("text")
-                        or general_answer.get("answer")
-                        or ""
-                    ).strip()
-
-                else:
-                    answer = str(
-                        getattr(
-                            general_answer,
-                            "text",
-                            general_answer,
-                        )
-                        or ""
-                    ).strip()
 
         except Exception as exc:
             import traceback
@@ -17809,34 +17652,15 @@ try:
             repr(answer),
         )
 
-        print(
-            "[BLOCKER FINAL ANSWER DEBUG]",
-            repr(kind),
-            repr(answer),
-        )
-
-        if kind in {
-            "mission_control",
-            "failure_interpreter",
-            "actual_blocker",
-            "current_project_state",
-        }:
+        if answer:
             return answer
-
-        if not _nova_project_brain_bad_answer_20260701(answer):
-            return answer
-
-        if kind == "next":
-            return (
-                "Current Nova project context:\n"
-                "Current task: fix Nova project brain answer quality.\n"
-                "Next move: continue improving project brain routing and verify the regression smoke."
-            )
 
         return (
             "Current Nova project context:\n"
-            "Current task: fix Nova project brain answer quality."
+            "Continue the pre-launch stabilization pass."
         )
+
+
     def _nova_project_brain_response_20260701(
         text,
         session_id,
@@ -17944,6 +17768,7 @@ try:
         )
 
         if kind:
+
             session_id = (
                 _nova_project_brain_question_session_20260701(
                     args,
@@ -17962,22 +17787,6 @@ try:
                 ),
             )
 
-            if kind == "current_project_state":
-                from nova_backend.services.project_brain_general_intelligence import (
-                    build_project_brain_general_answer,
-                )
-
-                fresh_answer = build_project_brain_general_answer(
-                    user_text,
-                    user_id="",
-                )
-
-                return _nova_project_brain_response_20260701(
-                    fresh_answer.text,
-                    session_id,
-                    first_message=False,
-                )
-
             if (
                 _nova_project_brain_has_active_execution_20260711(
                     self,
@@ -17988,28 +17797,183 @@ try:
                     "_NOVA_PRE_PROJECT_STATE_FRESH_PRIORITY_HANDLE_20260701"
                 )
 
-                return (
-                    _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701(
+                if callable(
+                    pre_project_state_handle
+                ):
+                    return pre_project_state_handle(
                         self,
                         *args,
                         **kwargs,
                     )
+
+            def _nova_ps_fresh_priority_should_handle_20260701(user_text):
+                text = str(user_text or "").strip().lower()
+
+                return any(
+                    phrase in text
+                    for phrase in (
+                        "where are we at",
+                        "where is nova at",
+                        "nova status",
+                        "give me the nova status",
+                        "status without hype",
+                    )
                 )
 
-            return (
-                _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701(
-                    self,
-                    *args,
-                    **kwargs,
+            fresh_priority_predicate = (
+                _nova_ps_fresh_priority_should_handle_20260701
+            )
+
+            if (
+                str(user_text or "")
+                .strip()
+                .lower()
+                == "what should we work on next"
+            ):
+                fresh_priority_predicate = None
+
+            blocker_question = any(
+                phrase in str(user_text or "").lower()
+                for phrase in (
+                    "what is the current blocker",
+                    "what's the current blocker",
+                    "current blocker",
+                    "what is the blocker",
+                    "what blocker do we have",
+                    "what are we blocked on",
+                    "what is blocking nova",
+                    "actual blocker",
                 )
             )
+
+            if (
+                callable(
+                    fresh_priority_predicate
+                )
+                and fresh_priority_predicate(
+                    user_text
+                )
+                and not blocker_question
+            ):
+
+                from nova_backend.services.project_state_service import (
+                    answer_project_state_question,
+                )
+
+                answer = (
+                    answer_project_state_question(
+                        user_text,
+                        session_id=session_id,
+                    )
+                )
+
+            if answer:
+                return (
+                    _nova_project_brain_response_20260701(
+                        answer,
+                        session_id,
+                        first_message=_nova_first_message,
+                    )
+                )
+
+            print(
+                "ANSWER KIND:",
+                repr(kind),
+                repr(user_text),
+            )
+
+
+            if kind in {
+                "actual_blocker",
+                "mission_control",
+                "next",
+            } and not answer:
+                from nova_backend.services.project_brain_general_intelligence import (
+                    build_project_brain_general_answer,
+                )
+
+                fresh_answer = build_project_brain_general_answer(
+                    user_text,
+                    user_id="",
+                )
+
+                answer = str(
+                    getattr(
+                        fresh_answer,
+                        "text",
+                        fresh_answer,
+                    )
+                    or ""
+                ).strip()
+
+            if kind in {
+                "actual_blocker",
+                "mission_control",
+                "next",
+            } and not answer:
+                from nova_backend.services.project_brain_general_intelligence import (
+                    build_project_brain_general_answer,
+                )
+
+                fresh_answer = build_project_brain_general_answer(
+                    user_text,
+                    user_id="",
+                )
+
+                answer = str(
+                    getattr(
+                        fresh_answer,
+                        "text",
+                        fresh_answer,
+                    )
+                    or ""
+                ).strip()
+
+            if kind in {
+                "actual_blocker",
+                "mission_control",
+                "next",
+            } and not answer:
+                from nova_backend.services.project_brain_general_intelligence import (
+                    build_project_brain_general_answer,
+                )
+
+                fresh_answer = build_project_brain_general_answer(
+                    user_text,
+                    user_id="",
+                )
+
+                answer = str(
+                    getattr(
+                        fresh_answer,
+                        "text",
+                        fresh_answer,
+                    )
+                    or ""
+                ).strip()
+
+            if answer:
+                return (
+                    _nova_project_brain_response_20260701(
+                        answer,
+                        session_id,
+                        first_message=_nova_first_message,
+                    )
+                )
+
+        return (
+            _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701(
+                self,
+                *args,
+                **kwargs,
+            )
+        )
 
     if hasattr(ChatService, "handle"):
         ChatService.handle = _nova_project_brain_question_top_priority_handle_20260701
 
         ChatService._NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701 = True
         print("[NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701] installed")
-
 except Exception as _nova_project_brain_question_top_priority_error_20260701:
     try:
         print(
@@ -18018,6 +17982,10 @@ except Exception as _nova_project_brain_question_top_priority_error_20260701:
         )
     except Exception:
         pass
+
+install_token_usage_finalize_wrapper(ChatService)
+
+install_attachment_web_suppression()
 
 def _nova_attachment_guard_method_looks_like_result_web_route(name):
     lowered = str(name or "").lower()
@@ -18045,5 +18013,6 @@ def _nova_attachment_guard_method_looks_like_result_web_route(name):
 
     if any(word in lowered for word in blocked):
         return False
+
 
     return True

@@ -304,10 +304,14 @@ class MemoryService:
 
         new_text = str(item.get("text") or "").strip()
         new_text_key = new_text.lower()
-        new_kind = str(item.get("kind") or "note").strip().lower()
+
+        new_kind = str(
+            item.get("kind")
+            or _nova_classify_memory_kind(new_text)
+        ).strip().lower()
+
         pinned = bool(item.get("pinned"))
 
-        # ðŸ”¥ CONFLICT RESOLUTION (newer overrides older)
         conflict_groups = [
             ("short answers", "long answers"),
             ("concise", "detailed"),
