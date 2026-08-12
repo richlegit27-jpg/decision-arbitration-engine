@@ -10,10 +10,11 @@ def tool_confidence(plan: dict):
 
     tool = plan.get("tool")
 
-    if tool in {
+    allowed_tools = {
         "memory_write",
+        "memory_read",
+        "memory_delete",
         "project_workspace_update",
-    }:
-        return True
+    }
 
-    return False
+    return tool in allowed_tools
