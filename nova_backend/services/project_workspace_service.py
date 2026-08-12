@@ -151,52 +151,53 @@ class ProjectWorkspaceService:
 
         return project
 
-def update_project(
-    self,
-    project_id,
-    name=None,
-    description=None,
-    status=None,
-):
-    projects = self._load_projects()
+    def update_project(
+        self,
+        project_id,
+        name=None,
+        description=None,
+        status=None,
+    ):
 
-    for project in projects:
-        if (
-            project.get("id") != project_id
-            or not self._same_project_owner(project)
-        ):
-            continue
+        projects = self._load_projects()
 
-        if name is not None:
-            project["name"] = str(
-                name
+        for project in projects:
+            if (
+                project.get("id") != project_id
+                or not self._same_project_owner(project)
+            ):
+                continue
+
+            if name is not None:
+                project["name"] = str(
+                    name
+                )
+
+                project["title"] = str(
+                    name
+                )
+
+            if description is not None:
+                project["description"] = str(
+                    description
+                )
+
+            if status is not None:
+                project["status"] = str(
+                    status
+                )
+
+            project["updated_at"] = datetime.now(
+                timezone.utc
+            ).isoformat()
+
+            self._save_projects(
+                projects
             )
 
-            project["title"] = str(
-                name
-            )
+            return project
 
-        if description is not None:
-            project["description"] = str(
-                description
-            )
-
-        if status is not None:
-            project["status"] = str(
-                status
-            )
-
-        project["updated_at"] = datetime.now(
-            timezone.utc
-        ).isoformat()
-
-        self._save_projects(
-            projects
-        )
-
-        return project
-
-    return None
+        return None
 
 def archive_project(
     self,
