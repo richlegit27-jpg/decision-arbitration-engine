@@ -2319,6 +2319,7 @@ Rules:
         # =========================
         # CORE SERVICES
         # =========================
+        self.chat_router = ChatRouter(self)
         self.planner_service = PlannerService(self)
         self.intelligence_router = IntelligenceRouter(self)
         self.auto_fix_service = AutoFixService(self)
@@ -10310,7 +10311,7 @@ Rules:
         )
 
 
-        route, command = self._single_router(
+        route, command = self.chat_router.handle(
             user_text,
             session_id,
             attachments
@@ -15136,6 +15137,8 @@ Rules:
         attachments = attachments or []
 
         execution = self._normalize_execution_state(execution or {})
+        execution["status"] = "running"
+        execution["waiting"] = False
 
         steps = execution.get("steps") or []
 
