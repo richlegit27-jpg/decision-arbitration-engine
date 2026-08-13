@@ -651,11 +651,11 @@ def _nova_project_brain_command_center_question_20260702(user_text):
 
     return False
 
-            if isinstance(first, dict):
-                for key in ("message", "question", "user_text", "text", "prompt"):
-                    value = first.get(key)
-                    if isinstance(value, str):
-                        return value
+    if isinstance(first, dict):
+        for key in ("message", "question", "user_text", "text", "prompt"):
+            value = first.get(key)
+            if isinstance(value, str):
+                return value
 
         for key in ("message", "question", "user_text", "text", "prompt"):
             value = kwargs.get(key)
