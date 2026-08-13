@@ -395,6 +395,7 @@ def _legacy_build_project_brain_general_answer_initial(
 
     return None
 
+
 # NOVA_PROJECT_BRAIN_GENERAL_LIVE_SELECTOR_CLASSIFIER_20260702
 # Keeps Project Brain general routing layered over the original classifier.
 # The original classifier must be captured before this wrapper replaces it.
@@ -583,6 +584,12 @@ def _legacy_build_project_brain_general_answer_497(user_text=""):
 
     return any(phrase in q for phrase in phrases)
 
+def build_project_brain_general_answer(
+    user_text="",
+):
+    return _legacy_build_project_brain_general_answer_497(
+        user_text
+    )
 
 def _nova_project_brain_command_center_question_20260702(user_text):
     q = _nova_project_brain_general_live_selector_normalize_20260702(user_text)
@@ -651,18 +658,6 @@ def _nova_project_brain_command_center_question_20260702(user_text):
 
     return False
 
-    if isinstance(first, dict):
-        for key in ("message", "question", "user_text", "text", "prompt"):
-            value = first.get(key)
-            if isinstance(value, str):
-                return value
-
-        for key in ("message", "question", "user_text", "text", "prompt"):
-            value = kwargs.get(key)
-            if isinstance(value, str):
-                return value
-
-        return ""
 
 def _nova_is_decision_log_question_20260701(user_text):
         text = str(user_text or "").strip().lower()
