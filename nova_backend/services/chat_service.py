@@ -15372,7 +15372,7 @@ try:
             )
         ):
 
-            if intent_decision.get("intent") == "planning":
+        if intent_decision and intent_decision.get("intent") == "planning":
                 return {
                     "route": "project_brain_general_intelligence",
                     "mode": "project_brain_general_intelligence",
