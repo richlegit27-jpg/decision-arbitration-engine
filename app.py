@@ -703,27 +703,6 @@ blog_route_service.install_routes(
 register_planner_routes(app)
 print("[NOVA_PLANNER_ROUTES_20260812] installed")
 
-
-# NOVA_MISSION_ROUTES_20260813
-try:
-    from nova_backend.routes.mission_routes import (
-        register_mission_routes,
-    )
-
-    register_mission_routes(
-        app,
-        execution_state_service,
-        mission_orchestrator,
-    )
-
-    print("[NOVA_MISSION_ROUTES_20260813] installed")
-
-except Exception as e:
-    print(
-        "[NOVA_MISSION_ROUTES_20260813] failed:",
-        e,
-    )
-
 session_route_service.install_routes(
     app,
     session_service,
@@ -877,6 +856,31 @@ from nova_backend.services.mission_orchestrator import (
 mission_orchestrator = MissionOrchestrator(
     tool_registry=tool_registry,
 )
+
+# NOVA_MISSION_ROUTES_20260813
+
+try:
+    from nova_backend.routes.mission_routes import (
+        register_mission_routes,
+    )
+
+    if "app" in globals():
+        register_mission_routes(
+            app,
+            execution_state_service,
+            mission_orchestrator,
+        )
+
+    print(
+        "[NOVA_MISSION_ROUTES_20260813] installed"
+    )
+
+except Exception as exc:
+    print(
+        "[NOVA_MISSION_ROUTES_20260813] failed:",
+        exc,
+    )
+
 from nova_backend.services.chat_service import (
     install_chat_service_runtime_patches,
 )
