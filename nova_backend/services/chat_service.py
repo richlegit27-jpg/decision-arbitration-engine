@@ -11945,20 +11945,6 @@ Rules:
 
         # REMOVE_DECIDE_ROUTE_DEBUG_PRINT_LOCK
 
-        # =========================
-        # RUNTIME LANE
-        # =========================
-
-        if self.safe_str(user_text).startswith("/runtime"):
-
-            return {
-                "route": "runtime",
-                "intent": "runtime",
-                "mode": "runtime",
-                "runtime_command": user_text,
-                "confidence": 1.0,
-                "reasons": ["User requested runtime cognition lane."],
-            }
 
         intelligence_state = self.intelligence_router.build_state(
             user_text=user_text,
