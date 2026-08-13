@@ -9,8 +9,11 @@ class AutoFixService:
         session_id: str,
         attachments=None,
     ) -> dict:
-        return self.chat_service._execute_auto_fix_file(
-            user_text=user_text,
-            session_id=session_id,
-            attachments=attachments,
-        )
+        return {
+            "ok": False,
+            "assistant_message": {
+                "role": "assistant",
+                "text": "AutoFixService is connected. Migration step pending."
+            },
+            "session_id": session_id,
+        }
