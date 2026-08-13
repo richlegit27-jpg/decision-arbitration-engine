@@ -15784,7 +15784,7 @@ def _nova_build_planner_fallback_state_20260609(goal_text: str) -> dict:
         ]
 
     return {
-        "status": "waiting",
+        "status": "ready",
         "goal": safe_goal,
         "original_user_text": str(goal_text or ""),
         "steps": steps,
@@ -15792,7 +15792,7 @@ def _nova_build_planner_fallback_state_20260609(goal_text: str) -> dict:
         "current_step": steps[0] if steps else None,
         "current_step_title": steps[0] if steps else None,
         "history": [],
-        "waiting": True,
+        "waiting": False,
         "complete": False,
         "error": None,
         "planner_service_used": planner_available,
