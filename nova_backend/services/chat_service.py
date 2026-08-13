@@ -636,9 +636,40 @@ class ChatService:
         return "\n\n".join([p for p in parts if p]).strip()
 
     def _auto_advance_execution(self, session_id):
+        try:
+            execution_state = self._load_execution_state(
+                session_id
+            ) or {}
+
+            if not isinstance(
+                execution_state,
+                dict,
+            ):
+                execution_state = {}
+
+            if not execution_state.get("steps"):
+                return None
+
+            result = self._execute_current_step(
+                execution=execution_state,
+                user_text="next",
+                session_id=session_id,
+                attachments=None,
+            )
+
+            if isinstance(result, dict):
+                return result
+
+        except Exception as exc:
+            try:
+                print(
+                    "[NOVA AUTO ADVANCE ERROR]",
+                    exc,
+                )
+            except Exception:
+                pass
+
         return None
-
-
 
     def _resume_execution_if_needed(self, session_id):
         session = self.sessions.get(session_id)
