@@ -703,6 +703,27 @@ blog_route_service.install_routes(
 register_planner_routes(app)
 print("[NOVA_PLANNER_ROUTES_20260812] installed")
 
+
+# NOVA_MISSION_ROUTES_20260813
+try:
+    from nova_backend.routes.mission_routes import (
+        register_mission_routes,
+    )
+
+    register_mission_routes(
+        app,
+        execution_state_service,
+        mission_orchestrator,
+    )
+
+    print("[NOVA_MISSION_ROUTES_20260813] installed")
+
+except Exception as e:
+    print(
+        "[NOVA_MISSION_ROUTES_20260813] failed:",
+        e,
+    )
+
 session_route_service.install_routes(
     app,
     session_service,
@@ -944,53 +965,6 @@ if not app.secret_key:
     raise RuntimeError(
         "NOVA_SECRET_KEY is required"
     )
-
-# NOVA_PLANNER_ROUTES_20260812
-
-try:
-    from nova_backend.routes.planner_routes import (
-        register_planner_routes,
-    )
-
-    register_planner_routes(app)
-
-    print("[NOVA_PLANNER_ROUTES_20260812] installed")
-
-except Exception as exc:
-    print(
-        "[NOVA_PLANNER_ROUTES_20260812] failed:",
-        exc,
-    )
-
-
-# NOVA_MISSION_ROUTES_20260813
-
-try:
-    from nova_backend.routes.mission_routes import (
-        register_mission_routes,
-    )
-
-    register_mission_routes(
-        app,
-        execution_state_service,
-        mission_orchestrator,
-    )
-
-except Exception as e:
-    print(
-        "[NOVA_MISSION_ROUTES_20260813] failed:",
-        e,
-    )
-
-
-    print("[NOVA_MISSION_ROUTES_20260813] installed")
-
-except Exception as exc:
-    print(
-        "[NOVA_MISSION_ROUTES_20260813] failed:",
-        exc,
-    )
-
 
 def json_ok(**kwargs):
     payload = {"ok": True}
