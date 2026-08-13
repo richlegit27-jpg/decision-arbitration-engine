@@ -1504,6 +1504,8 @@ def api_fetch():
 # CASUAL_CHAT_GUARD_20260604
 @app.before_request
 def _nova_casual_chat_guard():
+
+
     try:
         from flask import request, jsonify
 
@@ -5909,194 +5911,20 @@ session_title_guard_service.install(app)
 # Project state route guard
 project_state_route_guard_service.install(app)
 
+# NOVA_PROJECT_NEXT_ENDPOINT_SERVICE_20260813
 
-
-# NOVA_API_CHAT_PROJECT_NEXT_ENDPOINT_WRAPPER_FIXED_20260701
-# Corrected route-table wrapper for exact project-brain "what's next?"
-# Fixes prior Response/function name collision.
 try:
-    import json as _nova_next_fixed_json_20260701
-    from flask import request as _nova_next_fixed_request_20260701
-    from flask import Response as _nova_next_fixed_flask_response_20260701
-
-
-    def _nova_next_fixed_make_response_20260701(
-        session_id,
-        fixed_text,
-    ):
-
-        meta = {
-            "route": "api_chat_project_next_endpoint_wrapper_fixed",
-            "strategy": "api_chat_project_next_endpoint_wrapper_fixed",
-            "session_id": session_id,
-            "source_urls": [],
-            "sources": [],
-        }
-
-        data = build_project_next_response(
-            fixed_text,
-            session_id,
-        )
-
-        return _nova_next_fixed_flask_response_20260701(
-            _nova_next_fixed_json_20260701.dumps(data, ensure_ascii=False),
-            status=200,
-            mimetype="application/json",
-        )
-    def _nova_next_fixed_wrap_endpoint_20260701(endpoint_name, original_view):
-        if not callable(original_view):
-            return False
-
-        if getattr(original_view, "_nova_next_fixed_endpoint_wrapper_20260701", False):
-            return False
-
-        def _nova_next_fixed_wrapped_view_20260701(*args, **kwargs):
-            try:
-                if (
-                    str(getattr(_nova_next_fixed_request_20260701, "path", "") or "") == "/api/chat"
-                    and str(getattr(_nova_next_fixed_request_20260701, "method", "") or "").upper() == "POST"
-                ):
-                    payload = _nova_next_fixed_request_20260701.get_json(silent=True) or {}
-                    if isinstance(payload, dict):
-                        user_text = (
-                            payload.get("message")
-                            or payload.get("user_text")
-                            or payload.get("text")
-                            or payload.get("prompt")
-                            or ""
-                        )
-
-                        normalized_user_text = str(
-                            user_text or ""
-                        ).strip().lower()
-
-                        autonomy_prefixes = (
-                            "autonomy:",
-                            "autonomy ",
-                            "task brain:",
-                            "safe task:",
-                            "safe autonomy:",
-                        )
-
-                        if normalized_user_text.startswith(
-                            autonomy_prefixes
-                        ):
-                            from nova_backend.services.project_chat_response_router_service import (
-                                _nova_autonomy_goal_from_text_20260701,
-                                _nova_autonomy_load_formatter_20260701,
-                                _nova_autonomy_payload_20260701,
-                            )
-
-                            autonomy_goal = (
-                                _nova_autonomy_goal_from_text_20260701(
-                                    user_text
-                                )
-                            )
-
-                            autonomy_formatter = (
-                                _nova_autonomy_load_formatter_20260701()
-                            )
-
-                            if autonomy_goal and autonomy_formatter:
-                                autonomy_reply = autonomy_formatter(
-                                    autonomy_goal
-                                )
-
-                                autonomy_payload = (
-                                    _nova_autonomy_payload_20260701(
-                                        autonomy_reply,
-                                        payload,
-                                    )
-                                )
-
-                                return _nova_next_fixed_flask_response_20260701(
-                                    _nova_next_fixed_json_20260701.dumps(
-                                        autonomy_payload,
-                                        ensure_ascii=False,
-                                    ),
-                                    status=200,
-                                    mimetype="application/json",
-                                )
-
-                        if is_project_next_question(user_text):
-                            session_id = str(
-                                payload.get("session_id")
-                                or payload.get("active_session_id")
-                                or payload.get("requested_session_id")
-                                or ""
-                            ).strip()
-
-                            try:
-                                print(
-                                    "[NOVA_API_CHAT_PROJECT_NEXT_ENDPOINT_WRAPPER_FIXED_20260701] intercepted",
-                                    "session_id=" + session_id,
-                                )
-                            except Exception:
-                                pass
-
-                            return _nova_next_fixed_make_response_20260701(session_id)
-
-            except Exception as _nova_next_fixed_request_error_20260701:
-                try:
-                    print(
-                        "[NOVA_API_CHAT_PROJECT_NEXT_ENDPOINT_WRAPPER_FIXED_20260701] bypass:",
-                        _nova_next_fixed_request_error_20260701,
-                    )
-                except Exception:
-                    pass
-
-            return original_view(*args, **kwargs)
-
-        _nova_next_fixed_wrapped_view_20260701.__name__ = getattr(
-            original_view,
-            "__name__",
-            "nova_next_fixed_wrapped_api_chat",
-        )
-        _nova_next_fixed_wrapped_view_20260701.__doc__ = getattr(original_view, "__doc__", None)
-        _nova_next_fixed_wrapped_view_20260701._nova_next_fixed_endpoint_wrapper_20260701 = True
-
-        app.view_functions[endpoint_name] = _nova_next_fixed_wrapped_view_20260701
-        return True
-
-    _nova_next_fixed_wrapped_count_20260701 = 0
-
-    for _nova_next_fixed_rule_20260701 in list(app.url_map.iter_rules()):
-        try:
-            if getattr(_nova_next_fixed_rule_20260701, "rule", "") != "/api/chat":
-                continue
-
-            _nova_next_fixed_endpoint_name_20260701 = getattr(
-                _nova_next_fixed_rule_20260701,
-                "endpoint",
-                "",
-            )
-            _nova_next_fixed_original_view_20260701 = app.view_functions.get(
-                _nova_next_fixed_endpoint_name_20260701
-            )
-
-            if _nova_next_fixed_wrap_endpoint_20260701(
-                _nova_next_fixed_endpoint_name_20260701,
-                _nova_next_fixed_original_view_20260701,
-            ):
-                _nova_next_fixed_wrapped_count_20260701 += 1
-        except Exception:
-            pass
-
-    print(
-        "[NOVA_API_CHAT_PROJECT_NEXT_ENDPOINT_WRAPPER_FIXED_20260701] wrapped endpoints:",
-        _nova_next_fixed_wrapped_count_20260701,
+    from nova_backend.services.project_next_endpoint_service import (
+        install_project_next_endpoint_wrapper,
     )
 
-except Exception as _nova_next_fixed_install_error_20260701:
-    try:
-        print(
-            "[NOVA_API_CHAT_PROJECT_NEXT_ENDPOINT_WRAPPER_FIXED_20260701] failed:",
-            _nova_next_fixed_install_error_20260701,
-        )
-    except Exception:
-        pass
+    install_project_next_endpoint_wrapper(app)
 
-
+except Exception as exc:
+    print(
+        "[NOVA_PROJECT_NEXT_ENDPOINT_SERVICE] failed:",
+        exc,
+    )
 
     try:
         _nova_aq95_funcs_20260701 = app.before_request_funcs.get(None, [])
@@ -6112,20 +5940,20 @@ except Exception as _nova_aq95_error_20260701:
     print("[NOVA_ANSWER_QUALITY_95_DIRECT_POLICY_20260701] failed:", _nova_aq95_error_20260701)
 
 
-# 
-# Thin Flask wrapper for the service-owned Decision Log route contract.
-# Keeps current-state/project-state recall separate.
+# NOVA_PROJECT_BRAIN_DECISION_LOG_ROUTE_SERVICE
+
 try:
-    from flask import request, jsonify
-    from nova_backend.services.project_brain_decision_log_route_contract import (
-        build_decision_log_api_payload as _nova_build_decision_log_api_payload_20260701,
-        extract_user_text as _nova_decision_log_extract_user_text_20260701,
-        is_decision_log_question as _nova_is_decision_log_api_question_20260701,
+    from nova_backend.services.project_brain_decision_log_route_service import (
+        install_project_brain_decision_log_route,
     )
 
-except Exception as _nova_decision_log_api_route_error_20260701:
-    print("[NOVA_PROJECT_BRAIN_DECISION_LOG_API_ROUTE_CONTRACT_20260701] failed:", _nova_decision_log_api_route_error_20260701)
+    install_project_brain_decision_log_route(app)
 
+except Exception as exc:
+    print(
+        "[NOVA_PROJECT_BRAIN_DECISION_LOG_ROUTE_SERVICE] failed:",
+        exc,
+    )
 # --- NOVA_PROTECTED_SESSION_RESTORE_20260703 ---
 try:
     import os as _npsr_os
