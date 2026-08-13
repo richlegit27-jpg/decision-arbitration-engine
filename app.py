@@ -1582,26 +1582,26 @@ def api_chat():
             )
         )
 
-    
         # NOVA_IMAGE_GATE_WEB_INTENT_STRIPS_STALE_ATTACHMENTS_20260609
         # Web/news prompts must ignore stale mobile attachment payload before the image gate scans it.
-        _nova_image_gate_clean = " ".join(str(_nova_user_text or "").lower().split())
-        _nova_image_gate_web_terms = (
-            "latest news",
-            "news about",
-            "today in",
-            "what happened today",
-            "current news",
-            "breaking news",
-            "recent news",
-            "latest tech news",
-            "latest sports",
-            "weather",
-            "forecast",
-            "current events",
-        )
-        if any(term in _nova_image_gate_clean for term in _nova_image_gate_web_terms):
+
+        try:
+            from nova_backend.services.image_web_gate_service import (
+                image_web_gate_service,
+            )
+
+            _nova_image_gate_is_web = (
+                image_web_gate_service.is_web_intent(
+                    _nova_user_text
+                )
+            )
+
+        except Exception:
+            _nova_image_gate_is_web = False
+
+        if _nova_image_gate_is_web:
             _nova_attachments = []
+
             try:
                 request.environ["NOVA_FORCE_WEB_INTENT_20260609"] = "1"
                 request.environ["NOVA_IGNORE_STALE_ATTACHMENTS_20260609"] = "1"
