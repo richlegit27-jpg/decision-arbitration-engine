@@ -9,6 +9,7 @@ import shutil
 import tempfile
 import py_compile
 
+from nova_backend.services.planner_service import PlannerService
 from nova_backend.services.execution.service import ExecutionService
 from nova_backend.services.intelligence.router import IntelligenceRouter
 from nova_backend.services.auto_fix.service import AutoFixService
@@ -2316,6 +2317,7 @@ Rules:
         # =========================
         # CORE SERVICES
         # =========================
+        self.planner_service = PlannerService(self)
         self.intelligence_router = IntelligenceRouter(self)
         self.auto_fix_service = AutoFixService(self)
         self.session_service = session_service

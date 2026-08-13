@@ -24,7 +24,10 @@ from nova_backend.services.project_brain_operator_planner import (
 )
 
 class PlannerService:
-    def __init__(self) -> None:
+
+    def __init__(self, chat_service=None):
+        self.chat_service = chat_service
+
         self.plans_path = Path(
             "runtime/planner_plans.json"
         )
@@ -32,7 +35,6 @@ class PlannerService:
         self.plans: Dict[str, Dict[str, Any]] = (
             self._load_plans()
         )
-
     def _load_plans(self) -> Dict[str, Dict[str, Any]]:
         data = load_json_file(
             self.plans_path,
