@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 load_dotenv(
     Path(__file__).resolve().parent / ".env"
 )
+from nova_backend.services.attachment_service import attachment_service
 from nova_backend.services.auth_context import get_current_user_id
 from nova_backend.services.image_vision_service import ImageVisionService
 from flask import Flask, Response, jsonify, render_template, request, send_from_directory, session
@@ -1022,30 +1023,22 @@ def mobile():
 
 
 # ============================================================
-# NOVA_USAGE_API_ROUTES_ACTIVE_20260705
-# Token / usage tracking endpoints.
+# NOVA_USAGE_ROUTES_SERVICE_20260812
+# Token / usage tracking endpoints moved to service layer.
 # ============================================================
 
-@app.get("/api/usage")
-def nova_api_usage_summary_active_20260705():
-    try:
-        from nova_backend.services.usage_ledger_service import usage_summary
-        return json_ok(**usage_summary())
-    except Exception as exc:
-        return json_error(str(exc), route="nova_api_usage_summary_active_20260705")
+try:
+    from nova_backend.services.usage_routes_service import (
+        install_usage_routes,
+    )
 
+    install_usage_routes(app)
 
-@app.get("/api/usage/session/<session_id>")
-def nova_api_usage_session_summary_active_20260705(session_id):
-    try:
-        from nova_backend.services.usage_ledger_service import usage_summary
-        return json_ok(**usage_summary(session_id=session_id))
-    except Exception as exc:
-        return json_error(
-            str(exc),
-            route="nova_api_usage_session_summary_active_20260705",
-            session_id=session_id,
-        )
+except Exception as exc:
+    print(
+        "[NOVA_USAGE_ROUTES_SERVICE] failed:",
+        exc,
+    )
 
 @app.get("/api/health")
 def api_health():
@@ -1211,44 +1204,6 @@ def api_state():
         artifacts=artifact_service.build_list_payload(),
         memory=memory_service.build_list_payload(),
     )
-
-# NOVA_SKIP_RAW_BINARY_ATTACHMENT_INJECTION_20260607
-def should_skip_raw_attachment_injection(self, item):
-    try:
-        if not isinstance(item, dict):
-            return False
-
-        mime = str(item.get("mime_type") or item.get("type") or item.get("content_type") or "").lower()
-        name = str(
-            item.get("filename")
-            or item.get("original_filename")
-            or item.get("name")
-            or item.get("url")
-            or item.get("file_url")
-            or ""
-        ).lower()
-
-        blocked_exts = (
-            ".docx", ".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif",
-            ".zip", ".exe", ".dll", ".bin"
-        )
-
-        blocked_mimes = {
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "application/pdf",
-            "application/zip",
-            "application/octet-stream",
-        }
-
-        if mime in blocked_mimes:
-            return True
-
-        if mime.startswith("image/"):
-            return True
-
-        return name.endswith(blocked_exts)
-    except Exception:
-        return False
 
 
 def filter_raw_injection_attachments(
