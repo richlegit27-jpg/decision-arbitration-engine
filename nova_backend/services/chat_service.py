@@ -3308,7 +3308,7 @@ Rules:
                     },
                 )
 
-        if intent_decision.get("intent") == "planning":
+        if decision and decision.get("intent") == "planning":
             return None
 
             print(
