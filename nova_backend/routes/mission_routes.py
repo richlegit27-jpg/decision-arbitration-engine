@@ -39,7 +39,6 @@ def register_mission_routes(
             }
         )
 
-
     @app.get("/api/missions/<mission_id>")
     def get_mission(mission_id):
 
@@ -62,58 +61,58 @@ def register_mission_routes(
             }
         )
 
-@app.post("/api/missions/<mission_id>/start")
-def start_mission(mission_id):
+    @app.post("/api/missions/<mission_id>/start")
+    def start_mission(mission_id):
 
-    data = request.get_json(
-        silent=True
-    ) or {}
+        data = request.get_json(
+            silent=True
+        ) or {}
 
-    session_id = str(
-        data.get("session_id")
-        or data.get("active_session_id")
-        or ""
-    ).strip()
+        session_id = str(
+            data.get("session_id")
+            or data.get("active_session_id")
+            or ""
+        ).strip()
 
-    mission = mission_service.start_mission(
-        mission_id
-    )
+        mission = mission_service.start_mission(
+            mission_id
+        )
 
-    if not mission:
+        if not mission:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "mission_not_found",
+                }
+            ), 404
+
+        if mission_orchestrator:
+
+            orchestration_result = (
+                mission_orchestrator.run_mission(
+                    {
+                        "mission_id": mission.get("id"),
+                        "goal": mission.get("goal"),
+                        "steps": mission.get("steps", []),
+                    }
+                )
+            )
+
+            mission["orchestration"] = (
+                orchestration_result
+            )
+
+        persist_mission_state(
+            session_id,
+            mission,
+        )
+
         return jsonify(
             {
-                "ok": False,
-                "error": "mission_not_found",
+                "ok": True,
+                "mission": mission,
             }
-        ), 404
-
-    if mission_orchestrator:
-
-        orchestration_result = (
-            mission_orchestrator.run_mission(
-                {
-                    "mission_id": mission.get("id"),
-                    "goal": mission.get("goal"),
-                    "steps": mission.get("steps", []),
-                }
-            )
         )
-
-        mission["orchestration"] = (
-            orchestration_result
-        )
-
-    persist_mission_state(
-        session_id,
-        mission,
-    )
-
-    return jsonify(
-        {
-            "ok": True,
-            "mission": mission,
-        }
-    )
 
     @app.post("/api/missions/<mission_id>/advance")
     def advance_mission(mission_id):
@@ -151,7 +150,6 @@ def start_mission(mission_id):
                 "mission": mission,
             }
         )
-
 
     @app.post("/api/missions/<mission_id>/status")
     def update_mission_status(mission_id):
