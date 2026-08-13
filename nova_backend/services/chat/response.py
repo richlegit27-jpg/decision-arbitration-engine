@@ -356,4 +356,580 @@ class ChatResponseHandler:
         return text or ""
 
 
+
+
+
+
+
+
+    def _finalize_response(
+        self,
+        session_id: str = "",
+        user_text: str = "",
+        user_msg=None,
+        assistant_msg=None,
+        decision=None,
+        saved_artifact=None,
+        working_context_payload=None,
+        should_inject_working_context=False,
+        **extra,
+    ) -> dict:
+
+        print(
+            "[FINALIZE RESPONSE ENTERED]",
+            {
+                "session_id": session_id,
+                "user_text": user_text,
+                "has_user_msg": isinstance(user_msg, dict),
+                "has_assistant_msg": isinstance(assistant_msg, dict),
+            },
+        )
+
+        decision = decision if isinstance(decision, dict) else {}
+
+        session_id = self._ensure_session_id(session_id)
+
+        memory_written = False
+
+        clean_memory_user_text = self.safe_str(
+            locals().get("original_user_text") or user_text
+        ).strip()
+
+        for marker in (
+            "Project-aware context for Nova:",
+            "Relevant persistent memory:",
+            "Recent session context:",
+            "[RECENT SESSION CONTEXT]",
+            "[RANKED MEMORY + WORKING STATE]",
+        ):
+            if marker in clean_memory_user_text:
+                clean_memory_user_text = (
+                    clean_memory_user_text.split(marker, 1)[0].strip()
+                )
+
+        try:
+            memory_written = self._maybe_write_memory(
+                decision,
+                clean_memory_user_text,
+                session_id,
+            )
+        except Exception as e:
+            exec_debug("FINALIZE_MEMORY_WRITE_ERROR:", e)
+
+        # NOVA_DIRECT_MEMORY_SAVE_RESPONSE_LOCK_20260618
+        clean_memory_lc = " ".join(clean_memory_user_text.lower().split())
+        memory_recall_or_forget = clean_memory_lc.startswith((
+            "what is ",
+            "what's ",
+            "whats ",
+            "do you remember ",
+            "forget ",
+            "delete ",
+            "remove ",
+        ))
+
+        if (
+            memory_written
+            and not memory_recall_or_forget
+            and self._should_save_memory_text(clean_memory_user_text)
+        ):
+            memory_text = clean_memory_user_text
+
+            return {
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": "Got it. I'll keep that in mind.",
+                    "content": "Got it. I'll keep that in mind.",
+                }
+            }
+
+            decision["route"] = "memory_save"
+            decision["mode"] = "memory_save"
+            decision["save_memory"] = False
+            decision["use_memory"] = False
+            decision["sources"] = []
+            decision["source_urls"] = []
+
+            self._last_web_source_urls = []
+            self._last_web_sources = []
+
+        if isinstance(assistant_msg, dict):
+            existing_meta = assistant_msg.get("meta")
+            meta = existing_meta if isinstance(existing_meta, dict) else {}
+
+            # preserve existing keys (like sources)
+            meta.setdefault("sources", meta.get("sources", []))
+            meta.setdefault("source_urls", meta.get("source_urls", []))
+
+            # CACHE_WEB_SOURCES_IN_FINALIZE_RESPONSE_LOCK
+            try:
+                source_urls_for_cache = meta.get("source_urls")
+                sources_for_cache = meta.get("sources")
+
+                # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
+                if (not attachments) and (
+                    isinstance(source_urls_for_cache, list) and source_urls_for_cache
+                ):
+                    import json
+                    from pathlib import Path
+                    from datetime import datetime
+
+                    cache_path = Path(
+                        r"C:\Users\Owner\nova\data\nova_last_web_sources.json"
+                    )
+                    cache_path.parent.mkdir(parents=True, exist_ok=True)
+
+                    cache_payload = {
+                        "updated_at": datetime.now().isoformat(timespec="seconds"),
+                        "session_id": self.safe_str(session_id),
+                        "source_urls": [
+                            self.safe_str(url).strip()
+                            for url in source_urls_for_cache[:5]
+                            if self.safe_str(url).strip()
+                        ],
+                        "sources": (
+                            sources_for_cache[:5]
+                            if isinstance(sources_for_cache, list)
+                            else []
+                        ),
+                    }
+
+                    cache_path.write_text(
+                        json.dumps(cache_payload, indent=2, ensure_ascii=False),
+                        encoding="utf-8",
+                    )
+            except Exception as exc:
+                exec_debug("CACHE_WEB_SOURCES_IN_FINALIZE_RESPONSE_FAILED:", exc)
+
+            if not meta.get("sources"):
+                import re
+
+                assistant_text = self.safe_str(
+                    assistant_msg.get("text") or assistant_msg.get("content") or ""
+                )
+
+                found_urls = re.findall(r"https?://[^\s\)\]\}<>\"']+", assistant_text)
+
+                parsed_sources = []
+                parsed_urls = []
+
+                for found_url in found_urls[:10]:
+                    clean_url = found_url.rstrip(".,;:")
+                    if not clean_url:
+                        continue
+
+                    domain = (
+                        clean_url.split("/")[2] if "://" in clean_url else clean_url
+                    )
+                    slug = clean_url.rstrip("/").split("/")[-1]
+                    clean_title = (
+                        slug.replace("-", " ").replace("_", " ").strip().title()
+                    )
+                    clean_domain = domain.replace("www.", "")
+                    clean_homepage = clean_url.rstrip("/").lower()
+
+                    if clean_homepage in {
+                        f"https://{domain}".lower(),
+                        f"http://{domain}".lower(),
+                        f"https://{clean_domain}".lower(),
+                        f"http://{clean_domain}".lower(),
+                    }:
+                        clean_title = clean_domain
+
+                    if not clean_title or clean_title.lower() in {
+                        "news",
+                        "changelog",
+                        "docs",
+                    }:
+                        clean_title = clean_domain
+
+                    parsed_sources.append(
+                        {
+                            "title": clean_title or clean_url,
+                            "url": clean_url,
+                            "source": domain.replace("www.", ""),
+                            "snippet": "",
+                        }
+                    )
+
+                if parsed_sources:
+                    meta["sources"] = parsed_sources
+                    meta["source_urls"] = parsed_urls
+
+            used_memory_items = []
+
+            for key in ("memory_used", "used_memory", "memories_used"):
+                value = meta.get(key)
+                if isinstance(value, list):
+                    used_memory_items = value
+                    break
+
+            if not used_memory_items:
+
+                try:
+
+                    used_memory_items = (
+                        getattr(
+                            self,
+                            "_last_used_memory_items",
+                            [],
+                        )
+                        or []
+                    )
+
+                except Exception as e:
+
+                    exec_debug(
+                        "FINALIZE_MEMORY_USED_ERROR:",
+                        e,
+                    )
+
+                    used_memory_items = []
+
+                except Exception as e:
+                    exec_debug(
+                        "FINALIZE_MEMORY_USED_ERROR:",
+                        e,
+                    )
+
+            meta["memory_used"] = used_memory_items
+            meta["used_memory"] = used_memory_items
+            meta["memory_used_count"] = len(used_memory_items)
+            meta["used_memory_count"] = len(used_memory_items)
+            assistant_msg["meta"] = meta
+
+        session = self._get_session_payload(session_id) or {}
+
+        print(
+            "[SESSION BEFORE TITLE]",
+            {
+                "title": session.get("title"),
+                "id": session.get("id"),
+            },
+        )
+        verified_exchange = (
+            decision.get("last_verified_web_exchange")
+            if isinstance(decision, dict)
+            else None
+        )
+
+        if isinstance(verified_exchange, dict):
+            session_meta = session.get("meta")
+            session_meta = (
+                dict(session_meta)
+                if isinstance(session_meta, dict)
+                else {}
+            )
+            session_meta[
+                "last_verified_web_exchange"
+            ] = verified_exchange
+            session["meta"] = session_meta
+
+        try:
+            from flask import g, session as flask_session
+
+            auth_user = getattr(g, "nova_auth_user", None) or {}
+
+            auth_user_id = str(
+                auth_user.get("id")
+                or flask_session.get("nova_user_id")
+                or ""
+            ).strip()
+
+            if auth_user_id:
+                session["user_id"] = auth_user_id
+
+        except Exception:
+            pass
+
+        messages = session.get("messages")
+
+        if not isinstance(messages, list):
+            messages = []
+
+        if isinstance(user_msg, dict):
+            user_id = str(user_msg.get("id", "")).strip()
+
+            already_has_user = any(
+                isinstance(m, dict) and str(m.get("id", "")).strip() == user_id
+                for m in messages
+            )
+
+            if not already_has_user:
+                messages.append(user_msg)
+
+        if isinstance(assistant_msg, dict):
+
+            assistant_id = str(
+                assistant_msg.get("id") or f"msg_{uuid.uuid4().hex}"
+            ).strip()
+
+            assistant_msg["id"] = assistant_id
+
+            already_has_assistant = any(
+                isinstance(m, dict) and str(m.get("id", "")).strip() == assistant_id
+                for m in messages
+            )
+
+            if not already_has_assistant:
+                messages.append(assistant_msg)
+
+
+        session["id"] = session_id
+        session["messages"] = messages
+
+
+        try:
+            from flask import g, session as flask_session
+
+            auth_user_id = ""
+
+            user = getattr(g, "nova_auth_user", None) or {}
+
+            auth_user_id = str(
+                user.get("id") or ""
+            ).strip()
+
+            if not auth_user_id:
+                auth_user_id = str(
+                    flask_session.get("nova_user_id") or ""
+                ).strip()
+
+            existing = self.sessions.get_session(
+                session_id,
+                user_id=auth_user_id,
+            )
+
+            print(
+                "[OWNERSHIP CHECK]",
+                {
+                    "session_id": session_id,
+                    "auth_user_id": auth_user_id,
+                    "existing_user_id": (
+                        existing.get("user_id")
+                        if isinstance(existing, dict)
+                        else None
+                    ),
+                },
+            )
+
+            existing_messages = (
+                existing.get("messages", []) if isinstance(existing, dict) else []
+            )
+
+            existing_count = (
+                len(existing_messages) if isinstance(existing_messages, list) else 0
+            )
+
+            exec_debug(
+                "FINALIZE SAVE DEBUG:",
+                {
+                    "existing_count": existing_count,
+                    "message_count": len(messages),
+                    "messages": messages,
+                },
+            )
+
+            if auth_user_id:
+                session["user_id"] = str(auth_user_id)
+
+            print(
+                "[SESSION OWNERSHIP FINAL]",
+                {
+                    "session_id": session_id,
+                    "auth_user_id": auth_user_id,
+                    "session_user_id": session.get("user_id"),
+                },
+            )
+
+            print(
+                "[SESSION OBJECT DEBUG]",
+                {
+                    "type": str(type(self.sessions)),
+                    "module": getattr(type(self.sessions), "__module__", ""),
+                    "has_update": hasattr(self.sessions, "update_session"),
+                    "methods": [
+                        x for x in dir(self.sessions)
+                        if "update" in x.lower()
+                    ],
+                },
+            )
+
+            print(
+                "[TITLE RIGHT BEFORE SAVE]",
+                {
+                    "title": session.get("title"),
+                    "title_manual": session.get("title_manual"),
+                    "message_count": len(session.get("messages") or []),
+                },
+            )
+
+            # NOVA_SESSION_AUTO_TITLE_ON_FIRST_MESSAGE
+            try:
+                if (
+                    not session.get("title_manual")
+                    and self._should_auto_title_session(
+                        session.get("title")
+                    )
+                    and isinstance(user_msg, dict)
+                ):
+                    candidate = self._build_session_title_from_message(
+                        user_msg
+                    )
+
+                    print(
+                        "[AUTO TITLE FINAL CANDIDATE]",
+                        candidate,
+                    )
+
+                    if candidate:
+                        session["title"] = candidate
+
+            except Exception as exc:
+                exec_debug(
+                    "AUTO TITLE FINAL FAILED:",
+                    exc,
+                )
+
+            self.session_service.replace_session(
+                session_id,
+                session,
+            )
+
+        except Exception as e:
+            exec_debug("SESSION SAVE ERROR:", e)
+
+        try:
+            assistant_text_for_tracking = ""
+
+            if isinstance(assistant_msg, dict):
+                assistant_text_for_tracking = self.safe_str(assistant_msg.get("text"))
+
+            self._auto_track_working_state(
+                session_id=session_id,
+                user_text=user_text,
+                assistant_text="",
+            )
+
+        except Exception as e:
+            exec_debug("AUTO_TRACK_WORKING_STATE_ERROR:", e)
+
+        print(
+            "[NOVA FINALIZE BEHAVIOR TEST]",
+            user_text,
+        )
+
+
+        try:
+            self._observe_response_behavior(
+                user_text=user_text,
+                assistant_text=(
+                    assistant_msg.get("content")
+                    if isinstance(
+                        assistant_msg,
+                        dict
+                    )
+                    else str(
+                        assistant_msg
+                    )
+                ),
+                context="",          
+            )
+
+        except Exception as e:
+            exec_debug(
+                "BEHAVIOR_OBSERVER_FAILED:",
+                e
+            )
+
+        onboarding_payload = {}
+
+        if not session.get("meta", {}).get("onboarding"):
+
+            onboarding_payload = {
+                "onboarding": True,
+                "welcome_message": (
+                    "Welcome to your AI workspace.\n\n"
+                    "I can help you answer questions, plan projects, "
+                    "analyze files, work with documents, and create "
+                    "new things.\n\n"
+                    "For more information, check out Help in the menu."
+                ),
+                "actions": [
+                    {
+                        "label": "Start a project",
+                        "prompt": "Help me start a project",
+                        "intent": "project",
+                    },
+                    {
+                        "label": "Learn Nova",
+                        "prompt": "Show me how Nova works",
+                        "intent": "help",
+                    },
+                ],
+            }
+
+        return {
+            **onboarding_payload,
+            "ok": True,
+            "assistant_message": assistant_msg,
+            "session": {
+                **session,
+                "id": session_id,
+            },
+
+            "active_session_id": session_id,
+            "session_id": session_id,
+            "saved_artifact": saved_artifact,
+            "debug": {
+                "decision": decision,
+                "route": "chat_service.handle",
+                "route_taken": (
+                    decision.get("route")
+                    if isinstance(decision, dict)
+                    else ""
+                ),
+            },
+        }
+
+
+
+
+    def _finalize_assistant_response(self, assistant_msg, fallback_text=""):
+        """
+        Safety wrapper: guarantees assistant message always exists and is valid.
+        Prevents null/undefined exit paths from breaking execution flow.
+        """
+
+        if not assistant_msg:
+            assistant_msg = self._build_assistant_message(
+                text=fallback_text or "Execution complete."
+            )
+
+        # Ensure structure consistency
+        if isinstance(assistant_msg, str):
+            assistant_msg = self._build_assistant_message(text=assistant_msg)
+
+        if isinstance(assistant_msg, dict):
+            meta = assistant_msg.get("meta")
+
+            if not isinstance(meta, dict):
+                meta = {}
+
+            meta.setdefault(
+                "response_quality",
+                {},
+            )
+
+            meta["response_quality"].update(
+                {
+                    "finalized": True,
+                }
+            )
+
+            assistant_msg["meta"] = meta
+
+        return assistant_msg
+
+
  
