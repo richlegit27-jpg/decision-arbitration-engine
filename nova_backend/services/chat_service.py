@@ -9,7 +9,7 @@ import shutil
 import tempfile
 import py_compile
 
-
+from nova_backend.services.chat.execution import ChatExecutionHandler
 from nova_backend.services.chat.router import ChatRouter
 from nova_backend.services.planner_service import PlannerService
 from nova_backend.services.execution.service import ExecutionService
@@ -635,7 +635,7 @@ class ChatService:
 
         return "\n\n".join([p for p in parts if p]).strip()
 
-    def _auto_advance_execution(self, session_id):
+    def _run_auto_advance_execution(self, session_id):
         try:
             execution_state = self._load_execution_state(
                 session_id
@@ -2350,6 +2350,7 @@ Rules:
         # =========================
         # CORE SERVICES
         # =========================
+        self.execution_handler = ChatExecutionHandler(self)
         self.chat_router = ChatRouter(self)
         self.planner_service = PlannerService(self)
         self.intelligence_router = IntelligenceRouter(self)
