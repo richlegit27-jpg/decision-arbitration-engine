@@ -4,13 +4,6 @@ class ExecutionService:
         self.chat_service = chat_service
 
 
-
-
-
-
-
-
-
     def _build_goal(self, user_text: str):
         """
         Converts raw input into a structured goal.
@@ -120,12 +113,12 @@ class ExecutionService:
         assistant_text: str,
         decision: dict | None,
     ) -> dict | None:
-        if not self._looks_like_execution(user_text, decision):
+        if not self.chat_service._looks_like_execution(user_text, decision):
             return None
 
         goal = str(user_text or "").strip()
-        step_titles = self._execution_step_titles_for_goal(goal)
-        now_iso = self._iso_now()
+        step_titles = self.chat_service._execution_step_titles_for_goal(goal)
+        now_iso = self.chat_service._iso_now()
 
         step_objs = []
         for i, title in enumerate(step_titles, start=1):
@@ -161,7 +154,7 @@ class ExecutionService:
         steps = execution.get("steps")
         if not isinstance(steps, list) or not steps:
             execution["status"] = "running"
-            execution["updated_at"] = self._iso_now()
+            execution["updated_at"] = self.chat_service._iso_now()
             return execution
 
         for idx, step in enumerate(steps):
@@ -176,7 +169,7 @@ class ExecutionService:
                 step["status"] = "planned"
 
         execution["status"] = "running"
-        execution["updated_at"] = self._iso_now()
+        execution["updated_at"] = self.chat_service._iso_now()
         return execution
 
     def _execution_mark_completed(
@@ -199,7 +192,7 @@ class ExecutionService:
         execution["summary"] = str(assistant_text or execution.get("summary") or "")[
             :200
         ]
-        execution["updated_at"] = self._iso_now()
+        execution["updated_at"] = self.chat_service._iso_now()
 
         return execution
 
@@ -221,12 +214,12 @@ class ExecutionService:
                     failed_index = index
                     break
 
-        execution = self._mark_execution_failed(
+        execution = self.chat_service._mark_execution_failed(
             execution,
             step_index=failed_index,
             error=str(error_text or "Execution failed."),
         )
 
         execution["summary"] = str(error_text or execution.get("summary") or "")[:200]
-        execution["updated_at"] = self._iso_now()
+        execution["updated_at"] = self.chat_service._iso_now()
         return execution
