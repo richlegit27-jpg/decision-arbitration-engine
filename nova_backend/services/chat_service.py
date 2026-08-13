@@ -3308,6 +3308,9 @@ Rules:
                     },
                 )
 
+        if intent_decision.get("intent") == "planning":
+            return None
+
             print(
                 "EXECUTION RETURNING PROCESS COMMAND",
                 "run_step",
@@ -11516,14 +11519,15 @@ Rules:
         }
 
     def _looks_like_execution(
-        self, user_text: str, decision: dict | None = None
+        self,
+        user_text: str,
+        decision: dict | None = None,
     ) -> bool:
         text = str(user_text or "").strip().lower()
 
         if not text:
             return False
 
-        # Explicit execution planning only.
         execution_markers = [
             "auto-plan",
             "start execution",
@@ -11538,7 +11542,10 @@ Rules:
         if any(x in text for x in execution_markers):
             return True
 
-        # FALLBACK: coding / structured intent
+        # Planning requests should stay in planning/project brain.
+        if decision and decision.get("intent") == "planning":
+            return False
+
         if decision and decision.get("mode") in {"coding", "analysis"}:
             return True
 
@@ -11561,7 +11568,15 @@ Rules:
                 "Return recommendation",
             ]
 
-        if any(word in lowered for word in ("analyze", "audit", "review", "inspect")):
+        if any(
+            word in lowered
+            for word in (
+                "analyze",
+                "audit",
+                "review",
+                "inspect",
+            )
+        ):
             return [
                 "Inspect the request",
                 "Extract key findings",
@@ -11573,9 +11588,6 @@ Rules:
             "Process task",
             "Return result",
         ]
-
-
-
 
     def _reconcile_execution_state(
         self,
