@@ -1215,7 +1215,7 @@ def filter_raw_injection_attachments(
     skipped = []
 
     for item in attachments or []:
-        if self.should_skip_raw_attachment_injection(item):
+        if attachment_service.should_skip_raw_attachment_injection(item):
             skipped.append(item)
         else:
             kept.append(item)
@@ -3748,10 +3748,6 @@ def api_chat():
                 "[ImageAttachmentPreHandle] failed; falling through to chat_service.handle: %s",
                 _image_attachment_prehandle_error,
             )
-
-
-
-
 
 
         # NOVA_API_CHAT_EARLY_EXPLICIT_MEMORY_GUARD_LIVE_ANCHOR_20260611_CALL
