@@ -26,6 +26,9 @@ from nova_backend.services.web_preview_route_service import WebPreviewRouteServi
 from nova_backend.services.project_workspace_service import (
     ProjectWorkspaceService,
 )
+from nova_backend.services.image_attachment_prehandle_service import (
+    image_attachment_prehandle_service,
+)
 from nova_backend.services.project_intelligence_service import (
     project_intelligence_service,
 )
@@ -3579,10 +3582,13 @@ def api_chat():
             )
 
         # IMAGE_ATTACHMENT_PREHANDLE_LOCK
-        # Current image attachments must beat web/source-open routing.
+        # Image attachment decisions are owned by image_attachment_prehandle_service.
+
         try:
-            # NOVA_IMAGE_COMMAND_SKIP_IMAGE_ATTACHMENT_PREHANDLE_20260610
-            # Explicit image generation commands must not be converted into attachment-received replies.
+            from nova_backend.services.image_attachment_prehandle_service import (
+                image_attachment_prehandle_service,
+            )
+
             _nova_image_prehandle_command_text = str(
                 data.get("user_text")
                 or data.get("text")
@@ -3591,132 +3597,58 @@ def api_chat():
                 or ""
             ).strip().lower()
 
-            _nova_skip_image_attachment_prehandle = (
-                _nova_image_prehandle_command_text.startswith("/image")
-                or _nova_image_prehandle_command_text.startswith("image ")
-                or _nova_image_prehandle_command_text.startswith("generate image")
-                or _nova_image_prehandle_command_text.startswith("generate an image")
-                or _nova_image_prehandle_command_text.startswith("draw ")
-                or _nova_image_prehandle_command_text.startswith("create image")
-                or _nova_image_prehandle_command_text.startswith("make image")
-            )
-
-            if _nova_skip_image_attachment_prehandle:
-                raise RuntimeError("skip image attachment prehandle for explicit image command")
-
-            current_attachments = list(attachments or [])
-            image_attachments = []
-
-            for item in current_attachments:
-                if not isinstance(item, dict):
-                    continue
-
-                mime = str(
-                    item.get("mime_type")
-                    or item.get("type")
-                    or item.get("mime")
-                    or ""
-                ).lower().strip()
-
-                name = str(
-                    item.get("original_filename")
-                    or item.get("filename")
-                    or item.get("name")
-                    or item.get("url")
-                    or item.get("file_url")
-                    or "image attachment"
-                ).strip()
-
-                url = str(item.get("file_url") or item.get("url") or "").strip()
-
-                if mime.startswith("image/") or name.lower().endswith((".jpg", ".jpeg", ".png", ".webp", ".gif")):
-                    image_attachments.append({
-                        "name": name,
-                        "mime": mime or "image/*",
-                        "url": url,
-                    })
-
-            _image_prehandle_text = str(user_text or "").lower().strip()
-
-
-            _is_image_prehandle_analysis = any(
-
-
-                word in _image_prehandle_text
-
-
-                for word in (
-
-
-                    "summarize",
-
-
-                    "summary",
-
-
-                    "analyze",
-
-
-                    "analyse",
-
-
-                    "describe",
-
-
-                    "what is this",
-
-
-                    "what's this",
-
-
-                    "what is in",
-
-
-                    "what's in",
-
-
-                    "read this",
-
-
-                    "look at this",
-
-
-                    "tell me about",
-
-
+            if image_attachment_prehandle_service.is_image_command(
+                _nova_image_prehandle_command_text
+            ):
+                raise RuntimeError(
+                    "skip image attachment prehandle for explicit image command"
                 )
 
+            current_attachments = list(attachments or [])
 
+            image_attachments = (
+                image_attachment_prehandle_service.extract_image_attachments(
+                    current_attachments
+                )
             )
 
-
-          
-            if image_attachments and _is_image_prehandle_analysis:
-
-
-                raise RuntimeError("skip image prehandle receipt for analysis request")
-
-
-            
-
+            if (
+                image_attachments
+                and image_attachment_prehandle_service.is_image_analysis_request(
+                    user_text
+                )
+            ):
+                raise RuntimeError(
+                    "skip image prehandle receipt for analysis request"
+                )
 
             if image_attachments:
+                lines = [
+                    "Image attachment received."
+                ]
 
-
-                lines = ["Image attachment received."]
-
-                for index, item in enumerate(image_attachments[:5], start=1):
+                for index, item in enumerate(
+                    image_attachments[:5],
+                    start=1,
+                ):
                     label = item.get("name") or "image attachment"
                     mime = item.get("mime") or "image/*"
                     url = item.get("url") or ""
 
                     line = f"{index}. {label} ({mime})"
+
                     if url:
                         line += f" — {url}"
+
                     lines.append(line)
 
                 lines.append("")
-                lines.append("I can analyze this image, describe what is visible, or answer a question about it. The image attachment is now being handled as an attachment, not as a previous web source.")
+                lines.append(
+                    "I can analyze this image, describe what is visible, "
+                    "or answer a question about it. The image attachment "
+                    "is now being handled as an attachment, not as a "
+                    "previous web source."
+                )
 
                 reply_text = "\n".join(lines).strip()
 
@@ -3743,6 +3675,7 @@ def api_chat():
                         "image_count": len(image_attachments),
                     },
                 })
+
         except Exception as _image_attachment_prehandle_error:
             app.logger.warning(
                 "[ImageAttachmentPreHandle] failed; falling through to chat_service.handle: %s",
