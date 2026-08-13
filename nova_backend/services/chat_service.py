@@ -9,6 +9,8 @@ import shutil
 import tempfile
 import py_compile
 
+
+from nova_backend.services.chat.router import ChatRouter
 from nova_backend.services.planner_service import PlannerService
 from nova_backend.services.execution.service import ExecutionService
 from nova_backend.services.intelligence.router import IntelligenceRouter
@@ -9562,7 +9564,7 @@ Rules:
 
         lowered = self.safe_str(user_text).lower().strip()
 
-        decision = self._decide_route(
+        decision = self.chat_router.decide(
             user_text=user_text,
             attachments=attachments,
             session_id=session_id,
