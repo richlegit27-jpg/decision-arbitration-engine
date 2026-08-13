@@ -230,3 +230,19 @@ def format_public_response(
     )
 
     return cleaned.strip()
+
+def install_response_quality_service(app):
+    try:
+        service = ResponseQualityService()
+
+        app.response_quality_service = service
+
+        print(
+            "[NOVA_ANSWER_QUALITY_95_DIRECT_POLICY_20260701] installed"
+        )
+
+    except Exception as exc:
+        print(
+            "[NOVA_ANSWER_QUALITY_95_DIRECT_POLICY_20260701] failed:",
+            exc,
+        )

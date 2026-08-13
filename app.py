@@ -857,30 +857,6 @@ mission_orchestrator = MissionOrchestrator(
     tool_registry=tool_registry,
 )
 
-# NOVA_MISSION_ROUTES_20260813
-
-try:
-    from nova_backend.routes.mission_routes import (
-        register_mission_routes,
-    )
-
-    if "app" in globals():
-        register_mission_routes(
-            app,
-            execution_state_service,
-            mission_orchestrator,
-        )
-
-    print(
-        "[NOVA_MISSION_ROUTES_20260813] installed"
-    )
-
-except Exception as exc:
-    print(
-        "[NOVA_MISSION_ROUTES_20260813] failed:",
-        exc,
-    )
-
 from nova_backend.services.chat_service import (
     install_chat_service_runtime_patches,
 )
@@ -894,6 +870,29 @@ project_brain_general_intelligence_priority_service = (
     )
 )
 project_brain_general_intelligence_priority_service.install(app)
+
+# NOVA_MISSION_ROUTES_20260813
+
+try:
+    from nova_backend.routes.mission_routes import (
+        register_mission_routes,
+    )
+
+    register_mission_routes(
+        app,
+        execution_state_service,
+        mission_orchestrator,
+    )
+
+    print(
+        "[NOVA_MISSION_ROUTES_20260813] installed"
+    )
+
+except Exception as exc:
+    print(
+        "[NOVA_MISSION_ROUTES_20260813] failed:",
+        exc,
+    )
 
 if hasattr(chat_service, "start_execution_daemon"):
     chat_service.start_execution_daemon()
@@ -6098,67 +6097,6 @@ except Exception as _nova_next_fixed_install_error_20260701:
         pass
 
 
-# --- NOVA_ANSWER_QUALITY_95_DIRECT_POLICY_OWNER_20260701 ---
-# NOVA_ANSWER_QUALITY_95_DIRECT_POLICY_20260701
-# Project-intelligence direct policy answers for recurring Nova control questions.
-# Keeps project judgment, testing, memory boundaries, route/debug, and rollback answers specific.
-try:
-    from flask import request as _nova_aq95_request_20260701
-    from flask import jsonify as _nova_aq95_jsonify_20260701
-    from nova_backend.services.chat_response_finalizer_service import (
-        build_answer_quality_95_payload as _nova_build_answer_quality_95_payload_20260715,
-    )
-
-    def _nova_aq95_clean_20260701(value):
-        return " ".join(str(value or "").lower().strip().split())
-
-    @app.before_request
-    def _nova_answer_quality_95_direct_policy_20260701():
-        try:
-            if _nova_aq95_request_20260701.path != "/api/chat":
-                return None
-
-            if _nova_aq95_request_20260701.method != "POST":
-                return None
-
-            data = _nova_aq95_request_20260701.get_json(silent=True) or {}
-            user_text = str(
-                data.get("message")
-                or data.get("user_text")
-                or data.get("text")
-                or ""
-            ).strip()
-
-            clean = _nova_aq95_clean_20260701(user_text)
-
-            session_id = str(
-                data.get("session_id")
-                or data.get("active_session_id")
-                or ""
-            ).strip()
-
-
-            answer = get_answer_quality_policy_answer(user_text)
-            if not answer:
-                return None
-
-            return _nova_build_answer_quality_95_payload_20260715(
-                answer,
-                session_id=session_id,
-                route="answer_quality_95_direct_policy",
-                slim_payload_builder=response_quality_service.slim_assistant_payload,
-            )
-
-        except Exception as exc:
-            try:
-                app.logger.warning(
-                    "[NOVA_ANSWER_QUALITY_95_DIRECT_POLICY_20260701] failed: %s",
-                    exc,
-                )
-            except Exception:
-                pass
-
-        return None
 
     try:
         _nova_aq95_funcs_20260701 = app.before_request_funcs.get(None, [])
