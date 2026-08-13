@@ -54,4 +54,18 @@ class ImageAttachmentPrehandleService:
         return images
 
 
+
+    def should_bypass_attachments_for_image_command(self, text):
+        clean = str(text or "").strip().lower()
+
+        return (
+            clean.startswith("/image")
+            or clean.startswith("image ")
+            or clean.startswith("generate image")
+            or clean.startswith("generate an image")
+            or clean.startswith("draw ")
+            or clean.startswith("create image")
+            or clean.startswith("make image")
+        )
+
 image_attachment_prehandle_service = ImageAttachmentPrehandleService()

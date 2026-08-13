@@ -3154,27 +3154,52 @@ def api_chat():
 
         # NOVA_IMAGE_COMMAND_ATTACHMENT_BYPASS_20260610
         # Explicit image generation commands must not be hijacked by stale/current attachment gates.
-        _nova_image_command_text = str(data.get("user_text") or data.get("text") or data.get("message") or "").strip().lower()
-        _nova_is_image_command = (
-            _nova_image_command_text.startswith("/image")
-            or _nova_image_command_text.startswith("image ")
-            or _nova_image_command_text.startswith("generate image")
-            or _nova_image_command_text.startswith("generate an image")
-            or _nova_image_command_text.startswith("draw ")
-            or _nova_image_command_text.startswith("create image")
-            or _nova_image_command_text.startswith("make image")
-        )
+
+
+        _nova_image_command_text = str(
+            data.get("user_text")
+            or data.get("text")
+            or data.get("message")
+            or ""
+        ).strip()
+
+        try:
+            from nova_backend.services.image_attachment_prehandle_service import (
+                image_attachment_prehandle_service,
+            )
+
+            _nova_is_image_command = (
+                image_attachment_prehandle_service
+                .should_bypass_attachments_for_image_command(
+                    _nova_image_command_text
+                )
+            )
+
+        except Exception as _nova_image_command_service_error:
+            app.logger.warning(
+                "[ImageAttachmentPreHandle] image command service fallback failed: %s",
+                _nova_image_command_service_error,
+            )
+
+            _nova_image_command_text_lower = (
+                _nova_image_command_text.lower()
+            )
+
+            _nova_is_image_command = (
+                _nova_image_command_text_lower.startswith("/image")
+                or _nova_image_command_text_lower.startswith("image ")
+                or _nova_image_command_text_lower.startswith("generate image")
+                or _nova_image_command_text_lower.startswith("generate an image")
+                or _nova_image_command_text_lower.startswith("draw ")
+                or _nova_image_command_text_lower.startswith("create image")
+                or _nova_image_command_text_lower.startswith("make image")
+            )
 
         if _nova_is_image_command:
             attachments = []
             remembered_session_attachments = []
             attachment_content_lines = []
             attachments_for_chat_service = []
-            app.logger.info(
-                "[ImageCommandAttachmentBypass] cleared attachment state for image command session_id=%s text=%r",
-                session_id,
-                _nova_image_command_text,
-            )
 
         if attachment_content_lines:
             attachments_for_chat_service = []
