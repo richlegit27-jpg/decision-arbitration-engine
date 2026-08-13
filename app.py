@@ -843,6 +843,13 @@ tool_executor = tool_runtime["tool_executor"]
 tool_registry = tool_runtime["tool_registry"]
 tool_bridge = tool_runtime["tool_bridge"]
 
+from nova_backend.services.mission_orchestrator import (
+    MissionOrchestrator,
+)
+
+mission_orchestrator = MissionOrchestrator(
+    tool_registry=tool_registry,
+)
 from nova_backend.services.chat_service import (
     install_chat_service_runtime_patches,
 )
@@ -932,19 +939,6 @@ if not app.secret_key:
         "NOVA_SECRET_KEY is required"
     )
 
-
-# NOVA_SELF_IMPROVEMENT_REPORT_ROUTES_20260710
-
-try:
-    register_improvement_routes(app)
-    print("[NOVA_SELF_IMPROVEMENT_REPORT_ROUTES_20260710] installed")
-except Exception as exc:
-    print(
-        "[NOVA_SELF_IMPROVEMENT_REPORT_ROUTES_20260710] failed:",
-        exc,
-    )
-
-
 # NOVA_PLANNER_ROUTES_20260812
 
 try:
@@ -959,6 +953,35 @@ try:
 except Exception as exc:
     print(
         "[NOVA_PLANNER_ROUTES_20260812] failed:",
+        exc,
+    )
+
+
+# NOVA_MISSION_ROUTES_20260813
+
+try:
+    from nova_backend.routes.mission_routes import (
+        register_mission_routes,
+    )
+
+    register_mission_routes(
+        app,
+        execution_state_service,
+        mission_orchestrator,
+    )
+
+except Exception as e:
+    print(
+        "[NOVA_MISSION_ROUTES_20260813] failed:",
+        e,
+    )
+
+
+    print("[NOVA_MISSION_ROUTES_20260813] installed")
+
+except Exception as exc:
+    print(
+        "[NOVA_MISSION_ROUTES_20260813] failed:",
         exc,
     )
 

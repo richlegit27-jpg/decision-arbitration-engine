@@ -7,7 +7,6 @@
         tool_registry=None,
         retest_loop=None,
     ):
-
         self.execution_brain = (
             execution_brain
         )
@@ -23,6 +22,7 @@
         self.retest_loop = (
             retest_loop
         )
+
 
     def run_mission(
         self,
@@ -44,29 +44,37 @@
 
         for step in steps:
 
+            if not isinstance(step, dict):
+                step = {
+                    "title": str(step),
+                    "status": "pending",
+                }
+
             decision = (
                 self.execution_brain
                 .decide_next_action(
-                    execution_state=(
-                        execution_state
-                    ),
+                    execution_state=execution_state,
                     current_step=step,
                 )
+                if self.execution_brain
+                else {
+                    "type": "complete_step"
+                }
             )
 
-            history.append({
-                "step": step,
-                "decision": decision,
-            })
+            history.append(
+                {
+                    "step": step,
+                    "decision": decision,
+                }
+            )
 
             decision_type = str(
                 decision.get("type") or ""
             ).lower()
 
-            if (
-                decision_type
-                == "complete_step"
-            ):
+
+            if decision_type == "complete_step":
 
                 step["status"] = (
                     "completed"
@@ -74,10 +82,16 @@
 
                 continue
 
-            if (
-                decision_type
-                == "generate_code"
-            ):
+
+            if decision_type == "generate_code":
+
+                if not self.code_generator:
+
+                    return {
+                        "ok": False,
+                        "error": "code_generator_missing",
+                        "history": history,
+                    }
 
                 generation = (
                     self.code_generator
@@ -89,9 +103,11 @@
                     )
                 )
 
-                history.append({
-                    "generation": generation,
-                })
+                history.append(
+                    {
+                        "generation": generation,
+                    }
+                )
 
                 if not generation.get("ok"):
 
@@ -107,24 +123,26 @@
                     }
 
 
-                write_result = (
-                    self.tool_registry.execute(
-                        "write_file",
-                        path=generation.get(
-                            "target_file"
-                        ),
+                if self.tool_registry:
 
-                        content=generation.get(
-                            "code"
-                        ),
+                    write_result = (
+                        self.tool_registry.execute(
+                            "write_file",
+                            path=generation.get(
+                                "target_file"
+                            ),
+                            content=generation.get(
+                                "code"
+                            ),
+                        )
                     )
-                )
 
-                history.append({
-                    "write_result": (
-                        write_result
-                    ),
-                })
+                    history.append(
+                        {
+                            "write_result": write_result,
+                        }
+                    )
+
 
                 step["status"] = (
                     "completed"
@@ -132,10 +150,16 @@
 
                 continue
 
-            if (
-                decision_type
-                == "run_python_file"
-            ):
+
+            if decision_type == "run_python_file":
+
+                if not self.retest_loop:
+
+                    return {
+                        "ok": False,
+                        "error": "retest_loop_missing",
+                        "history": history,
+                    }
 
                 test_result = (
                     self.retest_loop
@@ -146,11 +170,11 @@
                     )
                 )
 
-                history.append({
-                    "test_result": (
-                        test_result
-                    ),
-                })
+                history.append(
+                    {
+                        "test_result": test_result,
+                    }
+                )
 
                 if not test_result.get("ok"):
 
@@ -164,16 +188,15 @@
                         "failed_step": step,
                     }
 
+
                 step["status"] = (
                     "completed"
                 )
+
 
         return {
             "ok": True,
             "history": history,
             "project_brain_decisions": history,
-            "execution_state": (
-                execution_state
-            ),
+            "execution_state": execution_state,
         }
-
