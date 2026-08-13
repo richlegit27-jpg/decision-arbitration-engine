@@ -42,6 +42,15 @@ from nova_backend.services.api_chat_final_response_service import (
 from nova_backend.services.session_attachment_response_service import (
     apply_session_attachment_response,
 )
+
+try:
+    from nova_backend.services.real_response_attachment_lock_service import (
+        apply_real_response_attachment_lock,
+    )
+except Exception:
+    def apply_real_response_attachment_lock(*args, **kwargs):
+        return None
+
 from nova_backend.services.project_next_answer_service import (
     get_project_next_answer,
     is_project_next_question,
@@ -519,6 +528,16 @@ runtime_response_sanitizer = RuntimeResponseSanitizerService()
 attachment_keypoints_service = AttachmentKeypointsService()
 # install_project_chat_response_router moved below app creation
 attachment_analysis_service = AttachmentAnalysisService()
+attachment_summary_lock_service = None
+from nova_backend.services.attachment_summary_lock_service import (
+    apply_attachment_summary_lock,
+)
+
+class AttachmentSummaryLockServiceCompat:
+    def apply_attachment_summary_lock(self, *args, **kwargs):
+        return apply_attachment_summary_lock(*args, **kwargs)
+
+attachment_summary_lock_service = AttachmentSummaryLockServiceCompat()
 chat_attachment_context_service = ChatAttachmentContextService(
     uploads_dir=UPLOADS_DIR,
     base_dir=BASE_DIR,
@@ -1543,6 +1562,23 @@ def _nova_mobile_now_iso():
         return ""
 
 def api_chat():
+    print("[CONTENT TYPE]", request.content_type)
+    print("[RAW BODY]", request.get_data())
+    data = request.get_json(silent=True) or {}
+    print("[CHAT RAW DATA DEBUG]", data)
+
+    user_text = str(
+        data.get("user_text")
+        or data.get("text")
+        or data.get("message")
+        or ""
+    ).strip()
+
+    session_id = str(
+        data.get("session_id")
+        or data.get("chat_id")
+        or ""
+    ).strip()
     from flask import session as flask_session
     # NOVA_API_CHAT_IMAGE_VISION_GATE_20260607
     try:
@@ -1787,7 +1823,18 @@ def api_chat():
 
     # NOVA_EMPTY_SESSION_CREATE_GUARD_EXACT_20260610
     # Normalize attachments before session creation so blank frontend pings do not create stored sessions.
+
     attachments = normalize_attachments(data.get("attachments"))
+
+    print(
+        "[EMPTY GUARD DEBUG]",
+        {
+            "user_text": repr(user_text),
+            "data": data,
+            "attachments": attachments,
+            "session_id": session_id,
+        },
+    )
 
     if not user_text and not attachments:
         return jsonify(
@@ -2094,6 +2141,7 @@ def api_chat():
                 if key != "text"
             },
         )
+    print("[BEFORE PROJECT RECALL]", repr(user_text), repr(session_id))
 
     direct_project_focus_response = (
         project_recall_service
@@ -2103,7 +2151,7 @@ def api_chat():
         )
     )
 
-    if direct_project_focus_response is not None:
+    if False and direct_project_focus_response is not None:
         app.logger.info(
             "[project-focus-direct-recall] answered from recent session context session_id=%s",
             session_id,
@@ -2241,126 +2289,101 @@ def api_chat():
             len(attachments_for_chat_service or []),
         )
 
-        username = ""
 
-        _nova_request_session_id = str(
-            data.get("session_id")
-            or session_id
-            or ""
-        ).strip().lower()
+    username = ""
+    result = None
+    attachments_for_chat_service = attachments
 
-        _nova_request_text = str(
-            data.get("message")
-            or data.get("user_text")
-            or user_text
-            or ""
-        ).strip().lower()
+    image_command_user_text = user_text
 
-        if (
-            _nova_request_session_id.startswith("regression_")
-            or _nova_request_text == "garbage_guard"
-        ):
-            result = chat_service.handle(
-                user_text=image_command_user_text,
-                session_id=session_id,
-                attachments=attachments_for_chat_service,
-            )
-
-        try:
-            result = chat_service.handle(
-                user_text=image_command_user_text,
-                session_id=session_id,
-                attachments=attachments_for_chat_service,
-            )
-
-        except Exception as chat_error:
-            import traceback
-
-            print(
-                "[CHAT SERVICE FAILURE DEBUG]",
-                repr(chat_error),
-            )
-
-            traceback.print_exc()
-
-            result = {
-                "ok": False,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": "Nova encountered an error processing that request.",
-                },
-            }
-
-            app.logger.warning(
-                "[CHAT_SERVICE_FAILURE] failed: %s",
-                chat_error,
-            )
-
-        print(
-            "[CHAT SERVICE RESULT DEBUG]",
-            repr(result)[:3000],
+    if user_text.lower().startswith("/image"):
+        image_command_user_text = (
+            "generate image "
+            + (user_text[6:].strip() or "image")
         )
 
-        # NOVA_MOBILE_IMAGE_SESSION_SERVICE_20260812
+    try:
+        result = chat_service.handle(
+            user_text=image_command_user_text,
+            session_id=session_id,
+            attachments=attachments_for_chat_service,
+        )
 
-        try:
-            from nova_backend.services.mobile_image_session_service import (
-                force_mobile_image_session_result,
-            )
+    except Exception as chat_error:
+        import traceback
 
-            result = force_mobile_image_session_result(
-                result,
-                data,
-                session_id,
-                session_service,
-                UPLOADS_DIR,
-                SESSIONS_FILE,
-            )
+        print(
+            "[CHAT SERVICE FAILURE DEBUG]",
+            repr(chat_error),
+        )
 
-        except Exception as exc:
-            app.logger.warning(
-                "[MobileImageSessionService] failed: %s",
-                exc,
-            )
+        traceback.print_exc()
 
-        # =========================
-        # SAFE LOGGING
-        # =========================
-        try:
-            app.logger.info(
-                "[api_chat] chat_service.handle result ok=%s active_session_id=%s keys=%s",
-                result.get("ok") if isinstance(result, dict) else None,
-                result.get("active_session_id") if isinstance(result, dict) else None,
-                sorted(list(result.keys())) if isinstance(result, dict) else type(result).__name__,
-            )
-        except Exception:
-            pass
+        result = {
+            "ok": False,
+            "assistant_message": {
+                "role": "assistant",
+                "text": "Nova encountered an error processing that request.",
+            },
+            "session_id": session_id,
+        }
 
-            result = apply_api_chat_final_response(
-                result,
-                image_command_user_text,
-                attachment_content_lines,
-                attachment_analysis_service,
-                attachment_summary_lock_service,
-                summarize_attachments_for_session,
-                session_id,
-                requested_session_id,
-                attachments,
-                app.logger,
-                response_quality_service,
-                apply_final_attachment_response,
-                apply_session_attachment_response,
-                apply_real_response_attachment_lock,
-            )
+        app.logger.warning(
+            "[CHAT_SERVICE_FAILURE] failed: %s",
+            chat_error,
+        )
 
-        except Exception:
-            app.logger.exception("[api_chat] failed while logging chat_service result")
+    print(
+        "[CHAT SERVICE RESULT DEBUG]",
+        repr(result)[:3000],
+    )
 
-        # TEMP DISABLED:
-        # runtime_brain.run_cycle is crashing on undefined working_state.
-        # Keep disabled until execution mutation is stable.
-        # REMOVE_API_CHAT_RAW_RESULT_PRINT_LOCK
+    # NOVA_MOBILE_IMAGE_SESSION_SERVICE_20260812
+    try:
+        from nova_backend.services.mobile_image_session_service import (
+            force_mobile_image_session_result,
+        )
 
+        result = force_mobile_image_session_result(
+            result,
+            data,
+            session_id,
+            session_service,
+            UPLOADS_DIR,
+            SESSIONS_FILE,
+        )
+
+    except Exception as exc:
+        app.logger.warning(
+            "[MobileImageSessionService] failed: %s",
+            exc,
+        )
+
+    # =========================
+    # SAFE LOGGING
+    # =========================
+    try:
+        app.logger.info(
+            "[api_chat] chat_service.handle result ok=%s active_session_id=%s keys=%s",
+            result.get("ok") if isinstance(result, dict) else None,
+            result.get("active_session_id") if isinstance(result, dict) else None,
+            sorted(list(result.keys())) if isinstance(result, dict) else type(result).__name__,
+        )
+    except Exception:
+        pass
+
+
+    attachment_content_lines = []
+
+    if "attachment_summary_lock_service" not in globals():
+        attachment_summary_lock_service = None
+
+    attachment_summary_lock_service = globals().get(
+        "attachment_summary_lock_service",
+        None,
+    )
+
+    try:
         if result is None:
             result = {
                 "ok": False,
@@ -2371,44 +2394,69 @@ def api_chat():
                 "session_id": session_id,
             }
 
-        try:
-            result = clear_pending_execution_actions(result)
-        except Exception as cleanup_error:
-            print(
-                "PENDING EXECUTION CLEANUP FAILED:",
-                cleanup_error,
-            )
-        result, assistant_message = build_assistant_message(
+        result = apply_api_chat_final_response(
             result,
-            user_text,
+            image_command_user_text,
+            attachment_content_lines,
+            attachment_analysis_service,
+            attachment_summary_lock_service,
+            summarize_attachments_for_session,
             session_id,
+            requested_session_id,
+            attachments,
+            app.logger,
             response_quality_service,
+            apply_final_attachment_response,
+            apply_session_attachment_response,
+            apply_real_response_attachment_lock,
         )
 
-        payload = build_chat_response_payload(
-            result,
-            assistant_message,
-            session_id,
-            session_service,
+    except Exception:
+        app.logger.exception(
+            "[api_chat] failed while finalizing chat response"
         )
 
-        return json_ok(
-            **{
-                k: v
-                for k, v in payload.items()
-                if v is not None
-            }
+    if result is None:
+        result = {
+            "ok": False,
+            "assistant_message": {
+                "role": "assistant",
+                "text": "Nova returned no response from chat_service.handle().",
+            },
+            "session_id": session_id,
+        }
+
+    try:
+        result = clear_pending_execution_actions(result)
+
+    except Exception as cleanup_error:
+        print(
+            "PENDING EXECUTION CLEANUP FAILED:",
+            cleanup_error,
         )
 
-        try:
-            error_reporting_service.report(
-                exc,
-                service="api_chat",
-            )
-        except Exception:
-            pass
+    result, assistant_message = build_assistant_message(
+        result,
+        user_text,
+        session_id,
+        response_quality_service,
+    )
 
-        return json_error(str(exc), 500)
+    payload = build_chat_response_payload(
+        result,
+        assistant_message,
+        session_id,
+        session_service,
+    )
+
+    return json_ok(
+        **{
+            k: v
+            for k, v in payload.items()
+            if v is not None
+        }
+    )
+
 
 @app.get("/api/chat/<session_id>")
 def api_chat_session_compat(session_id: str):
@@ -4188,7 +4236,6 @@ except Exception as _nvcvr_error:
         print("[NOVA_MOBILE_CHAT_VISIBLE_RECOVERY_INJECT_20260703] install failed:", _nvcvr_error)
     except Exception:
         pass
-
 
 # NOVA_DURABLE_DATA_HEALTH_ROUTE_20260703
 try:
