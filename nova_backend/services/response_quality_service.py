@@ -237,6 +237,7 @@ def install_response_quality_service(app):
 
         app.response_quality_service = service
 
+
         print(
             "[NOVA_ANSWER_QUALITY_95_DIRECT_POLICY_20260701] installed"
         )
