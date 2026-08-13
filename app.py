@@ -3780,26 +3780,25 @@ def api_chat():
             or ""
         ).strip()
 
-        _nova_real_web_probe = " ".join(_nova_real_user_text_for_web.lower().split())
-        _nova_real_web_terms = (
-            "latest news",
-            "news about",
-            "today in",
-            "what happened today",
-            "current news",
-            "breaking news",
-            "recent news",
-            "latest tech news",
-            "latest sports",
-            "weather",
-            "forecast",
-            "current events",
-        )
+        try:
+            from nova_backend.services.web_intent_cleaner_service import (
+                web_intent_cleaner_service,
+            )
+
+            _nova_is_web_intent = (
+                web_intent_cleaner_service.is_web_intent(
+                    _nova_real_user_text_for_web
+                )
+            )
+
+        except Exception:
+            _nova_is_web_intent = False
 
         if (
             request.environ.get("NOVA_FORCE_WEB_INTENT_20260609") == "1"
-            or any(term in _nova_real_web_probe for term in _nova_real_web_terms)
+            or _nova_is_web_intent
         ):
+
             if _nova_real_user_text_for_web:
                 user_text = _nova_real_user_text_for_web
                 attachments_for_chat_service = []
