@@ -38,8 +38,34 @@ def make_move(move_type: str, payload: dict[str, Any] | None = None) -> NextMove
 
 
 class ExecutionHandler:
-    def __init__(self, executor: MoveExecutor):
-        self.executor = executor
+
+    def __init__(self, service):
+        self.service = service
+
+    def handle(
+        self,
+        user_text,
+        session_id="",
+    ):
+        print(
+            "DEBUG EXECUTION HANDLER ENTERED",
+            {
+                "user_text": user_text,
+                "session_id": session_id,
+            },
+        )
+
+        execution = self.service._process_goal_and_plan(
+            user_text,
+            session_id,
+        )
+
+        print(
+            "DEBUG EXECUTION HANDLER RETURN =",
+            execution,
+        )
+
+        return execution
 
     def _build_fix_move(self, step: dict) -> dict:
         target_file = str(step.get("target_file") or "").strip()

@@ -513,6 +513,11 @@ def _legacy_build_project_brain_general_answer_497(user_text=""):
         user_text,
     )
     intent = classify_project_brain_intent(user_text)
+    if intent == "next_move":
+        return ProjectBrainAnswer(
+            intent="next_move",
+            text=_safe_next_answer(),
+        )
 
     print(
         "[DEBUG PROJECT BRAIN FINAL INTENT]",
@@ -536,53 +541,17 @@ def _legacy_build_project_brain_general_answer_497(user_text=""):
         )
 
     q = _nova_project_brain_general_live_selector_normalize_20260702(user_text)
+
     if intent == "mission_control":
         return ProjectBrainAnswer(
             intent="mission_control",
             text=_mission_control_answer(user_text),
         )
 
-    q = _nova_project_brain_general_live_selector_normalize_20260702(user_text)
-
-    exact_direct_project_state = {
-        "what are we working on",
-        "what are we working on now",
-        "what are we working on right now",
-    }
-    if q in exact_direct_project_state:
-        return False
-
-    phrases = [
-        "where are we at with nova right now",
-        "where are we at with nova",
-        "where are we at",
-        "where is nova at",
-        "where's nova at",
-        "where is the project at",
-        "where's the project at",
-        "give me the nova status",
-        "nova status without hype",
-        "what should we do next",
-        "what should we do",
-        "what's next",
-        "next concrete move",
-        "next move",
-        "what now",
-        "should we patch app py",
-        "should we patch app.py",
-        "should we patch or test",
-        "should we test first",
-        "test first",
-        "safe to code",
-        "what test should we run",
-        "what does this failure mean",
-        "why did this fail",
-        "stale memory",
-        "memory hijacking",
-        "source of truth",
-    ]
-
-    return any(phrase in q for phrase in phrases)
+        return ProjectBrainAnswer(
+            intent="general_project_answer",
+            text=_current_project_answer(user_text),
+        )
 
 def build_project_brain_general_answer(
     user_text="",

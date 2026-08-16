@@ -1,7 +1,12 @@
+import uuid
 class ChatResponseHandler:
 
     def __init__(self, chat_service):
         self.chat_service = chat_service
+
+    def exec_debug(self, *args, **kwargs):
+        print(*args, **kwargs)
+
 
     def extract_response_text(self, resp) -> str:
         try:
@@ -98,12 +103,12 @@ class ChatResponseHandler:
         mission_mode: str = "",
         user_text: str = "",
     ) -> str:
-        text = self.safe_str(text).strip()
-        user_text_raw = self.safe_str(user_text).strip()
+        text = self.chat_service.safe_str(text).strip()
+        user_text_raw = self.chat_service.safe_str(user_text).strip()
         user_text_lc = user_text_raw.lower()
         response_policy = response_policy if isinstance(response_policy, dict) else {}
 
-        exec_debug("CLEAN_FINAL_HIT:", user_text_raw)
+        self.exec_debug("CLEAN_FINAL_HIT:", user_text_raw)
 
         # === SMFF HARD OVERRIDE FOR CODE HELP ===
         try:
@@ -355,13 +360,6 @@ class ChatResponseHandler:
 
         return text or ""
 
-
-
-
-
-
-
-
     def _finalize_response(
         self,
         session_id: str = "",
@@ -370,6 +368,7 @@ class ChatResponseHandler:
         assistant_msg=None,
         decision=None,
         saved_artifact=None,
+        execution_state=None,
         working_context_payload=None,
         should_inject_working_context=False,
         **extra,
@@ -386,12 +385,17 @@ class ChatResponseHandler:
         )
 
         decision = decision if isinstance(decision, dict) else {}
+        print(
+            "[FINALIZE DECISION EXECUTION DEBUG]",
+            decision.get("execution_state"),
+        )
 
-        session_id = self._ensure_session_id(session_id)
+        session_id = self.chat_service._ensure_session_id(session_id)
+        attachments = extra.get("attachments") or []
 
         memory_written = False
 
-        clean_memory_user_text = self.safe_str(
+        clean_memory_user_text = self.chat_service.safe_str(
             locals().get("original_user_text") or user_text
         ).strip()
 
@@ -408,13 +412,16 @@ class ChatResponseHandler:
                 )
 
         try:
-            memory_written = self._maybe_write_memory(
+            memory_written = self.chat_service._maybe_write_memory(
                 decision,
                 clean_memory_user_text,
                 session_id,
             )
         except Exception as e:
-            exec_debug("FINALIZE_MEMORY_WRITE_ERROR:", e)
+            self.exec_debug(
+                "FINALIZE_MEMORY_WRITE_ERROR:",
+                e,
+            )
 
         # NOVA_DIRECT_MEMORY_SAVE_RESPONSE_LOCK_20260618
         clean_memory_lc = " ".join(clean_memory_user_text.lower().split())
@@ -431,7 +438,7 @@ class ChatResponseHandler:
         if (
             memory_written
             and not memory_recall_or_forget
-            and self._should_save_memory_text(clean_memory_user_text)
+            and self.chat_service._should_save_memory_text(clean_memory_user_text)
         ):
             memory_text = clean_memory_user_text
 
@@ -450,8 +457,8 @@ class ChatResponseHandler:
             decision["sources"] = []
             decision["source_urls"] = []
 
-            self._last_web_source_urls = []
-            self._last_web_sources = []
+            self.chat_service._last_web_source_urls = []
+            self.chat_service._last_web_sources = []
 
         if isinstance(assistant_msg, dict):
             existing_meta = assistant_msg.get("meta")
@@ -481,11 +488,11 @@ class ChatResponseHandler:
 
                     cache_payload = {
                         "updated_at": datetime.now().isoformat(timespec="seconds"),
-                        "session_id": self.safe_str(session_id),
+                        "session_id": self.chat_service.safe_str(session_id),
                         "source_urls": [
-                            self.safe_str(url).strip()
+                            self.chat_service.safe_str(url).strip()
                             for url in source_urls_for_cache[:5]
-                            if self.safe_str(url).strip()
+                            if self.chat_service.safe_str(url).strip()
                         ],
                         "sources": (
                             sources_for_cache[:5]
@@ -499,12 +506,12 @@ class ChatResponseHandler:
                         encoding="utf-8",
                     )
             except Exception as exc:
-                exec_debug("CACHE_WEB_SOURCES_IN_FINALIZE_RESPONSE_FAILED:", exc)
+                self.exec_debug("CACHE_WEB_SOURCES_IN_FINALIZE_RESPONSE_FAILED:", exc)
 
             if not meta.get("sources"):
                 import re
 
-                assistant_text = self.safe_str(
+                assistant_text = self.chat_service.safe_str(
                     assistant_msg.get("text") or assistant_msg.get("content") or ""
                 )
 
@@ -556,359 +563,103 @@ class ChatResponseHandler:
                     meta["sources"] = parsed_sources
                     meta["source_urls"] = parsed_urls
 
-            used_memory_items = []
+        used_memory_items = []
 
-            for key in ("memory_used", "used_memory", "memories_used"):
+        try:
+            used_memory_items = (
+                getattr(
+                    self.chat_service,
+                    "_last_used_memory_items",
+                    [],
+                )
+                or []
+            )
+        except Exception as e:
+            self.exec_debug(
+                "FINALIZE_MEMORY_USED_ERROR:",
+                e,
+            )
+
+        if not used_memory_items:
+            for key in (
+                "memory_used",
+                "used_memory",
+                "memories_used",
+            ):
                 value = meta.get(key)
                 if isinstance(value, list):
                     used_memory_items = value
                     break
 
-            if not used_memory_items:
-
-                try:
-
-                    used_memory_items = (
-                        getattr(
-                            self,
-                            "_last_used_memory_items",
-                            [],
-                        )
-                        or []
-                    )
-
-                except Exception as e:
-
-                    exec_debug(
-                        "FINALIZE_MEMORY_USED_ERROR:",
-                        e,
-                    )
-
-                    used_memory_items = []
-
-                except Exception as e:
-                    exec_debug(
-                        "FINALIZE_MEMORY_USED_ERROR:",
-                        e,
-                    )
-
-            meta["memory_used"] = used_memory_items
-            meta["used_memory"] = used_memory_items
-            meta["memory_used_count"] = len(used_memory_items)
-            meta["used_memory_count"] = len(used_memory_items)
-            assistant_msg["meta"] = meta
-
-        session = self._get_session_payload(session_id) or {}
+        meta["memory_used"] = used_memory_items
 
         print(
-            "[SESSION BEFORE TITLE]",
-            {
-                "title": session.get("title"),
-                "id": session.get("id"),
-            },
+            "[FINALIZE MEMORY DEBUG]",
+            getattr(
+                self.chat_service,
+                "_last_used_memory_items",
+                "MISSING",
+            ),
         )
-        verified_exchange = (
-            decision.get("last_verified_web_exchange")
-            if isinstance(decision, dict)
-            else None
-        )
-
-        if isinstance(verified_exchange, dict):
-            session_meta = session.get("meta")
-            session_meta = (
-                dict(session_meta)
-                if isinstance(session_meta, dict)
-                else {}
-            )
-            session_meta[
-                "last_verified_web_exchange"
-            ] = verified_exchange
-            session["meta"] = session_meta
-
-        try:
-            from flask import g, session as flask_session
-
-            auth_user = getattr(g, "nova_auth_user", None) or {}
-
-            auth_user_id = str(
-                auth_user.get("id")
-                or flask_session.get("nova_user_id")
-                or ""
-            ).strip()
-
-            if auth_user_id:
-                session["user_id"] = auth_user_id
-
-        except Exception:
-            pass
-
-        messages = session.get("messages")
-
-        if not isinstance(messages, list):
-            messages = []
-
-        if isinstance(user_msg, dict):
-            user_id = str(user_msg.get("id", "")).strip()
-
-            already_has_user = any(
-                isinstance(m, dict) and str(m.get("id", "")).strip() == user_id
-                for m in messages
-            )
-
-            if not already_has_user:
-                messages.append(user_msg)
-
-        if isinstance(assistant_msg, dict):
-
-            assistant_id = str(
-                assistant_msg.get("id") or f"msg_{uuid.uuid4().hex}"
-            ).strip()
-
-            assistant_msg["id"] = assistant_id
-
-            already_has_assistant = any(
-                isinstance(m, dict) and str(m.get("id", "")).strip() == assistant_id
-                for m in messages
-            )
-
-            if not already_has_assistant:
-                messages.append(assistant_msg)
-
-
-        session["id"] = session_id
-        session["messages"] = messages
-
-
-        try:
-            from flask import g, session as flask_session
-
-            auth_user_id = ""
-
-            user = getattr(g, "nova_auth_user", None) or {}
-
-            auth_user_id = str(
-                user.get("id") or ""
-            ).strip()
-
-            if not auth_user_id:
-                auth_user_id = str(
-                    flask_session.get("nova_user_id") or ""
-                ).strip()
-
-            existing = self.sessions.get_session(
-                session_id,
-                user_id=auth_user_id,
-            )
-
-            print(
-                "[OWNERSHIP CHECK]",
-                {
-                    "session_id": session_id,
-                    "auth_user_id": auth_user_id,
-                    "existing_user_id": (
-                        existing.get("user_id")
-                        if isinstance(existing, dict)
-                        else None
-                    ),
-                },
-            )
-
-            existing_messages = (
-                existing.get("messages", []) if isinstance(existing, dict) else []
-            )
-
-            existing_count = (
-                len(existing_messages) if isinstance(existing_messages, list) else 0
-            )
-
-            exec_debug(
-                "FINALIZE SAVE DEBUG:",
-                {
-                    "existing_count": existing_count,
-                    "message_count": len(messages),
-                    "messages": messages,
-                },
-            )
-
-            if auth_user_id:
-                session["user_id"] = str(auth_user_id)
-
-            print(
-                "[SESSION OWNERSHIP FINAL]",
-                {
-                    "session_id": session_id,
-                    "auth_user_id": auth_user_id,
-                    "session_user_id": session.get("user_id"),
-                },
-            )
-
-            print(
-                "[SESSION OBJECT DEBUG]",
-                {
-                    "type": str(type(self.sessions)),
-                    "module": getattr(type(self.sessions), "__module__", ""),
-                    "has_update": hasattr(self.sessions, "update_session"),
-                    "methods": [
-                        x for x in dir(self.sessions)
-                        if "update" in x.lower()
-                    ],
-                },
-            )
-
-            print(
-                "[TITLE RIGHT BEFORE SAVE]",
-                {
-                    "title": session.get("title"),
-                    "title_manual": session.get("title_manual"),
-                    "message_count": len(session.get("messages") or []),
-                },
-            )
-
-            # NOVA_SESSION_AUTO_TITLE_ON_FIRST_MESSAGE
-            try:
-                if (
-                    not session.get("title_manual")
-                    and self._should_auto_title_session(
-                        session.get("title")
-                    )
-                    and isinstance(user_msg, dict)
-                ):
-                    candidate = self._build_session_title_from_message(
-                        user_msg
-                    )
-
-                    print(
-                        "[AUTO TITLE FINAL CANDIDATE]",
-                        candidate,
-                    )
-
-                    if candidate:
-                        session["title"] = candidate
-
-            except Exception as exc:
-                exec_debug(
-                    "AUTO TITLE FINAL FAILED:",
-                    exc,
-                )
-
-            self.session_service.replace_session(
-                session_id,
-                session,
-            )
-
-        except Exception as e:
-            exec_debug("SESSION SAVE ERROR:", e)
-
-        try:
-            assistant_text_for_tracking = ""
-
-            if isinstance(assistant_msg, dict):
-                assistant_text_for_tracking = self.safe_str(assistant_msg.get("text"))
-
-            self._auto_track_working_state(
-                session_id=session_id,
-                user_text=user_text,
-                assistant_text="",
-            )
-
-        except Exception as e:
-            exec_debug("AUTO_TRACK_WORKING_STATE_ERROR:", e)
 
         print(
-            "[NOVA FINALIZE BEHAVIOR TEST]",
-            user_text,
+            "[FINAL META BEFORE ASSIGN]",
+            meta,
         )
 
+        meta["used_memory"] = used_memory_items
+        meta["memory_used_count"] = len(used_memory_items)
+        meta["used_memory_count"] = len(used_memory_items)
+
+        assistant_msg["memory_used"] = used_memory_items
+
+        assistant_msg["meta"] = meta
 
         try:
-            self._observe_response_behavior(
+            self.chat_service._observe_response_behavior(
                 user_text=user_text,
                 assistant_text=(
                     assistant_msg.get("content")
-                    if isinstance(
-                        assistant_msg,
-                        dict
-                    )
-                    else str(
-                        assistant_msg
-                    )
+                    if isinstance(assistant_msg, dict)
+                    else str(assistant_msg)
                 ),
-                context="",          
+                context="",
             )
 
         except Exception as e:
-            exec_debug(
+            self.exec_debug(
                 "BEHAVIOR_OBSERVER_FAILED:",
-                e
+                e,
             )
 
-        onboarding_payload = {}
-
-        if not session.get("meta", {}).get("onboarding"):
-
-            onboarding_payload = {
-                "onboarding": True,
-                "welcome_message": (
-                    "Welcome to your AI workspace.\n\n"
-                    "I can help you answer questions, plan projects, "
-                    "analyze files, work with documents, and create "
-                    "new things.\n\n"
-                    "For more information, check out Help in the menu."
-                ),
-                "actions": [
-                    {
-                        "label": "Start a project",
-                        "prompt": "Help me start a project",
-                        "intent": "project",
-                    },
-                    {
-                        "label": "Learn Nova",
-                        "prompt": "Show me how Nova works",
-                        "intent": "help",
-                    },
-                ],
-            }
 
         return {
-            **onboarding_payload,
             "ok": True,
             "assistant_message": assistant_msg,
-            "session": {
-                **session,
-                "id": session_id,
-            },
-
-            "active_session_id": session_id,
             "session_id": session_id,
-            "saved_artifact": saved_artifact,
-            "debug": {
-                "decision": decision,
-                "route": "chat_service.handle",
-                "route_taken": (
-                    decision.get("route")
-                    if isinstance(decision, dict)
-                    else ""
-                ),
-            },
+            "execution_state": execution_state or {},
+            "execution": execution_state or {},
         }
 
-
-
-
-    def _finalize_assistant_response(self, assistant_msg, fallback_text=""):
+    def _finalize_assistant_response(
+        self,
+        assistant_msg,
+        fallback_text="",
+    ):
         """
         Safety wrapper: guarantees assistant message always exists and is valid.
         Prevents null/undefined exit paths from breaking execution flow.
         """
 
         if not assistant_msg:
-            assistant_msg = self._build_assistant_message(
+            assistant_msg = self.chat_service._build_assistant_message(
                 text=fallback_text or "Execution complete."
             )
 
-        # Ensure structure consistency
         if isinstance(assistant_msg, str):
-            assistant_msg = self._build_assistant_message(text=assistant_msg)
+            assistant_msg = self._build_assistant_message(
+                text=assistant_msg
+            )
 
         if isinstance(assistant_msg, dict):
             meta = assistant_msg.get("meta")
@@ -931,5 +682,5 @@ class ChatResponseHandler:
 
         return assistant_msg
 
-
- 
+    def safe_str(self, value):
+        return self.chat_service.safe_str(value)

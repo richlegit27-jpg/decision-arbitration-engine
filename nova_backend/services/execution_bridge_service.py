@@ -3,6 +3,8 @@ from typing import Any
 from nova_backend.services.project_brain_context_builder import (
     build_project_brain_context,
 )
+
+
 class ExecutionBridgeService:
 
     def __init__(
@@ -54,8 +56,6 @@ class ExecutionBridgeService:
                 },
             }
 
-
-    # NOVA_EXECUTION_AUTOPLAN_START_20260607
     def try_execution_autoplan_start(self, session_id, user_text):
         try:
             clean = str(user_text or "").strip()
@@ -162,7 +162,6 @@ class ExecutionBridgeService:
                 },
             }
 
-    # NOVA_EXECUTION_STATUS_BRIDGE_20260607
     def try_execution_status(
         self,
         session_id,
@@ -235,9 +234,10 @@ class ExecutionBridgeService:
                 f"Status: {status}\n"
                 f"Checkpoint: {project_brain.get('active_checkpoint', 'Not available')}\n"
                 f"Blocker: {project_brain.get('blocker', 'None')}\n"
-                f"Next move: {project_brain.get('next_move', 'Continue execution')}\n"
-                f"Next action: {next_action.get('step', 'Continue mission')}\n"
+                f"Next move: {project_brain.get('next_move', 'Mission completed')}\n"
+                f"Next action: {next_action.get('step', 'No further action required')}\n"
             )
+
             return {
                 "ok": True,
                 "text": reply_text,

@@ -466,7 +466,6 @@ class ExecutionStateService:
 
         return {}
 
-
     def save_execution_state(
         self,
         session_id,
@@ -477,11 +476,18 @@ class ExecutionStateService:
         if not session_id:
             return {}
 
-        execution_state = (
-            execution_state
-            if isinstance(execution_state, dict)
-            else {}
-        )
+        if not isinstance(execution_state, dict):
+            return {}
+
+        if not execution_state:
+            return {}
+
+        if (
+            not execution_state.get("steps")
+            and not execution_state.get("plan")
+            and not execution_state.get("goal")
+        ):
+            return {}
 
         execution_state["_execution_processing"] = False
         execution_state["lock"] = False
@@ -500,33 +506,69 @@ class ExecutionStateService:
 
         return execution_state
 
-    def get_active_execution(self, session_id):
-        session_id = str(session_id or "").strip()
+def get_active_execution(self, session_id):
+    session_id = str(session_id or "").strip()
 
-        if session_id:
-            cached = self.active_execution_cache.get(
-                session_id
+    if not session_id:
+        return None
+
+    cached = self.active_execution_cache.get(
+        session_id
+    )
+
+    print(
+        "DEBUG ACTIVE EXEC CACHE:",
+        session_id,
+        cached,
+    )
+
+    if self.execution_is_active(cached):
+        print(
+            "DEBUG ACTIVE EXEC RETURN CACHE"
+        )
+        return cached
+
+    state = self.get_working_state(
+        session_id
+    )
+
+    print(
+        "DEBUG ACTIVE EXEC WORKING STATE:",
+        session_id,
+        state,
+    )
+
+    for key in (
+        "active_execution",
+        "execution_state",
+        "execution",
+    ):
+        execution = state.get(key)
+
+        print(
+            "DEBUG ACTIVE EXEC CHECK:",
+            key,
+            execution,
+        )
+
+        if self.execution_is_active(execution):
+            print(
+                "DEBUG ACTIVE EXEC RETURN:",
+                key,
             )
 
-            if self.execution_is_active(cached):
-                return cached
+            self.active_execution_cache[
+                session_id
+            ] = execution
 
-        state = self.get_working_state(session_id)
+            return execution
 
-        for key in (
-            "active_execution",
-            "execution_state",
-            "execution",
-        ):
-            execution = state.get(key)
+    print(
+        "DEBUG ACTIVE EXEC NONE FOUND:",
+        session_id,
+    )
 
-            if self.execution_is_active(execution):
-                if session_id:
-                    self.active_execution_cache[session_id] = execution
-
-                return execution
-
-        return None
+    return None
 
     def get_completed_execution(self, session_id):
         session_id = str(session_id or "").strip()

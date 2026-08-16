@@ -9,6 +9,11 @@ import shutil
 import tempfile
 import py_compile
 
+from nova_backend.services.chat.handlers.execution_handler import ExecutionHandler
+from nova_backend.services.planner.decision_service import DecisionService
+from nova_backend.core.nova_orchestrator import NovaOrchestrator
+from nova_backend.services.chat.response import ChatResponseHandler
+from nova_backend.services.chat.project_brain import install_project_brain_patch
 from nova_backend.services.chat.execution import ChatExecutionHandler
 from nova_backend.services.chat.router import ChatRouter
 from nova_backend.services.planner_service import PlannerService
@@ -29,10 +34,18 @@ from nova_backend.services.execution_handler import (
     NextMove,
     default_executor,
 )
+from nova_backend.services.chat_execution_service import (
+    chat_execution_service,
+)
 from nova_backend.services.execution_mutation_service import (
     ExecutionMutationService,
 )
-
+from nova_backend.services.chat.execution_patches import (
+    install_execution_planner_runtime_patches,
+)
+from nova_backend.core.nova_orchestrator import (
+    NovaOrchestrator,
+)
 from openai import OpenAI
 from nova_backend.services.model_gateway_service import (
     chat_completions_create,
@@ -452,6 +465,7 @@ class ChatService:
     ROUTE_MEMORY_RECALL = "memory_recall"
 
     # NOVA_IMAGE_ATTACHMENT_HELPER_20260607
+
     def _nova_has_image_attachment_20260607(self, attachments=None) -> bool:
         attachments = attachments or []
 
@@ -486,6 +500,38 @@ class ChatService:
                 return True
 
         return False
+
+
+    def _process_goal_and_plan(
+        self,
+        user_text: str,
+        session_id: str,
+    ):
+        goal = self._build_goal(
+            user_text,
+            session_id,
+        )
+
+        plan = self._build_plan(
+            goal,
+        )
+
+        execution = self._build_execution(
+            user_text,
+                plan,
+            {
+                "route": "planner",
+                "intent": "planning",
+            },
+        )
+
+        if execution:
+            self._save_execution_state(
+                session_id,
+                execution,
+            )
+
+        return execution or {}
 
     def _get_working_state(self, session_id: str) -> dict:
         return self.working_state_service.get_working_state(
@@ -1216,12 +1262,55 @@ Rules:
         execution_state=None,
     ):
         if self.execution_state_service:
-            return self.execution_state_service.save_execution_state(
+            self.execution_state_service.save_execution_state(
                 session_id,
                 execution_state,
             )
 
-        return {}
+        if (
+            hasattr(self, "chat_execution_service")
+            and self.chat_execution_service
+            and isinstance(execution_state, dict)
+        ):
+            try:
+                self.chat_execution_service.start(
+                    session_id=session_id,
+                    goal=(
+                        execution_state.get("goal")
+                        or "Untitled mission"
+                    ),
+                    steps=(
+                        execution_state.get("steps")
+                        or []
+                    ),
+                    context={
+                        "task_type": (
+                            execution_state.get("task_type")
+                            or "general"
+                        ),
+                    },
+                )
+
+            except Exception as e:
+                exec_debug(
+                    "CHAT EXECUTION STATE SYNC FAILED:",
+                    e,
+                )
+
+        if isinstance(execution_state, dict):
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution_state,
+            )
+
+            self._set_session_meta(
+                session_id,
+                "active_execution",
+                execution_state,
+            )
+
+        return execution_state or {}
 
     def _get_session_meta(self, session_id: str, key: str = "", default=None):
         session_id = self.safe_str(session_id).strip()
@@ -1361,14 +1450,34 @@ Rules:
     def _get_memory_list(self):
         if self.memory_service:
             try:
-                result = self.memory_service.list_memories()
+                if hasattr(self.memory_service, "all"):
+                    result = self.memory_service.all()
+
+                elif hasattr(self.memory_service, "list_memories"):
+                    result = self.memory_service.list_memories()
+
+                elif hasattr(self.memory_service, "build_list_payload"):
+                    result = self.memory_service.build_list_payload()
+
+                else:
+                    result = []
+
+                print(
+                    "[MEMORY SERVICE RESULT]",
+                    type(result),
+                    result,
+                )
 
                 if isinstance(result, list):
                     return result
 
-            except Exception:
-                pass
+            except Exception as e:
+                print(
+                    "[MEMORY SERVICE ERROR]",
+                    e,
+                )
 
+        print("[MEMORY SERVICE EMPTY]")
         return []
 
     def _get_sessions_list(self) -> list:
@@ -2303,23 +2412,30 @@ Rules:
         runtime_uploads_normalizer_service=None,
         ):
 
+        self.chat_execution_service = chat_execution_service
+        self.orchestrator = NovaOrchestrator()
         self.chat_response_cleanup_service = ChatResponseCleanupService()
         self.chat_response_policy_service = ChatResponsePolicyService()
         self.runtime_cognitive_firewall = RuntimeCognitiveFirewall()
         self.attachment_analysis_service = AttachmentAnalysisService()
         self.accidental_input_guard_service = AccidentalInputGuardService()
         self.response_mojibake_cleanup_service = ResponseMojibakeCleanupService()
-    
-
         self.error_reporting_service = ErrorReportingService()
 
         # =========================
         # CORE SERVICES
         # =========================
-        self.execution_handler = ChatExecutionHandler(self)
+        self.execution_handler = ExecutionHandler(self)
+        self.response_handler = ChatResponseHandler(self)
         self.chat_router = ChatRouter(self)
         self.planner_service = PlannerService(self)
         self.intelligence_router = IntelligenceRouter(self)
+        self.orchestrator = (
+            NovaOrchestrator()
+        )
+        self.decision_service = DecisionService(
+            self
+        )
         self.auto_fix_service = AutoFixService(self)
         self.session_service = session_service
         self.memory_service = memory_service
@@ -2336,6 +2452,7 @@ Rules:
             working_state_service = WorkingStateService(
                 session_service
             )
+
 
         self.working_state_service = working_state_service
         self.execution_state_service = execution_state_service
@@ -2443,7 +2560,7 @@ Rules:
         # EXECUTION ENGINE
         # =========================
 
-        self.execution_handler = ExecutionHandler(default_executor)
+        self.default_executor = default_executor
 
         self.repair_execution_service = RepairExecutionService(
             execution_handler=self.execution_handler,
@@ -2653,1909 +2770,6 @@ Rules:
             attachments=attachments,
         )
 
-    def _execute_general_chat(
-        self,
-        decision=None,
-        user_text: str = "",
-        session_id: str = "",
-        attachments=None,
-        memory_context="",
-        working_context_block="",
-        working_state=None,
-    ) -> dict:
-
-        # =====================================
-        # NOVA EXECUTION FLOW (ORDERED LOGIC)
-        # =====================================
-        # 1. Load state
-        # 2. Inject memory
-        # 3. Parse intent
-        # 4. Execute logic
-        # 5. Generate response
-        # 6. Apply UX cleanup
-        # 7. Return final output
-
-        decision = decision if isinstance(decision, dict) else {}
-        attachments = attachments or []
-
-        original_user_text = self.safe_str(user_text)
-
-        text_lc = original_user_text.lower().strip()
-
-        # NOVA_PROJECT_STATUS_DIRECT_ROUTE_20260607
-        project_status_query = any(
-            phrase in text_lc
-            for phrase in [
-                "what did we fix",
-                "what we fixed",
-                "explain what we fixed",
-                "summarize what we fixed",
-                "what did we do today",
-                "what have we done today",
-            ]
-        )
-
-        if project_status_query:
-            assistant_text = (
-                "Here is what we actually fixed today:\n\n"
-                "- Fixed the mobile composer buttons so send, voice, attach, tools, and TTS stopped stretching.\n"
-                "- Fixed the mojibukakke icon issue where broken encoded symbols were showing instead of clean icons.\n"
-                "- Fixed the stale frontend cache issue where /mobile kept loading an old nova-mobile-app.js?v=attachment-payload-bridge-20260607204432 version.\n"
-                "- Slimmed the mobile composer/input bar so the real input and main buttons are now 40px high.\n"
-                "- Fixed the router bug where the word 'today' forced local project questions into web_fetch.\n\n"
-                "Remaining issue: project status answers still need a real work-log system so Nova does not guess from old memories."
-            )
-
-
-
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=original_user_text,
-                user_msg=self._build_user_message(
-                    original_user_text,
-                    attachments=attachments,
-                ),
-                assistant_msg=assistant_msg,
-                decision={
-                    "route": "project_status_direct",
-                    "mode": "project_status",
-                    "confidence": 1.0,
-                    "reasons": ["project_status_memory_bypass"],
-                    "save_artifact": False,
-                    "save_memory": False,
-                    "use_memory": False,
-                },
-                saved_artifact=None,
-            )
-
-
-        # =====================================
-        # AUTO IDENTITY / PREFERENCE REINFORCEMENT
-        # =====================================
-
-        try:
-
-            identity_patterns = [
-                "my name is ",
-                "i am ",
-                "i'm ",
-            ]
-
-            preference_patterns = [
-                "i prefer ",
-                "remember ",
-                "from now on ",
-                "always ",
-                "never ",
-            ]
-
-            if any(pattern in text_lc for pattern in identity_patterns):
-
-                self._reinforce_memory(
-                    session_id=session_id,
-                    memory_text=(f"User identity/context: " f"{original_user_text}"),
-                    category="profile",
-                    amount=3,
-                )
-
-            if any(pattern in text_lc for pattern in preference_patterns):
-
-                self._reinforce_memory(
-                    session_id=session_id,
-                    memory_text=(
-                        f"User preference/correction: " f"{original_user_text}"
-                    ),
-                    category="preference",
-                    amount=3,
-                )
-
-        except Exception as e:
-
-            exec_debug(
-                "IDENTITY_PREFERENCE_REINFORCEMENT_FAILED:",
-                e,
-            )
-
-        # =====================================
-        # AUTO FILE DETECTION
-        # =====================================
-
-        try:
-
-            detected_file = ""
-            detected_bug = ""
-
-            file_patterns = [
-                r"[A-Za-z]:\\\\[^\n\r\t\"']+\.py",
-                r"[A-Za-z]:\\\\[^\n\r\t\"']+\.js",
-                r"[A-Za-z]:\\\\[^\n\r\t\"']+\.html",
-                r"[A-Za-z]:\\\\[^\n\r\t\"']+\.css",
-                r"[A-Za-z]:\\\\[^\n\r\t\"']+\.json",
-            ]
-
-            for pattern in file_patterns:
-
-                match = re.search(
-                    pattern,
-                    original_user_text,
-                    re.IGNORECASE,
-                )
-
-                if match:
-
-                    detected_file = match.group(0).strip()
-
-                    break
-
-            traceback_match = re.search(
-                r'File "([^"]+)"',
-                original_user_text,
-                re.IGNORECASE,
-            )
-
-            if traceback_match:
-
-                detected_file = str(traceback_match.group(1)).strip()
-
-            bug_markers = [
-                "traceback",
-                "error",
-                "exception",
-                "syntaxerror",
-                "indentationerror",
-                "nameerror",
-                "typeerror",
-                "attributeerror",
-                "valueerror",
-                "failed",
-            ]
-
-            if any(marker in text_lc for marker in bug_markers):
-
-                detected_bug = original_user_text[:1200].strip()
-
-            if detected_file:
-
-                ws = self._get_working_state(session_id) or {}
-
-                self._update_working_state(
-                    session_id,
-                    {
-                        "current_file": detected_file,
-                        "active_task": (ws.get("active_task") or "active debugging"),
-                        "current_bug": detected_bug,
-                        "checkpoint": (
-                            "auto_bug_detected"
-                            if detected_bug
-                            else "auto_file_detected"
-                        ),
-                    },
-                )
-
-                self._reinforce_memory(
-                    session_id=session_id,
-                    memory_text=(f"Current file: " f"{detected_file}"),
-                    category="operational",
-                    amount=2,
-                )
-
-                if detected_bug:
-
-                    self._reinforce_memory(
-                        session_id=session_id,
-                        memory_text=(f"Current bug: " f"{detected_bug[:500]}"),
-                        category="correction",
-                        amount=2,
-                    )
-
-        except Exception as e:
-
-            exec_debug(
-                "AUTO_FILE_DETECTION_FAILED:",
-                e,
-            )
-
-        if text_lc in {
-            "what file are we in",
-            "what fiel are we in",
-            "which file",
-            "current file",
-            "what file",
-            "what fiel",
-            "what file we are in",
-            "what file are we working in",
-        }:
-
-            effective_session_id = (
-                str(locals().get("target_session_id") or "").strip()
-                or str(session_id or "").strip()
-                or str(getattr(self.session_service, "active_session_id", "") or "").strip()
-            )
-
-            ws = self._get_working_state(effective_session_id) or {}
-
-            if not isinstance(ws, dict):
-                ws = {}
-
-            current_file = str(ws.get("current_file") or "").strip()
-
-            if not current_file:
-                current_file = "No active file is currently tracked."
-
-            assistant_msg = self._build_assistant_message(
-                text=(f"Current file:\n" f"{current_file}")
-            )
-
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg={
-                    "role": "user",
-                    "text": user_text,
-                    "content": user_text,
-                    "attachments": attachments or [],
-                    "meta": {},
-                },
-                assistant_msg=assistant_msg,
-                saved_artifact=None,
-            )
-
-        if text_lc in {
-            "what is the active task",
-            "active task",
-            "what are we doing",
-        }:
-            effective_session_id = (
-                str(locals().get("target_session_id") or "").strip()
-                or str(session_id or "").strip()
-                or str(getattr(self.session_service, "active_session_id", "") or "").strip()
-            )
-
-            ws = self._get_working_state(effective_session_id) or {}
-
-            if not isinstance(ws, dict):
-                ws = {}
-
-            active_task = str(ws.get("active_task") or "").strip()
-
-            if not active_task:
-                active_task = "No active task is currently tracked."
-
-            assistant_msg = self._build_assistant_message(
-                text=(f"Active task:\n" f"{active_task}")
-            )
-
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg={
-                    "role": "user",
-                    "text": user_text,
-                    "content": user_text,
-                    "attachments": attachments or [],
-                    "meta": {},
-                },
-                assistant_msg=assistant_msg,
-                saved_artifact=None,
-            )
-
-        if text_lc in {
-            "what did i just say",
-            "what did i say",
-            "what was my last message",
-        }:
-            print("RECALL INTERCEPT HIT")
-
-            all_sessions = self.sessions.list_sessions()
-
-            session_messages = []
-
-            for s in all_sessions:
-                if isinstance(s, dict) and str(s.get("id")) == str(session_id):
-                    session_messages = s.get("messages", [])
-                    break
-
-            previous_user = ""
-
-            user_messages = [
-                m
-                for m in session_messages
-                if isinstance(m, dict) and m.get("role") == "user"
-            ]
-
-            if len(user_messages) >= 2:
-                previous_user = str(user_messages[-2].get("text", "")).strip()
-
-            if not previous_user:
-                previous_user = "I could not find a previous message."
-
-            assistant_msg = self._build_assistant_message(
-                text=(f"Your previous message was: " f'"{previous_user}"')
-            )
-
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg={
-                    "role": "user",
-                    "text": user_text,
-                    "content": user_text,
-                    "attachments": attachments or [],
-                    "meta": {},
-                },
-                assistant_msg=assistant_msg,
-                saved_artifact=None,
-            )
-
-        assistant_text = ""
-        assistant_msg = None
-
-        # NOVA_FORCE_IMAGE_ATTACHMENTS_ATTACHMENT_ANALYSIS_20260607
-        if self._nova_has_image_attachment_20260607(attachments):
-            decision = decision if isinstance(decision, dict) else {}
-            decision["route"] = self.ROUTE_ATTACHMENT_ANALYSIS
-            decision["mode"] = "image_analysis"
-            decision["confidence"] = 1.0
-            decision["reasons"] = list(decision.get("reasons") or []) + ["forced_image_attachment_analysis"]
-            decision["save_artifact"] = False
-            decision["save_memory"] = False
-            decision["use_memory"] = False
-            decision["source_urls"] = []
-            decision["sources"] = []
-        route = self.safe_str(decision.get("route")).lower()
-
-        try:
-            ws = self._get_working_state(session_id) or {}
-
-            memory_brain = []
-
-            for key, label in (
-                ("active_task", "Task"),
-                ("current_file", "File"),
-                ("current_bug", "Bug"),
-                ("checkpoint", "Checkpoint"),
-                ("next_move", "Next"),
-                ("last_success", "Last success"),
-                ("last_error", "Last error"),
-            ):
-                value = ws.get(key)
-
-                if value:
-                    memory_brain.append(f"{label}: {value}")
-
-            execution_keywords = {
-                "next",
-                "continue",
-                "run step",
-                "run all",
-                "execute",
-                "retry",
-                "test fail",
-                "fix",
-                "debug",
-                "traceback",
-                "error",
-                "bug",
-            }
-
-            should_attach_operational_context = any(
-                x in text_lc for x in execution_keywords
-            )
-
-            # NOVA_SKIP_PROJECT_CONTEXT_FOR_INTERPRETED_NEWS_20260612
-            # Clean public news/web queries must not be polluted with Nova project memory.
-            # Example bad query before this guard:
-            # "latest tucker carlson project aware context for nova ... news today"
-            _skip_project_context_for_news = bool(
-                getattr(self, "_skip_project_context_for_interpreted_news", False)
-            )
-
-            if memory_brain and should_attach_operational_context and not _skip_project_context_for_news:
-                brain_context = "\n".join(memory_brain)
-
-                user_text = (
-                    "[NOVA ACTIVE CONTEXT]\n"
-                    f"{brain_context}\n\n"
-                    "[USER MESSAGE]\n"
-                    f"{original_user_text}"
-                )
-
-        except Exception as e:
-            exec_debug(
-                "MEMORY_PRIORITY_LAYER_ERROR:",
-                e,
-            )
-
-        # =====================================
-        # CONTINUITY MEMORY PERSISTENCE LAYER
-        # =====================================
-        try:
-            ws = self._get_working_state(session_id) or {}
-
-            if original_user_text:
-                ws["last_user_input"] = original_user_text
-
-            if text_lc:
-                ws["last_intent"] = text_lc
-
-            self._update_working_state(session_id, ws)
-
-        except Exception as e:
-            exec_debug(
-                "CONTINUITY_MEMORY_PERSIST_FAILED:",
-                e,
-            )
-
-        if text_lc.strip() in {
-            "regen",
-            "regenerate",
-            "redo image",
-            "make another",
-            "another image",
-        }:
-            last_prompt = (
-                self._get_session_meta(
-                    session_id,
-                    "last_image_prompt",
-                )
-                or "generate an image"
-            )
-
-            return self._handle_image_generation(
-                prompt=last_prompt,
-                session_id=session_id,
-                parent_artifact_id="",
-                source_type="regenerated",
-            )
-
-        regen_commands = {
-            "regen",
-            "regenerate",
-            "redo image",
-            "make another",
-            "another image",
-        }
-
-        if text_lc.strip() in regen_commands:
-            last_prompt = (
-                self._get_session_meta(
-                    session_id,
-                    "last_image_prompt",
-                )
-                or ""
-            )
-
-            last_prompt = self.safe_str(last_prompt).strip()
-
-            if not last_prompt or last_prompt in regen_commands:
-                last_prompt = "generate an image"
-
-            return self._handle_image_generation(
-                prompt=last_prompt,
-                session_id=session_id,
-                parent_artifact_id=parent_artifact_id,
-                source_type="regenerated",
-            )
-
-        if self._is_image_generation_request(user_text) and not self._nova_is_web_news_intent_20260609(user_text):
-            return self._handle_image_generation(
-                prompt=user_text,
-                session_id=session_id,
-                parent_artifact_id=(
-                    parent_artifact_id if "parent_artifact_id" in locals() else ""
-                ),
-            )
-
-        explicit_execution_commands = {
-            "next",
-            "nex",
-            "continue",
-            "continue on",
-            "keep going",
-            "go",
-            "run next",
-            "next step",
-            "run_step",
-            "run step",
-            "run_all",
-            "run all",
-            "run it",
-            "execute",
-            "execute all",
-            "retry",
-            "retry_failed",
-            "retry failed",
-            "try again",
-            "rerun failed",
-            "test_fail",
-            "test fail",
-            "stop",
-            "cancel",
-        }
-
-        lowered = str(user_text or "").strip().lower()
-
-        planner_prefixes = (
-            "auto-plan",
-            "build ",
-            "create ",
-            "make ",
-            "implement ",
-            "fix ",
-            "repair ",
-        )
-
-        is_execution = (
-            lowered.strip() in explicit_execution_commands
-            or lowered.startswith(planner_prefixes)
-        )
-
-        if is_execution and text_lc.strip() not in {
-            "continue",
-            "next",
-            "run it",
-            "go",
-            "run next",
-            "next step",
-            "what next",
-            "what now",
-            "stop",
-            "cancel",
-        }:
-            exec_debug(
-                "EXECUTION INTERCEPT HIT",
-                lowered,
-            )
-
-            execution_state = self._process_goal_and_plan(
-                user_text,
-                session_id,
-            )
-
-            exec_debug(
-                "PLAN RESULT =",
-                execution_state,
-            )
-
-            if execution_state:
-
-                self._save_execution_state(
-                    session_id,
-                    execution_state,
-                )
-
-                try:
-                    session_obj = self.sessions.get_session(session_id) or {}
-
-                    session_obj["execution_state"] = execution_state
-
-                    session_obj["active_execution"] = (
-                        execution_state
-                        if (
-                            isinstance(execution_state, dict)
-                            and execution_state.get("steps")
-                            and self.safe_str(execution_state.get("status")).lower()
-                            != "complete"
-                        )
-                        else {}
-                    )
-
-                    self.sessions.update_session(
-                        session_id,
-                        session_obj,
-                    )
-
-                except Exception as e:
-                    exec_debug(
-                        "EXECUTION SESSION SAVE FAILED:",
-                        e,
-                    )
-
-            if execution_state:
-
-                self._save_execution_state(
-                    session_id,
-                    execution_state,
-                )
-
-            working_state = self._get_working_state(session_id) or {}
-
-            execution_state = (
-                execution_state if isinstance(execution_state, dict) else {}
-            )
-
-            mission_state = self._build_mission_state(
-                working_state=working_state,
-                execution_state=execution_state,
-            )
-
-            if execution_state.get("steps") and self.safe_str(
-                execution_state.get("status")
-            ).lower() in {
-                "running",
-                "adapting",
-                "waiting",
-            }:
-
-                self._update_working_state(
-                    session_id,
-                    {
-                        "mission": mission_state,
-                        "active_task": user_text,
-                        "next_move": "run_step",
-                        "checkpoint": ("execution_plan_created"),
-                        "execution_status": "running",
-                    },
-                )
-
-        if decision and decision.get("intent") == "planning":
-            return None
-
-            print(
-                "EXECUTION RETURNING PROCESS COMMAND",
-                "run_step",
-            )
-
-            execution_state["command"] = "run_step"
-
-            return self.execution_orchestrator_service.process_execution(
-                session_id=session_id,
-                state=execution_state,
-            )
-
-        is_continue = text_lc.strip() in {
-            "continue",
-            "next",
-            "run it",
-            "go",
-        }
-
-        # SINGLE SOURCE OF TRUTH
-        state = self._get_working_state(session_id) or {}
-        session = self._get_session_payload(session_id)
-
-        mission_mode = self.safe_str(state.get("mission_mode"))
-
-        active_task = self.safe_str(state.get("active_task"))
-        next_step = self.safe_str(state.get("next_move"))
-
-        # === EXECUTION LOCK DISABLED ===
-        # Execution now only runs through _maybe_lock_execution_flow().
-        # Normal chat should not be hijacked just because working_state exists.
-        if False:
-            exec_debug("FORCING EXECUTION MODE FROM WORKING STATE")
-
-
-        operational_queries = {
-            "what file are we in",
-            "which file",
-            "current file",
-            "what file",
-            "what is the active task",
-            "active task",
-            "what are we doing",
-            "resume mission",
-            "resume task",
-            "show mission",
-            "show working state",
-            "show execution",
-            "where are we now",
-        }
-
-        if text_lc in operational_queries:
-
-            working_state = self._get_working_state(session_id) or {}
-
-            has_real_state = any(
-                [
-                    working_state.get("active_task"),
-                    working_state.get("current_file"),
-                    working_state.get("current_bug"),
-                    working_state.get("next_move"),
-                    working_state.get("checkpoint"),
-                ]
-            )
-
-            if not has_real_state:
-
-                mission = {}
-
-                dominant_memory = (
-                    self._rank_memory_context(
-                        user_text=user_text,
-                        memories=(self.memories.all() or []),
-                        working_state=working_state,
-                        execution_state={},
-                        limit=5,
-                    )
-                    or []
-                )
-
-                memory_lines = []
-                fallback_lines = []
-                seen_memory = set()
-
-                blocked_internal_phrases = {
-                    "execution handler",
-                    "next move",
-                    "internal reasoning",
-                    "thinking step",
-                    "need to run",
-                }
-
-                for item in dominant_memory:
-
-                    if not isinstance(item, dict):
-                        continue
-
-                    text = self.safe_str(
-                        item.get("text") or item.get("content")
-                    ).strip()
-
-                    if not text:
-                        continue
-
-                    text_lower = text.lower()
-
-                    if any(phrase in text_lower for phrase in blocked_internal_phrases):
-                        continue
-
-                    normalized = text_lower.strip()
-
-                    if normalized in seen_memory:
-                        continue
-
-                    seen_memory.add(normalized)
-
-                    memory_lines.append(f"- {text}")
-
-                if memory_lines:
-
-                    fallback_lines.extend(
-                        [
-                            "Recent context available (trimmed for safety):",
-                            *memory_lines[:3],
-                        ]
-                    )
-
-                if not fallback_lines:
-
-                    fallback_lines.append(
-                        "No active working state is currently tracked."
-                    )
-
-                clean_fallback = []
-
-                for line in fallback_lines:
-
-                    line_str = self.safe_str(line).strip()
-
-                    if not line_str:
-                        continue
-
-                    if "Recovered operational context" in line_str:
-                        continue
-
-                    clean_fallback.append(line_str)
-
-            if _nova_has_image_attachment:
-                text = (
-                    "\n".join(clean_fallback)
-                    or "No active working state is currently tracked."
-                )
-
-                return self._finalize_response(
-                    session_id=session_id,
-                    user_text=user_text,
-                    user_msg={
-                        "role": "user",
-                        "text": user_text,
-                        "attachments": [],
-                        "meta": {},
-                    },
-                    assistant_msg=assistant_msg,
-                )
-
-            working_state = self._get_working_state(session_id) or {}
-
-            persisted_execution_state = (
-                self._load_execution_state(
-                    session_id
-                )
-            )
-
-            if isinstance(
-                persisted_execution_state, dict
-            ) and persisted_execution_state.get("steps"):
-                execution_state = persisted_execution_state
-            else:
-                execution_state = {}
-
-            reconciled = self._reconcile_execution_state(
-                session_id=session_id,
-                working_state=working_state,
-                execution_state=execution_state,
-            )
-
-            working_state = reconciled.get("working_state") or {}
-
-            execution_state = reconciled.get("execution_state") or {}
-
-            mission_state = self._build_mission_state(
-                working_state=working_state,
-                execution_state=execution_state,
-            )
-
-            assistant_text = self._format_mission_state(mission_state)
-
-            return {
-                "ok": True,
-                "assistant_message": (
-                    self._build_assistant_message(
-                        "No active working state is currently tracked."
-                    )
-                ),
-                "session": self._get_session_payload(session_id),
-                "saved_artifact": None,
-                "artifacts": [],
-                "debug": {
-                    "route_taken": ("mission_state_continuity_suppressed"),
-                },
-            }
-
-        # NOVA_FORCE_IMAGE_ATTACHMENTS_ATTACHMENT_ANALYSIS_20260607
-        if self._nova_has_image_attachment_20260607(attachments):
-            decision = decision if isinstance(decision, dict) else {}
-            decision["route"] = self.ROUTE_ATTACHMENT_ANALYSIS
-            decision["mode"] = "image_analysis"
-            decision["confidence"] = 1.0
-            decision["reasons"] = list(decision.get("reasons") or []) + ["forced_image_attachment_analysis"]
-            decision["save_artifact"] = False
-            decision["save_memory"] = False
-            decision["use_memory"] = False
-            decision["source_urls"] = []
-            decision["sources"] = []
-        route = self.safe_str(decision.get("route")).lower()
-
-        isolated_routes = {
-            self.ROUTE_WEB_FETCH,
-            self.ROUTE_IMAGE_GENERATION,
-        }
-
-        # =========================
-        # RUNTIME ROUTE
-        # =========================
-
-        if route == "runtime":
-
-            runtime_command = (
-                self.safe_str(decision.get("runtime_command")).strip().lower()
-            )
-
-            execution_state = (
-                self._get_session_meta(
-                    session_id,
-                    "execution_state",
-                )
-                or {}
-            )
-
-            try:
-
-                if runtime_command == "/runtime state":
-
-                    runtime_result = {
-                        "runtime_attached": bool(
-                            getattr(
-                                self,
-                                "runtime",
-                                None,
-                            )
-                        ),
-                        "runtime_class": (
-                            self.runtime.__class__.__name__
-                            if getattr(
-                                self,
-                                "runtime",
-                                None,
-                            )
-                            else ""
-                        ),
-                        "cycle_count": getattr(
-                            self.runtime,
-                            "cycle_count",
-                            0,
-                        ),
-                        "last_reflection": getattr(
-                            self.runtime,
-                            "last_reflection",
-                            {},
-                        ),
-                        "last_decision": getattr(
-                            self.runtime,
-                            "last_decision",
-                            {},
-                        ),
-                    }
-
-                    return self._build_assistant_message(text=str(runtime_result))
-
-                elif text_lc in {
-                    "/runtime replays",
-                    "/runtime replay",
-                    "/runtime replay list",
-                }:
-
-                    runtime = getattr(
-                        self,
-                        "runtime",
-                        None,
-                    )
-
-                    if not runtime or not hasattr(
-                        runtime,
-                        "get_recent_replays",
-                    ):
-                        return self._build_assistant_message(
-                            text=str(
-                                {
-                                    "ok": False,
-                                    "error": ("runtime_replay_unavailable"),
-                                }
-                            )
-                        )
-
-                    return self._build_assistant_message(
-                        text=str(
-                            {
-                                "ok": True,
-                                "replays": (
-                                    runtime.get_recent_replays(
-                                        limit=10,
-                                    )
-                                ),
-                            }
-                        )
-                    )
-
-                elif text_lc.startswith("/runtime replay explain"):
-
-                    runtime = getattr(
-                        self,
-                        "runtime",
-                        None,
-                    )
-                    replay_id = runtime_command.replace(
-                        "/runtime replay explain",
-                        "",
-                        1,
-                    ).strip()
-
-                    if not runtime or not hasattr(
-                        runtime,
-                        "explain_replay",
-                    ):
-                        return self._build_assistant_message(
-                            text=str(
-                                {
-                                    "ok": False,
-                                    "error": ("runtime_replay_unavailable"),
-                                }
-                            )
-                        )
-
-                    return self._build_assistant_message(
-                        text=str(
-                            runtime.explain_replay(
-                                replay_id=replay_id,
-                            )
-                        )
-                    )
-
-                else:
-
-                    runtime_result = self.runtime.run_cycle(
-                        execution_state=execution_state,
-                        world_state={},
-                        scheduler_state={},
-                        knowledge_graph=None,
-                    )
-
-            except Exception as e:
-
-                runtime_result = {
-                    "ok": False,
-                    "runtime_error": type(e).__name__,
-                    "message": str(e),
-                }
-
-            assistant_msg = self._build_assistant_message(text=str(runtime_result))
-
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=self._build_user_message(
-                    original_user_text,
-                    attachments=attachments,
-                ),
-                assistant_msg=assistant_msg,
-                decision=decision,
-            )
-
-        if route == self.ROUTE_ATTACHMENT_ANALYSIS:
-            # NOVA_DISPATCH_ATTACHMENT_ANALYSIS_ROUTE_20260607
-            return self.attachment_analysis_service.execute_attachment_analysis(
-                attachments=attachments,
-                decision=decision,
-                user_text=user_text,
-                session_id=session_id,
-            )
-
-        if route in isolated_routes:
-            memory_context = ""
-
-            if route == self.ROUTE_WEB_FETCH:
-                return self._execute_web_fetch(
-                    decision=decision,
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                )
-
-        user_msg = self._build_user_message(
-            original_user_text,
-            attachments=attachments,
-        )
-        # NOVA_PROJECT_STATUS_MEMORY_FILTER_20260607
-        project_status_query = any(
-            phrase in original_user_text.lower()
-            for phrase in [
-                "what did we fix",
-                "what we fixed",
-                "explain what we fixed",
-                "summarize what we fixed",
-                "what did we do today",
-                "what have we done today",
-            ]
-        )
-
-
-
-
-
-        if project_status_query:
-            memory_context = ""
-            working_context_block = ""
-
-        # NOVA_MEMORY_RECALL_PRIORITY_20260726
-        memory_recall_query = any(
-            phrase in original_user_text.lower()
-            for phrase in [
-                "what did i ask you to remember",
-                "what did i tell you to remember",
-                "what do you remember about me",
-                "show my memories",
-                "what memories do you have",
-            ]
-        )
-
-        if memory_recall_query:
-            assistant_msg = self._build_assistant_message(
-                text=self._build_memory_recall_text(
-                    session_id=session_id,
-                    user_text=user_text,
-                    limit=5,
-                )
-            )
-
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=self._build_user_message(
-                    original_user_text,
-                    attachments=attachments,
-                ),
-                assistant_msg=assistant_msg,
-                decision=decision,
-            )
-
-        if not memory_context:
-            memory_context = self._build_memory_context_for_chat(
-                user_text,
-                decision,
-                session_id,
-            )
-
-        dominant_memory = []
-        memory_dominance_debug = []
-
-        used_memories = []
-
-        try:
-
-            used_memories = (
-                getattr(
-                    self,
-                    "_last_used_memory_items",
-                    [],
-                )
-                or []
-            )
-
-        except Exception:
-
-            used_memories = []
-
-        working_state = self._get_working_state(session_id) or {}
-
-        execution_state = (
-            self._get_session_meta(
-                session_id,
-                "execution_state",
-            )
-            or {}
-        )
-
-        try:
-
-            has_real_state = any(
-                [
-                    (
-                        working_state.get("active_task")
-                        and not self._is_control_command_value(
-                            working_state.get("active_task")
-                        )
-                    ),
-                    working_state.get("current_file"),
-                    working_state.get("current_bug"),
-                    (
-                        working_state.get("next_move")
-                        and not self._is_control_command_value(
-                            working_state.get("next_move")
-                        )
-                    ),
-                    (
-                        working_state.get("checkpoint")
-                        and working_state.get("checkpoint") != "execution_plan_created"
-                    ),
-                ]
-            )
-
-            has_real_execution = any(
-                [
-                    execution_state.get("steps"),
-                    execution_state.get("current_step"),
-                    execution_state.get("status") == "running",
-                ]
-            )
-
-            if not has_real_state and not has_real_execution:
-                used_memories = []
-                dominant_memory = []
-                memory_dominance_debug = []
-                ranked_memories = []
-
-            else:
-                ranked_memories = self._rank_memory_context(
-                    memories=used_memories,
-                    user_text=user_text,
-                    working_state=working_state,
-                    execution_state=execution_state,
-                    limit=5,
-                )
-
-            for mem in ranked_memories:
-
-                if isinstance(mem, dict):
-
-                    text = str(
-                        mem.get("content") or mem.get("text") or mem.get("memory") or ""
-                    ).strip()
-
-                else:
-                    text = str(mem).strip()
-
-                if text:
-
-                    dominant_memory.append(f"- {text}")
-
-                    memory_dominance_debug.append(text[:300])
-
-        except Exception as e:
-
-            print(
-                "[MEMORY DOMINANCE ERROR]",
-                e,
-            )
-
-        dominance_block = ""
-
-        continuity_queries = [
-            "continue",
-            "resume",
-            "what's next",
-            "next step",
-            "next move",
-            "active task",
-            "current file",
-            "show working state",
-            "show mission",
-            "execution",
-            "checkpoint",
-        ]
-
-        should_apply_dominance = any(q in text_lc for q in continuity_queries)
-
-        if dominant_memory:
-            dominance_block = (
-                "\n\n"
-                "SAVED MEMORY:\n"
-                "Lower priority than the current user message and recent conversation. "
-                "Use only when relevant and never when contradicted by the active session context.\n\n"
-                + "\n".join(dominant_memory)
-            )
-
-        memory_context += dominance_block
-
-        answer_depth = self._get_session_meta(session_id, "answer_depth") or "short"
-
-        depth_instruction = {
-            "short": "Answer briefly: 2-6 lines unless more detail is clearly needed.",
-            "medium": "Answer with enough detail to be useful, but avoid long essays.",
-            "deep": "Give a deeper explanation with clear structure and useful detail.",
-        }.get(answer_depth, "Answer briefly unless more detail is needed.")
-
-        if memory_context:
-            memory_context = (
-                f"{memory_context}\n\nAnswer depth instruction:\n{depth_instruction}"
-            )
-        else:
-            memory_context = f"Answer depth instruction:\n{depth_instruction}"
-
-        if route in isolated_routes:
-            model_messages = [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are operating in isolated tool mode. "
-                        "Do not use prior conversation context, "
-                        "memory, execution state, or continuity."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": user_text,
-                },
-            ]
-        else:
-            model_messages = self._compose_model_messages(
-                user_text=user_text,
-                session=session,
-                decision=decision,
-                memory_context=memory_context,
-            )
-
-        recall_text = original_user_text.lower().strip()
-
-        if recall_text in {
-            "what did i just say",
-            "what did i say",
-            "what was my last message",
-        }:
-
-            session_messages = (
-                session.get("messages", []) if isinstance(session, dict) else []
-            )
-
-            previous_user = ""
-
-            for msg in reversed(session_messages):
-
-                if not isinstance(msg, dict):
-                    continue
-
-                role = self.safe_str(msg.get("role"))
-                text = self.safe_str(msg.get("text")).strip()
-
-                if role != "user":
-                    continue
-
-                # block corrupted context leaks
-                lowered = text.lower()
-
-                blocked = [
-                    "mission:",
-                    "working state:",
-                    "next move:",
-                    "target file:",
-                    "resumed context",
-                    "we're still lined up",
-                ]
-
-                if any(b in lowered for b in blocked):
-                    continue
-
-                previous_user = text
-                break
-
-            user_messages = [
-                m
-                for m in session_messages
-                if isinstance(m, dict) and m.get("role") == "user"
-            ]
-
-            if len(user_messages) >= 2:
-                previous_user = str(user_messages[-2].get("text", "")).strip()
-
-            if not previous_user:
-                previous_user = "I could not find a previous user message."
-
-            assistant_text = f'Your previous message was: "{previous_user}"'
-
-            assistant_msg = self._build_assistant_message(text=assistant_text)
-
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                saved_artifact=None,
-            )
-
-        is_memory_request = (
-            original_user_text.lower()
-            .strip()
-            .startswith(
-                (
-                    "remember ",
-                    "remember:",
-                    "save this",
-                    "store this",
-                    "note that",
-                )
-            )
-        )
-
-        if mission_mode == "full_file" and not is_memory_request:
-
-            assistant_text = (
-                "SMFF mode active.\n\n"
-                "Send the file name, function, or task.\n"
-                "I will return full file or full replacement.\n"
-                "No partial snippets."
-            )
-
-            assistant_msg = self._build_assistant_message(
-                text=assistant_text,
-                attachments=[],
-                meta={"forced": "smff"},
-            )
-
-        # =====================================
-        # AGENT CONTINUITY FEEL LAYER
-        # =====================================
-
-        ws = self._get_working_state(session_id) or {}
-
-        execution_state = (
-            self._get_session_meta(
-                session_id,
-                "execution_state",
-            )
-            or {}
-        )
-
-        is_working = bool(
-            ws.get("active_task")
-            and ws.get("next_move")
-            and execution_state
-            and execution_state.get("status")
-            not in {
-                "complete",
-                "completed",
-                "idle",
-                "cancelled",
-                "stopped",
-            }
-        )
-
-        if is_working:
-            assistant_text = (
-                assistant_text.strip()
-                + "\n\n(I m keeping track of this and continuing the work.)"
-            )
-
-        # =====================================
-        # FINAL CLEAN UX GUARD (LAST LAYER)
-        # =====================================
-
-        assistant_text = (assistant_text or "").strip()
-
-        # remove any leftover system markers
-        assistant_text = assistant_text.replace("[NOVA MEMORY CONTEXT]", "")
-        assistant_text = assistant_text.replace("[NOVA ACTIVE CONTEXT]", "")
-
-        assistant_text = " ".join(assistant_text.split())
-
-        # NOVA ANSWER QUALITY DIRECTIVE 20260630
-        # Normal chat only. Do not touch web, image, or execution routes here.
-        quality_directive = {
-            "role": "system",
-            "content": (
-                "Nova answer quality rules: "
-                "Answer the user's latest message first. "
-                "Give the most concrete next action early, especially for Nova project work. "
-                "Avoid abstract labels like continuity, action shaping, workspace anchoring, or response selection unless the user asks for theory. "
-                "For coding/debugging, name the exact file path and exact command or patch before giving explanation. "
-                "Match the user's practical, get-to-the-point style. "
-                "Do not claim background work, future monitoring, or hidden async progress. "
-                "Do not say 'if you want', 'let me know', or add generic follow-up offers. "
-                "Do not repeat the same answer, paragraph, list, or conclusion twice. "
-                "Do not invent certainty; say when something is uncertain. "
-                "For attachments, describe only the provided file or image. "
-                "For current facts/news/prices/schedules, use the web route instead of guessing. "
-                "Keep replies concise unless the user asks for detail."
-            ),
-        }
-
-        if isinstance(model_messages, list):
-            insert_at = 1 if (
-                model_messages
-                and isinstance(model_messages[0], dict)
-                and model_messages[0].get("role") == "system"
-            ) else 0
-
-            model_messages.insert(insert_at, quality_directive)
-
-        def dedupe_repeated_answer_20260630(value: str) -> str:
-            import re
-
-            clean = self.safe_str(value).strip()
-
-            if not clean:
-                return ""
-
-            compact = " ".join(clean.split())
-
-            # Exact duplicated paragraph/list halves.
-            paragraphs = [p.strip() for p in clean.split("\n\n") if p.strip()]
-            if len(paragraphs) >= 2 and len(paragraphs) % 2 == 0:
-                half = len(paragraphs) // 2
-                if paragraphs[:half] == paragraphs[half:]:
-                    return "\n\n".join(paragraphs[:half]).strip()
-
-            # Exact duplicated text with only spaces between copies.
-            if len(compact) >= 80:
-                midpoint = len(compact) // 2
-
-                for cut in range(
-                    max(1, midpoint - 160),
-                    min(len(compact), midpoint + 160),
-                ):
-                    left = compact[:cut].strip()
-                    right = compact[cut:].strip()
-
-                    if len(left) >= 40 and left == right:
-                        return left
-
-                    if len(left) >= 40 and right.startswith(left):
-                        return left
-
-            # Sentence-level duplicate cleaner.
-            sentence_parts = re.split(r"(?<=[.!?])\s+", clean)
-            sentence_parts = [part.strip() for part in sentence_parts if part.strip()]
-
-            if len(sentence_parts) >= 2 and len(sentence_parts) % 2 == 0:
-                half = len(sentence_parts) // 2
-                left = " ".join(sentence_parts[:half]).strip()
-                right = " ".join(sentence_parts[half:]).strip()
-
-                if left and left == right:
-                    return left
-
-            # Remove repeated individual sentences while preserving order.
-            if len(sentence_parts) >= 4:
-                seen = set()
-                output = []
-
-                for sentence in sentence_parts:
-                    key = " ".join(sentence.lower().split())
-
-                    if key in seen:
-                        continue
-
-                    seen.add(key)
-                    output.append(sentence)
-
-                cleaned = " ".join(output).strip()
-
-                if cleaned and len(cleaned) < len(clean):
-                    return cleaned
-
-            return clean
-
-        print(
-            "DEBUG BEFORE MODEL CALL REACHED",
-            user_text,
-        )
-
-        try:
-            print(
-                "DEBUG GENERAL MODEL MESSAGES =",
-                repr(model_messages)[:2000],
-            )
-
-            response = responses_create(
-
-                nova_username=(
-                    getattr(self, "username", None)
-                    or os.getenv("NOVA_DEFAULT_USERNAME")
-                    or "richard"
-                ),
-                nova_session_id=session_id,
-                model=self.chat_model,
-                input=model_messages,
-            )
-
-            print(
-                "DEBUG GENERAL RESPONSE RAW =",
-                repr(response)[:1000],
-            )
-
-            print(
-                "DEBUG EXTRACT TEST RESPONSE =",
-                repr(response)[:3000],
-            )
-
-            assistant_text = dedupe_repeated_answer_20260630(
-                self.response_handler.extract_response_text(response)
-            )
-
-
-            print(
-                "DEBUG AFTER EXTRACTION =",
-                repr(assistant_text),
-            )
-        except Exception as e:
-
-                import traceback
-
-                error_text = "".join(
-                    traceback.format_exception(
-                        type(e),
-                        e,
-                        e.__traceback__,
-                    )
-                )
-
-                exec_debug(
-                    "GENERAL CHAT ERROR:",
-                    error_text,
-                )
-
-                if "insufficient_quota" in str(e).lower():
-                    assistant_text = (
-                        "OpenAI API quota exhausted.\n\n"
-                        "Nova backend is working, but the configured "
-                        "API key has no remaining quota."
-                    )
-                else:
-                    assistant_text = (
-                        "General chat failed.\n\n"
-                        f"{type(e).__name__}: {str(e)}"
-                    )
-
-        if not assistant_text:
-            if any(
-                phrase in text_lc
-                for phrase in [
-                    "my package",
-                    "my order",
-                    "my shipment",
-                    "my delivery",
-                    "where is my package",
-                    "where is my order",
-                    "track my package",
-                ]
-            ):
-                assistant_text = (
-                    "I can help with that, but I need some details first. "
-                    "Please provide the tracking number, carrier, or order "
-                    "information you have."
-                )
-
-            elif "name" in text_lc:
-                assistant_text = (
-                    "I do not have your name in this session yet. "
-                    "Tell me your name once and I ll use it for this chat."
-                )
-
-            else:
-                assistant_text = "I m here. Send the next instruction."
-
-        print(
-            "[DECISION DEBUG BEFORE INTELLIGENCE]",
-            repr(decision),
-        )
-
-        intelligence_result = self._apply_response_intelligence(
-
-
-            user_text=user_text,
-            assistant_text=assistant_text,
-            decision=decision,
-            session_id=session_id,
-            attachments=attachments,
-        )
-
-        print(
-            "DEBUG AFTER INTELLIGENCE =",
-            {
-                "assistant_text": repr(assistant_text),
-                "intelligence_result": repr(intelligence_result)[:2000],
-            },
-        )
-
-        intelligence_result = (
-            intelligence_result if isinstance(intelligence_result, dict) else {}
-        )
-
-        # lock tool outputs (prevent conversational overwrite)
-        if decision.get("route") in {
-            self.ROUTE_WEB_FETCH,
-            self.ROUTE_IMAGE_GENERATION,
-            self.ROUTE_ATTACHMENT_ANALYSIS,
-        }:
-            assistant_text = assistant_text
-        else:
-            rewritten_text = self.safe_str(
-                intelligence_result.get(
-                    "assistant_text",
-                    "",
-                )
-            ).strip()
-
-            protected_memory_answers = {
-                "richard",
-                "richard.",
-                "your name is richard.",
-            }
-
-            current_text_lc = assistant_text.lower().strip()
-
-            rewritten_text_lc = rewritten_text.lower().strip()
-
-            if current_text_lc in protected_memory_answers:
-                pass
-
-            elif rewritten_text and len(rewritten_text.split()) >= 3:
-                assistant_text = rewritten_text
-
-        assistant_text = dedupe_repeated_answer_20260630(assistant_text)
-
-        intelligence = intelligence_result.get("intelligence", {})
-        self_check = intelligence_result.get("self_check", {})
-        hard_override_applied = bool(intelligence_result.get("hard_override_applied"))
-
-        # Optional: enforce short mode hard clamp
-        if isinstance(intelligence, dict):
-            answer_length = str(intelligence.get("answer_length") or "").lower()
-            if answer_length == "short" and len(assistant_text.split()) > 120:
-                assistant_text = " ".join(assistant_text.split()[:120])
-
-        # === INTELLIGENCE LAYER END ===
-
-        next_step_out = ""
-        try:
-            for line in (assistant_text or "").split("\n"):
-                if "step" in line.lower():
-                    next_step_out = line.strip()
-                    break
-        except Exception:
-            pass
-
-        used_memory_items = getattr(self, "_last_used_memory_items", []) or []
-
-        memory_text = " ".join(
-            [
-                self.safe_str(m.get("text"))
-                for m in used_memory_items
-                if isinstance(m, dict)
-            ]
-        ).lower()
-
-        if "name is richard" in memory_text:
-            text_lc = (assistant_text or "").lower()
-
-            if "you haven" in text_lc and "told me" in text_lc:
-                assistant_text = "Your name is Richard."
-
-            elif text_lc.strip() in {"richard.", "richard"}:
-                assistant_text = "Your name is Richard."
-
-        try:
-            if any(
-                x in memory_text
-                for x in [
-                    "prefer direct",
-                    "be direct",
-                    "no fluff",
-                    "keep answers short",
-                ]
-            ):
-                assistant_text = (assistant_text or "").strip()
-
-        except Exception as e:
-            exec_debug("STYLE CLAMP ERROR:", e)
-
-        if decision.get("route") == self.ROUTE_GENERAL_CHAT:
-
-            working_state = self._get_working_state(session_id) or {}
-
-            if working_state.get("checkpoint") == "runtime_error_detected":
-                working_state["active_task"] = ""
-                working_state["current_bug"] = ""
-                working_state["next_move"] = ""
-                working_state["checkpoint"] = ""
-
-                self._update_working_state(
-                    session_id,
-                    working_state,
-                )
-
-            for key in [
-                "active_task",
-                "next_move",
-                "mission",
-            ]:
-
-                value = self.safe_str(working_state.get(key)).strip()
-
-                if self._is_control_command_value(value):
-                    working_state[key] = ""
-
-            if self._is_control_command_value(working_state.get("active_task")):
-                working_state["active_task"] = ""
-
-            if self._is_control_command_value(working_state.get("next_move")):
-                working_state["next_move"] = ""
-
-            self._update_working_state(
-                session_id,
-                working_state,
-            )
-
-        used_memory_full = [
-            {
-                "id": self.safe_str(m.get("id")),
-                "text": self.safe_str(m.get("text")),
-                "kind": self.safe_str(m.get("kind")),
-                "pinned": bool(m.get("pinned")),
-                "weight": m.get("weight", 1),
-            }
-            for m in used_memory_items
-            if isinstance(m, dict) and self.safe_str(m.get("text"))
-        ]
-
-        decision_mission = (
-            decision.get("mission", {}) if isinstance(decision, dict) else {}
-        )
-
-        if isinstance(decision_mission, dict):
-
-            sanitized_mission = {}
-
-            for k, v in decision_mission.items():
-
-                key = self.safe_str(k)
-                value = self.safe_str(v).strip()
-
-                if self._is_control_command_value(value):
-                    sanitized_mission[key] = ""
-                    continue
-
-                sanitized_mission[key] = v
-
-            decision_mission = sanitized_mission
-
-        else:
-            decision_mission = {}
-
-        meta_payload = {
-            "memory_dominance": {
-                "enabled": True,
-                "used_count": len(used_memory_full),
-                "top_memory": memory_dominance_debug[:5],
-            },
-            # === CHAT POLISH: STRATEGY / MISSION FEED ===
-            "mission": (
-                decision_mission
-                if not self._is_control_command_value(decision_mission.get("mission"))
-                else {}
-            ),
-            "strategy": (
-                decision.get("strategy", "") if isinstance(decision, dict) else ""
-            ),
-            # === MEMORY ===
-            "used_memory": used_memory_full,
-            "used_memory_count": len(used_memory_full),
-            "memory_confidence": 1.0,
-            # === EXECUTION STATE ===
-            "execution_mode": bool(is_execution),
-            "active_task": (
-                original_user_text
-                if is_execution
-                and not self._is_control_command_value(original_user_text)
-                else ""
-            ),
-            "next_step": next_step_out,
-        }
-
-        assistant_text = dedupe_repeated_answer_20260630(assistant_text)
-
-        # === BUILD FINAL MESSAGE ===
-        if assistant_text:
-            assistant_msg = self._build_assistant_message(
-                text=assistant_text,
-                attachments=[],
-                meta=meta_payload,
-            )
-        else:
-            assistant_msg = self._build_assistant_message(
-                text="No response generated.",
-                attachments=[],
-                meta=meta_payload,
-            )
-
-        return self._finalize_response(
-            session_id=session_id,
-            user_text=original_user_text,
-            user_msg=user_msg,
-            assistant_msg=assistant_msg,
-            decision=decision,
-            saved_artifact=None,
-        )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     def _build_diff_preview(self, old: str, new: str, file_path: str) -> str:
         try:
@@ -4594,9 +2808,9 @@ Rules:
 
         user_msg = self._build_user_message("apply fix")
 
-        decision = {
-            "route": "auto_fix_apply",
-            "intent": "debugging",
+        decision = decision or {
+            "route": "general_chat",
+            "intent": "chat",
         }
 
         if not pending_file_path or not pending_fix_code:
@@ -4979,6 +3193,18 @@ Rules:
         return self.response_handler._finalize_response(
             *args,
             **kwargs,
+        )
+
+    def _decide_route(
+        self,
+        user_text,
+        session_id="",
+        attachments=None,
+    ):
+        return self.decision_service._decide_route(
+            user_text,
+            attachments,
+            session_id,
         )
 
     def _build_response_policy(
@@ -7513,7 +5739,6 @@ Rules:
 
         return text or "Generate an image."
 
-
     def _extract_function_from_file(self, file_path: str, func_name: str) -> str:
         try:
             with open(file_path, "r", encoding="utf-8") as f:
@@ -7551,7 +5776,6 @@ Rules:
                 break
 
         return "".join(lines[start_index:end_index]).rstrip()
-
 
     def _handle_execution_control(
         self,
@@ -7861,7 +6085,6 @@ Rules:
             if has_previous_assistant:
                 return ("chat", "writing")
 
-
         # WRITING INTENT MUST BEAT FRESH-WEB WORDS
         writing_request = bool(
             re.match(
@@ -7976,7 +6199,6 @@ Rules:
         # 5. DEFAULT (IMPORTANT FIX)
 
         return ("chat", "normal")
-
 
     def _looks_like_live_store_hours_request(self, user_text: str) -> bool:
         """
@@ -8224,1571 +6446,90 @@ Rules:
             "verified": False,
         })
 
-
     def handle(
         self,
         user_text: str,
         session_id: str = "",
         attachments=None,
     ):
+        from nova_backend.services.chat.handle import chat_handle
 
-        try:
-            guard_result = self.accidental_input_guard_service.handle(
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-            )
-
-            if guard_result:
-                return guard_result
-
-        except Exception:
-            pass
-
-        # NOVA_FIRST_CONTACT_IDENTITY_20260727
-        # NOVA_TOOL_PIPELINE_BRIDGE_V1
-        try:
-            from nova_backend.tools.chat_tool_bridge import (
-                maybe_run_tool,
-            )
-
-            tool_result = maybe_run_tool(
-                user_text
-            )
-
-            if tool_result:
-                return tool_result
-
-        except Exception as _nova_tool_bridge_error:
-            try:
-                print(
-                    "[NOVA TOOL BRIDGE ERROR]",
-                    _nova_tool_bridge_error,
-                )
-            except Exception:
-                pass
-
-        try:
-            _nova_session = self._get_session(session_id)
-
-            _nova_messages = (
-                _nova_session.get("messages", [])
-                if isinstance(_nova_session, dict)
-                else []
-            )
-
-            _nova_first_message = not bool(_nova_messages)
-
-        except Exception:
-            _nova_first_message = False
-
-
-
-    # NOVA_CHAT_TURN_HANDLE_HELPER_SHADOW_20260705
-        try:
-            _nova_turn_payload = {
-                _key: _value
-                for _key, _value in locals().items()
-                if _key != "self"
-            }
-            self._nova_build_chat_turn_shadow(
-                _nova_turn_payload,
-                metadata={"source": "chat_service.handle.shadow"},
-            )
-        except Exception as _nova_turn_error:
-            self._last_chat_turn_shadow = None
-            self._last_chat_turn_messages_shadow = []
-            try:
-                print("[Nova ChatTurn Shadow Helper] failed:", _nova_turn_error)
-            except Exception:
-                pass
-
-
-        # LIVE_STORE_HOURS_ROUTE_V1: force current business hours/open-now questions to web.
-        if self._looks_like_live_store_hours_request(user_text):
-            return self._handle_live_store_hours_request(
-                user_text,
-                session_id=locals().get("session_id", ""),
-                attachments=locals().get("attachments", None),
-                location=locals().get("location", None),
-            )
-
-        # NOVA_PROJECT_NEXT_HANDLE_EARLY_RETURN_20260701
-        # Exact early return for project-brain "what's next?" questions.
-        # This must run before generic chat/model fallback.
-        try:
-            _nova_pn_locals_20260701 = locals()
-            _nova_pn_user_text_20260701 = ""
-
-            for _nova_pn_key_20260701 in ("user_text", "message", "text", "prompt", "content"):
-                _nova_pn_value_20260701 = _nova_pn_locals_20260701.get(_nova_pn_key_20260701)
-                if isinstance(_nova_pn_value_20260701, str) and _nova_pn_value_20260701.strip():
-                    _nova_pn_user_text_20260701 = _nova_pn_value_20260701.strip()
-                    break
-
-            if not _nova_pn_user_text_20260701:
-                _nova_pn_args_20260701 = _nova_pn_locals_20260701.get("args", ())
-                for _nova_pn_arg_20260701 in _nova_pn_args_20260701:
-                    if isinstance(_nova_pn_arg_20260701, str) and _nova_pn_arg_20260701.strip():
-                        _nova_pn_user_text_20260701 = _nova_pn_arg_20260701.strip()
-                        break
-                    if isinstance(_nova_pn_arg_20260701, dict):
-                        for _nova_pn_key_20260701 in ("user_text", "message", "text", "prompt", "content"):
-                            _nova_pn_value_20260701 = _nova_pn_arg_20260701.get(_nova_pn_key_20260701)
-                            if isinstance(_nova_pn_value_20260701, str) and _nova_pn_value_20260701.strip():
-                                _nova_pn_user_text_20260701 = _nova_pn_value_20260701.strip()
-                                break
-                    if _nova_pn_user_text_20260701:
-                        break
-
-            if not _nova_pn_user_text_20260701:
-                _nova_pn_kwargs_20260701 = _nova_pn_locals_20260701.get("kwargs", {})
-                if isinstance(_nova_pn_kwargs_20260701, dict):
-                    for _nova_pn_key_20260701 in ("user_text", "message", "text", "prompt", "content"):
-                        _nova_pn_value_20260701 = _nova_pn_kwargs_20260701.get(_nova_pn_key_20260701)
-                        if isinstance(_nova_pn_value_20260701, str) and _nova_pn_value_20260701.strip():
-                            _nova_pn_user_text_20260701 = _nova_pn_value_20260701.strip()
-                            break
-
-            _nova_pn_norm_20260701 = (
-                str(_nova_pn_user_text_20260701 or "")
-                .strip()
-                .lower()
-                .replace("?", "'")
-                .rstrip("?!.")
-            )
-
-            if _nova_pn_norm_20260701 in {
-                "what's next",
-                "whats next",
-                "what is next",
-                "what should we do next",
-                "next move",
-            }:
-                _nova_pn_session_id_20260701 = ""
-                for _nova_pn_key_20260701 in ("session_id", "active_session_id", "requested_session_id"):
-                    _nova_pn_value_20260701 = _nova_pn_locals_20260701.get(_nova_pn_key_20260701)
-                    if isinstance(_nova_pn_value_20260701, str) and _nova_pn_value_20260701.strip():
-                        _nova_pn_session_id_20260701 = _nova_pn_value_20260701.strip()
-                        break
-
-                _nova_pn_answer_20260701 = ""
-                try:
-                    _nova_pn_fresh_answer_20260701 = globals().get("_nova_answer_project_state_question_fresh_priority_20260701")
-                    if callable(_nova_pn_fresh_answer_20260701):
-                        _nova_pn_answer_20260701 = str(
-                            _nova_pn_fresh_answer_20260701(
-                                "what's next?",
-                                session_id=_nova_pn_session_id_20260701,
-                            )
-                            or ""
-                        ).strip()
-                except Exception as _nova_pn_fresh_error_20260701:
-                    try:
-                        print("[NOVA_PROJECT_NEXT_HANDLE_EARLY_RETURN_20260701] fresh bypass:", _nova_pn_fresh_error_20260701)
-                    except Exception:
-                        pass
-
-                if (
-                    not _nova_pn_answer_20260701
-                    or "tell me" in _nova_pn_answer_20260701.lower()
-                    or "send the file path" in _nova_pn_answer_20260701.lower()
-                    or "need the current target" in _nova_pn_answer_20260701.lower()
-                    or "no active task" in _nova_pn_answer_20260701.lower()
-                ):
-                    _nova_pn_answer_20260701 = (
-                        "Current Nova project context:\n"
-                        "Current task: Nova pre-launch quality pass — validate core user flows, "
-                        "desktop/mobile experience, onboarding, reliability, and launch readiness.\n"
-                        "Next move: continue pre-launch stabilization while preserving the locked "
-                        "Decision Engine v1, Project Brain routing, Mission Control v1.2 / Failure Interpreter API, "
-                        "and Decision Log API behavior."
-                    )
-                _nova_pn_meta_20260701 = {
-                    "route": "project_next_handle_early_return",
-                    "strategy": "project_next_handle_early_return",
-                    "session_id": _nova_pn_session_id_20260701,
-                    "source_urls": [],
-                    "sources": [],
-                }
-
-                _nova_pn_assistant_message_20260701 = self._build_assistant_message(
-                    text=_nova_pn_answer_20260701,
-                    meta=_nova_pn_meta_20260701,
-                )
-
-                return {
-                    "ok": True,
-                    "assistant_message": _nova_pn_assistant_message_20260701,
-                    "saved_artifact": None,
-                    "session": {
-                        "id": _nova_pn_session_id_20260701,
-                        "session_id": _nova_pn_session_id_20260701,
-                        "messages": [_nova_pn_assistant_message_20260701],
-                        "attachments": [],
-                        "meta": _nova_pn_meta_20260701,
-                    },
-                    "route": "project_next_handle_early_return",
-                    "route_taken": "project_next_handle_early_return",
-                    "debug": {
-                        "route": "project_next_handle_early_return",
-                        "route_taken": "project_next_handle_early_return",
-                    },
-                    "meta": _nova_pn_meta_20260701,
-                    "session_id": _nova_pn_session_id_20260701,
-                    "active_session_id": _nova_pn_session_id_20260701,
-                }
-        except Exception as _nova_project_next_handle_early_return_error_20260701:
-            try:
-                print(
-                    "[NOVA_PROJECT_NEXT_HANDLE_EARLY_RETURN_20260701] bypass:",
-                    _nova_project_next_handle_early_return_error_20260701,
-                )
-            except Exception:
-                pass
-
-        user_text = self.safe_str(user_text).strip()
-
-        for _nova_context_marker in (
-            "Project-aware context for Nova:",
-            "Relevant persistent memory:",
-            "Recent session context:",
-            "Session context:",
-            "[RANKED MEMORY + WORKING STATE]",
-            "HIGH PRIORITY MEMORY:",
-            "Web results:",
-        ):
-            if _nova_context_marker in user_text:
-                user_text = user_text.split(_nova_context_marker, 1)[0].strip()
-
-        original_user_text = user_text
-
-        # CHAT_SERVICE_HARD_ATTACHMENT_FINAL_LOCK
-        try:
-            if not attachments:
-                raise RuntimeError(
-                    "NOVA_SKIP_STALE_ATTACHMENT_GUARD_NO_CURRENT_ATTACHMENTS"
-                )
-            _txt = str(user_text or "").lower()
-            _has_attachment_context = any(
-                marker in _txt
-                for marker in [
-                    "attachment content:",
-                    "uploaded attachment context below",
-                    "extracted attachment text",
-                    "[mobile quick action attachment context active]",
-                    "uploaded pdf attachment",
-                    "uploaded attachment",
-                ]
-            )
-            _attachment_intent = any(
-                keyword in _txt
-                for keyword in [
-                    "summarize",
-                    "summary",
-                    "keypoint",
-                    "key point",
-                    "continue",
-                ]
-            )
-            if _has_attachment_context and _attachment_intent:
-                _lines = []
-                _seen = set()
-                for line in user_text.splitlines():
-                    clean = line.strip()
-                    if not clean or clean.lower().startswith("typed user text"):
-                        continue
-                    key = clean.lower()[:160]
-                    if key in _seen:
-                        continue
-                    _seen.add(key)
-                    _lines.append(clean)
-                top = _lines[:8]
-
-                bad_context_markers = (
-                    "project-aware context for nova:",
-                    "relevant persistent memory:",
-                    "recent session context:",
-                    "persistent memory:",
-                    "[preference]",
-                    "[user_fact]",
-                    "[people]",
-                )
-
-                if any(
-                    marker in str(user_text or "").lower()
-                    for marker in bad_context_markers
-                ):
-                    raise RuntimeError("ignored injected Nova context as attachment text")
-
-                if top:
-                    topic = "; ".join(top[:3])
-                    reply = "Attachment received:\\n"
-                    reply += f"Summary: The attachment appears related to: {topic}.\\n\\n"
-                    reply += "Topics detected:\\n"
-                    for i, l in enumerate(top, start=1):
-                        reply += f"{i}. {l}\\n"
-                    reply += "\\nPreview:\\n" + "\\n".join(top[:6])
-                else:
-                    reply = "Attachment analysis:\\nThe attachment was received and text was extracted, but it is too noisy to summarize cleanly."
-                return {
-                    "ok": True,
-                    "assistant_message": {"role": "assistant", "text": reply.strip()},
-                    "debug": {
-                        "route": "chat_service_hard_attachment_final",
-                        "blocked_web_hijack": True,
-                    },
-                    "skip_cleanup": True,
-                    "skip_post_processing": True,
-                    "skip_rewrite": True,
-                }
-        except Exception:
-            pass
-
-        # CHAT_SERVICE_HARD_ATTACHMENT_GUARD_LOCK
-        # Hard stop: if app.py injected attachment text into user_text, do not let
-        # direct URL / Google News / web routing hijack this request.
-        try:
-            if not attachments:
-                raise RuntimeError(
-                    "NOVA_SKIP_STALE_ATTACHMENT_GUARD_NO_CURRENT_ATTACHMENTS"
-                )
-            import re as _nova_attach_re
-
-            _nova_attach_text = str(user_text or "")
-            _nova_attach_lower = _nova_attach_text.lower()
-
-            _nova_has_attachment_context = (
-                "attachment content:" in _nova_attach_lower
-                or "uploaded attachment context below" in _nova_attach_lower
-                or "extracted attachment text" in _nova_attach_lower
-                or "[mobile quick action attachment context active]"
-                in _nova_attach_lower
-            )
-
-            _nova_attachment_intent = (
-                "summarize" in _nova_attach_lower
-                or "summary" in _nova_attach_lower
-                or "keypoint" in _nova_attach_lower
-                or "key point" in _nova_attach_lower
-                or "continue" in _nova_attach_lower
-                or "uploaded pdf attachment" in _nova_attach_lower
-                or "uploaded attachment" in _nova_attach_lower
-                or "image" in _nova_attach_lower
-                or "pdf" in _nova_attach_lower
-            )
-
-            if _nova_has_attachment_context and _nova_attachment_intent:
-                _nova_noise_exact = {
-                    "attachment <unknown> content:",
-                    "attachment content:",
-                    "uploaded attachment content:",
-                    "[pdf page 1]",
-                    "search",
-                    "images",
-                    "videos",
-                    "create",
-                    "inspiration",
-                    "keypoints",
-                    "continue",
-                    "summarize",
-                    "summary",
-                    "cop",
-                    "filt",
-                    "moderate",
-                    "amazon",
-                    "bath",
-                    "related content",
-                }
-
-                _nova_noise_contains = (
-                    "wayfair",
-                    "save big",
-                    "prices you'll love",
-                    "eye-catching prints",
-                    "url removed from extracted attachment text",
-                    "free_shipping",
-                    "furniture & dÃƒÆ’Ã‚Â©cor",
-                    "kitchen appliances",
-                    "love, horror and more themes",
-                    "plain field in front of mountain peak",
-                    "free stock photo",
-                    "google news",
-                    "direct_url_patch_hit",
-                    "news.google.com",
-                )
-
-                _nova_lines = []
-                _nova_seen = set()
-
-                for _nova_raw_line in _nova_attach_text.splitlines():
-                    _nova_line = _nova_attach_re.sub(
-                        r"^\s*\d+\.\s*", "", str(_nova_raw_line or "")
-                    ).strip()
-                    _nova_line = _nova_line.replace(
-                        "Attachment <unknown>", "uploaded attachment"
-                    )
-                    _nova_line = _nova_line.replace("Attachment content:", "").strip()
-                    _nova_line = _nova_attach_re.sub(r"\s+", " ", _nova_line).strip()
-
-                    if not _nova_line:
-                        continue
-
-                    _nova_low = _nova_line.lower().strip(" :;-ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢*|")
-                    _nova_low_compact = _nova_attach_re.sub(
-                        r"[^a-z0-9]+", " ", _nova_low
-                    ).strip()
-
-                    if _nova_low_compact in _nova_noise_exact:
-                        continue
-
-                    if any(
-                        _nova_bad in _nova_low for _nova_bad in _nova_noise_contains
-                    ):
-                        continue
-
-                    if _nova_line.startswith("http://") or _nova_line.startswith(
-                        "https://"
-                    ):
-                        continue
-
-                    if len(_nova_line) <= 2:
-                        continue
-
-                    if _nova_low.startswith("typed user text"):
-                        continue
-
-                    if _nova_low.startswith("uploaded attachment context below"):
-                        continue
-
-                    if _nova_low.startswith("extracted attachment text"):
-                        continue
-
-                    if _nova_low.startswith(
-                        "[mobile quick action attachment context active]"
-                    ):
-                        continue
-
-                    _nova_key = _nova_low_compact[:160]
-                    if not _nova_key or _nova_key in _nova_seen:
-                        continue
-
-                    _nova_seen.add(_nova_key)
-                    _nova_lines.append(_nova_line)
-
-                _nova_top = _nova_lines[:8]
-
-                _nova_bad_context_markers = (
-                    "project-aware context for nova:",
-                    "relevant persistent memory:",
-                    "recent session context:",
-                    "persistent memory:",
-                    "[preference]",
-                    "[user_fact]",
-                    "[people]",
-                )
-
-                if any(
-                    _nova_marker in str(user_text or "").lower()
-                    for _nova_marker in _nova_bad_context_markers
-                ):
-                    raise RuntimeError("ignored injected Nova context as attachment text")
-
-                if _nova_top:
-                    _nova_topic = "; ".join(_nova_top[:3])
-                    _nova_reply = "Attachment received:\n"
-                    _nova_reply += f"Summary: The attachment appears related to: {_nova_topic}.\n\n"
-                    _nova_reply += "Topics detected:\n"
-                    for _nova_index, _nova_item in enumerate(_nova_top, start=1):
-                        _nova_reply += f"{_nova_index}. {_nova_item}\n"
-                    _nova_reply += "\nPreview:\n" + "\n".join(_nova_top[:6])
-                else:
-                    _nova_reply = (
-                        "Attachment received:\n"
-                        "The attachment was received and text was extracted, but the available extraction looks too noisy to summarize cleanly."
-                    )
-
-                return {
-                    "ok": True,
-                    "assistant_message": {
-                        "role": "assistant",
-                        "text": _nova_reply.strip(),
-                    },
-                    "debug": {
-                        "route": "chat_service_hard_attachment_guard",
-                        "blocked_web_hijack": True,
-                    },
-                    "skip_cleanup": True,
-                    "skip_post_processing": True,
-                    "skip_rewrite": True,
-                }
-
-        except Exception:
-            pass
-
-        exec_debug("HANDLE IS BEING CALLED")
-        # REMOVE_CHAT_HANDLE_DEBUG_PRINT_LOCK
-
-        exec_debug(
-            "CHAT_SERVICE_FILE =",
-            __file__,
+        session_payload = self._get_session_payload(
+            session_id
         )
 
-        attachments = attachments or []
-
-        if not session_id:
-            session_id = self._create_session()
-
-        answer_depth = self._detect_answer_depth(user_text)
-        self._set_session_meta(session_id, "answer_depth", answer_depth)
-
-        lowered = self.safe_str(user_text).lower().strip()
-
-        decision = self.chat_router.decide(
+        brain_state = self.orchestrator.run(
             user_text=user_text,
-            attachments=attachments,
+            session_context=session_payload,
             session_id=session_id,
-        )
-        print("CHAT ROUTE DEBUG:", decision)
-
-
-        exec_debug(
-            "WRITING ROUTE DEBUG:",
-            user_text,
-            decision,
-        )
-
-        early_writing_request = bool(
-            re.match(
-                r"^(write|draft|compose|rewrite|edit|proofread)\b",
-                lowered,
-            )
-        )
-
-        early_writing_research = any(
-            marker in lowered
-            for marker in (
-                "search the web",
-                "look up",
-                "research ",
-                "find sources",
-                "cite sources",
-            )
-        )
-
-        if (
-            early_writing_request
-            and not early_writing_research
-        ):
-            if isinstance(decision, dict):
-                decision["route"] = self.ROUTE_GENERAL_CHAT
-                decision["mode"] = "chat"
-                decision["intent"] = "writing"
-                decision["strategy"] = "direct_writing_request"
-                decision["source_urls"] = []
-                decision["sources"] = []
-
-            writing_text = self._run_chat_model(
-                user_text=user_text,
-                decision=decision,
-                session_id=session_id,
-            )
-
-            writing_result = self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=self._build_user_message(
-                    user_text,
-                    attachments=attachments,
-                ),
-                assistant_msg=self._build_assistant_message(
-                    text=writing_text,
-                    meta={
-                        "writing": True,
-                        "direct_writing_request": True,
-                    },
-                    attachments=[],
-                ),
-                decision=decision,
-                saved_artifact=None,
-            )
-
-            if isinstance(writing_result, list):
-                writing_result = {
-                    "ok": True,
-                    "assistant_message": {
-                        "role": "assistant",
-                        "text": "\n".join(
-                            str(x) for x in writing_result
-                        ),
-                    },
-                }
-
-            print(
-                "[WRITING RESULT DEBUG]",
-                repr(writing_result)[:3000],
-            )
-
-            return writing_result
-
-
-        # NOVA_CENTRAL_INTERPRETATION_WEB_ROUTE_20260612
-        # Central pre-router interpretation, phase 2:
-        # safely force messy news/current-events prompts into the web route.
-        # This intentionally does NOT override attachments or execution yet.
-        # NOVA_FIX_INTERPRETATION_ORIGINAL_USER_TEXT_20260612
-        original_user_text = self.safe_str(user_text).strip()
-
-        # NOVA_CLEAN_INPUT_BEFORE_INTERPRETATION_20260612
-        # Some older Nova layers append project/session memory into user_text before routing.
-        # The interpretation layer must see only the user's actual request, not injected context.
-        clean_interpretation_text = original_user_text
-        for _nova_context_marker in (
-            "Project-aware context for Nova:",
-            "Relevant persistent memory:",
-            "Session context:",
-            "[RANKED MEMORY + WORKING STATE]",
-            "HIGH PRIORITY MEMORY:",
-        ):
-            if _nova_context_marker in clean_interpretation_text:
-                clean_interpretation_text = clean_interpretation_text.split(
-                    _nova_context_marker,
-                    1,
-                )[0].strip()
-
-        if not clean_interpretation_text:
-            clean_interpretation_text = original_user_text
-
-        original_user_text = clean_interpretation_text
-        user_text = clean_interpretation_text
-
-        # NOVA_TOPIC_RECALL_BEFORE_INTERPRETATION_WEB_20260612
-        # Generic conversation-recall phrases must never be routed to web search.
-        # They belong to the local session/topic carry-forward layer.
-        _conversation_recall_phrases = (
-            "what were we talking about",
-            "what was we talking about",
-            "what did we talk about",
-            "what were we just talking about",
-            "remind me what we were talking about",
-            "where were we",
-        )
-
-        _clean_recall_probe = clean_interpretation_text.lower().strip(" ?.!")
-
-
-        # NOVA_TOPIC_RECALL_USE_CONTINUITY_CONTEXT_20260612
-        # Use the existing continuity helper. Do not call missing topic/recent-session helpers.
-
-        if _clean_recall_probe in _conversation_recall_phrases:
-            try:
-                _recall_session = (
-                    self._get_session_payload(session_id)
-                    if session_id
-                    else {}
-                )
-
-                exec_debug(
-                    "[CONTINUITY BEFORE BUILD]",
-                    {
-                        "session_id": session_id,
-                        "keys": (
-                            list(_recall_session.keys())
-                            if isinstance(_recall_session, dict)
-                            else str(type(_recall_session))
-                        ),
-                        "message_count": (
-                            len(_recall_session.get("messages", []))
-                            if isinstance(_recall_session, dict)
-                            else -1
-                        ),
-                    },
-                )
-
-                _recent_context = self._build_continuity_context(
-                    _recall_session
-                )
-
-            except Exception as exc:
-                exec_debug(
-                    "[CONTINUITY RECALL FAILED]",
-                    repr(exc),
-                )
-                _recent_context = ""
-
-
-            if _recent_context:
-                return {
-                    "ok": True,
-                    "assistant_message": {
-                        "role": "assistant",
-                        "text": _recent_context,
-                        "meta": {
-                            "route": "topic_recall_before_web",
-                            "memory_used": [],
-                            "sources": [],
-                        },
-                    },
-                }
-
-            return {
-                "ok": True,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": (
-                        "We were working on Nova Project Brain improvements. "
-                        "The current focus is the local Nova Flask app, including Project Brain "
-                        "Command Center, decision routing, conversation continuity, and answer "
-                        "quality validation. We were improving Nova's ability to remember the "
-                        "active project context, choose the next safe engineering move, preserve "
-                        "conversation threads, and provide deeper operator guidance instead of "
-                        "falling back to generic responses."
-                    ),
-                    "meta": {
-                        "route": "topic_recall_before_web",
-                        "memory_used": [],
-                        "sources": [],
-                    },
-                },
-            }
-
-        interpretation = {}
-        try:
-            from nova_backend.services.interpretation_service import interpret_user_text
-
-            _active_execution_state = {}
-            try:
-                _active_execution_state = (
-                    self._load_execution_state(
-                        session_id
-                    )
-                    or self._get_session_meta(session_id, "execution_state")
-                    or self._get_session_meta(session_id, "active_execution")
-                    or {}
-                )
-            except Exception:
-                _active_execution_state = {}
-
-            _has_active_execution = False
-            if isinstance(_active_execution_state, dict):
-                _exec_status = self.safe_str(_active_execution_state.get("status")).lower()
-                _has_active_execution = any(
-                    [
-                        bool(_active_execution_state.get("steps")),
-                        bool(_active_execution_state.get("current_step")),
-                        bool(_active_execution_state.get("current_step_title")),
-                        _exec_status in {"running", "waiting", "failed"},
-                    ]
-                )
-
-            interpretation = interpret_user_text(
-                clean_interpretation_text,
-                has_active_execution=_has_active_execution,
-                has_attachments=bool(attachments),
-                has_active_session=bool(session_id),
-            )
-
-            self._last_interpretation = interpretation
-        except Exception as _nova_interpret_err:
-            interpretation = {
-                "intent": "interpretation_error",
-                "route_hint": "",
-                "rewritten_text": original_user_text,
-                "reason": str(_nova_interpret_err),
-            }
-            try:
-                exec_debug("INTERPRETATION_LAYER_ERROR:", _nova_interpret_err)
-            except Exception:
-                pass
-
-        # NOVA_INTERPRETATION_REWRITE_BEFORE_LEGACY_WEB_20260612
-        # Do not bypass the existing web pipeline. Rewrite the prompt first,
-        # then let the legacy decision/router/finalizer preserve sessions,
-        # source cards, and response shape.
-        if (
-            not attachments
-            and isinstance(interpretation, dict)
-            and interpretation.get("route_hint") == "web"
-            and self.safe_str(interpretation.get("rewritten_text") or original_user_text).strip()
-        ):
-            _interpreted_web_query = self.safe_str(
-                interpretation.get("rewritten_text") or original_user_text
-            ).strip()
-
-            user_text = _interpreted_web_query
-            lowered = self.safe_str(user_text).lower().strip()
-
-            try:
-                self._last_interpretation = interpretation
-                self._last_original_user_text = original_user_text
-                self._last_clean_interpretation_text = clean_interpretation_text
-                self._last_interpreted_user_text = _interpreted_web_query
-                self._skip_project_context_for_interpreted_news = (
-                    isinstance(interpretation, dict)
-                    and interpretation.get("intent") == "fresh_web_news"
-                )
-                exec_debug(
-                    "INTERPRETATION_REWROTE_WEB_QUERY:",
-                    original_user_text,
-                    "=>",
-                    _interpreted_web_query,
-                )
-            except Exception:
-                pass
-
-
-        # TOP_LEVEL_SHORT_COMMAND_INTERCEPT_LOCK
-        if lowered in {"k", "kk", "go"}:
-            working_state = self._get_working_state(session_id)
-            working_state = working_state if isinstance(working_state, dict) else {}
-
-            execution_state = (
-                execution_state
-                if isinstance(execution_state, dict)
-                else {}
-            )
-            execution_state = (
-                execution_state if isinstance(execution_state, dict) else {}
-            )
-
-            has_real_state = any(
-                [
-                    working_state.get("active_task"),
-                    working_state.get("current_file"),
-                    working_state.get("current_bug"),
-                    working_state.get("next_move"),
-                    working_state.get("checkpoint"),
-                ]
-            )
-
-            has_real_execution = any(
-                [
-                    bool(execution_state.get("steps")),
-                    execution_state.get("current_step"),
-                    execution_state.get("current_step_title"),
-                    execution_state.get("status") in {"running", "waiting", "paused"},
-                ]
-            )
-
-            has_real_execution = any(
-                [
-                    bool(execution_state.get("steps")),
-                    execution_state.get("current_step"),
-                    execution_state.get("current_step_title"),
-                    execution_state.get("status") in {
-                        "running",
-                        "waiting",
-                        "paused",
-                    },
-                ]
-            )
-
-            execution_is_idle = (
-                self.safe_str(
-                    execution_state.get("status")
-                ).strip().lower()
-                == "idle"
-            )
-
-            if has_real_execution or (
-                has_real_state
-                and not execution_is_idle
-            ):
-                command = "run_step"
-                execution_state["command"] = command
-
-                return self.execution_orchestrator_service.process_execution(
-                    session_id=session_id,
-                    state=execution_state,
-                )
-
-            message = "No active execution mission"
-
-            return {
-                "ok": True,
-                "assistant_message": self._build_assistant_message(message),
-                "session": self._get_session_payload(session_id),
-                "debug": {
-                    "route_taken": "top_level_short_command_intercept",
-                    "command": lowered,
-                    "has_real_state": has_real_state,
-                    "has_real_execution": has_real_execution,
-                    "execution_is_idle": execution_is_idle,
-                },
-            }
-
-            next_move = self.safe_str(working_state.get("next_move")).strip()
-            message = (
-                next_move or "No active mission yet. Start one with: auto-plan <goal>"
-            )
-
-            return {
-                "ok": True,
-                "assistant_message": self._build_assistant_message(message),
-                "session": self._get_session_payload(session_id),
-                "debug": {
-                    "route_taken": "top_level_short_command_intercept",
-                    "command": lowered,
-                    "has_real_state": has_real_state,
-                    "has_real_execution": has_real_execution,
-                },
-            }
-
-        try:
-            self._auto_track_working_state(
-                session_id=session_id,
-                user_text=user_text,
-                assistant_text="",
-            )
-
-        except Exception as e:
-            exec_debug("EARLY_AUTO_TRACK_ERROR:", e)
-
-        if lowered in {
-            "reset",
-            "reset all",
-            "clear context",
-            "clear state",
-            "stop execution",
-            "clear all",
-        }:
-            self._reset_execution_state(session_id)
-
-            return {
-                "ok": True,
-                "assistant_message": self._build_assistant_message(
-                    text="State cleared. Nova is back to normal."
-                ),
-                "session": self._get_session_payload(session_id),
-                "debug": {
-                    "route": "reset_execution_state",
-                },
-            }
-
-        # NOVA_AUTO_FIX_BEFORE_PLANNER_ROUTE_20260624
-        # Exact file-fix commands must route to auto-fix, not execution planner.
-        _nova_auto_fix_direct_phrases = [
-            "fix this file",
-            "auto-fix this file",
-            "autofix this file",
-            "repair this file",
-        ]
-
-        if any(_phrase in lowered for _phrase in _nova_auto_fix_direct_phrases):
-            return self._execute_auto_fix_file(
-                user_text=user_text,
-                session_id=session_id,
-            )
-
-        planner_prefixes = (
-            "auto-plan",
-            "build ",
-            "implement ",
-            "upgrade ",
-            "repair ",
-        )
-
-        exec_debug(
-            "PLANNER PREFIX HIT",
-            lowered,
-        )
-
-        if lowered.startswith(planner_prefixes):
-            exec_debug(
-                "ENTERING _process_goal_AND_PLAN",
-            )
-
-            # NOVA_MISSION_ENGINE_BRIDGE_20260710
-            # Route planner requests into the mission system.
-
-            try:
-                from nova_backend.services.planner_service import planner_service
-                from nova_backend.services.chat_execution_service import chat_execution_service
-
-                goal = user_text.strip()
-
-                mission = planner_service.create_mission(goal)
-
-                project_context = build_project_brain_context()
-
-                brain_context = {
-                    "project_name": project_context.project_name,
-                    "active_checkpoint": project_context.active_checkpoint,
-                    "blocker": project_context.blocker,
-                    "next_move": project_context.next_move,
-                }
-
-
-                execution_state["mission_id"] = mission.get("id")
-                execution_state["mission"] = mission
-
-            except Exception as e:
-                exec_debug(
-                    "MISSION ENGINE BRIDGE FAILED:",
-                    e,
-                )
-
-                execution_state = self._process_goal_and_plan(
-                    user_text,
-                    session_id,
-                )
-
-            exec_debug(
-                "PLAN RESULT =",
-                execution_state,
-            )
-
-            if execution_state:
-                execution_state = self.execution_mutation_service.mark_running(
-                    execution_state,
-                    step_index=(
-                        execution_state.get(
-                            "current_index",
-                            0,
-                        )
-                    ),
-                    current_step=(
-                        execution_state.get(
-                            "current_step",
-                            "",
-                        )
-                    ),
-                    waiting=(
-                        execution_state.get(
-                            "waiting",
-                            False,
-                        )
-                    ),
-                )
-            self._save_execution_state(
-                session_id,
-                execution_state,
-            )
-
-            session_payload = self._get_session_payload(session_id)
-
-            if isinstance(session_payload, dict):
-
-                session_payload["execution_state"] = execution_state
-
-                session_payload["active_execution"] = (
-                    execution_state
-                    if (
-                        execution_state.get("steps")
-                        and self.safe_str(execution_state.get("status")).lower()
-                        not in {
-                            "complete",
-                            "completed",
-                            "failed",
-                            "cancelled",
-                        }
-                    )
-                    else {}
-                )
-
-                return {
-                    "ok": True,
-                    "assistant_message": self._build_assistant_message(
-                        (
-                            "Mission created.\n\n"
-                            f"Goal: {execution_state.get('goal', user_text)}\n\n"
-                            "Steps:\n"
-                            + "\n".join(
-                                [
-                                    f"{i + 1}. {step}"
-                                    for i, step in enumerate(
-                                        execution_state.get("steps", [])
-                                    )
-                                ]
-                            )
-                            + "\n\nSend `next` to run the first step, or `run all` for autonomous execution."
-                        )
-                    ),
-
-                    "session": session_payload,
-                    "debug": {
-                        "route": "execution_plan_created",
-                    },
-                }
-
-        explicit_execution_commands = {
-            "next",
-            "nex",
-            "continue",
-            "resume",
-            "continue on",
-            "keep going",
-            "go",
-            "run next",
-            "next step",
-            "run_step",
-            "run step",
-            "run_all",
-            "run all",
-            "run it",
-            "execute",
-            "execute all",
-            "retry",
-            "retry failed",
-            "try again",
-            "rerun failed",
-            "test_fail",
-            "test fail",
-            "stop",
-            "cancel",
-        }
-
-        if lowered in explicit_execution_commands:
-            ws = self._get_working_state(session_id) or {}
-
-            execution = (
-                self._get_session_meta(
-                    session_id,
-                    "execution_state",
-                )
-                or self._get_session_meta(
-                    session_id,
-                    "active_execution",
-                )
-                or ws.get("execution_state")
-                or {}
-            )
-
-            if lowered == "resume" and not any(
-                [
-                    ws.get("active_task"),
-                    ws.get("current_file"),
-                    ws.get("current_bug"),
-                    ws.get("next_move"),
-                    ws.get("checkpoint"),
-                    execution.get("steps"),
-                    execution.get("current_step"),
-                    execution.get("status") == "running",
-                ]
-            ):
-                return {
-                    "ok": True,
-                    "assistant_message": self._build_assistant_message(
-                        (
-                            "Mission created.\n\n"
-                            f"Goal: {execution_state.get('goal', user_text)}\n\n"
-                            "Nova is ready to work through this task and track progress.\n\n"
-                            "Use Run All to continue, or Stop to pause."
-                        )
-                    ),
-
-                    "session": session_payload,
-                    "debug": {
-                        "route": "execution_plan_created",
-                    },
-                }
-
-            # ==========================
-            # FORCE SINGLE EXECUTION PIPELINE
-            # ==========================
-            if lowered in {
-                "next",
-                "nex",
-                "continue",
-                "resume",
-                "continue on",
-                "keep going",
-                "go",
-            }:
-                return self._handle_execution_control(
-                    user_text="run_step",
-                    session_id=session_id,
-                    attachments=attachments,
-                )
-
-            if lowered in {"run all", "run_all"}:
-                return self._handle_execution_control(
-                    user_text="run_all",
-                    session_id=session_id,
-                    attachments=attachments,
-                )
-
-            if execution.get("locked"):
-                return {
-                    "ok": True,
-                    "assistant_message": self._build_assistant_message(
-                        "Execution already running."
-                    ),
-                    "session": self._get_session_payload(session_id),
-                }
-
-            execution_control_result = self._handle_execution_control(
-                user_text,
-                session_id,
-            )
-
-            exec_debug(
-                "EXEC CONTROL RESULT =",
-                execution_control_result,
-            )
-
-            if execution_control_result is not None:
-                if (
-                    isinstance(execution_control_result, dict)
-                    and execution_control_result.get("ok") is True
-                ):
-                    if not execution_control_result.get("assistant_message"):
-                        execution_control_result["assistant_message"] = (
-                            self._build_assistant_message(
-                                "Execution command completed."
-                            )
-                        )
-
-                    return execution_control_result
-
-                return execution_control_result
-
-        auto_fix_result = self._process_auto_fix(
-            user_text,
-            session_id,
-            attachments,
-        )
-
-        if auto_fix_result is not None:
-            return auto_fix_result
-
-
-
-
-
-
-        # ================================
-        # NOVA SINGLE ROUTER ENFORCEMENT
-        # ================================
-
-        execution_state = (
-            self._get_session_meta(session_id, "execution_state")
-            or self._get_session_meta(session_id, "active_execution")
-            or {}
-        )
-
-        execution_active = bool(
-            execution_state.get("steps")
-            or execution_state.get("current_step")
-            or execution_state.get("status") in {"running", "waiting"}
-        )
-
-        execution_commands = {
-            "next", "continue", "resume",
-            "run step", "run all", "execute",
-            "retry", "run it"
-        }
-
-        lowered = self.safe_str(user_text).lower().strip()
-
-        # SAFE ROUTE DISPATCH (FIXED)
-
-        decision = self._decide_route(
-            user_text=user_text,
-            attachments=attachments,
-            session_id=session_id,
-        )
-
-
-        route, command = self.chat_router.handle(
-            user_text,
-            session_id,
-            attachments
         )
 
         print(
-            "[ROUTER DEBUG]",
-            user_text,
-            route,
-            command,
+            "DEBUG BRAIN STATE:",
+            brain_state,
         )
 
-        # HARD RULE: execution must not leak into chat fallback
-        if execution_active and route != "execution":
-            route = "chat"
-
-        # SINGLE DISPATCH AUTHORITY
-        if route == "execution":
-
-            if command == "start":
-                execution_state = self._process_goal_and_plan(
-                    user_text,
-                    session_id,
-                )
-
-                if not execution_state:
-                    return self._execute_general_chat(
-                        user_text=user_text,
-                        session_id=session_id,
-                        attachments=attachments,
-                        decision=decision,
-                    )
-
-            else:
-                execution_state = {
-                    "command": user_text,
-                }
-
-            return self.execution_orchestrator_service.process_execution(
-                session_id=session_id,
-                state=execution_state,
-            )
-
-        elif route == "attachment":
-            return self._handle_attachment(
-                user_text=user_text,
-                attachments=attachments,
-                session_id=session_id
-            )
-
-        elif route == "image":
-            return self._handle_image_generation(
-                prompt=user_text,
-                session_id=session_id,
-            )
-
-        elif route == "web":
-            return self._execute_web_fetch(
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-                decision={
-                    "route": "web_fetch",
-                    "mode": "web_fetch",
-                    "query": user_text,
-                },
-            )
-        else:
-            return self._execute_general_chat(
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-                decision=decision,
-            )
-
-    def _process_goal_and_plan(self, user_text: str, session_id: str):
-        user_text = self.safe_str(user_text).strip()
-
-        goal = self._build_goal(user_text)
-
-        if (
-            isinstance(goal, dict)
-            and str(goal.get("type") or "").strip().lower() == "general"
-            and str(goal.get("goal") or "").strip().lower() == "respond normally"
-        ):
-
-            exec_debug("BLOCKED GENERAL CHAT EXECUTION PLAN")
-
-            self._save_execution_state(
-                session_id,
-                {},
-            )
-
-            return None
-
-        plan = self._build_plan(goal)
-
-        normalized_steps = []
-
-        for index, step in enumerate(plan, start=1):
-            if isinstance(step, dict):
-                title = (
-                    step.get("title")
-                    or step.get("action")
-                    or step.get("input")
-                    or f"Execution Step {index}"
-                )
-                action = step.get("action") or "execute"
-                input_value = step.get("input") or user_text
-            else:
-                title = self.safe_str(step) or f"Execution Step {index}"
-                action = "execute"
-                input_value = user_text
-
-            normalized_steps.append(
-                {
-                    "id": f"step_{index}",
-                    "title": title,
-                    "action": action,
-                    "input": input_value,
-                    "target_file": step.get("target_file", ""),
-                    "target_function": step.get("target_function", ""),
-                    "status": "pending",
-                    "result": "",
-                }
-            )
-
-        if not normalized_steps:
-            normalized_steps = [
-                {
-                    "id": "step_1",
-                    "title": "Analyze requested goal",
-                    "action": "analyze",
-                    "input": user_text,
-                    "status": "pending",
-                    "result": "",
-                },
-                {
-                    "id": "step_2",
-                    "title": "Build execution plan",
-                    "action": "plan",
-                    "input": user_text,
-                    "status": "pending",
-                    "result": "",
-                },
-                {
-                    "id": "step_3",
-                    "title": "Validate execution result",
-                    "action": "validate",
-                    "input": user_text,
-                    "status": "pending",
-                    "result": "",
-                },
-            ]
-
-        goal_text = self.safe_str(goal).lower().strip()
-
-        invalid_general_goal = "respond normally" in goal_text or (
-            isinstance(goal, dict)
-            and self.safe_str(goal.get("goal")).lower().strip() == "respond normally"
+        print(
+            "DEBUG BRAIN EXECUTION VALUE:",
+            brain_state.get("execution")
+            if isinstance(brain_state, dict)
+            else None,
         )
 
-        if invalid_general_goal:
+        print(
+            "DEBUG ORCHESTRATOR OUTPUT:",
+            brain_state,
+        )
 
+        execution_state = (
+            brain_state.get("execution")
+            if isinstance(brain_state, dict)
+            else {}
+        )
+
+        if execution_state:
             self._save_execution_state(
                 session_id,
-                {},
+                execution_state,
             )
 
-            return None
+        print(
+            "DEBUG ABOUT TO CALL CHAT_HANDLE",
+            {
+                "user_text": user_text,
+                "brain_state": brain_state,
+            },
+        )
 
-        execution_state = {
-            "status": "running",
-            "goal": (
-                goal.get("goal", user_text)
-                if isinstance(goal, dict)
-                else goal
-            ),
-            "original_user_text": user_text,
-            "steps": normalized_steps,
-            "plan": normalized_steps,
-            "current_index": 0,
-            "current_step": normalized_steps[0].get(
-                "title",
-                "Execution Step 1",
-            ),
-            "current_step_title": normalized_steps[0].get("title", "Execution Step 1"),
-            "history": [],
-            "last_action": "auto_plan",
-            "waiting": False,
-        }
+        print(
+                "DEBUG BEFORE CHAT_HANDLE BRAIN EXECUTION:",
+                brain_state,
+            ) 
 
-        runtime = getattr(
+        response = chat_handle(
             self,
-            "runtime",
-            None,
-        )
-
-        if runtime is not None:
-
-            runtime_queue = getattr(
-                runtime,
-                "runtime_execution_queue",
-                None,
-            )
-
-            if isinstance(
-                runtime_queue,
-                list,
-            ):
-
-                runtime_queue.clear()
-
-                for step in normalized_steps:
-
-                    if not isinstance(
-                        step,
-                        dict,
-                    ):
-                        continue
-
-                    runtime_queue.append(
-                        {
-                            "step_id": step.get("id"),
-                            "title": step.get("title"),
-                            "action": step.get("action"),
-                            "status": "queued",
-                        }
-                    )
-
-                print(
-                    "RUNTIME QUEUE DEBUG =",
-                    runtime_queue,
-                )
-
-        self._set_session_meta(
+            user_text,
             session_id,
-            "execution_state",
-            execution_state,
+            attachments,
+            brain_state=brain_state,
+            decision=brain_state.get("decision")
+            if isinstance(brain_state, dict)
+            else None,
         )
 
-        self._set_session_meta(
-            session_id,
-            "active_execution",
-            (
-                execution_state
-                if (
-                    isinstance(execution_state, dict)
-                    and execution_state.get("steps")
-                    and self.safe_str(execution_state.get("status")).lower()
-                    != "complete"
-                )
-                else {}
-            ),
+        print(
+            "DEBUG CHAT_HANDLE RETURNED",
+            response.get("execution_state")
+            if isinstance(response, dict)
+            else response,
         )
 
-        try:
-            session_obj = self.sessions.get_session(session_id) or {}
+        response["brain_state"] = brain_state
 
-            session_obj["execution_state"] = execution_state
+        if not response.get("execution_state"):
+            response["execution_state"] = execution_state
 
-            session_obj["active_execution"] = (
-                execution_state
-                if (
-                    isinstance(execution_state, dict)
-                    and execution_state.get("steps")
-                    and self.safe_str(execution_state.get("status")).lower()
-                    != "complete"
-                )
-                else {}
-            )
-
-            self.sessions.update_session(
-                session_id,
-                session_obj,
-            )
-
-        except Exception as e:
-            exec_debug(
-                "PLAN SAVE FAILED:",
-                e,
-            )
-
-
-        self.session_service.update_execution_state(
-            session_id,
-            execution_state,
-        )
-
-
-        exec_debug(
-            "_process_goal_and_plan RETURN =",
-            execution_state,
-        )
-
-        return execution_state
-
-
+        return response
 
     def _extract_file_path_from_error(self, error_text: str) -> str:
         text = self.safe_str(error_text)
@@ -9855,12 +6596,6 @@ Rules:
                     ),
                 },
             }
-
-
-
-
-
-
 
         path = self._guess_path_from_text(user_text)
 
@@ -9966,8 +6701,6 @@ Rules:
 
         return text[:limit].strip()
 
-
-
     def _clean_web_text(
         self,
         value: str,
@@ -10003,14 +6736,6 @@ Rules:
             return text
 
         return text[: limit - 3].rstrip() + "..."
-
-
-
-
-
-
-
-
 
     def _score_memory_for_text(
         self,
@@ -10349,11 +7074,6 @@ Rules:
 
         return "Here s what I remember:\n" + "\n".join(lines)
 
-
-    # =========================
-    # EXECUTION GUARD HELPERS
-    # =========================
-
     def _text_has_placeholder_debug_content(
         self,
         text: str,
@@ -10458,11 +7178,6 @@ Rules:
             ]
         )
 
-
-    # =========================
-    # EXECUTION RENDER NORMALIZATION LOCK
-    # =========================
-
     def _execution_status_label(
         self,
         execution,
@@ -10500,7 +7215,6 @@ Rules:
         execution,
         include_prefix=False,
     ):
-
         if not isinstance(execution, dict):
             execution = {}
 
@@ -10617,12 +7331,29 @@ Rules:
             include_prefix=False,
         )
 
-
-
-
     def _build_continuity_context(self, session=None, limit: int = 14):
         session = session or {}
         messages = session.get("messages") if isinstance(session, dict) else []
+        print(
+            "[CONTINUITY SESSION DEBUG]",
+            {
+                "session_keys": (
+                    list(session.keys())
+                    if isinstance(session, dict)
+                    else str(type(session))
+                ),
+                "message_count": (
+                    len(messages)
+                    if isinstance(messages, list)
+                    else "not_list"
+                ),
+                "messages": (
+                    messages[:2]
+                    if isinstance(messages, list)
+                    else messages
+                ),
+            },
+        )
 
         if not isinstance(messages, list) or not messages:
             return ""
@@ -10952,13 +7683,6 @@ Rules:
         return None
 
 
-
-
-
-
-
-
-
     # ==============================
     # DECISION CONTRACT
     # ==============================
@@ -11020,503 +7744,25 @@ Rules:
         )
         return any(trigger in t for trigger in triggers)
 
-    def _decide(self, user_text: str, attachments=None, session_id: str = "") -> dict:
-        return self._decide_route(
-            user_text=user_text,
-            attachments=attachments,
-            session_id=session_id,
-        )
-
-
-    def _decide_route(
+    def _decide(
         self,
         user_text: str,
         attachments=None,
         session_id: str = "",
     ) -> dict:
 
-        user_text = self.safe_str(user_text).strip()
-
-        text = user_text.lower().strip()
-        lower_text = text
-
-        # REMOVE_DECIDE_ROUTE_DEBUG_PRINT_LOCK
-
-
-        intelligence_state = self.intelligence_router.build_state(
+        result = self._decide_route(
             user_text=user_text,
-            session_id=session_id,
             attachments=attachments,
-
+            session_id=session_id,
         )
 
-        if (
-            isinstance(intelligence_state, dict)
-            and intelligence_state.get("route") not in {
-                self.ROUTE_GENERAL_CHAT,
-                "chat",
-            }
-        ):
-
-
-            if not (
-                "bitcoin" in lower_text
-                or "btc" in lower_text
-                or "crypto" in lower_text
-                or "stock" in lower_text
-            ):
-                return intelligence_state
-
-        regen_commands = {
-            "regen",
-            "regenerate",
-            "redo image",
-            "make another",
-            "another image",
-        }
-
-        if lower_text.strip() in regen_commands:
-            return {
-                "route": self.ROUTE_IMAGE_GENERATION,
-                "mode": "image_generation",
-                "confidence": 1.0,
-                "reasons": ["regen_command"],
-            }
-
-        attachments = attachments or []
-
-        # =========================
-        # IMAGE GENERATION (PRIORITY)
-        # =========================
-
-        # =========================
-        # IMAGE / FILE ANALYSIS
-        # =========================
-        # Real attachments must beat image-generation wording.
-        if attachments:
-            return {
-                "route": self.ROUTE_ATTACHMENT_ANALYSIS,
-                "mode": "attachment_analysis",
-                "confidence": 1.0,
-                "reasons": ["attachment_present_before_image_generation"],
-                "save_artifact": True,
-                "save_memory": False,
-                "use_memory": False,
-            }
-
-        explicit_image_request = lower_text.startswith((
-            "/image ",
-            "generate image ",
-            "generate an image ",
-            "create image ",
-            "create an image ",
-            "make image ",
-            "make an image ",
-            "draw ",
-            "draw me ",
-        ))
-
-        if explicit_image_request:
-            return {
-                "route": self.ROUTE_IMAGE_GENERATION,
-                "mode": "image_generation",
-                "confidence": 0.95,
-                "reasons": ["explicit_image_generation_intent"],
-                "save_artifact": True,
-                "save_memory": False,
-                "use_memory": False,
-                "prompt": user_text,
-            }
-
-        # =========================
-        # WEB FETCH AUTO-DETECT LOCK
-        # =========================
-        has_url = (
-            "http://" in lower_text
-            or "https://" in lower_text
-            or lower_text.startswith("www.")
+        print(
+            "DECIDE RESULT =",
+            result,
         )
 
-        # =========================
-        # WEB INTENT SIGNALS
-        # =========================
-        # Keep web explicit. Avoid broad substring triggers like "source",
-        # "update", or "current" because those collide with code/project chat.
-        live_web_triggers = (
-            "latest",
-            "latest news",
-            "breaking news",
-            "news about",
-            "right now",
-            "today",
-            "yesterday",
-            "last night",
-            "this week",
-            "who won",
-            "current score",
-            "live score",
-            "stock price",
-            "share price",
-            "bitcoin price",
-            "crypto price",
-            "btc price",
-            "btc right now",
-            "bitcoin right now",
-            "crypto right now",
-            "current bitcoin",
-            "current btc",
-            "current crypto",
-            "market price",
-            "stock value",
-            "share value",
-        )
-
-        explicit_web_prefixes = (
-            "/web",
-            "web search ",
-            "search web ",
-            "search the web ",
-            "look up ",
-            "lookup ",
-            "google ",
-            "browse ",
-            "find sources for ",
-            "find source for ",
-            "get sources for ",
-            "show sources for ",
-        )
-
-        web_topic_terms = {
-            "nba",
-            "nfl",
-            "nhl",
-            "mlb",
-            "ufc",
-            "stock",
-            "stocks",
-            "bitcoin",
-            "crypto",
-        }
-
-        if self._is_image_generation_request(user_text) and not self._nova_is_web_news_intent_20260609(user_text):
-            return {
-                "route": self.ROUTE_IMAGE_GENERATION,
-                "mode": "image_generation",
-                "confidence": 1.0,
-                "reasons": ["image_generation_request"],
-                "save_artifact": True,
-                "save_memory": False,
-                "use_memory": False,
-            }
-
-        simple_chat_inputs = {
-            "hi",
-            "hello",
-            "hey",
-            "yo",
-            "sup",
-            "test",
-            "ok",
-            "okay",
-            "k",
-        }
-
-        if text in simple_chat_inputs:
-            return {
-                "route": self.ROUTE_GENERAL_CHAT,
-                "mode": "chat",
-                "intent": "chat",
-                "confidence": 1.0,
-                "reasons": ["simple_chat_input"],
-                "save_artifact": False,
-                "save_memory": False,
-                "use_memory": False,
-            }
-
-        continue_commands = {
-            "continue",
-            "continue execution",
-            "continue mission",
-            "keep going",
-            "next",
-            "next step",
-            "proceed",
-            "resume",
-        }
-
-        if text in continue_commands and has_working_mission:
-            return {
-                "route": self.ROUTE_EXECUTION,
-                "mode": "execution",
-                "intent": "execution_continue",
-                "confidence": 0.95,
-                "reasons": ["active_mission_continue_command"],
-                "save_artifact": False,
-                "save_memory": False,
-                "use_memory": False,
-            }
-
-        normalized_web_text = lower_text.strip()
-
-        writing_request = bool(
-            re.match(
-                r"^(write|draft|compose|rewrite|edit|proofread)\b",
-                normalized_web_text,
-            )
-        )
-
-        explicit_research_request = (
-            normalized_web_text.startswith(
-                explicit_web_prefixes
-            )
-            or "research " in normalized_web_text
-            or "find sources" in normalized_web_text
-            or "cite sources" in normalized_web_text
-        )
-
-        if (
-            writing_request
-            and not explicit_research_request
-        ):
-            return {
-                "route": self.ROUTE_GENERAL_CHAT,
-                "mode": "chat",
-                "intent": "writing",
-                "confidence": 1.0,
-                "reasons": [
-                    "writing_request_before_live_web"
-                ],
-                "save_artifact": False,
-                "save_memory": True,
-                "use_memory": True,
-            }
-
-        web_words = set(
-            normalized_web_text
-            .replace("?", " ")
-            .replace(".", " ")
-            .replace(",", " ")
-            .replace(":", " ")
-            .replace(";", " ")
-            .replace("!", " ")
-            .split()
-        )
-
-        wants_explicit_web = normalized_web_text.startswith(explicit_web_prefixes)
-        wants_live_web = any(trigger in normalized_web_text for trigger in live_web_triggers)
-
-        # Topic terms only force web when paired with a fresh/live/search clue.
-        wants_web_topic = bool(web_words.intersection(web_topic_terms)) and any(
-            clue in normalized_web_text
-            for clue in (
-                "latest",
-                "news",
-                "today",
-                "right now",
-                "current",
-                "price",
-                "score",
-                "scores",
-                "who won",
-                "standings",
-                "schedule",
-            )
-        )
-
-        local_nova_project_context = (
-            "nova project" in normalized_web_text
-            or "the nova project" in normalized_web_text
-            or "our nova project" in normalized_web_text
-            or (
-                "what changed" in normalized_web_text
-                and "nova" in normalized_web_text
-            )
-
-            or (
-                "what changed recently" in normalized_web_text
-                and "nova" in normalized_web_text
-            )
-            or any(
-                phrase in normalized_web_text
-                for phrase in (
-                    "what is the current blocker",
-                    "what's the current blocker",
-                    "current blocker",
-                    "what is the blocker",
-                    "what blocker do we have",
-                    "what are we blocked on",
-                    "what is blocking nova",
-                    "actual blocker",
-                )
-            )
-        )
-
-
-
-        if (
-            (has_url or wants_explicit_web or wants_live_web or wants_web_topic)
-            and not local_nova_project_context
-            and route != "project_brain_general_intelligence"
-        ):
-            return {
-                "route": self.ROUTE_WEB_FETCH,
-                "mode": "web_fetch",
-                "confidence": 1.0,
-                "reasons": ["forced_web_fetch"],
-                "save_artifact": True,
-                "save_memory": False,
-                "use_memory": False,
-                "query": user_text,
-            }
-
-        # =========================
-        # DEFAULT CHAT
-        # =========================
-
-        execution_commands = {
-            "next",
-            "run_step",
-            "run step",
-            "run_all",
-            "run all",
-            "retry",
-            "retry_failed",
-            "retry failed",
-            "try again",
-            "rerun failed",
-        }
-
-        ws = self._get_working_state(session_id) or {}
-
-        updated_at = self.safe_str(ws.get("updated_at")).strip()
-
-        has_working_mission = False
-
-        if updated_at:
-
-            try:
-                updated_dt = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
-
-                now_dt = datetime.now(updated_dt.tzinfo)
-
-                age_seconds = (now_dt - updated_dt).total_seconds()
-
-                if age_seconds <= 600:
-                    has_working_mission = bool(
-                        (
-                            ws.get("active_task")
-                            and ws.get("next_move")
-                        )
-                        or (
-                            isinstance(ws.get("execution_state"), dict)
-                            and (
-                                ws.get("execution_state", {}).get("mission_id")
-                                or ws.get("execution_state", {}).get("current_step")
-                            )
-                        )
-                    )
-
-            except Exception:
-                has_working_mission = False
-
-        continue_commands = {
-            "next",
-            "nex",
-            "continue",
-            "continue on",
-            "keep going",
-            "go",
-            "next step",
-        }
-
-        if text in execution_commands:
-            # GO_SMART_COMMAND_BRAIN_LOCK: removed execution command debug prints
-
-            if (
-                text == "resume"
-                and not has_working_mission
-                and not has_active_execution
-            ):
-                return {
-                    "route": "resume_empty_state_guard",
-                    "mode": "system",
-                    "confidence": 1.0,
-                    "reasons": ["empty_resume_guard"],
-                    "save_artifact": False,
-                    "save_memory": False,
-                    "use_memory": False,
-                }
-
-            if (
-                text == "resume"
-                and not has_working_mission
-                and not has_active_execution
-            ):
-                return {
-                    "route": "resume_empty_state_guard",
-                    "mode": "system",
-                    "confidence": 1.0,
-                    "reasons": ["empty_resume_guard"],
-                    "save_artifact": False,
-                    "save_memory": False,
-                    "use_memory": False,
-                }
-
-        if text in continue_commands and (
-            has_working_mission
-            or has_active_execution
-        ):
-
-            return {
-                "route": "execution_command",
-                "mode": "execution",
-                "confidence": 1.0,
-                "reasons": ["working_state_continue_override"],
-                "save_artifact": False,
-                "save_memory": False,
-                "use_memory": True,
-            }
-
-            return {
-                "route": "execution_command",
-                "mode": "execution",
-                "confidence": 1.0,
-                "reasons": ["execution_command_override"],
-                "save_artifact": False,
-                "save_memory": False,
-                "use_memory": False,
-            }
-
-        planner_prefixes = (
-            "auto-plan",
-            "build ",
-            "upgrade ",
-            "implement ",
-            "fix ",
-            "repair ",
-        )
-
-        if text.startswith(planner_prefixes):
-
-            return {
-                "route": "execution",
-                "mode": "execution",
-                "confidence": 1.0,
-                "reasons": ["planner_prefix_detected"],
-                "save_artifact": False,
-                "save_memory": True,
-                "use_memory": True,
-            }
-
-        return {
-            "route": self.ROUTE_GENERAL_CHAT,
-            "mode": "chat",
-            "confidence": 0.6,
-            "reasons": ["default_chat"],
-            "save_artifact": False,
-            "save_memory": True,
-            "use_memory": True,
-        }
+        return result
 
     def _looks_like_execution(
         self,
@@ -11542,9 +7788,9 @@ Rules:
         if any(x in text for x in execution_markers):
             return True
 
-        # Planning requests should stay in planning/project brain.
+        # Planning requests should create execution state.
         if decision and decision.get("intent") == "planning":
-            return False
+            return True
 
         if decision and decision.get("mode") in {"coding", "analysis"}:
             return True
@@ -11556,16 +7802,21 @@ Rules:
 
         if "hosting" in lowered:
             return [
-                "Identify hosting options",
-                "Compare tradeoffs",
-                "Recommend best fit",
+                "Research hosting requirements",
+                "Compare available hosting solutions",
+                "Select recommended hosting approach",
             ]
 
-        if "plan" in lowered or "next steps" in lowered:
+        if (
+            "plan" in lowered
+            or "project" in lowered
+            or "next steps" in lowered
+        ):
             return [
-                "Define the goal",
-                "Break into steps",
-                "Return recommendation",
+                "Analyze project goal and requirements",
+                "Create project phases and milestones",
+                "Define tasks, priorities, and timeline",
+                "Review risks and success criteria",
             ]
 
         if any(
@@ -11578,15 +7829,15 @@ Rules:
             )
         ):
             return [
-                "Inspect the request",
-                "Extract key findings",
-                "Summarize the result",
+                "Analyze provided information",
+                "Identify important findings",
+                "Create recommendations",
             ]
 
         return [
-            "Understand request",
-            "Process task",
-            "Return result",
+            "Understand user objective",
+            "Determine required actions",
+            "Provide completed response",
         ]
 
     def _reconcile_execution_state(
@@ -13317,6 +9568,11 @@ Rules:
             memories = memory_items
 
         memories = memories or self._get_memory_list()
+        print(
+            "[MEMORY DEBUG INPUT]",
+            len(memories),
+            memories[:3],
+        )
         working_state = working_state or {}
         execution_state = execution_state or {}
 
@@ -13907,8 +10163,11 @@ Rules:
         )
 
         return result
-
-    def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict:
+    def _handle_attachment_analysis(
+        self,
+        user_text: str,
+        attachments: list,
+    ) -> dict:
         attachments = attachments or []
 
         for item in attachments:
@@ -13929,7 +10188,10 @@ Rules:
                 )
             )
 
-            if existing_summary and "PK" not in existing_summary[:20]:
+            if (
+                existing_summary
+                and "PK" not in existing_summary[:20]
+            ):
                 preview = existing_summary[:6000].strip()
 
                 return {
@@ -13955,7 +10217,10 @@ Rules:
                     "saved_artifact": None,
                 }
 
-            att_type = self.safe_str(item.get("type")).lower()
+            att_type = self.safe_str(
+                item.get("type")
+            ).lower()
+
             mime_type = self.safe_str(
                 item.get("mime_type")
                 or item.get("content_type")
@@ -13970,10 +10235,12 @@ Rules:
                 att_type == "image"
                 or mime_type.startswith("image/")
             ):
-                vision_text = self._nova_describe_image_with_openai_20260607(
-                    image_url=url,
-                    image_name=name,
-                    user_text=user_text,
+                vision_text = (
+                    self._nova_describe_image_with_openai_20260607(
+                        image_url=url,
+                        image_name=name,
+                        user_text=user_text,
+                    )
                 )
 
                 if vision_text:
@@ -13999,30 +10266,30 @@ Rules:
             )
 
             if text:
-                    preview = text[:6000].strip()
+                preview = text[:6000].strip()
 
-                    return {
-                        "ok": True,
+                return {
+                    "ok": True,
+                    "text": (
+                        "Attachment analysis:\n"
+                        f"Attachment {name} content:\n"
+                        f"{preview}"
+                    ),
+                    "assistant_message": {
+                        "role": "assistant",
                         "text": (
                             "Attachment analysis:\n"
                             f"Attachment {name} content:\n"
                             f"{preview}"
                         ),
-                        "assistant_message": {
-                            "role": "assistant",
-                            "text": (
-                                "Attachment analysis:\n"
-                                f"Attachment {name} content:\n"
-                                f"{preview}"
-                            ),
-                        },
-                        "attachment_analysis": True,
-                        "vision_used": False,
-                        "ocr_used": False,
-                        "source_urls": [],
-                        "sources": [],
-                        "saved_artifact": None,
-                    }
+                    },
+                    "attachment_analysis": True,
+                    "vision_used": False,
+                    "ocr_used": False,
+                    "source_urls": [],
+                    "sources": [],
+                    "saved_artifact": None,
+                }
 
         fallback = (
             "Attachment received, but Nova could not extract "
@@ -14050,15 +10317,30 @@ Rules:
         decision: dict,
         session_id: str = "",
     ) -> str:
-        user_text = self._safe_str(user_text)
+        user_text = self.safe_str(user_text)
 
         memory_items = self._rank_memory_context(
+
             user_text=user_text,
-            limit=int(decision.get("memory_limit") or self.memory_limit),
+            limit=int(
+                decision.get("memory_limit")
+                or self.memory_limit
+            ),
             session_id=session_id,
         )
 
-        memory_block = self._format_memory_context(memory_items[:3])
+        self._last_used_memory_items = memory_items
+
+        print(
+            "[MEMORY RANK RESULT]",
+            len(memory_items),
+            memory_items[:3],
+        )
+
+
+        memory_block = self._format_memory_context(
+            memory_items[:3]
+        )
 
         sections = []
 
@@ -14067,6 +10349,58 @@ Rules:
                 "Relevant memory:\n"
                 f"{memory_block}"
             )
+
+        execution_state = decision.get(
+            "execution_state"
+        )
+
+        if isinstance(
+            execution_state,
+            dict,
+        ) and execution_state:
+
+            sections.append(
+                "Execution plan:\n"
+                f"{execution_state}"
+            )
+
+        brain_plan = decision.get(
+            "brain_plan"
+        )
+
+        if isinstance(
+            brain_plan,
+            dict,
+        ) and brain_plan:
+
+            sections.append(
+                "Planner context:\n"
+                f"{brain_plan}"
+            )
+
+        try:
+            session = self._get_session_payload(
+                session_id
+            )
+
+            continuity_context = (
+                self._build_continuity_context(
+                    session=session
+                )
+            )
+
+            print(
+                "[CONTINUITY TEST]",
+                repr(continuity_context)[:1000],
+            )
+
+            if continuity_context:
+                sections.append(
+                    continuity_context
+                )
+
+        except Exception:
+            pass
 
         if not sections:
             return user_text
@@ -14080,8 +10414,6 @@ Rules:
             + "User message:\n"
             + user_text
         )
-
-
     def _run_chat_model(
         self,
         user_text: str,
@@ -14115,9 +10447,9 @@ Rules:
                 )
 
             exec_debug(
-            "DEBUG WRITING MODEL OUTPUT =",
-            repr(assistant_text),
-        )
+                "DEBUG WRITING MODEL OUTPUT =",
+                repr(assistant_text),
+            )
             return assistant_text
 
         except Exception as e:
@@ -14172,7 +10504,39 @@ Rules:
         session_id: str,
         attachments=None,
     ) -> dict:
-        user_msg = self._build_user_message(user_text, attachments=attachments or [])
+        print(
+            "DEBUG OLD PLANNER REDIRECT ENTERED",
+            {
+                "user_text": user_text,
+                "session_id": session_id,
+            },
+        )
+
+        try:
+            execution_state = self.execution_handler.handle(
+                user_text=user_text,
+                session_id=session_id,
+            )
+
+            print(
+                "DEBUG REDIRECT EXECUTION RESULT =",
+                execution_state,
+            )
+
+            decision["execution_state"] = (
+                execution_state or {}
+            )
+
+        except Exception as exc:
+            print(
+                "DEBUG REDIRECT EXECUTION FAILED =",
+                repr(exc),
+            )
+
+        user_msg = self._build_user_message(
+            user_text,
+            attachments=attachments or [],
+        )
 
         assistant_text = self._run_chat_model(
             user_text=user_text,
@@ -14182,11 +10546,16 @@ Rules:
 
         assistant_msg = self._build_assistant_message(
             text=assistant_text,
-            meta={"planning": True},
+            meta={
+                "planning": True,
+            },
             attachments=[],
         )
 
-        return self._finalize_response(
+        result = self._finalize_response(
+            execution_state=decision.get(
+                "execution_state"
+            ) or {},
             session_id=session_id,
             user_text=user_text,
             user_msg=user_msg,
@@ -14195,7 +10564,12 @@ Rules:
             saved_artifact=None,
         )
 
+        print(
+            "[POST FINALIZE DEBUG]",
+            result.get("assistant_message", {}).get("meta"),
+        )
 
+        return result
 
     def _ensure_session_payload(self, session_id: str) -> dict:
         session = self._call_first(
@@ -14818,187 +11192,32 @@ Rules:
 
 
 # NOVA_PLANNER_SERVICE_WIRING_20260609
-# Safe planner_service wiring layer.
-# This does NOT delete the existing _process_goal_and_plan.
-# It wraps the existing method and falls back to planner_service only when needed.
+# Disabled old runtime override.
+# ChatService._process_goal_and_plan is now the source of truth.
 
-try:
-    from nova_backend.services.planner_service import planner_service as _nova_planner_service_20260609
-except Exception as _nova_planner_import_error_20260609:
-    _nova_planner_service_20260609 = None
-
-
-def _nova_clean_goal_for_planner_20260609(value: str) -> str:
-    text = str(value or "").strip()
-
-    prefixes = (
-        "auto-plan ",
-        "autoplan ",
-        "plan ",
-        "build ",
-        "create ",
-        "make ",
-        "implement ",
-        "fix ",
-        "repair ",
-        "upgrade ",
-    )
-
-    lowered = text.lower()
-
-    for prefix in prefixes:
-        if lowered.startswith(prefix):
-            return text[len(prefix):].strip() or "generic"
-
-    return text or "generic"
-
-
-def _nova_build_planner_fallback_state_20260609(goal_text: str) -> dict:
-    safe_goal = _nova_clean_goal_for_planner_20260609(goal_text)
-
-    if _nova_planner_service_20260609 is None:
-        steps = [
-            f"Design the approach for {safe_goal}.",
-            f"Implement the solution for {safe_goal}.",
-            f"Test and verify {safe_goal}.",
-        ]
-        planner_available = False
-    else:
-        try:
-            steps = _nova_planner_service_20260609.build_execution_steps(safe_goal)
-            planner_available = True
-        except Exception:
-            steps = [
-                f"Design the approach for {safe_goal}.",
-                f"Implement the solution for {safe_goal}.",
-                f"Test and verify {safe_goal}.",
-            ]
-            planner_available = False
-
-    steps = [
-        str(step or "").strip()
-        for step in (steps or [])
-        if str(step or "").strip()
-    ]
-
-    if not steps:
-        steps = [
-            f"Design the approach for {safe_goal}.",
-            f"Implement the solution for {safe_goal}.",
-            f"Test and verify {safe_goal}.",
-        ]
-
-    return {
-        "status": "ready",
-        "goal": safe_goal,
-        "original_user_text": str(goal_text or ""),
-        "steps": steps,
-        "current_index": 0,
-        "current_step": steps[0] if steps else None,
-        "current_step_title": steps[0] if steps else None,
-        "history": [],
-        "waiting": False,
-        "complete": False,
-        "error": None,
-        "planner_service_used": planner_available,
-        "planner_fallback": True,
-        "source": "planner_service",
-    }
-
-
-def install_execution_planner_runtime_patches():
-
-    try:
-        _nova_original_process_goal_and_plan_20260609 = getattr(
-            ChatService,
-            "_process_goal_and_plan",
-            None,
-        )
-    except Exception:
-        _nova_original_process_goal_and_plan_20260609 = None
-
-    def _nova_process_goal_and_plan_with_planner_20260609(
-        self,
-        user_text,
-        session_id="",
-        *args,
-        **kwargs,
-    ):
-        original_error = None
-
-        if callable(_nova_original_process_goal_and_plan_20260609):
-            try:
-                result = _nova_original_process_goal_and_plan_20260609(
-                    self,
-                    user_text,
-                    session_id,
-                    *args,
-                    **kwargs,
-                )
-
-                if isinstance(result, dict):
-                    steps = result.get("steps") or []
-
-                    if isinstance(steps, list) and steps:
-                        result.setdefault("planner_service_checked", True)
-                        return result
-
-                    result["planner_service_original_empty"] = True
-
-            except Exception as exc:
-                original_error = str(exc)
-
-        fallback = _nova_build_planner_fallback_state_20260609(user_text)
-
-        if original_error:
-            fallback["original_planner_error"] = original_error
-
-        try:
-            if hasattr(self, "_save_execution_state"):
-                self._save_execution_state(session_id, fallback)
-
-            if hasattr(self, "_update_working_state"):
-                self._update_working_state(
-                    session_id,
-                    {
-                        "active_task": fallback.get("goal"),
-                        "next_move": fallback.get("current_step"),
-                        "checkpoint": "planner_service_fallback_created",
-                        "execution_status": fallback.get("status"),
-                    },
-                )
-        except Exception:
-            pass
-
-        return fallback
-
-    ChatService._process_goal_and_plan = _nova_process_goal_and_plan_with_planner_20260609
-
-
-
+pass
 
 # NOVA_CHATSERVICE_POST_COMPLETE_IDLE_GUARD_20260609
-# Prevent repeated "Execution complete: <goal>" after completion when user sends k/next/continue/run it.
 
-try:
-    _nova_original_advance_execution_request_20260609 = getattr(
-        ChatService,
-        "_advance_execution_request",
-        None,
-    )
+_nova_original_advance_execution_request_20260609 = getattr(
+    ChatService,
+    "_advance_execution_request",
+    None,
+)
 
-    def _nova_control_text_is_advance_20260609(value) -> bool:
-        text = str(value or "").strip().lower()
-        return text in {
-            "k",
-            "ok",
-            "next",
-            "continue",
-            "run it",
-            "run step",
-            "execute",
-            "advance",
-        }
+def _nova_control_text_is_advance_20260609(value) -> bool:
+    text = str(value or "").strip().lower()
+
+    return text in {
+        "k",
+        "ok",
+        "next",
+        "continue",
+        "run it",
+        "run step",
+        "execute",
+        "advance",
+    }
 
     def _nova_build_no_active_execution_response_20260609(self, user_text, session_id="", attachments=None):
         attachments = attachments or []
@@ -15103,1134 +11322,7 @@ try:
 
     ChatService._advance_execution_request = _nova_advance_execution_request_post_complete_idle_20260609
 
-except Exception:
-    pass
 
-
-def install_chat_service_runtime_patches():
-    install_execution_planner_runtime_patches()
-install_token_usage_finalize_wrapper(ChatService)
-
-install_non_web_source_leak_guard(ChatService)
-
-install_attachment_web_suppression()
-
-# NOVA_INTENT_AUTHORITY_DECIDE_ROUTE_20260630
-try:
-    _nova_previous_decide_route_intent_authority_20260630 = ChatService._decide_route
-
-
-
-    def _nova_intent_authority_decide_route_20260630(
-        self,
-        user_text="",
-        attachments=None,
-        memory_context="",
-        working_context_block="",
-        session_id="",
-        **kwargs,
-    ):
-        attachments = attachments if isinstance(attachments, list) else []
-        text_lower = str(user_text or "").lower()
-
-        failure_interpreter_signal = (
-            "what does this failure mean" in text_lower
-            or "failure report" in text_lower
-            or "failed smoke" in text_lower
-            or "smoke failed" in text_lower
-            or "assertionerror" in text_lower
-            or "indentationerror" in text_lower
-            or "syntaxerror" in text_lower
-            or "winerror 10061" in text_lower
-            or "connection refused" in text_lower
-        )
-
-        if failure_interpreter_signal:
-            return {
-                "route": "project_brain_general_intelligence",
-                "mode": "project_brain_general_intelligence",
-                "intent": "failure_interpreter",
-                "confidence": 1.0,
-                "reasons": [
-                    "failure_interpreter_authority",
-                ],
-                "save_artifact": False,
-                "save_memory": False,
-                "use_memory": False,
-                "source_urls": [],
-                "sources": [],
-                "prompt": user_text,
-            }
-
-        failure_interpreter_signal = (
-            "what does this failure mean" in text_lower
-            or "failure report" in text_lower
-            or "failed smoke" in text_lower
-            or "smoke failed" in text_lower
-            or "assertionerror" in text_lower
-            or "indentationerror" in text_lower
-            or "syntaxerror" in text_lower
-            or "winerror 10061" in text_lower
-            or "connection refused" in text_lower
-            or "unexpected indent" in text_lower
-        )
-
-        if failure_interpreter_signal:
-            return {
-                "route": "project_brain_general_intelligence",
-                "mode": "project_brain_general_intelligence",
-                "intent": "failure_interpreter",
-                "confidence": 1.0,
-                "reasons": [
-                    "failure_interpreter_authority",
-                ],
-                "save_artifact": False,
-                "save_memory": False,
-                "use_memory": False,
-                "source_urls": [],
-                "sources": [],
-                "prompt": user_text,
-            }
-
-        failure_text_signal = (
-            "indentationerror" in text_lower
-            or "syntaxerror" in text_lower
-            or "unexpected indent" in text_lower
-            or "traceback" in text_lower
-            or "assertionerror" in text_lower
-            or "failed smoke" in text_lower
-            or "smoke failed" in text_lower
-        )
-
-        mission_control_signal = (
-            (
-                "mission control" in text_lower
-                or "mission-control" in text_lower
-                or (
-                    "show me the mission card" in text_lower
-                    and not failure_text_signal
-                )
-                or "operator mode" in text_lower
-                or (
-                    "failure interpreter" in text_lower
-                    and not failure_text_signal
-                )
-            )
-        )
-
-        if mission_control_signal:
-            return {
-                "route": "project_brain_general_intelligence",
-                "mode": "project_brain_general_intelligence",
-                "intent": "mission_control",
-                "confidence": 1.0,
-                "reasons": [
-                    "mission_control_signal",
-                ],
-                "save_artifact": False,
-                "save_memory": True,
-                "use_memory": True,
-                "source_urls": [],
-                "sources": [],
-                "prompt": user_text,
-            }
-
-        # PROJECT_BRAIN_BLOCKER_INTENT_AUTHORITY_PRIORITY_20260803
-        blocker_signal = (
-            "what is the current blocker" in text_lower
-            or "what's the current blocker" in text_lower
-            or "current blocker" in text_lower
-            or "what are we blocked on" in text_lower
-            or "what is blocking nova" in text_lower
-        )
-
-        if blocker_signal:
-            return {
-                "route": "project_brain_general_intelligence",
-                "mode": "project_brain_general_intelligence",
-                "intent": "actual_blocker",
-                "confidence": 1.0,
-                "reasons": [
-                    "project_brain_blocker_intent_authority",
-                ],
-                "save_artifact": False,
-                "save_memory": False,
-                "use_memory": True,
-                "source_urls": [],
-                "sources": [],
-                "prompt": user_text,
-            }
-
-        # existing function body stays here
-
-        # Real attachments always stay attachment-analysis.
-        if attachments:
-            return {
-                "route": self.ROUTE_ATTACHMENT_ANALYSIS,
-                "mode": "attachment_analysis",
-                "intent": "attachment",
-                "confidence": 1.0,
-                "reasons": ["intent_authority_real_attachments"],
-                "save_artifact": True,
-                "save_memory": True,
-                "use_memory": True,
-                "source_urls": [],
-                "sources": [],
-            }
-
-        # Project Brain mission/failure interpreter signals.
-        normalized_text = str(user_text or "").lower()
-
-        if (
-            (
-                "mission control" in normalized_text
-                or "mission card" in normalized_text
-                or "operator mode" in normalized_text
-            )
-            and not (
-                "indentationerror" in normalized_text
-                or "syntaxerror" in normalized_text
-                or "unexpected indent" in normalized_text
-                or "traceback" in normalized_text
-                or "assertionerror" in normalized_text
-                or "failed smoke" in normalized_text
-                or "smoke failed" in normalized_text
-            )
-        ):
-            return {
-                "route": "project_brain_general_intelligence",
-                "mode": "project_brain_general_intelligence",
-                "intent": "mission_control",
-                "confidence": 0.95,
-                "reasons": [
-                    "mission_control_signal",
-                    "failure_interpreter_signal",
-                ],
-                "save_artifact": False,
-                "save_memory": True,
-                "use_memory": True,
-                "source_urls": [],
-                "sources": [],
-                "prompt": user_text,
-            }
-
-        intent_decision = {}
-
-        try:
-            intent_service = getattr(self, "intent_service", None)
-
-            if intent_service is not None and hasattr(intent_service, "detect"):
-                print("INTENT AUTH TEXT:", repr(user_text))
-                intent_decision = intent_service.detect(user_text)
-                print("INTENT AUTH RESULT:", intent_decision)
-
-        except Exception:
-            intent_decision = {}
-
-        if isinstance(intent_decision, dict):
-            intent_route = str(intent_decision.get("route") or "").strip()
-            intent_confidence = float(intent_decision.get("confidence") or 0)
-
-            trusted_intents = {
-                "debugging",
-                "coding",
-                "planning",
-                "writing",
-                "current_project_state",
-                "project_brain_general_intelligence",
-            }
-
-
-            if (
-                "what does this failure mean" in text_lower
-                or "failure report" in text_lower
-                or "failed smoke" in text_lower
-                or "smoke failed" in text_lower
-                or "assertionerror" in text_lower
-            ):
-                return {
-                    "route": "project_brain_general_intelligence",
-                    "mode": "project_brain_general_intelligence",
-                    "intent": "failure_interpreter",
-                    "confidence": 1.0,
-                    "reasons": [
-                        "failure_interpreter_authority",
-                    ],
-                    "save_artifact": False,
-                    "save_memory": False,
-                    "use_memory": False,
-                    "source_urls": [],
-                    "sources": [],
-                    "prompt": user_text,
-                }
-
-        if (
-            intent_route
-            and (
-                intent_confidence >= 0.94
-                or intent_decision.get("intent") in trusted_intents
-            )
-        ):
-
-        if intent_decision and intent_decision.get("intent") == "planning":
-                return {
-                    "route": "project_brain_general_intelligence",
-                    "mode": "project_brain_general_intelligence",
-                    "intent": "planning",
-                    "confidence": intent_confidence,
-                    "reasons": list(intent_decision.get("reasons") or []) + [
-                        "planning_to_project_brain"
-                    ],
-                    "save_artifact": False,
-                    "save_memory": False,
-                    "use_memory": True,
-                    "source_urls": [],
-                    "sources": [],
-                    "prompt": user_text,
-                }
-
-            return {
-                "route": intent_route,
-                "mode": intent_decision.get("mode") or intent_decision.get("intent") or "chat",
-                "intent": intent_decision.get("intent") or "",
-                "confidence": intent_confidence,
-                "reasons": list(intent_decision.get("reasons") or []) + ["intent_authority"],
-                "save_artifact": bool(intent_decision.get("save_artifact", False)),
-                "save_memory": bool(intent_decision.get("save_memory", True)),
-                "use_memory": bool(intent_decision.get("use_memory", True)),
-                "source_urls": [],
-                "sources": [],
-                "prompt": intent_decision.get("prompt") or user_text,
-            }
-
-        decision = _nova_previous_decide_route_intent_authority_20260630(
-            self,
-            user_text=user_text,
-            attachments=attachments,
-            session_id=session_id,
-        )
-
-        if isinstance(intent_decision, dict):
-            intent_name = str(
-                intent_decision.get("intent") or ""
-            ).strip()
-
-            if intent_name in {
-                "coding",
-                "debugging",
-                "planning",
-                "writing",
-            }:
-                return {
-                    "route": intent_decision.get("route") or intent_name,
-                    "mode": intent_decision.get("mode") or intent_name,
-                    "intent": intent_name,
-                    "confidence": intent_decision.get("confidence") or 0,
-                    "reasons": list(
-                        intent_decision.get("reasons") or []
-                    ) + ["intent_authority"],
-                    "save_artifact": bool(
-                        intent_decision.get("save_artifact", False)
-                    ),
-                    "save_memory": bool(
-                        intent_decision.get("save_memory", True)
-                    ),
-                    "use_memory": bool(
-                        intent_decision.get("use_memory", True)
-                    ),
-                }
-
-        return decision
-
-    ChatService._decide_route = _nova_intent_authority_decide_route_20260630
-    _nova_boot_log_20260701("[NOVA_INTENT_AUTHORITY_DECIDE_ROUTE_20260630] installed")
-
-except Exception as _nova_intent_authority_install_error:
-    print(
-        "[NOVA_INTENT_AUTHORITY_DECIDE_ROUTE_20260630] failed:",
-        _nova_intent_authority_install_error,
-    )
-
-
-# NOVA_FINAL_LIVE_MARKET_PRICE_ROUTE_AUTHORITY_20260630
-# Final route authority: live market price questions must use web_fetch.
-# This prevents older chat/canned-answer layers from swallowing BTC/crypto/stock price requests.
-try:
-    _NOVA_PRE_FINAL_LIVE_MARKET_PRICE_DECIDE_20260630 = ChatService._decide_route
-
-    def _nova_final_live_market_price_text_20260630(args, kwargs):
-        for key in ("user_text", "text", "message", "prompt", "query"):
-            value = kwargs.get(key)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-
-        for value in args:
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-
-        return ""
-
-    def _nova_final_live_market_price_attachments_20260630(args, kwargs):
-        value = kwargs.get("attachments")
-        if value:
-            return value
-
-        if len(args) >= 2:
-            return args[1]
-
-        return None
-
-    def _nova_is_live_market_price_request_20260630(value):
-        text = " ".join(str(value or "").lower().replace("?", " ").split())
-        if not text:
-            return False
-
-        market_terms = (
-            "bitcoin",
-            "btc",
-            "crypto",
-            "stock",
-            "stocks",
-            "share",
-            "shares",
-        )
-
-        price_terms = (
-            "price",
-            "worth",
-            "trading at",
-            "right now",
-            "today",
-            "current",
-            "live",
-            "market",
-        )
-
-        return (
-            any(term in text for term in market_terms)
-            and any(term in text for term in price_terms)
-        )
-
-    def _nova_final_live_market_price_decide_20260630(self, *args, **kwargs):
-        user_text = _nova_final_live_market_price_text_20260630(args, kwargs)
-
-        print(
-            "FINAL ROUTE TEXT:",
-            repr(user_text),
-        )
-
-        attachments = _nova_final_live_market_price_attachments_20260630(
-            args,
-            kwargs,
-        )
-
-        # Attachments still win. This guard is only for clean text market-price questions.
-        if not attachments and _nova_is_live_market_price_request_20260630(user_text):
-            return {
-                "route": self.ROUTE_WEB_FETCH,
-                "mode": "web_fetch",
-                "confidence": 1.0,
-                "reasons": ["final_live_market_price_route_authority"],
-                "save_artifact": True,
-                "save_memory": False,
-                "use_memory": False,
-                "query": user_text,
-            }
-
-        return _nova_intent_authority_decide_route_20260630(self, *args, **kwargs)
-
-    ChatService._decide_route = _nova_final_live_market_price_decide_20260630
-    _nova_boot_log_20260701("[NOVA_FINAL_LIVE_MARKET_PRICE_ROUTE_AUTHORITY_20260630] installed")
-except Exception as _nova_final_live_market_price_error_20260630:
-    print("[NOVA_FINAL_LIVE_MARKET_PRICE_ROUTE_AUTHORITY_20260630] failed:", _nova_final_live_market_price_error_20260630)
-
-
-
-
-
-
-# NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701
-# Final top-priority guard for project-brain questions.
-# Prevents stale project brain fallback answers.
-# "No active task is currently tracked yet."
-try:
-    _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701 = ChatService.handle
-
-    def _nova_project_brain_question_text_20260701(args, kwargs):
-        for key in ("user_text", "message", "text", "prompt", "content"):
-            value = kwargs.get(key)
-            if isinstance(value, str) and value.strip():
-                return value
-
-        for arg in args:
-            if isinstance(arg, str) and arg.strip():
-                return arg
-            if isinstance(arg, dict):
-                for key in ("user_text", "message", "text", "prompt", "content"):
-                    value = arg.get(key)
-                    if isinstance(value, str) and value.strip():
-                        return value
-
-        return ""
-
-    def _nova_project_brain_question_session_20260701(args, kwargs):
-        for key in ("session_id", "active_session_id", "requested_session_id"):
-            value = kwargs.get(key)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-
-        for arg in args:
-            if isinstance(arg, dict):
-                for key in ("session_id", "active_session_id", "requested_session_id"):
-                    value = arg.get(key)
-                    if isinstance(value, str) and value.strip():
-                        return value.strip()
-
-        return ""
-
-    def _nova_project_brain_has_active_execution_20260711(
-        self,
-        session_id,
-    ):
-        try:
-            session_obj = (
-                self._get_session_payload(session_id)
-                or self._get_session(session_id)
-                or {}
-            )
-
-            if not isinstance(session_obj, dict):
-                return False
-
-            working_state = (
-                session_obj.get("working_state")
-                or {}
-            )
-
-            if not isinstance(
-                working_state,
-                dict,
-            ):
-                working_state = {}
-
-            execution_candidates = [
-                session_obj.get(
-                    "active_execution"
-                ),
-                session_obj.get(
-                    "execution_state"
-                ),
-                working_state.get(
-                    "active_execution"
-                ),
-                working_state.get(
-                    "execution_state"
-                ),
-            ]
-
-            terminal_statuses = {
-                "",
-                "idle",
-                "complete",
-                "completed",
-                "cancelled",
-                "canceled",
-                "stopped",
-                "failed",
-            }
-
-            for execution_state in execution_candidates:
-
-                if not isinstance(
-                    execution_state,
-                    dict,
-                ):
-                    continue
-
-                if bool(
-                    execution_state.get(
-                        "complete"
-                    )
-                ):
-                    continue
-
-                status = str(
-                    execution_state.get(
-                        "status"
-                    )
-                    or ""
-                ).strip().lower()
-
-                if status in terminal_statuses:
-                    continue
-
-                goal = str(
-                    execution_state.get(
-                        "goal"
-                    )
-                    or ""
-                ).strip()
-
-                current_step = str(
-                    execution_state.get(
-                        "current_step"
-                    )
-                    or ""
-                ).strip()
-
-                steps = (
-                    execution_state.get(
-                        "steps"
-                    )
-                    or []
-                )
-
-                if (
-                    goal
-                    or current_step
-                    or steps
-                ):
-                    return True
-
-        except Exception as exc:
-            try:
-                print(
-                    "[NOVA_ACTIVE_EXECUTION_PROJECT_BRAIN_PRIORITY_20260711] "
-                    "detection bypass:",
-                    exc,
-                )
-            except Exception:
-                pass
-
-        return False
-
-    def _nova_project_brain_question_kind_20260701(user_text):
-        text = str(user_text or "").strip().lower()
-        text = text.replace("?", "'").replace("`", "")
-        text = " ".join(text.split())
-        bare = text.rstrip("?!.")
-        
-        if (
-            "nova status" in bare
-            or "give me the nova status" in bare
-            or "status without hype" in bare
-            or "where are we at with nova" in bare
-            or "where are we at" in bare
-        ):
-            return "current_project_state"
-
-        if (
-            "what does this failure mean" in bare
-            or "failure" in bare
-            and (
-                "error" in bare
-                or "traceback" in bare
-                or "failed" in bare
-                or "smoke" in bare
-            )
-        ):
-            return "failure_interpreter"
-
-        if (
-            (
-                "mission control" in bare
-                or "mission-control" in bare
-                or "show mission" in bare
-                or "mission card" in bare
-                or "show mission card" in bare
-                or "project mission" in bare
-            )
-            and not (
-                "indentationerror" in bare
-                or "syntaxerror" in bare
-                or "unexpected indent" in bare
-                or "traceback" in bare
-                or "assertionerror" in bare
-                or "failed smoke" in bare
-                or "smoke failed" in bare
-            )
-        ):
-            return "mission_control"
-
-        if (
-            "current blocker" in bare
-            or "what is the current blocker" in bare
-            or "what's the current blocker" in bare
-            or bare == "blocker"
-        ):
-            return "actual_blocker"
-
-        if (
-            bare in {
-                "what are we working on",
-                "what are we working on now",
-                "what are we working on right now",
-                "what are we doing",
-                "what am i working on",
-                "what is the current task",
-                "current task",
-            }
-            or "where are we at with nova" in bare
-            or bare == "where are we at"
-            or bare == "where is nova at"
-            or "nova status" in bare
-            or "give me the nova status" in bare
-            or "status without hype" in bare
-            or (
-                "what changed" in bare
-                and "nova" in bare
-            )
-        ):
-            return "working"
-
-        if bare in {
-            "what's next",
-            "whats next",
-            "what is next",
-            "what should we work on next",
-            "what should we do next",
-            "next move",
-        }:
-            return "next"
-
-        if bare in {
-            "what's next",
-            "whats next",
-            "what is next",
-            "what should we work on next",
-            "what should we do next",
-            "next move",
-        }:
-            return "next"
-
-        if (
-            "indentationerror" in bare
-            or "syntaxerror" in bare
-            or "unexpected indent" in bare
-            or "traceback" in bare
-            or "assertionerror" in bare
-            or "failed smoke" in bare
-            or "smoke failed" in bare
-            or (
-                "failure" in bare
-                and (
-                    "error" in bare
-                    or "failed" in bare
-                    or "smoke" in bare
-                )
-            )
-            or "what does this failure mean" in bare
-        ):
-            return "failure_interpreter"
-
-        return ""
-
-    def _nova_project_brain_bad_answer_20260701(answer):
-        text = str(answer or "").strip()
-        low = text.lower()
-
-        if not text:
-            return True
-
-        bad_exact = {
-            "no active task is currently tracked yet.",
-            "no active task is currently tracked.",
-            "nothing active is tracked right now.",
-            "active task:\nno active task is currently tracked yet.",
-            "active task:\nno active task is currently tracked.",
-        }
-
-        if low in bad_exact:
-            return True
-
-        bad_starts = (
-            "next: tell me",
-            "reply with the task",
-            "paste the current file path",
-            "start with the highest-impact unblocker",
-            "no active execution mission",
-        )
-
-        return low.startswith(bad_starts)
-
-    def _nova_project_brain_answer_20260701(
-        kind,
-        session_id,
-        user_text="",
-    ):
-        print(
-            "[ANSWER BUILDER DEBUG]",
-            repr(kind),
-        )
-
-        question = (
-            "give me mission control"
-            if kind == "mission_control"
-            else "what are we working on?"
-            if kind == "working"
-            else user_text
-            if kind == "failure_interpreter"
-            else "give me the Nova status without hype"
-            if kind == "current_project_state"
-            else "what's next?"
-        )
-
-        answer = ""
-
-        try:
-            print(
-                "[ANSWER KIND BEFORE BRANCH]",
-                repr(kind),
-                repr(user_text),
-            )
-
-            if kind == "failure_interpreter":
-                from nova_backend.services.project_brain_failure_interpreter import (
-                    build_project_brain_failure_interpreter_answer,
-                )
-
-                answer = build_project_brain_failure_interpreter_answer(
-                    user_text=user_text,
-                    pasted_output=user_text,
-                )
-
-            elif kind == "mission_control":
-                from nova_backend.services.project_brain_general_intelligence import (
-                    build_project_brain_general_answer,
-                )
-
-                fresh_answer = build_project_brain_general_answer(
-                    question,
-                    user_id="",
-                )
-
-                answer = str(
-                    getattr(
-                        fresh_answer,
-                        "text",
-                        fresh_answer,
-                    )
-                    or ""
-
-                ).strip()
-
-            elif kind == "actual_blocker":
-                from nova_backend.services.project_brain_general_intelligence import (
-                    build_project_brain_general_answer,
-                )
-
-                fresh_answer = build_project_brain_general_answer(
-                    question,
-                    user_id="",
-                )
-
-                answer = str(
-                    getattr(
-                        fresh_answer,
-                        "text",
-                        fresh_answer,
-                    )
-                    or ""
-                ).strip()
-
-            elif kind == "current_project_state":
-                from nova_backend.services.project_brain_general_intelligence import (
-                    build_project_brain_general_answer,
-                )
-
-                print(
-                    "[CHAT SERVICE CALLING PBGI]",
-                    repr(user_text),
-                    "kind=",
-                    repr(kind),
-                )
-
-                fresh_answer = build_project_brain_general_answer(
-                    question,
-                    user_id="",
-                )
-
-                answer = str(
-                    getattr(
-                        fresh_answer,
-                        "text",
-                        fresh_answer,
-                    )
-                    or ""
-                ).strip()
-
-                print(
-                    "[CURRENT PROJECT ANSWER DEBUG]",
-                    repr(answer[:300]),
-                )
-            elif kind == "working":
-                from nova_backend.services.project_state_service import (
-                    answer_project_state_question,
-                )
-
-                if callable(answer_project_state_question):
-                    answer = str(
-                        answer_project_state_question(
-                            question,
-                            session_id=session_id,
-                        )
-                        or ""
-                    ).strip()
-
-            elif kind == "next":
-                from nova_backend.services.project_brain_general_intelligence import (
-                    build_project_brain_general_answer,
-                )
-
-                general_answer = build_project_brain_general_answer(
-                    question,
-                    user_id="",
-                )
-
-                if isinstance(general_answer, dict):
-                    answer = str(
-                        general_answer.get("content")
-                        or general_answer.get("text")
-                        or general_answer.get("answer")
-                        or ""
-                    ).strip()
-
-                else:
-                    answer = str(
-                        getattr(
-                            general_answer,
-                            "text",
-                            general_answer,
-                        )
-                        or ""
-                    ).strip()
-
-        except Exception as exc:
-            import traceback
-
-            traceback.print_exc()
-
-            print(
-                "[NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701] fresh answer bypass:",
-                exc,
-            )
-
-        print(
-            "[FINAL PROJECT BRAIN ANSWER DEBUG]",
-            repr(answer),
-        )
-
-        print(
-            "[BLOCKER FINAL ANSWER DEBUG]",
-            repr(kind),
-            repr(answer),
-        )
-
-        if kind in {
-            "mission_control",
-            "failure_interpreter",
-            "actual_blocker",
-            "current_project_state",
-        }:
-            return answer
-
-        if not _nova_project_brain_bad_answer_20260701(answer):
-            return answer
-
-        if kind == "next":
-            return (
-                "Current Nova project context:\n"
-                "Current task: fix Nova project brain answer quality.\n"
-                "Next move: continue improving project brain routing and verify the regression smoke."
-            )
-
-        return (
-            "Current Nova project context:\n"
-            "Current task: fix Nova project brain answer quality."
-        )
-    def _nova_project_brain_response_20260701(
-        text,
-        session_id,
-        first_message=False,
-    ):
-        meta = {
-            "route": "project_brain_general_intelligence",
-            "strategy": "project_brain_general_intelligence",
-            "session_id": session_id,
-            "source_urls": [],
-            "sources": [],
-        }
-
-        assistant_message = {
-            "role": "assistant",
-            "content": text,
-            "text": text,
-            "attachments": [],
-            "meta": meta,
-        }
-
-        if first_message:
-            onboarding_payload = {
-                "onboarding": True,
-                "welcome_message": (
-                    "Welcome to your AI workspace.\n\n"
-                    "I can help you answer questions, plan projects, "
-                    "analyze files, work with documents, and create "
-                    "new things.\n\n"
-                    "For more information, check out Help in the menu."
-                ),
-                "actions": [
-                    {
-                        "label": "Start a project",
-                        "prompt": "Help me start a project",
-                        "intent": "project",
-                    },
-                    {
-                        "label": "Learn Nova",
-                        "prompt": "Show me how Nova works",
-                        "intent": "help",
-                    },
-                ],
-            }
-        else:
-            onboarding_payload = {}
-
-        return {
-            "ok": True,
-            "assistant_message": assistant_message,
-            "saved_artifact": None,
-            "session": {
-                "id": session_id,
-                "session_id": session_id,
-                "messages": [assistant_message],
-                "attachments": [],
-                "meta": meta,
-            },
-            "route": "project_brain_general_intelligence",
-            "route_taken": "project_brain_general_intelligence",
-            "debug": {
-                "route": "project_brain_general_intelligence",
-                "route_taken": "project_brain_general_intelligence",
-            },
-            "meta": meta,
-            "session_id": session_id,
-            "active_session_id": session_id,
-        }
-
-    def _nova_project_brain_question_top_priority_handle_20260701(
-        self,
-        *args,
-        **kwargs,
-    ):
-        user_text = (
-            _nova_project_brain_question_text_20260701(
-                args,
-                kwargs,
-            )
-        )
-
-        _nova_first_message = user_text
-
-        print(
-            "[QUESTION TEXT DEBUG]",
-            repr(user_text),
-        )
-
-        kind = (
-            _nova_project_brain_question_kind_20260701(
-                user_text
-            )
-        )
-
-        print(
-            "[KIND CHECK BEFORE ANSWER]",
-            repr(user_text),
-            repr(kind),
-        )
-
-        print(
-            "[PROJECT BRAIN DEBUG]",
-            repr(user_text),
-            repr(kind),
-        )
-
-        if kind:
-            session_id = (
-                _nova_project_brain_question_session_20260701(
-                    args,
-                    kwargs,
-                )
-            )
-
-            answer = ""
-
-            print(
-                "[EXECUTION CHECK DEBUG]",
-                repr(session_id),
-                _nova_project_brain_has_active_execution_20260711(
-                    self,
-                    session_id,
-                ),
-            )
-
-            if kind == "current_project_state":
-                from nova_backend.services.project_brain_general_intelligence import (
-                    build_project_brain_general_answer,
-                )
-
-                fresh_answer = build_project_brain_general_answer(
-                    user_text,
-                    user_id="",
-                )
-
-                return _nova_project_brain_response_20260701(
-                    fresh_answer.text,
-                    session_id,
-                    first_message=False,
-                )
-
-            if (
-                _nova_project_brain_has_active_execution_20260711(
-                    self,
-                    session_id,
-                )
-            ):
-                pre_project_state_handle = globals().get(
-                    "_NOVA_PRE_PROJECT_STATE_FRESH_PRIORITY_HANDLE_20260701"
-                )
-
-                return (
-                    _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701(
-                        self,
-                        *args,
-                        **kwargs,
-                    )
-                )
-
-        return (
-            _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701(
-                self,
-                *args,
-                **kwargs,
-            )
-        )
-
-
-    if hasattr(ChatService, "handle"):
-
-        ChatService.handle = _nova_project_brain_question_top_priority_handle_20260701
-
-        ChatService._NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701 = True
-        print("[NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701] installed")
-
-except Exception as _nova_project_brain_question_top_priority_error_20260701:
-    try:
-        print(
-            "[NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701] failed:",
-            _nova_project_brain_question_top_priority_error_20260701,
-        )
-    except Exception:
-        pass
 
 def _nova_attachment_guard_method_looks_like_result_web_route(name):
     lowered = str(name or "").lower()
@@ -16260,3 +11352,26 @@ def _nova_attachment_guard_method_looks_like_result_web_route(name):
         return False
 
     return True
+
+def install_chat_service_runtime_patches():
+    install_project_brain_patch(ChatService)
+
+    try:
+        install_execution_planner_runtime_patches(ChatService)
+    except Exception:
+        pass
+
+    try:
+        install_token_usage_finalize_wrapper(ChatService)
+    except Exception:
+        pass
+
+    try:
+        install_non_web_source_leak_guard(ChatService)
+    except Exception:
+        pass
+
+    try:
+        install_attachment_web_suppression()
+    except Exception:
+        pass

@@ -145,11 +145,34 @@ class ChatExecutionService:
         return self._copy_state(state)
 
     def advance(self, session_id: str) -> Dict[str, Any]:
-        safe_session_id = self._safe_session_id(session_id)
-        state = self._states.get(safe_session_id)
+        safe_session_id = self._safe_session_id(
+            session_id
+        )
 
-        if state and str(state.get("status") or "").strip().lower() == "idle":
-            return self._copy_state(state)
+        state = self._states.get(
+            safe_session_id
+        )
+
+        if not state:
+            try:
+                self._load_states()
+
+                state = self._states.get(
+                    safe_session_id
+                )
+
+            except Exception as e:
+                logger.error(
+                    "[ChatExecutionService] LOAD STATE FAILED: %s",
+                    e,
+                )
+
+        if state and str(
+            state.get("status") or ""
+        ).strip().lower() == "idle":
+            return self._copy_state(
+                state
+            )
 
         if not state:
             return {
@@ -161,7 +184,10 @@ class ChatExecutionService:
                 "history": [],
                 "waiting": False,
                 "complete": False,
-                "error": "No active execution mission. Start one with auto-plan <goal>.",
+                "error": (
+                    "No active execution mission. "
+                    "Start one with auto-plan <goal>."
+                ),
             }
 
         if state.get("status") == "failed":
@@ -216,13 +242,16 @@ class ChatExecutionService:
         state["current_index"] = next_index
 
         if next_index >= len(steps):
+
             state["status"] = "complete"
             state["waiting"] = False
             state["complete"] = True
             state["current_step"] = None
+
         else:
-            state["status"] = "waiting"
-            state["waiting"] = True
+
+            state["status"] = "running"
+            state["waiting"] = False
             state["complete"] = False
             state["current_step"] = steps[next_index]
 

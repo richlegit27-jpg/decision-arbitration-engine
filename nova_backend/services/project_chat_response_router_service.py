@@ -1,4 +1,5 @@
-﻿import json
+﻿
+import json
 import importlib.util
 from pathlib import Path
 
@@ -1123,6 +1124,21 @@ def build_project_answer(user_text):
 
     return _nova_natural_project_load_answer_20260701(mapped)
 
+def route_project_chat_response(user_text):
+    """
+    Public router entrypoint used by project_next_endpoint_service.
+    """
+    reply = build_project_answer(user_text)
+
+    if not reply:
+        return None
+
+    payload = {
+        "route": "project_chat_response_router",
+        "prompt": user_text,
+    }
+
+    return apply_project_route(payload, reply)
 
 def apply_project_route(payload, reply):
     return _nova_natural_project_payload_20260701(
@@ -1135,3 +1151,6 @@ def patch_payload(payload, reply):
         payload,
         reply,
     )
+
+def route_project_chat_response(user_text):
+    return build_project_answer(user_text)

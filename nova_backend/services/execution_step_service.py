@@ -20,13 +20,19 @@ class ExecutionStepService:
             or ExecutionApprovalService()
         )
 
-    def _safe_str(self, value):
+    def _safe_str(
+        self,
+        value,
+    ):
         if callable(self.safe_str):
             return self.safe_str(value)
 
         return str(value or "")
 
-    def _implementation_content(self, step):
+    def _implementation_content(
+        self,
+        step,
+    ):
         for key in (
             "content",
             "file_content",
@@ -66,17 +72,42 @@ class ExecutionStepService:
                 step.get("action")
             ).strip().lower()
 
+            ACTION_ALIASES = {
+                "analysis": "design",
+                "analyze": "design",
+                "research": "design",
+                "review": "design",
+                "planning": "design",
+                "plan": "design",
+                "architecture": "design",
+                "integration": "design",
+                "optimization": "design",
+                "delivery": "design",
+                "implementation": "implement",
+                "implementing": "implement",
+                "coding": "implement",
+                "testing": "test",
+                "validation": "test",
+            }
+
+            step_action = ACTION_ALIASES.get(
+                step_action,
+                step_action,
+            )
+
             target_file = self._safe_str(
                 step.get("target_file")
             ).strip()
 
             if step_action == "design":
+
                 step["result"] = (
                     "Designed execution structure."
                 )
                 step["error"] = None
 
             elif step_action == "implement" and target_file:
+
                 if (
                     self.python_runner is None
                     or not self.python_runner.is_path_allowed(
@@ -120,6 +151,7 @@ class ExecutionStepService:
                 step["result"] = (
                     f"Created file: {target_file}"
                 )
+
                 step["error"] = None
 
             elif (
@@ -132,6 +164,7 @@ class ExecutionStepService:
                 and target_file
                 and self.python_runner is not None
             ):
+
                 python_result = (
                     self.python_runner.run_file(
                         target_file
@@ -145,6 +178,7 @@ class ExecutionStepService:
                 )
 
                 step["result"] = result
+
                 step["error"] = (
                     None
                     if python_result.get("ok")
@@ -152,6 +186,7 @@ class ExecutionStepService:
                 )
 
             else:
+
                 action_label = (
                     step_action
                     or "missing"
@@ -167,3 +202,5 @@ class ExecutionStepService:
         except Exception as e:
             step["status"] = "failed"
             step["error"] = str(e)
+
+        return step

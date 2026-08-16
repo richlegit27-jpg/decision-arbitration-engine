@@ -1,16 +1,21 @@
 class ExecutionMutationService:
 
-    def __init__(self, execution_state_service=None):
+    def __init__(
+        self,
+        execution_state_service=None,
+    ):
         self.execution_state_service = execution_state_service
 
     def mark_running(
         self,
         execution_state,
         step_index=0,
-        current_step="",
+        current_step=None,
         waiting=False,
     ):
-        execution_state = dict(execution_state or {})
+        execution_state = dict(
+            execution_state or {}
+        )
 
         execution_state["status"] = "running"
         execution_state["complete"] = False
@@ -18,8 +23,20 @@ class ExecutionMutationService:
         execution_state["lock"] = False
 
         execution_state["current_index"] = step_index
-        execution_state["current_step"] = current_step or ""
-        execution_state["current_step_title"] = current_step or ""
+
+        if current_step is not None:
+            execution_state["current_step"] = current_step
+            execution_state["current_step_title"] = current_step
+
+        else:
+            existing_step = (
+                execution_state.get("current_step")
+                or execution_state.get("current_step_title")
+                or ""
+            )
+
+            execution_state["current_step"] = existing_step
+            execution_state["current_step_title"] = existing_step
 
         return execution_state
 
@@ -27,7 +44,9 @@ class ExecutionMutationService:
         self,
         execution_state,
     ):
-        execution_state = dict(execution_state or {})
+        execution_state = dict(
+            execution_state or {}
+        )
 
         steps = execution_state.get("steps") or []
 
@@ -61,22 +80,17 @@ class ExecutionMutationService:
         execution_state["complete"] = False
         execution_state["waiting"] = True
         execution_state["lock"] = False
-        execution_state["current_index"] = (
-            step_index
-        )
-        execution_state[
-            "current_step_index"
-        ] = step_index
-        execution_state[
-            "failed_step_index"
-        ] = step_index
+
+        execution_state["current_index"] = step_index
+        execution_state["current_step_index"] = step_index
+        execution_state["failed_step_index"] = step_index
+
         execution_state["error"] = str(
             error
             or "Execution step failed."
         )
-        execution_state[
-            "_execution_processing"
-        ] = False
+
+        execution_state["_execution_processing"] = False
 
         return execution_state
 
@@ -90,34 +104,23 @@ class ExecutionMutationService:
             execution_state or {}
         )
 
-        execution_state["status"] = (
-            "waiting_approval"
-        )
+        execution_state["status"] = "waiting_approval"
         execution_state["complete"] = False
         execution_state["waiting"] = True
         execution_state["lock"] = False
-        execution_state["current_index"] = (
-            step_index
-        )
-        execution_state[
-            "current_step_index"
-        ] = step_index
-        execution_state[
-            "approval_required"
-        ] = True
-        execution_state[
-            "approval_status"
-        ] = "pending"
+
+        execution_state["current_index"] = step_index
+        execution_state["current_step_index"] = step_index
+
+        execution_state["approval_required"] = True
+        execution_state["approval_status"] = "pending"
+
         execution_state["error"] = str(
             reason
-            or (
-                "Approval required "
-                "before execution."
-            )
+            or "Approval required before execution."
         )
-        execution_state[
-            "_execution_processing"
-        ] = False
+
+        execution_state["_execution_processing"] = False
 
         return execution_state
 
@@ -156,9 +159,7 @@ class ExecutionMutationService:
             + 1
         )
 
-        execution_state["failure_count"] = (
-            failure_count
-        )
+        execution_state["failure_count"] = failure_count
 
         steps = execution_state.get("steps") or []
 
@@ -175,20 +176,14 @@ class ExecutionMutationService:
         if failed_index is None:
             return execution_state, None
 
-
-
         strategies = {
             1: "retry_step",
             2: "retry_with_smaller_scope",
             3: "retry_with_file_scope",
         }
 
-        execution_state["failure_count"] = (
-            failure_count
-        )
-        execution_state["current_index"] = (
-            failed_index
-        )
+        execution_state["current_index"] = failed_index
+
         execution_state["retry_strategy"] = (
             strategies.get(
                 failure_count,
@@ -209,6 +204,7 @@ class ExecutionMutationService:
         execution_state["waiting"] = False
         execution_state["lock"] = False
         execution_state["next_moves"] = []
+
         execution_state["current_step"] = ""
         execution_state["current_step_title"] = ""
 

@@ -1,0 +1,809 @@
+import uuid
+class ChatResponseHandler:
+
+    def __init__(self, chat_service):
+        self.chat_service = chat_service
+
+    def exec_debug(self, *args, **kwargs):
+        print(*args, **kwargs)
+
+
+    def extract_response_text(self, resp) -> str:
+        try:
+            output_text = getattr(resp, "output_text", None)
+
+            if output_text:
+                return str(output_text).strip()
+
+        except Exception:
+            pass
+
+        try:
+            data = (
+                resp.model_dump()
+                if hasattr(resp, "model_dump")
+                else {}
+            )
+
+        except Exception:
+            data = {}
+
+        if isinstance(data, dict):
+
+            text_parts = []
+
+            for item in data.get("output") or []:
+
+                if not isinstance(item, dict):
+                    continue
+
+                for part in item.get("content") or []:
+
+                    if not isinstance(part, dict):
+                        continue
+
+                    text_value = (
+                        part.get("text")
+                        or part.get("output_text")
+                    )
+
+                    if text_value:
+                        text_parts.append(
+                            str(text_value)
+                        )
+
+            if text_parts:
+                return "\n".join(
+                    text_parts
+                ).strip()
+
+            for key in (
+                "text",
+                "content",
+                "message",
+            ):
+                value = data.get(key)
+
+                if value:
+                    return str(value).strip()
+
+        try:
+            if hasattr(resp, "output"):
+
+                for item in resp.output:
+
+                    content = getattr(
+                        item,
+                        "content",
+                        [],
+                    )
+
+                    for part in content:
+
+                        text_value = getattr(
+                            part,
+                            "text",
+                            None,
+                        )
+
+                        if text_value:
+                            return str(
+                                text_value
+                            ).strip()
+
+        except Exception:
+            pass
+
+        return ""
+
+    def _clean_final_response_text(
+        self,
+        text: str,
+        response_policy=None,
+        mission_mode: str = "",
+        user_text: str = "",
+    ) -> str:
+        text = self.chat_service.safe_str(text).strip()
+        user_text_raw = self.chat_service.safe_str(user_text).strip()
+        user_text_lc = user_text_raw.lower()
+        response_policy = response_policy if isinstance(response_policy, dict) else {}
+
+        self.exec_debug("CLEAN_FINAL_HIT:", user_text_raw)
+
+        # === SMFF HARD OVERRIDE FOR CODE HELP ===
+        try:
+            memory_text = str(
+                self.memory_context_service.format_memory_context(
+                    getattr(self, "_last_used_memory_items", [])
+                )
+            ).lower()
+        except Exception:
+            memory_text = ""
+
+        smff_active = any(
+            x in memory_text
+            for x in [
+                "smff",
+                "full-file",
+                "full file",
+                "full code",
+                "powershell",
+                "direct",
+                "no fluff",
+            ]
+        )
+
+        code_intent = any(
+            x in user_text_lc
+            for x in [
+                "fix",
+                "function",
+                "code",
+                "python",
+                "flask",
+                "route",
+                "error",
+                "traceback",
+                "syntaxerror",
+                "indentationerror",
+                "attributeerror",
+                ".py",
+                ".js",
+                ".html",
+                ".css",
+            ]
+        )
+
+        asks_alternatives = any(
+            x in user_text_lc
+            for x in [
+                "alternative",
+                "alternatives",
+                "another way",
+                "different way",
+                "options",
+                "other answer",
+                "other answers",
+                "different answer",
+            ]
+        )
+
+        if smff_active and code_intent and not asks_alternatives:
+            return (
+                "Send full file path + full broken code.\n"
+                "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll return the full replacement, cleanly indented.\n\n"
+                "PowerShell test:\n"
+                "python -m py_compile <file_path>"
+            )
+
+        if smff_active and code_intent and asks_alternatives:
+            return (
+                "Option A ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â safest:\n"
+                "Send the full file path + full broken file. IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll return the full-file replacement.\n\n"
+                "Option B ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â faster:\n"
+                "Send the full function only. IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll return the full function replacement.\n\n"
+                "Option C ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â debug-only:\n"
+                "Run this and send the exact error:\n"
+                "python -m py_compile <file_path>"
+            )
+
+        filler_phrases = [
+            "if you want",
+            "i can also",
+            "would you like",
+            "i can give you",
+            "i can help with",
+            "more realistic",
+            "more cartoon",
+            "wallpaper format",
+            "transparent background",
+            "transparent background version",
+        ]
+        cleaned_lines = []
+
+        for line in text.splitlines():
+            lowered = line.strip().lower()
+
+            if any(phrase in lowered for phrase in filler_phrases):
+                break
+
+            cleaned_lines.append(line)
+
+        text = "\n".join(cleaned_lines).strip()
+
+        if not text:
+            return ""
+
+        if "Generated image:" in text:
+            return text
+
+        # === PREVENT DUPLICATE SMFF INTAKE ===
+        if (
+            "Send the full function and file path." in text
+            and "full replacement block" in text
+        ):
+            return (
+                "Send the full function and file path.\n"
+                "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll return the full replacement block, cleanly indented."
+            )
+
+        kill_phrases = [
+            "i can help",
+            "let me know",
+            "feel free",
+            "hopefully",
+            "in conclusion",
+            "overall",
+            "you might want",
+            "one option is",
+        ]
+
+        lines = []
+        for line in text.split("\n"):
+            clean = line.strip()
+            lc = clean.lower()
+
+            if not clean:
+                continue
+
+            if any(p in lc for p in kill_phrases):
+                continue
+
+            lines.append(clean)
+
+        text = "\n".join(lines).strip()
+
+        bad_endings = [
+            "Example:",
+            "HereÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s how:",
+            "Here's how:",
+            "This prints:",
+            "That prints:",
+            "Output:",
+            "Result:",
+        ]
+
+        for bad in bad_endings:
+            if text.endswith(bad):
+                text = text[: -len(bad)].strip()
+
+        lines = [line.rstrip() for line in text.splitlines() if line.strip()]
+
+        while lines:
+            last = lines[-1].strip()
+            last_lc = last.lower()
+
+            if (
+                last.endswith(":")
+                or last.endswith("-")
+                or last_lc
+                in {"example", "output", "result", "hereÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s how", "here's how"}
+            ):
+                lines.pop()
+                continue
+
+            break
+
+        text = "\n".join(lines).strip()
+
+        if user_text_lc.startswith("latest"):
+            useful = [line for line in text.split("\n") if line.strip()]
+            text = "\n".join(useful[:6]).strip() or text
+
+        if any(
+            line.strip().startswith(("1.", "2.", "3.", "4.", "5."))
+            for line in text.split("\n")
+        ):
+            text = "\n".join(text.split("\n")[:7]).strip()
+
+        if response_policy.get("answer_length") == "short":
+            text = "\n".join(text.split("\n")[:6]).strip()
+
+        if response_policy.get("user_frustrated"):
+            text = text.replace("please", "").replace("kindly", "").strip()
+
+        # =============================
+        # ANSWER PUNCH
+        # =============================
+
+        punch_rewrites = {
+            "javascript is a programming language used to make websites interactive.": (
+                "JavaScript = the language that makes websites interactive."
+            ),
+            "python is a high-level programming language.": (
+                "Python = a readable programming language used for scripts, apps, automation, data, and AI."
+            ),
+            "css stands for cascading style sheets.": (
+                "CSS = the styling language for webpages."
+            ),
+            "html stands for hypertext markup language.": (
+                "HTML = the structure language of webpages."
+            ),
+        }
+
+        lines = text.split("\n")
+        if lines:
+            first_lc = lines[0].strip().lower()
+            if first_lc in punch_rewrites:
+                lines[0] = punch_rewrites[first_lc]
+
+        text = "\n".join(lines).strip()
+
+        # =============================
+        # AUTHORITY TONE
+        # =============================
+
+        hedges = [
+            "maybe",
+            "perhaps",
+            "possibly",
+            "generally",
+            "typically",
+            "usually",
+            "kind of",
+            "sort of",
+        ]
+
+        strong_lines = []
+        for line in text.split("\n"):
+            clean_line = line.strip()
+
+            if len(clean_line.split()) > 5:
+                for hedge in hedges:
+                    clean_line = clean_line.replace(hedge, "").replace(
+                        hedge.title(), ""
+                    )
+
+            strong_lines.append(" ".join(clean_line.split()))
+
+        text = "\n".join(strong_lines).strip()
+
+        return text or ""
+
+    def _finalize_response(
+        self,
+        session_id: str = "",
+        user_text: str = "",
+        user_msg=None,
+        assistant_msg=None,
+        decision=None,
+        saved_artifact=None,
+        execution_state=None,
+        working_context_payload=None,
+        should_inject_working_context=False,
+        **extra,
+    ) -> dict:
+
+        print(
+            "[FINALIZE RESPONSE ENTERED]",
+            {
+                "session_id": session_id,
+                "user_text": user_text,
+                "has_user_msg": isinstance(user_msg, dict),
+                "has_assistant_msg": isinstance(assistant_msg, dict),
+            },
+        )
+
+        decision = decision if isinstance(decision, dict) else {}
+        print(
+            "[FINALIZE DECISION EXECUTION DEBUG]",
+            decision.get("execution_state"),
+        )
+
+        session_id = self.chat_service._ensure_session_id(session_id)
+        attachments = extra.get("attachments") or []
+
+        memory_written = False
+
+        clean_memory_user_text = self.chat_service.safe_str(
+            locals().get("original_user_text") or user_text
+        ).strip()
+
+        for marker in (
+            "Project-aware context for Nova:",
+            "Relevant persistent memory:",
+            "Recent session context:",
+            "[RECENT SESSION CONTEXT]",
+            "[RANKED MEMORY + WORKING STATE]",
+        ):
+            if marker in clean_memory_user_text:
+                clean_memory_user_text = (
+                    clean_memory_user_text.split(marker, 1)[0].strip()
+                )
+
+        try:
+            memory_written = self.chat_service._maybe_write_memory(
+                decision,
+                clean_memory_user_text,
+                session_id,
+            )
+        except Exception as e:
+            self.exec_debug(
+                "FINALIZE_MEMORY_WRITE_ERROR:",
+                e,
+            )
+
+        # NOVA_DIRECT_MEMORY_SAVE_RESPONSE_LOCK_20260618
+        clean_memory_lc = " ".join(clean_memory_user_text.lower().split())
+        memory_recall_or_forget = clean_memory_lc.startswith((
+            "what is ",
+            "what's ",
+            "whats ",
+            "do you remember ",
+            "forget ",
+            "delete ",
+            "remove ",
+        ))
+
+        if (
+            memory_written
+            and not memory_recall_or_forget
+            and self.chat_service._should_save_memory_text(clean_memory_user_text)
+        ):
+            memory_text = clean_memory_user_text
+
+            return {
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": "Got it. I'll keep that in mind.",
+                    "content": "Got it. I'll keep that in mind.",
+                }
+            }
+
+            decision["route"] = "memory_save"
+            decision["mode"] = "memory_save"
+            decision["save_memory"] = False
+            decision["use_memory"] = False
+            decision["sources"] = []
+            decision["source_urls"] = []
+
+            self.chat_service._last_web_source_urls = []
+            self.chat_service._last_web_sources = []
+
+        if isinstance(assistant_msg, dict):
+            existing_meta = assistant_msg.get("meta")
+            meta = existing_meta if isinstance(existing_meta, dict) else {}
+
+            # preserve existing keys (like sources)
+            meta.setdefault("sources", meta.get("sources", []))
+            meta.setdefault("source_urls", meta.get("source_urls", []))
+
+            # CACHE_WEB_SOURCES_IN_FINALIZE_RESPONSE_LOCK
+            try:
+                source_urls_for_cache = meta.get("source_urls")
+                sources_for_cache = meta.get("sources")
+
+                # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
+                if (not attachments) and (
+                    isinstance(source_urls_for_cache, list) and source_urls_for_cache
+                ):
+                    import json
+                    from pathlib import Path
+                    from datetime import datetime
+
+                    cache_path = Path(
+                        r"C:\Users\Owner\nova\data\nova_last_web_sources.json"
+                    )
+                    cache_path.parent.mkdir(parents=True, exist_ok=True)
+
+                    cache_payload = {
+                        "updated_at": datetime.now().isoformat(timespec="seconds"),
+                        "session_id": self.chat_service.safe_str(session_id),
+                        "source_urls": [
+                            self.chat_service.safe_str(url).strip()
+                            for url in source_urls_for_cache[:5]
+                            if self.chat_service.safe_str(url).strip()
+                        ],
+                        "sources": (
+                            sources_for_cache[:5]
+                            if isinstance(sources_for_cache, list)
+                            else []
+                        ),
+                    }
+
+                    cache_path.write_text(
+                        json.dumps(cache_payload, indent=2, ensure_ascii=False),
+                        encoding="utf-8",
+                    )
+            except Exception as exc:
+                self.exec_debug("CACHE_WEB_SOURCES_IN_FINALIZE_RESPONSE_FAILED:", exc)
+
+            if not meta.get("sources"):
+                import re
+
+                assistant_text = self.chat_service.safe_str(
+                    assistant_msg.get("text") or assistant_msg.get("content") or ""
+                )
+
+                found_urls = re.findall(r"https?://[^\s\)\]\}<>\"']+", assistant_text)
+
+                parsed_sources = []
+                parsed_urls = []
+
+                for found_url in found_urls[:10]:
+                    clean_url = found_url.rstrip(".,;:")
+                    if not clean_url:
+                        continue
+
+                    domain = (
+                        clean_url.split("/")[2] if "://" in clean_url else clean_url
+                    )
+                    slug = clean_url.rstrip("/").split("/")[-1]
+                    clean_title = (
+                        slug.replace("-", " ").replace("_", " ").strip().title()
+                    )
+                    clean_domain = domain.replace("www.", "")
+                    clean_homepage = clean_url.rstrip("/").lower()
+
+                    if clean_homepage in {
+                        f"https://{domain}".lower(),
+                        f"http://{domain}".lower(),
+                        f"https://{clean_domain}".lower(),
+                        f"http://{clean_domain}".lower(),
+                    }:
+                        clean_title = clean_domain
+
+                    if not clean_title or clean_title.lower() in {
+                        "news",
+                        "changelog",
+                        "docs",
+                    }:
+                        clean_title = clean_domain
+
+                    parsed_sources.append(
+                        {
+                            "title": clean_title or clean_url,
+                            "url": clean_url,
+                            "source": domain.replace("www.", ""),
+                            "snippet": "",
+                        }
+                    )
+
+                if parsed_sources:
+                    meta["sources"] = parsed_sources
+                    meta["source_urls"] = parsed_urls
+
+            used_memory_items = []
+
+            for key in ("memory_used", "used_memory", "memories_used"):
+                value = meta.get(key)
+                if isinstance(value, list):
+                    used_memory_items = value
+                    break
+
+            if not used_memory_items:
+
+                try:
+
+                    used_memory_items = (
+                        getattr(
+                            self,
+                            "_last_used_memory_items",
+                            [],
+                        )
+                        or []
+                    )
+
+            except Exception as e:
+                self.exec_debug(
+                    "FINALIZE_MEMORY_USED_ERROR:",
+                    e,
+                )
+
+                used_memory_items = []
+
+        meta["memory_used"] = used_memory_items
+        meta["used_memory"] = used_memory_items
+        meta["memory_used_count"] = len(used_memory_items)
+        meta["used_memory_count"] = len(used_memory_items)
+        assistant_msg["meta"] = meta
+
+    print(
+        "[SESSION OWNERSHIP FINAL]",
+        {
+            "session_id": session_id,
+            "auth_user_id": auth_user_id,
+            "session_user_id": session.get("user_id"),
+        },
+    )
+
+    print(
+        "[SESSION OBJECT DEBUG]",
+        {
+            "type": str(type(self.chat_service.sessions)),
+            "module": getattr(
+                type(self.chat_service.sessions),
+                "__module__",
+                "",
+            ),
+            "has_update": hasattr(
+                self.chat_service.sessions,
+                "update_session",
+            ),
+            "methods": [
+                x
+                for x in dir(self.chat_service.sessions)
+                if "update" in x.lower()
+            ],
+        },
+    )
+
+    try:
+        print(
+            "[TITLE RIGHT BEFORE SAVE]",
+            {
+                "title": session.get("title"),
+                "title_manual": session.get("title_manual"),
+                "message_count": len(session.get("messages") or []),
+            },
+        )
+
+        try:
+            if (
+                not session.get("title_manual")
+                and self.chat_service._should_auto_title_session(
+                    session.get("title")
+                )
+                and isinstance(user_msg, dict)
+            ):
+                candidate = self.chat_service._build_session_title_from_message(
+                    user_msg
+                )
+
+                print(
+                    "[AUTO TITLE FINAL CANDIDATE]",
+                    candidate,
+                )
+
+                if candidate:
+                    session["title"] = candidate
+
+        except Exception as exc:
+            self.exec_debug(
+                "AUTO TITLE FINAL FAILED:",
+                exc,
+            )
+
+        self.chat_service.sessions.replace_session(
+            session_id,
+            session,
+        )
+
+    except Exception as e:
+        self.exec_debug(
+            "SESSION SAVE ERROR:",
+            e,
+        )
+
+    try:
+        assistant_text_for_tracking = ""
+
+        if isinstance(assistant_msg, dict):
+            assistant_text_for_tracking = self.chat_service.safe_str(
+                assistant_msg.get("text")
+            )
+
+        self.chat_service._auto_track_working_state(
+            session_id=session_id,
+            user_text=user_text,
+            assistant_text="",
+        )
+
+    except Exception as e:
+        self.exec_debug(
+            "AUTO_TRACK_WORKING_STATE_ERROR:",
+            e,
+        )
+
+    print(
+        "[NOVA FINALIZE BEHAVIOR TEST]",
+        user_text,
+    )
+
+    try:
+        self.chat_service._observe_response_behavior(
+            user_text=user_text,
+            assistant_text=(
+                assistant_msg.get("content")
+                if isinstance(assistant_msg, dict)
+                else str(assistant_msg)
+            ),
+            context="",
+        )
+
+    except Exception as e:
+        self.exec_debug(
+            "BEHAVIOR_OBSERVER_FAILED:",
+            e,
+        )
+
+    onboarding_payload = {}
+
+    if not session.get("meta", {}).get("onboarding"):
+        onboarding_payload = {
+            "onboarding": True,
+            "welcome_message": (
+                "Welcome to your AI workspace.\n\n"
+                "I can help you answer questions, plan projects, "
+                "analyze files, work with documents, and create "
+                "new things.\n\n"
+                "For more information, check out Help in the menu."
+            ),
+            "actions": [
+                {
+                    "label": "Start a project",
+                    "prompt": "Help me start a project",
+                    "intent": "project",
+                },
+                {
+                    "label": "Learn Nova",
+                    "prompt": "Show me how Nova works",
+                    "intent": "help",
+                },
+            ],
+        }
+
+    return {
+        **onboarding_payload,
+        "ok": True,
+        "assistant_message": assistant_msg,
+        "session": {
+            **session,
+            "id": session_id,
+        },
+        "active_session_id": session_id,
+        "session_id": session_id,
+        "saved_artifact": saved_artifact,
+        "execution_state": execution_state,
+        "execution": execution_state,
+        "debug": {
+            "decision": decision,
+            "route": "chat_service.handle",
+            "route_taken": (
+                decision.get("route")
+                if isinstance(decision, dict)
+                else ""
+            ),
+        },
+    }
+
+    def _finalize_assistant_response(self, assistant_msg, fallback_text=""):
+        """
+        Safety wrapper: guarantees assistant message always exists and is valid.
+        Prevents null/undefined exit paths from breaking execution flow.
+        """
+
+        if not assistant_msg:
+            assistant_msg = self.chat_service._build_assistant_message(
+                text=fallback_text or "Execution complete."
+            )
+
+        # Ensure structure consistency
+        if isinstance(assistant_msg, str):
+            assistant_msg = self._build_assistant_message(text=assistant_msg)
+
+        if isinstance(assistant_msg, dict):
+            meta = assistant_msg.get("meta")
+
+            if not isinstance(meta, dict):
+                meta = {}
+
+            meta.setdefault(
+                "response_quality",
+                {},
+            )
+
+            meta["response_quality"].update(
+                {
+                    "finalized": True,
+                }
+            )
+
+            assistant_msg["meta"] = meta
+
+        return assistant_msg
+
+def safe_str(self, value):
+    return self.chat_service.safe_str(value)
+
+ 

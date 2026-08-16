@@ -13,13 +13,43 @@ class IntelligenceRouter:
         text = self.chat_service.safe_str(user_text).strip()
         text_lc = text.lower()
 
-        working_state = self.chat_service._get_working_state(session_id) or {}
+        session_id = self.chat_service._ensure_session_id(
+            session_id
+        )
 
-        execution_state = (
-            self.chat_service._get_session_meta(session_id, "execution_state")
-            or self.chat_service._get_session_meta(session_id, "active_execution")
+        working_state = (
+            self.chat_service._get_working_state(session_id)
             or {}
         )
+
+        execution_state = (
+            self.chat_service._get_session_meta(
+                session_id,
+                "execution_state",
+            )
+            or self.chat_service._get_session_meta(
+                session_id,
+                "active_execution",
+            )
+            or {}
+        )
+
+        if not isinstance(execution_state, dict):
+            execution_state = {}
+
+        if (
+            execution_state
+            and not (
+                execution_state.get("steps")
+                or execution_state.get("plan")
+                or execution_state.get("goal")
+            )
+        ):
+            print(
+                "[INVALID EXECUTION STATE CLEARED]",
+                execution_state,
+            )
+            execution_state = {}
 
         failed_steps = []
         if isinstance(execution_state, dict):
@@ -259,7 +289,6 @@ class IntelligenceRouter:
                 "fresh",
                 "breaking",
                 "news",
-                "current",
                 "right now",
                 "recent",
                 "update",

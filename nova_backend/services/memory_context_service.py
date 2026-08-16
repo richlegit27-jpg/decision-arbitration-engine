@@ -246,24 +246,6 @@ class MemoryContextService:
         return 0.0
 
 
-    def memory_session_bonus(
-        self,
-        item: dict,
-        session_id: str = "",
-    ) -> float:
-        if not isinstance(item, dict):
-            return 0.0
-
-        item_session = str(
-            item.get("session_id")
-            or ""
-        ).strip()
-
-        if item_session and item_session == str(session_id or "").strip():
-            return 5.0
-
-        return 0.0
-
     def rank_memory_items(
         self,
         memories,
@@ -289,19 +271,23 @@ class MemoryContextService:
             if not content:
                 continue
 
-            category = str(
-                memory.get("category")
-                or memory.get("type")
-                or memory.get("kind")
-                or ""
-            ).lower() if isinstance(memory, dict) else ""
+            category = ""
+            kind = ""
 
-            kind = str(
-                memory.get("kind")
-                or memory.get("type")
-                or memory.get("category")
-                or ""
-            ).lower() if isinstance(memory, dict) else ""
+            if isinstance(memory, dict):
+                category = str(
+                    memory.get("category")
+                    or memory.get("type")
+                    or memory.get("kind")
+                    or ""
+                ).lower()
+
+                kind = str(
+                    memory.get("kind")
+                    or memory.get("type")
+                    or memory.get("category")
+                    or ""
+                ).lower()
 
             content_lc = content.lower()
 
@@ -336,6 +322,10 @@ class MemoryContextService:
                 if len(word) >= 4 and word in content_lc:
                     score += 2.0
 
+            for token in text_lc.split():
+                if token.isdigit() and token in content_lc:
+                    score += 10.0
+
             if (
                 "profile" in category
                 or "identity" in category
@@ -356,6 +346,35 @@ class MemoryContextService:
                 or "always" in content_lc
             ):
                 score += 12.0
+
+            if (
+                "nova" in text_lc
+                or "project" in text_lc
+                or "backend" in text_lc
+                or "server" in text_lc
+                or "api" in text_lc
+            ):
+
+                if any(
+                    marker in content_lc
+                    for marker in (
+                        "port ",
+                        "localhost",
+                        "127.0.0.1",
+                        "backend",
+                        "frontend",
+                        "server",
+                        "api",
+                        "endpoint",
+                        "database",
+                        "python",
+                        "powershell",
+                        "command",
+                        "path",
+                        "file",
+                    )
+                ):
+                    score += 8.0
 
             if updated_at := (
                 memory.get("updated_at")

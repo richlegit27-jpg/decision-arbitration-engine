@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 load_dotenv(
     Path(__file__).resolve().parent / ".env"
 )
+from nova_backend.services.state_route_service import StateRouteService
 from nova_backend.services.attachment_service import attachment_service
 from nova_backend.services.auth_context import get_current_user_id
 from nova_backend.services.image_vision_service import ImageVisionService
@@ -500,6 +501,7 @@ memory_guard_route_service = MemoryGuardRouteService(
     session_service,
     memory_guard_service,
 )
+state_route_service = StateRouteService()
 chat_attachment_selector_service = ChatAttachmentSelectorService()
 attachment_summary_service = AttachmentSummaryService()
 attachment_utils_service = AttachmentUtilsService()
@@ -732,6 +734,14 @@ session_route_service.install_routes(
     artifact_service,
     memory_service,
     DATA_DIR,
+)
+
+state_route_service.install_routes(
+    app,
+    session_service,
+    artifact_service,
+    memory_service,
+    execution_state_service,
 )
 
 from nova_backend.routes.payments_routes import (

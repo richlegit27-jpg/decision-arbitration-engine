@@ -1,11 +1,13 @@
-from nova_backend.services.project_brain_context_builder import (
-    build_project_brain_context,
-)
 
 class ExecutionGuardService:
 
-    def __init__(self, chat_execution_service):
+    def __init__(
+        self,
+        chat_execution_service,
+        chat_service=None,
+    ):
         self.chat_execution_service = chat_execution_service
+        self.chat_service = chat_service
 
     def handle(self, payload):
         if not isinstance(payload, dict):
@@ -18,7 +20,9 @@ class ExecutionGuardService:
             or ""
         ).strip()
 
-        clean = " ".join(user_text.lower().split())
+        clean = " ".join(
+            user_text.lower().split()
+        )
 
         session_id = str(
             payload.get("session_id")
@@ -31,8 +35,13 @@ class ExecutionGuardService:
             "execution status",
             "mission status",
         }:
-            state = self.chat_execution_service.get_state(session_id)
-            reply = self.chat_execution_service.format_reply(state)
+            state = self.chat_execution_service.get_state(
+                session_id
+            )
+
+            reply = self.chat_execution_service.format_reply(
+                state
+            )
 
             return {
                 "ok": True,
@@ -51,7 +60,10 @@ class ExecutionGuardService:
             }
 
         if clean.startswith("auto-plan "):
-            goal = user_text.split("auto-plan", 1)[1].strip()
+            goal = user_text.split(
+                "auto-plan",
+                1,
+            )[1].strip()
 
             steps = [
                 "Inspect the mission and identify the likely target files",
@@ -116,7 +128,7 @@ class ExecutionGuardService:
             reply = (
                 "I'll get started on that.\n\n"
                 "I'll keep track of the progress and let you know what I find."
-            )           
+            )
 
             return {
                 "ok": True,
@@ -146,10 +158,15 @@ class ExecutionGuardService:
             "go",
             "advance",
         }:
+
             current_state = self.chat_execution_service.get_state(
                 session_id
             )
-            print("[EXEC_DEBUG_STATE]", current_state)
+
+            print(
+                "[EXEC_DEBUG_STATE]",
+                current_state,
+            )
 
             if isinstance(current_state, dict):
                 current_status = str(
@@ -183,16 +200,34 @@ class ExecutionGuardService:
                         "skip_rewrite": True,
                     }
 
-
             state = self.chat_execution_service.advance(
                 session_id
             )
+
+            try:
+                if (
+                    hasattr(
+                        self,
+                        "chat_service",
+                    )
+                    and self.chat_service
+                ):
+                    self.chat_service._save_execution_state(
+                        session_id,
+                        state,
+                    )
+
+            except Exception as e:
+                print(
+                    "EXECUTION STATE SAVE FAILED:",
+                    e,
+                )
 
             reply = self.format_execution_response(
                 state
             ).get(
                 "text",
-                "I'm continuing with the next part."
+                "I'm continuing with the next part.",
             )
 
             return {
