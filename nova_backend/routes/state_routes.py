@@ -1,6 +1,6 @@
 ﻿from __future__ import annotations
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 
 
 state_bp = Blueprint(
@@ -34,14 +34,21 @@ def register_state_routes(
             else []
         )
 
-        active_session_id = ""
+        active_session_id = (
+            request.headers.get("X-Session-ID")
+            or ""
+        )
 
-        if hasattr(
-            session_store,
-            "get_active_session_id",
+        if (
+            not active_session_id
+            and hasattr(
+                session_store,
+                "get_active_session_id",
+            )
         ):
 
             try:
+
                 active_session_id = (
                     session_store
                     .get_active_session_id()
@@ -49,6 +56,7 @@ def register_state_routes(
                 )
 
             except Exception:
+
                 active_session_id = ""
 
         if (
@@ -87,9 +95,21 @@ def register_state_routes(
                     or {}
                 )
 
-            except Exception:
+            except Exception as e:
+
+                print(
+                    "STATE EXECUTION LOAD FAILED:",
+                    repr(e),
+                )
 
                 execution_state = {}
+
+
+        print(
+            "[STATE ROUTE EXECUTION RETURN]",
+            execution_state,
+        )
+
 
         return jsonify(
             {
@@ -101,5 +121,6 @@ def register_state_routes(
                 "memory": memory,
             }
         )
+
 
     app.register_blueprint(state_bp)

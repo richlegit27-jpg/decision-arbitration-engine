@@ -90,6 +90,16 @@ class ExecutionOrchestratorService:
 
         command = self._safe_str(command).strip().lower()
 
+        print(
+            "EXECUTION INPUT DEBUG",
+            {
+                "session_id": session_id,
+                "command": command,
+                "incoming_goal": execution_state.get("goal"),
+                "incoming_steps": execution_state.get("steps"),
+            },
+        )
+
         intelligence_intent = (
             self._safe_str(
                 execution_state.get("intent") or execution_state.get("mode") or ""
@@ -147,11 +157,11 @@ class ExecutionOrchestratorService:
             execution_state.get("steps")
         )
 
-        if persisted_state_available:
-            execution_state = persisted_execution_state
-
-        elif incoming_has_state:
+        if incoming_has_state:
             execution_state = execution_state
+
+        elif persisted_state_available:
+            execution_state = persisted_execution_state
 
         else:
             execution_state = {}
@@ -702,16 +712,24 @@ class ExecutionOrchestratorService:
             else:
                 next_step = steps[next_index]
 
+                next_step["status"] = "active"
+
+                execution_state["steps"][next_index] = dict(
+                    next_step
+                )
+
                 execution_state["waiting"] = True
                 execution_state[
                     "_execution_processing"
                 ] = False
+
                 execution_state[
                     "current_step"
                 ] = (
                     next_step.get("title")
                     or ""
                 )
+
                 execution_state[
                     "current_step_title"
                 ] = (
@@ -719,15 +737,12 @@ class ExecutionOrchestratorService:
                     or ""
                 )
 
-            self._save_execution_state(
-                session_id,
-                execution_state,
-            )
-
-            self._save_execution_state(
-                session_id,
-                execution_state,
-            )
+                execution_state[
+                    "current_step_title"
+                ] = (
+                    next_step.get("title")
+                    or ""
+                )
 
             self._save_execution_state(
                 session_id,

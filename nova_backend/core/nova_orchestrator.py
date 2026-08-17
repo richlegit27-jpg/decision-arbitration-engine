@@ -92,6 +92,7 @@ class NovaOrchestrator:
         agent_router=None,
         tool_executor=None,
         state=None,
+        execution_state_service=None,
     ):
 
         self.state = (
@@ -99,19 +100,23 @@ class NovaOrchestrator:
             or NovaState()
         )
 
+
         self.context_engine = (
             context_engine
             or ContextFusionEngine()
         )
+
 
         self.model_router = (
             model_router
             or ModelRouter()
         )
 
+
         self.agent_registry = (
             AgentRegistry()
         )
+
 
         self.agent_router = (
             agent_router
@@ -120,13 +125,16 @@ class NovaOrchestrator:
             )
         )
 
+
         self.permission_controller = (
             PermissionController()
         )
 
+
         self.tool_registry = (
             ToolRegistry()
         )
+
 
         self.tool_executor = (
             tool_executor
@@ -135,13 +143,16 @@ class NovaOrchestrator:
             )
         )
 
+
         self.memory_bridge = (
             MemoryBridge()
         )
 
+
         self.execution_step_service = (
             ExecutionStepService()
         )
+
 
         self.execution_engine = (
             ExecutionEngine(
@@ -149,19 +160,24 @@ class NovaOrchestrator:
             )
         )
 
+
         self.execution_bridge = (
             ExecutionBridge(
                 execution_engine=self.execution_engine,
+                execution_state_service=execution_state_service,
             )
         )
+
 
         self.planner_bridge = (
             PlannerBridge()
         )
 
+
         self.learning = (
             LearningLoop()
         )
+
 
         self.reflection = (
             ReflectionEngine()
@@ -176,7 +192,10 @@ class NovaOrchestrator:
     ):
 
         if session_id:
-            self.state.session_id = session_id
+
+            self.state.session_id = (
+                session_id
+            )
 
 
         self.memory_bridge.apply(

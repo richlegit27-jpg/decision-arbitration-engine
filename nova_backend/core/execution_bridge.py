@@ -61,12 +61,29 @@ class ExecutionBridge:
                 )
 
 
+            print(
+                "[EXECUTION BRIDGE RECEIVED PLAN]",
+                plan,
+            )
+
+            print(
+                "[EXECUTION BRIDGE GOAL]",
+                goal,
+            )
+
+            print(
+                "[EXECUTION BRIDGE STEPS]",
+                steps,
+            )
+
+
             output = (
                 self.execution_engine.run(
                     goal=goal,
                     steps=steps,
                 )
             )
+
 
             result["output"] = output
 
@@ -80,9 +97,44 @@ class ExecutionBridge:
                 and session_id
             ):
 
-                self.execution_state_service.save_execution_state(
+                execution_state = {
+                    "id": session_id,
+                    "goal": goal,
+                    "steps": steps,
+                    "plan": plan,
+                    "output": output,
+                    "status": "completed",
+                    "session_id": session_id,
+                    "current_step_index": len(steps),
+                    "_execution_processing": False,
+                    "lock": False,
+                }
+
+
+                print(
+                    "[EXECUTION BRIDGE BEFORE SAVE]",
+                    execution_state,
+                )
+
+
+                print(
+                    "[EXECUTION BRIDGE SAVE TEST]",
                     session_id,
-                    output,
+                )
+
+
+                saved = (
+                    self.execution_state_service
+                    .save_execution_state(
+                        session_id,
+                        execution_state,
+                    )
+                )
+
+
+                print(
+                    "[EXECUTION BRIDGE SAVE RESULT]",
+                    saved,
                 )
 
 

@@ -441,28 +441,23 @@ class ExecutionStateService:
             session_id
         )
 
-        if isinstance(cached, dict) and cached:
-            return cached
-
         state = self.get_working_state(
             session_id
         )
 
         if isinstance(state, dict):
 
-            execution_state = state.get(
-                "execution_state"
-            )
+            for key in (
+                "active_execution",
+                "execution_state",
+                "execution",
+            ):
 
-            if isinstance(execution_state, dict):
-                return execution_state
+                execution = state.get(key)
 
-            active_execution = state.get(
-                "active_execution"
-            )
+                if isinstance(execution, dict) and execution:
+                    return execution
 
-            if isinstance(active_execution, dict):
-                return active_execution
 
         return {}
 
@@ -471,6 +466,7 @@ class ExecutionStateService:
         session_id,
         execution_state=None,
     ):
+
         session_id = str(session_id or "").strip()
 
         if not session_id:
@@ -479,6 +475,17 @@ class ExecutionStateService:
         if not isinstance(execution_state, dict):
             return {}
 
+        print(
+            "DEBUG SAVE EXECUTION STATE:",
+            {
+                "session_id": session_id,
+                "goal": execution_state.get("goal"),
+                "status": execution_state.get("status"),
+                "current_index": execution_state.get("current_index"),
+                "steps": execution_state.get("steps"),
+            },
+        )
+  
         if not execution_state:
             return {}
 
@@ -551,7 +558,8 @@ def get_active_execution(self, session_id):
             execution,
         )
 
-        if self.execution_is_active(execution):
+        if isinstance(execution, dict) and execution:
+
             print(
                 "DEBUG ACTIVE EXEC RETURN:",
                 key,

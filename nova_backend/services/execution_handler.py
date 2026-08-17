@@ -1013,39 +1013,34 @@ def {function_name}(self, *args, **kwargs):
                 history=history,
                 execution_state=execution_state,
             )
+        execution_state["status"] = (
+            "complete"
+            if execution_state["current_index"] >= len(steps)
+            else (
+                "failed"
+                if step.get("status") == "failed"
+                else "running"
+            )
+        )
 
-            execution_state["current_index"] = (
-                current_index + 1
+        self.service._save_execution_state(
+            session_id,
+            execution_state,
+        )
+
+        return {
+            "status": (
+                "success"
                 if step.get("status") == "completed"
-                else current_index
-            )
-            execution_state["current_step"] = step.get("title", "step")
-            execution_state["last_action"] = action
-            execution_state["steps"] = steps
-            execution_state["history"] = history
-            execution_state["status"] = (
-                "complete"
-                if execution_state["current_index"] >= len(steps)
-                else (
-                    "failed"
-                    if step.get("status") == "failed"
-                    else "running"
-                )
-            )
-
-            return {
-                "status": (
-                    "success"
-                    if step.get("status") == "completed"
-                    else "failed"
-                ),
-                "message": (
-                    "Run step executed."
-                    if step.get("status") == "completed"
-                    else step.get("error", "Run step failed.")
-                ),
-                "execution_state": execution_state,
-            }
+                else "failed"
+            ),
+            "message": (
+                "Run step executed."
+                if step.get("status") == "completed"
+                else step.get("error", "Run step failed.")
+            ),
+            "execution_state": execution_state,
+        }
 
         if action == "run_all":
             completed = []

@@ -96,121 +96,27 @@ from nova_backend.services.execution.executor import Executor
 from nova_backend.services.python_runner_service import PythonRunnerService
 from nova_backend.services.auth_context import get_current_user_id
 from nova_backend.services.upload_ownership_service import UploadOwnershipService
-
 from nova_backend.services.runtime_bootstrap import (
     RuntimeBootstrap,
 )
-
 from nova_backend.services.runtime_cognitive_firewall import (
     RuntimeCognitiveFirewall,
 )
-
-
 from nova_backend.services.non_web_source_leak_guard_service import (
     install_non_web_source_leak_guard,
 )
-
 from nova_backend.services.runtime_cognitive_injection_service import (
     RuntimeCognitiveInjectionService,
 )
-
 from nova_backend.services.nova_self_improvement_coordinator import (
     process_behavior_observation,
 )
-
-
-
 from nova_backend.services.chat_turn_pipeline import build_chat_turn_from_request, build_model_messages
-def _nova_boot_log_20260701(*args, **kwargs):
-    import os as _nova_boot_log_os_20260701
-
-    if str(_nova_boot_log_os_20260701.getenv("NOVA_VERBOSE_BOOT_LOGS", "")).strip().lower() in {"1", "true", "yes", "on"}:
-        print(*args, **kwargs)
-
-
-# NOVA_LOCAL_PROJECT_CONTEXT_GUARD_20260607
-def _nova_is_local_project_status_question_20260607(user_text):
-    clean = " ".join(str(user_text or "").lower().split())
-
-    triggers = [
-        "what did we fix",
-        "what we fixed",
-        "what did you fix",
-        "explain what we fixed",
-        "summarize what we fixed",
-        "what have we done",
-        "what did we do",
-        "what are we working on",
-        "what is broken",
-        "what's broken",
-        "what is left",
-        "what's left",
-        "what should we do now",
-        "what do you suggest",
-        "status",
-        "progress",
-        "this session",
-        "nova",
-        "mobile",
-        "composer",
-        "attachment",
-        "frontend",
-        "backend",
-    ]
-
-    project_words = [
-        "nova",
-        "mobile",
-        "composer",
-        "bar",
-        "button",
-        "buttons",
-        "icons",
-        "attachment",
-        "preview",
-        "session",
-        "frontend",
-        "backend",
-        "cache",
-        "flask",
-        "template",
-        "css",
-        "js",
-        "fixed",
-        "fix",
-        "working",
-    ]
-
-    if clean in ["status", "progress", "what now", "next", "what next"]:
-        return True
-
-    if any(trigger in clean for trigger in triggers) and any(word in clean for word in project_words):
-        return True
-
-    if "explain what we fixed today" in clean:
-        return True
-
-    return False
-
-
-# NOVA_LOCAL_PROJECT_CONTEXT_GUARD_ANSWER_20260607
-def _nova_local_project_status_answer_20260607(user_text):
-    return (
-        "Here is what we fixed in this checkpoint:\n\n"
-        "- Fixed the mobile composer buttons so the send, voice, attach, and tools buttons stopped stretching and now keep a clean square size.\n"
-        "- Fixed the mojibake icon problem where symbols were appearing as corrupted text.\n"
-        "- Fixed the stale frontend cache problem where the mobile page kept loading an outdated JavaScript bundle instead of the patched version.\n"
-        "- Slimmed the mobile input and composer bar so the text area and main composer buttons are 40 pixels high.\n"
-        "- Identified stale web and search context leaking into normal project questions.\n\n"
-        "Next move: prevent stale web and search context from affecting normal Nova project and session questions."
-    )
-
-
-# FINALIZE_RESPONSE_KWARGS_LOCK_20260604
 
 
 logger = logging.getLogger("nova.execution")
 DEBUG_EXECUTION = False
+
 
 
 def exec_debug(*args):
@@ -218,7 +124,7 @@ def exec_debug(*args):
         logger.debug(" ".join(str(arg) for arg in args))
 
 
-class ChatService:
+
     def _observe_response_behavior(
         self,
         user_text="",
@@ -310,6 +216,9 @@ class ChatService:
             "enabled",
         }
 
+class ChatService:
+
+
     def _nova_select_model_messages(self, fallback_messages):
         # NOVA_CHAT_TURN_FEATURE_FLAG_ADAPTER_20260705
         if not self._nova_use_chat_turn_messages_enabled():
@@ -322,8 +231,481 @@ class ChatService:
 
         return shadow_messages
 
+    def __init__(
+        self,
+        session_service: SessionService,
+        memory_service: MemoryService,
+        artifact_service: ArtifactService,
+        web_service: WebService,
+        recon_service: ReconService,
+        memory_context_service=None,
+        working_state_service=None,
+        execution_state_service=None,
+        runtime_uploads_normalizer_service=None,
+    ):
 
-    @classmethod
+        self.chat_execution_service = chat_execution_service
+
+        self.orchestrator = (
+            NovaOrchestrator(
+                execution_state_service=execution_state_service,
+            )
+        )
+
+        self.chat_response_cleanup_service = ChatResponseCleanupService()
+        self.chat_response_policy_service = ChatResponsePolicyService()
+        self.runtime_cognitive_firewall = RuntimeCognitiveFirewall()
+        self.attachment_analysis_service = AttachmentAnalysisService()
+        self.accidental_input_guard_service = AccidentalInputGuardService()
+        self.response_mojibake_cleanup_service = ResponseMojibakeCleanupService()
+        self.error_reporting_service = ErrorReportingService()
+
+        # =========================
+        # CORE SERVICES
+        # =========================
+
+        self.execution_handler = ExecutionHandler(self)
+        self.response_handler = ChatResponseHandler(self)
+        self.chat_router = ChatRouter(self)
+        self.planner_service = PlannerService(self)
+        self.intelligence_router = IntelligenceRouter(self)
+
+        self.orchestrator = (
+            NovaOrchestrator(
+                execution_state_service=execution_state_service,
+            )
+        )
+
+        self.decision_service = DecisionService(
+            self
+        )
+
+        self.auto_fix_service = AutoFixService(self)
+
+        self.session_service = session_service
+        self.memory_service = memory_service
+        self.runtime_uploads_normalizer_service = runtime_uploads_normalizer_service
+        self.artifact_service = artifact_service
+        self.web_service = web_service
+        self.recon_service = recon_service
+        self.memory_context_service = memory_context_service
+
+        if working_state_service is None:
+            from nova_backend.services.working_state_service import (
+                WorkingStateService,
+            )
+
+            working_state_service = WorkingStateService(
+                session_service
+            )
+
+        self.working_state_service = working_state_service
+        self.execution_state_service = execution_state_service
+
+        # =========================
+        # EXISTING ALIASES
+        # DO NOT REMOVE
+        # =========================
+
+        self.sessions = session_service
+        self.memory = memory_service
+        self.memories = memory_service
+        self.artifacts = artifact_service
+        self.web = web_service
+        self.recon = recon_service
+
+        # =========================
+        # CONFIG
+        # =========================
+
+        self.image_model = os.getenv(
+            "NOVA_IMAGE_MODEL",
+            "gpt-image-1",
+        )
+
+        self.image_size = os.getenv(
+            "NOVA_IMAGE_SIZE",
+            "1024x1024",
+        )
+
+        self.chat_model = os.getenv(
+            "OPENAI_MODEL",
+            "gpt-5.4",
+        )
+
+        self.model = self.chat_model
+
+        exec_debug(
+            "MODEL CHECK:",
+            hasattr(
+                self,
+                "model",
+            ),
+            self.model,
+        )
+
+        self.memory_limit = int(
+            os.getenv(
+                "NOVA_MEMORY_LIMIT",
+                "3",
+            )
+        )
+
+        # =========================
+        # UPLOADS
+        # =========================
+
+        self.uploads_dir = Path(
+            os.getenv(
+                "UPLOADS_DIR",
+                Path(__file__).resolve().parents[2] / "uploads",
+            )
+        )
+
+        self.uploads_dir.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        exec_debug(
+            "CHATSERVICE INIT uploads_dir =",
+            self.uploads_dir,
+        )
+
+        # =========================
+        # CORE CLIENTS
+        # =========================
+
+        # FORCE_CHAT_SERVICE_OPENAI_KEY_LOCK
+        # Load the exact Nova .env key before creating the OpenAI client.
+
+
+
+        self.agent = AgentService()
+        self.memory_ranker = MemoryRankerService()
+        self.tools = ToolService(base_dir=os.getcwd())
+
+        # =========================
+        # RESPONSE / INTENT SERVICES
+        # =========================
+
+        self.rewrite_service = ResponseRewriteService()
+        self.intent_service = IntentService()
+        self.python_runner = PythonRunnerService()
+
+        # =========================
+        # RUNTIME COGNITION
+        # =========================
+
+        self.runtime_cognitive_injection = RuntimeCognitiveInjectionService()
+
+        self.runtime_brain = None
+
+        # =========================
+        # EXECUTION ENGINE
+        # =========================
+
+        self.default_executor = default_executor
+
+        self.repair_execution_service = RepairExecutionService(
+            execution_handler=self.execution_handler,
+        )
+        self.execution_mutation_service = ExecutionMutationService(
+            execution_state_service=self.execution_state_service,
+        )
+        self.execution_approval_service = (
+            ExecutionApprovalService()
+        )
+
+        self.execution_step_service = ExecutionStepService(
+            safe_str=self._safe_str,
+            python_runner=self.python_runner,
+            approval_service=self.execution_approval_service,
+
+        )
+
+        self.execution_orchestrator_service = ExecutionOrchestratorService(
+            execution_state_service=self.execution_state_service,
+            working_state_service=self.working_state_service,
+            execution_mutation_service=self.execution_mutation_service,
+            safe_str=self._safe_str,
+            execution_step_service=self.execution_step_service,
+        )
+
+        self.runtime = RuntimeBootstrap.build(chat_service=self)
+
+        self.execution_loop = ExecutionLoopService(
+            execution_handler=self.execution_handler,
+            runtime_service=self.runtime,
+        )
+
+        self.execution_service = ExecutionService(self)
+
+        # =========================
+        # AUTONOMY
+        # =========================
+
+        self.autonomy = AutonomyService(
+            web_service=self.web,
+            recon_service=self.recon,
+            memory_service=self.memory,
+            artifact_service=self.artifacts,
+            max_steps=5,
+            max_deep_js=5,
+            max_follow_links=5,
+        )
+
+        # =========================
+        # AGENT CORE (NEW ARCHITECTURE)
+        # =========================
+
+        self.brain = BrainCore()
+        self.strategy = StrategyEngine()
+        self.memory_core = MemoryCore()
+        self.executor = Executor()
+
+    def handle(
+        self,
+        user_text: str,
+        session_id: str = "",
+        attachments=None,
+    ):
+        from nova_backend.services.chat.handle import chat_handle
+       
+        execution_result = self._handle_execution_control(
+            user_text=user_text,
+            session_id=session_id,
+            attachments=attachments,
+        )
+        print(
+            "DEBUG EXECUTION CONTROL RESULT =",
+            execution_result,
+        )
+
+        if execution_result is not None:
+            return execution_result
+
+        session_payload = self._get_session_payload(
+            session_id
+        )
+
+        brain_state = self.orchestrator.run(
+            user_text=user_text,
+            session_context=session_payload,
+            session_id=session_id,
+        )
+
+        print(
+            "DEBUG BRAIN STATE:",
+            brain_state,
+        )
+
+        print(
+            "DEBUG BRAIN EXECUTION VALUE:",
+            brain_state.get("execution")
+            if isinstance(brain_state, dict)
+            else None,
+        )
+
+        print(
+            "DEBUG BRAIN EXECUTION VALUE:",
+            brain_state.get("execution")
+            if isinstance(brain_state, dict)
+            else None,
+        )
+
+        print(
+            "DEBUG EXECUTION KEYS:",
+            list(
+                brain_state.get("execution", {}).keys()
+            )
+            if isinstance(brain_state, dict)
+            and isinstance(
+                brain_state.get("execution"),
+                dict,
+            )
+            else None,
+        )
+
+        print(
+            "DEBUG EXECUTION STEPS:",
+            brain_state.get("execution", {}).get("steps")
+            if isinstance(brain_state, dict)
+            and isinstance(
+                brain_state.get("execution"),
+                dict,
+            )
+            else None,
+        )
+
+        print(
+            "DEBUG ORCHESTRATOR OUTPUT:",
+            brain_state,
+        )
+
+        execution_state = (
+            brain_state.get("execution")
+            if isinstance(brain_state, dict)
+            else {}
+        )
+
+        if execution_state:
+            self._save_execution_state(
+                session_id,
+                execution_state,
+            )
+
+        print(
+            "DEBUG ABOUT TO CALL CHAT_HANDLE",
+            {
+                "user_text": user_text,
+                "brain_state": brain_state,
+            },
+        )
+
+        print(
+                "DEBUG BEFORE CHAT_HANDLE BRAIN EXECUTION:",
+                brain_state,
+            ) 
+
+        response = chat_handle(
+            self,
+            user_text,
+            session_id,
+            attachments,
+            brain_state=brain_state,
+            decision=brain_state.get("decision")
+            if isinstance(brain_state, dict)
+            else None,
+        )
+
+        print(
+            "DEBUG CHAT_HANDLE RETURNED",
+            response.get("execution_state")
+            if isinstance(response, dict)
+            else response,
+        )
+
+        response["brain_state"] = brain_state
+
+        if not response.get("execution_state"):
+            response["execution_state"] = execution_state
+
+        return response
+
+    def _nova_boot_log_20260701(*args, **kwargs):
+        import os as _nova_boot_log_os_20260701
+
+        if str(
+            _nova_boot_log_os_20260701.getenv(
+                "NOVA_VERBOSE_BOOT_LOGS",
+                "",
+            )
+        ).strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }:
+            print(*args, **kwargs)
+
+
+    def _nova_is_local_project_status_question_20260607(
+        user_text
+    ):
+        clean = " ".join(
+            str(user_text or "").lower().split()
+        )
+
+        triggers = [
+            "what did we fix",
+            "what we fixed",
+            "what did you fix",
+            "explain what we fixed",
+            "summarize what we fixed",
+            "what have we done",
+            "what did we do",
+            "what are we working on",
+            "what is broken",
+            "what's broken",
+            "what is left",
+            "what's left",
+            "what should we do now",
+            "what do you suggest",
+            "status",
+            "progress",
+            "this session",
+            "nova",
+            "mobile",
+            "composer",
+            "attachment",
+            "frontend",
+            "backend",
+        ]
+
+        project_words = [
+            "nova",
+            "mobile",
+            "composer",
+            "bar",
+            "button",
+            "buttons",
+            "icons",
+            "attachment",
+            "preview",
+            "session",
+            "frontend",
+            "backend",
+            "cache",
+            "flask",
+            "template",
+            "css",
+            "js",
+            "fixed",
+            "fix",
+            "working",
+        ]
+
+        if clean in [
+            "status",
+            "progress",
+            "what now",
+            "next",
+            "what next",
+        ]:
+            return True
+
+        if (
+            any(
+                trigger in clean
+                for trigger in triggers
+            )
+            and any(
+                word in clean
+                for word in project_words
+            )
+        ):
+            return True
+
+        if "explain what we fixed today" in clean:
+            return True
+
+        return False
+
+
+    def _nova_local_project_status_answer_20260607(
+        user_text
+    ):
+        return (
+            "Here is what we fixed in this checkpoint:\n\n"
+            "- Fixed the mobile composer buttons so the send, voice, attach, and tools buttons stopped stretching and now keep a clean square size.\n"
+            "- Fixed the mojibake icon problem where symbols were appearing as corrupted text.\n"
+            "- Fixed the stale frontend cache problem where the mobile page kept loading an outdated JavaScript bundle instead of the patched version.\n"
+            "- Slimmed the mobile input and composer bar so the text area and main composer buttons are 40 pixels high.\n"
+            "- Identified stale web and search context leaking into normal project questions.\n\n"
+            "Next move: prevent stale web and search context from affecting normal Nova project and session questions."
+        )
+
     def get_global_chat_turn_shadow_snapshot(cls):
         # NOVA_CHAT_TURN_GLOBAL_DEBUG_SNAPSHOT_20260705
         instance = cls.__new__(cls)
@@ -507,6 +889,40 @@ class ChatService:
         user_text: str,
         session_id: str,
     ):
+
+        existing_execution = (
+            self._load_execution_state(
+                session_id
+            )
+            or {}
+        )
+        print(
+            "[DEBUG LOADED EXECUTION]",
+            existing_execution,
+        )
+        print(
+            "[DEBUG PROCESS GOAL EXISTING EXECUTION]",
+            existing_execution,
+        )
+
+        if (
+            isinstance(
+                existing_execution,
+                dict,
+            )
+            and existing_execution.get(
+                "status"
+            ) == "running"
+            and existing_execution.get(
+                "steps"
+            )
+        ):
+            return self.execution_handler.run_next_move(
+                action="run_step",
+                session_id=session_id,
+                execution_state=existing_execution,
+            )
+
         goal = self._build_goal(
             user_text,
             session_id,
@@ -518,7 +934,7 @@ class ChatService:
 
         execution = self._build_execution(
             user_text,
-                plan,
+            plan,
             {
                 "route": "planner",
                 "intent": "planning",
@@ -690,7 +1106,12 @@ class ChatService:
             return None
 
         state = session.get("working_state") or {}
-        execution = state.get("execution_state") or {}
+
+        execution = (
+            state.get("active_execution")
+            or state.get("execution_state")
+            or {}
+        )
 
         if execution.get("status") == "running":
             return {
@@ -889,9 +1310,12 @@ Rules:
         try:
             if value is None:
                 return ""
+
             if isinstance(value, str):
                 return value
+
             return str(value)
+
         except Exception:
             return ""
 
@@ -1032,16 +1456,14 @@ Rules:
                 ]
             )
 
-
-
-
-
             has_real_execution = any(
                 [
                     bool(execution_state.get("steps")),
                     execution_state.get("current_step"),
-                    self.safe_str(execution_state.get("status")).lower().strip()
-                    == "running",
+                    self.safe_str(
+                        execution_state.get("status")
+                    ).lower().strip()
+                    in {"running", "waiting", "paused"},
                 ]
             )
 
@@ -1189,6 +1611,14 @@ Rules:
 
         execution_state = mission_command.get("execution") or {}
 
+        if execution_state:
+            execution_state["session_id"] = session_id
+
+            self._save_execution_state(
+                session_id,
+                execution_state,
+            )
+
         if mission_type in {"continue", "execute"}:
 
             persisted_execution_state = (
@@ -1197,10 +1627,25 @@ Rules:
                 )
                 or {}
             )
+
             selected_execution_state = (
-                persisted_execution_state
-                if persisted_execution_state.get("steps")
-                else execution_state
+                execution_state
+                if execution_state.get("steps")
+                else (
+                    persisted_execution_state
+                    if (
+                        persisted_execution_state.get("steps")
+                        and str(
+                            persisted_execution_state.get("status") or ""
+                        ).lower()
+                        not in {
+                            "complete",
+                            "completed",
+                            "done",
+                        }
+                    )
+                    else {}
+                )
             )
 
             selected_execution_state["_execution_dispatch_handled"] = True
@@ -1209,11 +1654,14 @@ Rules:
                 next_action or "run_step"
             )
 
-            return self.execution_orchestrator_service.process_execution(
-                session_id=session_id,
-                state=selected_execution_state,
-                command=command,
-            )
+        return self.execution_orchestrator_service.process_execution(
+            session_id=session_id,
+            state=selected_execution_state,
+            command=(
+                next_action
+                or "run_step"
+            ),
+        )
 
         if mission_type == "inspect":
             mission = mission_command.get("mission") or {}
@@ -1233,28 +1681,58 @@ Rules:
 
         return None
 
-    def _load_execution_state(
-        self,
-        session_id="",
-    ):
-        if self.execution_state_service:
-            state = self.execution_state_service.get_execution_state(
-                session_id
-            )
+def _load_execution_state(
+    self,
+    session_id="",
+):
+    meta_state = self._get_session_meta(
+        session_id,
+        "execution_state",
+        {},
+    )
 
-            if isinstance(state, dict) and state:
-                return state
+    exec_debug(
+        "LOAD EXECUTION META DEBUG",
+        {
+            "session_id": session_id,
+            "goal": meta_state.get("goal") if isinstance(meta_state, dict) else None,
+            "status": meta_state.get("status") if isinstance(meta_state, dict) else None,
+            "steps": len(meta_state.get("steps", []) or []) if isinstance(meta_state, dict) else None,
+            "current_index": meta_state.get("current_index") if isinstance(meta_state, dict) else None,
+        },
+    )
 
-        meta_state = self._get_session_meta(
-            session_id,
-            "execution_state",
-            {},
+    if self.execution_state_service:
+        state = self.execution_state_service.get_execution_state(
+            session_id
         )
 
-        if isinstance(meta_state, dict):
+        if isinstance(state, dict) and state:
+            return state
+
+    if isinstance(meta_state, dict) and meta_state:
+        status = self.safe_str(
+            meta_state.get("status")
+        ).lower()
+
+        if status not in {
+            "complete",
+            "completed",
+        }:
             return meta_state
 
-        return {}
+        if meta_state.get("waiting"):
+            return meta_state
+
+    if self.execution_state_service:
+        state = self.execution_state_service.get_execution_state(
+            session_id
+        )
+
+        if isinstance(state, dict) and state:
+            return state
+
+    return {}
 
     def _save_execution_state(
         self,
@@ -2399,225 +2877,7 @@ Rules:
 
         return {"results": cleaned}
 
-    def __init__(
-        self,
-        session_service: SessionService,
-        memory_service: MemoryService,
-        artifact_service: ArtifactService,
-        web_service: WebService,
-        recon_service: ReconService,
-        memory_context_service=None,
-        working_state_service=None,
-        execution_state_service=None,
-        runtime_uploads_normalizer_service=None,
-        ):
 
-        self.chat_execution_service = chat_execution_service
-        self.orchestrator = NovaOrchestrator()
-        self.chat_response_cleanup_service = ChatResponseCleanupService()
-        self.chat_response_policy_service = ChatResponsePolicyService()
-        self.runtime_cognitive_firewall = RuntimeCognitiveFirewall()
-        self.attachment_analysis_service = AttachmentAnalysisService()
-        self.accidental_input_guard_service = AccidentalInputGuardService()
-        self.response_mojibake_cleanup_service = ResponseMojibakeCleanupService()
-        self.error_reporting_service = ErrorReportingService()
-
-        # =========================
-        # CORE SERVICES
-        # =========================
-        self.execution_handler = ExecutionHandler(self)
-        self.response_handler = ChatResponseHandler(self)
-        self.chat_router = ChatRouter(self)
-        self.planner_service = PlannerService(self)
-        self.intelligence_router = IntelligenceRouter(self)
-        self.orchestrator = (
-            NovaOrchestrator()
-        )
-        self.decision_service = DecisionService(
-            self
-        )
-        self.auto_fix_service = AutoFixService(self)
-        self.session_service = session_service
-        self.memory_service = memory_service
-        self.runtime_uploads_normalizer_service = runtime_uploads_normalizer_service
-        self.artifact_service = artifact_service
-        self.web_service = web_service
-        self.recon_service = recon_service
-        self.memory_context_service = memory_context_service
-
-        if working_state_service is None:
-            from nova_backend.services.working_state_service import (
-                WorkingStateService,
-            )
-            working_state_service = WorkingStateService(
-                session_service
-            )
-
-
-        self.working_state_service = working_state_service
-        self.execution_state_service = execution_state_service
-
-        # =========================
-        # EXISTING ALIASES
-        # DO NOT REMOVE
-        # =========================
-
-        self.sessions = session_service
-        self.memory = memory_service
-        self.memories = memory_service
-        self.artifacts = artifact_service
-        self.web = web_service
-        self.recon = recon_service
-
-        # =========================
-        # CONFIG
-        # =========================
-
-        self.image_model = os.getenv(
-            "NOVA_IMAGE_MODEL",
-            "gpt-image-1",
-        )
-
-        self.image_size = os.getenv(
-            "NOVA_IMAGE_SIZE",
-            "1024x1024",
-        )
-
-        self.chat_model = os.getenv(
-            "OPENAI_MODEL",
-            "gpt-5.4",
-        )
-
-        self.model = self.chat_model
-
-        exec_debug(
-            "MODEL CHECK:",
-            hasattr(
-                self,
-                "model",
-            ),
-            self.model,
-        )
-
-        self.memory_limit = int(
-            os.getenv(
-                "NOVA_MEMORY_LIMIT",
-                "3",
-            )
-        )
-
-        # =========================
-        # UPLOADS
-        # =========================
-
-        self.uploads_dir = Path(
-            os.getenv(
-                "UPLOADS_DIR",
-                Path(__file__).resolve().parents[2] / "uploads",
-            )
-        )
-
-        self.uploads_dir.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-        exec_debug(
-            "CHATSERVICE INIT uploads_dir =",
-            self.uploads_dir,
-        )
-
-        # =========================
-        # CORE CLIENTS
-        # =========================
-
-        # FORCE_CHAT_SERVICE_OPENAI_KEY_LOCK
-        # Load the exact Nova .env key before creating the OpenAI client.
-
-
-
-        self.agent = AgentService()
-        self.memory_ranker = MemoryRankerService()
-        self.tools = ToolService(base_dir=os.getcwd())
-
-        # =========================
-        # RESPONSE / INTENT SERVICES
-        # =========================
-
-        self.rewrite_service = ResponseRewriteService()
-        self.intent_service = IntentService()
-        self.python_runner = PythonRunnerService()
-
-        # =========================
-        # RUNTIME COGNITION
-        # =========================
-
-        self.runtime_cognitive_injection = RuntimeCognitiveInjectionService()
-
-        self.runtime_brain = None
-
-        # =========================
-        # EXECUTION ENGINE
-        # =========================
-
-        self.default_executor = default_executor
-
-        self.repair_execution_service = RepairExecutionService(
-            execution_handler=self.execution_handler,
-        )
-        self.execution_mutation_service = ExecutionMutationService(
-            execution_state_service=self.execution_state_service,
-        )
-        self.execution_approval_service = (
-            ExecutionApprovalService()
-        )
-
-        self.execution_step_service = ExecutionStepService(
-            safe_str=self._safe_str,
-            python_runner=self.python_runner,
-            approval_service=self.execution_approval_service,
-
-        )
-
-        self.execution_orchestrator_service = ExecutionOrchestratorService(
-            execution_state_service=self.execution_state_service,
-            working_state_service=self.working_state_service,
-            execution_mutation_service=self.execution_mutation_service,
-            safe_str=self._safe_str,
-            execution_step_service=self.execution_step_service,
-        )
-
-        self.runtime = RuntimeBootstrap.build(chat_service=self)
-
-        self.execution_loop = ExecutionLoopService(
-            execution_handler=self.execution_handler,
-            runtime_service=self.runtime,
-        )
-
-        self.execution_service = ExecutionService(self)
-
-        # =========================
-        # AUTONOMY
-        # =========================
-
-        self.autonomy = AutonomyService(
-            web_service=self.web,
-            recon_service=self.recon,
-            memory_service=self.memory,
-            artifact_service=self.artifacts,
-            max_steps=5,
-            max_deep_js=5,
-            max_follow_links=5,
-        )
-
-        # =========================
-        # AGENT CORE (NEW ARCHITECTURE)
-        # =========================
-
-        self.brain = BrainCore()
-        self.strategy = StrategyEngine()
-        self.memory_core = MemoryCore()
-        self.executor = Executor()
 
 
 
@@ -5783,6 +6043,15 @@ Rules:
         session_id: str,
         attachments=None,
     ):
+
+        print(
+            "DEBUG EXEC CONTROL ENTRY",
+            {
+                "session_id": session_id,
+                "user_text": user_text,
+            },
+        )
+
         text = self.safe_str(
             user_text
         ).strip().lower()
@@ -5792,6 +6061,11 @@ Rules:
                 user_text=text,
                 session_id=session_id,
             )
+        )
+
+        print(
+            "DEBUG MISSION COMMAND RESULT =",
+            mission_command,
         )
 
         mission_result = (
@@ -5813,6 +6087,8 @@ Rules:
             return self._apply_pending_fix(
                 session_id
             )
+
+        command = None
 
         if text in {
             "approve",
@@ -5905,10 +6181,32 @@ Rules:
             command = "retry_failed"
 
         execution_state["lock"] = False
+
         execution_state[
             "_execution_processing"
         ] = False
+
         execution_state["command"] = command
+
+        print(
+            "DEBUG EXEC CONTROL BEFORE ORCHESTRATOR",
+            {
+                "session_id": session_id,
+                "goal": execution_state.get("goal"),
+                "status": execution_state.get("status"),
+                "current_index": execution_state.get("current_index"),
+                "command": command,
+            },
+        )
+
+        if (
+            "current_index" not in execution_state
+            and "current_step_index" in execution_state
+        ):
+            execution_state["current_index"] = execution_state.get(
+                "current_step_index",
+                0,
+            )
 
         return (
             self.execution_orchestrator_service
@@ -5918,287 +6216,6 @@ Rules:
                 command=command,
             )
         )
-
-
-        attachments = attachments or []
-
-        # LOAD EXECUTION STATE
-        execution_state = (
-            self._get_session_meta(session_id, "execution_state")
-            or self._get_session_meta(session_id, "active_execution")
-            or {}
-        )
-
-        execution_active = bool(
-            execution_state.get("steps")
-            or execution_state.get("current_step")
-            or execution_state.get("status") in {"running", "waiting"}
-        )
-
-        execution_commands = {
-            "next",
-            "continue",
-            "resume",
-            "run step",
-            "run all",
-            "execute",
-            "retry",
-            "run it",
-        }
-
- # 1. EXECUTION MODE
-
-        if execution_active:
-            if lowered in execution_commands:
-                return ("execution", "run")
-            return ("chat", "escape_execution")
-
-        # 2. ATTACHMENTS
-
-        if attachments:
-            return ("attachment", "analyze")
-
-        if self._is_image_generation_request(text):
-            return ("image", "generate")
-
-        # CONTEXTUAL WEATHER FOLLOW-UP ROUTE
-        weather_followup = any(
-            marker in lowered
-            for marker in (
-                "umbrella",
-                "rain",
-                "snow",
-                "temperature",
-                "forecast",
-                "weather",
-                "wind",
-            )
-        )
-
-        if weather_followup and session_id:
-            session_payload = (
-                self._get_session_payload(session_id)
-                or {}
-            )
-            session_messages = (
-                session_payload.get("messages")
-                if isinstance(session_payload, dict)
-                else []
-            ) or []
-
-            previous_exchange = (
-                self._get_session_meta(
-                    session_id,
-                    "last_verified_web_exchange",
-                )
-                or {}
-            )
-
-            weather_context_parts = []
-
-            for message in session_messages[-8:]:
-                if not isinstance(message, dict):
-                    continue
-
-                weather_context_parts.append(
-                    self.safe_str(
-                        message.get("content")
-                        or message.get("text")
-                        or ""
-                    )
-                )
-
-            if isinstance(previous_exchange, dict):
-                weather_context_parts.extend(
-                    [
-                        self.safe_str(
-                            previous_exchange.get("query")
-                        ),
-                        self.safe_str(
-                            previous_exchange.get("answer")
-                        ),
-                    ]
-                )
-
-            weather_context = " ".join(
-                weather_context_parts
-            ).lower()
-
-            if any(
-                marker in weather_context
-                for marker in (
-                    "weather",
-                    "forecast",
-                    "precipitation",
-                    "temperature",
-                    "?c",
-                    "?f",
-                )
-            ):
-                return ("web", "fetch")
-
-        # REWRITE FOLLOW-UP DETECTION
-        # Handles natural follow-ups after a writing response.
-        rewrite_followup_request = any(
-            phrase in lowered
-            for phrase in (
-                "make it shorter",
-                "make this shorter",
-                "make it longer",
-                "make this longer",
-                "make it better",
-                "make this better",
-                "make it more exciting",
-                "make it professional",
-                "make it more professional",
-                "make it casual",
-                "make it more casual",
-                "change the tone",
-                "improve this",
-                "improve it",
-            )
-        )
-
-        if rewrite_followup_request and session_id:
-            session_payload = (
-                self._get_session_payload(session_id)
-                or {}
-            )
-
-            session_messages = (
-                session_payload.get("messages")
-                if isinstance(session_payload, dict)
-                else []
-            ) or []
-
-            has_previous_assistant = any(
-                isinstance(message, dict)
-                and message.get("role") == "assistant"
-                and str(
-                    message.get("text")
-                    or message.get("content")
-                    or ""
-                ).strip()
-                for message in session_messages[-6:]
-            )
-
-            if has_previous_assistant:
-                return ("chat", "writing")
-
-        # WRITING INTENT MUST BEAT FRESH-WEB WORDS
-        writing_request = bool(
-            re.match(
-                r"^(write|draft|compose|rewrite|edit|proofread)\b",
-                lowered,
-            )
-        )
-
-        explicit_writing_research = any(
-            marker in lowered
-            for marker in (
-                "search the web",
-                "look up",
-                "research ",
-                "find sources",
-                "cite sources",
-            )
-        )
-
-        if (
-            writing_request
-            and not explicit_writing_research
-        ):
-            return ("chat", "writing")
-
-
-        # CENTRAL WEB DECISION AUTHORITY
-        # Reuse Nova's full route decision instead of maintaining
-        # a second, keyword-only web router.
-        try:
-            central_decision = self._decide(
-                user_text=text,
-                attachments=attachments,
-                session_id=session_id,
-            )
-
-            central_route = self.safe_str(
-                central_decision.get("route")
-                if isinstance(central_decision, dict)
-                else ""
-            ).strip()
-
-            if central_route in {
-                self.ROUTE_WEB_FETCH,
-                "web",
-                "web_search",
-            }:
-                return ("web", "fetch")
-
-            if (
-                isinstance(central_decision, dict)
-                and central_decision.get("intent") == "writing"
-            ):
-                return ("chat", "writing")
-
-        except Exception as exc:
-            exec_debug(
-                "SINGLE_ROUTER_CENTRAL_WEB_DECISION_ERROR:",
-                exc,
-            )
-
-
-        # 3. WEB (STRICT ONLY)
-
-
-        # LIVE MARKET PRICE ROUTE
-        # Current prices must use web, never normal chat.
-        market_terms = (
-            "bitcoin",
-            "btc",
-            "crypto",
-            "stock",
-            "stocks",
-            "share",
-            "shares",
-        )
-
-        price_terms = (
-            "price",
-            "worth",
-            "right now",
-            "current",
-            "live",
-            "today",
-            "market",
-            "trading at",
-        )
-
-        if (
-            any(term in lowered for term in market_terms)
-            and any(term in lowered for term in price_terms)
-        ):
-            return ("web", "fetch")
-
-        web_keywords = (
-            "news",
-            "weather",
-            "search",
-            "latest",
-            "find information",
-            "look up",
-        )
-
-        if any(keyword in lowered for keyword in web_keywords):
-            return ("web", "fetch")
-
-        # 4. START EXECUTION
-
-        if lowered.startswith(("auto-plan", "build", "create", "fix", "implement", "upgrade")):
-            return ("execution", "start")
-
-        # 5. DEFAULT (IMPORTANT FIX)
-
-        return ("chat", "normal")
 
     def _looks_like_live_store_hours_request(self, user_text: str) -> bool:
         """
@@ -6446,90 +6463,7 @@ Rules:
             "verified": False,
         })
 
-    def handle(
-        self,
-        user_text: str,
-        session_id: str = "",
-        attachments=None,
-    ):
-        from nova_backend.services.chat.handle import chat_handle
 
-        session_payload = self._get_session_payload(
-            session_id
-        )
-
-        brain_state = self.orchestrator.run(
-            user_text=user_text,
-            session_context=session_payload,
-            session_id=session_id,
-        )
-
-        print(
-            "DEBUG BRAIN STATE:",
-            brain_state,
-        )
-
-        print(
-            "DEBUG BRAIN EXECUTION VALUE:",
-            brain_state.get("execution")
-            if isinstance(brain_state, dict)
-            else None,
-        )
-
-        print(
-            "DEBUG ORCHESTRATOR OUTPUT:",
-            brain_state,
-        )
-
-        execution_state = (
-            brain_state.get("execution")
-            if isinstance(brain_state, dict)
-            else {}
-        )
-
-        if execution_state:
-            self._save_execution_state(
-                session_id,
-                execution_state,
-            )
-
-        print(
-            "DEBUG ABOUT TO CALL CHAT_HANDLE",
-            {
-                "user_text": user_text,
-                "brain_state": brain_state,
-            },
-        )
-
-        print(
-                "DEBUG BEFORE CHAT_HANDLE BRAIN EXECUTION:",
-                brain_state,
-            ) 
-
-        response = chat_handle(
-            self,
-            user_text,
-            session_id,
-            attachments,
-            brain_state=brain_state,
-            decision=brain_state.get("decision")
-            if isinstance(brain_state, dict)
-            else None,
-        )
-
-        print(
-            "DEBUG CHAT_HANDLE RETURNED",
-            response.get("execution_state")
-            if isinstance(response, dict)
-            else response,
-        )
-
-        response["brain_state"] = brain_state
-
-        if not response.get("execution_state"):
-            response["execution_state"] = execution_state
-
-        return response
 
     def _extract_file_path_from_error(self, error_text: str) -> str:
         text = self.safe_str(error_text)
@@ -7972,47 +7906,111 @@ Rules:
             artifacts = []
 
             if hasattr(self, "artifact_service") and hasattr(
-                self.artifact_service, "list_all"
+                self.artifact_service,
+                "list_all",
             ):
                 artifacts = self.artifact_service.list_all()
-            elif hasattr(self, "artifacts") and hasattr(self.artifacts, "list_all"):
+
+            elif hasattr(self, "artifacts") and hasattr(
+                self.artifacts,
+                "list_all",
+            ):
                 artifacts = self.artifacts.list_all()
 
             artifacts = artifacts or []
 
-            exec_debug("ALL ARTIFACTS =", artifacts)
+            exec_debug(
+                "ALL ARTIFACTS =",
+                artifacts,
+            )
 
             matches = []
 
             for a in artifacts:
                 a = a or {}
 
-                if session_id and self.safe_str(a.get("session_id")) != session_id:
+                if (
+                    session_id
+                    and self.safe_str(a.get("session_id")) != session_id
+                ):
                     continue
 
                 execution = (
-                    a.get("execution") or ((a.get("meta") or {}).get("execution")) or {}
+                    a.get("execution")
+                    or ((a.get("meta") or {}).get("execution"))
+                    or {}
                 )
 
                 if execution:
-                    exec_debug("MATCHED EXECUTION ARTIFACT =", a)
+                    exec_debug(
+                        "MATCHED EXECUTION ARTIFACT =",
+                        a,
+                    )
                     matches.append(a)
 
-            matches.sort(
-                key=lambda x: self.safe_str(x.get("created_at")),
+            active_matches = []
+
+            for artifact in matches:
+                execution = (
+                    artifact.get("execution")
+                    or ((artifact.get("meta") or {}).get("execution"))
+                    or {}
+                )
+
+                status = self.safe_str(
+                    execution.get("status")
+                ).lower().strip()
+
+                is_complete = (
+                    execution.get("complete") is True
+                    or status in {
+                        "complete",
+                        "completed",
+                        "done",
+                    }
+                )
+
+                has_steps = bool(
+                    execution.get("steps")
+                )
+
+                if has_steps and not is_complete:
+                    active_matches.append(
+                        artifact
+                    )
+
+            selected = (
+                active_matches
+                if active_matches
+                else matches
+            )
+
+            selected.sort(
+                key=lambda x: self.safe_str(
+                    x.get("created_at")
+                ),
                 reverse=True,
             )
 
-            latest = matches[0] if matches else None
+            latest = (
+                selected[0]
+                if selected
+                else None
+            )
 
-            exec_debug("FINAL LATEST =", latest)
+            exec_debug(
+                "FINAL LATEST =",
+                latest,
+            )
 
             return latest
 
         except Exception as e:
-            exec_debug("FIND EXECUTION FAILED =", e)
+            exec_debug(
+                "FIND EXECUTION FAILED =",
+                e,
+            )
             return None
-
     def _attach_execution(
         self, payload, user_text, assistant_msg, decision, session_id=""
     ):
@@ -10414,6 +10412,7 @@ Rules:
             + "User message:\n"
             + user_text
         )
+
     def _run_chat_model(
         self,
         user_text: str,
@@ -10450,15 +10449,11 @@ Rules:
                 "DEBUG WRITING MODEL OUTPUT =",
                 repr(assistant_text),
             )
+
             return assistant_text
 
         except Exception as e:
             return f"Model error: {e}"
-
-
-        # ==============================
-        # RESPONSE BUILDERS
-        # ==============================
 
     def _execute_memory_recall(
         self,
@@ -11236,10 +11231,14 @@ def _nova_control_text_is_advance_20260609(value) -> bool:
 
             # Do not erase an active mission.
             if isinstance(execution, dict) and execution.get("steps"):
+
                 return self.execution_orchestrator_service.process_execution(
                     session_id=session_id,
-                    state=execution,
-                    command=user_text,
+                    state=selected_execution_state,
+                    command=(
+                        next_action
+                        or "run_step"
+                    ),
                 )
 
             if hasattr(self, "_save_execution_state"):
