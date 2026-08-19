@@ -506,13 +506,14 @@ def _nova_project_brain_general_live_selector_normalize_20260702(user_text):
     q = " ".join(q.split())
     return q
 
-
 def _legacy_build_project_brain_general_answer_497(user_text=""):
     print(
         "[DEBUG_PROJECT_BRAIN_GENERAL_CALLED]",
         user_text,
     )
+
     intent = classify_project_brain_intent(user_text)
+
     if intent == "next_move":
         return ProjectBrainAnswer(
             intent="next_move",
@@ -540,18 +541,16 @@ def _legacy_build_project_brain_general_answer_497(user_text=""):
             text=format_project_brain_mission_card(card),
         )
 
-    q = _nova_project_brain_general_live_selector_normalize_20260702(user_text)
-
-    if intent == "mission_control":
+    if intent == "current_project_state":
         return ProjectBrainAnswer(
-            intent="mission_control",
-            text=_mission_control_answer(user_text),
-        )
-
-        return ProjectBrainAnswer(
-            intent="general_project_answer",
+            intent="current_project_state",
             text=_current_project_answer(user_text),
         )
+
+    return ProjectBrainAnswer(
+        intent="general_project_answer",
+        text=_current_project_answer(user_text),
+    )
 
 def build_project_brain_general_answer(
     user_text="",

@@ -113,17 +113,12 @@ from nova_backend.services.nova_self_improvement_coordinator import (
 )
 from nova_backend.services.chat_turn_pipeline import build_chat_turn_from_request, build_model_messages
 
-
 logger = logging.getLogger("nova.execution")
 DEBUG_EXECUTION = False
-
-
 
 def exec_debug(*args):
     if DEBUG_EXECUTION:
         logger.debug(" ".join(str(arg) for arg in args))
-
-
 
     def _observe_response_behavior(
         self,
@@ -158,7 +153,6 @@ def exec_debug(*args):
                 )
             )
 
-
             print(
                 "[NOVA BEHAVIOR OBSERVER RESULT]",
                 result
@@ -172,7 +166,6 @@ def exec_debug(*args):
                         result
                     )
                 )
-
 
                 print(
                     "[NOVA SELF IMPROVEMENT RESULT]",
@@ -215,9 +208,7 @@ def exec_debug(*args):
             "on",
             "enabled",
         }
-
 class ChatService:
-
 
     def _nova_select_model_messages(self, fallback_messages):
         # NOVA_CHAT_TURN_FEATURE_FLAG_ADAPTER_20260705
@@ -588,7 +579,17 @@ class ChatService:
 
         response["brain_state"] = brain_state
 
-        if not response.get("execution_state"):
+        decision = (
+            brain_state.get("decision")
+            if isinstance(brain_state, dict)
+            else {}
+        )
+
+        if (
+            isinstance(decision, dict)
+            and decision.get("route") == "execution"
+            and not response.get("execution_state")
+        ):
             response["execution_state"] = execution_state
 
         return response
@@ -1097,8 +1098,6 @@ class ChatService:
 
         return "\n\n".join([p for p in parts if p]).strip()
 
-
-
     def _resume_execution_if_needed(self, session_id):
         session = self.sessions.get(session_id)
 
@@ -1202,7 +1201,7 @@ Rules:
         if not code:
             return code
 
-        # 1. convert tabs ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 4 spaces
+        # 1. convert tabs ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ 4 spaces
         code = code.replace("\t", "    ")
 
         # 2. normalize line endings
@@ -1429,16 +1428,19 @@ Rules:
         )
 
         if not steps:
+            execution_state.setdefault(
+                "status",
+                "idle",
+            )
 
-            execution_state["status"] = "idle"
+            execution_state.setdefault(
+                "current_step",
+                "",
+            )
 
-            execution_state["current_step"] = ""
-
-            execution_state["progress"] = 0
-
-            self._save_execution_state(
-                session_id,
-                execution_state,
+            execution_state.setdefault(
+                "progress",
+                0,
             )
 
         working_state = self._get_working_state(session_id) or {}
@@ -1474,8 +1476,16 @@ Rules:
                 == "idle"
             )
 
-            if execution_is_idle or (
-                not has_real_state
+            has_saved_mission = bool(
+                mission
+                or execution_state.get("goal")
+                or execution_state.get("steps")
+                or execution_state.get("current_step")
+            )
+
+            if (
+                not has_saved_mission
+                and not has_real_state
                 and not has_real_execution
             ):
                 message = (
@@ -1555,9 +1565,12 @@ Rules:
             return {
                 "ok": True,
                 "is_mission": True,
-                "type": "inspect",
+                "type": "continue",
                 "mission": mission,
-                "next_action": mission.get("next_action") or "inspect_state",
+                "next_action": (
+                    mission.get("next_action")
+                    or "run_step"
+                ),
                 "execution": execution_state,
             }
 
@@ -1577,7 +1590,7 @@ Rules:
             "type": "",
             "mission": mission,
             "next_action": "",
-            "execution": execution_state,
+            "execution": {},
         }
 
     def _handle_mission_command_result(
@@ -1588,17 +1601,26 @@ Rules:
         if not isinstance(mission_command, dict):
             return None
 
-        mission_type = self.safe_str(mission_command.get("type")).lower().strip()
+        mission_type = self.safe_str(
+            mission_command.get("type")
+        ).lower().strip()
 
         if mission_type == "empty_next_guard":
             return {
                 "ok": True,
                 "assistant_message": (
                     mission_command.get("assistant_message")
-                    or self._build_assistant_message("No active execution to continue.")
+                    or self._build_assistant_message(
+                        "No active execution to continue."
+                    )
                 ),
-                "execution": mission_command.get("execution") or {},
-                "session": self._get_session_payload(session_id),
+                "execution": (
+                    mission_command.get("execution")
+                    or {}
+                ),
+                "session": self._get_session_payload(
+                    session_id
+                ),
                 "debug": {
                     "route_taken": "empty_next_guard",
                 },
@@ -1607,9 +1629,14 @@ Rules:
         if mission_command.get("is_mission") is not True:
             return None
 
-        next_action = self.safe_str(mission_command.get("next_action")).lower().strip()
+        next_action = self.safe_str(
+            mission_command.get("next_action")
+        ).lower().strip()
 
-        execution_state = mission_command.get("execution") or {}
+        execution_state = (
+            mission_command.get("execution")
+            or {}
+        )
 
         if execution_state:
             execution_state["session_id"] = session_id
@@ -1619,8 +1646,33 @@ Rules:
                 execution_state,
             )
 
-        if mission_type in {"continue", "execute"}:
+        if mission_type == "inspect":
+            mission = (
+                mission_command.get("mission")
+                or {}
+            )
 
+            return {
+                "ok": True,
+                "assistant_message": self._build_assistant_message(
+                    mission.get("recommended_next_move")
+                    or "Inspect current mission state."
+                ),
+                "execution": execution_state,
+                "session": self._get_session_payload(
+                    session_id
+                ),
+                "debug": {
+                    "route_taken": "mission_inspect",
+                },
+            }
+
+        selected_execution_state = execution_state
+
+        if mission_type in {
+            "continue",
+            "execute",
+        }:
             persisted_execution_state = (
                 self._load_execution_state(
                     session_id
@@ -1636,7 +1688,8 @@ Rules:
                     if (
                         persisted_execution_state.get("steps")
                         and str(
-                            persisted_execution_state.get("status") or ""
+                            persisted_execution_state.get("status")
+                            or ""
                         ).lower()
                         not in {
                             "complete",
@@ -1648,11 +1701,36 @@ Rules:
                 )
             )
 
-            selected_execution_state["_execution_dispatch_handled"] = True
+        selected_execution_state[
+            "_execution_dispatch_handled"
+        ] = True
 
-            selected_execution_state["command"] = (
-                next_action or "run_step"
-            )
+        selected_execution_state[
+            "command"
+        ] = (
+            next_action
+            or "run_step"
+        )
+
+        exec_debug(
+            "DISPATCH EXECUTION STATE DEBUG",
+            {
+                "goal": selected_execution_state.get(
+                    "goal"
+                ),
+                "status": selected_execution_state.get(
+                    "status"
+                ),
+                "steps": len(
+                    selected_execution_state.get(
+                        "steps",
+                        []
+                    )
+                    or []
+                ),
+                "command": next_action,
+            },
+        )
 
         return self.execution_orchestrator_service.process_execution(
             session_id=session_id,
@@ -1663,76 +1741,55 @@ Rules:
             ),
         )
 
-        if mission_type == "inspect":
-            mission = mission_command.get("mission") or {}
+    def _load_execution_state(
+        self,
+        session_id="",
+    ):
+        meta_state = self._get_session_meta(
+            session_id,
+            "execution_state",
+            {},
+        )
 
-            return {
-                "ok": True,
-                "assistant_message": self._build_assistant_message(
-                    mission.get("recommended_next_move")
-                    or "Inspect current mission state."
+        exec_debug(
+            "LOAD EXECUTION META DEBUG",
+            {
+                "session_id": session_id,
+                "goal": (
+                    meta_state.get("goal")
+                    if isinstance(meta_state, dict)
+                    else None
                 ),
-                "execution": execution_state,
-                "session": self._get_session_payload(session_id),
-                "debug": {
-                    "route_taken": "mission_inspect",
-                },
-            }
-
-        return None
-
-def _load_execution_state(
-    self,
-    session_id="",
-):
-    meta_state = self._get_session_meta(
-        session_id,
-        "execution_state",
-        {},
-    )
-
-    exec_debug(
-        "LOAD EXECUTION META DEBUG",
-        {
-            "session_id": session_id,
-            "goal": meta_state.get("goal") if isinstance(meta_state, dict) else None,
-            "status": meta_state.get("status") if isinstance(meta_state, dict) else None,
-            "steps": len(meta_state.get("steps", []) or []) if isinstance(meta_state, dict) else None,
-            "current_index": meta_state.get("current_index") if isinstance(meta_state, dict) else None,
-        },
-    )
-
-    if self.execution_state_service:
-        state = self.execution_state_service.get_execution_state(
-            session_id
+                "status": (
+                    meta_state.get("status")
+                    if isinstance(meta_state, dict)
+                    else None
+                ),
+                "steps": (
+                    len(meta_state.get("steps", []) or [])
+                    if isinstance(meta_state, dict)
+                    else None
+                ),
+                "current_index": (
+                    meta_state.get("current_index")
+                    if isinstance(meta_state, dict)
+                    else None
+                ),
+            },
         )
 
-        if isinstance(state, dict) and state:
-            return state
+        if self.execution_state_service:
+            state = self.execution_state_service.get_execution_state(
+                session_id
+            )
 
-    if isinstance(meta_state, dict) and meta_state:
-        status = self.safe_str(
-            meta_state.get("status")
-        ).lower()
+            if isinstance(state, dict) and state:
+                return state
 
-        if status not in {
-            "complete",
-            "completed",
-        }:
+        if isinstance(meta_state, dict) and meta_state:
             return meta_state
 
-        if meta_state.get("waiting"):
-            return meta_state
-
-    if self.execution_state_service:
-        state = self.execution_state_service.get_execution_state(
-            session_id
-        )
-
-        if isinstance(state, dict) and state:
-            return state
-
-    return {}
+        return {}
 
     def _save_execution_state(
         self,
@@ -1775,20 +1832,6 @@ def _load_execution_state(
                     e,
                 )
 
-        if isinstance(execution_state, dict):
-            self._set_session_meta(
-                session_id,
-                "execution_state",
-                execution_state,
-            )
-
-            self._set_session_meta(
-                session_id,
-                "active_execution",
-                execution_state,
-            )
-
-        return execution_state or {}
 
     def _get_session_meta(self, session_id: str, key: str = "", default=None):
         session_id = self.safe_str(session_id).strip()
@@ -1814,6 +1857,7 @@ def _load_execution_state(
             exec_debug("GET SESSION META FAILED:", e)
             return default
 
+
     def _set_session_meta(self, session_id: str, key: str, value) -> bool:
         session_id = self.safe_str(session_id).strip()
         key = self.safe_str(key).strip()
@@ -1835,6 +1879,7 @@ def _load_execution_state(
             )
             return False
 
+
     def _should_auto_title_session(self, title):
         title = self.safe_str(title).strip().lower()
 
@@ -1843,6 +1888,7 @@ def _load_execution_state(
             "new chat",
             "untitled session",
         )
+
 
     def _build_session_title_from_message(self, user_msg):
         text = ""
@@ -1876,11 +1922,12 @@ def _load_execution_state(
             return False
 
         text = self.safe_str(user_text).strip()
+
         if not text:
             return False
 
         if not self._should_save_memory_text(text):
-            exec_debug("MEMORY_REJECTED_TEXT =", text)
+            exec_debug("MEMORY REJECTED TEXT =", text)
             return False
 
         memory_kind = "user_fact"
@@ -1918,6 +1965,7 @@ def _load_execution_state(
             "add",
         ):
             method = getattr(self.memory, method_name, None)
+
             if callable(method):
                 method(payload)
                 return True
@@ -2090,17 +2138,16 @@ def _load_execution_state(
             payload["meta"] = meta
 
         live_execution = (
-            payload.get("active_execution") or payload.get("execution_state") or {}
+            payload.get("execution_state")
+            or payload.get("active_execution")
+            or {}
         )
 
         # HARD BLOCK RESURRECTION FROM PAYLOAD
 
         payload["active_execution"] = live_execution
-
         payload["execution_state"] = live_execution
-        # =========================
-        # INVALID EXECUTION SANITIZER
-        # =========================
+
 
         goal_text = self.safe_str(live_execution.get("goal")).lower().strip()
 
@@ -2140,7 +2187,7 @@ def _load_execution_state(
         )
 
         if execution_complete:
-            live_execution = {}
+            live_execution["archived"] = True
 
         payload["active_execution"] = live_execution
         payload["execution_state"] = live_execution
@@ -2492,9 +2539,9 @@ def _load_execution_state(
                 "assembly news headlines today",
                 "curated for you",
                 "you're my favorite song",
-                "youÃ¢â‚¬â„¢re my favorite song",
+                "youÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢re my favorite song",
                 "introduces today's new top stars",
-                "introduces todayÃ¢â‚¬â„¢s new top stars",
+                "introduces todayÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s new top stars",
                 "gma network",
                 "kanak news odisha",
                 "odia news",
@@ -2928,7 +2975,7 @@ def _load_execution_state(
     def _normalize_assistant_message(self, message):
         if message is None:
             return self._build_assistant_message(
-                text="I’m here. Send the next instruction."
+                text="I'm here. Send the next instruction."
             )
 
         if isinstance(message, dict):
@@ -2974,7 +3021,7 @@ def _load_execution_state(
         safe_text = self.safe_str(text).strip()
 
         if not safe_text:
-            safe_text = "I’m here. Send the next instruction."
+            safe_text = "I'm here. Send the next instruction."
 
         return {
             "role": "assistant",
@@ -3395,7 +3442,7 @@ def _load_execution_state(
             "send the code",
             "send one of these",
             "send the code and",
-            "whatÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢s the symptom",
+            "whatÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢s the symptom",
             "what's the symptom",
             "tell me what you need",
             "i can help",
@@ -3792,7 +3839,7 @@ def _load_execution_state(
                 "SMFF mode:\n"
                 "- Send full file path.\n"
                 "- Send the full broken function or file.\n"
-                "- IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll return the full replacement, cleanly indented."
+                "- IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll return the full replacement, cleanly indented."
             ).strip()
 
         stuck_exact = {
@@ -3830,7 +3877,7 @@ def _load_execution_state(
             return {
                 "assistant_text": (
                     "Send the full function and file path.\n"
-                    "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll return the full replacement block, cleanly indented."
+                    "IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll return the full replacement block, cleanly indented."
                 ),
                 "intelligence": {
                     "strategy": "smff_bug_intake",
@@ -3846,7 +3893,7 @@ def _load_execution_state(
             return {
                 "assistant_text": (
                     "Paste the error, file path, or failing behavior.\n"
-                    "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll help patch it."
+                    "IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll help patch it."
                 ),
                 "intelligence": {
                     "strategy": "bug_intake",
@@ -3863,7 +3910,7 @@ def _load_execution_state(
             return {
                 "assistant_text": (
                     "Paste the text, code, error, screenshot, or link.\n"
-                    "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll break it down clearly."
+                    "IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll break it down clearly."
                 ),
                 "intelligence": {
                     "strategy": "clarify_missing_subject",
@@ -3883,7 +3930,7 @@ def _load_execution_state(
         hard_override_applied = False
 
         if not assistant_text:
-            assistant_text = "I couldnÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢t generate a useful answer from that. Send the exact thing you want handled."
+            assistant_text = "I couldnÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢t generate a useful answer from that. Send the exact thing you want handled."
 
         try:
             intelligence = self._fuse_response_intelligence(
@@ -3981,24 +4028,42 @@ def _load_execution_state(
                         attachments=attachments,
                     )
 
-                    if isinstance(exec_result, dict):
-                        execution = exec_result.get("execution") or execution
+                if isinstance(exec_result, dict):
 
-                        self._save_active_execution(
+                    execution = (
+                        exec_result.get("execution")
+                        or execution
+                    )
+
+                    decision["mission"] = (
+                        decision.get("mission")
+                        or {}
+                    )
+
+                    decision["mission"]["execution"] = execution
+
+                    self._set_session_meta(
+                        session_id,
+                        "execution_state",
+                        execution,
+                    )
+
+                    self._save_active_execution(
+                        session_id,
+                        execution,
+                    )
+
+                    try:
+                        self._persist_execution_artifact(
                             session_id,
                             execution,
                         )
 
-                        try:
-                            self._persist_execution_artifact(
-                                session_id,
-                                execution,
-                            )
-                        except Exception as e:
-                            exec_debug("EXECUTION_SAVE_ERROR:", e)
-
-                        decision["mission"] = decision.get("mission") or {}
-                        decision["mission"]["execution"] = execution
+                    except Exception as e:
+                        exec_debug(
+                            "EXECUTION_SAVE_ERROR:",
+                            e,
+                        )
 
         except Exception as e:
             exec_debug("EXECUTION_STEP_ERROR:", e)
@@ -4009,13 +4074,6 @@ def _load_execution_state(
             "self_check": self_check,
             "hard_override_applied": hard_override_applied,
         }
-
-
-
-
-
-
-
 
     def _decide_response_strategy(
         self,
@@ -4180,7 +4238,7 @@ def _load_execution_state(
 
         clean_query = re.sub(r"\s+", " ", clean_query).strip()
 
-        # ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ empty ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ global news
+        # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ empty ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ global news
         if not clean_query:
             return [
                 "world news",
@@ -4421,7 +4479,7 @@ def _load_execution_state(
                     "eye-catching prints",
                     "url removed from extracted attachment text",
                     "free_shipping",
-                    "furniture & dÃƒÆ’Ã‚Â©cor",
+                    "furniture & dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cor",
                     "kitchen appliances",
                     "love, horror and more themes",
                     "plain field in front of mountain peak",
@@ -4444,7 +4502,7 @@ def _load_execution_state(
                     if not _line:
                         continue
 
-                    _low = _line.lower().strip(" :;-ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢*|")
+                    _low = _line.lower().strip(" :;-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢*|")
                     _compact = _nova_attach_re.sub(r"[^a-z0-9]+", " ", _low).strip()
 
                     if _compact in _noise_exact:
@@ -4819,11 +4877,11 @@ def _load_execution_state(
                 summary_looks_raw = (
                     len(summary) > 400
                     or "search wikipedia" in summary.lower()
-                    or "ÃƒÆ’Ã‹Å“" in summary
-                    or "ÃƒÆ’Ã¢â€žÂ¢" in summary
-                    or "ÃƒÆ’Ã‚Â" in summary
-                    or "ÃƒÆ’Ã†â€™" in summary
-                    or "ÃƒÆ’Ã‚Â Ãƒâ€šÃ‚Â¦" in summary
+                    or "ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œ" in summary
+                    or "ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢" in summary
+                    or "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â" in summary
+                    or "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢" in summary
+                    or "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦" in summary
                 )
 
                 assistant_text = "" if summary_looks_raw else summary
@@ -5994,7 +6052,7 @@ def _load_execution_state(
 
         for prefix in prefixes:
             if lowered.startswith(prefix):
-                prompt = text[len(prefix) :].strip()
+                prompt = text[len(prefix):].strip()
                 return prompt or text
 
         return text or "Generate an image."
@@ -6056,16 +6114,24 @@ def _load_execution_state(
             user_text
         ).strip().lower()
 
-        mission_command = (
-            self._resolve_mission_command(
-                user_text=text,
-                session_id=session_id,
-            )
+        print(
+            "MISSION COMMAND DEBUG =",
+            {
+                "text": text,
+                "session_id": session_id,
+            },
+            flush=True,
+        )
+
+        mission_command = self._resolve_mission_command(
+            user_text=user_text,
+            session_id=session_id,
         )
 
         print(
             "DEBUG MISSION COMMAND RESULT =",
             mission_command,
+            flush=True,
         )
 
         mission_result = (
@@ -6084,9 +6150,7 @@ def _load_execution_state(
             "auto fix",
             "autofix",
         }:
-            return self._apply_pending_fix(
-                session_id
-            )
+            return self._apply_pending_fix(session_id)
 
         command = None
 
@@ -6157,35 +6221,24 @@ def _load_execution_state(
             return None
 
         execution_state = (
-            self._load_execution_state(
-                session_id
-            )
+            self._load_execution_state(session_id)
             or {}
         )
 
-        if not isinstance(
-            execution_state,
-            dict,
-        ):
+        if not isinstance(execution_state, dict):
             execution_state = {}
 
         if (
             command == "run_step"
             and self.safe_str(
-                execution_state.get(
-                    "status"
-                )
+                execution_state.get("status")
             ).strip().lower()
             == "failed"
         ):
             command = "retry_failed"
 
         execution_state["lock"] = False
-
-        execution_state[
-            "_execution_processing"
-        ] = False
-
+        execution_state["_execution_processing"] = False
         execution_state["command"] = command
 
         print(
@@ -6208,15 +6261,11 @@ def _load_execution_state(
                 0,
             )
 
-        return (
-            self.execution_orchestrator_service
-            .process_execution(
-                session_id=session_id,
-                state=execution_state,
-                command=command,
-            )
+        return self.execution_orchestrator_service.process_execution(
+            session_id=session_id,
+            state=execution_state,
+            command=command,
         )
-
     def _looks_like_live_store_hours_request(self, user_text: str) -> bool:
         """
         LIVE_STORE_HOURS_ROUTE_V1
@@ -6381,7 +6430,7 @@ def _load_execution_state(
             or "use the web route to verify" in combined_lower
             or "can't directly browse from here" in combined_lower
             or "cannot directly browse from here" in combined_lower
-            or "i canâ€™t directly browse from here" in combined_lower
+            or "i canÃ¢â‚¬â„¢t directly browse from here" in combined_lower
             or "i can't directly browse from here" in combined_lower
             or "fastest exact query is" in combined_lower
             or "paste the listing here" in combined_lower
@@ -6817,15 +6866,9 @@ def _load_execution_state(
 
         normalized_recall_text = " ".join(str(user_text or "").lower().strip().rstrip("?!.").split())
         project_state_questions = {
-            "what are we working on",
-            "what are we working on now",
-            "what are we doing",
-            "current task",
-            "active task",
-            "current project",
             "what is the current project",
         }
-
+            
         if normalized_recall_text in project_state_questions:
             try:
                 import json as _nova_project_memory_json_20260701
@@ -7267,7 +7310,63 @@ def _load_execution_state(
 
     def _build_continuity_context(self, session=None, limit: int = 14):
         session = session or {}
-        messages = session.get("messages") if isinstance(session, dict) else []
+        messages = (
+            session.get("messages")
+            if isinstance(session, dict)
+            else []
+        )
+
+        project_lines = []
+
+        try:
+            project_state = {}
+
+            project_state_path = (
+                r"C:\Users\Owner\nova\data\nova_project_state.json"
+            )
+
+            import json
+            import os
+
+            if os.path.exists(project_state_path):
+                with open(project_state_path, "r", encoding="utf-8") as f:
+                    project_state = json.load(f)
+
+            print(
+                "[PROJECT STATE DEBUG LOADED KEYS]",
+                list(project_state.keys())
+                if isinstance(project_state, dict)
+                else type(project_state),
+            )
+
+            if isinstance(project_state, dict):
+                for key in (
+                    "project",
+                    "checkpoint",
+                    "current_focus",
+                    "working_on",
+                    "current_work",
+                    "next_move",
+                    "branch",
+                ):
+                    value = project_state.get(key)
+
+                    if value:
+                        project_lines.append(
+                            f"{key}: {value}"
+                        )
+
+                print(
+                    "[PROJECT STATE LOADED]",
+                    project_lines[:5],
+                )
+
+        except Exception as exc:
+            print(
+                "[PROJECT STATE CONTINUITY FAILED]",
+                repr(exc),
+            )
+
         print(
             "[CONTINUITY SESSION DEBUG]",
             {
@@ -7281,60 +7380,69 @@ def _load_execution_state(
                     if isinstance(messages, list)
                     else "not_list"
                 ),
-                "messages": (
-                    messages[:2]
-                    if isinstance(messages, list)
-                    else messages
-                ),
+                "project_lines": project_lines[:5],
             },
         )
 
-        if not isinstance(messages, list) or not messages:
-            return ""
+        if not isinstance(messages, list):
+            messages = []
 
         recent = messages[-limit:]
+
         lines = []
+
+        if project_lines:
+            lines.append(
+                "Current Nova project context:"
+            )
+
+            lines.extend(
+                project_lines
+            )
+
+        stale_context_markers = (
+            "Current checkpoint:",
+            "Nova is tuned for",
+            "Nova should act like",
+            "continuity-aware workspace assistant",
+            "continuity-aware AI workspace assistant",
+            "Active behavior constraints:",
+            "Pinned constraints in the workspace:",
+            "Known user test context:",
+            "Active validation:",
+            "Memory rule:",
+            "Project behavior:",
+        )
 
         for msg in recent:
             if not isinstance(msg, dict):
                 continue
 
-            role = str(msg.get("role") or "").strip().lower()
-            text = str(msg.get("text") or msg.get("content") or "").strip()
+            role = str(
+                msg.get("role") or ""
+            ).strip().lower()
 
-            stale_context_markers = (
-                "Current checkpoint:",
-                "Nova is tuned for",
-                "Nova should act like",
-                "continuity-aware workspace assistant",
-                "continuity-aware AI workspace assistant",
-                "Active behavior constraints:",
-                "Pinned constraints in the workspace:",
-                "Known user test context:",
-                "Active validation:",
-                "Memory rule:",
-                "Project behavior:",
-            )
-
-            if any(
-                marker.lower() in text.lower()
-                for marker in stale_context_markers
-            ):
-                continue
-
-            if any(
-                marker.lower() in text.lower()
-                for marker in stale_context_markers
-            ):
-                continue
+            text = str(
+                msg.get("text")
+                or msg.get("content")
+                or ""
+            ).strip()
 
             if not text:
                 continue
 
+            if any(
+                marker.lower() in text.lower()
+                for marker in stale_context_markers
+            ):
+                continue
+
             if role in {"human", "user"}:
                 role = "user"
+
             elif role in {"assistant", "nova"}:
                 role = "assistant"
+
             else:
                 continue
 
@@ -7343,25 +7451,27 @@ def _load_execution_state(
             if len(text) > 900:
                 text = text[:900].rstrip() + "..."
 
-            lines.append(f"{role}: {text}")
+            lines.append(
+                f"{role}: {text}"
+            )
 
         if not lines:
             return ""
 
         return (
             "Recent conversation context. Highest priority after the current user message.\n"
-            "Use this before older saved memory. The latest user correction or instruction overrides earlier context.\n"
+            "Use this before older saved memory. The latest user correction or instruction overrides earlier context.\n\n"
+            "Answer format rules:\n"
+            "- Use only:\n"
+            "  Checkpoint:\n"
+            "  Blocker:\n"
+            "  Next move:\n"
+            "- No summaries.\n"
+            "- No repetition.\n"
+            "- No follow-up offers.\n"
+            "- Keep answers under 8 lines unless asked for detail.\n\n"
             + "\n".join(lines)
         )
-
-    def _compose_model_messages(
-        self, user_text, session=None, decision=None, memory_context=None
-    ):
-        session = session or {}
-        memory_context = self.safe_str(memory_context).strip()
-
-        system_prompt = self._build_system_prompt(decision=decision)
-        continuity_context = self._build_continuity_context(session=session)
 
         execution_text = ""
         try:
@@ -7723,10 +7833,18 @@ def _load_execution_state(
             return True
 
         # Planning requests should create execution state.
-        if decision and decision.get("intent") == "planning":
+        if decision and decision.get("route") in {
+            "execution",
+            "execution_plan",
+            "execution_command",
+        }:
             return True
 
-        if decision and decision.get("mode") in {"coding", "analysis"}:
+        if decision and decision.get("intent") in {
+            "start_execution",
+            "execute_plan",
+            "execution_command",
+        }:
             return True
 
         return False
@@ -8439,7 +8557,7 @@ def _load_execution_state(
         current_index = -1
 
         for i, line in enumerate(lines):
-            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â", "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â"]):
+            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â", "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â"]):
                 step_indexes.append(i)
 
             if "[>]" in line:
@@ -8807,10 +8925,16 @@ def _load_execution_state(
         self, user_text: str, current_state: dict | None = None
     ) -> dict:
         text = self.safe_str(user_text).strip()
+
         if not text:
             return {}
 
-        current_state = current_state if isinstance(current_state, dict) else {}
+        current_state = (
+            current_state
+            if isinstance(current_state, dict)
+            else {}
+        )
+
         lowered = text.lower()
         updates = {}
 
@@ -8837,11 +8961,10 @@ def _load_execution_state(
                 "checkpoint",
             ],
         }
-
         def _clean_value(value: str) -> str:
             value = self.safe_str(value).strip()
             value = value.strip(
-                "+    ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â (FOUR SPACES ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â press space 4 times)\r\n-:;,."
+                "+ ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â\r\n-:;,.\""
             )
             return value
 
@@ -8850,9 +8973,6 @@ def _load_execution_state(
             if value:
                 updates[field_name] = value
 
-        # -----------------------------
-        # explicit "set X to Y" patterns
-        # -----------------------------
         for field_name, aliases in field_aliases.items():
             for alias in aliases:
                 patterns = [
@@ -8862,18 +8982,17 @@ def _load_execution_state(
                     f"{alias} is ",
                     f"{alias}: ",
                 ]
+
                 for marker in patterns:
                     idx = lowered.find(marker)
                     if idx != -1:
-                        raw_value = text[idx + len(marker) :]
+                        raw_value = text[idx + len(marker):]
                         _set_if_present(field_name, raw_value)
                         break
+
                 if field_name in updates:
                     break
 
-        # -----------------------------------
-        # compact continuity / status patterns
-        # -----------------------------------
         continuity_markers = [
             ("working on ", "active_task"),
             ("i'm working on ", "active_task"),
@@ -8893,71 +9012,53 @@ def _load_execution_state(
         for marker, field_name in continuity_markers:
             idx = lowered.find(marker)
             if idx != -1 and field_name not in updates:
-                raw_value = text[idx + len(marker) :]
+                raw_value = text[idx + len(marker):]
                 _set_if_present(field_name, raw_value)
 
-        # -----------------------------
         # file path extraction
-        # -----------------------------
         if "current_file" not in updates:
             path_match = re.search(
                 r"([A-Za-z]:\\[^\r\n\"'<>|?*]+(?:\.[A-Za-z0-9_]+)?)",
                 text,
             )
+
             if path_match:
-                _set_if_present("current_file", path_match.group(1))
+                _set_if_present(
+                    "current_file",
+                    path_match.group(1),
+                )
 
-        # -----------------------------------------
-        # preserve state if user says "where are we"
-        # or similar continuity-checking questions
-        # -----------------------------------------
-        continuity_queries = [
-            "where are we",
-            "what are we doing",
-            "what were we doing",
-            "what are we working on",
-            "what were we working on",
-            "what now",
-            "what's next",
-            "whats next",
-            "status",
-            "recap",
-        ]
-
-        if any(q in lowered for q in continuity_queries):
-            return {}
-
-        # -----------------------------------------
-        # strip values that just repeat old state
-        # -----------------------------------------
+        # remove values that are unchanged
         deduped = {}
+
         for key, value in updates.items():
-            existing = self.safe_str(current_state.get(key)).strip()
+            existing = self.safe_str(
+                current_state.get(key)
+            ).strip()
+
             if (
                 self.safe_str(value).strip()
                 and self.safe_str(value).strip() != existing
             ):
                 deduped[key] = value
 
-        return deduped
+            return deduped
 
-    def _format_working_state(self, state):
         def c(x):
             return x if x else " "
 
         return (
-            f"Active task: {c(state.get('active_task'))}\n"
-            f"Current file: {c(state.get('current_file'))}\n"
-            f"Current bug: {c(state.get('current_bug'))}\n"
-            f"Last success: {c(state.get('last_success'))}\n"
-            f"Next move: {c(state.get('next_move'))}\n"
-            f"Checkpoint: {c(state.get('checkpoint'))}"
-        )
+        f"Active task: {c(state.get('active_task'))}\n"
+        f"Current file: {c(state.get('current_file'))}\n"
+        f"Current bug: {c(state.get('current_bug'))}\n"
+        f"Last success: {c(state.get('last_success'))}\n"
+        f"Next move: {c(state.get('next_move'))}\n"
+        f"Checkpoint: {c(state.get('checkpoint'))}"
+    )
 
     # =========================
     # WORKING STATE HELPERS
     # =========================
-
 
     def _build_mission_state(
         self,
@@ -10408,10 +10509,10 @@ def _load_execution_state(
             + "\n\nInstructions:\n"
             + "- Answer clearly and directly.\n"
             + "- Use relevant memory when it helps.\n"
-            + "- Do not claim missing context if the answer is already available.\n\n"
-            + "User message:\n"
-            + user_text
-        )
+                + "- Do not claim missing context if the answer is already available.\n\n"
+                + "User message:\n"
+                + user_text
+            )
 
     def _run_chat_model(
         self,
@@ -10611,7 +10712,14 @@ def _load_execution_state(
         attachments = attachments or []
 
         execution = self._normalize_execution_state(execution or {})
-        execution["status"] = "running"
+
+        if execution.get("status") not in {
+            "complete",
+            "completed",
+            "done",
+        }:
+            execution["status"] = "running"
+
         execution["waiting"] = False
 
         steps = execution.get("steps") or []
@@ -10629,62 +10737,78 @@ def _load_execution_state(
         ):
 
             execution = self._sync_execution_state(
-                execution=execution,
-                current_index=len(steps),
-                status="complete",
-                current_step="complete",
-                progress=len(steps),
-            )
+            execution=execution,
+            current_index=len(steps),
+            status="complete",
+            current_step="complete",
+            progress=len(steps),
+        )
 
-            execution["current_step_title"] = "complete"
+        execution["current_step_title"] = "complete"
 
-            execution["complete"] = True
 
-            execution.setdefault(
-                "step_results",
-                [],
-            )
+        self._save_execution_state(
+            session_id,
+            execution,
+        )
 
-            self._update_working_state(
-                session_id,
-                {
-                    "next_move": "",
-                    "active_task": "",
-                    "current_file": "",
-                    "current_bug": "",
-                    "checkpoint": ("execution_complete"),
-                    "last_success": (
-                        self.safe_str(execution.get("goal")) or "execution_complete"
-                    ),
-                    "execution_status": ("complete"),
-                },
-            )
+        execution.setdefault(
+            "step_results",
+            [],
+        )
 
-            return {
+        self._update_working_state(
+            session_id,
+            {
+                "next_move": "",
+                "active_task": "",
+                "current_file": "",
+                "current_bug": "",
+                "checkpoint": "execution_complete",
+                "last_success": (
+                    self.safe_str(execution.get("goal"))
+                    or "execution_complete"
+                ),
+                "execution_status": "complete",
+            },
+        )
+
+        return {
+            "execution": execution,
+            "step_output": "No remaining execution step.",
+            "saved_artifact": {
+                "kind": "execution",
+                "title": (
+                    self.safe_str(execution.get("goal"))
+                    or "Execution"
+                ),
+                "body": self._render_execution(execution),
                 "execution": execution,
-                "step_output": ("No remaining execution step."),
-                "saved_artifact": {
-                    "kind": "execution",
-                    "title": (self.safe_str(execution.get("goal")) or "Execution"),
-                    "body": self._render_execution(execution),
+                "meta": {
                     "execution": execution,
-                    "meta": {
-                        "execution": execution,
-                        "execution_id": (self.safe_str(execution.get("id"))),
-                        "status": (
-                            self.safe_str(execution.get("status")) or "complete"
-                        ),
-                        "progress": execution.get(
-                            "progress",
-                            len(steps),
-                        ),
-                        "current_step": (
-                            self.safe_str(execution.get("current_step")) or "complete"
-                        ),
-                        "goal": self.safe_str(execution.get("goal")),
-                    },
+                    "execution_id": (
+                        self.safe_str(execution.get("id"))
+                    ),
+                    "status": (
+                        self.safe_str(execution.get("status"))
+                        or "complete"
+                    ),
+                    "progress": execution.get(
+                        "progress",
+                        len(steps),
+                    ),
+                    "current_step": (
+                        self.safe_str(
+                            execution.get("current_step")
+                        )
+                        or "complete"
+                    ),
+                    "goal": self.safe_str(
+                        execution.get("goal")
+                    ),
                 },
-            }
+            },
+        }
 
         # =========================
         # CURRENT STEP
@@ -10889,6 +11013,11 @@ def _load_execution_state(
         )
 
         self._save_active_execution(
+            session_id,
+            execution,
+        )
+
+        self._save_execution_state(
             session_id,
             execution,
         )
@@ -11192,165 +11321,13 @@ def _load_execution_state(
 
 pass
 
-# NOVA_CHATSERVICE_POST_COMPLETE_IDLE_GUARD_20260609
-
-_nova_original_advance_execution_request_20260609 = getattr(
-    ChatService,
-    "_advance_execution_request",
-    None,
-)
-
-def _nova_control_text_is_advance_20260609(value) -> bool:
-    text = str(value or "").strip().lower()
-
-    return text in {
-        "k",
-        "ok",
-        "next",
-        "continue",
-        "run it",
-        "run step",
-        "execute",
-        "advance",
-    }
-
-    def _nova_build_no_active_execution_response_20260609(self, user_text, session_id="", attachments=None):
-        attachments = attachments or []
-
-        try:
-            execution = {}
-
-            if hasattr(self, "_load_execution_state"):
-                execution = self._load_execution_state(session_id) or {}
-
-            if not execution and hasattr(self, "_get_session_meta"):
-                execution = self._get_session_meta(
-                    session_id,
-                    "execution_state",
-                ) or {}
-
-            # Do not erase an active mission.
-            if isinstance(execution, dict) and execution.get("steps"):
-
-                return self.execution_orchestrator_service.process_execution(
-                    session_id=session_id,
-                    state=selected_execution_state,
-                    command=(
-                        next_action
-                        or "run_step"
-                    ),
-                )
-
-            if hasattr(self, "_save_execution_state"):
-                self._save_execution_state(session_id, {})
-
-            if hasattr(self, "_set_session_meta"):
-                self._set_session_meta(
-                    session_id,
-                    "execution_state",
-                    {},
-                )
-                self._set_session_meta(
-                    session_id,
-                    "active_execution",
-                    {},
-                )
-
-            if hasattr(self, "_update_working_state"):
-                self._update_working_state(
-                    session_id,
-                    {
-                        "active_task": "",
-                        "next_move": "await_new_mission",
-                        "checkpoint": "execution_complete_idle_guard",
-                        "execution_status": "idle",
-                    },
-                )
-
-        except Exception:
-            pass
-
-    def _nova_advance_execution_request_post_complete_idle_20260609(
-        self,
-        user_text: str,
-        session_id: str = "",
-        attachments=None,
-    ):
-        attachments = attachments or []
-
-        if _nova_control_text_is_advance_20260609(user_text):
-            try:
-                execution = {}
-
-                if hasattr(self, "_load_execution_state"):
-                    execution = (
-                        self._load_execution_state(
-                            session_id
-                        )
-                        or {}
-                    )
-                if not execution and hasattr(self, "_get_session_meta"):
-                    execution = self._get_session_meta(session_id, "execution_state") or {}
-
-                status = str((execution or {}).get("status") or "").strip().lower()
-
-                if status in {"complete", "completed"} or (execution or {}).get("complete") is True:
-                    return _nova_build_no_active_execution_response_20260609(
-                        self,
-                        user_text=user_text,
-                        session_id=session_id,
-                        attachments=attachments,
-                    )
-            except Exception:
-                pass
-
-        if callable(_nova_original_advance_execution_request_20260609):
-            return _nova_original_advance_execution_request_20260609(
-                self,
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-            )
-
-        return _nova_build_no_active_execution_response_20260609(
-            self,
-            user_text=user_text,
-            session_id=session_id,
-            attachments=attachments,
-        )
-
-    ChatService._advance_execution_request = _nova_advance_execution_request_post_complete_idle_20260609
+    # NOVA_CHATSERVICE_POST_COMPLETE_IDLE_GUARD_20260609
 
 
 
-def _nova_attachment_guard_method_looks_like_result_web_route(name):
-    lowered = str(name or "").lower()
 
-    if not (
-        "web" in lowered
-        or "fetch" in lowered
-        or "search" in lowered
-        or "lookup" in lowered
-    ):
-        return False
 
-    if _nova_attachment_guard_method_looks_like_bool_web_route(lowered):
-        return False
 
-    blocked = (
-        "suppress",
-        "guard",
-        "install",
-        "wrap",
-        "predicate",
-        "should",
-        "needs",
-    )
-
-    if any(word in lowered for word in blocked):
-        return False
-
-    return True
 
 def install_chat_service_runtime_patches():
     install_project_brain_patch(ChatService)
@@ -11374,3 +11351,223 @@ def install_chat_service_runtime_patches():
         install_attachment_web_suppression()
     except Exception:
         pass
+
+def _nova_control_text_is_advance_20260609(value) -> bool:
+        text = str(value or "").strip().lower()
+
+        return text in {
+            "k",
+            "ok",
+            "next",
+            "continue",
+            "run it",
+            "run step",
+            "execute",
+            "advance",
+        }
+
+
+        def _nova_build_no_active_execution_response_20260609(self, user_text, session_id="", attachments=None):
+            attachments = attachments or []
+
+            try:
+                execution = {}
+                selected_execution_state = {}
+
+                if hasattr(self, "_load_execution_state"):
+                    execution = (
+                        self._load_execution_state(session_id)
+                        or {}
+                    )
+
+                if (
+                    not execution
+                    and hasattr(self, "_get_session_meta")
+                ):
+                    execution = (
+                        self._get_session_meta(
+                            session_id,
+                            "execution_state",
+                        )
+                        or {}
+                    )
+
+                # Do not erase an active mission.
+                if (
+                    isinstance(execution, dict)
+                    and execution.get("steps")
+                ):
+                    selected_execution_state = execution
+
+                    return self.execution_orchestrator_service.process_execution(
+                        session_id=session_id,
+                        state=selected_execution_state,
+                        command=(
+                            next_action
+                            or "run_step"
+                        ),
+                    )
+
+                if False and hasattr(self, "_save_execution_state"):
+                    self._save_execution_state(
+                        session_id,
+                        {},
+                    )
+
+                if False and hasattr(self, "_set_session_meta"):
+                    self._set_session_meta(
+                        session_id,
+                        "execution_state",
+                        {},
+                    )
+
+                    self._set_session_meta(
+                        session_id,
+                        "active_execution",
+                        {},
+                    )
+
+                if hasattr(self, "_update_working_state"):
+                    self._update_working_state(
+                        session_id,
+                        {
+                            "active_task": "",
+                            "next_move": "await_new_mission",
+                            "checkpoint": "execution_complete_idle_guard",
+                            "execution_status": "idle",
+                        },
+                    )
+
+            except Exception:
+                pass
+
+
+        def _nova_advance_execution_request_post_complete_idle_20260609(
+            self,
+            user_text: str,
+            session_id: str = "",
+            attachments=None,
+        ):
+            attachments = attachments or []
+
+            if _nova_control_text_is_advance_20260609(user_text):
+                try:
+                    execution = {}
+
+                    if hasattr(self, "_load_execution_state"):
+                        execution = (
+                            self._load_execution_state(
+                                session_id
+                            )
+                            or {}
+                        )
+
+                    if (
+                        not execution
+                        and hasattr(self, "_get_session_meta")
+                    ):
+                        execution = (
+                            self._get_session_meta(
+                                session_id,
+                                "execution_state",
+                            )
+                            or {}
+                        )
+
+                    status = str(
+                        (execution or {}).get("status")
+                        or ""
+                    ).strip().lower()
+
+                    if (
+                        status in {
+                            "complete",
+                            "completed",
+                        }
+                        or (execution or {}).get("complete") is True
+                    ):
+                        return _nova_build_no_active_execution_response_20260609(
+                            self,
+                            user_text=user_text,
+                            session_id=session_id,
+                            attachments=attachments,
+                        )
+
+                except Exception:
+                    pass
+
+            if callable(
+                _nova_original_advance_execution_request_20260609
+            ):
+                return _nova_original_advance_execution_request_20260609(
+                    self,
+                    user_text=user_text,
+                    session_id=session_id,
+                    attachments=attachments,
+                )
+
+            return _nova_build_no_active_execution_response_20260609(
+                self,
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
+            )
+
+
+        ChatService._advance_execution_request = (
+            _nova_advance_execution_request_post_complete_idle_20260609
+        )
+
+
+        def _nova_attachment_guard_method_looks_like_result_web_route(name):
+            lowered = str(name or "").lower()
+
+            if not (
+                "web" in lowered
+                or "fetch" in lowered
+                or "search" in lowered
+                or "lookup" in lowered
+            ):
+                return False
+
+            if _nova_attachment_guard_method_looks_like_bool_web_route(lowered):
+                return False
+
+            blocked = (
+                "suppress",
+                "guard",
+                "install",
+                "wrap",
+                "predicate",
+                "should",
+                "needs",
+            )
+
+            if any(word in lowered for word in blocked):
+                return False
+
+            return True
+
+
+        def install_chat_service_runtime_patches():
+            install_project_brain_patch(ChatService)
+
+            try:
+                install_execution_planner_runtime_patches(ChatService)
+            except Exception:
+                pass
+
+            try:
+                install_token_usage_finalize_wrapper(ChatService)
+            except Exception:
+                pass
+
+            try:
+                install_non_web_source_leak_guard(ChatService)
+            except Exception:
+                pass
+
+            try:
+                install_attachment_web_suppression()
+            except Exception:
+                pass
