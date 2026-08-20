@@ -6705,10 +6705,25 @@ console.log("[Nova Force New Chat] cleared chat");
 
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
-<script src="/static/js/nova-desktop-sessions.js?v=session-open-fix-20260621-1"></script>
-<script src="/static/js/nova-render.js"></script>
-<script src="/static/js/nova-desktop-projects.js?v=projects-v4"></script>
 <script src="/static/js/nova-chat-stream.js"></script>
+
+<script src="/static/js/chat-state.js"></script>
+<script src="/static/js/chat-storage.js"></script>
+<script src="/static/js/chat-messages.js"></script>
+
+<script src="/static/js/composer-input.js"></script>
+<script src="/static/js/composer-attachments.js"></script>
+<script src="/static/js/composer-reactive.js"></script>
+<script src="/static/js/composer-actions.js"></script>
+<script src="/static/js/composer-service.js"></script>
+<script src="/static/js/nova-composer-bridge.js"></script>
+
+<script src="/static/js/chat-sidebar.js"></script>
+<script src="/static/js/chat-orchestrator.js"></script>
+<script src="/static/js/chat-bootstrap.js"></script>
+<script src="/static/js/memory-panel.js"></script>
+<script src="/static/js/chat-app.js"></script>
+
 
 <script>
   window.Nova = window.Nova || {};
@@ -8754,7 +8769,7 @@ if (document.readyState === "loading") {
 setTimeout(ensureMemoryTypedInput, 300);
 setTimeout(ensureMemoryTypedInput, 900);
 setTimeout(ensureMemoryTypedInput, 1600);
-
+})();
 </script>
 
 <!-- NOVA_RIGHT_PANEL_MEMORY_ONLY_CLEANUP_20260622 -->
@@ -12213,7 +12228,14 @@ document.querySelectorAll("#nova-desktop-execution-native [data-exec-fill]").for
         start();
     }
 
+})();
+</script>
+
+<script>
+(function () {
+
 const novaSettingsClose =
+
     document.getElementById(
         "novaSettingsClose"
     );
@@ -12246,6 +12268,25 @@ const novaAboutClose =
         "novaAboutClose"
     );
 
+if (novaAboutClose) {
+
+    novaAboutClose.onclick = function () {
+
+        const modal =
+            document.getElementById(
+                "novaAboutModal"
+            );
+
+        if (modal) {
+            modal.setAttribute(
+                "hidden",
+                ""
+            );
+        }
+
+    };
+
+}
 
 })();
 </script>
@@ -12436,7 +12477,8 @@ document.addEventListener(
 
 
     }
-})();
+);
+
 </script>
 <style id="nova-desktop-execution-native-panel-lock-20260702">
 /* NOVA_DESKTOP_EXECUTION_NATIVE_PANEL_LOCK_20260702
@@ -13219,7 +13261,6 @@ aside.panel.tools,
     margin-left: -13px !important;
     width: calc(100% + 26px) !important;
     box-sizing: border-box !important;
-}sendBtn.addEventListener("click", (e) => {
 
 <style>
 .chat-panel {

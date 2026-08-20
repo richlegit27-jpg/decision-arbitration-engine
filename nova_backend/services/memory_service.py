@@ -110,14 +110,16 @@ class MemoryService:
         return get_current_user_id()
 
     def _same_memory_owner(self, item: Dict[str, Any]) -> bool:
-        owner_id = self._current_owner_id()
-
-        if not owner_id:
-            return False
+        owner_id = str(self._current_owner_id() or "").strip()
 
         item_owner = str(
             (item or {}).get("owner_id") or ""
         ).strip()
+
+        # No authenticated owner:
+        # treat anonymous/manual memory as same owner
+        if not owner_id and not item_owner:
+            return True
 
         return item_owner == owner_id
 
@@ -140,6 +142,11 @@ class MemoryService:
         return data
 
     def _write_store(self, data: Dict[str, Any]) -> None:
+        print(
+            "DEBUG MEMORY WRITE PATH =",
+            self.memory_file,
+        )
+
         try:
             save_json_file(self.memory_file, data)
 
@@ -292,6 +299,10 @@ class MemoryService:
         return strong[-100:]
 
     def add_memory(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        print(
+            "[MEMORY ADD HIT]",
+            item,
+        )
         # NOVA_BAD_MEMORY_SAVE_GUARD_SAFE_20260610_ENTRY
         if _nova_should_reject_memory_item_20260610(item):
             return item
@@ -354,9 +365,13 @@ class MemoryService:
             "communication style",
             "name is",
             "prefers to be called",
+            "always want",
+            "always use",
+            "prefer",
+            "prefers",
         )
 
-        # ðŸ”¥ KEYED PREFERENCE REPLACEMENT
+        # 🔥 KEYED PREFERENCE REPLACEMENT
         for key in preference_keys:
             if key in new_text_key:
                 for i, existing in enumerate(memory):
@@ -364,11 +379,27 @@ class MemoryService:
                     existing_text = str(existing.get("text") or "").strip().lower()
                     existing_kind = str(existing.get("kind") or "note").strip().lower()
 
+                    print(
+                        "[MEMORY PREF MATCH CHECK]",
+                        {
+                            "key": key,
+                            "existing_text": existing_text,
+                            "new_text_key": new_text_key,
+                            "existing_kind": existing_kind,
+                            "new_kind": new_kind,
+                            "match": (
+                                key in existing_text
+                                and existing_kind == new_kind
+                            ),
+                        },
+                    )
+
                     if (
-                        self._same_memory_owner(existing)
-                        and key in existing_text
+                        key in existing_text
                         and existing_kind == new_kind
+                        and existing_text == new_text_key
                     ):
+                        existing["count"] = int(existing.get("count") or 1) + 1
                         existing.update(item)
                         existing["updated_at"] = now
                         existing["created_at"] = existing.get("created_at") or now
@@ -376,6 +407,7 @@ class MemoryService:
                         memory[i] = existing
                         data["memory"] = memory
                         self._write_store(data)
+
                         return existing
 
         # DUPLICATE REINFORCEMENT
@@ -390,36 +422,47 @@ class MemoryService:
                 and existing_kind == new_kind
             ):
                 count = int(existing.get("count") or 1) + 1
-                existing_weight = float(existing.get("weight") or item.get("weight") or 1.0)
+                existing_weight = float(
+                    existing.get("weight") or item.get("weight") or 1.0
+                )
 
                 existing.update(item)
                 existing["count"] = count
                 existing["updated_at"] = now
                 existing["created_at"] = existing.get("created_at") or now
 
-                # ðŸ”¥ DECAY BEFORE BOOST
+                # DECAY BEFORE BOOST
                 try:
                     from datetime import datetime, UTC
+
                     created_at = existing.get("created_at")
                     if created_at:
-                        created_ts = datetime.fromisoformat(created_at.replace("Z", ""))
+                        created_ts = datetime.fromisoformat(
+                            created_at.replace("Z", "")
+                        )
                         age_days = (datetime.now(UTC) - created_ts).days
 
                         if age_days > 7:
                             existing_weight *= 0.85
                         if age_days > 30:
                             existing_weight *= 0.65
+
                 except Exception:
                     pass
 
-                # ðŸ”¥ IMPORTANCE BOOST
+                # IMPORTANCE BOOST
                 boost = 1.25
+
                 if existing.get("pinned"):
                     boost = 0.5
+
                 if "from now on" in existing_text or "always" in existing_text:
                     boost = 2.0
 
-                existing["weight"] = min(10.0, existing_weight + boost)
+                existing["weight"] = min(
+                    10.0,
+                    existing_weight + boost
+                )
 
                 if count >= 3:
                     existing["pinned"] = True
@@ -428,8 +471,8 @@ class MemoryService:
                 memory[i] = existing
                 data["memory"] = memory
                 self._write_store(data)
-                return existing
 
+                return existing
         # 🔥 NEW MEMORY
         if not item.get("id"):
             item["id"] = f"memory_{uuid.uuid4().hex}"
@@ -660,6 +703,9 @@ class MemoryService:
             "favourite song",
             "favorite game",
             "favourite game",
+            "communication style",
+            "name is",
+            "prefers to be called",
         )
 
         items = self.all()
@@ -704,6 +750,8 @@ class MemoryService:
             seen_keys.add(semantic_key)
 
             matched_preference_key = None
+
+
             for key in preference_keys:
                 if key in text:
                     matched_preference_key = key.replace("favourite", "favorite")

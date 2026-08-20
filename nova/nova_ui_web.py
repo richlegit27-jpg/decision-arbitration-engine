@@ -52,7 +52,7 @@ async def root(request: Request):
 @app.get("/app", response_class=HTMLResponse)
 async def app_page(request: Request):
     return templates.TemplateResponse(
-        "index.html",
+        "app.html",
         {
             "request": request
         }

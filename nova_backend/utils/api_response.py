@@ -35,4 +35,3 @@ def error_response(
         },
         "error": str(error or "Request failed."),
     }
-

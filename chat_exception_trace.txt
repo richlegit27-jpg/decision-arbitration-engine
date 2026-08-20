@@ -1,0 +1,1340 @@
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_handle_execution_control'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 475, in handle
+    execution_result = self._handle_execution_control(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_handle_execution_control'
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_handle_execution_control'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 475, in handle
+    execution_result = self._handle_execution_control(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_handle_execution_control'
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_handle_execution_control'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 475, in handle
+    execution_result = self._handle_execution_control(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_handle_execution_control'
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_handle_execution_control'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 475, in handle
+    execution_result = self._handle_execution_control(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_handle_execution_control'
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_handle_execution_control'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 475, in handle
+    execution_result = self._handle_execution_control(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_handle_execution_control'
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_handle_execution_control'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 475, in handle
+    execution_result = self._handle_execution_control(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_handle_execution_control'
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_handle_execution_control'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 475, in handle
+    execution_result = self._handle_execution_control(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_handle_execution_control'
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_handle_execution_control'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 475, in handle
+    execution_result = self._handle_execution_control(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_handle_execution_control'
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_handle_execution_control'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 475, in handle
+    execution_result = self._handle_execution_control(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_handle_execution_control'
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_handle_execution_control'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 475, in handle
+    execution_result = self._handle_execution_control(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_handle_execution_control'
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_handle_execution_control'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 475, in handle
+    execution_result = self._handle_execution_control(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_handle_execution_control'
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_handle_execution_control'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 475, in handle
+    execution_result = self._handle_execution_control(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_handle_execution_control'
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if self._looks_like_live_market_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+SyntaxError("unmatched ')'", ('C:\\Users\\Owner\\nova\\nova_backend\\services\\chat\\handle.py', 172, 9, '        )', 172, 9))
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 473, in handle
+    from nova_backend.services.chat.handle import chat_handle
+  File "C:\Users\Owner\nova\nova_backend\services\chat\handle.py", line 172
+    )
+    ^
+SyntaxError: unmatched ')'
+
+
+===== CHAT FAILURE =====
+SyntaxError("unmatched ')'", ('C:\\Users\\Owner\\nova\\nova_backend\\services\\chat\\handle.py', 172, 9, '        )', 172, 9))
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 473, in handle
+    from nova_backend.services.chat.handle import chat_handle
+  File "C:\Users\Owner\nova\nova_backend\services\chat\handle.py", line 172
+    )
+    ^
+SyntaxError: unmatched ')'
+
+
+===== CHAT FAILURE =====
+SyntaxError("unmatched ')'", ('C:\\Users\\Owner\\nova\\nova_backend\\services\\chat\\handle.py', 187, 9, '        )', 187, 9))
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 473, in handle
+    from nova_backend.services.chat.handle import chat_handle
+  File "C:\Users\Owner\nova\nova_backend\services\chat\handle.py", line 187
+    )
+    ^
+SyntaxError: unmatched ')'
+
+
+===== CHAT FAILURE =====
+SyntaxError("unmatched ')'", ('C:\\Users\\Owner\\nova\\nova_backend\\services\\chat\\handle.py', 187, 9, '        )', 187, 9))
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 473, in handle
+    from nova_backend.services.chat.handle import chat_handle
+  File "C:\Users\Owner\nova\nova_backend\services\chat\handle.py", line 187
+    )
+    ^
+SyntaxError: unmatched ')'
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if _nova_is_live_market_price_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if _nova_is_live_market_price_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if _nova_is_live_market_price_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if _nova_is_live_market_price_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if _nova_is_live_market_price_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    if _nova_is_live_market_price_request(user_text):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    attachments=attachments,
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    attachments=attachments,
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    return execution_result
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    return execution_result
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    )
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute '_looks_like_live_market_request'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 499, in handle
+    )
+AttributeError: 'ChatService' object has no attribute '_looks_like_live_market_request'. Did you mean: '_looks_like_live_store_hours_request'?
+
+
+===== CHAT FAILURE =====
+SyntaxError('invalid syntax. Perhaps you forgot a comma?', ('C:\\Users\\Owner\\nova\\nova_backend\\services\\chat\\handle.py', 206, 17, '                print(\n', 211, 24))
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 496, in handle
+    from nova_backend.services.chat.handle import chat_handle
+  File "C:\Users\Owner\nova\nova_backend\services\chat\handle.py", line 206
+    print(
+    ^^^^^^
+SyntaxError: invalid syntax. Perhaps you forgot a comma?
+
+
+===== CHAT FAILURE =====
+SyntaxError('invalid syntax. Perhaps you forgot a comma?', ('C:\\Users\\Owner\\nova\\nova_backend\\services\\chat\\handle.py', 206, 17, '                print(\n', 211, 24))
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2359, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 496, in handle
+    from nova_backend.services.chat.handle import chat_handle
+  File "C:\Users\Owner\nova\nova_backend\services\chat\handle.py", line 206
+    print(
+    ^^^^^^
+SyntaxError: invalid syntax. Perhaps you forgot a comma?

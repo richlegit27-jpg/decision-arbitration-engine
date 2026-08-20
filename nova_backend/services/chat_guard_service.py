@@ -20,6 +20,26 @@ class ChatGuardService:
                 payload.get("session_id") or ""
             ).strip()
 
+            clean = (
+                " ".join(
+                    user_text.lower().split()
+                )
+                .rstrip("?!.")
+            )
+
+            project_state_questions = {
+                "what are we working on",
+                "what are we working on now",
+                "what are we working on right now",
+                "where are we at",
+                "where are we at with nova",
+                "what is nova working on",
+                "what is nova working on now",
+            }
+
+            if clean in project_state_questions:
+                return None
+
             execution_status_result = (
                 execution_bridge_service
                 .try_execution_status(

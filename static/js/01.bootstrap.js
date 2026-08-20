@@ -133,8 +133,11 @@ try{
 }
 /* ---------- /NOVA_TRAP_SEND_V1 ---------- */
 console.log("[NOVA] BOOT TOP", new Date().toISOString());
+
+
 /* --- NOVA_BOOTSTRAP_API8793_V1 --- */
-try{ window.__NOVA_API_BASE__ = "http://127.0.0.1:8793"; }catch(e){}
+try{ window.NOVA_API_BASE = window.location.origin; }catch(e){}
+
 try{
   // Force global URL builder for all /api/*
   window.__novaUrl = function(u){
@@ -142,30 +145,15 @@ try{
       if(typeof u !== "string") return u;
       if(/^https?:\/\//i.test(u)) return u;
       if(u.startsWith("/api/")){
-        const base = String(window.__NOVA_API_BASE__ || "").replace(/\/+$/,"");
+try{ window.NOVA_API_BASE = window.location.origin; }catch(e){}
         return base ? (base + u) : u;
       }
     }catch(e){}
     return u;
   };
 }catch(e){}
-try{
-  // Patch fetch to route /api/* through window.__novaUrl
-  const _f = window.fetch;
-  window.fetch = function(input, init){
-    try{
-      const fn = window.__novaUrl;
-      if(typeof fn === "function"){
-        if(typeof input === "string"){
-          input = fn(input);
-        } else if(input && typeof input.url === "string"){
-          input = new Request(fn(input.url), input);
-        }
-      }
-    }catch(e){}
-    return _f(input, init);
-  };
-}catch(e){}
+
+
 /* --- /NOVA_BOOTSTRAP_API8793_V1 --- */
 /* NOVA_BOOTSTRAP v2 (clean, Request-safe) */
 (function(){
@@ -433,6 +421,8 @@ console.log("[NOVA] BOOT PRE-FORCE", new Date().toISOString());
     setTimeout(() => { try{ addCss(); addJs(); }catch(e){} }, 900);
   } catch (e) {}
 })();
+
+
 
 
 

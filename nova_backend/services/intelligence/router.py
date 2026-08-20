@@ -358,6 +358,24 @@ class IntelligenceRouter:
             confidence = 0.95
             reasons.append("checkpoint_project_state_query")
 
+        elif self.chat_service.is_exact_project_state_prompt(text):
+            intent = "current_project_state"
+            route = "project_state_current_memory_direct_recall"
+            strategy = "direct_project_state_recall"
+            priority = "highest"
+            confidence = 1.0
+            reasons.append(
+                "project_state_current_memory_direct_recall"
+            )
+
+            self.chat_service._update_working_state(
+                session_id,
+                {
+                    "active_task": "",
+                    "next_move": "",
+                },
+            )
+
         elif (
             "where are we at with nova" in text_lc
             or "what are we working on" in text_lc
@@ -365,6 +383,22 @@ class IntelligenceRouter:
             or "give me the nova status" in text_lc
             or "status without hype" in text_lc
         ):
+            intent = "current_project_state"
+            route = "project_brain_general_intelligence"
+            strategy = "project_brain_general_intelligence"
+            priority = "high"
+            confidence = 0.95
+            reasons.append(
+                "project_brain_general_intelligence_query"
+            )
+
+            self.chat_service._update_working_state(
+                session_id,
+                {
+                    "active_task": "",
+                    "next_move": "",
+                },
+            )
             intent = "current_project_state"
             route = "project_brain_general_intelligence"
             strategy = "project_brain_general_intelligence"

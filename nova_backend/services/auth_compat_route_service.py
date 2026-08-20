@@ -115,12 +115,6 @@ class AuthCompatRouteService:
 
             routes = [
                 (
-                    "/api/auth/status",
-                    "nova_api_auth_status_safe_20260611",
-                    auth_status,
-                    ["GET"],
-                ),
-                (
                     "/api/auth/me",
                     "nova_api_auth_me_safe_20260612",
                     auth_status,

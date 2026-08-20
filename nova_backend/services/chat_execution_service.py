@@ -76,6 +76,24 @@ class ChatExecutionService:
     ) -> Dict[str, Any]:
         safe_session_id = self._safe_session_id(session_id)
 
+        existing = self._states.get(
+            safe_session_id
+        )
+
+        if isinstance(existing, dict):
+
+            if (
+                existing.get("complete") is True
+                or existing.get("status") in {
+                    "complete",
+                    "completed",
+                }
+                or existing.get("current_index", 0) > 0
+            ):
+                return self.get_state(
+                    safe_session_id
+                )
+
         safe_goal = (
             str(goal or "Untitled mission")
             .strip()
@@ -226,8 +244,8 @@ class ChatExecutionService:
             return self._copy_state(state)
 
         current_step = steps[current_index]
-        state["status"] = "running"
-        state["waiting"] = False
+        state["status"] = "waiting"
+        state["waiting"] = True
         state["current_step"] = current_step
 
         state.setdefault("history", []).append(
@@ -250,8 +268,8 @@ class ChatExecutionService:
 
         else:
 
-            state["status"] = "running"
-            state["waiting"] = False
+            state["status"] = "waiting"
+            state["waiting"] = True
             state["complete"] = False
             state["current_step"] = steps[next_index]
 
@@ -349,7 +367,7 @@ class ChatExecutionService:
                 f"Goal: {goal}\n\n"
                 f"Step {step_number}/{total}:\n"
                 f"{current_step}\n\n"
-                f"Status: {status}"
+                "Status: waiting"
             )
 
         return f"Execution {status}."

@@ -326,7 +326,8 @@ def install(app):
             response.set_data(
                 json.dumps(data, ensure_ascii=False)
             )
-            response.headers["Content-Type"] = "application/json"
+            response.headers["Content-Type"] = "application/json; charset=utf-8"
+
             response.headers["Content-Length"] = str(
                 len(response.get_data())
             )

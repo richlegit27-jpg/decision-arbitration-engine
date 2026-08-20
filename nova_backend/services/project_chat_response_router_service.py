@@ -595,6 +595,25 @@ try:
         # NOVA_COMPACT_PROJECT_CONTEXT_DELEGATE_TO_PROJECT_BRAIN_20260701
         # Broad Nova project paraphrases belong to Project Brain
         # general intelligence.
+
+        preference_memory_markers = (
+            "i always want",
+            "i prefer",
+            "remember that",
+            "remember this",
+            "from now on",
+            "going forward",
+            "always format",
+            "my preference",
+        )
+
+        normalized_user_text = str(user_text or "").lower()
+
+        if any(
+            marker in normalized_user_text
+            for marker in preference_memory_markers
+        ):
+            return None
         try:
             normalized = (
                 _nova_compact_project_normalize_20260701(
@@ -692,6 +711,40 @@ try:
                         )
                     ):
                         return None
+
+            excluded_page_paths = {
+                "/login",
+                "/register",
+                "/logout",
+                "/account",
+                "/settings",
+                "/billing",
+                "/pricing",
+                "/about",
+                "/contact",
+                "/blog",
+                "/dashboard",
+                "/admin",
+                "/api/auth/login",
+                "/api/auth/register",
+                "/api/auth/status",
+                "/api/auth/logout",
+                "/api/auth/me",
+            }
+
+            try:
+                request_path = str(
+                    _nova_compact_project_request_20260701.path or ""
+                ).lower()
+
+                if (
+                    request_path.startswith("/static/")
+                    or not request_path.startswith("/api/")
+                ):
+                    return None
+
+            except Exception:
+                pass
 
             direct_recall_prompts = {
                 "what are we working on",
@@ -799,7 +852,7 @@ try:
                 pass
 
             return None
-
+ 
 
     def _nova_compact_project_load_context_20260701():
         try:
@@ -843,13 +896,15 @@ try:
                 "content": reply,
                 "attachments": [],
             },
-            "route": "project_state_context",
-            "route_taken": "project_state_context",
+
+            "route": "project_state_current_memory_direct_recall",
+            "route_taken": "project_state_current_memory_direct_recall",
             "debug": {
-                "route": "project_state_context",
-                "route_taken": "project_state_context",
+                "route": "project_state_current_memory_direct_recall",
+                "route_taken": "project_state_current_memory_direct_recall",
                 "compact_project_context": True,
             },
+
             "meta": {
                 "route": "project_state_context",
                 "strategy": "compact_project_context",
@@ -1028,6 +1083,16 @@ try:
         }
 
     def _nova_autonomy_wrap_endpoint_20260701(app, endpoint_name):
+
+        skip_endpoints = {
+            "nova_login_page_20260610",
+            "nova_register_page_20260610",
+            "nova_roadmap_page_20260709",
+        }
+
+        if endpoint_name in skip_endpoints:
+            return False
+
         view = app.view_functions.get(endpoint_name)
         if not callable(view):
             return False
@@ -1088,17 +1153,83 @@ def install_project_chat_response_router(app):
     try:
         wrapped = 0
 
+        excluded_endpoints = {
+            "nova_login_page_20260610",
+            "nova_register_page_20260610",
+            "nova_logout_page_20260610",
+            "nova_api_auth_status_safe_20260612",
+            "nova_api_auth_me_safe_20260612",
+            "nova_api_me_safe_20260612",
+            "nova_api_auth_login_safe_20260611",
+            "nova_api_auth_logout_safe_20260611",
+
+            # Protected infrastructure APIs
+            "api_memory",
+            "api_memory_add",
+            "api_memory_pin",
+            "api_memory_delete",
+            "api_memory_update",
+            "api_memory_cleanup",
+            "api_memory_promote",
+            "api_memory_cleanup_promote",
+
+            "api_sessions",
+            "api_sessions_new",
+            "api_session_by_id",
+            "api_sessions_switch",
+            "api_sessions_rename",
+            "api_sessions_pin",
+            "api_sessions_delete",
+            "api_sessions_delete_all",
+
+            "state_bp.api_state",
+
+            "api_models_route",
+            "api_models_select_route",
+
+            "api_health",
+
+            "nova_account_profile_20260708",
+        }
+
         for endpoint_name, view in list(app.view_functions.items()):
-            if _nova_api_project_state_wrap_endpoint_20260630(app, endpoint_name):
+
+            if endpoint_name in excluded_endpoints:
+                continue
+
+            if (
+                "auth" in endpoint_name.lower()
+                or "login" in endpoint_name.lower()
+                or "logout" in endpoint_name.lower()
+                or "register" in endpoint_name.lower()
+            ):
+                continue
+
+            if (
+                "auth" in endpoint_name.lower()
+                or "register" in endpoint_name.lower()
+            ):
+                if endpoint_name.startswith("nova_auth_"):
+                    return False
+
                 wrapped += 1
 
-            if _nova_natural_project_wrap_endpoint_20260701(app, endpoint_name):
+            if _nova_natural_project_wrap_endpoint_20260701(
+                app,
+                endpoint_name,
+            ):
                 wrapped += 1
 
-            if _nova_compact_project_wrap_endpoint_20260701(app, endpoint_name):
+            if _nova_compact_project_wrap_endpoint_20260701(
+                app,
+                endpoint_name,
+            ):
                 wrapped += 1
 
-            if _nova_autonomy_wrap_endpoint_20260701(app, endpoint_name):
+            if _nova_autonomy_wrap_endpoint_20260701(
+                app,
+                endpoint_name,
+            ):
                 wrapped += 1
 
         print(
@@ -1111,7 +1242,6 @@ def install_project_chat_response_router(app):
             "[NOVA_PROJECT_CHAT_RESPONSE_ROUTER_SERVICE] failed:",
             error,
         )
-
 def normalize_text(value):
     text = str(value or "").strip()
     return " ".join(text.split())

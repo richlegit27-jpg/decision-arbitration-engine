@@ -49,6 +49,8 @@ class LocalAuthRouteService:
             )
 
         def load_users():
+            print("[AUTH DEBUG USERS PATH]", self.users_path)
+
             if not self.users_path.exists():
                 return {"users": []}
 
@@ -108,11 +110,22 @@ class LocalAuthRouteService:
         def find_user(identifier):
             ident = clean(identifier).lower()
 
+            if not ident:
+                return None
+
             for user in load_users().get("users", []):
-                if clean(user.get("username")).lower() == ident:
+                username = clean(
+                    user.get("username")
+                ).lower()
+
+                email = clean(
+                    user.get("email")
+                ).lower()
+
+                if username and username == ident:
                     return user
 
-                if clean(user.get("email")).lower() == ident:
+                if email and email == ident:
                     return user
 
             return None
@@ -221,6 +234,10 @@ class LocalAuthRouteService:
                 silent=True
             ) or {}
 
+            print("[AUTH DEBUG CONTENT TYPE]", request.content_type)
+            print("[AUTH DEBUG RAW DATA]", request.data)
+            print("[AUTH DEBUG JSON]", request.get_json(silent=True))
+
             identifier = clean(
                 payload.get("username")
                 or payload.get("email")
@@ -234,17 +251,25 @@ class LocalAuthRouteService:
 
             user = find_user(identifier)
 
+            print("[AUTH DEBUG IDENTIFIER]", repr(identifier))
+            print("[AUTH DEBUG USER FOUND]", user)
+
             if not user:
                 return jsonify({
                     "ok": False,
                     "error": "Invalid username or password.",
                 }), 401
 
-            if hash_password(
+            calculated = hash_password(
                 password,
                 user.get("salt", ""),
-            ) != user.get("password_hash"):
+            )
 
+            print("[AUTH DEBUG PASSWORD]", repr(password))
+            print("[AUTH DEBUG CALCULATED]", calculated)
+            print("[AUTH DEBUG STORED]", user.get("password_hash"))
+
+            if calculated != user.get("password_hash"):
                 return jsonify({
                     "ok": False,
                     "error": "Invalid username or password.",
@@ -259,7 +284,6 @@ class LocalAuthRouteService:
                 "authenticated": True,
                 "user": public_user(user),
             })
-
         def auth_password_reset_request():
             payload = request.get_json(
                 silent=True
@@ -359,15 +383,13 @@ class LocalAuthRouteService:
             }), 400
 
         def auth_logout():
-            session.pop(
-                "nova_user_id",
-                None,
-            )
+            session.clear()
 
             return jsonify({
                 "ok": True,
                 "authenticated": False,
                 "user": None,
+                "redirect_to": "/login",
             })
 
         def auth_mfa_setup():

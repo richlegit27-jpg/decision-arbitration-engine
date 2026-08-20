@@ -15,17 +15,36 @@ class ExecutionBridgeService:
         self.chat_execution_service = chat_execution_service
         self.logger = logger
 
-    def try_execution_trigger(self, session_id, user_text):
+    def try_execution_trigger(
+        self,
+        session_id,
+        user_text,
+    ):
+
         try:
-            if not self.chat_execution_service.is_execution_trigger(user_text):
+            if not self.chat_execution_service.is_execution_trigger(
+                user_text
+            ):
                 return None
 
-            state = self.chat_execution_service.advance(session_id)
+            if hasattr(
+                self.chat_execution_service,
+                "execution_orchestrator_service",
+            ):
+                return None
 
+            state = self.chat_execution_service.advance(
+                session_id
+            )
             reply_text = (
                 self._format_execution_response(state)
-                if hasattr(self, "_format_execution_response")
-                else self.chat_execution_service.format_reply(state)
+                if hasattr(
+                    self,
+                    "_format_execution_response",
+                )
+                else self.chat_execution_service.format_reply(
+                    state
+                )
             )
 
             return {
@@ -43,9 +62,14 @@ class ExecutionBridgeService:
             }
 
         except Exception as exc:
-            self.logger.exception("[NovaExecutionBridge] failed")
+            self.logger.exception(
+                "[NovaExecutionBridge] failed"
+            )
 
-            reply_text = "Execution bridge failed: " + str(exc)
+            reply_text = (
+                "Execution bridge failed: "
+                + str(exc)
+            )
 
             return {
                 "ok": True,
@@ -56,7 +80,11 @@ class ExecutionBridgeService:
                 },
             }
 
-    def try_execution_autoplan_start(self, session_id, user_text):
+    def try_execution_autoplan_start(
+        self,
+        session_id,
+        user_text,
+    ):
         try:
             clean = str(user_text or "").strip()
             lower = clean.lower()
@@ -182,9 +210,6 @@ class ExecutionBridgeService:
                 "status",
                 "execution status",
                 "mission status",
-                "what are we working on",
-                "what are we working on now",
-                "what are we working on right now",
                 "what comes next",
             }
 
@@ -234,8 +259,8 @@ class ExecutionBridgeService:
                 f"Status: {status}\n"
                 f"Checkpoint: {project_brain.get('active_checkpoint', 'Not available')}\n"
                 f"Blocker: {project_brain.get('blocker', 'None')}\n"
-                f"Next move: {project_brain.get('next_move', 'Mission completed')}\n"
-                f"Next action: {next_action.get('step', 'No further action required')}\n"
+                f"Next move: {project_brain.get('next_move') or 'No next move available'}\n"
+                f"Next action: {next_action.get('step') or 'Waiting for instruction'}\n"
             )
 
             return {

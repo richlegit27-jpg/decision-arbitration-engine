@@ -15,9 +15,11 @@ class SessionRouteService:
     ):
         try:
 
-            if request.path != "/api/sessions" or request.method != "GET":
+            if request.path not in (
+                "/api/sessions",
+                "/api/chats",
+            ) or request.method != "GET":
                 return None
-
             if not session.get("nova_user_id"):
                 return None
 

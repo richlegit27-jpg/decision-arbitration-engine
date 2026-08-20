@@ -1,5 +1,5 @@
 ﻿// Connect to the backend via Socket.IO
-const socket = io.connect("http://127.0.0.1:5000");  // Make sure this matches your backend URL
+const socket = io.connect(window.location.origin);  // Make sure this matches your backend URL
 
 // Access DOM elements for user interaction
 const sendButton = document.getElementById('send-button');

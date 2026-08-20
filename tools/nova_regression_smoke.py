@@ -169,6 +169,15 @@ def run():
             "bitcoin price right now",
             f"regression_btc_web_{stamp}",
         )
+
+    print(
+        "DEBUG BTC RESPONSE =",
+        json.dumps(
+            btc,
+            indent=2,
+        ),
+    )
+
     assert_true(
         "live_market_price_web",
         route_of(btc) in {"web_fetch", "web"} or "web" in route_of(btc),
@@ -239,10 +248,17 @@ def run():
     )
 
     print(
-        "[WRITING DEBUG]",
-        json.dumps(writing, indent=2)[:1000],
+        "[WRITING ROUTE DEBUG]",
+        {
+            "route": route_of(writing),
+            "debug": writing.get("debug"),
+            "assistant_meta": (
+                writing.get("assistant_message", {}).get("meta")
+                if isinstance(writing.get("assistant_message"), dict)
+                else None
+            ),
+        },
     )
-
     assert_true(
         "writing_intent_safe",
         route_of(writing) in {"general_chat", "chat"},

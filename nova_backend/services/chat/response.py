@@ -411,12 +411,21 @@ class ChatResponseHandler:
                     clean_memory_user_text.split(marker, 1)[0].strip()
                 )
 
+        print(
+            "DEBUG FINALIZE MEMORY INPUT =",
+            {
+                "user_text": clean_memory_user_text,
+                "decision": decision,
+            },
+        )
+
         try:
             memory_written = self.chat_service._maybe_write_memory(
                 decision,
                 clean_memory_user_text,
                 session_id,
             )
+
         except Exception as e:
             self.exec_debug(
                 "FINALIZE_MEMORY_WRITE_ERROR:",

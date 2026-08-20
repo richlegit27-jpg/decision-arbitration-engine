@@ -383,8 +383,8 @@ def install_project_brain_patch(ChatService):
                         fresh_answer,
                     )
                     or ""
-
                 ).strip()
+
 
             elif kind == "actual_blocker":
                 from nova_backend.services.project_brain_general_intelligence import (
@@ -586,107 +586,68 @@ def install_project_brain_patch(ChatService):
             "active_session_id": session_id,
         }
 
-    def _nova_project_brain_question_top_priority_handle_20260701(
-        self,
-        *args,
-        **kwargs,
-    ):
-        user_text = (
-            _nova_project_brain_question_text_20260701(
-                args,
-                kwargs,
-            )
+def _nova_project_brain_question_top_priority_handle_20260701(
+    self,
+    *args,
+    **kwargs,
+):
+    user_text = (
+        _nova_project_brain_question_text_20260701(
+            args,
+            kwargs,
+        )
+    )
+
+    print(
+        "[QUESTION TEXT DEBUG]",
+        repr(user_text),
+    )
+
+    kind = (
+        _nova_project_brain_question_kind_20260701(
+            user_text
+        )
+    )
+
+    print(
+        "[KIND CHECK BEFORE ANSWER]",
+        repr(user_text),
+        repr(kind),
+    )
+
+    print(
+        "[PROJECT BRAIN DEBUG]",
+        repr(user_text),
+        repr(kind),
+    )
+
+    session_id = (
+        _nova_project_brain_question_session_20260701(
+            args,
+            kwargs,
+        )
+    )
+
+    if kind in {
+        "current_project_state",
+        "working",
+    }:
+        from nova_backend.services.project_brain_context_builder import (
+            build_current_project_answer,
         )
 
-        _nova_first_message = user_text
+        fresh_answer = build_current_project_answer()
 
-        print(
-            "[QUESTION TEXT DEBUG]",
-            repr(user_text),
+        return _nova_project_brain_response_20260701(
+            fresh_answer,
+            session_id,
+            first_message=False,
         )
 
-        kind = (
-            _nova_project_brain_question_kind_20260701(
-                user_text
-            )
+    return (
+        _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701(
+            self,
+            *args,
+            **kwargs,
         )
-
-        print(
-            "[KIND CHECK BEFORE ANSWER]",
-            repr(user_text),
-            repr(kind),
-        )
-
-        print(
-            "[PROJECT BRAIN DEBUG]",
-            repr(user_text),
-            repr(kind),
-        )
-
-        if kind:
-            session_id = (
-                _nova_project_brain_question_session_20260701(
-                    args,
-                    kwargs,
-                )
-            )
-
-            answer = ""
-
-            print(
-                "[EXECUTION CHECK DEBUG]",
-                repr(session_id),
-                _nova_project_brain_has_active_execution_20260711(
-                    self,
-                    session_id,
-                ),
-            )
-
-        if kind == "current_project_state":
-            from nova_backend.services.project_brain_context_builder import (
-                build_current_project_answer,
-            )
-
-            fresh_answer = build_current_project_answer()
-
-            return _nova_project_brain_response_20260701(
-                fresh_answer,
-                session_id,
-                first_message=False,
-            )
-
-            if (
-                _nova_project_brain_has_active_execution_20260711(
-                    self,
-                    session_id,
-                )
-            ):
-                pre_project_state_handle = globals().get(
-                    "_NOVA_PRE_PROJECT_STATE_FRESH_PRIORITY_HANDLE_20260701"
-                )
-
-                return (
-                    _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701(
-                        self,
-                        *args,
-                        **kwargs,
-                    )
-                )
-
-        return (
-            _NOVA_PRE_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_HANDLE_20260701(
-                self,
-                *args,
-                **kwargs,
-            )
-        )
-
-
-    if hasattr(ChatService, "handle"):
-        ChatService.handle = _nova_project_brain_question_top_priority_handle_20260701
-
-        ChatService._NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701 = True
-
-        print(
-            "[NOVA_PROJECT_BRAIN_QUESTION_TOP_PRIORITY_20260701] installed"
-        )
+    )

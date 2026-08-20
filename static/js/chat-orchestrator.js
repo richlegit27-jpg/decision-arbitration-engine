@@ -210,19 +210,38 @@ function createChatOrchestrator(options = {}){
     }
   }
 
-  function persistCurrentMessages(){
+function persistCurrentMessages(){
     if(!state.activeChatId){
-      return
+        return
     }
 
     if(typeof chatStorage.saveMessages !== "function"){
-      return
+        return
     }
 
-    const saved = chatStorage.saveMessages(state.activeChatId, state.messages)
-    state.messages = Array.isArray(saved) ? saved.slice() : []
-    hydrateChatTitle(state.activeChatId, state.messages)
-  }
+    const cleanMessages = state.messages.filter((message) => {
+        return !(
+            message?.isThinking ||
+            message?.thinking ||
+            message?.message_type === "thinking" ||
+            message?.status === "thinking"
+        )
+    })
+
+    const saved = chatStorage.saveMessages(
+        state.activeChatId,
+        cleanMessages,
+    )
+
+    state.messages = Array.isArray(saved)
+        ? saved.slice()
+        : cleanMessages.slice()
+
+    hydrateChatTitle(
+        state.activeChatId,
+        state.messages,
+    )
+}
 
   function syncPersistedMessages(options = {}){
     const preserveScroll = !!options.preserveScroll
@@ -317,7 +336,17 @@ function createChatOrchestrator(options = {}){
       messages = await chatStorage.loadMessages(activeChatId)
     }
 
-    state.messages = Array.isArray(messages) ? messages.slice() : []
+state.messages = Array.isArray(messages)
+    ? messages.filter((message) => {
+        return !(
+            message?.isThinking ||
+            message?.thinking ||
+            message?.message_type === "thinking" ||
+            message?.status === "thinking"
+        )
+    })
+    : []
+
 
     syncMessagesAfterLoad(state.messages)
     hydrateChatTitle(activeChatId, state.messages)
@@ -357,13 +386,18 @@ function createChatOrchestrator(options = {}){
       memoryPanel.init()
     }
 
-    if(typeof chatStorage.loadChats === "function"){
-      await chatStorage.loadChats()
-    }
+if(typeof chatStorage.loadChats === "function"){
+  await chatStorage.loadChats()
+}
 
-    await loadActiveChatMessages()
+renderShell()
 
-    renderShell()
+await loadActiveChatMessages()
+
+if(typeof chatMessages.renderMessages === "function"){
+  chatMessages.renderMessages()
+}
+
     scrollMessagesToBottom(true)
 
     if(typeof composer.focusInput === "function"){

@@ -30,10 +30,15 @@ function renderChatList(){
     li.textContent = chat.title;
     li.dataset.chatId = chat.id;
 
-    li.onclick = () => {
-      window.NovaChatState.setActiveChat(chat.id);
-      renderChatList();
-    };
+li.onclick = async () => {
+  window.NovaChatState.setActiveChat(chat.id);
+
+  renderChatList();
+
+  if(window.NovaChatApp?.loadActiveChatMessages){
+    await window.NovaChatApp.loadActiveChatMessages();
+  }
+};
 
     const del = document.createElement("button");
     del.textContent = "âœ•";
@@ -105,5 +110,92 @@ if(document.readyState === "loading"){
   init();
 }
 
-})();
+async function loadChats(){
 
+  const response = await fetch("/api/sessions");
+
+  if(!response.ok){
+    throw new Error("Failed to load chats");
+  }
+
+  const data = await response.json();
+
+  const chats = Array.isArray(data.items)
+    ? data.items
+    : [];
+
+  const state = window.NovaChatState?.state;
+
+  if(!state){
+    throw new Error("NovaChatState missing");
+  }
+
+  state.chats = chats;
+
+  const activeChat = chats.find(
+    chat => String(chat.id) === String(state.activeChatId)
+  );
+
+  const hasActiveChat = !!activeChat;
+
+const activeHasMessages =
+    activeChat &&
+    (
+      (Array.isArray(activeChat.messages) && activeChat.messages.length > 0) ||
+      Number(activeChat.message_count || 0) > 0
+    );
+
+const chatWithMessages = chats.find(
+  chat =>
+    (Array.isArray(chat.messages) && chat.messages.length > 0) ||
+    Number(chat.message_count || 0) > 0
+);
+
+  if(!hasActiveChat){
+    state.activeChatId = chatWithMessages?.id || chats[0]?.id || null;
+  }
+  else if(!activeHasMessages && chatWithMessages){
+    state.activeChatId = chatWithMessages.id;
+  }
+
+  renderChatList();
+
+  return chats;
+}
+
+async function loadMessages(chatId){
+
+  if(!chatId){
+    return [];
+  }
+
+  const response = await fetch(
+    `/api/sessions/${encodeURIComponent(chatId)}`
+  );
+
+  if(!response.ok){
+    return [];
+  }
+
+  const data = await response.json();
+
+  if(Array.isArray(data.messages)){
+    return data.messages;
+  }
+
+  if(data.session && Array.isArray(data.session.messages)){
+    return data.session.messages;
+  }
+
+  return [];
+}
+
+
+window.NovaChatStorage = {
+  renderChatList,
+  openNewChat,
+  loadChats,
+  loadMessages
+};
+
+})();

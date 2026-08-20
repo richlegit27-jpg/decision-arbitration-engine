@@ -5,6 +5,7 @@ from nova_backend.utils.time_utils import iso_now
 
 from flask import request
 
+
 class MemoryRouteService:
 
     def __init__(self, memory_service):
@@ -28,7 +29,25 @@ class MemoryRouteService:
         @app.post("/api/memory/add")
         @guarded_json_route
         def api_memory_add():
+
+            print(
+                "[MEMORY ADD DEBUG RAW]",
+                {
+                    "content_type": request.content_type,
+                    "content_length": request.content_length,
+                    "raw": request.get_data(
+                        cache=True,
+                        as_text=True,
+                    ),
+                },
+            )
+
             data = get_json_body(request)
+
+            print(
+                "[MEMORY ADD DEBUG JSON]",
+                data,
+            )
 
             text = get_str(data, "text")
             kind = get_str(data, "kind", "note") or "note"
@@ -41,12 +60,14 @@ class MemoryRouteService:
                     code="missing_text",
                 ), 400
 
-            item = self.memory_service.add_memory({
-                "text": text,
-                "kind": kind,
-                "source": source,
-                "session_id": session_id,
-            })
+            item = self.memory_service.add_memory(
+                {
+                    "text": text,
+                    "kind": kind,
+                    "source": source,
+                    "session_id": session_id,
+                }
+            )
 
             memory = self.memory_service.all()
 
@@ -63,7 +84,12 @@ class MemoryRouteService:
         @guarded_json_route
         def api_memory_pin():
             data = get_json_body(request)
-            memory_id = get_str(data, "id") or get_str(data, "memory_id")
+
+            memory_id = (
+                get_str(data, "id")
+                or get_str(data, "memory_id")
+            )
+
             pinned = bool(data.get("pinned", True))
 
             if not memory_id:
@@ -88,12 +114,15 @@ class MemoryRouteService:
                 message="Memory pinned." if pinned else "Memory unpinned.",
             )
 
-
         @app.post("/api/memory/delete")
         @guarded_json_route
         def api_memory_delete():
             data = get_json_body(request)
-            memory_id = get_str(data, "id") or get_str(data, "memory_id")
+
+            memory_id = (
+                get_str(data, "id")
+                or get_str(data, "memory_id")
+            )
 
             if not memory_id:
                 return error_response(
@@ -118,9 +147,17 @@ class MemoryRouteService:
         def api_memory_update():
             data = get_json_body(request)
 
-            memory_id = str(data.get("id") or "").strip()
-            text = str(data.get("text") or "").strip()
-            kind = str(data.get("kind") or "note").strip()
+            memory_id = str(
+                data.get("id") or ""
+            ).strip()
+
+            text = str(
+                data.get("text") or ""
+            ).strip()
+
+            kind = str(
+                data.get("kind") or "note"
+            ).strip()
 
             if not memory_id:
                 return error_response(
@@ -153,7 +190,9 @@ class MemoryRouteService:
                 ), 404
 
             self.memory_service._write_store(
-                {"memory": items}
+                {
+                    "memory": items
+                }
             )
 
             return ok_response(
@@ -176,7 +215,6 @@ class MemoryRouteService:
                 message="Memory cleanup complete.",
             )
 
-
         @app.post("/api/memory/promote")
         @guarded_json_route
         def api_memory_promote():
@@ -191,7 +229,6 @@ class MemoryRouteService:
                 },
                 message="Memory promotion complete.",
             )
-
 
         @app.post("/api/memory/cleanup-promote")
         @guarded_json_route

@@ -102,7 +102,7 @@ class ProjectRecallService:
                     == "memory_nova_project_state_current"
                 ):
                     stale_markers = (
-                        "gangster intelligence stack",
+                        "Project Brain intelligence stack",
                         "Nova Conversation Quality Field Test v1",
                         "Project Brain Upgrade Radar v1",
                         "Auto-Debug Brain v1",

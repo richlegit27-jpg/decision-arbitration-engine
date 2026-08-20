@@ -17,6 +17,31 @@ class DecisionService:
 
         lower_text = user_text.lower()
 
+        if any(
+            phrase in lower_text
+            for phrase in [
+                "what are we working on",
+                "what are we working on right now",
+                "current blocker",
+                "what should we do next",
+                "next move",
+                "where are we",
+            ]
+        ):
+            return {
+                "route": "project_brain",
+                "mode": "project_state",
+                "intent": "mission_control",
+                "confidence": 1.0,
+                "reasons": [
+                    "project_state_priority",
+                ],
+                "save_artifact": False,
+                "save_memory": False,
+                "use_memory": True,
+                "prompt": user_text,
+            }
+
         short_chat = (
             "hello",
             "hi",
@@ -34,36 +59,6 @@ class DecisionService:
                 "confidence": 0.95,
                 "reasons": [
                     "short_chat",
-                ],
-                "save_artifact": False,
-                "save_memory": False,
-                "use_memory": False,
-                "prompt": user_text,
-            }
-
-        execution_triggers = (
-            "next",
-            "continue",
-            "keep going",
-            "run step",
-            "run all",
-            "execute",
-            "advance",
-            "status",
-            "mission status",
-            "execution status",
-            "stop",
-            "cancel",
-        )
-
-        if lower_text.strip() in execution_triggers:
-            return {
-                "route": "execution",
-                "mode": "execution",
-                "intent": "execution_control",
-                "confidence": 1.0,
-                "reasons": [
-                    "execution_command",
                 ],
                 "save_artifact": False,
                 "save_memory": False,
@@ -93,6 +88,7 @@ class DecisionService:
             }
 
         project_state_triggers = (
+            "status",
             "what's next",
             "whats next",
             "next move",
@@ -101,6 +97,9 @@ class DecisionService:
             "where are we at",
             "what are we doing",
             "what is left",
+            "what are we working on",
+            "what are we working on now",
+            "what are we working on right now",
         )
 
         if any(
@@ -118,6 +117,33 @@ class DecisionService:
                 "save_artifact": False,
                 "save_memory": False,
                 "use_memory": True,
+                "prompt": user_text,
+            }
+
+        execution_triggers = (
+            "next",
+            "continue",
+            "keep going",
+            "run step",
+            "run all",
+            "execute",
+            "advance",
+            "stop",
+            "cancel",
+        )
+
+        if lower_text.strip() in execution_triggers:
+            return {
+                "route": "execution",
+                "mode": "execution",
+                "intent": "execution_control",
+                "confidence": 1.0,
+                "reasons": [
+                    "execution_command",
+                ],
+                "save_artifact": False,
+                "save_memory": False,
+                "use_memory": False,
                 "prompt": user_text,
             }
 

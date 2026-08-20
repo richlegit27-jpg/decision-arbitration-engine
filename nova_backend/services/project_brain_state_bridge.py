@@ -125,7 +125,7 @@ def build_state_bridge_record(
         move = _clean(item.get("next_move")) or move
 
     checkpoint = (
-        "Project Brain gangster intelligence stack is locked through "
+        "Project Brain intelligence stack is locked through "
         + ", ".join(locked)
         + ". Command Center can rank upgrades, classify failures, plan patches, select smokes, "
         + "launch command blocks, run safe mission logic, coach runtime output, "

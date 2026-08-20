@@ -61,6 +61,15 @@ class ExecutionBridge:
                 )
 
 
+            if not goal or not steps:
+
+                result["status"] = (
+                    "skipped_no_execution_plan"
+                )
+
+                return result
+
+
             print(
                 "[EXECUTION BRIDGE RECEIVED PLAN]",
                 plan,

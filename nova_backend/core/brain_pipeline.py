@@ -1,5 +1,7 @@
-class BrainPipeline:
+from nova_backend.core.memory_intelligence import MemoryIntelligence
 
+
+class BrainPipeline:
 
     def __init__(
         self,
@@ -13,19 +15,14 @@ class BrainPipeline:
     ):
 
         self.orchestrator = orchestrator
-
         self.planner_bridge = planner_bridge
-
         self.execution_bridge = execution_bridge
-
         self.evaluation_bridge = evaluation_bridge
-
         self.quality_gate = quality_gate
-
         self.telemetry_bridge = telemetry_bridge
-
         self.recovery_bridge = recovery_bridge
 
+        self.memory_intelligence = MemoryIntelligence()
 
 
     def run(
@@ -64,6 +61,22 @@ class BrainPipeline:
                 )
 
 
+            memory_candidate = self.memory_intelligence.extract_memory(
+                user_text
+            )
+
+            if memory_candidate:
+
+                pipeline_state["memory"] = memory_candidate
+
+                pipeline_state["response"] = (
+                    "Memory saved: "
+                    + memory_candidate["content"]
+                )
+
+                return pipeline_state
+
+
             if self.orchestrator:
 
                 brain_state = (
@@ -74,9 +87,7 @@ class BrainPipeline:
                     )
                 )
 
-                pipeline_state["brain"] = (
-                    brain_state
-                )
+                pipeline_state["brain"] = brain_state
 
 
             if self.planner_bridge:

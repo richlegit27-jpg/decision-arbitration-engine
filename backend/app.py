@@ -219,19 +219,21 @@ async def get_chat_session(session_id: str):
 # --- Memory endpoints ---
 @app.post("/api/memory/add")
 async def add_memory(req: Request):
-    data = await req.json()
-    text = str(data.get("text") or "").strip()
+    body = await req.json()
 
     item = {
         "id": str(uuid.uuid4()),
-        "text": text,
-        "embedding": [ord(c) for c in text][:50],
-        "timestamp": now_ts(),
+        "text": body.get("text"),
+        "kind": body.get("kind", "note"),
+        "source": body.get("source", "manual"),
     }
-    memory_state.append(item)
 
-    return JSONResponse({"status": "ok", "item": item})
+    item = memory_service.add_memory(item)
 
+    return {
+        "status": "ok",
+        "item": item,
+    }
 
 @app.post("/api/memory/search")
 async def search_memory(req: Request):

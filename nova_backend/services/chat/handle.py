@@ -34,7 +34,9 @@ def chat_handle(
     attachments = attachments or []
 
     try:
-        user_text = service.safe_str(user_text).strip()
+        user_text = service.safe_str(
+            user_text
+        ).strip()
 
         if not session_id:
             session_id = service._create_session()
@@ -46,24 +48,26 @@ def chat_handle(
             }
 
         try:
-            routed = service.chat_router.decide(
-                user_text=user_text,
-                attachments=attachments,
-                session_id=session_id,
-            )
+            if hasattr(service, "_decide_route"):
+                routed = service._decide_route(
+                    user_text=user_text,
+                    attachments=attachments,
+                    session_id=session_id,
+                )
+            else:
+                routed = service.chat_router.decide(
+                    user_text=user_text,
+                    attachments=attachments,
+                    session_id=session_id,
+                )
 
             print(
-                "DEBUG ROUTER RAW OUTPUT =",
+                "DEBUG PRIMARY ROUTE DECISION =",
                 routed,
             )
 
             if isinstance(routed, dict):
                 decision.update(routed)
-
-            print(
-                "DEBUG DECISION AFTER ROUTER UPDATE =",
-                decision,
-            )
 
         except Exception as exc:
             print(
@@ -92,44 +96,24 @@ def chat_handle(
             },
         )
 
+        if route == "web_fetch":
+            return service._execute_web_fetch(
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
+                decision=decision,
+            )
+
         if (
             route == "planner"
             or intent == "planning"
             or mode == "planning"
         ):
-            print(
-                "DEBUG ENTERING PLANNER BLOCK"
-            )
-
             try:
                 execution_state = service._process_goal_and_plan(
                     user_text,
                     session_id,
                 )
-
-                print(
-                    "DEBUG PROCESS GOAL PLAN RETURN =",
-                    execution_state,
-                )
-
-                if execution_state:
-
-                    try:
-                        if hasattr(
-                            service,
-                            "execution_mutation_service",
-                        ):
-                            execution_state = (
-                                service.execution_mutation_service.mark_running(
-                                    execution_state
-                                )
-                            )
-
-                    except Exception as exc:
-                        print(
-                            "[MARK RUNNING FAILED]",
-                            repr(exc),
-                        )
 
                 decision["execution_state"] = execution_state
 
@@ -144,10 +128,6 @@ def chat_handle(
                     execution_state,
                 )
 
-                print(
-                    "DEBUG STORED EXECUTION STATE =",
-                    execution_state,
-                )
             except Exception as exc:
                 print(
                     "[PLANNER EXECUTION FAILED]",
@@ -161,115 +141,23 @@ def chat_handle(
         ):
             decision["brain_plan"] = brain_state["plan"]
 
-            print(
-                "DEBUG BRAIN PLAN AVAILABLE:",
-                decision["brain_plan"],
-            )
-
-        response_text = ""
-
-        planner_source = None
-
-        if (
-            route == "planner"
-            and isinstance(brain_state, dict)
-            and isinstance(
-                brain_state.get("plan"),
-                dict,
-            )
-        ):
-            planner_source = brain_state["plan"]
-
-        elif (
-            isinstance(decision, dict)
-            and isinstance(
-                decision.get("brain_plan"),
-                dict,
-            )
-        ):
-            planner_source = decision["brain_plan"]
-
-        elif (
-            isinstance(decision, dict)
-            and isinstance(
-                decision.get("execution_state"),
-                dict,
-            )
-        ):
-            planner_source = decision["execution_state"]
-
-        if isinstance(planner_source, dict):
-
-            goal = (
-                planner_source.get("goal")
-                or user_text
-            )
-
-            steps = (
-                planner_source.get("steps")
-                or planner_source.get("plan")
-                or []
-            )
-
-            lines = []
-
-            lines.append(
-                f"Project Plan: {goal}"
-            )
-
-            lines.append("")
-
-            for index, step in enumerate(
-                steps,
-                start=1,
-            ):
-
-                if isinstance(step, dict):
-
-                    title = (
-                        step.get("title")
-                        or step.get("action")
-                        or step.get("name")
-                        or f"Step {index}"
-                    )
-
-                    status = (
-                        step.get("status")
-                        or "planned"
-                    )
-
-                    detail = (
-                        step.get("input")
-                        or step.get("result")
-                        or ""
-                    )
-
-                    if detail:
-                        lines.append(
-                            f"{index}. {title} ({status}) - {detail}"
-                        )
-                    else:
-                        lines.append(
-                            f"{index}. {title} ({status})"
-                        )
-
-                else:
-                    lines.append(
-                        f"{index}. {step}"
-                    )
-
-            response_text = "\n".join(lines)
-
-        if not response_text:
-            response_text = service._run_chat_model(
-                user_text=user_text,
+        if route == "memory_recall":
+            return service._execute_memory_recall(
                 decision=decision,
+                user_text=user_text,
                 session_id=session_id,
+                attachments=attachments,
             )
+
+        response_text = service._run_chat_model(
+            user_text=user_text,
+            decision=decision,
+            session_id=session_id,
+        )
 
         print(
-            "DEBUG BEFORE FINALIZE EXECUTION:",
-            decision.get("execution_state"),
+            "DEBUG BEFORE FINALIZE DECISION =",
+            decision,
         )
 
         return service._finalize_response(
@@ -285,14 +173,7 @@ def chat_handle(
             assistant_msg=service._build_assistant_message(
                 text=response_text,
                 meta={
-                    "route": (
-                        "brain_planner_chat"
-                        if (
-                            isinstance(brain_state, dict)
-                            and brain_state.get("plan")
-                        )
-                        else "rebuilt_chat_handler"
-                    ),
+                    "route": "general_chat",
                 },
                 attachments=[],
             ),

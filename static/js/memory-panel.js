@@ -1,4 +1,24 @@
-﻿document.addEventListener("DOMContentLoaded", () => {
+﻿window.NovaMemoryPanel = {
+  open: () => {
+    const panel = document.getElementById("memoryPanel");
+    if (panel) {
+      panel.classList.add("open");
+    }
+  },
+
+  close: () => {
+    const panel = document.getElementById("memoryPanel");
+    if (panel) {
+      panel.classList.remove("open");
+    }
+  },
+
+  refresh: () => {
+    window.dispatchEvent(new Event("nova:memory-changed"));
+  }
+};
+
+document.addEventListener("DOMContentLoaded", () => {
   const body = document.body;
   const memoryPanel = document.getElementById("memoryPanel");
   if (!memoryPanel) return;
@@ -293,10 +313,15 @@
     renderMemory();
   });
 
-  if (!body.classList.contains("memory-open") && !body.classList.contains("mobile-right-open")) {
-    memoryPanel.setAttribute("aria-hidden", "true");
-  }
+if (!body.classList.contains("memory-open") && !body.classList.contains("mobile-right-open")) {
+  memoryPanel.setAttribute("aria-hidden", "true");
+}
 
-  renderMemory();
+window.NovaMemoryPanel = {
+  open: openMemoryPanel,
+  close: closeMemoryPanel,
+  refresh: renderMemory
+};
+
+renderMemory();
 });
-

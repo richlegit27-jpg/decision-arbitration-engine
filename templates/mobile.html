@@ -3889,33 +3889,35 @@ composer.style.setProperty("overflow", "visible", "important");
 <!-- TEST_DISABLED_TOP_ACTIONS_OWNER -->
 <!--
 
--->
-<script src="/static/js/mobile/nova-mobile-new-chat-backend-create-v1.js?v=new-chat-in-place-reset-20260722"></script>
-<!-- DISABLED_DUPLICATE_SEND_OWNER_20260706 -->
-<!-- <script src="/static/js/mobile/nova-mobile-send-dedupe-guard-v1.js?v=send-dedupe-v1-20260703"></script> -->
-<!-- DISABLED_CHAT_VISIBLE_RECOVERY_AFTER_SESSION_CLEAN_20260706 -->
-<!-- <script src="/static/js/mobile/nova-mobile-chat-visible-recovery-v1.js?v=chat-visible-recovery-dedupe-final-20260703c"></script> -->
-<!-- NOVA_SESSION_OWNER_CLEANUP_20260703: disabled duplicate sessions rescue-final loader -->
-<!-- NOVA_SESSION_OWNER_CLEANUP_20260703: disabled duplicate session fallback renderer loader -->
 
-<!-- DISABLED_DUPLICATE_SESSION_SANITIZER_20260706 -->
+<!-- MOBILE_PATCH_TEST_CLEANUP_20260819 -->
+
+<!-- Keep new chat backend owner -->
+<script src="/static/js/mobile/nova-mobile-new-chat-backend-create-v1.js?v=new-chat-in-place-reset-20260722"></script>
+
+<!-- Disabled legacy duplicate owners -->
 <!--
-<!-- DISABLED_SESSION_SANITIZER_DUPLICATE_OWNER_20260725
+<script src="/static/js/mobile/nova-mobile-send-dedupe-guard-v1.js?v=send-dedupe-v1-20260703"></script>
+<script src="/static/js/mobile/nova-mobile-chat-visible-recovery-v1.js?v=chat-visible-recovery-dedupe-final-20260703c"></script>
 <script src="/static/js/mobile/nova-mobile-active-session-sanitizer-v1.js?v=active-session-sanitizer-v1-20260703"></script>
--->
--->
-<!-- DISABLED_DUPLICATE_SESSION_RESTORE_KEEPER_20260706 -->
-<!--
 <script src="/static/js/mobile/nova-mobile-chat-restore-keeper-v1.js?v=chat-restore-keeper-v1-20260703"></script>
 -->
-<!-- DISABLED_OLD_SESSION_OWNER_20260705: nova-mobile-session-flat-actions-v1.js -->
 
+<!-- Temporarily disabled for mobile login/session isolation test -->
+
+<!--
 <script src="/static/js/mobile/nova-mobile-attachment-boot-reset-v1.js?v=attachment-boot-reset-v1-20260705"></script>
-<!-- NOVA_CLEANUP_DISABLED_20260705: disabled plus-menu attach experiment :: <script src="/static/js/mobile/nova-mobile-plus-menu-reliability-v1.js?v=plus-menu-reliability-v1-20260705"></script> -->
 <script src="/static/js/mobile/nova-mobile-upload-change-authority-v1.js?v=upload-single-owner-20260714h"></script>
 <script src="/static/js/mobile/nova-mobile-runtime.js?v=runtime-stop-wire-20260706"></script>
 <script src="/static/js/mobile/nova-mobile-send-stable-v1.js?v=latest-message-anchor-20260722"></script>
 <script src="/static/js/mobile/nova-mobile-attachment-send-cleanup-v1.js?v=attachment-send-cleanup-v2-20260706"></script>
+-->
+
+<!-- MOBILE_PATCH_TEST_CLEANUP_END -->
+
+
+
+
 <!-- TEST_DISABLED_CHAT_VISIBLE_RECOVERY_20260706 -->
 <!--
 <script src="/static/js/mobile/nova-mobile-chat-visible-recovery-v1.js?v=chat-visible-recovery-dedupe-final-20260703c"></script>

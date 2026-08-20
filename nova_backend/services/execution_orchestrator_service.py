@@ -47,6 +47,21 @@ class ExecutionOrchestratorService:
             execution_state=execution_state,
         )
 
+        print(
+            "ORCH COMMAND DEBUG:",
+            {
+                "command_arg": command,
+                "state_command": execution_state.get("command"),
+                "selected_command": selected_command,
+                "continue_request": execution_state.get(
+                    "continue_request"
+                ),
+                "status": execution_state.get(
+                    "status"
+                ),
+            },
+        )
+
     def _save_execution_state(
         self,
         session_id="",
@@ -167,6 +182,9 @@ class ExecutionOrchestratorService:
             execution_state = {}
 
         steps = execution_state.get("steps") or []
+
+        if not steps:
+            return None
 
         current_index = int(
             execution_state.get(
@@ -539,6 +557,66 @@ class ExecutionOrchestratorService:
 
             execution_state = refreshed_execution
             steps = refreshed_steps
+
+        print(
+            "CONTINUE REQUEST DEBUG =",
+            execution_state.get("continue_request"),
+            execution_state.get("command"),
+            execution_state.get("current_index"),
+        )
+
+        if (
+            execution_state.get("continue_request")
+            or command == "continue"
+        ):
+            execution_state.pop(
+                "continue_request",
+                None,
+            )
+
+            execution_state["status"] = "waiting"
+            execution_state["waiting"] = True
+            execution_state["current_step"] = (
+                step.get("title") or ""
+            )
+            if step:
+                step["status"] = "waiting"
+
+            execution_state["steps"][current_index] = dict(step)
+
+            execution_state = (
+                self.execution_mutation_service.mark_waiting(
+                    execution_state,
+                    step_index=current_index,
+                    current_step=step.get("title") or "",
+                )
+                if self.execution_mutation_service
+                and hasattr(
+                    self.execution_mutation_service,
+                    "mark_waiting",
+                )
+                else execution_state
+            )
+
+            self._save_execution_state(
+                session_id,
+                execution_state,
+            )
+
+            return {
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": (
+                        "Continuing mission:\n\n"
+                        f"Goal: {execution_state.get('goal', '')}\n\n"
+                        f"Step {current_index + 1}/{len(steps)}:\n"
+                        f"{step.get('title') or ''}\n\n"
+                        "Status: waiting"
+                    ),
+                },
+                "execution": execution_state,
+            }
 
             step["status"] = "running"
 
@@ -1002,9 +1080,21 @@ class ExecutionOrchestratorService:
                     chat_execution_service,
                 )
 
-                chat_execution_service.reset(
-                    session_id
-                )
+                if hasattr(
+                    chat_execution_service,
+                    "cancel",
+                ):
+                    execution_state = (
+                        chat_execution_service.cancel(
+                            session_id
+                        )
+                    )
+
+                else:
+                    chat_execution_service.reset(
+                        session_id
+                    )
+
             except Exception as legacy_reset_error:
                 print(
                     "LEGACY EXECUTION RESET FAILED:",

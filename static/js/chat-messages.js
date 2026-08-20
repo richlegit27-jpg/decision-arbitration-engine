@@ -13,11 +13,23 @@ if(!chatStateApi){
 const { state } = chatStateApi
 
 const el = {
-  messages: document.getElementById("messages"),
-  messagesScroll: document.getElementById("messagesScroll"),
+  messages:
+    document.getElementById("messages") ||
+    document.getElementById("chat") ||
+    document.querySelector("[data-messages]") ||
+    document.querySelector(".chat-messages"),
+
+  messagesScroll:
+    document.getElementById("messagesScroll") ||
+    document.getElementById("chat") ||
+    document.querySelector("[data-messages]") ||
+    document.querySelector(".chat-messages"),
+
   emptyState: document.getElementById("emptyState"),
+
   jumpToLatestBtn: document.getElementById("jumpToLatestBtn"),
 }
+
 
 const SCROLL_LOCK_THRESHOLD = 140
 const COPY_FEEDBACK_MS = 1200
@@ -210,6 +222,14 @@ function getMessages(){
   return Array.isArray(state.messages) ? state.messages : []
 }
 
+function syncMessagesFromStorage(messages){
+  state.messages = Array.isArray(messages)
+    ? messages
+    : []
+
+  renderMessages()
+}
+
 function renderMessages(){
   if(!el.messages){
     return
@@ -357,6 +377,7 @@ window.NovaChatMessages = {
   renderMessages,
   scrollToBottom,
   updateJumpButton,
+  syncMessagesFromStorage,
 }
 
 if(document.readyState === "loading"){

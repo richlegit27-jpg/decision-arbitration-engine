@@ -363,11 +363,24 @@ class SessionService:
 
         cleaned["messages"] = self.trim_session_messages(session.get("messages", []))
 
-        # keep only one lean execution source of truth here
-        cleaned["active_execution"] = self._sanitize_active_execution_for_storage(
-            session.get("active_execution")
+        # keep execution state and active execution synchronized
+        execution_state = (
+            session.get("execution_state")
+            or session.get("active_execution")
+            or {}
         )
 
+        cleaned["execution_state"] = (
+            self._sanitize_active_execution_for_storage(
+                execution_state
+            )
+        )
+
+        cleaned["active_execution"] = (
+            self._sanitize_active_execution_for_storage(
+                execution_state
+            )
+        )
         # keep working state tiny if present
         working_state = session.get("working_state")
         if isinstance(working_state, dict):
@@ -566,73 +579,115 @@ class SessionService:
         Compatibility bridge for older ChatService code that expects
         SessionService.load() to return the session list.
         """
-        return self._load_sessions()
 
-    def replace_session(
-        self,
-        session_id,
-        session_data,
-    ):
         sessions = self._load_sessions()
 
-        index = self._find(
-            sessions,
-            session_id,
-        )
+        try:
 
-        if index is None:
-            return False
-
-        sessions[index] = session_data
-
-        self._save_sessions(
-            sessions,
-            self.get_active_session_id(),
-        )
-
-        return True
-
-    def update_execution_state(
-        self,
-        session_id,
-        execution_state,
-    ):
-        sessions = self._load_sessions()
-
-        index = self._find(
-            sessions,
-            session_id,
-        )
-
-        if index is None:
-            return False
-
-        active_execution = (
-            execution_state
-            if (
-                execution_state.get("steps")
-                and str(
-                    execution_state.get("status") or ""
-                ).lower()
-                not in {
-                    "complete",
-                    "completed",
-                    "failed",
-                    "cancelled",
-                }
+            from nova_backend.services.session_detail_cache_service import (
+                SessionDetailCacheService,
             )
-            else {}
-        )
 
-        sessions[index]["active_execution"] = active_execution
-        sessions[index]["execution_state"] = execution_state
+            cache = SessionDetailCacheService()
 
-        self._save_sessions(
-            sessions,
-            self.get_active_session_id(),
-        )
+            detail_store = (
+                cache.load_sessions_store()
+            )
 
-        return True
+            if isinstance(
+                detail_store,
+                dict,
+            ):
+
+                for session in sessions:
+
+                    session_id = str(
+                        session.get(
+                            "id"
+                        )
+                        or ""
+                    )
+
+                    cached = (
+                        detail_store.get(
+                            session_id
+                        )
+                    )
+
+                    if not cached:
+
+                        candidates = []
+
+                        for key, value in detail_store.items():
+
+                            if not isinstance(
+                                value,
+                                dict,
+                            ):
+                                continue
+
+                            state = (
+                                value.get(
+                                    "execution_state"
+                                )
+                                or value.get(
+                                    "active_execution"
+                                )
+                                or {}
+                            )
+
+                            if (
+                                isinstance(
+                                    state,
+                                    dict,
+                                )
+                                and state.get(
+                                    "id"
+                                )
+                            ):
+
+                                candidates.append(
+                                    value
+                                )
+
+                        if candidates:
+
+                            cached = candidates[-1]
+
+                    if not isinstance(
+                        cached,
+                        dict,
+                    ):
+                        continue
+
+                    execution_state = (
+                        cached.get(
+                            "execution_state"
+                        )
+                        or cached.get(
+                            "active_execution"
+                        )
+                        or {}
+                    )
+
+                    if execution_state:
+
+                        session["execution_state"] = (
+                            execution_state
+                        )
+
+                        session["active_execution"] = (
+                            execution_state
+                        )
+
+        except Exception as e:
+
+            print(
+                "SESSION LOAD EXECUTION MERGE FAILED:",
+                repr(e),
+            )
+
+        return sessions
 
     def append_execution_history(
         self,

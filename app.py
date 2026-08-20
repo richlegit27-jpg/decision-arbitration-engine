@@ -43,7 +43,6 @@ from nova_backend.services.api_chat_final_response_service import (
 from nova_backend.services.session_attachment_response_service import (
     apply_session_attachment_response,
 )
-
 try:
     from nova_backend.services.real_response_attachment_lock_service import (
         apply_real_response_attachment_lock,
@@ -703,6 +702,19 @@ app = Flask(
     static_folder=str(BASE_DIR / "static"),
 )
 
+@app.route("/debug/routes")
+def debug_routes():
+    return {
+        "routes": [
+            {
+                "rule": str(r.rule),
+                "endpoint": r.endpoint,
+                "methods": list(r.methods),
+            }
+            for r in app.url_map.iter_rules()
+        ]
+    }
+
 app.secret_key = os.environ.get(
     "NOVA_SECRET_KEY"
 )
@@ -754,6 +766,10 @@ execution_priority_guard_service.install(app)
 session_history_persistence_guard_service.install(app)
 lead_route_service.install_routes(app)
 debug_route_service.install_routes(app)
+
+from asgiref.wsgi import WsgiToAsgi
+
+asgi_app = WsgiToAsgi(app)
 memory_guard_route_service.install_routes(app)
 session_auth_scope_service.install(app)
 empty_session_pruner_service.install(app)
@@ -1310,6 +1326,33 @@ def about():
 @app.route("/faq")
 def faq():
     return render_template("nova_faq.html")
+
+@app.route("/api/models", methods=["GET"])
+def api_models_route():
+    return {
+        "ok": True,
+        "models": [
+            "nova-fast",
+            "gpt-5.4",
+            "gpt-4.1-mini",
+            "gpt-4o-mini",
+        ],
+        "default_model": "nova-fast",
+        "selected_model": "nova-fast",
+    }
+
+
+@app.route("/api/models/select", methods=["POST"])
+def api_models_select_route():
+    data = request.get_json(silent=True) or {}
+
+    return {
+        "ok": True,
+        "selected_model": data.get(
+            "model",
+            "nova-fast",
+        ),
+    }
 
 @app.route("/api/chat", methods=["POST"])
 def api_chat_route():
@@ -2325,9 +2368,20 @@ def api_chat():
         print(
             "[CHAT SERVICE FAILURE DEBUG]",
             repr(chat_error),
+            flush=True,
         )
 
         traceback.print_exc()
+
+        with open(
+            "chat_exception_trace.txt",
+            "a",
+            encoding="utf-8",
+        ) as f:
+            f.write("\n\n===== CHAT FAILURE =====\n")
+            f.write(repr(chat_error))
+            f.write("\n")
+            traceback.print_exc(file=f)
 
         result = {
             "ok": False,
@@ -4304,7 +4358,15 @@ except Exception as exc:
 
 
 if __name__ == "__main__":
+
     create_startup_backup()
+
+    print("LOGIN ROUTES:")
+
+    for rule in app.url_map.iter_rules():
+        if "login" in str(rule).lower():
+            print(rule, "=>", rule.endpoint)
+
     app.run(
         host="0.0.0.0",
         port=int(os.getenv("PORT", "5001")),

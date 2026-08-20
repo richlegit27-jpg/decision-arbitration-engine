@@ -159,6 +159,15 @@ class ExecutionGuardService:
             "advance",
         }:
 
+            if (
+                self.chat_service
+                and hasattr(
+                    self.chat_service,
+                    "execution_orchestrator_service",
+                )
+            ):
+                return None
+
             current_state = self.chat_execution_service.get_state(
                 session_id
             )
@@ -281,12 +290,28 @@ class ExecutionGuardService:
         action = commands[clean]
 
         if action == "run_all":
-            state = self.chat_execution_service.run_all(session_id)
-        elif action == "cancel":
-            state = self.chat_execution_service.reset(session_id)
-        else:
-            state = self.chat_execution_service.advance(session_id)
+            state = self.chat_execution_service.run_all(
+                session_id
+            )
 
+        elif action == "cancel":
+            state = self.chat_execution_service.reset(
+                session_id
+            )
+
+        else:
+            if (
+                self.chat_service
+                and hasattr(
+                    self.chat_service,
+                    "execution_orchestrator_service",
+                )
+            ):
+                return None
+
+            state = self.chat_execution_service.advance(
+                session_id
+            )
         return {
             "state": state,
             "action": action,

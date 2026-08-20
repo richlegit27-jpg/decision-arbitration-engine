@@ -1,100 +1,109 @@
 ﻿// C:\Users\Owner\nova\static\js\api-memory.js
-
 (() => {
-"use strict"
+"use strict";
 
-const core = window.NovaAPICore
+const core = window.NovaAPICore;
 
-if(!core){
-  throw new Error("NovaAPIMemory: window.NovaAPICore is required")
+if (!core) {
+    throw new Error("NovaAPIMemory: window.NovaAPICore is required");
 }
 
 const {
-  fetchJson,
-  jsonOptions,
-  normalizeMemoryList,
-} = core
+    fetchJson,
+    jsonOptions,
+    normalizeMemoryList,
+} = core;
 
-function normalizeItems(items){
-  return Array.isArray(items)
-    ? items.map((item) => String(item || "").trim()).filter(Boolean)
-    : [String(items || "").trim()].filter(Boolean)
+
+function normalizeItems(items) {
+    return Array.isArray(items)
+        ? items.map((item) => String(item || "").trim()).filter(Boolean)
+        : [String(items || "").trim()].filter(Boolean);
 }
 
-function wrapMemoryPayload(payload){
-  return {
-    ...payload,
-    memories: normalizeMemoryList(payload),
-    updated_at: payload?.updated_at || null,
-  }
+
+function wrapMemoryPayload(payload) {
+    return {
+        ...payload,
+        memories: normalizeMemoryList(payload),
+        updated_at: payload?.updated_at || null,
+    };
 }
 
-async function tryMemoryWrite(method, items){
-  const normalizedItems = normalizeItems(items)
 
-  if(!normalizedItems.length){
-    return wrapMemoryPayload({ memories: [] })
-  }
+async function listMemory() {
+    const payload = await fetchJson("/api/memory");
+    return wrapMemoryPayload(payload);
+}
 
-  const payloadVariants = [
-    { items: normalizedItems },
-    { memories: normalizedItems },
-    { memory_items: normalizedItems },
-    { entries: normalizedItems },
-    normalizedItems,
-  ]
 
-  let lastError = null
+async function addMemory(items) {
+    const normalizedItems = normalizeItems(items);
 
-  for(const body of payloadVariants){
-    try{
-      const payload = await fetchJson(
-        "/api/memory",
-        jsonOptions(method, body)
-      )
-      return wrapMemoryPayload(payload)
-    }catch(error){
-      lastError = error
+    if (!normalizedItems.length) {
+        return wrapMemoryPayload({
+            memories: [],
+        });
     }
-  }
 
-  throw lastError || new Error(`Memory ${method} failed.`)
+    const payloadVariants = [
+        { items: normalizedItems },
+        { memories: normalizedItems },
+        { memory_items: normalizedItems },
+        { entries: normalizedItems },
+    ];
+
+    let lastError = null;
+
+    for (const body of payloadVariants) {
+        try {
+            const payload = await fetchJson(
+                "/api/memory/add",
+                jsonOptions("POST", body)
+            );
+
+            return wrapMemoryPayload(payload);
+
+        } catch (error) {
+            lastError = error;
+        }
+    }
+
+    throw lastError || new Error("Memory add failed.");
 }
 
-async function listMemory(){
-  const payload = await fetchJson("/api/memory")
-  return wrapMemoryPayload(payload)
-}
 
-async function addMemory(items){
-  return await tryMemoryWrite("POST", items)
-}
+async function deleteMemoryItems(items) {
+    const normalizedItems = normalizeItems(items);
 
-async function deleteMemoryItems(items){
-  return await tryMemoryWrite("DELETE", items)
-}
-
-async function clearMemory(){
-  try{
-    const payload = await fetchJson("/api/memory", {
-      method: "DELETE",
-    })
-    return wrapMemoryPayload(payload)
-  }catch(_error){
     const payload = await fetchJson(
-      "/api/memory",
-      jsonOptions("DELETE", { clear_all: true })
-    )
-    return wrapMemoryPayload(payload)
-  }
+        "/api/memory/delete",
+        jsonOptions("POST", {
+            items: normalizedItems,
+        })
+    );
+
+    return wrapMemoryPayload(payload);
 }
+
+
+async function clearMemory() {
+    const payload = await fetchJson(
+        "/api/memory/cleanup",
+        jsonOptions("POST", {
+            clear_all: true,
+        })
+    );
+
+    return wrapMemoryPayload(payload);
+}
+
 
 window.NovaAPIMemory = {
-  listMemory,
-  addMemory,
-  deleteMemoryItems,
-  clearMemory,
-}
+    listMemory,
+    addMemory,
+    deleteMemoryItems,
+    clearMemory,
+};
 
-})()
-
+})();

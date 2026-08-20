@@ -262,6 +262,16 @@ class MemoryContextService:
 
         text_lc = str(user_text or "").lower().strip()
 
+        identity_query = any(
+            phrase in text_lc
+            for phrase in (
+                "what is nova",
+                "what's nova",
+                "what is the nova project",
+                "tell me about nova",
+            )
+        )
+
         ranked = []
 
         for index, memory in enumerate(memories):
@@ -315,6 +325,7 @@ class MemoryContextService:
 
             try:
                 score = float(raw_weight)
+
             except Exception:
                 score = 1.0
 
@@ -346,6 +357,48 @@ class MemoryContextService:
                 or "always" in content_lc
             ):
                 score += 12.0
+
+            if identity_query:
+
+                if any(
+                    marker in content_lc
+                    for marker in (
+                        "branch",
+                        "launch testing",
+                        "frontend-polish",
+                        "post-frontend",
+                        "port ",
+                        "localhost",
+                        "127.0.0.1",
+                        "backend",
+                        "frontend",
+                        "server",
+                        "api",
+                        "endpoint",
+                        "database",
+                        "python",
+                        "powershell",
+                        "command",
+                        "path",
+                        "file",
+                    )
+                ):
+                    score -= 15.0
+
+                if any(
+                    marker in content_lc
+                    for marker in (
+                        "is a",
+                        "is an",
+                        "project",
+                        "application",
+                        "workspace",
+                        "assistant",
+                        "platform",
+                        "software",
+                    )
+                ):
+                    score += 20.0
 
             if (
                 "nova" in text_lc
@@ -407,44 +460,6 @@ class MemoryContextService:
         top = ranked[: max(1, int(limit or 12))]
 
         return top
-
-    def score_memory_item(
-        self,
-        item,
-        query,
-        session_id="",
-    ):
-        memory_text = self.memory_text(item)
-
-        if not memory_text:
-            return 0.0
-
-        query_tokens = self.memory_text_tokens(query)
-        memory_tokens = self.memory_text_tokens(memory_text)
-
-        overlap = len(
-            query_tokens.intersection(
-                memory_tokens
-            )
-        )
-
-        kind_score = self.memory_kind_weight(
-            self.memory_kind(item)
-        )
-
-        return (
-            overlap * 10
-            + kind_score
-            + self.memory_time_bonus(item)
-            + self.memory_session_bonus(
-                item,
-                session_id=session_id,
-            )
-            - self.score_penalty(
-                memory_text,
-                self.memory_kind(item),
-            )
-        )
 
     def is_junk_memory(
         self,

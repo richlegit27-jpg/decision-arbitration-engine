@@ -1,0 +1,143 @@
+﻿
+
+    def _execute_general_chat(
+        self,
+        decision=None,
+        user_text: str = "",
+        session_id: str = "",
+        attachments=None,
+        memory_context="",
+        working_context_block="",
+        working_state=None,
+    ) -> dict:
+
+        decision = decision if isinstance(decision, dict) else {}
+        attachments = attachments or []
+
+        original_user_text = user_text
+        text_lc = (user_text or "").lower()
+
+        execution_keywords = [
+            "build", "create", "make", "fix", "implement",
+            "add", "write", "generate", "set up"
+        ]
+        is_execution = any(k in text_lc for k in execution_keywords)
+
+        continue_triggers = ["continue", "next", "run it", "go"]
+        is_continue = any(k == text_lc.strip() for k in continue_triggers)
+
+        session = self._get_session_payload(session_id)
+        state = session.get("working_state") if isinstance(session, dict) else {}
+        state = state or {}
+
+        active_task = self._safe_str(state.get("active_task"))
+        next_step = self._safe_str(state.get("next_step"))
+
+        if is_continue and active_task:
+            user_text = f"Continue task: {active_task}. Next step: {next_step}"
+
+        user_msg = self._build_user_message(
+            original_user_text,
+            attachments=attachments,
+        )
+
+        if not memory_context:
+            memory_context = self._build_memory_context_for_chat(user_text, decision)
+
+        model_messages = self._compose_model_messages(
+            user_text=user_text,
+            session=session,
+            decision=decision,
+            memory_context=memory_context,
+        )
+
+        if is_execution or active_task:
+            model_messages.insert(0, {
+                "role": "system",
+                "content": (
+                    "You are an execution-focused AI.\n"
+                    f"Current task: {active_task or original_user_text}\n"
+                    f"Next step hint: {next_step}\n\n"
+                    "Rules:\n"
+                    "- Be direct.\n"
+                    "- Output real work: code, commands, files, or exact actions.\n"
+                    "- Do not stop at explanation.\n"
+                    "- Always move the task forward."
+                )
+            })
+
+        try:
+            response = self.client.responses.create(
+                model=self.chat_model,
+                input=model_messages,
+            )
+            assistant_text = self._extract_response_text(response)
+
+        except Exception as e:
+            print("GENERAL CHAT ERROR:", e)
+            assistant_text = "Something went wrong."
+
+        if not assistant_text:
+            assistant_text = "No response generated."
+
+        next_step_out = ""
+        try:
+            for line in (assistant_text or "").split("\n"):
+                if "step" in line.lower():
+                    next_step_out = line.strip()
+                    break
+        except Exception:
+            pass
+
+        used_memory_items = getattr(self, "_last_used_memory_items", []) or []
+
+        memory_text = " ".join([
+            self._safe_str(m.get("text"))
+            for m in used_memory_items
+            if isinstance(m, dict)
+        ]).lower()
+
+        if "name is richard" in memory_text:
+            if "your name is" in (assistant_text or "").lower():
+                assistant_text = "Your name is Richard."
+
+        try:
+            if any(x in memory_text for x in ["prefer direct", "be direct", "no fluff", "keep answers short"]):
+                assistant_text = (assistant_text or "").strip()
+        except Exception as e:
+            print("STYLE CLAMP ERROR:", e)
+
+        used_memory_full = [
+            {
+                "id": self._safe_str(m.get("id")),
+                "text": self._safe_str(m.get("text")),
+                "kind": self._safe_str(m.get("kind")),
+                "pinned": bool(m.get("pinned")),
+                "weight": m.get("weight", 1),
+            }
+            for m in used_memory_items
+            if isinstance(m, dict) and self._safe_str(m.get("text"))
+        ]
+
+        assistant_msg = self._build_assistant_message(
+            text=assistant_text,
+            attachments=[],
+            meta={
+                "used_memory": used_memory_full,
+                "used_memory_count": len(used_memory_full),
+                "memory_confidence": 1.0,
+                "execution_mode": bool(is_execution or active_task),
+                "active_task": active_task or original_user_text if is_execution else active_task,
+                "next_step": next_step_out,
+            },
+            memory_used=[m.get("id") for m in used_memory_items if isinstance(m, dict)],
+        )
+
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=original_user_text,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision=decision,
+            saved_artifact=None,
+        )

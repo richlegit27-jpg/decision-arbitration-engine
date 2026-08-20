@@ -1,0 +1,272 @@
+    def _execute_general_chat(
+        self,
+        decision=None,
+        user_text: str = "",
+        session_id: str = "",
+        attachments=None,
+        memory_context="",
+        working_context_block="",
+        working_state=None,
+    ) -> dict:
+
+        decision = decision if isinstance(decision, dict) else {}
+        attachments = attachments or []
+
+        original_user_text = user_text
+        text_lc = (user_text or "").lower()
+
+        execution_keywords = [
+            "build", "create", "make", "fix", "implement",
+            "add", "write", "generate", "set up"
+        ]
+        is_execution = any(k in text_lc for k in execution_keywords)
+
+        continue_triggers = ["continue", "next", "run it", "go"]
+        is_continue = any(k == text_lc.strip() for k in continue_triggers)
+
+        session = self._get_session_payload(session_id)
+        state = session.get("working_state") if isinstance(session, dict) else {}
+        state = state or {}
+
+        mission_mode = self._safe_str(state.get("mission_mode"))
+
+        active_task = self._safe_str(state.get("active_task"))
+        next_step = self._safe_str(state.get("next_step"))
+
+        # === EXECUTION LOCK DISABLED ===
+        # Execution now only runs through _maybe_lock_execution_flow().
+        # Normal chat should not be hijacked just because working_state exists.
+        if False:
+            exec_debug("FORCING EXECUTION MODE FROM WORKING STATE")
+
+        if is_continue:
+            mission = decision.get("mission") if isinstance(decision, dict) else {}
+            mission = mission if isinstance(mission, dict) else {}
+
+            # Disabled: do not rewrite normal chat into execution mode
+            pass
+
+        user_msg = self._build_user_message(
+            original_user_text,
+            attachments=attachments,
+        )
+
+        if not memory_context:
+            memory_context = self._build_memory_context_for_chat(user_text, decision)
+
+        model_messages = self._compose_model_messages(
+            user_text=user_text,
+            session=session,
+            decision=decision,
+            memory_context=memory_context,
+        )
+
+        if is_execution:
+            try:
+                auto_result = self._run_execution_autoloop(session_id)
+
+                return {
+                    "ok": True,
+                    "assistant_message": auto_result,
+                    "session": {
+                        "id": session_id,
+                    },
+                    "meta": {
+                        "mode": "execution",
+                        "autonomous": True,
+                    },
+                }
+
+            except Exception as e:
+                return {
+                    "ok": False,
+                    "assistant_message": f"Execution error:\n{str(e)}",
+                    "session": {
+                        "id": session_id,
+                    },
+                }
+
+        mission = decision.get("mission") if isinstance(decision, dict) else {}
+        mission_mode = str(mission.get("mode") or "").lower()
+
+        if is_continue and mission_mode == "debugging":
+            assistant_text = (
+                "Next move:\n\n"
+                "Paste the exact compile error so we can fix it."
+            )
+
+            assistant_msg = self._build_assistant_message(
+                text=assistant_text,
+                attachments=[],
+                meta={"forced": "continue_debug"},
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=original_user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+                saved_artifact=None,
+            )
+
+        is_memory_request = original_user_text.lower().strip().startswith((
+            "remember ",
+            "remember:",
+            "save this",
+            "store this",
+            "note that",
+        ))
+
+        if mission_mode == "full_file" and not is_memory_request:
+
+            assistant_text = (
+                "SMFF mode active.\n\n"
+                "Send the file name, function, or task.\n"
+                "I will return full file or full replacement.\n"
+                "No partial snippets."
+            )
+
+            assistant_msg = self._build_assistant_message(
+                text=assistant_text,
+                attachments=[],
+                meta={"forced": "smff"},
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=original_user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+                saved_artifact=None,
+            )
+
+        try:
+            response = self.client.responses.create(
+                model=self.chat_model,
+                input=model_messages,
+            )
+            assistant_text = self._extract_response_text(response)
+
+        except Exception as e:
+            exec_debug("GENERAL CHAT ERROR:", e)
+            assistant_text = "Something went wrong."
+
+        if not assistant_text:
+            assistant_text = "No response generated."
+
+        intelligence_result = self._apply_response_intelligence(
+            user_text=user_text,
+            assistant_text=assistant_text,
+            decision=decision,
+            session_id=session_id,
+            attachments=attachments,
+        )
+
+        # lock web fetch output (prevent duplication)
+        if decision.get("route") == "web_fetch":
+            assistant_text = assistant_text
+        else:
+            assistant_text = intelligence_result.get("assistant_text", assistant_text)
+        intelligence = intelligence_result.get("intelligence", {})
+        self_check = intelligence_result.get("self_check", {})
+        hard_override_applied = bool(intelligence_result.get("hard_override_applied"))
+
+        # Optional: enforce short mode hard clamp
+        if isinstance(intelligence, dict):
+            answer_length = str(intelligence.get("answer_length") or "").lower()
+            if answer_length == "short" and len(assistant_text.split()) > 120:
+                assistant_text = " ".join(assistant_text.split()[:120])
+
+        # === INTELLIGENCE LAYER END ===
+
+        next_step_out = ""
+        try:
+            for line in (assistant_text or "").split("\n"):
+                if "step" in line.lower():
+                    next_step_out = line.strip()
+                    break
+        except Exception:
+            pass
+
+        used_memory_items = getattr(self, "_last_used_memory_items", []) or []
+
+        memory_text = " ".join([
+            self._safe_str(m.get("text"))
+            for m in used_memory_items
+            if isinstance(m, dict)
+        ]).lower()
+
+        if "name is richard" in memory_text:
+            if "your name is" in (assistant_text or "").lower():
+                assistant_text = "Your name is Richard."
+
+        try:
+            if any(x in memory_text for x in ["prefer direct", "be direct", "no fluff", "keep answers short"]):
+                assistant_text = (assistant_text or "").strip()
+        except Exception as e:
+            exec_debug("STYLE CLAMP ERROR:", e)
+
+        used_memory_full = [
+            {
+                "id": self._safe_str(m.get("id")),
+                "text": self._safe_str(m.get("text")),
+                "kind": self._safe_str(m.get("kind")),
+                "pinned": bool(m.get("pinned")),
+                "weight": m.get("weight", 1),
+            }
+            for m in used_memory_items
+            if isinstance(m, dict) and self._safe_str(m.get("text"))
+        ]
+
+        meta_payload = {
+            "memory_dominance": {
+                "enabled": True,
+                "used_count": len(used_memory_full),
+                "top_memory": used_memory_full[:3],
+            },
+
+            # === CHAT POLISH: STRATEGY / MISSION FEED ===
+            "mission": decision.get("mission", {}) if isinstance(decision, dict) else {},
+            "strategy": decision.get("strategy", "") if isinstance(decision, dict) else "",
+
+            # === MEMORY ===
+            "used_memory": used_memory_full,
+            "used_memory_count": len(used_memory_full),
+            "memory_confidence": 1.0,
+
+            # === EXECUTION STATE ===
+            "execution_mode": bool(is_execution),
+            "active_task": (
+                original_user_text
+                if is_execution
+                else ""
+            ),
+
+            "next_step": next_step_out,
+        }
+
+        # === BUILD FINAL MESSAGE ===
+        if assistant_text:
+            assistant_msg = self._build_assistant_message(
+                text=assistant_text,
+                attachments=[],
+                meta=meta_payload,
+            )
+        else:
+            assistant_msg = self._build_assistant_message(
+                text="No response generated.",
+                attachments=[],
+                meta=meta_payload,
+            )
+
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=original_user_text,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision=decision,
+            saved_artifact=None,
+        )
+
