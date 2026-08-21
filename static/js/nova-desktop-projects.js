@@ -1,4 +1,4 @@
-console.log("[Nova Projects] FILE LOADED");
+﻿console.log("[Nova Projects] FILE LOADED");
 
 (function () {
     "use strict";
@@ -233,7 +233,7 @@ function openProjectWorkspace(project) {
     if (health) {
         health.innerHTML = `
             <h3>Health</h3>
-            <p>🟢 Healthy</p>
+            <p>ðŸŸ¢ Healthy</p>
         `;
     }
 
@@ -386,7 +386,7 @@ async function loadProjectIntelligence(projectId) {
 
         if (resume) {
             resume.innerHTML = `
-                <h3>📋 Resume Summary</h3>
+                <h3>ðŸ“‹ Resume Summary</h3>
 
                 <p>
                     ${escapeHtml(
@@ -1371,13 +1371,6 @@ await loadProjectNotes(
 
     const nextAction =
         $("desktopProjectNextAction");
-
-    if (nextAction) {
-        nextAction.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-        });
-    }
 
     setProjectStatus(
         "Ready to continue"

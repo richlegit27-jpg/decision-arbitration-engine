@@ -15,17 +15,10 @@
     min-height: 0 !important;
     max-height: none !important;
 
-    margin: 0 !important;
+    margin: 60px 0 0 0 !important;
 
     border: 1px solid rgba(255,255,255,.18) !important;
     border-radius: 18px !important;
-
-#nova-desktop-execution-native {
-    display: none !important;
-    height: 0 !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-}
 
     padding: 14px !important;
     box-sizing: border-box !important;
@@ -53,12 +46,30 @@
     overflow-x: hidden !important;
 }
 
-/* NOVA MEMORY LOGOUT SAFE POSITION */
 
-.panel.tools > .memory-section {
-    margin-top: 60px !important;
-}
+/* Hide desktop execution panel */
 
 #nova-desktop-execution-native {
     display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+
+/* Contain project workspace inside sidebar */
+
+#desktopProjectWorkspace {
+    flex: 0 0 auto !important;
+}
+
+
+#desktopProjectWorkspace .project-workspace-card {
+    display: flex !important;
+    flex-direction: column !important;
+
+    max-height: 600px !important;
+
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
 }

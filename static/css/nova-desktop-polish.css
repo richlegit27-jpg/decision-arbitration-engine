@@ -1054,3 +1054,8 @@ max-width: none !important;
     opacity: .65;
 }
 
+/* Prevent project workspace from expanding sidebar */
+.project-workspace-card {
+    max-height: 600px !important;
+    overflow-y: auto !important;
+}
