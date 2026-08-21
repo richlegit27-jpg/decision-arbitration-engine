@@ -488,6 +488,8 @@
       white-space: nowrap;
     }
 
+
+
     .desktop-session-meta {
       color: var(--muted);
       font-size: 11px;
@@ -13046,6 +13048,37 @@ aside.panel.tools > .quick-actions-section {
 
 </style>
 
+
+<style id="NOVA_SESSION_TITLE_VISIBILITY_FIX">
+
+.desktop-session-item {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    min-height: 44px !important;
+}
+
+.desktop-session-title {
+    display: block !important;
+    flex: 0 0 auto !important;
+    height: auto !important;
+    min-height: 17px !important;
+    line-height: 17px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+.desktop-session-meta {
+    display: block !important;
+    flex: 0 0 auto !important;
+    height: auto !important;
+    min-height: 14px !important;
+    line-height: 14px !important;
+}
+
+</style>
 <script>
 (function () {
     function initDesktopAttachments() {
