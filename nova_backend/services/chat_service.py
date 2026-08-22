@@ -9,6 +9,7 @@ import shutil
 import tempfile
 import py_compile
 
+
 from nova_backend.services.chat.handlers.execution_handler import ExecutionHandler
 from nova_backend.services.planner.decision_service import DecisionService
 from nova_backend.core.nova_orchestrator import NovaOrchestrator
@@ -618,6 +619,8 @@ class ChatService:
             "on",
         }:
             print(*args, **kwargs)
+
+
 
 
     def _nova_is_local_project_status_question_20260607(
@@ -2139,7 +2142,6 @@ Rules:
                 "favourite drink",
                 "favorite animal",
                 "favourite animal",
-                "i prefer",
                 "call me",
                 "my name is",
             )
@@ -2149,19 +2151,9 @@ Rules:
         if any(
             marker in text.lower()
             for marker in (
-                "favorite color",
-                "favourite color",
-                "favorite movie",
-                "favourite movie",
-                "favorite drink",
-                "favourite drink",
-                "favorite animal",
-                "favourite animal",
                 "i prefer",
                 "i always",
                 "i like",
-                "call me",
-                "my name is",
                 "remember that",
                 "going forward",
                 "from now on",
@@ -7730,6 +7722,92 @@ Rules:
             else []
         )
 
+    def _compose_model_messages(
+        self,
+        user_text,
+        session=None,
+        decision=None,
+        memory_context=None,
+    ):
+        session = session or {}
+        memory_context = self.safe_str(
+            memory_context
+        ).strip()
+
+        system_prompt = self._build_system_prompt(
+            decision=decision
+        )
+
+        continuity_context = self._build_continuity_context(
+            session=session,
+            user_text=user_text,
+        )
+
+        execution_text = ""
+
+        try:
+            latest = self._find_latest_execution_artifact(
+                session_id=session.get("id", "")
+            )
+
+            if latest:
+                execution = latest.get("execution") or {}
+
+                if execution:
+                    execution_text = self._render_execution(
+                        execution
+                    )
+
+        except Exception:
+            execution_text = ""
+
+        messages = [
+            {
+                "role": "system",
+                "content": system_prompt,
+            }
+        ]
+
+        if continuity_context:
+            messages.append(
+                {
+                    "role": "system",
+                    "content": continuity_context,
+                }
+            )
+
+        if execution_text:
+            messages.append(
+                {
+                    "role": "system",
+                    "content": (
+                        f"Current execution:\n"
+                        f"{execution_text}"
+                    ),
+                }
+            )
+
+        if memory_context:
+            messages.append(
+                {
+                    "role": "system",
+                    "content": (
+                        "Memory about the user "
+                        "(use this as ground truth when relevant):\n"
+                        f"{memory_context}"
+                    ),
+                }
+            )
+
+        messages.append(
+            {
+                "role": "user",
+                "content": user_text or "",
+            }
+        )
+
+        return messages
+
     def _maybe_update_working_state(self, session_id: str, user_text: str):
         session_id = self.safe_str(session_id).strip()
         if not session_id:
@@ -7858,12 +7936,33 @@ Rules:
         if kind in {
             "profile",
             "project",
-            "preference",
-            "user_fact",
             "goal",
             "note",
             "style",
         }:
+            return True
+
+        if kind == "user_fact":
+            strong_fact_signals = (
+                "my name is",
+                "call me",
+                "i am ",
+                "i'm ",
+                "i work on",
+                "i'm working on",
+                "i am working on",
+                "i live in",
+            )
+
+            if any(
+                signal in lowered
+                for signal in strong_fact_signals
+            ):
+                return True
+
+            return False
+
+        if kind == "preference":
             return True
 
         strong_signals = (
@@ -8788,7 +8887,19 @@ Rules:
         current_index = -1
 
         for i, line in enumerate(lines):
-            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â", "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â"]):
+            if any(
+                x in line
+                for x in [
+                    "[ ]",
+                    "[>]",
+                    "[x]",
+                    "[X]",
+                    "✓",
+                    "✔",
+                    "→",
+                    "➡",
+                ]
+            ):
                 step_indexes.append(i)
 
             if "[>]" in line:
@@ -8800,10 +8911,17 @@ Rules:
     def _persist_message_fallback(self, session_id: str, message: dict) -> None:
         if self.session_service:
             try:
+                print(
+                    "[PERSISTING MESSAGE]",
+                    session_id,
+                    message,
+                )
+
                 self.session_service.append_message(
                     session_id,
                     message,
                 )
+
             except Exception as e:
                 exec_debug(
                     "MESSAGE PERSIST FAILED:",
@@ -10048,7 +10166,14 @@ Rules:
 
         top = ranked[: max(1, int(limit or 12))]
 
-        return [item["memory"] for item in top]
+        selected_memory = [
+            item["memory"]
+            for item in top
+        ]
+
+        self._last_used_memory_items = selected_memory
+
+        return selected_memory
 
 
     def _build_image_generation_meta(
@@ -11680,6 +11805,9 @@ Rules:
                 f"User name: {username}\n\n"
                 + memory_context
             )
+
+        print("MEMORY GOING INTO MODEL:")
+        print(memory_context)
 
         model_messages = self._compose_model_messages(
             user_text=user_text,
