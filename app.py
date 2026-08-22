@@ -1641,10 +1641,15 @@ def api_chat():
         import os as _nova_os
 
         _nova_payload = request.get_json(silent=True) or {}
+
+        print(
+            "[BEFORE EXECUTION GUARD]",
+            _nova_payload,
+        )
+
         execution_guard_result = execution_guard_service.handle(
             _nova_payload
         )
-
         if execution_guard_result:
             return jsonify(execution_guard_result)
 
@@ -1655,6 +1660,11 @@ def api_chat():
         _nova_user_text = _nova_chat_context["user_text"]
         _nova_session_id = _nova_chat_context["session_id"]
         _nova_attachments = _nova_chat_context["attachments"]
+
+        user_text = _nova_user_text
+        session_id = _nova_session_id
+        attachments = _nova_attachments
+
         print(
             "[NOVA ATTACHMENT DEBUG]",
             _nova_attachments,
@@ -1869,8 +1879,16 @@ def api_chat():
             exc,
         )
 
-    _nova_user_text_lower = str(user_text or "").strip().lower()
+    print(
+        "[CHAT BEFORE EMPTY GUARD]",
+        {
+            "user_text": repr(user_text),
+            "_nova_user_text": repr(_nova_user_text),
+            "data": data,
+        }
+    )
 
+    _nova_user_text_lower = str(user_text or "").strip().lower()
     requested_session_id = str(data.get("session_id") or "").strip()
     session_id = requested_session_id
 

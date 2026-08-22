@@ -4,6 +4,11 @@ from __future__ import annotations
 class ChatRequestContextService:
 
     def build_context(self, payload):
+        print(
+            "[CHAT CONTEXT PAYLOAD]",
+            payload,
+        )
+
         if not isinstance(payload, dict):
             payload = {}
 
@@ -26,33 +31,46 @@ class ChatRequestContextService:
         if not isinstance(attachments, list):
             attachments = []
 
+        print(
+            "[CHAT CONTEXT RETURN]",
+            {
+                "user_text": user_text,
+                "session_id": session_id,
+                "attachments": attachments,
+            }
+        )
+
         return {
             "user_text": user_text,
             "session_id": session_id,
             "attachments": attachments,
         }
 
-def clean_web_attachment_context(self, user_text, attachments):
-    clean = " ".join(
-        str(user_text or "").lower().split()
-    )
+    def clean_web_attachment_context(
+        self,
+        user_text,
+        attachments,
+    ):
+        clean = " ".join(
+            str(user_text or "").lower().split()
+        )
 
-    web_terms = (
-        "latest news",
-        "news about",
-        "today in",
-        "what happened today",
-        "current news",
-        "breaking news",
-        "recent news",
-        "latest tech news",
-        "latest sports",
-        "weather",
-        "forecast",
-        "current events",
-    )
+        web_terms = (
+            "latest news",
+            "news about",
+            "today in",
+            "what happened today",
+            "current news",
+            "breaking news",
+            "recent news",
+            "latest tech news",
+            "latest sports",
+            "weather",
+            "forecast",
+            "current events",
+        )
 
-    if any(term in clean for term in web_terms):
-        return [], True
+        if any(term in clean for term in web_terms):
+            return [], True
 
-    return attachments, False
+        return attachments, False

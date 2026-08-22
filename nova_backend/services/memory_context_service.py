@@ -269,6 +269,14 @@ class MemoryContextService:
                 "what's nova",
                 "what is the nova project",
                 "tell me about nova",
+                "what is my name",
+                "what's my name",
+                "who am i",
+                "who am i?",
+                "tell me my name",
+                "do you know my name",
+                "what do you remember about me",
+                "what do you know about me",
             )
         )
 
@@ -363,6 +371,18 @@ class MemoryContextService:
                 if any(
                     marker in content_lc
                     for marker in (
+                        "my name is",
+                        "user's name",
+                        "called",
+                        "i am ",
+                        "i'm ",
+                    )
+                ):
+                    score += 30.0
+
+                if any(
+                    marker in content_lc
+                    for marker in (
                         "branch",
                         "launch testing",
                         "frontend-polish",
@@ -384,21 +404,6 @@ class MemoryContextService:
                     )
                 ):
                     score -= 15.0
-
-                if any(
-                    marker in content_lc
-                    for marker in (
-                        "is a",
-                        "is an",
-                        "project",
-                        "application",
-                        "workspace",
-                        "assistant",
-                        "platform",
-                        "software",
-                    )
-                ):
-                    score += 20.0
 
             if (
                 "nova" in text_lc
