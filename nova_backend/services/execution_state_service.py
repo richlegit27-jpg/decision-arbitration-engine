@@ -74,21 +74,37 @@ class ExecutionStateService:
 
     def steps(self, execution):
         raw_steps = (execution or {}).get("steps") or []
+
+        if not isinstance(raw_steps, list):
+            return []
+
         steps = []
 
         for item in raw_steps:
             if isinstance(item, dict):
-                title = str(
-                    item.get("title")
-                    or item.get("text")
-                    or item.get("name")
-                    or ""
-                ).strip()
+                step = dict(item)
+
+                if not step.get("title"):
+                    step["title"] = str(
+                        step.get("text")
+                        or step.get("name")
+                        or ""
+                    ).strip()
+
+                if step.get("title"):
+                    steps.append(step)
+
             else:
                 title = str(item or "").strip()
 
-            if title:
-                steps.append(title)
+                if title:
+                    steps.append(
+                        {
+                            "title": title,
+                            "action": "unknown",
+                            "status": "pending",
+                        }
+                    )
 
         return steps
 
@@ -263,9 +279,22 @@ class ExecutionStateService:
                     state = method(session_id)
 
                     if isinstance(state, dict):
-                        merged_state.update(
-                            state
-                        )
+                        for state_key, state_value in state.items():
+
+                            if state_key in {
+                                "active_execution",
+                                "execution_state",
+                                "execution",
+                                "last_execution",
+                            } and state_value is None:
+                                merged_state[state_key] = None
+                                continue
+
+                            if (
+                                state_key not in merged_state
+                                or state_value is not None
+                            ):
+                                merged_state[state_key] = state_value
 
                 except Exception:
                     pass
@@ -295,10 +324,32 @@ class ExecutionStateService:
                         "working_state"
                     )
 
-                    if isinstance(working_state, dict):
-                        merged_state.update(
-                            working_state
-                        )
+
+
+                    if isinstance(
+                        working_state,
+                        dict,
+                    ):
+
+                        for ws_key, ws_value in working_state.items():
+
+                            if ws_key in {
+                                "active_execution",
+                                "execution_state",
+                                "execution",
+                                "last_execution",
+                            }:
+
+                                if isinstance(
+                                    ws_value,
+                                    dict,
+                                ) and ws_value:
+
+                                    merged_state[ws_key] = ws_value
+
+                                continue
+
+                            merged_state[ws_key] = ws_value
 
                     for key in (
                         "active_execution",
@@ -312,16 +363,28 @@ class ExecutionStateService:
                         )
 
                         if isinstance(value, dict) and value:
+                            merged_state[key] = value
+
+                        if key in session and value is None:
+                            merged_state[key] = None
+                            continue
+
+                        if isinstance(value, dict) and value:
+
+                            if value.get(
+                                "status"
+                            ) == "complete":
+
+                                merged_state[key] = None
+                                continue
 
                             existing = merged_state.get(
                                 key
                             )
-
                             existing_index = 0
                             value_index = 0
 
                             if isinstance(existing, dict):
-
                                 existing_index = int(
                                     existing.get(
                                         "current_index"
@@ -342,9 +405,74 @@ class ExecutionStateService:
                                 or 0
                             )
 
-                            if (
+                            def execution_richness(item):
+                                score = 0
+
+                                if not isinstance(item, dict):
+                                    return score
+
+                                steps = item.get("steps")
+
+                                if isinstance(steps, list):
+                                    score += len(steps)
+
+                                    for step in steps:
+                                        if isinstance(step, dict):
+                                            if step.get("action"):
+                                                score += 5
+
+                                            if step.get("result"):
+                                                score += 5
+
+                                            if step.get("text"):
+                                                score += 3
+
+                                            if step.get("target_file"):
+                                                score += 3
+
+                                            if step.get("target_function"):
+                                                score += 3
+
+                                            if step.get("mutation_mode"):
+                                                score += 3
+
+                                if item.get("history"):
+                                    score += 2
+
+                                if item.get("learning_history"):
+                                    score += 2
+
+                                return score
+
+                            existing_richness = execution_richness(
+                                existing
+                            )
+
+                            value_richness = execution_richness(
+                                value
+                            )
+
+                            print(
+                                "DEBUG EXECUTION MERGE RICHNESS:",
+                                {
+                                    "key": key,
+                                    "existing": existing_richness,
+                                    "incoming": value_richness,
+                                    "existing_index": existing_index,
+                                    "value_index": value_index,
+                                },
+                            )
+
+                            if value is None:
+                                merged_state[key] = None
+
+                            elif (
                                 not existing
-                                or value_index >= existing_index
+                                or value_index > existing_index
+                                or (
+                                    value_index == existing_index
+                                    and value_richness >= existing_richness
+                                )
                             ):
                                 merged_state[key] = value
 
@@ -370,10 +498,36 @@ class ExecutionStateService:
                 "working_state"
             )
 
-            if isinstance(working_state, dict):
-                merged_state.update(
-                    working_state
-                )
+            print(
+                "DEBUG WORKING STATE EXEC:",
+                {
+                    "active_execution": working_state.get(
+                        "active_execution"
+                    ),
+                    "execution_state": working_state.get(
+                        "execution_state"
+                    ),
+                },
+            )
+
+            for ws_key, ws_value in working_state.items():
+                if ws_key in {
+                    "active_execution",
+                    "execution_state",
+                    "execution",
+                    "last_execution",
+                }:
+
+                    if ws_key in working_state and ws_value is None:
+                        merged_state[ws_key] = None
+                        continue
+
+                    if isinstance(ws_value, dict) and ws_value:
+                        merged_state[ws_key] = ws_value
+
+                    continue
+
+                merged_state[ws_key] = ws_value
 
             for key in (
                 "active_execution",
@@ -385,6 +539,10 @@ class ExecutionStateService:
                 value = session.get(
                     key
                 )
+
+                if key in session and value is None:
+                    merged_state[key] = None
+                    continue
 
                 if isinstance(value, dict) and value:
 
@@ -461,6 +619,8 @@ class ExecutionStateService:
                 ),
             },
         )
+
+        return merged_state
 
     def persist_working_state(
         self,
@@ -576,10 +736,6 @@ class ExecutionStateService:
                 "execution_state"
             )
 
-            session["active_execution"] = patch.get(
-                "execution_state"
-            )
-
         try:
             path.write_text(
                 json.dumps(
@@ -640,6 +796,12 @@ class ExecutionStateService:
                 key
             )
 
+            if (
+                execution is None
+                and key in state
+            ):
+                continue
+
             print(
                 "DEBUG EXECUTION CANDIDATE:",
                 key,
@@ -660,6 +822,12 @@ class ExecutionStateService:
                     },
                 )
 
+                print(
+                    "DEBUG CANDIDATE STEPS =",
+                    key,
+                    execution.get("steps"),
+                )
+
                 execution_index = int(
                     execution.get(
                         "current_index",
@@ -671,7 +839,52 @@ class ExecutionStateService:
                     or 0
                 )
 
-                execution["_state_priority_index"] = execution_index
+                rich_steps = 0
+
+                if isinstance(
+                    execution.get("steps"),
+                    list,
+                ):
+                    for step in execution["steps"]:
+                        if isinstance(step, dict):
+                            if (
+                                step.get("action")
+                                or step.get("result")
+                                or step.get("text")
+                                or step.get("target_file")
+                                or step.get("mutation_mode")
+                            ):
+                                rich_steps += 1
+
+                execution["_state_priority_index"] = (
+                    (10 if rich_steps else 0)
+                    +
+                    (1 if execution.get("steps") else 0)
+                    +
+                    (
+                        2
+                        if execution.get("status")
+                        in {
+                            "running",
+                            "waiting_approval",
+                        }
+                        else 0
+                    )
+                    +
+                    (
+                        4
+                        if execution.get("status")
+                        == "complete"
+                        else 0
+                    )
+                    +
+                    execution_index
+                )
+
+                print(
+                    "DEBUG BEFORE APPEND FULL EXECUTION:",
+                    execution,
+                )
 
                 candidates.append(
                     execution

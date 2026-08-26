@@ -199,26 +199,28 @@ const ROUTES = {
     };
   }
 
-  function normalizeMemoryPayload(payload) {
+function normalizeMemoryPayload(payload) {
     if (!isObject(payload)) {
-      return {
-        ok: true,
-        items: [],
-      };
+        return {
+            ok: true,
+            items: [],
+        };
     }
 
     return {
-      ok: payload.ok !== false,
-      items: Array.isArray(payload.items)
-        ? payload.items
-        : Array.isArray(payload.memory)
-          ? payload.memory
-          : Array.isArray(payload.data?.items)
-            ? payload.data.items
-            : [],
-      raw: payload,
+        ok: payload.ok !== false,
+        items: Array.isArray(payload.items)
+            ? payload.items
+            : Array.isArray(payload.memory)
+                ? payload.memory
+                : Array.isArray(payload.data?.items)
+                    ? payload.data.items
+                    : Array.isArray(payload.data?.memory)
+                        ? payload.data.memory
+                        : [],
+        raw: payload,
     };
-  }
+}
 
   function normalizeChatPayload(payload) {
     if (!isObject(payload)) {
@@ -541,5 +543,13 @@ const ROUTES = {
   api.normalizeMemoryPayload = normalizeMemoryPayload;
   api.normalizeChatPayload = normalizeChatPayload;
   api.normalizeModelsPayload = normalizeModelsPayload;
-})();
 
+  window.NovaApp = window.NovaApp || {};
+
+  window.NovaApp.api = api;
+
+  window.NovaApp.getMemory = getMemory;
+  window.NovaApp.addMemory = addMemory;
+  window.NovaApp.deleteMemory = deleteMemory;
+
+})();

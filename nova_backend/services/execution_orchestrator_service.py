@@ -181,6 +181,11 @@ class ExecutionOrchestratorService:
         else:
             execution_state = {}
 
+        print(
+            "ORCH STATE BEFORE STEPS =",
+            execution_state,
+        )
+
         steps = execution_state.get("steps") or []
 
         if not steps:
@@ -287,6 +292,7 @@ class ExecutionOrchestratorService:
                 execution_state["status"] = (
                     "running"
                 )
+
                 execution_state["waiting"] = False
                 execution_state["command"] = (
                     "run_step"
@@ -486,7 +492,41 @@ class ExecutionOrchestratorService:
                 )
                 or execution_state
             )
-            refreshed_steps = refreshed_execution.get("steps") or []
+
+
+            print(
+                "AFTER RELOAD DEBUG =",
+                {
+                    "current_index": refreshed_execution.get(
+                        "current_index"
+                    ),
+                    "current_step": refreshed_execution.get(
+                        "current_step"
+                    ),
+                    "step0_status": (
+                        refreshed_execution.get("steps", [{}])[0].get(
+                            "status"
+                        )
+                        if refreshed_execution.get("steps")
+                        else None
+                    ),
+                    "step1_status": (
+                        refreshed_execution.get("steps", [{}, {}])[1].get(
+                            "status"
+                        )
+                        if len(
+                            refreshed_execution.get("steps", [])
+                        ) > 1
+                        else None
+                    ),
+                },
+                flush=True,
+            )
+
+            refreshed_steps = (
+                refreshed_execution.get("steps")
+                or []
+            )
 
             if not isinstance(
                 refreshed_steps,
@@ -494,14 +534,7 @@ class ExecutionOrchestratorService:
             ) or current_index >= len(refreshed_steps):
                 refreshed_steps = steps
 
-            step = refreshed_steps[current_index]
-
-            execution_state = refreshed_execution
-
-            steps = refreshed_steps
-            execution_state["current_index"] = current_index
-
-            if current_index >= len(steps):
+            if current_index >= len(refreshed_steps):
                 execution_state = (
                     self.execution_mutation_service.mark_complete(
                         execution_state,
@@ -522,13 +555,11 @@ class ExecutionOrchestratorService:
                     "execution": execution_state,
                 }
 
-            refreshed_execution = (
-                self.execution_state_service.get_execution_state(
-                    session_id
-                )
-                or execution_state
-            )
-            
+            step = refreshed_steps[current_index]
+
+            execution_state = refreshed_execution
+            steps = refreshed_steps
+            execution_state["current_index"] = current_index            
             refreshed_steps = refreshed_execution.get("steps") or []
 
             if not isinstance(
@@ -558,65 +589,51 @@ class ExecutionOrchestratorService:
             execution_state = refreshed_execution
             steps = refreshed_steps
 
-        print(
-            "CONTINUE REQUEST DEBUG =",
-            execution_state.get("continue_request"),
-            execution_state.get("command"),
-            execution_state.get("current_index"),
-        )
-
-        if (
-            execution_state.get("continue_request")
-            or command == "continue"
-        ):
-            execution_state.pop(
-                "continue_request",
-                None,
+            print(
+                "CONTINUE REQUEST DEBUG =",
+                execution_state.get("continue_request"),
+                execution_state.get("command"),
+                execution_state.get("current_index"),
             )
 
-            execution_state["status"] = "waiting"
-            execution_state["waiting"] = True
-            execution_state["current_step"] = (
-                step.get("title") or ""
-            )
-            if step:
-                step["status"] = "waiting"
-
-            execution_state["steps"][current_index] = dict(step)
-
-            execution_state = (
-                self.execution_mutation_service.mark_waiting(
-                    execution_state,
-                    step_index=current_index,
-                    current_step=step.get("title") or "",
+            if (
+                execution_state.get("continue_request")
+                or command == "continue"
+            ):
+                execution_state.pop(
+                    "continue_request",
+                    None,
                 )
-                if self.execution_mutation_service
-                and hasattr(
-                    self.execution_mutation_service,
-                    "mark_waiting",
+
+                execution_state["status"] = "running"
+                execution_state["waiting"] = False
+
+                if step:
+                    step["status"] = "running"
+
+                execution_state["steps"][current_index] = dict(step)
+
+                execution_state = (
+                    self.execution_mutation_service.mark_running(
+                        execution_state,
+                        step_index=current_index,
+                        current_step=step.get("title") or "",
+                        waiting=False,
+                    )
+                    if self.execution_mutation_service
+                    and hasattr(
+                        self.execution_mutation_service,
+                        "mark_running",
+                    )
+                    else execution_state
                 )
-                else execution_state
-            )
 
             self._save_execution_state(
                 session_id,
                 execution_state,
             )
 
-            return {
-                "ok": True,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": (
-                        "Continuing mission:\n\n"
-                        f"Goal: {execution_state.get('goal', '')}\n\n"
-                        f"Step {current_index + 1}/{len(steps)}:\n"
-                        f"{step.get('title') or ''}\n\n"
-                        "Status: waiting"
-                    ),
-                },
-                "execution": execution_state,
-            }
+
 
             step["status"] = "running"
 
@@ -629,9 +646,36 @@ class ExecutionOrchestratorService:
                 )
             )
 
+            print(
+                "DEBUG BEFORE EXECUTE_STEP_LOGIC",
+                {
+                    "has_execution_step_service": self.execution_step_service is not None,
+                    "step": step,
+                },
+                flush=True,
+            )
+
+            print(
+                "DEBUG STEP BEFORE EXECUTE_STEP_LOGIC =",
+                {
+                    "title": step.get("title"),
+                    "action": step.get("action"),
+                    "target_file": step.get("target_file"),
+                    "keys": list(step.keys()),
+                    "full": step,
+                },
+                flush=True,
+            )
+
             result = self.execution_step_service.execute_step_logic(
                 session_id=session_id,
                 step=step,
+            )
+
+            print(
+                "DEBUG AFTER EXECUTE_STEP_LOGIC",
+                result,
+                flush=True,
             )
 
             step_status = self._safe_str(
@@ -749,7 +793,11 @@ class ExecutionOrchestratorService:
             step["status"] = "completed"
 
             if result:
-                step["result"] = result
+                step["result"] = (
+                    result.get("result")
+                    if isinstance(result, dict)
+                    else result
+                )
 
             execution_state["steps"][current_index] = dict(step)
 
@@ -790,13 +838,13 @@ class ExecutionOrchestratorService:
             else:
                 next_step = steps[next_index]
 
-                next_step["status"] = "active"
+                next_step["status"] = "pending"
 
                 execution_state["steps"][next_index] = dict(
                     next_step
                 )
 
-                execution_state["waiting"] = True
+                execution_state["waiting"] = False
                 execution_state[
                     "_execution_processing"
                 ] = False
@@ -887,6 +935,20 @@ class ExecutionOrchestratorService:
                 self._save_active_execution(
                     session_id,
                     execution_state,
+                )
+
+                print(
+                    "DEBUG RUN_ALL STEP SENT TO EXECUTOR =",
+                    {
+                        "title": step.get("title"),
+                        "action": step.get("action"),
+                        "target_file": step.get("target_file"),
+                        "content_length": len(
+                            step.get("content") or ""
+                        ),
+                        "full_step": step,
+                    },
+                    flush=True,
                 )
 
                 result = self.execution_step_service.execute_step_logic(

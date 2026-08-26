@@ -401,6 +401,12 @@ execution_state_service = ExecutionStateService(
     session_service=session_service
 )
 
+chat_execution_service.execution_state_service = execution_state_service
+
+chat_execution_service.set_session_service(
+    session_service
+)
+
 memory_command_service = MemoryCommandService(
     session_service=session_service,
 )
@@ -773,7 +779,6 @@ asgi_app = WsgiToAsgi(app)
 memory_guard_route_service.install_routes(app)
 session_auth_scope_service.install(app)
 empty_session_pruner_service.install(app)
-memory_guard_route_service.install_routes(app)
 local_auth_route_service = None
 login_page_route_service.install_routes(app)
 auth_compat_route_service.install_routes(app)
@@ -1640,21 +1645,28 @@ def api_chat():
         import mimetypes as _nova_mimetypes
         import os as _nova_os
 
-        _nova_payload = request.get_json(silent=True) or {}
+        _nova_payload = data
 
-        print(
-            "[BEFORE EXECUTION GUARD]",
-            _nova_payload,
-        )
 
         execution_guard_result = execution_guard_service.handle(
             _nova_payload
         )
+
         if execution_guard_result:
             return jsonify(execution_guard_result)
 
         _nova_chat_context = chat_request_context_service.build_context(
             _nova_payload
+        )
+
+        print(
+            "[CHAT CONTEXT DEBUG]",
+            {
+                "payload": _nova_payload,
+                "context": _nova_chat_context,
+                "before_override_user_text": repr(user_text),
+            },
+            flush=True,
         )
 
         _nova_user_text = _nova_chat_context["user_text"]
@@ -1883,7 +1895,7 @@ def api_chat():
         "[CHAT BEFORE EMPTY GUARD]",
         {
             "user_text": repr(user_text),
-            "_nova_user_text": repr(_nova_user_text),
+            "_nova_user_text": repr(user_text),
             "data": data,
         }
     )
@@ -2239,6 +2251,7 @@ def api_chat():
         )
 
 
+
         # NOVA_API_CHAT_EARLY_EXPLICIT_MEMORY_GUARD_LIVE_ANCHOR_20260611_CALL
         try:
             _nova_raw_user_text = str(
@@ -2248,15 +2261,65 @@ def api_chat():
                 or user_text
                 or ""
             ).strip()
-            _nova_explicit_memory_text = memory_command_service.extract_explicit_memory_live(_nova_raw_user_text)
+
+            raw_user_text = str(
+                payload.get("user_text")
+                or payload.get("text")
+                or payload.get("message")
+                or ""
+            ).strip()
+
+            print(
+                "MEMORY GUARD RAW PAYLOAD =",
+                payload,
+                flush=True,
+            )
+
+            print(
+                "MEMORY GUARD RAW TEXT =",
+                repr(raw_user_text),
+                flush=True,
+            )
+
+            lowered = raw_user_text.lower().strip()
+
+            _nova_explicit_memory_text = memory_command_service.extract_explicit_memory_live(
+                _nova_raw_user_text
+            )
+
+            print(
+                "EARLY MEMORY EXTRACTED =",
+                repr(_nova_explicit_memory_text),
+                flush=True,
+            )
 
             if _nova_explicit_memory_text:
-                memory_service.add_memory({
-                    "text": _nova_explicit_memory_text,
-                    "kind": memory_command_service.memory_kind_live(_nova_explicit_memory_text),
-                    "source": "app_explicit_memory_command",
-                    "session_id": session_id or "",
-                })
+                print(
+                    "EARLY MEMORY ABOUT TO SAVE =",
+                    repr(_nova_explicit_memory_text),
+                    flush=True,
+                )
+
+                _nova_memory_result = memory_service.add_memory(
+                    {
+                        "text": _nova_explicit_memory_text,
+                        "kind": memory_command_service.memory_kind_live(
+                            _nova_explicit_memory_text
+                        ),
+                        "source": "app_explicit_memory_command",
+                        "confidence": 0.95,
+                        "session_id": session_id or "",
+                    }
+                )
+
+                return jsonify(
+                    memory_command_service.memory_response_live(
+                        raw_user_text=_nova_raw_user_text,
+                        session_id=session_id,
+                        clean=_nova_explicit_memory_text,
+                    )
+                )
+
 
                 return jsonify(
                     memory_command_service.memory_response_live(

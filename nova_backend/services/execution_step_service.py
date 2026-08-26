@@ -50,6 +50,19 @@ class ExecutionStepService:
         session_id,
         step,
     ):
+
+        print(
+            "DEBUG EXECUTOR RECEIVED STEP =",
+            step,
+            flush=True,
+        )
+
+        print(
+            "DEBUG EXECUTOR ACTION =",
+            step.get("action"),
+            flush=True,
+        )
+
         try:
             approval = (
                 self.approval_service.evaluate(
@@ -71,6 +84,18 @@ class ExecutionStepService:
             step_action = self._safe_str(
                 step.get("action")
             ).strip().lower()
+
+            print(
+                "DEBUG EXECUTOR RECEIVED STEP =",
+                step,
+                flush=True,
+            )
+
+            print(
+                "DEBUG EXECUTOR ACTION =",
+                step_action,
+                flush=True,
+            )
 
             ACTION_ALIASES = {
                 "analysis": "design",

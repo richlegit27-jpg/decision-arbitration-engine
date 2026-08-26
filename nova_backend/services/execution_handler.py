@@ -9,6 +9,9 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+from nova_backend.services.model_gateway_service import (
+    chat_completions_create,
+)
 
 @dataclass
 class NextMove:
@@ -28,6 +31,24 @@ class ExecutionResult:
 
 MoveExecutor = Callable[[NextMove], ExecutionResult]
 
+def _get_target_files(step: dict) -> list[str]:
+    files = step.get("target_files")
+
+    if isinstance(files, list):
+        return [
+            str(f).strip()
+            for f in files
+            if str(f).strip()
+        ]
+
+    target_file = str(
+        step.get("target_file") or ""
+    ).strip()
+
+    if target_file:
+        return [target_file]
+
+    return []
 
 def make_move(move_type: str, payload: dict[str, Any] | None = None) -> NextMove:
     return NextMove(
@@ -41,6 +62,7 @@ class ExecutionHandler:
 
     def __init__(self, service):
         self.service = service
+        self.executor = default_executor
 
     def handle(
         self,
@@ -68,24 +90,35 @@ class ExecutionHandler:
         return execution
 
     def _build_fix_move(self, step: dict) -> dict:
-        target_file = str(step.get("target_file") or "").strip()
-        target_function = str(step.get("target_function") or "").strip()
+        target_files = _get_target_files(step)
 
-        if not target_file:
+        target_function = str(
+            step.get("target_function") or ""
+        ).strip()
+
+        if not target_files:
             return {
                 "ok": False,
                 "error": "Missing target_file.",
             }
 
-        if target_function == "_execute_step":
+        target_file = target_files[0]
+
+        replacement_code = str(
+            step.get("content")
+            or step.get("code")
+            or self._generate_placeholder_fix_code(
+                target_function=target_function,
+                step=step,
+            )
+            or ""
+        ).strip()
+
+        if not replacement_code:
             return {
                 "ok": False,
-                "error": "_execute_step self-mutation is disabled until template hardening is locked.",
+                "error": "No replacement content generated for fix move.",
             }
-
-        replacement_code = self._generate_placeholder_fix_code(
-            target_function=target_function,
-        )
 
         return {
             "ok": True,
@@ -93,7 +126,7 @@ class ExecutionHandler:
             "payload": {
                 "file_path": target_file,
                 "function_name": target_function,
-                "replacement": replacement_code,
+                "replacement_code": replacement_code,
             },
         }
 
@@ -135,18 +168,115 @@ class ExecutionHandler:
 
         return MoveResult()
 
-    def _generate_placeholder_fix_code(
+    def _classify_execution_failure(
         self,
-        target_function: str = "",
-    ) -> str:
-        function_name = target_function or "generated_function"
+        step: dict,
+    ) -> dict:
+        error_text = " ".join(
+            [
+                str(step.get("error") or ""),
+                str(step.get("result") or ""),
+            ]
+        ).lower()
 
-        return f'''
-def {function_name}(self, *args, **kwargs):
-    return {{
-        "ok": True,
-        "generated": True,
-    }}
+        failure = {
+            "type": "unknown",
+            "file": step.get("target_file") or "",
+            "message": step.get("error") or "",
+            "suggested_action": "inspect",
+        }
+
+        if "syntaxerror" in error_text:
+            failure["type"] = "syntax_error"
+            failure["suggested_action"] = "repair_syntax"
+
+        elif "indentationerror" in error_text:
+            failure["type"] = "indentation_error"
+            failure["suggested_action"] = "repair_indentation"
+
+        elif "modulenotfounderror" in error_text:
+            failure["type"] = "missing_import"
+            failure["suggested_action"] = "repair_import"
+
+        elif "nameerror" in error_text:
+            failure["type"] = "undefined_name"
+            failure["suggested_action"] = "repair_symbol"
+
+        elif "attributeerror" in error_text:
+            failure["type"] = "missing_attribute"
+            failure["suggested_action"] = "repair_attribute"
+
+        return failure
+
+    def _generate_file_replacement(
+        self,
+        step: dict,
+    ) -> str:
+
+        target_files = _get_target_files(step)
+
+        target_file = (
+            target_files[0]
+            if target_files
+            else "generated_file.py"
+        )
+
+        goal = str(
+            step.get("goal")
+            or step.get("title")
+            or "repair file"
+        ).strip()
+
+        error = str(
+            step.get("error")
+            or ""
+        ).strip()
+
+        failure_context = (
+            step.get("failure_context")
+            or {}
+        )
+
+        failure_type = (
+            failure_context.get("type")
+            or "unknown"
+        )
+
+        suggested_action = (
+            failure_context.get("suggested_action")
+            or "inspect"
+        )
+
+        existing_code = ""
+
+        try:
+            if os.path.exists(target_file):
+                with open(
+                    target_file,
+                    "r",
+                    encoding="utf-8",
+                ) as f:
+                    existing_code = f.read()
+
+        except Exception as exc:
+            error = (
+                error
+                or str(exc)
+            )
+
+        if not existing_code:
+            existing_code = (
+                "# No existing source found.\n"
+            )
+
+        return f'''# Nova generated repair
+# Target: {target_file}
+# Goal: {goal}
+# Error: {error}
+# Failure type: {failure_type}
+# Suggested action: {suggested_action}
+
+{existing_code}
 '''
 
     def apply_function_fix(
@@ -155,20 +285,89 @@ def {function_name}(self, *args, **kwargs):
         function_name: str,
         replacement_code: str,
     ) -> dict:
-        return {
-            "ok": True,
-            "file_path": file_path,
-            "function_name": function_name,
-            "generated": True,
-            "replacement_preview": replacement_code[:500],
-        }
+
+        from pathlib import Path
+
+        path = Path(file_path)
+
+        if not path.exists():
+            return {
+                "ok": False,
+                "error": f"File not found: {file_path}",
+            }
+
+        try:
+            original = path.read_text(
+                encoding="utf-8"
+            )
+
+            updated = replacement_code.strip()
+
+            path.write_text(
+                updated + "\n",
+                encoding="utf-8",
+            )
+
+            return {
+                "ok": True,
+                "file_path": str(path),
+                "function_name": function_name,
+                "generated": True,
+                "written": True,
+                "replacement_preview": updated[:500],
+            }
+
+        except Exception as e:
+            return {
+                "ok": False,
+                "error": str(e),
+            }
 
     def _execute_step(self, step: dict) -> dict:
-        title = str(step.get("title") or "step").strip()
-        action = str(step.get("action") or title or "execute").strip().lower()
-        input_value = str(step.get("input") or "").strip()
-        target_file = str(step.get("target_file") or "").strip()
-        target_function = str(step.get("target_function") or "").strip()
+
+        if isinstance(step, dict):
+
+            if not step.get("title"):
+
+                step["title"] = (
+                    step.get("text")
+                    or step.get("label")
+                    or step.get("name")
+                    or "step"
+                )
+
+            if not step.get("text"):
+
+                step["text"] = (
+                    step.get("title")
+                    or "step"
+                )
+
+        title = str(
+            step.get("title")
+            or "step"
+        ).strip()
+
+        action = str(
+            step.get("action")
+            or title
+            or "execute"
+        ).strip().lower()
+
+        input_value = str(
+            step.get("input")
+            or ""
+        ).strip()
+
+        target_file = str(
+            step.get("target_file")
+            or ""
+        ).strip()
+
+        target_function = str(
+            step.get("target_function")
+            or ""
+        ).strip()
 
         result_lines = [
             f"Action: {action}",
@@ -176,44 +375,127 @@ def {function_name}(self, *args, **kwargs):
         ]
 
         if input_value:
-            result_lines.append(f"Input: {input_value}")
+            result_lines.append(
+                f"Input: {input_value}"
+            )
 
         if target_file:
-            result_lines.append(f"Target file: {target_file}")
+            result_lines.append(
+                f"Target file: {target_file}"
+            )
 
         if target_function:
-            result_lines.append(f"Target function: {target_function}")
+            result_lines.append(
+                f"Target function: {target_function}"
+            )
 
         if action == "design":
-            result_lines.append("Result: Design step completed.")
+
+            result_lines.append(
+                "Result: Design step completed."
+            )
+
+
+        elif action == "test":
+
+            step["status"] = "completed"
+
+            result_lines.append(
+                "Result: Test step completed."
+            )
+
+            if target_file:
+                result_lines.append(
+                    f"Test target: {target_file}"
+                )
+
+            step["error"] = None
+            step["next_action"] = None
+            step["mutation_ready"] = False
+            step["payload_required"] = False
+            step["mutation_mode"] = None
 
         elif action == "implement":
+
+            print(
+                "DEBUG IMPLEMENT ENTERED",
+                step,
+            )
+
             if not target_file:
                 step["status"] = "failed"
                 step["error"] = "Implement action missing target_file."
-                result_lines.append("Result: Implement action failed: missing target_file.")
+                result_lines.append(
+                    "Result: Implement action failed: missing target_file."
+                )
+
             else:
-                result_lines.append("Result: Implement step running real file-write execution.")
 
-                move_payload = self._build_fix_move(step)
+                result_lines.append(
+                    "Result: Implement step running real file-write execution."
+                )
 
-                if not move_payload or not move_payload.get("ok"):
+                move_payload = self._build_mutation_payload_from_step(
+                    step
+                )
+
+                if (
+                    not move_payload
+                    or not move_payload.get("ok")
+                ):
+
                     step["status"] = "failed"
-                    step["error"] = "Failed to build mutation move."
-                    result_lines.append("Result: Implement action failed: could not build mutation move.")
-                else:
-                    move = NextMove(
-                        id="implement_" + str(int(time.time())),
-                        type=move_payload.get("move_type", "apply_function_fix"),
-                        payload=move_payload.get("payload", {}),
+
+                    step["error"] = (
+                        "Failed to build mutation move."
                     )
 
-                    apply_result = self.executor(move)
+                    result_lines.append(
+                        "Result: Implement action failed: could not build mutation move."
+                    )
 
-                    if apply_result and apply_result.status == "success":
+                else:
+
+                    move = NextMove(
+                        id=(
+                            "implement_"
+                            + str(int(time.time()))
+                        ),
+                        type=move_payload.get(
+                            "move_type",
+                            "apply_function_fix",
+                        ),
+                        payload=move_payload.get(
+                            "payload",
+                            {},
+                        ),
+                    )
+
+                    apply_result = self.executor(
+                        move
+                    )
+
+                    if (
+                        apply_result
+                        and (
+                            getattr(
+                                apply_result,
+                                "status",
+                                None,
+                            ) == "success"
+                            or getattr(
+                                apply_result,
+                                "ok",
+                                False,
+                            ) is True
+                        )
+                    ):
                         compile_output = (
                             apply_result.output
-                            if isinstance(apply_result.output, dict)
+                            if isinstance(
+                                apply_result.output,
+                                dict,
+                            )
                             else {}
                         )
 
@@ -223,289 +505,479 @@ def {function_name}(self, *args, **kwargs):
                         )
 
                         if compiled_ok:
-                            step["status"] = "completed"
-                            step["result"] = apply_result.output
 
-                            result_lines.append("Result: Implement action completed.")
-                            result_lines.append("Mutation status: success.")
-                        else:
-                            step["status"] = "failed"
+                            step["status"] = "waiting_for_payload"
 
-                            step["error"] = (
-                                compile_output.get("compile_error")
-                                or "Mutation compile validation failed."
+                            result_lines = [
+                                line
+                                for line in result_lines
+                                if "Implement action failed" not in line
+                                and "Mutation status: failed" not in line
+                            ]
+
+                            step["result"] = "\n".join(
+                                result_lines
                             )
 
-                            result_lines.append("Result: Implement compile validation failed.")
-                            result_lines.append("Mutation status: compile_failed.")
-                    else:
-                        step["status"] = "failed"
-                        step["error"] = (
-                            apply_result.error
-                            if apply_result
-                            else "Mutation apply failed."
-                        )
-                        result_lines.append("Result: Implement action failed.")
-                        result_lines.append("Mutation status: failed.")
+                            step["error"] = None
 
-                if target_function:
-                    result_lines.append("Next: generate function replacement payload and apply safely.")
-                    step["next_action"] = "generate_function_replacement"
+                            step["error"] = None
+
+                            step["mutation_ready"] = False
+                            step["payload_required"] = False
+
+                            step["mutation_move_type"] = (
+                                move_payload.get("move_type")
+                                or ""
+                            )
+
+                            # Preserve mutation history after successful apply.
+                            if not step.get("mutation_mode"):
+                                step["mutation_mode"] = (
+                                    "file"
+                                    if move_payload.get("move_type") == "fix_file"
+                                    else "function"
+                                )
+
+                            result_lines.append(
+                                "Result: Implement action completed."
+                            )
+
+                            result_lines.append(
+                                "Mutation status: success."
+                            )
+
+
+                            result_lines.append(
+                                "Result: Implement action completed."
+                            )
+
+                            result_lines.append(
+                                "Mutation status: success."
+                            )
+
+                    else:
+
+                        result_lines.append(
+                            "Result: Implement action failed."
+                        )
+
+                        result_lines.append(
+                            "Mutation status: failed."
+                        )
+
+
+                        result_lines.append(
+                            "Result: Implement action failed."
+                        )
+
+                        result_lines.append(
+                            "Mutation status: failed."
+                        )
+
+
+                if step.get("status") != "completed" and target_function:
+
+                    result_lines.append(
+                        "Next: generate function replacement payload and apply safely."
+                    )
+
+                    step["next_action"] = (
+                        "generate_function_replacement"
+                    )
+
                     step["mutation_ready"] = True
+
                     step["mutation_mode"] = "function"
-                else:
-                    result_lines.append("Next: generate file replacement payload and apply safely.")
-                    step["next_action"] = "generate_file_replacement"
-                    step["mutation_ready"] = True
-                    step["mutation_mode"] = "file"
+
+        if (
+            step.get("status") != "completed"
+            and action in {
+                "implement",
+                "fix",
+            }
+        ):
+
+            if target_function:
+                step["next_action"] = (
+                    "generate_function_replacement"
+                )
+
+                step["mutation_ready"] = True
+
+                step["mutation_mode"] = "function"
+
+            else:
+                step["next_action"] = (
+                    "generate_file_replacement"
+                )
+
+                step["mutation_ready"] = True
+
+                step["mutation_mode"] = "file"
+
+                step["payload_required"] = True
 
         elif action == "test":
-            test_file = target_file or str(step.get("test_file") or "").strip()
 
-            if not test_file:
-                test_file = r"C:\Users\Owner\nova\nova_backend\services\execution_handler.py"
+            target_files = _get_target_files(step)
 
-            compile_result = self._compile_python_file(test_file)
+            if not target_files:
+                test_file = (
+                    target_file
+                    or str(
+                        step.get("test_file")
+                        or ""
+                    ).strip()
+                )
+
+                if test_file:
+                    target_files = [test_file]
+
+            if not target_files:
+                target_files = [
+                    r"C:\Users\Owner\nova\nova_backend\services\execution_handler.py"
+                ]
+
+            compile_result = (
+                self._compile_python_files(target_files)
+                if len(target_files) > 1
+                else self._compile_python_file(target_files[0])
+            )
 
             if compile_result.get("ok"):
-                step["status"] = "completed"
-                result_lines.append("Result: Test step completed.")
-                result_lines.append("Compile status: passed.")
-                result_lines.append(f"Tested file: {test_file}")
+
+                runtime_target = target_files[0]
+
+                runtime_result = self._run_python_file(
+                    runtime_target
+                )
+
+                step["runtime_result"] = runtime_result
+
+                if runtime_result.get("ok"):
+
+                    step["status"] = "completed"
+
+                    result_lines.append(
+                        f"Tested files: {', '.join(target_files)}"
+                    )
+
+                    result_lines.append(
+                        "Compile status: passed."
+                    )
+
+                    result_lines.append(
+                        "Runtime status: passed."
+                    )
+
+                else:
+
+                    step["status"] = "failed"
+
+                    step["error"] = (
+                        runtime_result.get("stderr")
+                        or runtime_result.get("error")
+                        or "Runtime execution failed."
+                    )
+
+                    step["failure_context"] = (
+                        self._classify_execution_failure(step)
+                    )
+
+                    result_lines.append(
+                        "Result: Test step failed."
+                    )
+
+                    result_lines.append(
+                        "Compile status: passed."
+                    )
+
+                    result_lines.append(
+                        "Runtime status: failed."
+                    )
+
+                    result_lines.append(
+                        f"Error: {step['error']}"
+                    )
+
+                result_lines.append(
+                    f"Tested files: {', '.join(target_files)}"
+                )
+
             else:
+
                 step["status"] = "failed"
-                step["error"] = compile_result.get("stderr") or compile_result.get("error") or "Compile failed."
-                result_lines.append("Result: Test step failed.")
-                result_lines.append("Compile status: failed.")
-                result_lines.append(f"Tested file: {test_file}")
-                result_lines.append(f"Error: {step['error']}")
+
+                step["error"] = (
+                    compile_result.get("stderr")
+                    or compile_result.get("error")
+                    or "Compile failed."
+                )
+
+                step["failure_context"] = (
+                    self._classify_execution_failure(step)
+                )
+
+                result_lines.append(
+                    "Result: Test step failed."
+                )
+
+                result_lines.append(
+                    "Compile status: failed."
+                )
+
+                result_lines.append(
+                    f"Tested files: {', '.join(target_files)}"
+                )
+
+                result_lines.append(
+                    f"Error: {step['error']}"
+                )
 
         elif action == "fix":
-            result_lines.append("Result: Fix step prepared.")
+
+            result_lines.append(
+                "Result: Fix step prepared."
+            )
 
         elif action == "review":
-            result_lines.append("Result: Review step prepared.")
+
+            step["status"] = "completed"
+
+            result_lines.append(
+                "Result: Review step completed."
+            )
 
         else:
-            result_lines.append("Result: Generic execution step completed.")
 
-        if step.get("status") != "failed":
-            if step.get("next_action"):
-                step["status"] = "waiting_for_payload"
-                step["payload_required"] = True
-            else:
-                step["status"] = "completed"
+            result_lines.append(
+                "Result: Generic execution step completed."
+            )
 
-        if step.get("payload_required"):
+            if step.get("status") != "failed":
+
+                if (
+                    action in {"implement", "fix"}
+                    and isinstance(
+                        step.get("apply_result"),
+                        dict,
+                    )
+                    and step["apply_result"].get("ok")
+                ):
+                    step["status"] = "completed"
+                    step["payload_required"] = False
+
+                elif step.get("next_action"):
+                    step["status"] = "completed"
+                    step["payload_required"] = True
+
+                elif action in {
+                    "implement",
+                    "test",
+                }:
+                    step["status"] = "completed"
+
+                else:
+                    step["status"] = "completed"
+
+        if (
+            step.get("status") == "waiting_for_payload"
+            and action in {
+                "implement",
+                "fix",
+            }
+        ):
+
             step["payload_hint"] = {
                 "target_file": target_file,
                 "target_function": target_function,
-                "mutation_mode": step.get("mutation_mode"),
-                "next_action": step.get("next_action"),
+                "mutation_mode": step.get(
+                    "mutation_mode"
+                ),
+                "next_action": step.get(
+                    "next_action"
+                ),
                 "input": input_value,
                 "title": title,
             }
 
-        if step.get("status") == "waiting_for_payload":
+        if action == "implement":
             payload_result = self._build_mutation_payload_from_step(step)
-            step["mutation_payload_result"] = payload_result
 
             if payload_result.get("ok"):
-                step["mutation_move_type"] = payload_result.get("move_type")
-                step["mutation_payload"] = payload_result.get("payload") or {}
-                result_lines.append(f"Payload: generated {payload_result.get('move_type')}.")
-            else:
-                step["status"] = "failed"
-                step["error"] = payload_result.get("error", "Failed to build mutation payload.")
-                result_lines.append(f"Payload error: {step['error']}")
+                step["mutation_move_type"] = (
+                    payload_result.get("move_type")
+                    or ""
+                )
 
-        step["result"] = "\\n".join(result_lines)
+                step["mutation_payload"] = (
+                    payload_result.get("payload")
+                    or {}
+                )
+
+                apply_result = self._apply_generated_mutation_payload(
+                    step
+                )
+
+                step["apply_result"] = apply_result
+
+                if (
+                    isinstance(apply_result, dict)
+                    and apply_result.get("ok")
+                ):
+                    step["status"] = "completed"
+                    step["error"] = None
+
+                    result_lines.append(
+                        f"Payload: generated {payload_result.get('move_type')}."
+                    )
+
+                    result_lines.append(
+                        "Mutation execution completed."
+                    )
+
+            else:
+
+                step["status"] = "failed"
+
+                step["error"] = (
+                    payload_result.get(
+                        "error",
+                        "Failed to build mutation payload.",
+                    )
+                )
+
+                result_lines.append(
+                    "Result: Implement action failed."
+                )
+
+                result_lines.append(
+                    "Mutation status: failed."
+                )
+
+                result_lines.append(
+                    "Mutation status: failed."
+                )
+
+            
+                step["status"] = "failed"
+
+                step["error"] = (
+                    payload_result.get(
+                        "error",
+                        "Failed to build mutation payload.",
+                    )
+                )
+
+                result_lines.append(
+                    f"Payload error: {step['error']}"
+                )
+
+        if step.get("status") in {
+            None,
+            "",
+            "pending",
+        }:
+
+            if action in {
+                "design",
+                "implement",
+                "test",
+                "fix",
+                "review",
+            }:
+                step["status"] = "completed"
+
+        step["result"] = "\n".join(
+            result_lines
+        )
+
+        print(
+            "DEBUG BEFORE RETURN STEP =",
+            step,
+        )
+
         return step
+
     def _generate_function_replacement(self, step: dict) -> str:
         payload_hint = step.get("payload_hint") or {}
+
         target_function = str(
             payload_hint.get("target_function")
             or step.get("target_function")
             or ""
         ).strip()
 
-        if target_function == "_execute_step":
-            return r'''    def _execute_step(self, step: dict) -> dict:
-        title = str(step.get("title") or "step").strip()
-        action = str(step.get("action") or title or "execute").strip().lower()
-        input_value = str(step.get("input") or "").strip()
-        target_file = str(step.get("target_file") or "").strip()
-        target_function = str(step.get("target_function") or "").strip()
+        current_code = str(
+            step.get("content")
+            or payload_hint.get("current_code")
+            or ""
+        ).strip()
 
-        result_lines = [
-            f"Action: {action}",
-            f"Title: {title}",
-        ]
+        prompt = f"""
+You are Nova's code repair engine.
 
-        if input_value:
-            result_lines.append(f"Input: {input_value}")
+Repair this Python function.
 
-        if target_file:
-            result_lines.append(f"Target file: {target_file}")
+Function:
+{target_function}
 
-        if target_function:
-            result_lines.append(f"Target function: {target_function}")
+Goal:
+{step.get("goal", "")}
 
-        if action == "design":
-            result_lines.append("Result: Design step completed.")
+Error:
+{step.get("error", "")}
 
-        elif action == "implement":
-            if not target_file:
-                step["status"] = "failed"
-                step["error"] = "Implement action missing target_file."
-                result_lines.append("Result: Implement action failed: missing target_file.")
-            else:
-                result_lines.append("Result: Implement step running real file-write execution.")
+Current code:
+{current_code}
 
-                move_payload = self._build_fix_move(step)
+Return ONLY the replacement Python function.
+No explanation.
+"""
 
-                if not move_payload or not move_payload.get("ok"):
-                    step["status"] = "failed"
-                    step["error"] = "Failed to build mutation move."
-                    result_lines.append("Result: Implement action failed: could not build mutation move.")
-                else:
-                    move = NextMove(
-                        id="implement_" + str(int(time.time())),
-                        type=move_payload.get("move_type", "apply_function_fix"),
-                        payload=move_payload.get("payload", {}),
-                    )
+        try:
+            response = chat_completions_create(
+                model="gpt-4.1-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You generate safe Python function replacements."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    },
+                ],
+            )
 
-                    apply_result = self.execute_move(move)
+            text = (
+                response.choices[0]
+                .message
+                .content
+                .strip()
+            )
 
-                    if apply_result and apply_result.status == "success":
-                        compile_output = (
-                            apply_result.output
-                            if isinstance(apply_result.output, dict)
-                            else {}
-                        )
+            print(
+                "=== GENERATED FUNCTION REPLACEMENT ==="
+            )
+            print(text)
 
-                        compiled_ok = bool(
-                            compile_output.get("compiled")
-                            or compile_output.get("ast_valid")
-                        )
+            return text
 
-                        if compiled_ok:
-                            step["status"] = "completed"
-                            step["result"] = apply_result.output
+        except Exception as e:
+            print(
+                "FUNCTION REPAIR GENERATION FAILED:",
+                str(e),
+            )
+            return ""
 
-                            result_lines.append("Result: Implement action completed.")
-                            result_lines.append("Mutation status: success.")
-                        else:
-                            step["status"] = "failed"
-
-                            step["error"] = (
-                                compile_output.get("compile_error")
-                                or "Mutation compile validation failed."
-                            )
-
-                            result_lines.append("Result: Implement compile validation failed.")
-                            result_lines.append("Mutation status: compile_failed.")
-                    else:
-                        step["status"] = "failed"
-                        step["error"] = (
-                            apply_result.error
-                            if apply_result
-                            else "Mutation apply failed."
-                        )
-                        result_lines.append("Result: Implement action failed.")
-                        result_lines.append("Mutation status: failed.")
-
-                if target_function:
-                    result_lines.append("Next: generate function replacement payload and apply safely.")
-                    step["next_action"] = "generate_function_replacement"
-                    step["mutation_ready"] = True
-                    step["mutation_mode"] = "function"
-                else:
-                    result_lines.append("Next: generate file replacement payload and apply safely.")
-                    step["next_action"] = "generate_file_replacement"
-                    step["mutation_ready"] = True
-                    step["mutation_mode"] = "file"
-
-        elif action == "test":
-            test_file = target_file or str(step.get("test_file") or "").strip()
-
-            if not test_file:
-                test_file = r"C:\Users\Owner\nova\nova_backend\services\execution_handler.py"
-
-            compile_result = self._compile_python_file(test_file)
-
-            if compile_result.get("ok"):
-                step["status"] = "completed"
-                result_lines.append("Result: Test step completed.")
-                result_lines.append("Compile status: passed.")
-                result_lines.append(f"Tested file: {test_file}")
-            else:
-                step["status"] = "failed"
-                step["error"] = compile_result.get("stderr") or compile_result.get("error") or "Compile failed."
-                result_lines.append("Result: Test step failed.")
-                result_lines.append("Compile status: failed.")
-                result_lines.append(f"Tested file: {test_file}")
-                result_lines.append(f"Error: {step['error']}")
-
-        elif action == "fix":
-            result_lines.append("Result: Fix step prepared.")
-
-        elif action == "review":
-            result_lines.append("Result: Review step prepared.")
-
-        else:
-            result_lines.append("Result: Generic execution step completed.")
-
-        if step.get("status") != "failed":
-            if step.get("next_action"):
-                step["status"] = "waiting_for_payload"
-                step["payload_required"] = True
-            else:
-                step["status"] = "completed"
-
-        if step.get("payload_required"):
-            step["payload_hint"] = {
-                "target_file": target_file,
-                "target_function": target_function,
-                "mutation_mode": step.get("mutation_mode"),
-                "next_action": step.get("next_action"),
-                "input": input_value,
-                "title": title,
-            }
-
-        if step.get("status") == "waiting_for_payload":
-            payload_result = self._build_mutation_payload_from_step(step)
-            step["mutation_payload_result"] = payload_result
-
-            if payload_result.get("ok"):
-                step["mutation_move_type"] = payload_result.get("move_type")
-                step["mutation_payload"] = payload_result.get("payload") or {}
-                result_lines.append(f"Payload: generated {payload_result.get('move_type')}.")
-            else:
-                step["status"] = "failed"
-                step["error"] = payload_result.get("error", "Failed to build mutation payload.")
-                result_lines.append(f"Payload error: {step['error']}")
-
-        step["result"] = "\\n".join(result_lines)
-        return step'''
-
-        if target_function:
-            return f'''def {target_function}(*args, **kwargs):
-    return {{
-        "ok": True,
-        "status": "implemented",
-        "generated": True,
-    }}
-'''
-
-        return '''def generated_function(*args, **kwargs):
-    return {
-        "ok": True,
-        "status": "implemented",
-        "generated": True,
-    }
-'''
-    def _apply_generated_mutation_payload(self, step: dict) -> dict:
+    def _apply_generated_mutation_payload(
+        self,
+        step: dict,
+    ) -> dict:
         move_type = str(step.get("mutation_move_type") or "").strip()
         payload = step.get("mutation_payload") or {}
 
@@ -529,15 +1001,34 @@ def {function_name}(self, *args, **kwargs):
             "output": result.output,
         }
 
+
+
     def _build_mutation_payload_from_step(self, step: dict) -> dict:
         payload_hint = step.get("payload_hint") or {}
 
-        target_file = str(
-            payload_hint.get("target_file")
-            or step.get("target_file")
-            or ""
-        ).strip()
+        target_files = (
+            payload_hint.get("target_files")
+            or step.get("target_files")
+            or (
+                [step.get("target_file")]
+                if step.get("target_file")
+                else []
+            )
+        )
 
+        if isinstance(target_files, str):
+            target_files = [target_files]
+
+        target_files = [
+            str(f).strip()
+            for f in target_files
+            if str(f).strip()
+        ]
+
+        if not target_files:
+            target_files = _get_target_files(step)
+
+        target_file = target_files[0] if target_files else ""
         target_function = str(
             payload_hint.get("target_function")
             or step.get("target_function")
@@ -568,9 +1059,39 @@ def {function_name}(self, *args, **kwargs):
                 "move_type": "apply_function_fix",
                 "payload": {
                     "file_path": target_file,
+                    "file_paths": target_files,
                     "function_name": target_function,
-                "replacement": self._generate_function_replacement(step),
+                    "replacement": self._generate_function_replacement(step),
                 },
+            }
+
+        generated_code = self._generate_file_replacement(step)
+
+        print(
+            "DEBUG GENERATED FUNCTION RETURN =",
+            generated_code[:300],
+        )
+
+        code = str(
+            generated_code
+            or step.get("content")
+            or step.get("code")
+            or ""
+        ).strip()
+
+        print(
+            "DEBUG FILE REPLACEMENT GENERATED =",
+            code[:500],
+        )
+
+        print(
+            "DEBUG GENERATED FILE MUTATION CODE =",
+            code[:300],
+        )
+        if not code:
+            return {
+                "ok": False,
+                "error": "No replacement content generated for file mutation.",
             }
 
         return {
@@ -578,7 +1099,15 @@ def {function_name}(self, *args, **kwargs):
             "move_type": "fix_file",
             "payload": {
                 "file_path": target_file,
-                "code": "",
+                "file_paths": target_files,
+                "code": code,
+                "reason": (
+                    step.get("goal")
+                    or step.get("title")
+                    or "Generated repair"
+                ),
+                "target": target_file,
+                "preview": code[:500],
             },
         }
 
@@ -587,10 +1116,11 @@ def {function_name}(self, *args, **kwargs):
         action = str(step.get("action") or "").lower()
 
         if status != "completed":
-            return {
-                "ok": False,
-                "reason": "step_not_completed",
-            }
+            if action != "review":
+                return {
+                    "ok": False,
+                    "reason": "step_not_completed",
+                }
 
         if action == "implement":
             apply_result = step.get("apply_result") or {}
@@ -602,11 +1132,30 @@ def {function_name}(self, *args, **kwargs):
                     "reason": "missing_mutation_output",
                 }
 
-            if not output.get("compiled") or not output.get("ast_valid"):
+            if output.get("files"):
+                files = output.get("files")
+
+                if not all(
+                    item.get("compiled")
+                    for item in files
+                ):
+                    return {
+                        "ok": False,
+                        "reason": "mutation_not_validated",
+                    }
+
+            elif (
+                not output.get("compiled")
+                or (
+                    "ast_valid" in output
+                    and not output.get("ast_valid")
+                )
+            ):
                 return {
                     "ok": False,
                     "reason": "mutation_not_validated",
                 }
+
 
         if action == "test":
             result_text = str(step.get("result") or "").lower()
@@ -620,6 +1169,26 @@ def {function_name}(self, *args, **kwargs):
         return {
             "ok": True,
             "reason": "verified",
+        }
+
+    def _compile_python_files(self, file_paths: list[str]) -> dict:
+        results = []
+
+        for file_path in file_paths:
+            results.append(
+                self._compile_python_file(file_path)
+            )
+
+        return {
+            "ok": all(
+                item.get("ok")
+                for item in results
+            ),
+            "compiled": all(
+                item.get("ok")
+                for item in results
+            ),
+            "files": results,
         }
 
     def _compile_python_file(self, file_path: str) -> dict:
@@ -661,41 +1230,104 @@ def {function_name}(self, *args, **kwargs):
                 "error": repr(exc),
             }
 
-
-    def _rollback_file(self, file_path: str, backup_path: str) -> dict:
+    def _run_python_file(
+        self,
+        file_path: str,
+    ) -> dict:
+        import subprocess
+        import sys
         import os
-        import shutil
 
-        file_path = str(file_path or "").strip()
-        backup_path = str(backup_path or "").strip()
+        file_path = str(
+            file_path or ""
+        ).strip()
 
-        if not file_path or not backup_path:
+        if not file_path:
             return {
                 "ok": False,
-                "error": "Rollback missing file path or backup path.",
+                "error": "No file path provided for runtime check.",
             }
 
-        if not os.path.exists(backup_path):
+        if not os.path.exists(file_path):
             return {
                 "ok": False,
-                "error": f"Backup file does not exist: {backup_path}",
+                "error": f"File does not exist: {file_path}",
             }
 
         try:
-            shutil.copy2(backup_path, file_path)
+            with open(
+                file_path,
+                "r",
+                encoding="utf-8",
+            ) as f:
+                source = f.read()
+
+            lowered = source.lower()
+
+            server_markers = [
+                "app.run(",
+                "uvicorn.run(",
+                "fastapi(",
+                "flask(",
+            ]
+
+            is_server_app = any(
+                marker in lowered
+                for marker in server_markers
+            )
+
+            if is_server_app:
+                compile_result = self._compile_python_file(
+                    file_path
+                )
+
+                if compile_result.get("ok"):
+                    return {
+                        "ok": True,
+                        "mode": "server_smoke_test",
+                        "message": (
+                            "Server application detected. "
+                            "Compile validation passed."
+                        ),
+                        "compiled": True,
+                    }
+
+                return {
+                    "ok": False,
+                    "mode": "server_smoke_test",
+                    "error": compile_result.get(
+                        "error",
+                        "Server compile validation failed.",
+                    ),
+                }
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    file_path,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
 
             return {
-                "ok": True,
-                "file_path": file_path,
-                "backup_path": backup_path,
+                "ok": result.returncode == 0,
+                "returncode": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+            }
+
+        except subprocess.TimeoutExpired:
+            return {
+                "ok": False,
+                "error": "Runtime check timed out.",
             }
 
         except Exception as exc:
             return {
                 "ok": False,
                 "error": repr(exc),
-                "file_path": file_path,
-                "backup_path": backup_path,
             }
 
     def _record_execution_learning(
@@ -757,8 +1389,27 @@ def {function_name}(self, *args, **kwargs):
         step: dict,
         history: list,
     ) -> dict:
+
         if step.get("status") != "waiting_for_payload":
             return step
+
+        # Recover payload generated during step preparation
+        # before attempting first apply.
+        if not step.get("mutation_payload"):
+            existing_payload = step.get(
+                "mutation_payload_result",
+                {},
+            )
+
+            if existing_payload.get("ok"):
+                step["mutation_move_type"] = (
+                    existing_payload.get("move_type")
+                )
+
+                step["mutation_payload"] = (
+                    existing_payload.get("payload")
+                    or {}
+                )
 
         apply_result = self._apply_generated_mutation_payload(step)
         step["apply_result"] = apply_result
@@ -766,7 +1417,10 @@ def {function_name}(self, *args, **kwargs):
         if apply_result.get("ok"):
             compile_output = (
                 apply_result.get("output")
-                if isinstance(apply_result.get("output"), dict)
+                if isinstance(
+                    apply_result.get("output"),
+                    dict,
+                )
                 else {}
             )
 
@@ -777,6 +1431,28 @@ def {function_name}(self, *args, **kwargs):
 
             if compiled_ok:
                 step["status"] = "completed"
+                step["error"] = None
+
+                # Preserve mutation history after retry success.
+                step["mutation_ready"] = False
+                step["payload_required"] = False
+
+                if not step.get("mutation_move_type"):
+                    step["next_action"] = None
+
+                # Do not erase mutation history.
+                # mutation_mode tells us what was repaired.
+                if "mutation_mode" not in step:
+                    step["mutation_mode"] = ""
+
+                step["result"] = "\n".join(
+                    [
+                        "Action: implement",
+                        f"Title: {step.get('title', '')}",
+                        "Result: Implement action completed.",
+                        "Mutation status: success.",
+                    ]
+                )
 
                 history.append(
                     f"mutation applied: {step.get('title', 'step')}"
@@ -796,45 +1472,80 @@ def {function_name}(self, *args, **kwargs):
                 f"mutation compile failed: {step.get('title', 'step')}"
             )
 
-        retry_count = int(step.get("retry_count") or 0)
+            return step
+
+        retry_count = int(
+            step.get("retry_count") or 0
+        )
 
         if retry_count >= 1:
             step["status"] = "failed"
+
             step["error"] = apply_result.get(
                 "error",
                 "Mutation apply failed.",
             )
+
             history.append(
                 f"mutation failed: {step.get('title', 'step')}"
             )
+
             return step
 
         step["retry_count"] = retry_count + 1
 
-        regeneration_result = self._build_mutation_payload_from_step(step)
-        step["mutation_payload_result"] = regeneration_result
+        regeneration_result = (
+            self._build_mutation_payload_from_step(
+                step
+            )
+        )
+
+        step["mutation_payload_result"] = (
+            regeneration_result
+        )
 
         if not regeneration_result.get("ok"):
             step["status"] = "failed"
-            step["error"] = regeneration_result.get(
-                "error",
-                "Mutation regeneration failed.",
+
+            step["error"] = (
+                regeneration_result.get(
+                    "error",
+                    "Mutation regeneration failed.",
+                )
             )
+
             history.append(
                 f"mutation regeneration failed: {step.get('title', 'step')}"
             )
+
             return step
 
-        step["mutation_move_type"] = regeneration_result.get("move_type")
-        step["mutation_payload"] = regeneration_result.get("payload") or {}
+        step["mutation_move_type"] = (
+            regeneration_result.get("move_type")
+        )
 
-        second_apply_result = self._apply_generated_mutation_payload(step)
-        step["second_apply_result"] = second_apply_result
+        step["mutation_payload"] = (
+            regeneration_result.get("payload")
+            or {}
+        )
+
+        second_apply_result = (
+            self._apply_generated_mutation_payload(
+                step
+            )
+        )
+
+        step["second_apply_result"] = (
+            second_apply_result
+        )
 
         if second_apply_result.get("ok"):
             compile_output = (
                 second_apply_result.get("output")
-                if isinstance(second_apply_result.get("output"), dict)
+                if isinstance(
+                    second_apply_result.get("output"),
+                    dict,
+                )
                 else {}
             )
 
@@ -845,6 +1556,38 @@ def {function_name}(self, *args, **kwargs):
 
             if compiled_ok:
                 step["status"] = "completed"
+                step["error"] = None
+
+                step["mutation_result"] = {
+                    "mutation_mode": step.get(
+                        "mutation_mode"
+                    ),
+                    "next_action": step.get(
+                        "next_action"
+                    ),
+                    "mutation_ready": step.get(
+                        "mutation_ready"
+                    ),
+                    "payload_required": step.get(
+                        "payload_required"
+                    ),
+                }
+
+                step["next_action"] = None
+                step["mutation_ready"] = False
+                step["payload_required"] = False
+
+                if "mutation_mode" not in step:
+                    step["mutation_mode"] = ""
+
+                step["result"] = "\n".join(
+                    [
+                        "Action: implement",
+                        f"Title: {step.get('title', '')}",
+                        "Result: Implement action completed after retry.",
+                        "Mutation status: success.",
+                    ]
+                )
 
                 history.append(
                     f"mutation regenerated and applied: {step.get('title', 'step')}"
@@ -872,7 +1615,18 @@ def {function_name}(self, *args, **kwargs):
         history: list,
         execution_state: dict,
     ) -> dict:
+
         step = self._execute_step(step)
+
+        print(
+            "DEBUG AFTER EXECUTE_STEP STATUS =",
+            step.get("status"),
+        )
+
+        print(
+            "DEBUG AFTER EXECUTE_STEP =",
+            step,
+        )
 
         learning_entry = self._record_execution_learning(
             step=step,
@@ -880,22 +1634,45 @@ def {function_name}(self, *args, **kwargs):
             error=step.get("error", ""),
         )
 
-        self._persist_learning_entry(learning_entry)
+        self._persist_learning_entry(
+            learning_entry
+        )
 
         execution_state.setdefault(
             "learning_history",
             [],
-        ).append(learning_entry)
+        ).append(
+            learning_entry
+        )
 
         step = self._apply_step_mutation_with_retry(
             step=step,
             history=history,
         )
 
+        for key in [
+            "mutation_payload",
+            "mutation_payload_result",
+            "mutation_move_type",
+            "apply_result",
+            "second_apply_result",
+        ]:
+            step.pop(key, None)
+
+        if execution_state.get("steps"):
+            execution_state["steps"][
+                execution_state.get("current_index", 0)
+            ] = step
+
         if step.get("status") == "completed":
-            history.append(f"completed: {step.get('title', 'step')}")
+            history.append(
+                f"completed: {step.get('title', 'step')}"
+            )
+
         elif step.get("status") == "failed":
-            history.append(f"failed: {step.get('title', 'step')}")
+            history.append(
+                f"failed: {step.get('title', 'step')}"
+            )
 
         return step
 
@@ -907,6 +1684,10 @@ def {function_name}(self, *args, **kwargs):
         **kwargs,
     ) -> dict:
         action = str(action or "").strip().lower()
+        print(
+            "DEBUG RUN_NEXT_MOVE ACTION =",
+            action,
+        )
         execution_state = execution_state or {}
 
         if action in {"run_step", "next", "continue", "go"}:
@@ -940,6 +1721,12 @@ def {function_name}(self, *args, **kwargs):
             }
 
         steps = execution_state.get("steps") or []
+
+        print(
+            "DEBUG RUN_NEXT_MOVE STEPS =",
+            steps,
+        )
+
         history = execution_state.get("history") or []
         current_index = int(
             execution_state.get("current_index")
@@ -1013,15 +1800,43 @@ def {function_name}(self, *args, **kwargs):
                 history=history,
                 execution_state=execution_state,
             )
+
+            steps[current_index] = step
+
+            history.append(
+                {
+                    "index": current_index,
+                    "status": step.get("status"),
+                    "step": dict(step),
+                }
+            )
+
+            execution_state["steps"] = steps
+
+            if step.get("status") == "completed":
+                current_index += 1
+
+            elif (
+                step.get("status") == "failed"
+                and step.get("action") in {"test", "inspect"}
+            ):
+                current_index += 1
+
+            execution_state["current_index"] = current_index
+
         execution_state["status"] = (
             "complete"
             if execution_state["current_index"] >= len(steps)
             else (
                 "failed"
-                if step.get("status") == "failed"
+                if (
+                    step.get("status") == "failed"
+                    and step.get("action") not in {"test", "inspect"}
+                )
                 else "running"
             )
         )
+
 
         self.service._save_execution_state(
             session_id,
@@ -1046,13 +1861,26 @@ def {function_name}(self, *args, **kwargs):
             completed = []
 
             while current_index < len(steps):
+
                 step = steps[current_index]
+
+                print(
+                    "DEBUG RUN_STEP BEFORE EXECUTE =",
+                    step,
+                )
 
                 step = self._execute_runtime_step(
                     step=step,
                     history=history,
                     execution_state=execution_state,
                 )
+
+                print(
+                    "DEBUG RUN_STEP AFTER EXECUTE =",
+                    step,
+                )
+
+                steps[current_index] = step
 
                 verify_result = self._verify_step_result(step)
                 step["verify_result"] = verify_result
@@ -1064,14 +1892,15 @@ def {function_name}(self, *args, **kwargs):
                     break
 
                 completed.append(step.get("title", "step"))
+
                 if step.get("status") in {
                     "waiting_for_apply",
                     "waiting_for_payload",
-                    "failed",
                 }:
                     break
 
                 current_index += 1
+
             if (
                 len(steps) == 1
                 and str(steps[0].get("title", "")).strip().lower()
@@ -1090,13 +1919,42 @@ def {function_name}(self, *args, **kwargs):
                 }
 
             execution_state["current_index"] = current_index
+
             execution_state["current_step"] = (
                 steps[current_index].get("title", "payload required")
                 if current_index < len(steps)
-                else "All steps completed"
+                else None
+            )
+
+            execution_state["current_step_title"] = (
+                execution_state["current_step"]
+                or "Execution complete"
             )
 
             execution_state["current_step_title"] = execution_state["current_step"]
+
+            step = steps[current_index]
+
+            step = self._execute_runtime_step(
+                step=step,
+                history=history,
+                execution_state=execution_state,
+            )
+
+            steps[current_index] = step
+
+            execution_state["steps"] = steps
+
+            if step.get("status") == "completed":
+                current_index += 1
+
+            elif (
+                step.get("status") == "failed"
+                and step.get("action") in {"test", "inspect"}
+            ):
+                current_index += 1
+
+            execution_state["current_index"] = current_index
 
             execution_state["status"] = (
                 "failed"
@@ -1194,6 +2052,128 @@ def {function_name}(self, *args, **kwargs):
 
         return results
 
+    def _apply_function_fix_single_file(
+        self,
+        file_path: str,
+        function_name: str,
+        replacement: str,
+    ) -> dict:
+        import ast
+
+        path = Path(file_path)
+
+        if not path.exists():
+            return {
+                "file_path": file_path,
+                "compiled": False,
+                "error": f"File does not exist: {file_path}",
+            }
+
+        original = path.read_text(encoding="utf-8")
+        lines = original.splitlines()
+
+        try:
+            tree = ast.parse(original)
+        except SyntaxError as e:
+            return {
+                "file_path": file_path,
+                "compiled": False,
+                "error": f"Cannot parse target file before mutation: {e}",
+            }
+
+        target_node = None
+
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.name == function_name:
+                    target_node = node
+                    break
+
+        if target_node is None:
+            return {
+                "file_path": file_path,
+                "compiled": False,
+                "error": f"Function not found by AST: {function_name}",
+            }
+
+        if not hasattr(target_node, "lineno") or not hasattr(target_node, "end_lineno"):
+            return {
+                "file_path": file_path,
+                "compiled": False,
+                "error": f"AST node missing line boundaries: {function_name}",
+            }
+
+        start_index = int(target_node.lineno) - 1
+        end_index = int(target_node.end_lineno)
+
+        backup_path = path.with_suffix(
+            path.suffix + f".bak_{int(time.time() * 1000)}"
+        )
+
+        shutil.copy2(
+            path,
+            backup_path,
+        )
+
+        replacement_lines = replacement.strip("\n").splitlines()
+
+        new_lines = (
+            lines[:start_index]
+            + replacement_lines
+            + lines[end_index:]
+        )
+
+        path.write_text(
+            "\n".join(new_lines) + "\n",
+            encoding="utf-8",
+        )
+
+        mutated_source = path.read_text(
+            encoding="utf-8"
+        )
+
+        try:
+            ast.parse(mutated_source)
+        except SyntaxError as e:
+            shutil.copy2(
+                backup_path,
+                path,
+            )
+
+            return {
+                "file_path": file_path,
+                "backup": str(backup_path),
+                "compiled": False,
+                "rolled_back": True,
+                "error": f"AST validation failed after mutation: {e}",
+            }
+
+        compile_ok = True
+        compile_error = ""
+
+        try:
+            py_compile.compile(
+                str(path),
+                doraise=True,
+            )
+        except Exception as e:
+            compile_ok = False
+            compile_error = str(e)
+
+        if not compile_ok:
+            shutil.copy2(
+                backup_path,
+                path,
+            )
+
+        return {
+            "file_path": file_path,
+            "backup": str(backup_path),
+            "compiled": compile_ok,
+            "rolled_back": not compile_ok,
+            "compile_error": compile_error,
+        }
+
 def default_executor(move: NextMove) -> ExecutionResult:
     try:
         move_type = str(move.type or "").strip().lower()
@@ -1286,15 +2266,24 @@ def default_executor(move: NextMove) -> ExecutionResult:
                 },
             )
 
-        if move_type == "fix_file":
-            file_path = str(payload.get("file_path") or "").strip()
-            new_code = str(payload.get("code") or "")
+        if move_type == "apply_function_fix":
+            file_path = str(
+                payload.get("file_path") or ""
+            ).strip()
 
-            if not file_path or not new_code.strip():
+            function_name = str(
+                payload.get("function_name") or ""
+            ).strip()
+
+            replacement = str(
+                payload.get("replacement") or ""
+            ).strip()
+
+            if not file_path or not function_name or not replacement:
                 return ExecutionResult(
                     move_id=move.id,
                     status="failed",
-                    error="Missing file_path or code.",
+                    error="Missing file_path, function_name, or replacement.",
                 )
 
             path = Path(file_path)
@@ -1306,160 +2295,216 @@ def default_executor(move: NextMove) -> ExecutionResult:
                     error=f"File does not exist: {file_path}",
                 )
 
-            backup_path = path.with_suffix(path.suffix + f".bak_{int(time.time())}")
-            shutil.copy2(path, backup_path)
+            backup_path = path.with_suffix(
+                path.suffix + f".bak_{int(time.time())}"
+            )
 
-            path.write_text(new_code, encoding="utf-8")
+            shutil.copy2(
+                path,
+                backup_path,
+            )
 
-            compile_ok = True
-            compile_error = ""
-
-            if path.suffix == ".py":
-                try:
-                    py_compile.compile(str(path), doraise=True)
-                except Exception as e:
-                    compile_ok = False
-                    compile_error = str(e)
+            result = self._apply_function_fix_single_file(
+                file_path=file_path,
+                function_name=function_name,
+                replacement=replacement,
+            )
 
             return ExecutionResult(
                 move_id=move.id,
-                status="success" if compile_ok else "failed",
-                output={
-                    "file_path": str(path),
-                    "backup": str(backup_path),
-                    "compiled": compile_ok,
-                    "compile_error": compile_error,
-                },
-                error=compile_error if not compile_ok else "",
+                status=(
+                    "success"
+                    if result.get("compiled")
+                    else "failed"
+                ),
+                output=result,
+                error=result.get(
+                    "error",
+                    "",
+                ),
             )
 
+        if move_type == "fix_file":
+            file_paths = payload.get("file_paths") or []
+
+            if isinstance(file_paths, str):
+                file_paths = [file_paths]
+
+            file_paths = [
+                str(f).strip()
+                for f in file_paths
+                if str(f).strip()
+            ]
+
+            file_path = str(
+                payload.get("file_path") or ""
+            ).strip()
+
+            if not file_paths and file_path:
+                file_paths = [file_path]
+
+            new_code = str(payload.get("code") or "")
+
+            if not file_paths or not new_code.strip():
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error="Missing file_path(s) or code.",
+                )
+
+
+
+            results = []
+
+            for file_path in file_paths:
+                path = Path(file_path)
+
+                if path.exists():
+                    backup_path = path.with_suffix(
+                        path.suffix + f".bak_{int(time.time())}"
+                    )
+
+                    shutil.copy2(
+                        path,
+                        backup_path,
+                    )
+                else:
+                    path.parent.mkdir(
+                        parents=True,
+                        exist_ok=True,
+                    )
+
+                    backup_path = None
+
+                path.write_text(
+                    new_code,
+                    encoding="utf-8",
+                )
+
+                compile_ok = True
+                compile_error = ""
+
+                if path.suffix == ".py":
+                    try:
+                        import ast
+
+                        ast.parse(
+                            path.read_text(
+                                encoding="utf-8"
+                            )
+                        )
+
+                    except Exception as e:
+                        compile_ok = False
+                        compile_error = (
+                            f"AST validation failed: {e}"
+                        )
+
+                        if backup_path:
+                            shutil.copy2(
+                                backup_path,
+                                path,
+                            )
+
+
+                if path.suffix == ".py":
+                    try:
+                        py_compile.compile(str(path), doraise=True)
+                    except Exception as e:
+                        compile_ok = False
+                        compile_error = str(e)
+
+                results.append(
+                    {
+                        "file_path": str(path),
+                        "backup": str(backup_path),
+                        "compiled": compile_ok,
+                        "compile_error": compile_error,
+                    }
+                )
+
+            all_compiled = all(
+                item.get("compiled")
+                for item in results
+            )
+
+            first_error = next(
+                (
+                    item.get("compile_error")
+                    for item in results
+                    if item.get("compile_error")
+                ),
+                "",
+            )
+
+            return ExecutionResult(
+                move_id=move.id,
+                status="success" if all_compiled else "failed",
+                output={
+                    "files": results,
+                    "compiled": all_compiled,
+                },
+                error=first_error,
+            )
+            
         if move_type == "apply_function_fix":
-            import ast
+            file_paths = payload.get("file_paths") or []
 
-            file_path = str(payload.get("file_path") or "").strip()
-            function_name = str(payload.get("function_name") or "").strip()
-            replacement = str(payload.get("replacement") or "")
+            if isinstance(file_paths, str):
+                file_paths = [file_paths]
 
-            if not file_path or not function_name or not replacement.strip():
+            file_paths = [
+                str(f).strip()
+                for f in file_paths
+                if str(f).strip()
+            ]
+
+            file_path = str(
+                payload.get("file_path") or ""
+            ).strip()
+
+            if not file_paths and file_path:
+                file_paths = [file_path]
+
+            function_name = str(
+                payload.get("function_name") or ""
+            ).strip()
+
+            replacement = str(
+                payload.get("replacement") or ""
+            )
+
+            if not file_paths or not function_name or not replacement.strip():
                 return ExecutionResult(
                     move_id=move.id,
                     status="failed",
                     error="Missing required fields.",
                 )
 
-            path = Path(file_path)
+            results = []
 
-            if not path.exists():
-                return ExecutionResult(
-                    move_id=move.id,
-                    status="failed",
-                    error=f"File does not exist: {file_path}",
+            for file_path in file_paths:
+                results.append(
+                    self._apply_function_fix_single_file(
+                        file_path=file_path,
+                        function_name=function_name,
+                        replacement=replacement,
+                    )
                 )
 
-            original = path.read_text(encoding="utf-8")
-            lines = original.splitlines()
-
-            try:
-                tree = ast.parse(original)
-            except SyntaxError as e:
-                return ExecutionResult(
-                    move_id=move.id,
-                    status="failed",
-                    error=f"Cannot parse target file before mutation: {e}",
-                )
-
-            target_node = None
-
-            for node in ast.walk(tree):
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    if node.name == function_name:
-                        target_node = node
-                        break
-
-            if target_node is None:
-                return ExecutionResult(
-                    move_id=move.id,
-                    status="failed",
-                    error=f"Function not found by AST: {function_name}",
-                )
-
-            if not hasattr(target_node, "lineno") or not hasattr(target_node, "end_lineno"):
-                return ExecutionResult(
-                    move_id=move.id,
-                    status="failed",
-                    error=f"AST node missing line boundaries: {function_name}",
-                )
-
-            start_index = int(target_node.lineno) - 1
-            end_index = int(target_node.end_lineno)
-
-            backup_path = path.with_suffix(path.suffix + f".bak_{int(time.time())}")
-            shutil.copy2(path, backup_path)
-
-            replacement_lines = replacement.strip("\n").splitlines()
-            new_lines = lines[:start_index] + replacement_lines + lines[end_index:]
-
-            path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-
-            mutated_source = path.read_text(encoding="utf-8")
-
-            try:
-                ast.parse(mutated_source)
-            except SyntaxError as e:
-                shutil.copy2(backup_path, path)
-
-                return ExecutionResult(
-                    move_id=move.id,
-                    status="failed",
-                    output={
-                        "file_path": str(path),
-                        "backup": str(backup_path),
-                        "ast_valid": False,
-                        "rolled_back": True,
-                        "syntax_error": str(e),
-                    },
-                    error=f"AST validation failed after mutation: {e}",
-                )
-
-            compile_ok = True
-            compile_error = ""
-
-            try:
-                py_compile.compile(str(path), doraise=True)
-            except Exception as e:
-                compile_ok = False
-                compile_error = str(e)
-
-            if not compile_ok:
-                shutil.copy2(backup_path, path)
-
-                return ExecutionResult(
-                    move_id=move.id,
-                    status="failed",
-                    output={
-                        "file_path": str(path),
-                        "backup": str(backup_path),
-                        "ast_valid": True,
-                        "compiled": False,
-                        "rolled_back": True,
-                        "compile_error": compile_error,
-                    },
-                    error=compile_error,
-                )
+            success = all(
+                item.get("compiled")
+                for item in results
+            )
 
             return ExecutionResult(
                 move_id=move.id,
-                status="success",
+                status="success" if success else "failed",
                 output={
-                    "file_path": str(path),
-                    "backup": str(backup_path),
-                    "ast_valid": True,
-                    "compiled": True,
-                    "rolled_back": False,
+                    "files": results,
                 },
             )
 
-        if move_type == "chain":
             next_list = payload.get("next") or []
             next_moves = []
 

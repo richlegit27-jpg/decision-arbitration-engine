@@ -68,7 +68,10 @@ def _nova_wants_live_web_20260622(text):
     return any(term in t for term in explicit_web)
 
 
-def _nova_strip_source_payload_20260622(obj):
+def _nova_strip_source_payload_20260622(obj, _seen=None):
+    if _seen is None:
+        _seen = set()
+
     source_keys = {
         "sources",
         "source",
@@ -86,6 +89,13 @@ def _nova_strip_source_payload_20260622(obj):
         "cards",
     }
 
+    obj_id = id(obj)
+
+    if obj_id in _seen:
+        return obj
+
+    _seen.add(obj_id)
+
     if isinstance(obj, dict):
         for key in list(obj.keys()):
             low = str(key).lower()
@@ -99,11 +109,11 @@ def _nova_strip_source_payload_20260622(obj):
                     obj[key] = None
                 continue
 
-            _nova_strip_source_payload_20260622(obj[key])
+            _nova_strip_source_payload_20260622(obj[key], _seen)
 
     elif isinstance(obj, list):
         for item in obj:
-            _nova_strip_source_payload_20260622(item)
+            _nova_strip_source_payload_20260622(item, _seen)
 
     return obj
 

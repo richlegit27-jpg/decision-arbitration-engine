@@ -54,10 +54,19 @@ document.addEventListener("DOMContentLoaded", () => {
     return window.NovaApp || null;
   }
 
-  function getMemoryItems() {
+async function getMemoryItems() {
     const app = getNovaApp();
-    return Array.isArray(app?.state?.memory) ? app.state.memory : [];
-  }
+
+    if (!app) return [];
+
+    if (typeof app.getMemory === "function") {
+        const result = await app.getMemory();
+
+        return result.items || [];
+    }
+
+    return [];
+}
 
   function openMemoryPanel() {
     if (isMobile()) {
@@ -121,10 +130,9 @@ document.addEventListener("DOMContentLoaded", () => {
       .replaceAll("'", "&#39;");
   }
 
-  function renderMemory() {
-    if (!memoryList) return;
-
-    const items = getMemoryItems();
+async function renderMemory() {
+    const items = await getMemoryItems();
+console.log("[MEMORY RENDER]", items.map(x => x.id));
 
     if (memoryEmpty) {
       memoryEmpty.style.display = items.length ? "none" : "";
@@ -142,7 +150,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="memory-item" data-memory-id="${escapeHtml(item.id || "")}">
             <div class="memory-item-main">
               <div class="memory-item-kind">${escapeHtml(item.kind || "memory")}</div>
-              <div class="memory-item-value">${escapeHtml(item.value || "")}</div>
+              <div class="memory-item-value">${escapeHtml(item.value || item.text || "")}</div>
               <div class="memory-item-meta">${escapeHtml(
                 formatTime(item.updated_at || item.created_at || "")
               )}</div>
@@ -202,13 +210,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       setMemoryStatus("Saving memory...");
-      await app.addMemory(kind, value);
+
+await app.addMemory(kind, value);
+
       if (memoryValue) {
         memoryValue.value = "";
       }
-      renderMemory();
-      setMemoryStatus("Memory saved.");
+
+await renderMemory();
+setMemoryStatus("Memory saved.");
     } catch (error) {
+
       console.error(error);
       setMemoryStatus("Memory save failed.");
       if (window.NovaToast?.error) {
@@ -229,21 +241,28 @@ document.addEventListener("DOMContentLoaded", () => {
     const ok = window.confirm("Delete this memory?");
     if (!ok) return;
 
-    try {
-      setMemoryStatus("Deleting memory...");
-      await app.deleteMemory(id);
-      renderMemory();
-      setMemoryStatus("Memory deleted.");
-    } catch (error) {
-      console.error(error);
-      setMemoryStatus("Delete failed.");
-      if (window.NovaToast?.error) {
-        window.NovaToast.error(error.message || "Could not delete memory.");
-      }
-    }
-  }
+try {
+  setMemoryStatus("Deleting memory...");
 
-  if (openBtn) {
+  await app.deleteMemory(id);
+
+  await renderMemory();
+
+  setMemoryStatus("Memory deleted.");
+
+} catch (error) {
+  console.error(error);
+  setMemoryStatus("Delete failed.");
+
+  if (window.NovaToast?.error) {
+    window.NovaToast.error(error.message || "Could not delete memory.");
+  }
+}
+
+}
+ 
+if (openBtn) {
+
     openBtn.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();

@@ -10,6 +10,7 @@ import tempfile
 import py_compile
 
 
+from nova_backend.services.execution_bridge_service import ExecutionBridgeService
 from nova_backend.services.chat.handlers.execution_handler import ExecutionHandler
 from nova_backend.services.planner.decision_service import DecisionService
 from nova_backend.core.nova_orchestrator import NovaOrchestrator
@@ -241,6 +242,7 @@ class ChatService:
         self.orchestrator = (
             NovaOrchestrator(
                 execution_state_service=execution_state_service,
+                memory_service=memory_service,
             )
         )
 
@@ -257,6 +259,12 @@ class ChatService:
         # =========================
 
         self.execution_handler = ExecutionHandler(self)
+
+        if self.chat_execution_service:
+            self.chat_execution_service.execution_handler = (
+                self.execution_handler
+            )
+
         self.response_handler = ChatResponseHandler(self)
         self.chat_router = ChatRouter(self)
         self.planner_service = PlannerService(self)
@@ -265,6 +273,7 @@ class ChatService:
         self.orchestrator = (
             NovaOrchestrator(
                 execution_state_service=execution_state_service,
+                memory_service=memory_service,
             )
         )
 
@@ -432,6 +441,11 @@ class ChatService:
         )
 
         self.execution_service = ExecutionService(self)
+        self.execution_bridge_service = ExecutionBridgeService(
+            chat_execution_service=self.chat_execution_service,
+            logger=logger,
+            chat_service=self,
+        )
 
         # =========================
         # AUTONOMY
@@ -515,6 +529,19 @@ class ChatService:
 
         else:
 
+            current_execution = self.chat_execution_service.get_state(
+                session_id
+            )
+
+            if (
+                self.chat_execution_service.is_execution_trigger(user_text)
+                and current_execution.get("complete") is True
+            ):
+                return {
+                    "status": "complete",
+                    "execution_state": current_execution,
+                }
+
             execution_result = self._handle_execution_control(
                 user_text=user_text,
                 session_id=session_id,
@@ -569,8 +596,34 @@ class ChatService:
             ),
         )
 
+        memory_result = self._maybe_write_memory(
+            decision=(
+                brain_state.get("decision")
+                if isinstance(brain_state, dict)
+                else {}
+            ),
+            user_text=user_text,
+            session_id=session_id,
+        )
+
+        print(
+            "DEBUG HANDLE MEMORY RESULT =",
+            memory_result,
+            flush=True,
+        )
+
+        response["brain_state"] = brain_state
+
+        if memory_result:
+            response.setdefault(
+                "debug",
+                {},
+            )["memory_saved"] = True
+
+
         print(
             "DEBUG AFTER CHAT_HANDLE META =",
+
             response.get("assistant_message", {}).get("meta")
             if isinstance(response, dict)
             and isinstance(response.get("assistant_message"), dict)
@@ -903,46 +956,26 @@ class ChatService:
         session_id: str,
     ):
 
-        if isinstance(execution, dict):
-
-            if not execution.get("steps"):
-
-                plan_value = execution.get(
-                    "plan"
-                )
-
-                if isinstance(
-                    plan_value,
-                    dict,
-                ) and plan_value.get("steps"):
-
-                    execution["steps"] = (
-                        plan_value["steps"]
-                    )
-
-            execution.setdefault(
-                "current_index",
-                0,
-            )
-
-            execution.setdefault(
-                "status",
-                "running",
-            )
-
         existing_execution = (
             self._load_execution_state(
                 session_id
             )
             or {}
         )
+
         print(
-            "[DEBUG LOADED EXECUTION]",
+            "DEBUG PROCESS GOAL EXISTING EXECUTION =",
             existing_execution,
         )
+
         print(
-            "[DEBUG PROCESS GOAL EXISTING EXECUTION]",
-            existing_execution,
+            "[DEBUG LOADED EXECUTION STATUS]",
+            existing_execution.get("status"),
+        )
+
+        print(
+            "[DEBUG LOADED EXECUTION STEPS]",
+            existing_execution.get("steps"),
         )
 
         if (
@@ -952,7 +985,11 @@ class ChatService:
             )
             and existing_execution.get(
                 "status"
-            ) == "running"
+            ) in {
+                "ready",
+                "running",
+                "waiting",
+            }
             and existing_execution.get(
                 "steps"
             )
@@ -981,7 +1018,28 @@ class ChatService:
             },
         )
 
-        if execution:
+        if execution and (
+            execution.get("steps")
+            or execution.get("goal")
+        ):
+            execution["status"] = (
+                execution.get("status")
+                or "ready"
+            )
+            execution["current_index"] = (
+                execution.get("current_index")
+                or 0
+            )
+
+            execution["current_step"] = (
+                execution.get("current_step")
+                or (
+                    execution.get("steps", [{}])[0].get("title")
+                    if execution.get("steps")
+                    else ""
+                )
+            )
+
             self._save_execution_state(
                 session_id,
                 execution,
@@ -1057,6 +1115,7 @@ class ChatService:
     def _build_system_prompt(
         self,
         decision=None,
+        memory_items=None,
     ):
 
         parts = []
@@ -1134,6 +1193,30 @@ class ChatService:
                 "Use the user's style: direct, "
                 "endgame, no filler."
             )
+
+        if memory_items:
+            memory_lines = []
+
+            for item in memory_items[:8]:
+                if not isinstance(item, dict):
+                    continue
+
+                text = (
+                    item.get("text")
+                    or item.get("content")
+                    or ""
+                )
+
+                if text:
+                    memory_lines.append(
+                        f"- {text}"
+                    )
+
+            if memory_lines:
+                parts.append(
+                    "Relevant saved memory:\n"
+                    + "\n".join(memory_lines)
+                )
 
         return "\n\n".join([p for p in parts if p]).strip()
 
@@ -1405,6 +1488,7 @@ Rules:
             "abort",
             "halt",
         }:
+
             execution_state = (
                 self._load_execution_state(
                     session_id
@@ -1631,6 +1715,38 @@ Rules:
                 "execution": execution_state,
             }
 
+        if text.startswith("auto-plan"):
+            goal = (
+                user_text[len("auto-plan"):].strip()
+            )
+
+            return {
+                "ok": True,
+                "is_mission": True,
+                "type": "start",
+                "mission": {},
+                "next_action": "start_execution",
+                "continue_request": False,
+                "goal": goal,
+                "execution": execution_state,
+            }
+
+        if text.startswith("auto-plan"):
+            goal = (
+                user_text[len("auto-plan"):].strip()
+            )
+
+            return {
+                "ok": True,
+                "is_mission": True,
+                "type": "start",
+                "mission": {},
+                "next_action": "start_execution",
+                "continue_request": False,
+                "goal": goal,
+                "execution": execution_state,
+            }
+
         return {
             "ok": True,
             "is_mission": False,
@@ -1721,6 +1837,24 @@ Rules:
                 },
             }
 
+        if mission_type == "start":
+            goal = self.safe_str(
+                mission_command.get("goal")
+            ).strip()
+
+            if not goal:
+                goal = "Untitled mission"
+
+            return self.execution_bridge_service.try_execution_autoplan_start(
+                session_id=session_id,
+                user_text=(
+                    "auto-plan "
+                    + self.safe_str(
+                        mission_command.get("goal")
+                    )
+                ),
+            )
+
         selected_execution_state = dict(
             execution_state or {}
         )
@@ -1796,6 +1930,20 @@ Rules:
             },
         )
 
+        if (
+            selected_execution_state.get("status") == "complete"
+            or selected_execution_state.get("complete") is True
+        ):
+            exec_debug(
+                "EXECUTION DISPATCH SKIPPED: already complete",
+                selected_execution_state,
+            )
+            return {
+                "status": "complete",
+                "execution_state": selected_execution_state,
+            }
+
+
         exec_debug(
             "DISPATCH EXECUTION STATE DEBUG",
             {
@@ -1853,65 +2001,43 @@ Rules:
             "continue_request"
         ):
             selected_execution_state[
-                "status"
-            ] = "waiting"
+                "command"
+            ] = "run_step"
 
             selected_execution_state[
                 "waiting"
-            ] = True
+            ] = False
+
+            selected_execution_state[
+                "status"
+            ] = "ready"
 
             self._save_execution_state(
                 session_id,
                 selected_execution_state,
             )
 
-            step_index = int(
-                selected_execution_state.get(
+            return self.execution_orchestrator_service.process_execution(
+                session_id=session_id,
+                state=selected_execution_state,
+                command="run_step",
+            )
+
+        print(
+            "FINAL ORCHESTRATOR DISPATCH =",
+            {
+                "goal": selected_execution_state.get("goal"),
+                "steps": len(
+                    selected_execution_state.get("steps", [])
+                ),
+                "current_index": selected_execution_state.get(
                     "current_index"
-                )
-                or 0
-            )
-
-            steps = (
-                selected_execution_state.get(
-                    "steps"
-                )
-                or []
-            )
-
-            current_step = (
-                selected_execution_state.get(
-                    "current_step"
-                )
-                or (
-                    steps[step_index].get("title")
-                    if step_index < len(steps)
-                    and isinstance(
-                        steps[step_index],
-                        dict,
-                    )
-                    else ""
-                )
-            )
-
-            text = (
-                "Continuing mission:\n\n"
-                f"Goal: {selected_execution_state.get('goal', '')}\n\n"
-                f"Step {step_index + 1}/{len(steps)}:\n"
-                f"{current_step}\n\n"
-                "Status: waiting"
-            )
-
-            return {
-                "ok": True,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": text,
-                    "content": text,
-                    "execution_state": selected_execution_state,
-                },
-                "execution_state": selected_execution_state,
-            }
+                ),
+                "command": next_action or "run_step",
+                "status": selected_execution_state.get("status"),
+            },
+            flush=True,
+        )
 
         return self.execution_orchestrator_service.process_execution(
             session_id=session_id,
@@ -1921,6 +2047,17 @@ Rules:
                 or "run_step"
             ),
         )
+
+        return self.execution_orchestrator_service.process_execution(
+            session_id=session_id,
+            state=selected_execution_state,
+            command=(
+                next_action
+                or "run_step"
+            ),
+        )
+
+
     def _load_execution_state(
         self,
         session_id="",
@@ -1931,7 +2068,11 @@ Rules:
             {},
         )
 
-        if isinstance(meta_state, dict) and meta_state:
+        if (
+            isinstance(meta_state, dict)
+            and meta_state
+            and meta_state.get("steps")
+        ):
             return meta_state
 
         try:
@@ -1944,9 +2085,10 @@ Rules:
 
                 if (
                     isinstance(execution_state, dict)
-                    and execution_state
+                    and execution_state.get("steps")
                 ):
                     return execution_state
+
 
         except Exception as exc:
             print(
@@ -1961,42 +2103,86 @@ Rules:
         session_id="",
         execution_state=None,
     ):
+        if not isinstance(
+            execution_state,
+            dict,
+        ):
+            return
+
         if self.execution_state_service:
             self.execution_state_service.save_execution_state(
                 session_id,
                 execution_state,
             )
 
+        # Persist into session payload/meta
+        try:
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution_state,
+            )
+
+            self._set_session_meta(
+                session_id,
+                "active_execution",
+                execution_state,
+            )
+
+        except Exception as e:
+            exec_debug(
+                "SESSION EXECUTION META SAVE FAILED:",
+                e,
+            )
+
         if (
             hasattr(self, "chat_execution_service")
             and self.chat_execution_service
-            and isinstance(execution_state, dict)
         ):
             try:
-                self.chat_execution_service.start(
-                    session_id=session_id,
-                    goal=(
-                        execution_state.get("goal")
-                        or "Untitled mission"
-                    ),
-                    steps=(
-                        execution_state.get("steps")
-                        or []
-                    ),
-                    context={
-                        "task_type": (
-                            execution_state.get("task_type")
-                            or "general"
-                        ),
-                    },
+                existing_state = (
+                    self.chat_execution_service.get_state(
+                        session_id
+                    )
+                    or {}
                 )
+
+                if (
+                    existing_state.get("steps")
+                    or existing_state.get("status")
+                    not in {
+                        None,
+                        "idle",
+                    }
+                ):
+                    exec_debug(
+                        "CHAT EXECUTION SYNC SKIPPED: existing execution",
+                        existing_state,
+                    )
+                else:
+                    self.chat_execution_service.start(
+                        session_id=session_id,
+                        goal=(
+                            execution_state.get("goal")
+                            or "Untitled mission"
+                        ),
+                        steps=(
+                            execution_state.get("steps")
+                            or []
+                        ),
+                        context={
+                            "task_type": (
+                                execution_state.get("task_type")
+                                or "general"
+                            ),
+                        },
+                    )
 
             except Exception as e:
                 exec_debug(
                     "CHAT EXECUTION STATE SYNC FAILED:",
                     e,
                 )
-
 
     def _get_session_meta(self, session_id: str, key: str = "", default=None):
         session_id = self.safe_str(session_id).strip()
@@ -2101,8 +2287,13 @@ Rules:
             for marker in [
                 "i prefer",
                 "i always want",
-                "remember that",
+                "i like",
+                "i love",
+                "my favorite",
+                "my favourite",
                 "remember my",
+                "remember that",
+                "remember this",
                 "my preference",
                 "from now on",
             ]
@@ -2112,7 +2303,6 @@ Rules:
             decision["save_memory"] = True
             decision["intent"] = "memory"
             decision["route"] = "memory"
-            memory_kind = "preference"
 
         if (
             decision.get("route")
@@ -2130,6 +2320,72 @@ Rules:
             return False
 
         memory_kind = "user_fact"
+
+        # DO NOT SAVE MEMORY QUESTIONS
+        question_memory_block = (
+            "what is my name",
+            "what's my name",
+            "who am i",
+            "what do you know about me",
+            "what do you remember about me",
+            "tell me my name",
+        )
+
+        text_lower = text.lower()
+
+        if any(
+            marker in text_lower
+            for marker in question_memory_block
+        ):
+            print(
+                "MEMORY BLOCKED QUESTION =",
+                text,
+                flush=True,
+            )
+            return False
+
+        if any(
+            marker in text.lower()
+            for marker in (
+                "i prefer",
+                "i always want",
+                "i like",
+                "remember my",
+                "going forward",
+                "from now on",
+            )
+        ):
+            memory_kind = "preference"
+
+        if any(
+            marker in text.lower()
+            for marker in (
+                "my name is",
+                "call me",
+                "my name's",
+            )
+        ):
+            memory_kind = "user_fact"
+
+        if "remember that" in text.lower():
+            memory_kind = "project"
+
+        if any(
+            marker in text.lower()
+            for marker in (
+                "favorite color",
+                "favourite color",
+                "favorite movie",
+                "favourite movie",
+                "favorite drink",
+                "favourite drink",
+                "favorite animal",
+                "favourite animal",
+                "call me",
+                "my name is",
+            )
+        ):
+            memory_kind = "user_fact"
 
         if any(
             marker in text.lower()
@@ -2204,10 +2460,6 @@ Rules:
 
         for method_name in (
             "add_memory",
-            "save_memory",
-            "append_memory",
-            "remember",
-            "add",
         ):
 
             method = getattr(
@@ -2243,6 +2495,24 @@ Rules:
         )
 
         return False
+
+    def _is_memory_recall_question(self, text: str) -> bool:
+        text = str(text or "").strip().lower()
+
+        recall_patterns = (
+            "what do i like",
+            "what is my name",
+            "what do you remember",
+            "do you remember",
+            "what color do i like",
+            "what are my preferences",
+        )
+
+        return any(
+            pattern in text
+            for pattern in recall_patterns
+        )
+
     def _get_memory_list(self):
         if self.memory_service:
             try:
@@ -2408,10 +2678,26 @@ Rules:
             payload["meta"] = meta
 
         live_execution = (
-            payload.get("execution_state")
-            or payload.get("active_execution")
+            payload.get("active_execution")
+            or payload.get("execution_state")
             or {}
         )
+
+        if isinstance(live_execution, dict):
+
+            status = self.safe_str(
+                live_execution.get("status")
+            ).strip().lower()
+
+            if (
+                status in {
+                    "complete",
+                    "completed",
+                    "done",
+                }
+                or live_execution.get("complete") is True
+            ):
+                live_execution = {}
 
         # HARD BLOCK RESURRECTION FROM PAYLOAD
 
@@ -3383,13 +3669,22 @@ Rules:
             state.get("pending_fix_code")
         )
 
+        print(
+            "DEBUG PENDING FIX STATE =",
+            {
+                "pending_file_path": pending_file_path,
+                "pending_fix_code": pending_fix_code[:500],
+                "state_keys": list(state.keys()),
+            },
+            flush=True,
+        )
+
         user_msg = self._build_user_message("apply fix")
 
-        decision = decision or {
-            "route": "general_chat",
-            "intent": "chat",
+        decision = {
+            "route": "apply_pending_fix",
+            "intent": "execution",
         }
-
         if not pending_file_path or not pending_fix_code:
             assistant_msg = self._build_assistant_message(
                 text="No pending fix found. Run `fix this file` first."
@@ -3425,7 +3720,11 @@ Rules:
             if func_name:
                 pattern = rf"(def\s+{re.escape(func_name)}\s*\(.*?\):\n(?:\s+.*\n)*)"
 
-                match = re.search(pattern, current_content, flags=re.DOTALL)
+                match = re.search(
+                    pattern,
+                    current_content,
+                    flags=re.DOTALL,
+                )
 
                 if not match:
                     return {
@@ -3440,15 +3739,23 @@ Rules:
                     flags=re.DOTALL,
                 )
 
-                pending_fix_code = self._normalize_python_indentation(pending_fix_code)
-                result = self._safe_write_file(pending_file_path, pending_fix_code)
+                pending_fix_code = updated
 
-                if not result.get("ok"):
-                    return {
-                        "ok": False,
-                        "error": "Auto-fix failed",
-                        "details": result,
-                    }
+            pending_fix_code = self._normalize_python_indentation(
+                pending_fix_code
+            )
+
+            result = self._safe_write_file(
+                pending_file_path,
+                pending_fix_code,
+            )
+
+            if not result.get("ok"):
+                return {
+                    "ok": False,
+                    "error": "Auto-fix failed",
+                    "details": result,
+                }
 
             self._update_working_state(
                 session_id,
@@ -6412,6 +6719,47 @@ Rules:
             flush=True,
         )
 
+        # NOVA_DIRECT_REPAIR_REQUEST_GATE
+        # Explicit repair requests should enter auto-fix instead of general chat.
+
+        if any(
+            phrase in text
+            for phrase in [
+                "apply the repair",
+                "apply repair",
+                "apply the fix",
+                "apply fix",
+                "write the fix",
+                "write fix",
+                "commit fix",
+            ]
+        ):
+            return self._apply_pending_fix(
+                session_id
+            )
+
+
+        if (
+            "repair " in text
+            or (
+                "fix " in text
+                and (
+                    ".py" in text
+                    or "file" in text
+                    or "function" in text
+                )
+            )
+        ):
+
+            repair_result = self._process_auto_fix(
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
+            )
+
+            if repair_result is not None:
+                return repair_result
+
         mission_command = self._resolve_mission_command(
             user_text=user_text,
             session_id=session_id,
@@ -7427,7 +7775,10 @@ Rules:
         if not lines:
             return "I do not have any saved memory yet."
 
-        return "Here s what I remember:\n" + "\n".join(lines)
+        return (
+            "I remember these saved items:\n"
+            + "\n".join(lines)
+        )
 
     def _text_has_placeholder_debug_content(
         self,
@@ -7735,7 +8086,8 @@ Rules:
         ).strip()
 
         system_prompt = self._build_system_prompt(
-            decision=decision
+            decision=decision,
+            memory_items=memory_items,
         )
 
         continuity_context = self._build_continuity_context(
@@ -7931,6 +8283,24 @@ Rules:
         )
 
         if any(pattern in lowered for pattern in junk_patterns):
+            return False
+
+        weak_memory_patterns = (
+            "temporary",
+            " temp",
+            "test",
+            " trace",
+            "debug",
+            "debugging",
+            "experiment",
+            "testing",
+            "sample",
+        )
+
+        if any(
+            pattern in lowered
+            for pattern in weak_memory_patterns
+        ):
             return False
 
         if kind in {
@@ -8468,8 +8838,6 @@ Rules:
             decision=decision,
         )
 
-        return payload
-
         if not execution:
             return payload
 
@@ -8543,143 +8911,151 @@ Rules:
             execution_state,
         )
 
-
     def _normalize_execution_state(self, execution):
-        if not isinstance(execution, dict):
-            execution = {}
+                if not isinstance(execution, dict):
+                    execution = {}
 
-        execution.setdefault("goal", "")
-        execution.setdefault("steps", [])
-        execution.setdefault("status", "idle")
-        execution.setdefault("progress", 0)
-        execution.setdefault("current_step", "")
+                execution.setdefault("goal", "")
+                execution.setdefault("steps", [])
+                execution.setdefault("current_step_index", 0)
+                execution.setdefault("status", "running")
+                execution.setdefault("progress", 0)
+                execution.setdefault("current_step", "")
 
-        raw_steps = execution.get("steps") or []
-        clean_steps = []
+                raw_steps = execution.get("steps") or []
+                clean_steps = []
 
-        for raw in raw_steps:
-            if isinstance(raw, dict):
-                title = str(raw.get("title") or "").strip()
+                for raw in raw_steps:
+                    if isinstance(raw, dict):
+                        title = str(
+                            raw.get("title")
+                            or raw.get("text")
+                            or raw.get("name")
+                            or ""
+                        ).strip()
+                    else:
+                        title = str(raw).strip()
 
-                print(
-                    "RAW STEP BEFORE CLEAN =",
-                    raw,
-                )
+                    if not title:
+                        continue
 
-                clean_steps.append(
-                    {
-                        "id": raw.get("id", ""),
-                        "title": title,
-                        "action": raw.get("action", ""),
-                        "input": raw.get("input", ""),
-                        "target_file": raw.get("target_file", ""),
-                        "target_function": raw.get("target_function", ""),
-                        "status": raw.get("status", "pending"),
-                        "result": raw.get("result", ""),
-                        "error": raw.get("error", None),
-                    }
-                )
+                    clean_steps.append(
+                        {
+                            "title": title,
+                            "action": (
+                                raw.get("action")
+                                if isinstance(raw, dict)
+                                else None
+                            ),
+                            "target_file": (
+                                raw.get("target_file")
+                                if isinstance(raw, dict)
+                                else ""
+                            ),
+                            "target_function": (
+                                raw.get("target_function")
+                                if isinstance(raw, dict)
+                                else ""
+                            ),
+                            "mutation_mode": (
+                                raw.get("mutation_mode")
+                                if isinstance(raw, dict)
+                                else ""
+                            ),
+                            "status": (
+                                raw.get("status", "pending")
+                                if isinstance(raw, dict)
+                                else "pending"
+                            ),
+                            "result": (
+                                raw.get("result", "")
+                                if isinstance(raw, dict)
+                                else ""
+                            ),
+                            "error": (
+                                raw.get("error")
+                                if isinstance(raw, dict)
+                                else None
+                            ),
+                        }
+                    )
 
-            else:
-                title = str(raw).strip()
+                step_count = len(clean_steps)
 
-                clean_steps.append(
-                    {
-                        "id": "",
-                        "title": title,
-                        "action": "",
-                        "input": "",
-                        "target_file": "",
-                        "target_function": "",
-                        "status": "pending",
-                        "result": "",
-                        "error": None,
-                    }
-                )
+                if step_count == 0:
+                    execution["steps"] = []
+                    execution["current_step_index"] = 0
+                    execution["progress"] = 0
+                    execution["current_step"] = (
+                        "complete"
+                        if execution.get("status") == "complete"
+                        else ""
+                    )
+                    execution["status"] = "complete"
+                    execution["complete"] = True
+                    return execution
 
-        clean_steps = [step for step in clean_steps if step.get("title")]
-        execution["steps"] = clean_steps
+                try:
+                    current_index = int(
+                        execution.get(
+                            "current_step_index",
+                            execution.get("current_index", 0),
+                        )
+                        or 0
+                    )
+                except Exception:
+                    current_index = 0
 
-        step_count = len(clean_steps)
-        current_index = self._execution_current_index(execution)
+                if current_index < 0:
+                    current_index = 0
 
-        status = str(execution.get("status") or "idle").strip().lower()
+                if current_index > step_count:
+                    current_index = step_count
 
-        if status not in {
-            "running",
-            "complete",
-            "completed",
-            "blocked",
-            "idle",
-        }:
-            status = "idle"
+                status = str(
+                    execution.get("status") or "running"
+                ).strip().lower()
 
-        if status == "completed":
-            status = "complete"
+                if status not in {
+                    "running",
+                    "complete",
+                    "blocked",
+                    "waiting_approval",
+                }:
+                    status = "running"
 
-        if not clean_steps:
-            execution = self._finalize_execution_state(execution)
-            execution["steps"] = []
+                if status == "complete" or current_index >= step_count:
+                    current_index = step_count
 
-            return self._sync_execution_state(
-                execution=execution,
-                current_index=0,
-                status="complete",
-                current_step="complete",
-                progress=0,
-            )
+                    for step in clean_steps:
+                        step["status"] = "done"
 
-        if current_index >= step_count or status == "complete":
-            current_index = step_count
-            status = "complete"
+                    progress = step_count
+                    current_step = "complete"
+                    status = "complete"
+                    execution["complete"] = True
 
-            for step in clean_steps:
-                step["status"] = "done"
+                else:
+                    for idx, step in enumerate(clean_steps):
+                        if idx < current_index:
+                            step["status"] = "done"
+                        elif idx == current_index:
+                            step["status"] = "current"
+                        else:
+                            step["status"] = "pending"
 
-            return self._sync_execution_state(
-                execution=execution,
-                current_index=current_index,
-                status=status,
-                current_step="complete",
-                progress=step_count,
-            )
+                    progress = current_index
+                    current_step = clean_steps[current_index]["title"]
+                    execution["complete"] = False
 
-        status = "running" if status == "running" else status
+                execution["steps"] = clean_steps
+                execution["current_step_index"] = current_index
+                execution["current_index"] = current_index
+                execution["progress"] = progress
+                execution["current_step"] = current_step
+                execution["status"] = status
 
-        for idx, step in enumerate(clean_steps):
-
-            existing_status = self.safe_str(step.get("status")).lower().strip()
-
-            if existing_status in {
-                "completed",
-                "done",
-                "failed",
-                "running",
-            }:
-                continue
-
-            if idx < current_index:
-                step["status"] = "completed"
-
-            elif idx == current_index:
-                step["status"] = "running"
-
-            else:
-                step["status"] = "pending"
-
-        current_step = clean_steps[current_index].get("title", "")
-
-        return self._sync_execution_state(
-            execution=execution,
-            current_index=current_index,
-            status=status,
-            current_step=current_step,
-            progress=current_index,
-        )
-
-    # =========================
-    # AUTO EXECUTION LOOP (PHASE 6)
-    # =========================
+                return execution
 
     def _looks_like_auto_execution_request(self, user_text: str) -> bool:
         text = self.safe_str(user_text).strip().lower()
@@ -11038,28 +11414,18 @@ Rules:
             },
         )
 
-        print(
-            "DEBUG BEFORE MEMORY CALL",
-            repr(user_text),
-            repr(session_id),
-        )
 
-        print(
-            "DEBUG MEMORY CALL USER TEXT =",
-            repr(user_text),
-            "PROMPT FALLBACK =",
-            repr(decision.get("prompt")),
-        )
+        if memory_result:
+            assistant_text = "Saved. I'll remember that."
 
-
-        memory_result = self._maybe_write_memory(
-            decision=decision,
-            user_text=(
-                user_text
-                or decision.get("prompt", "")
-            ),
-            session_id=session_id,
-        )
+            assistant_msg = self._build_assistant_message(
+                text=assistant_text,
+                meta={
+                    "planning": True,
+                    "memory_saved": True,
+                },
+                attachments=[],
+            )
 
         print(
             "DEBUG AFTER MEMORY CALL",
@@ -11067,6 +11433,13 @@ Rules:
         )
 
         decision["DEBUG_memory_result"] = memory_result
+
+        print(
+            "RETURN MEMORY DEBUG =",
+            memory_result,
+            flush=True,
+        )
+
         decision["DEBUG_user_text_seen"] = user_text
         decision["DEBUG_memory_type"] = str(type(self.memory))
 
@@ -11845,7 +12218,20 @@ Rules:
         if not assistant_text:
             assistant_text = "No response generated."
 
+        try:
+            assistant_text = (
+                self.response_mojibake_cleanup_service.cleanup(
+                    assistant_text
+                )
+            )
+        except Exception as e:
+            print(
+                "MOJIBAKE CLEANUP FAILED:",
+                e,
+            )
+
         next_step_out = ""
+
         try:
             for line in (assistant_text or "").split("\n"):
                 if "step" in line.lower():
@@ -11862,9 +12248,26 @@ Rules:
             if isinstance(m, dict)
         ]).lower()
 
-        if "name is richard" in memory_text:
-            if "your name is" in (assistant_text or "").lower():
-                assistant_text = "Your name is Richard."
+        if "my name is" in memory_text:
+            try:
+                name_part = memory_text.split(
+                    "my name is",
+                    1,
+                )[1].strip()
+
+                name = name_part.split()[0]
+
+                if name:
+                    if "your name is" in (assistant_text or "").lower():
+                        assistant_text = (
+                            f"Your name is {name}."
+                        )
+
+            except Exception as e:
+                print(
+                    "NAME MEMORY RECALL FIX ERROR:",
+                    e,
+                )
 
         try:
             if any(x in memory_text for x in ["prefer direct", "be direct", "no fluff", "keep answers short"]):

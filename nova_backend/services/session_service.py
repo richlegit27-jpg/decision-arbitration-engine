@@ -17,12 +17,18 @@ WORKING_STATE_KEYS = (
     "last_success",
     "next_move",
     "checkpoint",
+
+    "pending_fix_file_path",
+    "pending_fix_code",
+
     "updated_at",
+    "active_execution",
+    "execution_state",
+    "execution",
+    "last_execution",
 )
 
-
-
-def _new_working_state() -> Dict[str, str]:
+def _new_working_state() -> Dict[str, Any]:
     return {
         "active_task": "",
         "current_file": "",
@@ -30,9 +36,16 @@ def _new_working_state() -> Dict[str, str]:
         "last_success": "",
         "next_move": "",
         "checkpoint": "",
-        "updated_at": "",
-    }
 
+        "pending_fix_file_path": "",
+        "pending_fix_code": "",
+
+        "updated_at": "",
+        "active_execution": None,
+        "execution_state": None,
+        "execution": None,
+        "last_execution": None,
+    }
 
 def _normalize_working_state(value: Any) -> Dict[str, str]:
     state = _new_working_state()
@@ -364,11 +377,17 @@ class SessionService:
         cleaned["messages"] = self.trim_session_messages(session.get("messages", []))
 
         # keep execution state and active execution synchronized
-        execution_state = (
-            session.get("execution_state")
-            or session.get("active_execution")
-            or {}
-        )
+        # Preserve explicit clears from reset()
+        if "execution_state" in session:
+            execution_state = session.get(
+                "execution_state"
+            )
+        elif "active_execution" in session:
+            execution_state = session.get(
+                "active_execution"
+            )
+        else:
+            execution_state = {}
 
         cleaned["execution_state"] = (
             self._sanitize_active_execution_for_storage(
@@ -381,18 +400,50 @@ class SessionService:
                 execution_state
             )
         )
+
         # keep working state tiny if present
         working_state = session.get("working_state")
+
         if isinstance(working_state, dict):
+
             cleaned["working_state"] = {
-                "active_task": self._truncate_text(working_state.get("active_task", ""), 300),
-                "current_file": self._truncate_text(working_state.get("current_file", ""), 500),
-                "current_bug": self._truncate_text(working_state.get("current_bug", ""), 500),
-                "last_success": self._truncate_text(working_state.get("last_success", ""), 500),
-                "next_move": self._truncate_text(working_state.get("next_move", ""), 500),
-                "checkpoint": self._truncate_text(working_state.get("checkpoint", ""), 300),
-                "updated_at": self._safe_str(working_state.get("updated_at")).strip(),
+                "active_task": self._truncate_text(
+                    working_state.get("active_task", ""),
+                    300,
+                ),
+                "current_file": self._truncate_text(
+                    working_state.get("current_file", ""),
+                    500,
+                ),
+                "current_bug": self._truncate_text(
+                    working_state.get("current_bug", ""),
+                    500,
+                ),
+                "last_success": self._truncate_text(
+                    working_state.get("last_success", ""),
+                    500,
+                ),
+                "next_move": self._truncate_text(
+                    working_state.get("next_move", ""),
+                    500,
+                ),
+                "checkpoint": self._truncate_text(
+                    working_state.get("checkpoint", ""),
+                    300,
+                ),
+                "pending_fix_file_path": self._truncate_text(
+                    working_state.get("pending_fix_file_path", ""),
+                    500,
+                ),
+                "pending_fix_code": self._truncate_text(
+                    working_state.get("pending_fix_code", ""),
+                    5000,
+                ),
+                "updated_at": self._safe_str(
+                    working_state.get("updated_at")
+                ).strip(),
             }
+
         else:
             cleaned["working_state"] = {
                 "active_task": "",
@@ -401,6 +452,8 @@ class SessionService:
                 "last_success": "",
                 "next_move": "",
                 "checkpoint": "",
+                "pending_fix_file_path": "",
+                "pending_fix_code": "",
                 "updated_at": "",
             }
 
@@ -626,15 +679,23 @@ class SessionService:
                             ):
                                 continue
 
-                            state = (
-                                value.get(
+                            state = None
+
+                            if (
+                                "execution_state"
+                                in value
+                            ):
+                                state = value.get(
                                     "execution_state"
                                 )
-                                or value.get(
+
+                            elif (
+                                "active_execution"
+                                in value
+                            ):
+                                state = value.get(
                                     "active_execution"
                                 )
-                                or {}
-                            )
 
                             if (
                                 isinstance(
@@ -645,7 +706,6 @@ class SessionService:
                                     "id"
                                 )
                             ):
-
                                 candidates.append(
                                     value
                                 )
@@ -660,17 +720,31 @@ class SessionService:
                     ):
                         continue
 
-                    execution_state = (
-                        cached.get(
+
+                    if (
+                        "execution_state"
+                        in cached
+                    ):
+
+                        execution_state = cached.get(
                             "execution_state"
                         )
-                        or cached.get(
+
+                    elif (
+                        "active_execution"
+                        in cached
+                    ):
+
+                        execution_state = cached.get(
                             "active_execution"
                         )
-                        or {}
-                    )
 
-                    if execution_state:
+                    else:
+
+                        execution_state = None
+
+
+                    if execution_state is not None:
 
                         session["execution_state"] = (
                             execution_state
@@ -679,6 +753,7 @@ class SessionService:
                         session["active_execution"] = (
                             execution_state
                         )
+
 
         except Exception as e:
 
@@ -987,7 +1062,7 @@ class SessionService:
 
         self._save_sessions(
             sessions,
-            self.get_active_session_id(),
+            session_id,
         )
 
         return True
@@ -1005,7 +1080,9 @@ class SessionService:
         ):
             return _new_working_state()
 
-        state = _normalize_working_state(sessions[i].get("working_state"))
+        state = _normalize_working_state(
+            sessions[i].get("working_state")
+        )
 
         return deepcopy(state)
 

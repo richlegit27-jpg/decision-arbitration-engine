@@ -44,7 +44,25 @@ class ChatExecutionService:
     - Persist execution state so refresh/restart does not lose the active mission.
     """
 
-    def __init__(self, state_path: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        state_path: Optional[str] = None,
+        execution_handler=None,
+        session_service=None,
+    ) -> None:
+
+        self.state_path = (
+            Path(state_path)
+            if state_path
+            else DEFAULT_EXECUTION_STATE_PATH
+        )
+
+        self.execution_handler = execution_handler
+        self.session_service = session_service
+        self._states: Dict[str, Dict[str, Any]] = {}
+
+        self._load_states()
+
         self.state_path = Path(state_path) if state_path else DEFAULT_EXECUTION_STATE_PATH
         self._states: Dict[str, Dict[str, Any]] = {}
         self._load_states()
@@ -74,7 +92,9 @@ class ChatExecutionService:
         steps: Optional[List[Any]] = None,
         context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        safe_session_id = self._safe_session_id(session_id)
+        safe_session_id = self._safe_session_id(
+            session_id
+        )
 
         existing = self._states.get(
             safe_session_id
@@ -88,10 +108,9 @@ class ChatExecutionService:
                     "complete",
                     "completed",
                 }
-                or existing.get("current_index", 0) > 0
             ):
-                return self.get_state(
-                    safe_session_id
+                return self._copy_state(
+                    existing
                 )
 
         safe_goal = (
@@ -114,7 +133,10 @@ class ChatExecutionService:
             "status": "ready",
             "goal": safe_goal,
             "context": safe_context,
-            "task_type": safe_context.get("task_type", "general"),
+            "task_type": safe_context.get(
+                "task_type",
+                "general",
+            ),
             "steps": safe_steps,
             "current_index": 0,
             "current_step": (
@@ -130,6 +152,7 @@ class ChatExecutionService:
         }
 
         self._states[safe_session_id] = state
+
         self._save_states()
 
         logger.info(
@@ -139,13 +162,42 @@ class ChatExecutionService:
             len(safe_steps),
         )
 
-        return self.get_state(
-            safe_session_id
+        return self._copy_state(
+            state
         )
 
     def get_state(self, session_id: str) -> Dict[str, Any]:
         safe_session_id = self._safe_session_id(session_id)
-        state = self._states.get(safe_session_id)
+
+        state = None
+
+        execution_state_service = getattr(
+            self,
+            "execution_state_service",
+            None,
+        )
+
+        if execution_state_service:
+            try:
+                persisted = (
+                    execution_state_service.get_execution_state(
+                        safe_session_id
+                    )
+                )
+
+                if isinstance(persisted, dict) and persisted:
+                    state = persisted
+
+            except Exception as e:
+                logger.error(
+                    "[ChatExecutionService] persisted state read failed: %s",
+                    e,
+                )
+
+        if state is None:
+            state = self._states.get(
+                safe_session_id
+            )
 
         if not state:
             return {
@@ -209,10 +261,32 @@ class ChatExecutionService:
             }
 
         if state.get("status") == "failed":
+            state["status"] = "running"
             state["waiting"] = False
             state["complete"] = False
+
+            current_index = int(
+                state.get("current_index") or 0
+            )
+
+            steps = state.get("steps") or []
+
+            if current_index < len(steps):
+                steps[current_index]["status"] = "active"
+                steps[current_index].pop(
+                    "error",
+                    None,
+                )
+                steps[current_index].pop(
+                    "apply_result",
+                    None,
+                )
+                steps[current_index].pop(
+                    "second_apply_result",
+                    None,
+                )
+
             self._save_states()
-            return self._copy_state(state)
 
         if state.get("complete") or state.get("status") == "complete":
             state["status"] = "complete"
@@ -243,18 +317,34 @@ class ChatExecutionService:
             self._save_states()
             return self._copy_state(state)
 
-        current_step = steps[current_index]
-        state["status"] = "waiting"
-        state["waiting"] = True
-        state["current_step"] = current_step
-
-        state.setdefault("history", []).append(
-            {
-                "index": current_index,
-                "step": current_step,
-                "status": "complete",
-            }
+        current_step = dict(
+            steps[current_index]
         )
+
+        print(
+            "DEBUG EXECUTION HANDLER =",
+            self.execution_handler,
+        )
+
+        if self.execution_handler:
+            execution_result = (
+                self.execution_handler.run_next_step(
+                    action="run_step",
+                    session_id=safe_session_id,
+                    execution_state=state,
+                )
+            )
+
+            state = (
+                execution_result.get(
+                    "execution_state"
+                )
+                or state
+            )
+
+            self._save_states()
+
+            return self._copy_state(state)
 
         next_index = current_index + 1
         state["current_index"] = next_index
@@ -326,12 +416,88 @@ class ChatExecutionService:
 
         return self._copy_state(state)
 
-    def reset(self, session_id: str) -> Dict[str, Any]:
-        safe_session_id = self._safe_session_id(session_id)
-        self._states.pop(safe_session_id, None)
-        self._save_states()
-        return self.get_state(safe_session_id)
+    def set_session_service(
+        self,
+        session_service,
+    ) -> None:
+        self.session_service = session_service
 
+    def reset(self, session_id: str) -> Dict[str, Any]:
+        safe_session_id = self._safe_session_id(
+            session_id
+        )
+
+        self._states.pop(
+            safe_session_id,
+            None,
+        )
+
+        self._save_states()
+
+        if hasattr(
+            self,
+            "active_execution_cache",
+        ):
+            self.active_execution_cache.pop(
+                safe_session_id,
+                None,
+            )
+
+        if hasattr(
+            self,
+            "completed_execution_cache",
+        ):
+            self.completed_execution_cache.pop(
+                safe_session_id,
+                None,
+            )
+
+        try:
+            session_service = getattr(
+                self,
+                "session_service",
+                None,
+            )
+
+            if session_service is not None:
+
+                session = session_service.get_session(
+                    safe_session_id
+                )
+
+                if session:
+                    session["active_execution"] = None
+                    session["execution_state"] = None
+
+                    if isinstance(
+                        session.get("working_state"),
+                        dict,
+                    ):
+                        session["working_state"][
+                            "active_execution"
+                        ] = None
+
+                        session["working_state"][
+                            "execution_state"
+                        ] = None
+
+                    if hasattr(
+                        session_service,
+                        "save_session",
+                    ):
+                        session_service.save_session(
+                            session
+                        )
+
+        except Exception as e:
+            print(
+                "RESET SESSION EXECUTION CLEANUP FAILED:",
+                e,
+            )
+
+        return self.get_state(
+            safe_session_id
+        )
     def format_reply(self, state: Dict[str, Any]) -> str:
         status = state.get("status") or "idle"
         goal = state.get("goal")
@@ -410,29 +576,128 @@ class ChatExecutionService:
         except Exception:
             logger.exception("[ChatExecutionService] failed to save execution state")
 
-    def _normalize_steps(self, steps: Optional[List[Any]]) -> List[str]:
+    def _normalize_steps(
+        self,
+        steps: Optional[List[Any]],
+    ) -> List[Dict[str, Any]]:
+
+        print(
+            "DEBUG NORMALIZE INPUT STEPS =",
+            steps,
+        )
+
+        print(
+            "DEBUG NORMALIZE INPUT TYPES =",
+            [
+                type(x).__name__
+                for x in steps
+            ] if steps else []
+        )
+
         if not steps:
             return [
-                "Design the solution",
-                "Implement the change",
-                "Verify the result",
+                {
+                    "title": "Design the solution",
+                    "action": "design",
+                    "status": "pending",
+                    "result": "",
+                    "error": None,
+                },
+                {
+                    "title": "Implement the change",
+                    "action": "implement",
+                    "status": "pending",
+                    "result": "",
+                    "error": None,
+                    "target_file": (
+                        ""
+                    ),
+                    "target_files": [],
+                    "target_function": (
+                        ""
+                    ),
+                    "mutation_mode": "file",
+                    "next_action": "generate_file_replacement",
+                    "mutation_ready": True,
+                    "payload_required": True,
+                },
+                {
+                    "title": "Verify the result",
+                    "action": "test",
+                    "status": "pending",
+                    "result": "",
+                    "error": None,
+                },
             ]
 
         normalized = []
-        for item in steps:
-            if isinstance(item, dict):
-                title = (
-                    item.get("title")
-                    or item.get("name")
-                    or item.get("step")
-                    or item.get("description")
-                    or str(item)
-                )
-                normalized.append(str(title).strip())
-            else:
-                normalized.append(str(item).strip())
 
-        return [item for item in normalized if item]
+        for item in steps:
+
+            if isinstance(item, dict):
+                step = dict(item)
+
+                step.setdefault(
+                    "target_file",
+                    "",
+                )
+
+                step.setdefault(
+                    "target_files",
+                    [],
+                )
+
+                step.setdefault(
+                    "target_function",
+                    "",
+                )
+
+                if not step.get("title"):
+                    step["title"] = str(
+                        step.get("text")
+                        or step.get("name")
+                        or ""
+                    ).strip()
+
+                step.setdefault(
+                    "action",
+                    "design",
+                )
+
+                step.setdefault(
+                    "status",
+                    "pending",
+                )
+
+                step.setdefault(
+                    "result",
+                    "",
+                )
+
+                step.setdefault(
+                    "error",
+                    None,
+                )
+
+                normalized.append(step)
+
+            else:
+                normalized.append(
+                    {
+                        "title": str(item).strip(),
+                        "action": "design",
+                        "status": "pending",
+                        "result": "",
+                        "error": None,
+                    }
+                )
+
+        print(
+            "DEBUG NORMALIZE OUTPUT =",
+            normalized,
+        )
+
+        return normalized
 
     def _clean_text(self, user_text: str) -> str:
         return " ".join(str(user_text or "").strip().lower().split())
@@ -440,26 +705,89 @@ class ChatExecutionService:
     def _safe_session_id(self, session_id: str) -> str:
         return str(session_id or "default").strip() or "default"
 
-    def _copy_state(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    def _copy_state(
+        self,
+        state: Dict[str, Any],
+    ) -> Dict[str, Any]:
+
+        steps = state.get("steps") or []
+
+        print(
+            "DEBUG COPY_STATE STEPS =",
+            steps,
+        )
+
+        current_index = int(
+            state.get("current_index")
+            or state.get("current_step_index")
+            or 0
+        )
+
+        copied_steps = [
+            dict(step)
+            if isinstance(step, dict)
+            else step
+            for step in steps
+        ]
+
+        current_step = state.get(
+            "current_step"
+        )
+
+        if (
+            isinstance(copied_steps, list)
+            and 0 <= current_index < len(copied_steps)
+        ):
+            current_step = copied_steps[current_index]
+
         return {
             "status": state.get("status"),
             "goal": state.get("goal"),
-            "task_type": state.get("task_type", "general"),
-            "context": state.get("context", {}),
+            "task_type": state.get(
+                "task_type",
+                "general",
+            ),
+            "context": state.get(
+                "context",
+                {},
+            ),
             "execution_decision": state.get(
                 "execution_decision",
                 {},
             ),
-            "steps": list(state.get("steps") or []),
-            "current_index": int(state.get("current_index") or 0),
-            "current_step": state.get("current_step"),
-            "history": list(state.get("history") or []),
-            "waiting": bool(state.get("waiting")),
-            "complete": bool(state.get("complete")),
-            "mission_id": state.get("mission_id"),
-            "error": state.get("error"),
+            "steps": copied_steps,
+            "current_index": current_index,
+            "current_step": current_step,
+            "history": list(
+                state.get("history") or []
+            ),
+            "waiting": (
+                bool(state.get("waiting"))
+                and str(
+                    state.get("status") or ""
+                ).strip().lower()
+                not in {
+                    "complete",
+                    "completed",
+                }
+            ),
+            "complete": (
+                bool(state.get("complete"))
+                or str(
+                    state.get("status") or ""
+                ).strip().lower()
+                in {
+                    "complete",
+                    "completed",
+                }
+            ),
+            "mission_id": state.get(
+                "mission_id"
+            ),
+            "error": state.get(
+                "error"
+            ),
         }
-
 
 ExecutionService = ChatExecutionService
 

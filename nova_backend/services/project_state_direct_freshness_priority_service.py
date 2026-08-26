@@ -83,6 +83,7 @@ class ProjectStateDirectFreshnessPriorityService:
                     refresh_states()
                 except Exception:
                     pass
+
             get_state = getattr(
                 chat_service,
                 "get_state",
@@ -151,6 +152,24 @@ class ProjectStateDirectFreshnessPriorityService:
                     )
 
                     if not isinstance(payload, dict):
+                        return None
+
+                    message = str(
+                        payload.get("message")
+                        or ""
+                    ).strip().lower()
+
+                    execution_commands = {
+                        "next",
+                        "continue",
+                        "run",
+                        "go",
+                        "execute",
+                        "execute all",
+                        "run all",
+                    }
+
+                    if message in execution_commands:
                         return None
 
                     if self._has_active_execution(

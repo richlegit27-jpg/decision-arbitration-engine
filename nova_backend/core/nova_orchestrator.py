@@ -93,6 +93,7 @@ class NovaOrchestrator:
         tool_executor=None,
         state=None,
         execution_state_service=None,
+        memory_service=None,
     ):
 
         self.state = (
@@ -100,12 +101,12 @@ class NovaOrchestrator:
             or NovaState()
         )
 
-
         self.context_engine = (
             context_engine
-            or ContextFusionEngine()
+            or ContextFusionEngine(
+                memory=memory_service,
+            )
         )
-
 
         self.model_router = (
             model_router

@@ -354,6 +354,7 @@ class ExecutionService:
                     "python project" in user_text.lower()
                     or "create a small python" in user_text.lower()
                 ):
+
                     action = "implement"
 
                     step["target_file"] = (
@@ -366,6 +367,33 @@ class ExecutionService:
                         "if __name__ == \"__main__\":\n"
                         "    print(greet())\n"
                     )
+
+                if (
+                    "flask api" in user_text.lower()
+                    or "create a flask api" in user_text.lower()
+                ):
+
+                    action = "implement"
+
+                    step["target_file"] = (
+                        "flask_api/app.py"
+                    )
+
+                    step["content"] = (
+                        "from flask import Flask, jsonify\n\n"
+                        "app = Flask(__name__)\n\n\n"
+                        "@app.route('/')\n"
+                        "def home():\n"
+                        "    return jsonify({\"message\": \"Hello Nova API\"})\n\n\n"
+                        "if __name__ == \"__main__\":\n"
+                        "    app.run(debug=True)\n"
+                    )
+
+                print(
+                    "DEBUG RAW STEP BEFORE NORMALIZE =",
+                    step,
+                    flush=True,
+                )
 
                 normalized_steps.append(
                     {
@@ -465,6 +493,23 @@ class ExecutionService:
             "waiting": False,
         }
 
+        if self.chat_execution_service:
+            self.chat_execution_service.start(
+                session_id=session_id,
+                goal=execution_state.get(
+                    "goal",
+                    user_text,
+                ),
+                steps=normalized_steps,
+                context={
+                    "task_type": (
+                        goal.get("type", "general")
+                        if isinstance(goal, dict)
+                        else "general"
+                    )
+                },
+            )
+
         self._set_session_meta(
             session_id,
             "execution_state",
@@ -502,58 +547,10 @@ class ExecutionService:
             self.chat_execution_service,
         )
 
-        try:
-            if hasattr(
-                self,
-                "chat_execution_service",
-            ) and self.chat_execution_service:
-
-                execution_state = (
-                    self.chat_execution_service
-                    .advance(
-                        session_id
-                    )
-                )
-
-                self._set_session_meta(
-                    session_id,
-                    "execution_state",
-                    execution_state,
-                )
-
-                self._set_session_meta(
-                    session_id,
-                    "active_execution",
-                    execution_state,
-                )
-
-                try:
-                    session_obj = (
-                        self.sessions.get_session(
-                            session_id
-                        )
-                        or {}
-                    )
-
-                    session_obj["execution_state"] = execution_state
-                    session_obj["active_execution"] = execution_state
-
-                    self.sessions.update_session(
-                        session_id,
-                        session_obj,
-                    )
-
-                except Exception as e:
-                    exec_debug(
-                        "ADVANCED EXECUTION SAVE FAILED:",
-                        e,
-                    )
-
-        except Exception as e:
-            exec_debug(
-                "EXECUTION AUTO ADVANCE FAILED:",
-                e,
-            )
+        exec_debug(
+            "EXECUTION MISSION CREATED - WAITING FOR USER ADVANCE",
+            execution_state,
+        )
 
         exec_debug(
             "_process_goal_and_plan RETURN =",

@@ -4,10 +4,6 @@ from __future__ import annotations
 class ChatRequestContextService:
 
     def build_context(self, payload):
-        print(
-            "[CHAT CONTEXT PAYLOAD]",
-            payload,
-        )
 
         if not isinstance(payload, dict):
             payload = {}
@@ -31,14 +27,6 @@ class ChatRequestContextService:
         if not isinstance(attachments, list):
             attachments = []
 
-        print(
-            "[CHAT CONTEXT RETURN]",
-            {
-                "user_text": user_text,
-                "session_id": session_id,
-                "attachments": attachments,
-            }
-        )
 
         return {
             "user_text": user_text,

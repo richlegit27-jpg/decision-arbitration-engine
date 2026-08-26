@@ -87,18 +87,77 @@ class MemoryGuardService:
                     "from now on",
                     "always",
                     "call me",
-                    "my name is",
                 )
             ):
                 kind = "preference"
 
-            memory_service.add_memory(
+
+            if "my name is" in clean_lc:
+                kind = "user_fact"
+
+            weak_memory_patterns = (
+                "temporary",
+                " temp",
+                "test",
+                " trace",
+                "debug",
+                "debugging",
+                "experiment",
+                "testing",
+                "sample",
+            )
+
+            if any(
+                pattern in clean_lc
+                for pattern in weak_memory_patterns
+            ):
+                blocked_text = (
+                    "I did not save that because it looks like "
+                    "a temporary test or debug note."
+                )
+
+                return jsonify(
+                    {
+                        "ok": True,
+                        "content": blocked_text,
+                        "assistant_message": {
+                            "role": "assistant",
+                            "text": blocked_text,
+                            "content": blocked_text,
+                        },
+                        "debug": {
+                            "route_taken": "memory_blocked",
+                        },
+                    }
+                )
+
+            print(
+                "MEMORY GUARD CLEAN VALUE =",
+                repr(clean),
+                flush=True,
+            )
+
+            print(
+                "MEMORY SERVICE OBJECT =",
+                type(memory_service),
+                getattr(memory_service, "memory_file", "NO MEMORY FILE"),
+                flush=True,
+            )
+
+            result = memory_service.add_memory(
                 {
                     "text": clean,
                     "kind": kind,
                     "source": "app_explicit_memory_command",
                     "session_id": session_id,
+                    "confidence": 0.95,
                 }
+            )
+
+            print(
+                "MEMORY GUARD ADD RESULT =",
+                result,
+                flush=True,
             )
 
             assistant_text = f"Saved to memory: {clean}"

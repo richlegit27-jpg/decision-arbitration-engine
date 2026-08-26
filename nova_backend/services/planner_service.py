@@ -100,6 +100,49 @@ class PlannerService:
         if any(
             word in text
             for word in (
+                "repair",
+                "fix",
+                "debug",
+                "broken",
+                "error",
+                "syntax",
+                "failure",
+            )
+        ):
+            return [
+                {
+                    "step": "inspect",
+                    "status": "pending",
+                    "description": (
+                        f"Inspect the current state and identify the cause of the problem: {goal}."
+                    ),
+                },
+                {
+                    "step": "repair",
+                    "status": "pending",
+                    "description": (
+                        f"Generate and apply a repair for {goal}."
+                    ),
+                },
+                {
+                    "step": "test",
+                    "status": "pending",
+                    "description": (
+                        f"Run validation tests after repairing {goal}."
+                    ),
+                },
+                {
+                    "step": "review",
+                    "status": "pending",
+                    "description": (
+                        f"Review the repair result for {goal}."
+                    ),
+                },
+            ]
+
+        if any(
+            word in text
+            for word in (
                 "python",
                 "code",
                 "project",

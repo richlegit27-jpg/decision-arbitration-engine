@@ -22,6 +22,7 @@ DIRECT_PROJECT_STATE_PROMPTS = {
 }
 
 NEXT_MOVE_PROMPTS = {
+    "next",
     "what should we do next",
     "what do we do next",
     "what should we work on next",
@@ -87,6 +88,7 @@ def _route_for_intent(intent):
 
 def build_project_state_direct_fresh_response(payload):
     payload = payload or {}
+
     user_text = (
         payload.get("message")
         or payload.get("text")
@@ -95,11 +97,18 @@ def build_project_state_direct_fresh_response(payload):
     )
 
     intent = classify_project_state_freshness_prompt(user_text)
-    print("[FRESHNESS BRIDGE DEBUG]", repr(user_text), repr(intent))
+
+    print(
+        "[FRESHNESS BRIDGE DEBUG]",
+        repr(user_text),
+        repr(intent),
+    )
+
     if not intent:
         return None
 
     answer_source = SOURCE
+    answer = ""
 
     if intent in {
         "next_move",
@@ -126,6 +135,10 @@ def build_project_state_direct_fresh_response(payload):
             or ""
         ).strip()
 
+        answer_source = (
+            "project_brain_general_intelligence"
+        )
+
         if intent == "general_project_answer":
             from nova_backend.services.project_brain_context_builder import (
                 build_current_project_answer,
@@ -143,27 +156,20 @@ def build_project_state_direct_fresh_response(payload):
                     "Next move: follow the ranked Best Move above."
                 )
 
-        answer_source = (
-            "project_brain_general_intelligence"
+    elif intent == "direct_project_state":
+        from nova_backend.services.project_brain_state_recall_refresh import (
+            load_state_bridge_text,
         )
 
-    else:
-        answer = ""
+        answer = str(
+            load_state_bridge_text()
+            or ""
+        ).strip()
 
-        if intent == "direct_project_state":
-            from nova_backend.services.project_brain_state_recall_refresh import (
-                load_state_bridge_text,
+        if answer:
+            answer_source = (
+                "project_brain_state_bridge"
             )
-
-            answer = str(
-                load_state_bridge_text()
-                or ""
-            ).strip()
-
-            if answer:
-                answer_source = (
-                    "project_brain_state_bridge"
-                )
 
         if not answer:
             from nova_backend.services.project_brain_context_builder import (
@@ -178,7 +184,12 @@ def build_project_state_direct_fresh_response(payload):
     if not answer:
         return None
 
-    session_id = payload.get("session_id") or payload.get("active_session_id") or ""
+    session_id = (
+        payload.get("session_id")
+        or payload.get("active_session_id")
+        or ""
+    )
+
     route = _route_for_intent(intent)
 
     debug = {

@@ -193,6 +193,7 @@ if (
 
 async function loadDesktopSessionsExternal() {
   const list = $("desktopSessionList");
+if (!list || window.__NOVA_SESSION_V2_LOCK__) return;
 
   if (!list) return;
 
@@ -220,7 +221,7 @@ async function loadDesktopSessionsExternal() {
     const btn = document.createElement("div");
 
     btn.className =
-      "desktop-session-item" +
+      "nova-v2-session-item" +
       (sid === active ? " is-active" : "");
 
     btn.dataset.sessionId = sid;
@@ -452,11 +453,10 @@ function wireButtons() {
   }
 }
 
-  window.getSessionId = window.getSessionId || getSessionId;
-  window.setSessionId = window.setSessionId || setSessionId;
-  window.NovaDesktopOpenSession = openSession;
-  window.loadDesktopSessions = loadDesktopSessionsExternal;
-  window.NovaDesktopLoadSessions = loadDesktopSessionsExternal;
+window.getSessionId = window.getSessionId || getSessionId;
+window.setSessionId = window.setSessionId || setSessionId;
+window.NovaDesktopOpenSession = openSession;
+window.NovaDesktopLoadSessions = null;
 window.NovaDesktopNewSession = newSessionExternal;
 
   if (document.readyState === "loading") {

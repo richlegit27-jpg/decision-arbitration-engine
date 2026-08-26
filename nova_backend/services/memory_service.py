@@ -11,6 +11,7 @@ from nova_backend.services.auth_context import get_current_user_id
 
 # NOVA_BAD_MEMORY_SAVE_GUARD_SAFE_20260610
 _BAD_MEMORY_SAVE_MARKERS_20260610 = (
+
     "Project-aware context for Nova:",
     "Recent session context:",
     "Relevant persistent memory:",
@@ -18,6 +19,19 @@ _BAD_MEMORY_SAVE_MARKERS_20260610 = (
     "Key points:",
     "[CURRENT UPLOADED",
     "python app.py Project-aware context",
+)
+
+# NOVA_WEAK_MEMORY_MARKERS_SAFE_20260822
+_NOVA_WEAK_MEMORY_MARKERS_20260822 = (
+    "temporary",
+    " temp",
+    "test",
+    " trace",
+    "debug",
+    "debugging",
+    "experiment",
+    "testing",
+    "sample",
 )
 
 def _nova_should_reject_memory_item_20260610(item):
@@ -42,7 +56,31 @@ def _nova_should_reject_memory_item_20260610(item):
     if not value:
         return True
 
+    lowered = value.lower()
+
+    junk_memory = (
+        "hi",
+        "hello",
+        "hey",
+        "yo",
+        "ok",
+        "okay",
+        "thanks",
+        "thank you",
+        "thx",
+        "test",
+    )
+
+    if lowered in junk_memory:
+        return True
+
     if any(marker in value for marker in _BAD_MEMORY_SAVE_MARKERS_20260610):
+        return True
+
+    if any(
+        marker in value.lower()
+        for marker in _NOVA_WEAK_MEMORY_MARKERS_20260822
+    ):
         return True
 
     if kind == "user_fact" and len(value) > 500:
@@ -88,10 +126,25 @@ def _nova_memory_semantic_key_20260618(text: str) -> str:
         "favorite color is": "favorite color",
         "fav color is": "favorite color",
         "fav color": "favorite color",
+
         "i like": "likes",
         "i prefer": "prefers",
         "richard likes": "likes",
         "rich likes": "likes",
+
+        "remember that my name is": "name is",
+        "my name is": "name is",
+        "my name": "name is",
+
+        "nova uses powershell commands": "always use powershell commands",
+        "i always want powershell commands": "always use powershell commands",
+        "always want powershell commands": "always use powershell commands",
+        "use powershell commands": "always use powershell commands",
+
+        "remember that nova uses port 5001 for development": "nova uses port 5001",
+        "nova uses port 5001 for development": "nova uses port 5001",
+        "remember that nova uses port 5001": "nova uses port 5001",
+        "nova uses port 5001": "nova uses port 5001",
     }
 
     for old, new in replacements.items():
@@ -104,7 +157,31 @@ def _nova_memory_semantic_key_20260618(text: str) -> str:
 
     return " ".join(words)
 
+def _nova_memory_fact_key(text: str) -> str:
+    value = str(text or "").lower().strip()
+
+    if "nova" in value and "backend" in value and "port" in value:
+        return "nova_backend_port"
+
+    if "nova" in value and "ui" in value and "port" in value:
+        return "nova_ui_port"
+
+    if "ollama" in value and "port" in value:
+        return "ollama_port"
+
+    return ""
+
 class MemoryService:
+
+    def _nova_should_accept_memory_confidence(self, item):
+        try:
+            confidence = float(
+                item.get("confidence", 0.5)
+            )
+        except Exception:
+            confidence = 0.5
+
+        return confidence >= 0.35
 
     def _current_owner_id(self) -> str:
         return get_current_user_id()
@@ -132,12 +209,51 @@ class MemoryService:
             save_json_file(self.memory_file, {"memory": []})
 
     def _read_store(self) -> Dict[str, Any]:
-        data = load_json_file(self.memory_file, {"memory": []})
+        data = load_json_file(
+            self.memory_file,
+            {"memory": []},
+        )
+
         if not isinstance(data, dict):
             return {"memory": []}
 
         if not isinstance(data.get("memory"), list):
             data["memory"] = []
+
+        memory = data["memory"]
+
+        seen_fact_keys = {}
+
+        cleaned_memory = []
+
+        for item in memory:
+            fact_key = item.get("fact_key")
+
+            if fact_key:
+                if fact_key in seen_fact_keys:
+                    existing = seen_fact_keys[fact_key]
+
+                    if (
+                        int(item.get("count") or 1)
+                        >
+                        int(existing.get("count") or 1)
+                    ):
+                        seen_fact_keys[fact_key] = item
+
+                    continue
+
+                seen_fact_keys[fact_key] = item
+
+            cleaned_memory.append(item)
+
+        data["memory"] = (
+            list(seen_fact_keys.values())
+            + [
+                item
+                for item in cleaned_memory
+                if not item.get("fact_key")
+            ]
+        )
 
         return data
 
@@ -145,10 +261,38 @@ class MemoryService:
         print(
             "DEBUG MEMORY WRITE PATH =",
             self.memory_file,
+            flush=True,
         )
 
         try:
-            save_json_file(self.memory_file, data)
+            print(
+                "[MEMORY WRITE DATA LAST ITEM]",
+                data.get("memory", [])[-1]
+                if data.get("memory")
+                else None,
+                flush=True,
+            )
+
+            save_json_file(
+                self.memory_file,
+                data,
+            )
+
+            print(
+                "[MEMORY WRITE COMPLETE]",
+                self.memory_file,
+                flush=True,
+            )
+
+            print(
+                "[MEMORY WRITE VERIFY]",
+                self.memory_file,
+                self.memory_file.exists(),
+                self.memory_file.stat().st_size
+                if self.memory_file.exists()
+                else 0,
+                flush=True,
+            )
 
         except Exception as exc:
             try:
@@ -165,6 +309,7 @@ class MemoryService:
                 pass
 
             raise
+
     def _base_weight_for_kind(self, kind: str, pinned: bool = False) -> float:
         if pinned:
             return 10.0
@@ -298,13 +443,42 @@ class MemoryService:
 
         return strong[-100:]
 
+    def _nova_memory_confidence(self, item):
+        try:
+            value = float(
+                item.get("confidence", 0.5)
+            )
+        except Exception:
+            value = 0.5
+
+        return max(
+            0.0,
+            min(value, 1.0)
+        )
+
     def add_memory(self, item: Dict[str, Any]) -> Dict[str, Any]:
         print(
             "[MEMORY ADD HIT]",
-            item,
+            {
+                "text": item.get("text"),
+                "kind": item.get("kind"),
+                "confidence": item.get("confidence"),
+                "source": item.get("source"),
+            },
+            flush=True,
         )
-        # NOVA_BAD_MEMORY_SAVE_GUARD_SAFE_20260610_ENTRY
+
         if _nova_should_reject_memory_item_20260610(item):
+            print(
+                "[MEMORY REJECTED]",
+                item,
+                flush=True,
+            )
+            return item
+
+        item["confidence"] = self._nova_memory_confidence(item)
+
+        if not self._nova_should_accept_memory_confidence(item):
             return item
 
         data = self._read_store()
@@ -313,37 +487,36 @@ class MemoryService:
         item = dict(item or {})
         now = iso_now()
 
-        new_text = str(item.get("text") or "").strip()
-        new_text_key = new_text.lower()
+        item_text = str(
+            item.get("text")
+            or ""
+        ).strip()
+
+        item["text"] = item_text
+
+        new_text_key = item_text.lower()
 
         new_kind = str(
             item.get("kind")
-            or _nova_classify_memory_kind(new_text)
+            or "note"
         ).strip().lower()
 
-        pinned = bool(item.get("pinned"))
-
-        conflict_groups = [
-            ("short answers", "long answers"),
-            ("concise", "detailed"),
-            ("formal", "casual"),
-        ]
-
-        for a, b in conflict_groups:
-            if a in new_text_key or b in new_text_key:
-                for i, existing in enumerate(memory):
-                    existing = dict(existing or {})
-                    existing_text = str(existing.get("text") or "").lower()
-
-                    if (a in existing_text or b in existing_text) and existing_text != new_text_key:
-                        existing["weight"] = 0.5
-                        existing["pinned"] = False
-                        existing["updated_at"] = now
-                        memory[i] = existing
-
-        item["text"] = new_text
         item["kind"] = new_kind
-        item["weight"] = float(item.get("weight") or self._base_weight_for_kind(new_kind, pinned=pinned))
+
+        fact_key = _nova_memory_fact_key(
+            item_text
+        )
+
+        if fact_key:
+            item["fact_key"] = fact_key
+
+        item["weight"] = float(
+            item.get("weight")
+            or self._base_weight_for_kind(
+                new_kind,
+                pinned=bool(item.get("pinned"))
+            )
+        )
 
         preference_keys = (
             "favorite color",
@@ -363,7 +536,6 @@ class MemoryService:
             "favorite game",
             "favourite game",
             "communication style",
-            "name is",
             "prefers to be called",
             "always want",
             "always use",
@@ -371,79 +543,115 @@ class MemoryService:
             "prefers",
         )
 
-        # 🔥 KEYED PREFERENCE REPLACEMENT
         for key in preference_keys:
             if key in new_text_key:
+
                 for i, existing in enumerate(memory):
                     existing = dict(existing or {})
-                    existing_text = str(existing.get("text") or "").strip().lower()
-                    existing_kind = str(existing.get("kind") or "note").strip().lower()
 
-                    print(
-                        "[MEMORY PREF MATCH CHECK]",
-                        {
-                            "key": key,
-                            "existing_text": existing_text,
-                            "new_text_key": new_text_key,
-                            "existing_kind": existing_kind,
-                            "new_kind": new_kind,
-                            "match": (
-                                key in existing_text
-                                and existing_kind == new_kind
-                            ),
-                        },
-                    )
+                    existing_text = str(
+                        existing.get("text")
+                        or ""
+                    ).strip().lower()
+
+                    existing_kind = str(
+                        existing.get("kind")
+                        or ""
+                    ).strip().lower()
 
                     if (
                         key in existing_text
                         and existing_kind == new_kind
-                        and existing_text == new_text_key
                     ):
-                        existing["count"] = int(existing.get("count") or 1) + 1
                         existing.update(item)
+
+                        existing["count"] = int(
+                            existing.get("count")
+                            or 1
+                        ) + 1
+
+                        existing["created_at"] = (
+                            existing.get("created_at")
+                            or now
+                        )
+
                         existing["updated_at"] = now
-                        existing["created_at"] = existing.get("created_at") or now
 
                         memory[i] = existing
+
                         data["memory"] = memory
+
                         self._write_store(data)
 
                         return existing
 
+
+
         # DUPLICATE REINFORCEMENT
         for i, existing in enumerate(memory):
             existing = dict(existing or {})
-            existing_text = str(existing.get("text") or "").strip().lower()
-            existing_kind = str(existing.get("kind") or "note").strip().lower()
+
+            existing_fact_key = existing.get(
+                "fact_key"
+            )
+
+            if not existing_fact_key:
+                existing_fact_key = _nova_memory_fact_key(
+                    existing.get("text")
+                )
+
+            existing_kind = str(
+                existing.get("kind") or "note"
+            ).strip().lower()
 
             if (
                 self._same_memory_owner(existing)
-                and existing_text == new_text_key
+                and existing_fact_key
+                and existing_fact_key == fact_key
                 and existing_kind == new_kind
             ):
-                count = int(existing.get("count") or 1) + 1
+                count = int(
+                    existing.get("count")
+                    or 1
+                ) + 1
+
                 existing_weight = float(
-                    existing.get("weight") or item.get("weight") or 1.0
+                    existing.get("weight")
+                    or item.get("weight")
+                    or 1.0
                 )
 
                 existing.update(item)
+
                 existing["count"] = count
+                existing["fact_key"] = fact_key
                 existing["updated_at"] = now
-                existing["created_at"] = existing.get("created_at") or now
+                existing["created_at"] = (
+                    existing.get("created_at")
+                    or now
+                )
 
                 # DECAY BEFORE BOOST
                 try:
                     from datetime import datetime, UTC
 
-                    created_at = existing.get("created_at")
+                    created_at = existing.get(
+                        "created_at"
+                    )
+
                     if created_at:
                         created_ts = datetime.fromisoformat(
                             created_at.replace("Z", "")
                         )
-                        age_days = (datetime.now(UTC) - created_ts).days
+
+                        age_days = (
+                            datetime.now(UTC)
+                            - created_ts
+                        ).days
 
                         if age_days > 7:
                             existing_weight *= 0.85
+
                         if age_days > 30:
                             existing_weight *= 0.65
 
@@ -453,10 +661,17 @@ class MemoryService:
                 # IMPORTANCE BOOST
                 boost = 1.25
 
+                existing_text = str(
+                    existing.get("text") or ""
+                ).lower()
+
                 if existing.get("pinned"):
                     boost = 0.5
 
-                if "from now on" in existing_text or "always" in existing_text:
+                if (
+                    "from now on" in existing_text
+                    or "always" in existing_text
+                ):
                     boost = 2.0
 
                 existing["weight"] = min(
@@ -469,15 +684,18 @@ class MemoryService:
                     existing["weight"] = 10.0
 
                 memory[i] = existing
+
                 data["memory"] = memory
                 self._write_store(data)
 
                 return existing
+
         # 🔥 NEW MEMORY
         if not item.get("id"):
             item["id"] = f"memory_{uuid.uuid4().hex}"
 
         owner_id = self._current_owner_id()
+
         if owner_id:
             item["owner_id"] = owner_id
 
@@ -485,14 +703,87 @@ class MemoryService:
         item["created_at"] = item.get("created_at") or now
         item["count"] = int(item.get("count") or 1)
 
-        # NOVA_MEMORY_DEDUPE_LOCK_20260618
-        normalized_text = str(item.get("text") or "").strip().lower()
-        semantic_text = _nova_memory_semantic_key_20260618(normalized_text)
+        normalized_text = str(
+            item.get("text") or ""
+        ).strip().lower()
 
+        semantic_text = _nova_memory_semantic_key_20260618(
+            normalized_text
+        )
+
+        fact_key = _nova_memory_fact_key(
+            normalized_text
+        )
+
+        if fact_key:
+            item["fact_key"] = fact_key
+
+        # FACT KEY REPLACEMENT
+        if fact_key:
+            for i, existing in enumerate(memory):
+                existing = dict(existing or {})
+
+                existing_fact_key = existing.get(
+                    "fact_key"
+                )
+
+                if not existing_fact_key:
+                    existing_fact_key = _nova_memory_fact_key(
+                        existing.get("text")
+                    )
+
+                    if existing_fact_key:
+                        existing["fact_key"] = existing_fact_key
+
+                if (
+                    self._same_memory_owner(existing)
+                    and existing_fact_key == fact_key
+                ):
+
+                    item["created_at"] = (
+                        existing.get("created_at")
+                        or now
+                    )
+
+                    item["count"] = int(
+                        existing.get("count")
+                        or 1
+                    ) + 1
+
+                    item["fact_key"] = fact_key
+
+                    item["updated_at"] = now
+
+                    if existing.get("pinned"):
+                        item["pinned"] = True
+
+                    if existing.get("weight"):
+                        item["weight"] = max(
+                            float(existing.get("weight") or 1.0),
+                            float(item.get("weight") or 1.0),
+                        )
+
+                    memory[i] = item
+
+                    data["memory"] = memory
+
+                    self._write_store(data)
+
+                    return item
+
+        # SEMANTIC DUPLICATE CHECK
         for i, existing in enumerate(memory):
             existing = dict(existing or {})
-            existing_text = str(existing.get("text") or "").strip().lower()
-            existing_semantic_text = _nova_memory_semantic_key_20260618(existing_text)
+
+            existing_text = str(
+                existing.get("text") or ""
+            ).strip().lower()
+
+            existing_semantic_text = (
+                _nova_memory_semantic_key_20260618(
+                    existing_text
+                )
+            )
 
             if (
                 self._same_memory_owner(existing)
@@ -504,7 +795,10 @@ class MemoryService:
 
                 existing["updated_at"] = now
                 existing["last_seen_at"] = now
-                existing["count"] = int(existing.get("count") or 1) + 1
+                existing["count"] = int(
+                    existing.get("count")
+                    or 1
+                ) + 1
 
                 if item.get("weight"):
                     existing["weight"] = max(
@@ -513,20 +807,63 @@ class MemoryService:
                     )
 
                 memory[i] = existing
+
                 data["memory"] = memory
+
                 self._write_store(data)
+
                 return existing
+
+
+        print(
+            "[FINAL MEMORY BEFORE APPEND]",
+            item,
+            flush=True,
+        )
 
         memory.append(item)
 
-        # ðŸ”¥ CLEANUP WEAK MEMORY
+        print(
+            "[MEMORY APPENDED ITEM]",
+            item,
+            flush=True,
+        )
+
+        print(
+            "[MEMORY COUNT AFTER APPEND]",
+            len(memory),
+            flush=True,
+        )
+
+        # 🔥 CLEANUP WEAK MEMORY
         memory = [
             m for m in memory
             if float(m.get("weight", 1.0)) > 0.5
         ]
 
         MAX_MEMORY_ITEMS = 300
+        print(
+            "[BEFORE SUMMARY CHECK]",
+            [
+
+                m.get("text")
+                for m in memory
+                if "full file" in str(m.get("text") or "").lower()
+            ],
+            flush=True,
+        )
+
         memory = self.summarize_memory_list(memory)
+
+        print(
+            "[AFTER SUMMARY CHECK]",
+            [
+                m.get("text")
+                for m in memory
+                if "full file" in str(m.get("text") or "").lower()
+            ],
+            flush=True,
+        )
 
         memory.sort(
             key=lambda m: (
@@ -541,11 +878,15 @@ class MemoryService:
         memory = memory[:MAX_MEMORY_ITEMS]
 
         data["memory"] = memory
+
         self._write_store(data)
 
         return item
 
+ 
     def save_memory(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        return self.add_memory(item)
+
         data = self._read_store()
         memory = data.get("memory", [])
 
@@ -595,6 +936,10 @@ class MemoryService:
         memory = memory[:MAX_MEMORY_ITEMS]
 
         data["memory"] = memory
+
+        self._write_store(data)
+
+        return item
         self._write_store(data)
 
         return item
@@ -704,7 +1049,6 @@ class MemoryService:
             "favorite game",
             "favourite game",
             "communication style",
-            "name is",
             "prefers to be called",
         )
 
@@ -732,6 +1076,40 @@ class MemoryService:
                 "can you ",
                 "tell me ",
             )
+
+            transient_patterns = (
+                "price right now",
+                "current price",
+                "stock price",
+                "weather today",
+                "latest news",
+                "search for",
+                "look up",
+                "tell me the price",
+                "what time is",
+                "current time",
+            )
+
+            if any(pattern in text for pattern in transient_patterns):
+                removed.append(item)
+                continue
+
+            protected_junk_patterns = (
+                "price right now",
+                "current price",
+                "stock price",
+                "weather today",
+                "latest news",
+                "search for",
+                "look up",
+            )
+
+            if any(
+                pattern in text
+                for pattern in protected_junk_patterns
+            ):
+                removed.append(item)
+                continue
 
             if text.endswith("?") or text.startswith(question_starters):
                 removed.append(item)

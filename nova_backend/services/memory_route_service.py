@@ -142,6 +142,15 @@ class MemoryRouteService:
                 message="Memory deleted." if deleted else "Memory not found.",
             )
 
+        @app.post("/api/memory/clear")
+        def api_memory_clear():
+            self.memory_service.clear()
+
+            return {
+                "ok": True,
+                "message": "All memories cleared.",
+            }
+
         @app.post("/api/memory/update")
         @guarded_json_route
         def api_memory_update():

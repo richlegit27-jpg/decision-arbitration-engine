@@ -2478,17 +2478,35 @@ class ChatService:
 
         for raw in raw_steps:
             if isinstance(raw, dict):
-                title = str(raw.get("title") or "").strip()
+                step = dict(raw)
+                title = str(
+                    step.get("title") or ""
+                ).strip()
             else:
+                step = {}
                 title = str(raw).strip()
 
             if not title:
                 continue
 
-            clean_steps.append({
-                "title": title,
-                "status": "pending",
-            })
+            step["title"] = title
+
+            if "action" not in step:
+                step["action"] = ""
+
+            if "target_file" not in step:
+                step["target_file"] = ""
+
+            if "target_function" not in step:
+                step["target_function"] = ""
+
+            if "mutation_mode" not in step:
+                step["mutation_mode"] = ""
+
+            if "status" not in step:
+                step["status"] = "pending"
+
+            clean_steps.append(step)
 
         step_count = len(clean_steps)
 
@@ -2496,37 +2514,58 @@ class ChatService:
             execution["steps"] = []
             execution["current_step_index"] = 0
             execution["progress"] = 0
-            execution["current_step"] = "complete" if execution.get("status") == "complete" else ""
+            execution["current_step"] = (
+                "complete"
+                if execution.get("status") == "complete"
+                else ""
+            )
             execution["status"] = "complete"
             return execution
 
         try:
-            current_index = int(execution.get("current_step_index", 0) or 0)
+            current_index = int(
+                execution.get("current_step_index", 0)
+                or 0
+            )
         except Exception:
             current_index = 0
 
         if current_index < 0:
             current_index = 0
+
         if current_index > step_count:
             current_index = step_count
 
-        status = str(execution.get("status") or "running").strip().lower()
-        if status not in ["running", "complete", "blocked"]:
+        status = str(
+            execution.get("status")
+            or "running"
+        ).strip().lower()
+
+        if status not in [
+            "running",
+            "complete",
+            "blocked",
+        ]:
             status = "running"
 
         if status == "complete" or current_index >= step_count:
             current_index = step_count
+
             for step in clean_steps:
                 step["status"] = "done"
+
             progress = step_count
             current_step = "complete"
             status = "complete"
+
         else:
             for idx, step in enumerate(clean_steps):
                 if idx < current_index:
                     step["status"] = "done"
+
                 elif idx == current_index:
                     step["status"] = "current"
+
                 else:
                     step["status"] = "pending"
 
@@ -2538,6 +2577,7 @@ class ChatService:
         execution["progress"] = progress
         execution["current_step"] = current_step
         execution["status"] = status
+
         return execution
 
 
@@ -2881,17 +2921,54 @@ Write the exact goal in one sentence.
             "Summarize outcome and next move",
         ]
 
-        execution = self._normalize_execution_state({
-            "goal": goal,
-            "steps": [
-                {"title": s, "status": "current" if i == 0 else "pending"}
-                for i, s in enumerate(steps)
-            ],
-            "current_step_index": 0,
-            "progress": 0,
-            "current_step": steps[0],
-            "status": "running",
-        })
+        execution = self._normalize_execution_state(
+            {
+                "goal": goal,
+                "steps": [
+                    {
+                        "title": (
+                            s.get("title")
+                            if isinstance(s, dict)
+                            else s
+                        ),
+                        "action": (
+                            s.get("action")
+                            if isinstance(s, dict)
+                            else None
+                        ),
+                        "target_file": (
+                            s.get("target_file")
+                            if isinstance(s, dict)
+                            else ""
+                        ),
+                        "target_function": (
+                            s.get("target_function")
+                            if isinstance(s, dict)
+                            else ""
+                        ),
+                        "mutation_mode": (
+                            s.get("mutation_mode")
+                            if isinstance(s, dict)
+                            else ""
+                        ),
+                        "status": (
+                            "current"
+                            if i == 0
+                            else "pending"
+                        ),
+                    }
+                    for i, s in enumerate(steps)
+                ],
+                "current_step_index": 0,
+                "progress": 0,
+                "current_step": (
+                    steps[0].get("title")
+                    if isinstance(steps[0], dict)
+                    else steps[0]
+                ),
+                "status": "running",
+            }
+        )
 
         body = self._render_execution(execution)
 

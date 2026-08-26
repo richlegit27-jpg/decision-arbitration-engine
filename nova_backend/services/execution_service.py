@@ -102,15 +102,33 @@ class ExecutionService:
         )
 
         normalized = {
-            "id": self._safe_str(step.get("id"), f"step_{index + 1}"),
+            **deepcopy(step),
+            "id": self._safe_str(
+                step.get("id"),
+                f"step_{index + 1}",
+            ),
             "text": text,
             "status": status,
-            "notes": self._safe_str(step.get("notes")),
-            "started_at": self._safe_str(step.get("started_at")),
-            "completed_at": self._safe_str(step.get("completed_at")),
-            "blocked_at": self._safe_str(step.get("blocked_at")),
-            "failed_at": self._safe_str(step.get("failed_at")),
-            "meta": deepcopy(step.get("meta")) if isinstance(step.get("meta"), dict) else {},
+            "notes": self._safe_str(
+                step.get("notes")
+            ),
+            "started_at": self._safe_str(
+                step.get("started_at")
+            ),
+            "completed_at": self._safe_str(
+                step.get("completed_at")
+            ),
+            "blocked_at": self._safe_str(
+                step.get("blocked_at")
+            ),
+            "failed_at": self._safe_str(
+                step.get("failed_at")
+            ),
+            "meta": (
+                deepcopy(step.get("meta"))
+                if isinstance(step.get("meta"), dict)
+                else {}
+            ),
         }
 
         now = self.iso_now()

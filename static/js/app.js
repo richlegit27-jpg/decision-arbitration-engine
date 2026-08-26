@@ -740,7 +740,9 @@ async function init(){
     renderMessages();
   }
 
-  window.NovaApp = {
+window.NovaApp = window.NovaApp || {};
+
+Object.assign(window.NovaApp, {
     state,
     apiFetch,
     getActiveChat,
@@ -751,7 +753,7 @@ async function init(){
     renderChatList,
     renderActiveChatCard,
     renderMessages
-  };
+});
 }
 
 document.addEventListener("DOMContentLoaded", init);

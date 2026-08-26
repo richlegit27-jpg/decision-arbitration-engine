@@ -1338,3 +1338,470 @@ Traceback (most recent call last):
     print(
     ^^^^^^
 SyntaxError: invalid syntax. Perhaps you forgot a comma?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute 'execution_bridge_service'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2424, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 526, in handle
+    execution_result = self._handle_execution_control(
+        user_text=user_text,
+        session_id=session_id,
+        attachments=attachments,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 6708, in _handle_execution_control
+    self._handle_mission_command_result(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        mission_command=mission_command,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        session_id=session_id,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 1829, in _handle_mission_command_result
+    return self.execution_bridge_service.start_execution(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute 'execution_bridge_service'. Did you mean: 'execution_state_service'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute 'execution_bridge_service'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2424, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 526, in handle
+    execution_result = self._handle_execution_control(
+        user_text=user_text,
+        session_id=session_id,
+        attachments=attachments,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 6708, in _handle_execution_control
+    self._handle_mission_command_result(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        mission_command=mission_command,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        session_id=session_id,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 1829, in _handle_mission_command_result
+    return self.execution_bridge_service.try_execution_autoplan_start(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute 'execution_bridge_service'. Did you mean: 'execution_state_service'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute 'execution_bridge_service'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2424, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 526, in handle
+        }
+    
+    ...<3 lines>...
+        execution_result = self._handle_execution_control(
+        ^
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 6708, in _handle_execution_control
+        flush=True,
+        ^^^^^^^^^^^
+    ...<2 lines>...
+    mission_result = (
+    ^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 1829, in _handle_mission_command_result
+AttributeError: 'ChatService' object has no attribute 'execution_bridge_service'. Did you mean: 'execution_state_service'?
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute 'execution_bridge_service'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2424, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 526, in handle
+            }
+    
+    ...<3 lines>...
+    
+    
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 6708, in _handle_execution_control
+        mission_command,
+    ...<2 lines>...
+    
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 1829, in _handle_mission_command_result
+    ).strip()
+           ^^
+AttributeError: 'ChatService' object has no attribute 'execution_bridge_service'. Did you mean: 'execution_state_service'?
+
+
+===== CHAT FAILURE =====
+NameError("name 'user_text' is not defined")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2424, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 220, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 531, in handle
+    execution_result = self._handle_execution_control(
+        user_text=user_text,
+        session_id=session_id,
+        attachments=attachments,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 6713, in _handle_execution_control
+    self._handle_mission_command_result(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        mission_command=mission_command,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        session_id=session_id,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 1836, in _handle_mission_command_result
+    user_text=user_text,
+              ^^^^^^^^^
+NameError: name 'user_text' is not defined
+
+
+===== CHAT FAILURE =====
+RecursionError('maximum recursion depth exceeded')
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2424, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 231, in guarded_handle
+    _nova_strip_source_payload_20260622(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        result
+        ^^^^^^
+    )
+    ^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(obj[key])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(obj[key])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 106, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(item)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(obj[key])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(obj[key])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(obj[key])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  [Previous line repeated 976 more times]
+RecursionError: maximum recursion depth exceeded
+
+
+===== CHAT FAILURE =====
+RecursionError('maximum recursion depth exceeded')
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2424, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 231, in guarded_handle
+    _nova_strip_source_payload_20260622(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        result
+        ^^^^^^
+    )
+    ^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(obj[key])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(obj[key])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 106, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(item)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(obj[key])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(obj[key])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(obj[key])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  [Previous line repeated 975 more times]
+RecursionError: maximum recursion depth exceeded
+
+
+===== CHAT FAILURE =====
+RecursionError('maximum recursion depth exceeded')
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2424, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 231, in guarded_handle
+    _nova_strip_source_payload_20260622(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        result
+        ^^^^^^
+    )
+    ^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(obj[key])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(obj[key])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 106, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(item)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(obj[key])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(obj[key])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(obj[key])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  [Previous line repeated 976 more times]
+RecursionError: maximum recursion depth exceeded
+
+
+===== CHAT FAILURE =====
+RecursionError('maximum recursion depth exceeded')
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2424, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 231, in guarded_handle
+    _nova_strip_source_payload_20260622(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        result
+        ^^^^^^
+    )
+    ^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(obj[key])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(obj[key])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 106, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(item)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(obj[key])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(obj[key])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+    _nova_strip_source_payload_20260622(obj[key])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  [Previous line repeated 975 more times]
+RecursionError: maximum recursion depth exceeded
+
+
+===== CHAT FAILURE =====
+RecursionError('maximum recursion depth exceeded')
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2424, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 231, in guarded_handle
+    self,
+    ^^^^^
+    *args,
+    ^^^^^^
+    **kwargs,
+    
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 106, in _nova_strip_source_payload_20260622
+    elif isinstance(obj[key], dict):
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 102, in _nova_strip_source_payload_20260622
+  [Previous line repeated 975 more times]
+RecursionError: maximum recursion depth exceeded
+
+
+===== CHAT FAILURE =====
+UnboundLocalError("cannot access local variable 'decision' where it is not associated with a value")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2440, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 545, in handle
+    execution_result = self._handle_execution_control(
+        user_text=user_text,
+        session_id=session_id,
+        attachments=attachments,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 6738, in _handle_execution_control
+    return self._apply_pending_fix(
+           ~~~~~~~~~~~~~~~~~~~~~~~^
+        session_id
+        ^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 3684, in _apply_pending_fix
+    decision = decision or {
+               ^^^^^^^^
+UnboundLocalError: cannot access local variable 'decision' where it is not associated with a value
+
+
+===== CHAT FAILURE =====
+UnboundLocalError("cannot access local variable 'decision' where it is not associated with a value")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2440, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 545, in handle
+    execution_result = self._handle_execution_control(
+        user_text=user_text,
+        session_id=session_id,
+        attachments=attachments,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 6738, in _handle_execution_control
+    return self._apply_pending_fix(
+           ~~~~~~~~~~~~~~~~~~~~~~~^
+        session_id
+        ^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 3684, in _apply_pending_fix
+    decision = decision or {
+               ^^^^^^^^
+UnboundLocalError: cannot access local variable 'decision' where it is not associated with a value
+
+
+===== CHAT FAILURE =====
+UnboundLocalError("cannot access local variable 'decision' where it is not associated with a value")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2440, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 545, in handle
+    execution_result = self._handle_execution_control(
+        user_text=user_text,
+        session_id=session_id,
+        attachments=attachments,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 6738, in _handle_execution_control
+        session_id
+           ^^^^^^^
+    )
+    ^
+    
+    
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 3684, in _apply_pending_fix
+    decision = {
+               ^
+UnboundLocalError: cannot access local variable 'decision' where it is not associated with a value

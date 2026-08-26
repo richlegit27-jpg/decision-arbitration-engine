@@ -1,4 +1,5 @@
 import uuid
+
 class ChatResponseHandler:
 
     def __init__(self, chat_service):
@@ -419,18 +420,7 @@ class ChatResponseHandler:
             },
         )
 
-        try:
-            memory_written = self.chat_service._maybe_write_memory(
-                decision,
-                clean_memory_user_text,
-                session_id,
-            )
-
-        except Exception as e:
-            self.exec_debug(
-                "FINALIZE_MEMORY_WRITE_ERROR:",
-                e,
-            )
+        memory_written = False
 
         # NOVA_DIRECT_MEMORY_SAVE_RESPONSE_LOCK_20260618
         clean_memory_lc = " ".join(clean_memory_user_text.lower().split())
@@ -641,6 +631,54 @@ class ChatResponseHandler:
                 e,
             )
 
+
+        try:
+            if isinstance(user_msg, dict):
+                self.chat_service.session_service.append_message(
+                    session_id,
+                    user_msg,
+                )
+
+            if isinstance(assistant_msg, dict):
+                self.chat_service.session_service.append_message(
+                    session_id,
+                    assistant_msg,
+                )
+
+            print(
+                "[SESSION SAVE COMPLETE]",
+                session_id,
+            )
+
+        except Exception as e:
+            print(
+                "[SESSION SAVE FAILED]",
+                repr(e),
+            )
+
+        try:
+            if isinstance(user_msg, dict):
+                self.chat_service._persist_message_fallback(
+                    session_id,
+                    user_msg,
+                )
+
+            if isinstance(assistant_msg, dict):
+                self.chat_service._persist_message_fallback(
+                    session_id,
+                    assistant_msg,
+                )
+
+            print(
+                "[SESSION SAVE COMPLETE]",
+                session_id,
+            )
+
+        except Exception as e:
+            print(
+                "[SESSION SAVE FAILED]",
+                repr(e),
+            )
 
         return {
             "ok": True,

@@ -166,6 +166,7 @@ def chat_handle(
                 or {}
             ),
             session_id=session_id,
+            user_text=user_text,
             user_msg=service._build_user_message(
                 user_text,
                 attachments=attachments,

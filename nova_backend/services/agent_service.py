@@ -40,7 +40,6 @@ class AgentService:
         "smff",
         "powershell me always",
     )
-
     CODING_MARKERS = (
         "code",
         "python",
@@ -51,6 +50,10 @@ class AgentService:
         "html",
         "bug",
         "fix",
+        "repair",
+        "broken",
+        "incorrect",
+        "fails",
         "debug",
         "error",
         "traceback",
@@ -66,6 +69,7 @@ class AgentService:
         "wire",
         "implement",
         "patch",
+        "replace",
         "file",
         "app.py",
         "nova",

@@ -189,9 +189,11 @@ class MemoryContextService:
     def memory_kind_weight(self, kind: str) -> float:
         weights = {
             "profile": 5.0,
-            "preference": 4.0,
-            "user_fact": 4.0,
-            "project_focus": 3.5,
+            "preference": 4.5,
+            "user_fact": 4.5,
+            "fact": 4.5,
+            "project_focus": 4.0,
+            "project": 4.0,
             "note": 2.0,
             "memory": 1.0,
         }
@@ -200,7 +202,6 @@ class MemoryContextService:
             str(kind or "").strip().lower(),
             1.0,
         )
-
 
     def memory_time_bonus(self, item: dict) -> float:
         if not isinstance(item, dict):
@@ -453,6 +454,38 @@ class MemoryContextService:
                     "memory": memory,
                 }
             )
+
+        # NOVA_IDENTITY_CONFLICT_RESOLUTION
+        identity_items = []
+        other_items = []
+
+        for item in ranked:
+            content_lc = str(
+                item.get("content") or ""
+            ).lower()
+
+            if (
+                "my name is" in content_lc
+                or "user's name" in content_lc
+                or "called" in content_lc
+            ):
+                identity_items.append(item)
+            else:
+                other_items.append(item)
+
+        if identity_items:
+            identity_items.sort(
+                key=lambda item: (
+                    item["score"],
+                    -item["index"],
+                ),
+                reverse=True,
+            )
+
+            ranked = [
+                identity_items[0],
+                *other_items,
+            ]
 
         ranked.sort(
             key=lambda item: (

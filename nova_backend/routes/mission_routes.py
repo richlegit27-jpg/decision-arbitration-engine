@@ -13,22 +13,44 @@ def register_mission_routes(
 
     def persist_mission_state(session_id, mission):
         if execution_state_service and session_id:
-            execution_state_service.persist_working_state(
+            execution_state_service.save_execution_state(
                 session_id,
                 {
-                    "active_execution": {
-                        "id": mission.get("id"),
-                        "goal": mission.get("goal"),
-                        "status": mission.get("status"),
-                        "steps": mission.get("steps", []),
-                        "current_step_index": mission.get(
-                            "current_step",
-                            0,
-                        ),
-                    }
+                    "id": mission.get("id"),
+                    "mission_id": mission.get("id"),
+                    "goal": (
+                        mission.get("goal")
+                        or mission.get("title")
+                        or "Untitled mission"
+                    ),
+                    "status": mission.get(
+                        "status",
+                        "running",
+                    ),
+                    "task_type": "general",
+                    "context": {
+                        "source": "mission_routes",
+                        "mission": mission,
+                    },
+                    "execution_decision": {},
+                    "steps": mission.get(
+                        "steps",
+                        [],
+                    ),
+                    "current_index": mission.get(
+                        "current_step",
+                        0,
+                    ),
+                    "current_step_index": mission.get(
+                        "current_step",
+                        0,
+                    ),
+                    "history": [],
+                    "waiting": True,
+                    "complete": False,
+                    "error": None,
                 },
             )
-
     @app.get("/api/missions")
     def list_missions():
 

@@ -402,9 +402,12 @@ async function initCoreServices(){
 
           scheduleStreamingRender(lastMessage)
         },
-        onDone(payload = {}){
-          cancelPendingStreamingRender()
-          state.isStreaming = false
+
+onDone(payload = {}){
+  cancelPendingStreamingRender()
+  state.isStreaming = false
+
+  window.NovaComposerActions?.clearThinkingIndicator?.()
 
           if(Array.isArray(payload?.messages)){
             mergeDoneMessages(payload.messages)
@@ -428,13 +431,18 @@ async function initCoreServices(){
           renderAll()
           scrollToBottom(true)
         },
-        onError(error){
-          cancelPendingStreamingRender()
-          console.error("Nova stream error:", error)
-          state.isStreaming = false
-          renderAll()
-        },
-        onFinally(){
+
+onError(error){
+  cancelPendingStreamingRender()
+  console.error("Nova stream error:", error)
+  state.isStreaming = false
+
+  window.NovaComposerActions?.clearThinkingIndicator?.()
+
+  renderAll()
+    },
+
+    onFinally(){
           cancelPendingStreamingRender()
           state.isStreaming = false
           updateComposerState()

@@ -1,5 +1,6 @@
 import json
 
+
 class WorkingStateService:
 
     def __init__(self, session_service):
@@ -14,15 +15,30 @@ class WorkingStateService:
             if not isinstance(session, dict):
                 return {}
 
-            state = session.get("working_state")
+            state = session.get(
+                "working_state"
+            )
+
+            print(
+                "WORKING STATE READ DEBUG =",
+                {
+                    "session_id": session_id,
+                    "stored_state": state,
+                },
+                flush=True,
+            )
 
             return self.normalize_working_state(
                 state
             )
 
-        except Exception:
+        except Exception as e:
+            print(
+                "WORKING STATE READ ERROR =",
+                repr(e),
+                flush=True,
+            )
             return {}
-
 
     def update_working_state(
         self,
@@ -36,11 +52,29 @@ class WorkingStateService:
         if not isinstance(patch, dict):
             patch = {}
 
+        print(
+            "WORKING STATE PATCH DEBUG =",
+            {
+                "session_id": session_id,
+                "patch": patch,
+            },
+            flush=True,
+        )
+
         merged = dict(current)
         merged.update(patch)
 
         clean_state = self.normalize_working_state(
             merged
+        )
+
+        print(
+            "WORKING STATE CLEAN DEBUG =",
+            {
+                "session_id": session_id,
+                "clean_state": clean_state,
+            },
+            flush=True,
         )
 
         self.set_working_state(
@@ -49,6 +83,7 @@ class WorkingStateService:
         )
 
         return clean_state
+
     def set_working_state(
         self,
         session_id,
@@ -56,6 +91,15 @@ class WorkingStateService:
     ):
         clean_state = self.normalize_working_state(
             state
+        )
+
+        print(
+            "WORKING STATE SAVE DEBUG =",
+            {
+                "session_id": session_id,
+                "state": clean_state,
+            },
+            flush=True,
         )
 
         self.session_service.update_working_state(

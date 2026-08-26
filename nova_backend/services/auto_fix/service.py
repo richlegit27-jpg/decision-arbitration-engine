@@ -1,8 +1,15 @@
 
+from nova_backend.services.model_gateway_service import responses_create
+
 class AutoFixService:
 
     def __init__(self, chat_service):
         self.chat_service = chat_service
+        self.model = getattr(
+            chat_service,
+            "model",
+            None,
+        )
 
     def execute_file_fix(
         self,
@@ -277,10 +284,9 @@ class AutoFixService:
         # =============================
 
         try:
-            fixed_code = self._normalize_python_indentation(
+            fixed_code = self.chat_service._normalize_python_indentation(
                 fixed_code
             )
-
             self.chat_service._update_working_state(
                 session_id,
                 {

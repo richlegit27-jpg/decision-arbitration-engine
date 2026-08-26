@@ -66,23 +66,24 @@ def register_memory_panel_routes(app, memory_service):
 
         return _json_error("Memory service missing add_memory()", 500)
 
-    @app.post("/api/memory/delete")
-    def api_memory_delete():
-        from flask import request
-
-        data = request.get_json(silent=True) or {}
-        memory_id = str(data.get("id") or "").strip()
-
-        if not memory_id:
-            return _json_error("Missing memory id")
-
-        if hasattr(memory_service, "delete_memory"):
-            deleted = memory_service.delete_memory(memory_id)
-            return _json_ok(deleted=bool(deleted))
-
-        if hasattr(memory_service, "remove_memory"):
-            deleted = memory_service.remove_memory(memory_id)
-            return _json_ok(deleted=bool(deleted))
-
-        return _json_error("Memory service missing delete method", 500)
+# DUPLICATE DISABLED - handled by MemoryRouteService
+# @app.post("/api/memory/delete")
+# def api_memory_delete():
+#     from flask import request
+#
+#     data = request.get_json(silent=True) or {}
+#     memory_id = str(data.get("id") or "").strip()
+#
+#     if not memory_id:
+#         return _json_error("Missing memory id")
+#
+#     if hasattr(memory_service, "delete_memory"):
+#         deleted = memory_service.delete_memory(memory_id)
+#         return _json_ok(deleted=bool(deleted))
+#
+#     if hasattr(memory_service, "remove_memory"):
+#         deleted = memory_service.remove_memory(memory_id)
+#         return _json_ok(deleted=bool(deleted))
+#
+#     return _json_error("Memory service missing delete method", 500)
 
