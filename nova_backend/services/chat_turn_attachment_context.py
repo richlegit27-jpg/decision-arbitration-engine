@@ -289,14 +289,31 @@ def inject_attachment_context_message(
 
 
 def nova_chat_turn_inject_attachment_context_from_locals(
-    messages: Any,
-    scope: dict[str, Any] | None = None,
-) -> Any:
-    attachments = collect_attachments_from_scope(scope)
-    return inject_attachment_context_message(messages, attachments)
+    messages,
+    attachments,
+):
+    if not attachments:
+        try:
+            from flask import g
 
+            attachments = getattr(
+                g,
+                "attachments",
+                [],
+            ) or getattr(
+                g,
+                "nova_attachments",
+                [],
+            ) or []
 
-# NOVA_CHAT_TURN_ATTACHMENT_HYDRATOR_WIRING_20260705
+        except Exception:
+            attachments = []
+
+    return inject_attachment_context_message(
+        messages,
+        attachments,
+    )
+
 def nova_chat_turn_inject_attachment_context_from_locals(
     messages: Any,
     scope: dict[str, Any] | None = None,
