@@ -325,19 +325,21 @@ class ChatExecutionService:
             state.get("current_index") or 0
         )
 
-        if (
-            user_text
-            and current_index < len(steps)
-        ):
+        current_index = int(
+            state.get("current_index") or 0
+        )
 
-            ignored_commands = {
-                "next",
-                "continue",
-                "go",
-                "run",
-                "advance",
-            }
+        ignored_commands = {
+            "next",
+            "continue",
+            "go",
+            "run",
+            "advance",
+        }
 
+        current_step = None
+
+        if current_index < len(steps):
             current_step = steps[current_index]
 
         # Activate waiting implementation step
@@ -674,16 +676,14 @@ class ChatExecutionService:
 
             steps = state.get("steps") or []
 
+            next_index = current_index + 1
+
             if state.get("complete"):
                 return self._copy_state(
                     state
                 )
 
             current_step = steps[current_index]
-
-
-
-            next_index = current_index + 1
 
 
             if (
@@ -805,8 +805,6 @@ class ChatExecutionService:
             self._save_states()
 
             return self._copy_state(state)
-
-        next_index = current_index + 1
 
         state["current_index"] = next_index
 
