@@ -8,8 +8,8 @@ or modify this file during a mutation test.
 
 
 def mutation_test_value():
-    # Changed the return value from 'after' to 'mutated' to simulate mutation
-    return "mutated"
+    # Changed the return value from 'mutated' to 'mutation_target' to determine implementation target
+    return "mutation_target"
 
 
 def run_mutation_test():
