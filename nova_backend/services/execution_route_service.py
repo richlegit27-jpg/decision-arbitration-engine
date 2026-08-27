@@ -7,10 +7,10 @@ class ExecutionRouteService:
 
     def __init__(
         self,
-        chat_service,
-        execution_service,
+        working_state_service=None,
+        execution_service=None,
     ):
-        self.chat_service = chat_service
+        self.working_state_service = working_state_service
         self.execution_service = execution_service
 
     def execution_control(self):
@@ -31,22 +31,24 @@ class ExecutionRouteService:
                 "error": "missing action",
             }), 400
 
-        working = {}
+        if not self.working_state_service or not self.execution_service:
+            return jsonify({
+                "ok": False,
+                "error": "execution control is unavailable",
+            }), 503
 
-        working = {}
-
-        if self.working_state_service:
-            working = (
-                self.working_state_service.get_working_state(
-                    session_id
-                )
-                or {}
+        working = (
+            self.working_state_service.get_working_state(
+                session_id
             )
+            or {}
+        )
 
         execution = working.get("execution")
 
-        if not isinstance(execution, dict):
-            execution = {}
+        execution = self.execution_service.normalize_execution(
+            execution
+        )
 
         execution = self.execution_service.apply_control_action(
             execution,

@@ -1,4 +1,5 @@
 
+
 from typing import Any
 
 from nova_backend.services.project_brain_context_builder import (
@@ -25,6 +26,98 @@ class ExecutionBridgeService:
     ):
 
         try:
+
+            state = self.chat_execution_service.get_state(
+                session_id
+            )
+
+            print(
+                "[EXECUTION TARGET DEBUG]",
+                {
+                    "session_id": session_id,
+                    "user_text": user_text,
+                    "state": state,
+                },
+                flush=True,
+            )
+
+            if state:
+                steps = state.get("steps") or []
+
+                current_index = int(
+                    state.get("current_index") or 0
+                )
+
+                if current_index < len(steps):
+                    current_step = steps[current_index]
+
+                    if (
+                        isinstance(current_step, dict)
+                        and current_step.get("next_action")
+                        == "request_target"
+                    ):
+                        target = str(
+                            user_text or ""
+                        ).strip()
+
+                        ignored_commands = {
+                            "next",
+                            "continue",
+                            "go",
+                            "run",
+                            "advance",
+                        }
+
+                        if (
+                            not target
+                            or target.lower() in ignored_commands
+                            or target.lower().startswith(
+                                "auto-plan"
+                            )
+                            or target.lower().startswith(
+                                "autoplan"
+                            )
+                        ):
+                            return None
+
+                        current_step["target_file"] = target
+                        current_step["target_files"] = [
+                            target
+                        ]
+                        current_step["next_action"] = (
+                            "generate_file_replacement"
+                        )
+                        current_step["mutation_ready"] = True
+                        current_step["payload_required"] = True
+                        current_step["status"] = "active"
+
+                        steps[current_index] = current_step
+                        state["steps"] = steps
+                        state["current_step"] = current_step
+
+                        self.chat_execution_service._save_states()
+
+                        return {
+                            "ok": True,
+                            "skip_cleanup": True,
+                            "skip_post_processing": True,
+                            "skip_rewrite": True,
+                            "assistant_message": {
+                                "role": "assistant",
+                                "text": (
+                                    "Target captured:\n"
+                                    + target
+                                    + "\n\nReady for implementation."
+                                ),
+                                "content": (
+                                    "Target captured:\n"
+                                    + target
+                                    + "\n\nReady for implementation."
+                                ),
+                            },
+                            "execution_state": state,
+                        }
+
             if not self.chat_execution_service.is_execution_trigger(
                 user_text
             ):
@@ -37,8 +130,10 @@ class ExecutionBridgeService:
                 return None
 
             state = self.chat_execution_service.advance(
-                session_id
+                session_id,
+                user_text,
             )
+
             reply_text = (
                 self._format_execution_response(state)
                 if hasattr(
@@ -269,19 +364,23 @@ class ExecutionBridgeService:
                         "action": "design",
                     },
                     {
-                        "title": "Work through implementation",
+                        "title": "Determine implementation target",
                         "action": "implement",
                         "target_file": "",
                         "target_files": [],
                         "target_function": "",
                         "mutation_mode": "file",
-                        "next_action": "generate_file_replacement",
-                        "mutation_ready": True,
+                        "next_action": "request_target",
+                        "mutation_ready": False,
                         "payload_required": True,
+                        "status": "pending",
                     },
                     {
                         "title": "Review result",
                         "action": "review",
+                        "target_file": "",
+                        "target_files": [],
+                        "target_function": "",
                     },
                 ]
 
@@ -313,17 +412,28 @@ class ExecutionBridgeService:
 
                     step["mutation_mode"] = "file"
 
-                    step.setdefault(
-                        "next_action",
-                        "generate_file_replacement",
-                    )
+                    if not step.get("target_file"):
+                        step["next_action"] = (
+                            "request_target"
+                        )
+                        step["mutation_ready"] = False
+                        step["payload_required"] = True
 
-                    step["mutation_ready"] = True
-                    step["payload_required"] = True
+                    else:
+                        step["next_action"] = (
+                            "generate_file_replacement"
+                        )
+                        step["mutation_ready"] = True
+                        step["payload_required"] = True
+
+
+            session_id = self.chat_service._ensure_session_id(
+                session_id
+            )
+
             print(
                 "AUTOPLAN BEFORE START",
                 {
-
                     "has_chat_execution_service": hasattr(
                         self,
                         "chat_execution_service",
@@ -363,6 +473,12 @@ class ExecutionBridgeService:
                 },
             )
 
+            print(
+                "DEBUG STATE AFTER EXECUTION START =",
+                state,
+                flush=True,
+            )
+
             if state:
                 if self.chat_service and hasattr(
                     self.chat_service,
@@ -372,7 +488,6 @@ class ExecutionBridgeService:
                         session_id,
                         state,
                     )
-
             step_lines = []
 
             for index, step in enumerate(steps):
@@ -384,6 +499,12 @@ class ExecutionBridgeService:
                     step_lines.append(
                         f"{index + 1}. {step}"
                     )
+
+            print(
+                "DEBUG EXECUTION BRIDGE STATE BEFORE RETURN =",
+                state,
+                flush=True,
+            )
 
             reply_text = (
                 "Mission created.\n\n"
@@ -400,6 +521,8 @@ class ExecutionBridgeService:
                 "skip_post_processing": True,
                 "skip_rewrite": True,
                 "assistant_message": {
+                    "session_id": session_id,
+                    "active_session_id": session_id,
                     "role": "assistant",
                     "text": reply_text,
                     "content": reply_text,
@@ -407,6 +530,8 @@ class ExecutionBridgeService:
                 },
                 "execution_state": state,
             }
+
+
 
         except Exception as exc:
             self.logger.exception(
@@ -455,6 +580,19 @@ class ExecutionBridgeService:
 
             state = self.chat_execution_service.get_state(
                 session_id
+            )
+            print(
+                "DEBUG TARGET CAPTURE CHECK",
+                {
+                    "session_id": session_id,
+                    "current_index": state.get("current_index")
+                    if isinstance(state, dict)
+                    else None,
+                    "steps": state.get("steps")
+                    if isinstance(state, dict)
+                    else None,
+                },
+                flush=True,
             )
 
             if (
@@ -517,4 +655,115 @@ class ExecutionBridgeService:
             }
 
         except Exception:
+            return None
+
+    def try_execution_target_capture(
+        self,
+        session_id,
+        user_text,
+    ):
+        try:
+            state = self.chat_execution_service.get_state(
+                session_id
+            )
+
+            if not isinstance(state, dict):
+                return None
+
+            steps = state.get("steps") or []
+
+            current_index = int(
+                state.get("current_index") or 0
+            )
+
+            if current_index >= len(steps):
+                return None
+
+            step = steps[current_index]
+
+            if not isinstance(step, dict):
+                return None
+
+            if step.get("next_action") != "request_target":
+                return None
+
+            target = str(
+                user_text or ""
+            ).strip()
+
+            ignored_commands = {
+                "next",
+                "continue",
+                "go",
+                "run",
+                "advance",
+            }
+
+            if (
+                not target
+                or target.lower() in ignored_commands
+                or target.lower().startswith(
+                    "auto-plan"
+                )
+                or target.lower().startswith(
+                    "autoplan"
+                )
+                or target.lower().startswith(
+                    "auto plan"
+                )
+            ):
+                return None
+
+            step["target_file"] = target
+            step["target_files"] = [
+                target
+            ]
+
+            step["next_action"] = (
+                "generate_file_replacement"
+            )
+            step["mutation_ready"] = True
+            step["payload_required"] = True
+            step["status"] = "active"
+            step["waiting_for_target"] = False
+
+            state["steps"][current_index] = step
+            state["current_step"] = step
+            state["status"] = "waiting"
+
+            self.chat_execution_service._states[
+                session_id
+            ] = state
+
+            self.chat_execution_service._sync_state_to_session(
+                session_id,
+                state,
+            )
+
+            self.chat_execution_service._save_states()
+
+            reply_text = (
+                "Target captured:\n"
+                f"{target}\n\n"
+                "Ready to continue. Send `next`."
+            )
+
+            return {
+                "ok": True,
+                "skip_cleanup": True,
+                "skip_post_processing": True,
+                "skip_rewrite": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": reply_text,
+                    "content": reply_text,
+                    "execution_state": state,
+                },
+                "execution_state": state,
+            }
+
+        except Exception as exc:
+            self.logger.exception(
+                "[ExecutionTargetCapture] failed"
+            )
             return None

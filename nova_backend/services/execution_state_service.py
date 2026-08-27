@@ -436,6 +436,18 @@ class ExecutionStateService:
                                             if step.get("mutation_mode"):
                                                 score += 3
 
+                                            if step.get("mutation_ready"):
+                                                score += 20
+
+                                            if step.get("next_action") in {
+                                                "generate_file_replacement",
+                                                "generate_function_replacement",
+                                            }:
+                                                score += 20
+
+                                            if step.get("payload_required"):
+                                                score += 5
+
                                 if item.get("history"):
                                     score += 2
 
@@ -759,12 +771,13 @@ class ExecutionStateService:
         except Exception:
             return service_saved
 
-
     def get_execution_state(
         self,
         session_id,
     ):
-        session_id = str(session_id or "").strip()
+        session_id = str(
+            session_id or ""
+        ).strip()
 
         if not session_id:
             return {}
@@ -783,139 +796,43 @@ class ExecutionStateService:
             },
         )
 
-        candidates = []
+        execution = state.get(
+            "execution_state"
+        )
 
-        for key in (
-            "active_execution",
-            "execution_state",
-            "execution",
-            "last_execution",
+        if (
+            isinstance(execution, dict)
+            and execution
         ):
-
-            execution = state.get(
-                key
-            )
-
-            if (
-                execution is None
-                and key in state
-            ):
-                continue
-
             print(
-                "DEBUG EXECUTION CANDIDATE:",
-                key,
-                bool(execution),
+                "DEBUG EXECUTION RETURN execution_state:",
+                {
+                    "status": execution.get("status"),
+                    "current_index": execution.get("current_index"),
+                    "steps": execution.get("steps"),
+                },
             )
 
-            if isinstance(execution, dict) and execution:
+            return execution
 
-                print(
-                    "DEBUG EXECUTION CANDIDATE DATA:",
-                    key,
-                    {
-                        "status": execution.get("status"),
-                        "current_index": execution.get("current_index"),
-                        "current_step_index": execution.get("current_step_index"),
-                        "complete": execution.get("complete"),
-                        "updated_at": execution.get("updated_at"),
-                    },
-                )
+        execution = state.get(
+            "active_execution"
+        )
 
-                print(
-                    "DEBUG CANDIDATE STEPS =",
-                    key,
-                    execution.get("steps"),
-                )
-
-                execution_index = int(
-                    execution.get(
-                        "current_index",
-                        execution.get(
-                            "current_step_index",
-                            0,
-                        ),
-                    )
-                    or 0
-                )
-
-                rich_steps = 0
-
-                if isinstance(
-                    execution.get("steps"),
-                    list,
-                ):
-                    for step in execution["steps"]:
-                        if isinstance(step, dict):
-                            if (
-                                step.get("action")
-                                or step.get("result")
-                                or step.get("text")
-                                or step.get("target_file")
-                                or step.get("mutation_mode")
-                            ):
-                                rich_steps += 1
-
-                execution["_state_priority_index"] = (
-                    (10 if rich_steps else 0)
-                    +
-                    (1 if execution.get("steps") else 0)
-                    +
-                    (
-                        2
-                        if execution.get("status")
-                        in {
-                            "running",
-                            "waiting_approval",
-                        }
-                        else 0
-                    )
-                    +
-                    (
-                        4
-                        if execution.get("status")
-                        == "complete"
-                        else 0
-                    )
-                    +
-                    execution_index
-                )
-
-                print(
-                    "DEBUG BEFORE APPEND FULL EXECUTION:",
-                    execution,
-                )
-
-                candidates.append(
-                    execution
-                )
-
-        if candidates:
-
-            candidates.sort(
-                key=lambda item: (
-                    int(
-                        item.get(
-                            "_state_priority_index",
-                            0,
-                        )
-                        or 0
-                    ),
-                    str(
-                        item.get("updated_at")
-                        or item.get("started_at")
-                        or ""
-                    ),
-                ),
-                reverse=True,
-            )
-
+        if (
+            isinstance(execution, dict)
+            and execution
+        ):
             print(
-                "DEBUG EXECUTION RETURN:",
-                candidates[0],
+                "DEBUG EXECUTION RETURN active_execution:",
+                {
+                    "status": execution.get("status"),
+                    "current_index": execution.get("current_index"),
+                    "steps": execution.get("steps"),
+                },
             )
 
-            return candidates[0]
+            return execution
 
         print(
             "DEBUG EXECUTION EMPTY:",
@@ -923,6 +840,7 @@ class ExecutionStateService:
         )
 
         return {}
+
     def save_execution_state(
         self,
         session_id,

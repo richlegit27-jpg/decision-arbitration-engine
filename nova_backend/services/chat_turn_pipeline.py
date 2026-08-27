@@ -107,7 +107,7 @@ def normalize_session_id(payload: dict[str, Any]) -> str:
     if session_id:
         return session_id
 
-    return "default"
+    return ""
 
 
 def _guess_attachment_kind(filename: str, mime_type: str, url: str) -> str:

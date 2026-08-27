@@ -27,6 +27,14 @@ class ExecutionOrchestratorService:
         state=None,
         command="",
     ):
+        if command in {
+            "next",
+            "continue",
+            "keep going",
+            "run next",
+        }:
+            command = "run_step"
+
         execution_state = (
             state
             if isinstance(state, dict)
@@ -39,12 +47,6 @@ class ExecutionOrchestratorService:
             or execution_state.get("intent")
             or execution_state.get("mode")
             or ""
-        )
-
-        return self._process_execution_command(
-            command=selected_command,
-            session_id=session_id,
-            execution_state=execution_state,
         )
 
         print(
@@ -60,6 +62,13 @@ class ExecutionOrchestratorService:
                     "status"
                 ),
             },
+            flush=True,
+        )
+
+        return self._process_execution_command(
+            command=selected_command,
+            session_id=session_id,
+            execution_state=execution_state,
         )
 
     def _save_execution_state(
@@ -851,16 +860,8 @@ class ExecutionOrchestratorService:
 
                 execution_state[
                     "current_step"
-                ] = (
-                    next_step.get("title")
-                    or ""
-                )
-
-                execution_state[
-                    "current_step_title"
-                ] = (
-                    next_step.get("title")
-                    or ""
+                ] = dict(
+                    next_step
                 )
 
                 execution_state[

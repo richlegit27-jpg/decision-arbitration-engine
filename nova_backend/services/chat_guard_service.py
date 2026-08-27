@@ -51,6 +51,17 @@ class ChatGuardService:
             if execution_status_result is not None:
                 return execution_status_result
 
+            target_capture_result = (
+                execution_bridge_service
+                .try_execution_target_capture(
+                    session_id,
+                    user_text,
+                )
+            )
+
+            if target_capture_result is not None:
+                return target_capture_result
+
             execution_result = (
                 execution_bridge_service
                 .try_execution_trigger(

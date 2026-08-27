@@ -459,10 +459,7 @@ chat_attachment_memory_service = ChatAttachmentMemoryService()
 chat_response_cleanup_service = ChatResponseCleanupService()
 chat_request_context_service = ChatRequestContextService()
 chat_stream_service = ChatStreamService()
-execution_route_service = ExecutionRouteService(
-    chat_execution_service,
-    chat_execution_service,
-)
+execution_route_service = None
 execution_bridge_service = ExecutionBridgeService(
     chat_execution_service,
     None,
@@ -877,6 +874,11 @@ chat_service = ChatService(
     memory_context_service=memory_context_service,
     working_state_service=working_state_service,
     execution_state_service=execution_state_service,
+)
+
+execution_route_service = ExecutionRouteService(
+    working_state_service=working_state_service,
+    execution_service=chat_service.execution_service,
 )
 
 attachment_action_service = AttachmentActionService(
@@ -1636,8 +1638,30 @@ def api_chat():
         data.get("session_id")
         or data.get("chat_id")
         or ""
+
     ).strip()
     from flask import session as flask_session
+
+    from flask import session as flask_session
+
+    auth_user_id = (
+        flask_session.get("nova_user_id")
+        or flask_session.get("user_id")
+        or ""
+    )
+
+    session_id = session_bootstrap_service.resolve_chat_session(
+        session_id,
+        data,
+        user_text,
+        auth_user_id,
+    )
+
+    print(
+        "[DEBUG EARLY SESSION RESOLVE]",
+        repr(session_id),
+        flush=True,
+    )
     # NOVA_API_CHAT_IMAGE_VISION_GATE_20260607
     try:
         from pathlib import Path as _NovaPath
@@ -1670,7 +1694,13 @@ def api_chat():
         )
 
         _nova_user_text = _nova_chat_context["user_text"]
-        _nova_session_id = _nova_chat_context["session_id"]
+
+        _nova_session_id = (
+            session_id
+            or _nova_chat_context.get("session_id")
+            or ""
+        )
+
         _nova_attachments = _nova_chat_context["attachments"]
 
         user_text = _nova_user_text
@@ -2434,6 +2464,59 @@ def api_chat():
         image_command_user_text = (
             "generate image "
             + (user_text[6:].strip() or "image")
+        )
+
+    print(
+        "DEBUG API BEFORE CHAT_SERVICE SESSION=",
+        repr(session_id),
+        flush=True,
+    )
+
+    # NOVA_EXECUTION_TARGET_CAPTURE_GATE
+    try:
+
+        execution_state = (
+            chat_execution_service.get_state(
+                session_id
+            )
+        )
+
+        current_step = execution_state.get(
+            "current_step"
+        )
+
+        if (
+            isinstance(current_step, dict)
+            and current_step.get("next_action")
+            == "request_target"
+            and user_text
+            and not user_text.lower().startswith("auto-plan")
+        ):
+            result = {
+                "ok": True,
+                "execution_state": (
+                    chat_execution_service.advance(
+                        session_id=session_id,
+                        user_text=user_text,
+                    )
+                ),
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": (
+                        "Target captured: "
+                        + user_text
+                    ),
+                },
+                "session_id": session_id,
+                "active_session_id": session_id,
+            }
+
+            return jsonify(result)
+
+    except Exception as e:
+        app.logger.warning(
+            "[TARGET_CAPTURE_GATE] failed %s",
+            e,
         )
 
     try:

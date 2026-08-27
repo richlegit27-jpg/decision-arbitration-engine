@@ -265,6 +265,17 @@ class ChatService:
                 self.execution_handler
             )
 
+        self.chat_execution_service.set_session_service(
+            session_service
+        )
+
+        print(
+            "DEBUG CHAT SERVICE EXECUTION WIRING",
+            self.chat_execution_service,
+            self.chat_execution_service.session_service,
+            flush=True,
+        )
+
         self.response_handler = ChatResponseHandler(self)
         self.chat_router = ChatRouter(self)
         self.planner_service = PlannerService(self)
@@ -500,6 +511,12 @@ class ChatService:
         attachments=None,
     ):
 
+        print(
+            "DEBUG CHAT_SERVICE HANDLE SESSION=",
+            repr(session_id),
+            flush=True,
+        )
+
         guard_result = self.accidental_input_guard_service.handle(
             user_text=user_text,
             session_id=session_id,
@@ -507,6 +524,17 @@ class ChatService:
 
         if guard_result:
             return guard_result
+
+        target_capture_result = (
+            self.execution_bridge_service
+            .try_execution_target_capture(
+                session_id,
+                user_text,
+            )
+        )
+
+        if target_capture_result is not None:
+            return target_capture_result
 
         from nova_backend.services.chat.handle import chat_handle
 
@@ -554,6 +582,16 @@ class ChatService:
             )
 
             if execution_result is not None:
+
+                if (
+                    isinstance(execution_result, dict)
+                    and "execution" in execution_result
+                    and "execution_state" not in execution_result
+                ):
+                    execution_result["execution_state"] = (
+                        execution_result["execution"]
+                    )
+
                 return execution_result
 
             session_payload = self._get_session_payload(
@@ -2062,18 +2100,6 @@ Rules:
         self,
         session_id="",
     ):
-        meta_state = self._get_session_meta(
-            session_id,
-            "execution_state",
-            {},
-        )
-
-        if (
-            isinstance(meta_state, dict)
-            and meta_state
-            and meta_state.get("steps")
-        ):
-            return meta_state
 
         try:
             if self.chat_execution_service:
@@ -2089,12 +2115,38 @@ Rules:
                 ):
                     return execution_state
 
-
         except Exception as exc:
             print(
-                "[EXECUTION FALLBACK LOAD FAILED]",
+                "[EXECUTION SERVICE LOAD FAILED]",
                 exc,
             )
+
+        session_payload = self._get_session_payload(
+            session_id
+        )
+
+        if isinstance(session_payload, dict):
+            direct_state = session_payload.get(
+                "execution_state"
+            )
+
+            if (
+                isinstance(direct_state, dict)
+                and direct_state.get("steps")
+            ):
+                return direct_state
+
+        meta_state = self._get_session_meta(
+            session_id,
+            "execution_state",
+            {},
+        )
+
+        if (
+            isinstance(meta_state, dict)
+            and meta_state.get("steps")
+        ):
+            return meta_state
 
         return {}
 
@@ -2149,6 +2201,8 @@ Rules:
 
                 if (
                     existing_state.get("steps")
+                    or existing_state.get("current_step")
+                    or existing_state.get("goal")
                     or existing_state.get("status")
                     not in {
                         None,
@@ -3685,6 +3739,7 @@ Rules:
             "route": "apply_pending_fix",
             "intent": "execution",
         }
+
         if not pending_file_path or not pending_fix_code:
             assistant_msg = self._build_assistant_message(
                 text="No pending fix found. Run `fix this file` first."
@@ -6700,7 +6755,90 @@ Rules:
         text = self.safe_str(
             user_text
         ).strip().lower()
+        active_execution = (
+            self._load_execution_state(
+                session_id
+            )
+            or {}
+        )
 
+        if not active_execution.get("steps"):
+            meta_execution = self._get_session_meta(
+                session_id,
+                "active_execution",
+                {},
+            )
+
+            if (
+                isinstance(meta_execution, dict)
+                and meta_execution.get("steps")
+            ):
+                active_execution = meta_execution
+
+        active_steps = (
+            active_execution.get("steps")
+            or []
+        )
+
+        active_index = int(
+            active_execution.get(
+                "current_index",
+                0,
+            )
+            or 0
+        )
+
+        if (
+            active_steps
+            and active_index < len(active_steps)
+        ):
+            active_step = active_steps[
+                active_index
+            ]
+
+            if (
+                active_step.get(
+                    "next_action"
+                )
+                == "request_target"
+                and text not in {
+                    "next",
+                    "continue",
+                    "go",
+                    "run",
+                }
+            ):
+                execution_result = (
+                    self.chat_execution_service.advance(
+                        session_id,
+                        user_text=user_text,
+                    )
+                )
+
+                if isinstance(
+                    execution_result,
+                    dict,
+                ):
+                    execution_state = (
+                        execution_result.get(
+                            "execution_state"
+                        )
+                        or execution_result.get(
+                            "execution"
+                        )
+                        or execution_result
+                    )
+
+                    if isinstance(
+                        execution_state,
+                        dict,
+                    ):
+                        self._save_execution_state(
+                            session_id,
+                            execution_state,
+                        )
+
+                return execution_result
         print(
             "MISSION COMMAND DEBUG =",
             {
@@ -6760,10 +6898,66 @@ Rules:
             if repair_result is not None:
                 return repair_result
 
+        execution_state = (
+            self._load_execution_state(session_id)
+            or {}
+        )
+
+        steps = execution_state.get("steps") or []
+        current_index = int(
+            execution_state.get(
+                "current_index",
+                0,
+            )
+            or 0
+        )
+
+        if (
+            steps
+            and current_index < len(steps)
+        ):
+            current_step = steps[current_index]
+
+            if (
+                current_step.get("next_action")
+                == "request_target"
+                and text not in {
+                    "next",
+                    "continue",
+                    "go",
+                    "run",
+                }
+            ):
+                target_capture = (
+                    self.execution_bridge_service.try_execution_target_capture(
+                        session_id=session_id,
+                        user_text=user_text,
+                    )
+                )
+
+                if target_capture:
+                    return target_capture
+
+                return self.chat_execution_service.advance(
+                    session_id,
+                    user_text=user_text,
+                )
+
+        target_capture = (
+            self.execution_bridge_service.try_execution_target_capture(
+                session_id=session_id,
+                user_text=user_text,
+            )
+        )
+
+        if target_capture:
+            return target_capture
+
         mission_command = self._resolve_mission_command(
             user_text=user_text,
             session_id=session_id,
         )
+
 
         if self.safe_str(
             user_text
@@ -6832,6 +7026,12 @@ Rules:
             flush=True,
         )
 
+        print(
+            "DEBUG BEFORE MISSION RESULT SESSION=",
+            repr(session_id),
+            flush=True,
+        )
+
         mission_result = (
             self._handle_mission_command_result(
                 mission_command=mission_command,
@@ -6841,6 +7041,42 @@ Rules:
 
         if mission_result is not None:
             return mission_result
+
+        current_execution = (
+            self._load_execution_state(
+                session_id
+            )
+            or {}
+        )
+
+        if (
+            current_execution.get("waiting")
+            and current_execution.get("steps")
+        ):
+            current_index = int(
+                current_execution.get(
+                    "current_index",
+                    0,
+                )
+                or 0
+            )
+
+            steps = current_execution.get(
+                "steps",
+                [],
+            )
+
+            if (
+                current_index < len(steps)
+                and steps[current_index].get(
+                    "next_action"
+                )
+                == "request_target"
+            ):
+                return self.chat_execution_service.advance(
+                    session_id=session_id,
+                    user_text=user_text,
+                )
 
         if text in {
             "apply_auto_fix",
@@ -6916,6 +7152,42 @@ Rules:
             command = "cancel"
 
         else:
+            current_execution = (
+                self._load_execution_state(
+                    session_id
+                )
+                or {}
+            )
+
+            if (
+                current_execution.get("waiting")
+                and current_execution.get("steps")
+            ):
+                current_index = int(
+                    current_execution.get(
+                        "current_index",
+                        0,
+                    )
+                    or 0
+                )
+
+                steps = current_execution.get(
+                    "steps",
+                    [],
+                )
+
+                if (
+                    current_index < len(steps)
+                    and steps[current_index].get(
+                        "next_action"
+                    )
+                    == "request_target"
+                ):
+                    return self.chat_execution_service.advance(
+                        session_id=session_id,
+                        user_text=user_text,
+                    )
+
             return None
 
         execution_state = (

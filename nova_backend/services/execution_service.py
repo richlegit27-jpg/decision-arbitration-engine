@@ -903,6 +903,8 @@ Write the exact goal in one sentence.
         execution,
         action,
     ):
+        execution = self.normalize_execution(execution)
+
         if action == "run_step":
             step_num = len(execution["steps"]) + 1
             step_title = f"Step {step_num}"
@@ -910,7 +912,7 @@ Write the exact goal in one sentence.
             execution["steps"].append(
                 {
                     "title": step_title,
-                    "status": "done",
+                    "status": "completed",
                     "output": "Step completed.",
                 }
             )
@@ -918,7 +920,7 @@ Write the exact goal in one sentence.
             execution["history"].append(
                 f"run_step: {step_title}"
             )
-            execution["status"] = "complete"
+            execution["status"] = "completed"
             execution["last_action"] = action
             execution["current_step"] = step_title
 
@@ -932,7 +934,7 @@ Write the exact goal in one sentence.
                 execution["steps"].append(
                     {
                         "title": step_title,
-                        "status": "done",
+                        "status": "completed",
                         "output": "Step completed.",
                     }
                 )
@@ -940,7 +942,7 @@ Write the exact goal in one sentence.
             execution["history"].append(
                 "run_all: added 3 completed steps"
             )
-            execution["status"] = "complete"
+            execution["status"] = "completed"
             execution["last_action"] = action
             execution["current_step"] = "Run all complete"
 
@@ -959,7 +961,7 @@ Write the exact goal in one sentence.
             execution["history"].append(
                 f"test_fail: {step_title}"
             )
-            execution["status"] = "error"
+            execution["status"] = "failed"
             execution["last_action"] = action
             execution["current_step"] = step_title
 
@@ -987,10 +989,10 @@ Write the exact goal in one sentence.
                     or f"Step {failed_index + 1}"
                 )
 
-                failed_step["status"] = "done"
+                failed_step["status"] = "completed"
                 failed_step["output"] = "Retry successful."
 
-                execution["status"] = "complete"
+                execution["status"] = "completed"
                 execution["last_action"] = "retry_failed"
                 execution["current_step"] = "Retry complete"
                 execution["history"].append(
@@ -1000,7 +1002,7 @@ Write the exact goal in one sentence.
                 execution["history"].append(
                     "retry_failed: no failed step found"
                 )
-                execution["status"] = "complete"
+                execution["status"] = "completed"
                 execution["last_action"] = "retry_failed"
                 execution["current_step"] = (
                     "No failed step found"
@@ -1008,7 +1010,7 @@ Write the exact goal in one sentence.
 
         elif action == "stop":
             execution["history"].append("stop")
-            execution["status"] = "stopped"
+            execution["status"] = "blocked"
             execution["last_action"] = action
             execution["current_step"] = "Stopped"
 
@@ -1016,9 +1018,9 @@ Write the exact goal in one sentence.
             execution["history"].append(
                 f"unknown action: {action}"
             )
-            execution["status"] = "error"
+            execution["status"] = "failed"
             execution["last_action"] = action
             execution["current_step"] = "Unknown action"
 
-        return execution
+        return self.normalize_execution(execution)
 

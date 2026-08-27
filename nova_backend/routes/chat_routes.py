@@ -9,12 +9,28 @@ def register_chat_routes(app, agent_service):
     @chat_bp.route("/api/chat", methods=["POST"])
     def api_chat():
         data = request.get_json(silent=True) or {}
-        user_text = str(data.get("user_text") or "")
-        attachments = data.get("attachments") or []
 
-        result = agent_service.run(user_text, attachments)
+        user_text = str(
+            data.get("user_text") or ""
+        )
+
+        attachments = (
+            data.get("attachments")
+            or []
+        )
+
+        session_id = (
+            data.get("session_id")
+            or data.get("active_session_id")
+            or ""
+        )
+
+        result = agent_service.run(
+            user_text,
+            attachments,
+            session_id=session_id,
+        )
 
         return jsonify(result)
 
     app.register_blueprint(chat_bp)
-

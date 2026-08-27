@@ -203,6 +203,9 @@ class SessionRouteService:
                     "active_execution": item.get("active_execution")
                     if isinstance(item.get("active_execution"), dict)
                     else {},
+                    "execution_state": item.get("execution_state")
+                    if isinstance(item.get("execution_state"), dict)
+                    else {},
                 })
 
             slim_sessions.sort(
