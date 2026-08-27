@@ -12949,4 +12949,113 @@ except Exception as e:
         e,
     )
 
+def _nova_attachment_guard_should_suppress_current_web_call(
+    args=None,
+    kwargs=None,
+):
+    args = args or ()
+    kwargs = kwargs or {}
+
+    user_text = ""
+
+    payload = {}
+
+    if len(args) > 0:
+        user_text = str(args[0] or "")
+
+    if len(args) > 1 and isinstance(args[1], dict):
+        payload = args[1]
+
+    if isinstance(kwargs.get("payload"), dict):
+        payload = kwargs["payload"]
+
+    attachments = payload.get("attachments") or []
+
+    if not attachments:
+        return False
+
+    text = user_text.lower()
+
+    explicit_web_terms = {
+        "search",
+        "look up",
+        "latest",
+        "news",
+        "web",
+        "internet",
+    }
+
+    if any(term in text for term in explicit_web_terms):
+        return False
+
+    return True
+
+
+def _nova_attachment_guard_install_web_routing_suppression():
+
+    cls = ChatService
+
+    if hasattr(cls, "_should_use_web"):
+        original_should_use_web = cls._should_use_web
+
+        def wrapped_should_use_web(
+            self,
+            user_text,
+            payload=None,
+        ):
+            if _nova_attachment_guard_should_suppress_current_web_call(
+                args=(user_text, payload),
+                kwargs={},
+            ):
+                return False
+
+            return original_should_use_web(
+                self,
+                user_text,
+                payload,
+            )
+
+        cls._should_use_web = wrapped_should_use_web
+
+
+    if hasattr(cls, "_execute_web_search"):
+        original_execute_web_search = cls._execute_web_search
+
+        def wrapped_execute_web_search(
+            self,
+            user_text,
+            payload=None,
+        ):
+            if _nova_attachment_guard_should_suppress_current_web_call(
+                args=(user_text, payload),
+                kwargs={},
+            ):
+                return {
+                    "ok": False,
+                    "suppressed": True,
+                    "reason": "attachment_focused_turn",
+                }
+
+            return original_execute_web_search(
+                self,
+                user_text,
+                payload,
+            )
+
+        cls._execute_web_search = wrapped_execute_web_search
+
+
+    return {
+        "installed": True,
+        "wrapped_result_methods": [
+            "_execute_web_search",
+        ],
+        "wrapped_bool_methods": [
+            "_should_use_web",
+        ],
+        "guard": "attachment_web_routing_suppression",
+    }
+
+def _nova_install_attachment_guard_web_suppression():
+    return _nova_attachment_guard_install_web_routing_suppression()
 
