@@ -289,57 +289,59 @@ def inject_attachment_context_message(
 
 
 def nova_chat_turn_inject_attachment_context_from_locals(
-    messages,
-    attachments,
-):
-    if not attachments:
-        try:
-            from flask import g
-
-            attachments = getattr(
-                g,
-                "attachments",
-                [],
-            ) or getattr(
-                g,
-                "nova_attachments",
-                [],
-            ) or []
-
-        except Exception:
-            attachments = []
-
-    return inject_attachment_context_message(
-        messages,
-        attachments,
-    )
-
-def nova_chat_turn_inject_attachment_context_from_locals(
     messages: Any,
     scope: dict[str, Any] | None = None,
 ) -> Any:
     attachments = collect_attachments_from_scope(scope)
 
-    # NOVA_API_CHAT_ATTACHMENT_BOUNDARY_G_CONTEXT_20260705
-    try:
-        from flask import g, has_request_context
+    if not attachments:
+        try:
+            from flask import g, has_request_context
 
-        if has_request_context():
-            boundary_attachments = getattr(g, "nova_api_chat_attachments", None) or []
-            attachments = list(attachments or []) + list(boundary_attachments or [])
-    except Exception:
-        pass
+            if has_request_context():
+                boundary_attachments = (
+                    getattr(
+                        g,
+                        "nova_api_chat_attachments",
+                        None,
+                    )
+                    or getattr(
+                        g,
+                        "attachments",
+                        None,
+                    )
+                    or getattr(
+                        g,
+                        "nova_attachments",
+                        None,
+                    )
+                    or []
+                )
+
+                attachments = list(
+                    boundary_attachments
+                )
+
+        except Exception:
+            attachments = []
 
     try:
         from nova_backend.services.chat_turn_attachment_hydrator import (
             hydrate_attachments_for_context,
         )
 
-        attachments = hydrate_attachments_for_context(attachments)
+        attachments = hydrate_attachments_for_context(
+            attachments
+        )
+
     except Exception:
         pass
 
-    return inject_attachment_context_message(messages, attachments)
+    return inject_attachment_context_message(
+        messages,
+        attachments,
+    )
+
 
 # NOVA_ATTACHMENT_CONTEXT_REGRESSION_REPAIR_20260705
 def _nova_attachment_originalish_filename(value: Any) -> str:
