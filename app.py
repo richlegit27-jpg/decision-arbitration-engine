@@ -459,7 +459,10 @@ chat_attachment_memory_service = ChatAttachmentMemoryService()
 chat_response_cleanup_service = ChatResponseCleanupService()
 chat_request_context_service = ChatRequestContextService()
 chat_stream_service = ChatStreamService()
-execution_route_service = None
+execution_route_service = ExecutionRouteService(
+    chat_execution_service,
+    chat_execution_service,
+)
 execution_bridge_service = ExecutionBridgeService(
     chat_execution_service,
     None,
@@ -874,11 +877,6 @@ chat_service = ChatService(
     memory_context_service=memory_context_service,
     working_state_service=working_state_service,
     execution_state_service=execution_state_service,
-)
-
-execution_route_service = ExecutionRouteService(
-    working_state_service=working_state_service,
-    execution_service=chat_service.execution_service,
 )
 
 attachment_action_service = AttachmentActionService(
@@ -1997,7 +1995,13 @@ def api_chat():
         app.logger.exception("[api_chat] failed to force active mobile session id")
 
 
-    attachments = normalize_attachments(request.json.get("attachments", []))
+        attachments = normalize_attachments(
+            request.json.get("attachments", [])
+        )
+
+        from flask import g
+
+        g.nova_api_chat_attachments = attachments
 
     attachments = chat_attachment_guard_service.handle_web_attachment_guard(
         request,
