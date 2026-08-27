@@ -13034,6 +13034,7 @@ def _nova_attachment_guard_install_web_routing_suppression():
                     "ok": False,
                     "suppressed": True,
                     "reason": "attachment_focused_turn",
+                    "results": [],
                 }
 
             return original_execute_web_search(
