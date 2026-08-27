@@ -199,6 +199,9 @@ def exec_debug(*args):
                 "error_type": type(exc).__name__,
             }
 
+
+class ChatService:
+
     def _nova_use_chat_turn_messages_enabled(self):
         # NOVA_CHAT_TURN_FEATURE_FLAG_ADAPTER_20260705
         value = str(os.getenv("NOVA_USE_CHAT_TURN_MESSAGES", "")).strip().lower()
@@ -210,7 +213,6 @@ def exec_debug(*args):
             "on",
             "enabled",
         }
-class ChatService:
 
     def _nova_select_model_messages(self, fallback_messages):
         # NOVA_CHAT_TURN_FEATURE_FLAG_ADAPTER_20260705
