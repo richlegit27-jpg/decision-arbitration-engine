@@ -2312,6 +2312,126 @@ function showThinking(node) {
   return () => clearInterval(interval);
 }
 
+async function sendText(textOverride) {
+  console.log("&#128206; sendText TRIGGERED");
+
+  const liveInput = document.getElementById("input") || document.querySelector("textarea");
+  const capturedText = window.__novaLastInputBeforeSend || "";
+  const rawText = String(textOverride || capturedText || liveInput?.value || "").trim();
+
+  window.__novaLastInputBeforeSend = "";
+
+  const attachments = pendingDesktopAttachments.slice();
+  const text = clarifyAttachmentPrompt(rawText, attachments);
+
+  console.log("&#128206; SEND SNAPSHOT", { rawText, text, attachments });
+
+  if (!text && !attachments.length) return;
+
+  input.value = "";
+  input.style.height = "auto";
+
+setStatus("loading...");
+
+novaChatAbortController = new AbortController();
+
+sendBtn.disabled = false;
+sendBtn.textContent = "Stop";
+sendBtn.dataset.mode = "stop";
+
+addMsg("user", text);
+const assistantNode = addMsg("assistant", "");
+
+try {
+  console.log("&#128206; CHAT REQUEST START", { text, attachments });
+
+  const forcingNewSession = window.NOVA_FORCE_NEW_SESSION_ON_NEXT_SEND === true;
+
+  const response = await fetch("/api/chat", {
+    signal: novaChatAbortController.signal,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": API_KEY
+    },
+    body: JSON.stringify(buildDesktopChatPayload(text, attachments))
+  });
+
+if (forcingNewSession) {
+  window.NOVA_FORCE_NEW_SESSION_ON_NEXT_SEND = false;
+window.NOVA_PENDING_NEW_SESSION_ID = "";
+}
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText);
+    }
+
+    const raw = await response.text();
+
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (e) {
+      throw new Error("Invalid JSON from server: " + raw.slice(0, 200));
+    }
+
+    const freshSessionId =
+      data.session_id ||
+      data.active_session_id ||
+      data.session?.id ||
+      data.assistant_message?.session_id;
+
+if (freshSessionId && freshSessionId !== "[object HTMLInputElement]") {
+  const newSessionId = String(freshSessionId);
+
+  setSessionId(newSessionId);
+
+  if (window.NovaChatApp?.state) {
+    window.NovaChatApp.state.activeChatId = newSessionId;
+  }
+
+  if (window.NovaChatState?.setActiveChat) {
+    window.NovaChatState.setActiveChat(newSessionId);
+  }
+
+  console.log("[NOVA sessions] adopted backend session", newSessionId);
+
+  if (window.NovaChatApp?.loadActiveChatMessages) {
+    await window.NovaChatApp.loadActiveChatMessages();
+  }
+
+  if (window.NovaChatApp?.renderAll) {
+    window.NovaChatApp.renderAll();
+  }
+
+  if (typeof loadDesktopSessions === "function") {
+    loadDesktopSessions();
+  }
+}
+
+    renderAssistantMessage(assistantNode, data);
+
+    setStatus("done");
+    clearDesktopAttachments();
+    refreshSummaryMeta();
+    refreshDesktopPanels();
+
+// NOVA_LEGACY_MEMORY_AUTOLOAD_DISABLED
+
+  } catch (e) {
+    console.warn("sendText error:", e);
+    assistantNode.textContent = "Error generating response";
+    setStatus("error");
+
+  } finally {
+    novaChatAbortController = null;
+    sendBtn.disabled = false;
+    sendBtn.textContent = "Send";
+    sendBtn.dataset.mode = "send";
+    setStatus("ready");
+    }
+}
 
 function renderMessageWithCodeBlocks(container, text) {
     container.innerHTML = "";
@@ -2497,11 +2617,22 @@ renderMessageWithCodeBlocks(bubble, assistantMessage.text || "");
    ========================= */
 
 function handleSendClick(prompt = "") {
-  if (typeof window.sendText === "function") {
-    return window.sendText(prompt);
+  if (window.__NOVA_HANDLE_SEND_LOCK__) {
+    console.warn("[NOVA send] blocked duplicate handleSendClick");
+    return;
   }
 
-  console.warn("[NOVA] sendText unavailable");
+  window.__NOVA_HANDLE_SEND_LOCK__ = true;
+
+  Promise.resolve(sendText(prompt))
+    .catch((e) => {
+      console.warn("[NOVA send] failed", e);
+    })
+    .finally(() => {
+      setTimeout(() => {
+        window.__NOVA_HANDLE_SEND_LOCK__ = false;
+      }, 500);
+    });
 }
 
 const summarizeBtn =
@@ -6561,7 +6692,6 @@ console.log("[Nova Force New Chat] cleared chat");
 <script src="/static/js/chat-state.js"></script>
 <script src="/static/js/chat-storage.js"></script>
 <script src="/static/js/chat-messages.js"></script>
-<script src="/static/js/chat/chat.js"></script>
 
 <script src="/static/js/composer-input.js"></script>
 <script src="/static/js/composer-attachments.js"></script>

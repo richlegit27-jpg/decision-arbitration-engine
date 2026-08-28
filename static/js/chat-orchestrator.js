@@ -354,11 +354,25 @@ async function loadActiveChatMessages(){
     filteredMessages
   })
 
-  state.messages = filteredMessages
+if (
+  filteredMessages.length === 0 &&
+  Array.isArray(state.messages) &&
+  state.messages.length > 0
+) {
+  console.warn(
+    "[NOVA] prevented empty storage overwrite",
+    {
+      existing: state.messages.length,
+      incoming: filteredMessages.length
+    }
+  );
+} else {
+  state.messages = filteredMessages;
+}
 
-  syncMessagesAfterLoad(state.messages)
-  hydrateChatTitle(activeChatId, state.messages)
-  renderShell()
+syncMessagesAfterLoad(state.messages)
+hydrateChatTitle(activeChatId, state.messages)
+renderShell()
 
   return state.messages
 }

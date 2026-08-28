@@ -2497,11 +2497,22 @@ renderMessageWithCodeBlocks(bubble, assistantMessage.text || "");
    ========================= */
 
 function handleSendClick(prompt = "") {
-  if (typeof window.sendText === "function") {
-    return window.sendText(prompt);
+  if (window.__NOVA_HANDLE_SEND_LOCK__) {
+    console.warn("[NOVA send] blocked duplicate handleSendClick");
+    return;
   }
 
-  console.warn("[NOVA] sendText unavailable");
+  window.__NOVA_HANDLE_SEND_LOCK__ = true;
+
+  Promise.resolve(sendText(prompt))
+    .catch((e) => {
+      console.warn("[NOVA send] failed", e);
+    })
+    .finally(() => {
+      setTimeout(() => {
+        window.__NOVA_HANDLE_SEND_LOCK__ = false;
+      }, 500);
+    });
 }
 
 const summarizeBtn =
