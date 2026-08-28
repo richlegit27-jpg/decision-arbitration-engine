@@ -36,7 +36,11 @@ function byId(id) {
 
 function cacheElements() {
   el.appShell = byId("appShell");
-  el.chatMessages = byId("chatMessages");
+  el.chatMessages =
+    byId("chat") ||
+    byId("chatMessages") ||
+    byId("messages");
+
   el.chatList = byId("chatList");
   el.sendBtn = byId("sendBtn");
   el.stopBtn = byId("stopBtn");

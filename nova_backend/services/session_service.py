@@ -507,12 +507,23 @@ class SessionService:
         self._save_sessions(sessions, active)
 
     def _read_store(self) -> Dict[str, Any]:
+        import time
+
+        _t0 = time.perf_counter()
+
         data = load_json_file(
             self.sessions_file,
             {
                 "active_session_id": "",
                 "sessions": [],
             },
+        )
+
+        print(
+            "[TIMING load_json_file]",
+            round(time.perf_counter() - _t0, 3),
+            "seconds",
+            flush=True,
         )
 
         if isinstance(data, list):
@@ -522,12 +533,15 @@ class SessionService:
             }
 
         if not isinstance(data, dict):
-            return {"active_session_id": "", "sessions": []}
+            return {
+                "active_session_id": "",
+                "sessions": [],
+            }
 
         data.setdefault("active_session_id", "")
         data.setdefault("sessions", [])
-        return data
 
+        return data
     def _write_store(self, store: Dict[str, Any]) -> None:
         payload = {
             "active_session_id": str(store.get("active_session_id") or "").strip(),
@@ -1145,10 +1159,30 @@ class SessionService:
         return ""
 
     def get_session(self, session_id, user_id=""):
+        import time
+
+        _t0 = time.perf_counter()
+
         if not user_id:
             user_id = self._current_owner_id()
 
+        _load_t0 = time.perf_counter()
+
         sessions = self._load_sessions()
+
+        print(
+            "[TIMING _load_sessions]",
+            round(time.perf_counter() - _load_t0, 3),
+            "seconds",
+            flush=True,
+        )
+
+        print(
+            "[TIMING get_session AFTER LOAD]",
+            round(time.perf_counter() - _t0, 3),
+            "seconds",
+            flush=True,
+        )
 
         i = self._find(sessions, session_id)
 

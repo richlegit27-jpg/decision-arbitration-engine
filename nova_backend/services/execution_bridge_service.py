@@ -188,6 +188,7 @@ class ExecutionBridgeService:
             "DEBUG NEW AUTOPLAN BRIDGE LOADED",
             flush=True,
         )
+
         try:
             clean = str(user_text or "").strip()
             lower = clean.lower()
@@ -206,6 +207,11 @@ class ExecutionBridgeService:
                     break
 
             if not matched_prefix:
+                print(
+                    "[AUTOPLAN BYPASS]",
+                    clean,
+                    flush=True,
+                )
                 return None
 
             goal = clean[len(matched_prefix):].strip()

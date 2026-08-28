@@ -9,7 +9,11 @@ app.state = app.state || {};
 function byId(id){ return document.getElementById(id); }
 
 function renderMessage(msg, role){
-    const chat = byId("chatMessages");
+    const chat =
+    byId("chat") ||
+    byId("chatMessages") ||
+    byId("messages");
+
     const div = document.createElement("div");
     div.className = "message "+role+" fade-in";
     div.textContent = msg;

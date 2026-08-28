@@ -12,9 +12,9 @@ window.NovaComposer = {
     },
 
     sendMessage(...args) {
-        if (window.NovaComposerActions?.sendMessage) {
-            return window.NovaComposerActions.sendMessage(...args);
-        }
+if (window.NovaComposerActions?.sendCurrentMessage) {
+    return window.NovaComposerActions.sendCurrentMessage(...args);
+}
 
         if (window.NovaComposerReactive?.sendMessage) {
             return window.NovaComposerReactive.sendMessage(...args);

@@ -3,6 +3,7 @@ console.log("[NOVA CHAT STREAM LOADED - INPUT FIX TEST]");
   "use strict";
 
   const Nova = (window.Nova = window.Nova || {});
+window.NovaStreamService = window.NovaStreamService || {};
   Nova.state = Nova.state || {};
   Nova.chatStream = Nova.chatStream || {};
   Nova.chat = Nova.chat || {};
@@ -15,21 +16,22 @@ console.log("[NOVA CHAT STREAM LOADED - INPUT FIX TEST]");
     defaultModel: "gpt-5.4",
   };
 
-  const state = Object.assign(
-    {
-      activeSessionId: null,
-      sessions: [],
-      messages: [],
-      models: [],
-      selectedModel: null,
-      isSending: false,
-      pendingAttachments: [],
-      booted: false,
-    },
-    Nova.state || {}
-  );
+const state = Object.assign(
 
-  Nova.state = state;
+  Nova.state || {},
+  {
+    activeSessionId: null,
+    sessions: [],
+    messages: [],
+    models: [],
+    selectedModel: null,
+    isSending: false,
+    pendingAttachments: [],
+    booted: false,
+  }
+);
+
+Nova.state = Nova.state || state;
 
   const els = {};
 
@@ -538,15 +540,19 @@ return {
         (state.sessions[0] ? state.sessions[0].id : null);
     }
 
-    const active = state.sessions.find((item) => item.id === state.activeSessionId);
-    state.messages = active ? safeArray(active.messages) : [];
+const active = state.sessions.find((item) => item.id === state.activeSessionId);
 
-    renderModels();
-    renderSessions();
-    renderMessages();
+if (active && Array.isArray(active.messages)) {
+  state.messages = active.messages;
+}
+
+renderModels();
+renderSessions();
+renderMessages();
+
   }
 
-function renderModels() {
+  function renderModels() {
     if (!els.modelSelect) return;
 
     const models = [
@@ -960,18 +966,38 @@ els.stopBtn.addEventListener("click", async function () {
     });
   }
 
-  function exposeApi() {
-    Nova.chatStream.sendCurrentMessage = sendCurrentMessage;
-Nova.chatStream.loadState = loadState;
-Nova.chatStream.openSession = openSession;
+function exposeApi() {
+  Nova.chatStream.sendCurrentMessage = sendCurrentMessage;
+  Nova.chatStream.loadState = loadState;
+  Nova.chatStream.openSession = openSession;
 
-window.renderDesktopOnboarding = renderDesktopOnboarding;
+  window.renderDesktopOnboarding = renderDesktopOnboarding;
 
-Nova.chat.sendCurrentMessage = sendCurrentMessage;
-    Nova.chat.loadState = loadState;
-    Nova.chat.openSession = openSession;
-  }
+  Nova.chat.sendCurrentMessage = sendCurrentMessage;
+  Nova.chat.loadState = loadState;
+  Nova.chat.openSession = openSession;
 
+
+  window.NovaStreamService = window.NovaStreamService || {};
+
+  window.NovaStreamService.send = async function(payload = {}) {
+    console.log("[NOVA STREAM SERVICE SEND]", payload);
+
+    return await apiPost(CONFIG.chatEndpoint, {
+      session_id:
+        payload.chatId ||
+        state.activeSessionId,
+
+      content:
+        payload.message ||
+        "",
+
+      attachments:
+        payload.attachments ||
+        [],
+    });
+  };
+}
   async function bootstrap() {
     if (state.booted) return;
     state.booted = true;
@@ -988,10 +1014,10 @@ Nova.chat.sendCurrentMessage = sendCurrentMessage;
     }
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", bootstrap, { once: true });
-  } else {
-    bootstrap();
-  }
-})();
+   if (document.readyState === "loading") {
+     document.addEventListener("DOMContentLoaded", bootstrap, { once: true });
+   } else {
+     bootstrap();
+   }
 
+})();

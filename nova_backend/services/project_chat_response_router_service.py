@@ -416,6 +416,14 @@ try:
         return payload
 
     def _nova_natural_project_wrap_endpoint_20260701(app, endpoint_name):
+        if endpoint_name in {
+            "api_attachment_status",
+            "api_attachment_extract",
+            "api_attachment_summarize",
+            "api_attachment_keypoints",
+            "api_debug_attachment_readiness",
+        }:
+            return False
         view = app.view_functions.get(endpoint_name)
         if not callable(view):
             return False
@@ -912,6 +920,15 @@ try:
         }
 
     def _nova_compact_project_wrap_endpoint_20260701(app, endpoint_name):
+        if endpoint_name in {
+            "api_attachment_status",
+            "api_attachment_extract",
+            "api_attachment_summarize",
+            "api_attachment_keypoints",
+            "api_debug_attachment_readiness",
+        }:
+            return False
+
         view = app.view_functions.get(endpoint_name)
         if not callable(view):
             return False
@@ -1154,6 +1171,10 @@ def install_project_chat_response_router(app):
         wrapped = 0
 
         excluded_endpoints = {
+            "api_attachment_status",
+            "api_attachment_extract",
+            "api_attachment_summarize",
+            "api_attachment_keypoints",
             "nova_login_page_20260610",
             "nova_register_page_20260610",
             "nova_logout_page_20260610",

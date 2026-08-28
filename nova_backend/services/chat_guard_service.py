@@ -16,9 +16,15 @@ class ChatGuardService:
                 or ""
             ).strip()
 
+            if not user_text:
+                return None
+
             session_id = str(
                 payload.get("session_id") or ""
             ).strip()
+
+            if not user_text:
+                return None
 
             clean = (
                 " ".join(

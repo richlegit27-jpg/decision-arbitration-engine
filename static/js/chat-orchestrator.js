@@ -322,38 +322,46 @@ function persistCurrentMessages(){
     }
   }
 
-  async function loadActiveChatMessages(){
-    const activeChatId = String(state.activeChatId || "").trim()
+async function loadActiveChatMessages(){
+  const activeChatId = String(state.activeChatId || "").trim()
 
-    if(!activeChatId){
-      state.messages = []
-      return []
-    }
+  if(!activeChatId){
+    state.messages = []
+    return []
+  }
 
-    let messages = []
+  let messages = []
 
-    if(typeof chatStorage.loadMessages === "function"){
-      messages = await chatStorage.loadMessages(activeChatId)
-    }
+  if(typeof chatStorage.loadMessages === "function"){
+    messages = await chatStorage.loadMessages(activeChatId)
+  }
 
-state.messages = Array.isArray(messages)
+  const filteredMessages = Array.isArray(messages)
     ? messages.filter((message) => {
         return !(
-            message?.isThinking ||
-            message?.thinking ||
-            message?.message_type === "thinking" ||
-            message?.status === "thinking"
+          message?.isThinking ||
+          message?.thinking ||
+          message?.message_type === "thinking" ||
+          message?.status === "thinking"
         )
-    })
+      })
     : []
 
+  console.log("🔥 LOAD ACTIVE CHAT DEBUG", {
+    activeChatId,
+    incomingCount: Array.isArray(messages) ? messages.length : "not-array",
+    filteredCount: filteredMessages.length,
+    filteredMessages
+  })
 
-    syncMessagesAfterLoad(state.messages)
-    hydrateChatTitle(activeChatId, state.messages)
-    renderShell()
+  state.messages = filteredMessages
 
-    return state.messages
-  }
+  syncMessagesAfterLoad(state.messages)
+  hydrateChatTitle(activeChatId, state.messages)
+  renderShell()
+
+  return state.messages
+}
 
   async function createChatAndLoad(){
     let chat = null

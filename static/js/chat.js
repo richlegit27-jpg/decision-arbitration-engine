@@ -625,7 +625,7 @@ async function boot(){
   }
 }
 
-window.NovaChatApp = {
+window.NovaChatApp = window.NovaChatApp || {};
   get state(){
     return state
   },

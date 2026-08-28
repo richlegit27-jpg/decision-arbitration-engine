@@ -299,6 +299,12 @@ def nova_chat_turn_inject_attachment_context_from_locals(
             from flask import g, has_request_context
 
             if has_request_context():
+
+                print(
+                    "[ATTACHMENT G DEBUG]",
+                    getattr(g, "__dict__", {}),
+                )
+
                 boundary_attachments = (
                     getattr(
                         g,

@@ -1,5 +1,7 @@
 ﻿from __future__ import annotations
-
+from nova_backend.services.chat_turn_attachment_context import (
+    build_attachment_context_text,
+)
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -462,7 +464,17 @@ def build_chat_turn_from_request(
     payload = coerce_chat_payload(payload)
 
     user_text = normalize_user_text(payload)
+
     attachments = normalize_attachments(payload)
+
+    if not attachment_context and attachments:
+        attachment_context = [
+            {
+                "text": build_attachment_context_text(
+                    attachments
+                )
+            }
+        ]
 
     return ChatTurn(
         request_id=str(uuid.uuid4()),
@@ -477,7 +489,6 @@ def build_chat_turn_from_request(
         model=model,
         metadata=metadata or {},
     )
-
 
 def build_model_messages(turn: ChatTurn) -> list[dict[str, str]]:
     system_parts = [

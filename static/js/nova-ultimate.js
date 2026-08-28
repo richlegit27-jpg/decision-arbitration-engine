@@ -992,7 +992,8 @@
       await parseSseStream(response);
       state.lastRouter = { label: "Ready", tone: "success" };
       persistUiState();
-      await refreshAfterSend(state.activeSessionId || sessionId);
+      renderAll();
+
     } catch (error) {
       console.error("Nova send failed:", error);
       state.lastRouter = { label: "Error", tone: "danger" };

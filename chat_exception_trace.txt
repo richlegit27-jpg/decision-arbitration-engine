@@ -1805,3 +1805,26 @@ Traceback (most recent call last):
     decision = {
                ^
 UnboundLocalError: cannot access local variable 'decision' where it is not associated with a value
+
+
+===== CHAT FAILURE =====
+UnboundLocalError("cannot access local variable 'target_capture_result' where it is not associated with a value")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2593, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 547, in handle
+    if target_capture_result is not None:
+       ^^^^^^^^^^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'target_capture_result' where it is not associated with a value

@@ -223,9 +223,21 @@ function getMessages(){
 }
 
 function syncMessagesFromStorage(messages){
+
+  console.log("🔥 SYNC RECEIVED", {
+    isArray: Array.isArray(messages),
+    count: Array.isArray(messages) ? messages.length : "not-array",
+    messages
+  });
+
   state.messages = Array.isArray(messages)
     ? messages
     : []
+
+  console.log("🔥 AFTER SYNC STATE", {
+    count: state.messages.length,
+    messages: state.messages
+  });
 
   renderMessages()
 }
@@ -234,7 +246,6 @@ function renderMessages(){
   if(!el.messages){
     return
   }
-
   const messages = getMessages()
   const shouldStick = isNearBottom()
 

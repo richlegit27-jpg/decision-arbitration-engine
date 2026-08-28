@@ -1,0 +1,5 @@
+Nova attachment test.
+
+Purple robot banana.
+
+This file is being used to verify attachment context injection.

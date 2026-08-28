@@ -288,7 +288,11 @@ function resetUiAfterDeleteAll(){
     `
   }
 
-  const messages = document.getElementById("messages")
+  const messages =
+    document.getElementById("chat") ||
+    document.getElementById("messages") ||
+    document.getElementById("chatMessages");
+
   if(messages){
     messages.innerHTML = ""
   }

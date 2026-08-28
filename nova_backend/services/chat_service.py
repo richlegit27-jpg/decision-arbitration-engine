@@ -49,10 +49,7 @@ from nova_backend.core.nova_orchestrator import (
     NovaOrchestrator,
 )
 from openai import OpenAI
-from nova_backend.services.model_gateway_service import (
-    chat_completions_create,
-    responses_create,
-)
+from nova_backend.services import model_gateway_service
 from nova_backend.services.repair_execution_service import RepairExecutionService
 from nova_backend.services.execution_orchestrator_service import ExecutionOrchestratorService
 from nova_backend.services.execution_step_service import ExecutionStepService
@@ -144,11 +141,6 @@ def exec_debug(*args):
                 )
             )
 
-            print(
-                "[NOVA BEHAVIOR EVALUATION DEBUG]",
-                evaluation
-            )
-
             result = (
                 behavior_observer.observe(
                     evaluation
@@ -201,6 +193,13 @@ def exec_debug(*args):
 
 
 class ChatService:
+
+    def _observe_response_behavior(
+        self,
+        *args,
+        **kwargs,
+    ):
+        return None
 
     def _nova_use_chat_turn_messages_enabled(self):
         # NOVA_CHAT_TURN_FEATURE_FLAG_ADAPTER_20260705
@@ -269,13 +268,6 @@ class ChatService:
 
         self.chat_execution_service.set_session_service(
             session_service
-        )
-
-        print(
-            "DEBUG CHAT SERVICE EXECUTION WIRING",
-            self.chat_execution_service,
-            self.chat_execution_service.session_service,
-            flush=True,
         )
 
         self.response_handler = ChatResponseHandler(self)
@@ -514,10 +506,22 @@ class ChatService:
     ):
 
         print(
-            "DEBUG CHAT_SERVICE HANDLE SESSION=",
-            repr(session_id),
+            "[CHAT HANDLE ENTER]",
+            user_text,
+            session_id,
             flush=True,
         )
+
+        import time
+
+        _chat_handle_t0 = time.perf_counter()
+
+        print(
+            "[CHAT HANDLE START]",
+            user_text,
+            flush=True,
+        )
+        print("[CHAT HANDLE STEP 1]", flush=True)
 
         guard_result = self.accidental_input_guard_service.handle(
             user_text=user_text,
@@ -525,7 +529,22 @@ class ChatService:
         )
 
         if guard_result:
+            print(
+                "[CHAT HANDLE END - INPUT GUARD]",
+                round(time.perf_counter() - _chat_handle_t0, 3),
+                "seconds",
+                flush=True,
+            )
             return guard_result
+
+            target_capture_result = None
+
+            print(
+                "[CHAT HANDLE END - TARGET CAPTURE]",
+                round(time.perf_counter() - _chat_handle_t0, 3),
+                "seconds",
+                flush=True,
+            )
 
         target_capture_result = (
             self.execution_bridge_service
@@ -535,19 +554,46 @@ class ChatService:
             )
         )
 
+        print(
+            "[AFTER EXECUTION TARGET CAPTURE]",
+            round(time.perf_counter() - _chat_handle_t0, 3),
+            flush=True,
+        )
+
         if target_capture_result is not None:
             return target_capture_result
 
+        if target_capture_result is not None:
+            return target_capture_result
+
+        print(
+            "[CHAT BEFORE CHAT_HANDLE IMPORT]",
+            flush=True,
+        )
+
         from nova_backend.services.chat.handle import chat_handle
+        print(
+            "[AFTER CHAT_HANDLE IMPORT]",
+            round(time.perf_counter() - _chat_handle_t0, 3),
+            flush=True,
+        )
+        print("[CHAT HANDLE STEP 3 IMPORTED]", flush=True)
+
+        print(
+            "[CHAT AFTER CHAT_HANDLE IMPORT]",
+            flush=True,
+        )
+
+        print(
+            "[BEFORE CHAT_HANDLE CALL]",
+            user_text,
+            session_id,
+            flush=True,
+        )
 
         attachments = attachments or []
 
         if self._looks_like_live_market_request(user_text):
-            print(
-                "DEBUG LIVE MARKET BYPASS EXECUTION",
-                user_text,
-                flush=True,
-            )
 
             brain_state = {
                 "decision": {
@@ -562,11 +608,16 @@ class ChatService:
             current_execution = self.chat_execution_service.get_state(
                 session_id
             )
-
             if (
                 self.chat_execution_service.is_execution_trigger(user_text)
                 and current_execution.get("complete") is True
             ):
+                print(
+                    "[CHAT HANDLE END - COMPLETE EXECUTION]",
+                    round(time.perf_counter() - _chat_handle_t0, 3),
+                    "seconds",
+                    flush=True,
+                )
                 return {
                     "status": "complete",
                     "execution_state": current_execution,
@@ -576,11 +627,6 @@ class ChatService:
                 user_text=user_text,
                 session_id=session_id,
                 attachments=attachments,
-            )
-
-            print(
-                "DEBUG EXECUTION CONTROL RESULT =",
-                execution_result,
             )
 
             if execution_result is not None:
@@ -594,10 +640,24 @@ class ChatService:
                         execution_result["execution"]
                     )
 
+                print(
+                    "[CHAT HANDLE END - EXECUTION CONTROL]",
+                    round(time.perf_counter() - _chat_handle_t0, 3),
+                    "seconds",
+                    flush=True,
+                )
+
                 return execution_result
 
             session_payload = self._get_session_payload(
                 session_id
+            )
+
+            print(
+                "[BEFORE ORCHESTRATOR]",
+                round(time.perf_counter() - _chat_handle_t0, 3),
+                "seconds",
+                flush=True,
             )
 
             brain_state = self.orchestrator.run(
@@ -606,21 +666,11 @@ class ChatService:
                 session_id=session_id,
             )
 
-        print(
-            "DEBUG BRAIN STATE:",
-            brain_state,
-        )
-
-        execution_state = (
-            brain_state.get("execution")
-            if isinstance(brain_state, dict)
-            else {}
-        )
-
-        if execution_state:
-            self._save_execution_state(
-                session_id,
-                execution_state,
+            print(
+                "[AFTER ORCHESTRATOR]",
+                round(time.perf_counter() - _chat_handle_t0, 3),
+                "seconds",
+                flush=True,
             )
 
         response = chat_handle(
@@ -636,6 +686,13 @@ class ChatService:
             ),
         )
 
+        print(
+            "[AFTER CHAT_HANDLE]",
+            round(time.perf_counter() - _chat_handle_t0, 3),
+            "seconds",
+            flush=True,
+        )
+
         memory_result = self._maybe_write_memory(
             decision=(
                 brain_state.get("decision")
@@ -646,12 +703,6 @@ class ChatService:
             session_id=session_id,
         )
 
-        print(
-            "DEBUG HANDLE MEMORY RESULT =",
-            memory_result,
-            flush=True,
-        )
-
         response["brain_state"] = brain_state
 
         if memory_result:
@@ -659,18 +710,6 @@ class ChatService:
                 "debug",
                 {},
             )["memory_saved"] = True
-
-
-        print(
-            "DEBUG AFTER CHAT_HANDLE META =",
-
-            response.get("assistant_message", {}).get("meta")
-            if isinstance(response, dict)
-            and isinstance(response.get("assistant_message"), dict)
-            else None,
-        )
-
-        response["brain_state"] = brain_state
 
         decision = (
             brain_state.get("decision")
@@ -695,6 +734,13 @@ class ChatService:
 
             response["debug"] = debug
 
+        print(
+            "[CHAT HANDLE END]",
+            round(time.perf_counter() - _chat_handle_t0, 3),
+            "seconds",
+            flush=True,
+        )
+
         return response
 
     def _nova_boot_log_20260701(*args, **kwargs):
@@ -712,9 +758,6 @@ class ChatService:
             "on",
         }:
             print(*args, **kwargs)
-
-
-
 
     def _nova_is_local_project_status_question_20260607(
         user_text
@@ -901,14 +944,16 @@ class ChatService:
             payload,
             history=history or [],
             memory=memory or [],
-            attachment_context=attachment_context or [],
+            attachment_context=attachment_context,
             tool_results=tool_results or [],
             model=str(
                 getattr(self, "chat_model", "")
                 or getattr(self, "model", "")
                 or ""
             ),
-            metadata=metadata or {"source": "chat_service.shadow_helper"},
+            metadata=metadata or {
+                "source": "chat_service.shadow_helper",
+            },
         )
 
         messages = build_model_messages(turn)
@@ -1003,20 +1048,6 @@ class ChatService:
             or {}
         )
 
-        print(
-            "DEBUG PROCESS GOAL EXISTING EXECUTION =",
-            existing_execution,
-        )
-
-        print(
-            "[DEBUG LOADED EXECUTION STATUS]",
-            existing_execution.get("status"),
-        )
-
-        print(
-            "[DEBUG LOADED EXECUTION STEPS]",
-            existing_execution.get("steps"),
-        )
 
         if (
             isinstance(
@@ -1954,21 +1985,6 @@ Rules:
                 "command"
             ] = next_action or "run_step"
 
-        print(
-            "K DISPATCH CHECK =",
-            {
-                "continue_request": selected_execution_state.get(
-                    "continue_request"
-                ),
-                "command": selected_execution_state.get(
-                    "command"
-                ),
-                "next_action": next_action,
-                "status": selected_execution_state.get(
-                    "status"
-                ),
-            },
-        )
 
         if (
             selected_execution_state.get("status") == "complete"
@@ -2004,10 +2020,6 @@ Rules:
             },
         )
 
-        print(
-            "EXECUTION STATE BEFORE ORCHESTRATOR =",
-            selected_execution_state,
-        )
 
         if (
             isinstance(selected_execution_state, dict)
@@ -2062,22 +2074,6 @@ Rules:
                 state=selected_execution_state,
                 command="run_step",
             )
-
-        print(
-            "FINAL ORCHESTRATOR DISPATCH =",
-            {
-                "goal": selected_execution_state.get("goal"),
-                "steps": len(
-                    selected_execution_state.get("steps", [])
-                ),
-                "current_index": selected_execution_state.get(
-                    "current_index"
-                ),
-                "command": next_action or "run_step",
-                "status": selected_execution_state.get("status"),
-            },
-            flush=True,
-        )
 
         return self.execution_orchestrator_service.process_execution(
             session_id=session_id,
@@ -2323,17 +2319,6 @@ Rules:
         session_id: str = "",
     ) -> bool:
 
-        print(
-            "MEMORY FUNCTION HIT",
-            repr(user_text),
-        )
-
-        print(
-            "DEBUG MEMORY ENTERED =",
-            "NOVA_MEMORY_TEST_009_REACHED",
-            repr(session_id),
-        )
-
         decision = decision if isinstance(decision, dict) else {}
 
         user_text_lc = self.safe_str(user_text).lower().strip()
@@ -2393,11 +2378,7 @@ Rules:
             marker in text_lower
             for marker in question_memory_block
         ):
-            print(
-                "MEMORY BLOCKED QUESTION =",
-                text,
-                flush=True,
-            )
+
             return False
 
         if any(
@@ -2473,28 +2454,6 @@ Rules:
         ):
             memory_kind = "preference"
 
-        print(
-            "MEMORY CLASSIFY:",
-            text,
-            memory_kind,
-        )
-
-        print(
-            "MEMORY FILTER CHECK =",
-            repr(text),
-            "kind=",
-            memory_kind,
-        )
-
-        print(
-            "DEBUG MEMORY BEFORE FILTER =",
-            {
-                "text": text,
-                "kind": memory_kind,
-                "decision": decision,
-            },
-        )
-
         if not self._should_save_memory_text(
             text,
             kind=memory_kind,
@@ -2509,10 +2468,6 @@ Rules:
             "source": "chat_service_memory_save",
         }
 
-        print(
-            "DEBUG MEMORY PAYLOAD =",
-            payload,
-        )
 
         for method_name in (
             "add_memory",
@@ -2526,23 +2481,7 @@ Rules:
 
             if callable(method):
 
-                print(
-                    "DEBUG MEMORY CALLING =",
-                    method_name,
-                )
-
                 result = method(payload)
-
-                print(
-                    "DEBUG MEMORY METHOD RETURNED =",
-                    method_name,
-                    repr(result),
-                )
-
-                print(
-                    "DEBUG MEMORY RESULT =",
-                    result,
-                )
 
                 return True
 
@@ -2584,23 +2523,11 @@ Rules:
                 else:
                     result = []
 
-                print(
-                    "[MEMORY SERVICE RESULT]",
-                    type(result),
-                    result,
-                )
-
                 if isinstance(result, list):
                     return result
 
             except Exception as e:
-                print(
-                    "[MEMORY SERVICE ERROR]",
-                    e,
-                )
-
-        print("[MEMORY SERVICE EMPTY]")
-        return []
+                return []
 
     def _get_sessions_list(self) -> list:
         try:
@@ -2674,18 +2601,6 @@ Rules:
 
         if hasattr(self.sessions, "get_session"):
             found = self.sessions.get_session(sid)
-
-            print(
-                "[NOVA CONTINUITY DEBUG]",
-                "sid=",
-                sid,
-                "found_type=",
-                type(found),
-                "messages=",
-                len(found.get("messages", []))
-                if isinstance(found, dict)
-                else "NO_DICT",
-            )
 
             if isinstance(found, dict):
                 payload = found
@@ -2776,8 +2691,6 @@ Rules:
         )
 
         if invalid_general_execution:
-
-            print("SANITIZER CLEARED INVALID EXECUTION")
 
             live_execution = {}
 
@@ -3725,16 +3638,6 @@ Rules:
             state.get("pending_fix_code")
         )
 
-        print(
-            "DEBUG PENDING FIX STATE =",
-            {
-                "pending_file_path": pending_file_path,
-                "pending_fix_code": pending_fix_code[:500],
-                "state_keys": list(state.keys()),
-            },
-            flush=True,
-        )
-
         user_msg = self._build_user_message("apply fix")
 
         decision = {
@@ -4639,9 +4542,15 @@ Rules:
         mission = self._safe_dict(decision.get("mission"))
         execution = mission.get("execution")
 
-        if isinstance(execution, dict):
+        if (
+            isinstance(execution, dict)
+            and self._looks_like_execution(user_text)
+        ):
             try:
-                assistant_text = self._render_execution(execution, include_prefix=True)
+                assistant_text = self._render_execution(
+                    execution,
+                    include_prefix=True,
+                )
             except Exception as e:
                 exec_debug("EXECUTION_RENDER_ERROR:", e)
 
@@ -4651,10 +4560,22 @@ Rules:
             mission = self._safe_dict(decision.get("mission"))
             execution = mission.get("execution")
 
-            if isinstance(execution, dict):
-                status = str(execution.get("status") or "").lower()
+            if (
+                isinstance(execution, dict)
+                and self._looks_like_execution(user_text)
+            ):
 
-                if status not in ["complete", "completed", "done"]:
+                exec_result = None
+
+                status = str(
+                    execution.get("status") or ""
+                ).lower()
+
+                if status not in [
+                    "complete",
+                    "completed",
+                    "done",
+                ]:
                     exec_result = self._execute_current_step(
                         execution=execution,
                         user_text=user_text,
@@ -4718,10 +4639,7 @@ Rules:
 
         decision = decision if isinstance(decision, dict) else {}
 
-        print(
-            "[RESPONSE INTELLIGENCE DECISION DEBUG]",
-            decision,
-        )
+
 
         attachments = attachments or []
         assistant_text = self.safe_str(assistant_text).strip()
@@ -4927,15 +4845,6 @@ Rules:
         attachments=None,
         decision=None,
     ) -> dict:
-
-        print(
-            "DEBUG ENTERED EXECUTE WEB FETCH",
-            {
-                "user_text": user_text,
-                "decision": decision,
-            },
-            flush=True,
-        )
 
         decision = decision if isinstance(decision, dict) else {}
         attachments = attachments or []
@@ -5460,7 +5369,6 @@ Rules:
             )
             and (text.startswith("http://") or text.startswith("https://"))
         ):
-            print("DIRECT_URL_PATCH_HIT =", text)
 
             web_result = {}
 
@@ -5528,8 +5436,6 @@ Rules:
                     or "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦" in summary
                 )
 
-                assistant_text = "" if summary_looks_raw else summary
-
                 if not assistant_text and (body or summary):
                     try:
                         clean_body = self._clean_web_text((body or summary)[:5000])
@@ -5545,9 +5451,23 @@ Rules:
                         )
 
                         response = chat_completions_create(
-                            nova_username=getattr(self, "username", None) or os.getenv("NOVA_DEFAULT_USERNAME") or "richard",
-                            nova_session_id=locals().get("session_id") or getattr(getattr(self, "session_service", None), "active_session_id", "") or "",
-                            model=getattr(self, "model", "gpt-4o-mini"),
+                            nova_username=getattr(self, "username", None)
+                            or os.getenv("NOVA_DEFAULT_USERNAME")
+                            or "richard",
+                            nova_session_id=(
+                                locals().get("session_id")
+                                or getattr(
+                                    getattr(self, "session_service", None),
+                                    "active_session_id",
+                                    "",
+                                )
+                                or ""
+                            ),
+                            model=getattr(
+                                self,
+                                "model",
+                                "gpt-4o-mini",
+                            ),
                             messages=[
                                 {
                                     "role": "system",
@@ -5579,6 +5499,7 @@ Rules:
 
                 if not assistant_text:
                     assistant_text = f"Fetched {title}"
+
 
             source = {
                 "title": title,
@@ -6746,14 +6667,6 @@ Rules:
         attachments=None,
     ):
 
-        print(
-            "DEBUG EXEC CONTROL ENTRY",
-            {
-                "session_id": session_id,
-                "user_text": user_text,
-            },
-        )
-
         text = self.safe_str(
             user_text
         ).strip().lower()
@@ -6841,23 +6754,7 @@ Rules:
                         )
 
                 return execution_result
-        print(
-            "MISSION COMMAND DEBUG =",
-            {
-                "text": text,
-                "session_id": session_id,
-            },
-            flush=True,
-        )
 
-        print(
-            "DEBUG BEFORE RESOLVE",
-            {
-                "user_text": user_text,
-                "session_id": session_id,
-            },
-            flush=True,
-        )
 
         # NOVA_DIRECT_REPAIR_REQUEST_GATE
         # Explicit repair requests should enter auto-fix instead of general chat.
@@ -6982,57 +6879,6 @@ Rules:
                 command="cancel",
             )
 
-        print(
-            "DEBUG AFTER RESOLVE",
-            mission_command,
-            flush=True,
-        )
-
-        print(
-            "DEBUG STOP RESOLVE RESULT =",
-            {
-                "user_text": user_text,
-                "type": (
-                    mission_command.get("type")
-                    if isinstance(
-                        mission_command,
-                        dict,
-                    )
-                    else None
-                ),
-                "next_action": (
-                    mission_command.get("next_action")
-                    if isinstance(
-                        mission_command,
-                        dict,
-                    )
-                    else None
-                ),
-                "continue_request": (
-                    mission_command.get(
-                        "continue_request"
-                    )
-                    if isinstance(
-                        mission_command,
-                        dict,
-                    )
-                    else None
-                ),
-            },
-            flush=True,
-        )
-
-        print(
-            "DEBUG MISSION COMMAND RESULT =",
-            mission_command,
-            flush=True,
-        )
-
-        print(
-            "DEBUG BEFORE MISSION RESULT SESSION=",
-            repr(session_id),
-            flush=True,
-        )
 
         mission_result = (
             self._handle_mission_command_result(
@@ -7239,17 +7085,6 @@ Rules:
         execution_state["lock"] = False
         execution_state["_execution_processing"] = False
         execution_state["command"] = command
-
-        print(
-            "DEBUG EXEC CONTROL BEFORE ORCHESTRATOR",
-            {
-                "session_id": session_id,
-                "goal": execution_state.get("goal"),
-                "status": execution_state.get("status"),
-                "current_index": execution_state.get("current_index"),
-                "command": command,
-            },
-        )
 
         if (
             "current_index" not in execution_state
@@ -7663,13 +7498,11 @@ Rules:
             }
 
             if text in triggers:
-                print("EXECUTION LOCK TRIGGERED:", text)
                 return True
 
             return False
 
         except Exception as e:
-            print("EXECUTION LOCK ERROR:", e)
             return False
 
     def _clean_artifact_text(
@@ -7913,7 +7746,6 @@ Rules:
         try:
             if hasattr(self, "memory") and self.memory and hasattr(self.memory, "all"):
                 items = self.memory.all() or []
-                print("[MEMORY RECALL DEBUG]", items[-5:])
 
         except Exception:
             items = []
@@ -8353,6 +8185,7 @@ Rules:
         session=None,
         decision=None,
         memory_context=None,
+        attachments=None,
     ):
         session = session or {}
         memory_context = self.safe_str(
@@ -8424,6 +8257,33 @@ Rules:
                     ),
                 }
             )
+
+        if attachments:
+            try:
+                from nova_backend.services.chat_turn_attachment_context import (
+                    build_attachment_context_text,
+                )
+
+                attachment_context = build_attachment_context_text(
+                    attachments
+                )
+
+                if attachment_context:
+                    messages.append(
+                        {
+                            "role": "system",
+                            "content": (
+                                "Attachment analysis/context:\n"
+                                f"{attachment_context}"
+                            ),
+                        }
+                    )
+
+            except Exception as e:
+                print(
+                    "ATTACHMENT CONTEXT BUILD FAILED:",
+                    e,
+                )
 
         messages.append(
             {
@@ -8773,11 +8633,6 @@ Rules:
             user_text=user_text,
             attachments=attachments,
             session_id=session_id,
-        )
-
-        print(
-            "DECIDE RESULT =",
-            result,
         )
 
         return result
@@ -10666,11 +10521,6 @@ Rules:
             memories = memory_items
 
         memories = memories or self._get_memory_list()
-        print(
-            "[MEMORY DEBUG INPUT]",
-            len(memories),
-            memories[:3],
-        )
         working_state = working_state or {}
         execution_state = execution_state or {}
 
@@ -11231,7 +11081,6 @@ Rules:
             return self.safe_str(response.choices[0].message.content).strip()
 
         except Exception as exc:
-            print("[NOVA_OPENAI_VISION_ATTACHMENT_ANALYSIS] failed:", exc)
             return ""
 
     def _handle_attachment(
@@ -11449,6 +11298,35 @@ Rules:
 
         sections = []
 
+        try:
+            from nova_backend.services.chat_turn_attachment_context import (
+                nova_chat_turn_inject_attachment_context_from_locals,
+            )
+
+            attachment_messages = (
+                nova_chat_turn_inject_attachment_context_from_locals(
+                    [],
+                    locals(),
+                )
+            )
+
+            if attachment_messages:
+                sections.append(
+                    "\n".join(
+                        str(item.get("content", ""))
+                        for item in attachment_messages
+                        if isinstance(item, dict)
+                        and item.get("content")
+                    )
+                )
+
+        except Exception as exc:
+            print(
+                "ATTACHMENT CONTEXT BUILD FAILED:",
+                exc,
+                flush=True,
+            )
+
         if memory_block:
             sections.append(
                 "Relevant memory:\n"
@@ -11494,11 +11372,6 @@ Rules:
                 )
             )
 
-            print(
-                "[CONTINUITY TEST]",
-                repr(continuity_context)[:1000],
-            )
-
             if continuity_context:
                 sections.append(
                     continuity_context
@@ -11533,12 +11406,7 @@ Rules:
         )
 
         try:
-            print(
-                "DEBUG GENERAL MODEL INPUT =",
-                repr(prompt)[:2000],
-            )
-
-            response = responses_create(
+            response = model_gateway_service.responses_create(
                 model=self.chat_model,
                 input=prompt,
             )
@@ -11613,13 +11481,6 @@ Rules:
             attachments=attachments,
         )
 
-        print(
-            "DEBUG MEMORY RECALL USER MESSAGE =",
-            user_msg,
-        )
-
- 
-
     def _execute_planning(
         self,
         decision: dict,
@@ -11627,13 +11488,6 @@ Rules:
         session_id: str,
         attachments=None,
     ) -> dict:
-        print(
-            "DEBUG OLD PLANNER REDIRECT ENTERED",
-            {
-                "user_text": user_text,
-                "session_id": session_id,
-            },
-        )
 
         try:
             execution_state = self.execution_handler.handle(
@@ -11641,10 +11495,7 @@ Rules:
                 session_id=session_id,
             )
 
-            print(
-                "DEBUG REDIRECT EXECUTION RESULT =",
-                execution_state,
-            )
+
 
             decision["execution_state"] = (
                 execution_state or {}
@@ -11675,19 +11526,6 @@ Rules:
             attachments=[],
         )
 
-        print(
-            "DEBUG MEMORY INPUT =",
-            {
-                "user_text": user_text,
-                "decision": decision,
-                "memory_type": type(self.memory),
-                "memory_methods": [
-                    x for x in dir(self.memory)
-                    if "memory" in x.lower() or x in ("add", "remember")
-                ],
-            },
-        )
-
 
         if memory_result:
             assistant_text = "Saved. I'll remember that."
@@ -11701,32 +11539,7 @@ Rules:
                 attachments=[],
             )
 
-        print(
-            "DEBUG AFTER MEMORY CALL",
-            memory_result,
-        )
 
-        decision["DEBUG_memory_result"] = memory_result
-
-        print(
-            "RETURN MEMORY DEBUG =",
-            memory_result,
-            flush=True,
-        )
-
-        decision["DEBUG_user_text_seen"] = user_text
-        decision["DEBUG_memory_type"] = str(type(self.memory))
-
-        print(
-            "DEBUG MEMORY GENERAL CHAT RESULT =",
-            memory_result,
-        )
-
-        print(
-            "DEBUG MEMORY OBJECT =",
-            type(self.memory),
-            getattr(self.memory, "memory_file", None),
-        )
         result = self._finalize_response(
 
             execution_state=decision.get(
@@ -11738,11 +11551,6 @@ Rules:
             assistant_msg=assistant_msg,
             decision=decision,
             saved_artifact=None,
-        )
-
-        print(
-            "[POST FINALIZE DEBUG]",
-            result.get("assistant_message", {}).get("meta"),
         )
 
         return result
@@ -11968,7 +11776,7 @@ Rules:
 
         try:
 
-            response = responses_create(
+            response = model_gateway_service.responses_create(
                 nova_username=(
                     getattr(self, "username", None)
                     or os.getenv("NOVA_DEFAULT_USERNAME")
@@ -12418,6 +12226,7 @@ Rules:
         ]
         is_execution = any(k in text_lc for k in execution_keywords)
 
+
         continue_triggers = ["continue", "next", "run it", "go"]
         is_continue = any(k == text_lc.strip() for k in continue_triggers)
 
@@ -12453,8 +12262,6 @@ Rules:
                 + memory_context
             )
 
-        print("MEMORY GOING INTO MODEL:")
-        print(memory_context)
 
         model_messages = self._compose_model_messages(
             user_text=user_text,
@@ -12462,6 +12269,23 @@ Rules:
             decision=decision,
             memory_context=memory_context,
         )
+
+
+        try:
+            from nova_backend.services.chat_turn_attachment_context import (
+                nova_chat_turn_inject_attachment_context_from_locals,
+            )
+
+            model_messages = (
+                nova_chat_turn_inject_attachment_context_from_locals(
+                    model_messages,
+                    locals(),
+                )
+            )
+
+        except Exception:
+            pass
+
 
         if is_execution or active_task:
             model_messages.insert(0, {
@@ -12479,14 +12303,13 @@ Rules:
             })
 
         try:
-            response = self.client.responses.create(
+            response = model_gateway_service.responses_create(
                 model=self.chat_model,
                 input=model_messages,
             )
             assistant_text = self._extract_response_text(response)
 
         except Exception as e:
-            print("GENERAL CHAT ERROR:", e)
             assistant_text = "Something went wrong."
 
         if not assistant_text:
@@ -12910,19 +12733,9 @@ try:
             kwargs,
         )
 
-        print(
-            "DEBUG LIVE MARKET ROUTER CHECK:",
-            user_text,
-            flush=True,
-        )
-
         if _nova_is_live_market_price_request(
             user_text
         ):
-            print(
-                "DEBUG LIVE MARKET FORCE WEB_FETCH",
-                flush=True,
-            )
 
             return {
                 "route": self.ROUTE_WEB_FETCH,
@@ -13060,3 +12873,8 @@ def _nova_attachment_guard_install_web_routing_suppression():
 def _nova_install_attachment_guard_web_suppression():
     return _nova_attachment_guard_install_web_routing_suppression()
 
+def _create_model_response(self, model_messages):
+    return self._create_model_response(
+        model=self.chat_model,
+        input=model_messages,
+    )

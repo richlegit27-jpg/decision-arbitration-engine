@@ -132,8 +132,19 @@ from nova_backend.routes.planner_routes import (
 from nova_backend.services.upload_ownership_service import (
     UploadOwnershipService,
 )
+import time
+
+_t0 = time.perf_counter()
+
 from nova_backend.services.execution_bridge_service import (
     ExecutionBridgeService,
+)
+
+print(
+    "[IMPORT TIMING] execution_bridge_service",
+    round(time.perf_counter() - _t0, 3),
+    "seconds",
+    flush=True,
 )
 from nova_backend.services.upload_route_service import (
     UploadRouteService,
@@ -530,7 +541,18 @@ session_slim_response_service = SessionSlimResponseService()
 web_service = WebService(timeout=WEB_TIMEOUT)
 recon_service = ReconService(timeout=RECON_TIMEOUT)
 intent_router = IntentRouterService()
+import time
+
+_t0 = time.perf_counter()
+
 runtime_brain = SafeUnifiedRuntime()
+
+print(
+    "[TIMING] SafeUnifiedRuntime init",
+    round(time.perf_counter() - _t0, 3),
+    "seconds",
+    flush=True,
+)
 runtime_response_sanitizer = RuntimeResponseSanitizerService()
 attachment_keypoints_service = AttachmentKeypointsService()
 # install_project_chat_response_router moved below app creation
@@ -770,8 +792,8 @@ register_payments_routes(app)
 autonomy_route_guard_service.install(app)
 execution_priority_guard_service.install(app)
 session_history_persistence_guard_service.install(app)
-lead_route_service.install_routes(app)
 debug_route_service.install_routes(app)
+lead_route_service.install_routes(app)
 
 from asgiref.wsgi import WsgiToAsgi
 
@@ -1609,26 +1631,57 @@ def _nova_casual_chat_guard():
         return None
 
 
-@app.post("/api/chat")
-
-
-def _nova_mobile_now_iso():
-    try:
-        from datetime import datetime, timezone
-        return datetime.now(timezone.utc).isoformat()
-    except Exception:
-        return ""
-
 def api_chat():
-    print("[CONTENT TYPE]", request.content_type)
+    print(
+        "[API CHAT ENTERED]",
+        flush=True,
+    )
+
+    print(
+        "[CONTENT TYPE]",
+        request.content_type,
+        flush=True,
+    )
+
+    print(
+        "[API CHAT RAW CHECK]",
+        request.get_data(
+            cache=True,
+            as_text=True,
+        ),
+        flush=True,
+    )
+
+    print(
+        "[API CHAT JSON CHECK]",
+        request.get_json(silent=True),
+        flush=True,
+    )
+
     print("[RAW BODY]", request.get_data())
-    data = request.get_json(silent=True) or {}
-    print("[CHAT RAW DATA DEBUG]", data)
+
+    data = request.get_json(
+        silent=True,
+        cache=True,
+    ) or {}
+
+    print(
+        "[CHAT STEP 1 DATA]",
+        data,
+        flush=True,
+    )
+
+    print(
+        "[CHAT RAW DATA DEBUG]",
+        data,
+        flush=True,
+    )
 
     user_text = str(
         data.get("user_text")
         or data.get("text")
         or data.get("message")
+        or data.get("content")
         or ""
     ).strip()
 
@@ -1654,6 +1707,7 @@ def api_chat():
         user_text,
         auth_user_id,
     )
+    print("[CHAT STEP 3 SESSION]", repr(session_id), flush=True)
 
     print(
         "[DEBUG EARLY SESSION RESOLVE]",
@@ -1999,9 +2053,6 @@ def api_chat():
             request.json.get("attachments", [])
         )
 
-        from flask import g
-
-        g.nova_api_chat_attachments = attachments
 
     attachments = chat_attachment_guard_service.handle_web_attachment_guard(
         request,
@@ -2494,6 +2545,11 @@ def api_chat():
             and current_step.get("next_action")
             == "request_target"
             and user_text
+            and (
+                "." in user_text
+                or "/" in user_text
+                or "\\" in user_text
+            )
             and not user_text.lower().startswith("auto-plan")
         ):
             result = {
@@ -2523,13 +2579,22 @@ def api_chat():
             e,
         )
 
+    print(
+        "[ABOUT TO CALL CHAT SERVICE]",
+        {
+            "user_text": user_text,
+            "session_id": session_id,
+            "attachments": attachments_for_chat_service,
+        },
+        flush=True,
+    )
+
     try:
         result = chat_service.handle(
             user_text=image_command_user_text,
             session_id=session_id,
             attachments=attachments_for_chat_service,
         )
-
     except Exception as chat_error:
         import traceback
 
@@ -2732,6 +2797,18 @@ def api_chat_session_compat(session_id: str):
 # NOVA_FIX_MISSING_UPLOAD_HELPER_LOGGER_20260609
 import logging as _nova_logging_20260609
 logger = _nova_logging_20260609.getLogger(__name__)
+
+@app.get("/api/chats")
+def api_chats_compat():
+    sessions = session_service.get_all()
+
+    return json_ok(
+        ok=True,
+        chats=sessions,
+        items=sessions,
+        sessions=sessions,
+        active_session_id=session_service.active_session_id,
+    )
 
 @app.get("/api/sessions/<session_id>")
 def api_session_by_id(session_id: str):
@@ -4113,6 +4190,44 @@ def nova_memory_command_before_web_20260611():
     except Exception:
         return None
 
+@app.before_request
+def nova_attachment_boundary_capture():
+    try:
+        from flask import request, g
+
+        if request.path != "/api/chat":
+            return
+
+        data = request.get_json(
+            silent=True
+        ) or {}
+
+        attachments = normalize_attachments(
+            data.get("attachments", [])
+            or data.get("files", [])
+        )
+
+        g.nova_api_chat_attachments = attachments
+
+        print(
+            "[ATTACHMENT BOUNDARY CAPTURE]",
+            attachments,
+        )
+
+    except Exception as error:
+        try:
+            from flask import g
+
+            g.nova_api_chat_attachments = []
+
+            print(
+                "[ATTACHMENT BOUNDARY ERROR]",
+                error,
+            )
+
+        except Exception:
+            pass
+
 # NOVA_WEB_FETCH_BRIDGE_JSON_IMPORT_FIX_20260612
 # Ensure this late bridge can rewrite Flask response JSON even if json was not imported globally.
 import json as json
@@ -4413,18 +4528,6 @@ except Exception as _npsr_error_20260703:
         pass
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 # --- NOVA_MOBILE_CHAT_VISIBLE_RECOVERY_INJECT_20260703 ---
 try:
     from flask import request as _nvcvr_request
@@ -4533,10 +4636,30 @@ if __name__ == "__main__":
 
     for rule in app.url_map.iter_rules():
         if "login" in str(rule).lower():
-            print(rule, "=>", rule.endpoint)
+            print(
+                rule,
+                "=>",
+                rule.endpoint,
+            )
+
+    import time
+
+    _flask_run_t0 = time.perf_counter()
+
+    print(
+        "[ENTERING FLASK SERVER]",
+        flush=True,
+    )
 
     app.run(
         host="0.0.0.0",
         port=int(os.getenv("PORT", "5001")),
         debug=os.getenv("NOVA_DEBUG", "false").lower() == "true",
+    )
+
+    print(
+        "[FLASK SERVER EXITED]",
+        round(time.perf_counter() - _flask_run_t0, 3),
+        "seconds",
+        flush=True,
     )

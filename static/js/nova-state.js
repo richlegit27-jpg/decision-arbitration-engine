@@ -185,7 +185,7 @@ pinSession: "/api/sessions/pin",
 
   window.Nova.storage = STORAGE;
   window.Nova.apiPaths = API;
-  window.Nova.state = state;
+  window.Nova.state = window.Nova.state || state;
   window.Nova.stateUtils = {
     loadPreference,
     savePreference,

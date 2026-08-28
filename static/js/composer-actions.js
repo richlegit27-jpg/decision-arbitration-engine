@@ -1,9 +1,11 @@
 ﻿// C:\Users\Owner\nova\static\js\composer-actions.js
 
 (() => {
+console.log("[NOVA COMPOSER ACTIONS DEBUG VERSION LOADED]");
 "use strict"
 
 function createComposerActions(options = {}){
+
   const {
     state,
     elements = {},
@@ -17,6 +19,14 @@ function createComposerActions(options = {}){
     callbacks = {},
     onStateChange = null,
   } = options
+
+
+  console.log("[NOVA COMPOSER STREAM DEBUG]", {
+    streamService,
+    hasSend: typeof streamService?.send,
+    keys: streamService ? Object.keys(streamService) : [],
+  })
+
 
   if(!state){
     throw new Error("NovaComposerActions: state is required")
@@ -63,9 +73,15 @@ function createComposerActions(options = {}){
     return state.pendingAttachments
   }
 
-  function getActiveChatId(){
-    return String(state.activeChatId || "").trim()
-  }
+function getActiveChatId(){
+  return String(
+    state.activeChatId ||
+    state.activeSessionId ||
+    window.Nova?.state?.activeSessionId ||
+    window.NovaChatOrchestrator?.activeChatId ||
+    ""
+  ).trim()
+}
 
   function setActiveChatId(chatId){
     state.activeChatId = String(chatId || "").trim()

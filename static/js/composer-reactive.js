@@ -95,7 +95,36 @@ async function startVoiceRecording(){ mediaStream=await navigator.mediaDevices.g
 async function stopVoiceRecording(commit=true){ if(!mediaRecorder) return; await new Promise(r=>mediaRecorder.addEventListener("stop",r,{once:true})); mediaStream?.getTracks().forEach(t=>t.stop()); mediaStream=null; mediaRecorder=null; isRecording=false; if(el.voiceBtn){el.voiceBtn.textContent="ðŸŽ¤"; el.voiceBtn.classList.remove("is-recording")} if(el.voiceStatus) el.voiceStatus.textContent=""; if(!commit){recordingChunks=[];return} if(!recordingChunks.length)return; const blob=new Blob(recordingChunks,{type:mediaRecorder?.mimeType||"audio/webm"}); recordingChunks=[]; const url=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result||"")); r.onerror=()=>rej(new Error("Voice note failed")); r.readAsDataURL(blob)}); state.pendingAttachments.push({id:makeId("voice"),name:`voice-${Date.now()}.webm`,type:blob.type,size:blob.size,url,content:""}); renderPendingAttachments(); window.dispatchEvent(new CustomEvent("nova:attachments-changed",{detail:state.pendingAttachments}))}
 
 // --- Send ---
-async function sendMessage(){ const text=String(el.composerInput?.value||"").trim(); const attachments=[...ensurePendingAttachments()]; if(!text&&!attachments.length) return; appendUserMessage(text||"[Attachment]",attachments); clearPendingAttachments(); el.composerInput.value=""; autoResizeComposer(); setTimeout(()=>appendAssistantMessage("This is a local offline response"),500) }
+async function sendMessage(){
+
+  const text = String(
+    el.composerInput?.value || ""
+  ).trim();
+
+  const attachments = [
+    ...ensurePendingAttachments()
+  ];
+
+  if(!text && !attachments.length){
+    return;
+  }
+
+  clearPendingAttachments();
+
+  if(el.composerInput){
+    el.composerInput.value = "";
+  }
+
+  autoResizeComposer();
+
+  if(typeof window.sendText === "function"){
+    return await window.sendText(text);
+  }
+
+  console.error(
+    "[NovaComposerReactive] Real sendText missing"
+  );
+}
 
 // --- Event handlers ---
 function handleSubmit(e){e.preventDefault();sendMessage()}
