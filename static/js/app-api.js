@@ -1,12 +1,14 @@
 ﻿(() => {
 "use strict";
 
-if (window.NovaApp && window.NovaApp.api) {
-  console.warn("Nova app-api already loaded.");
-  return;
-}
-
 window.NovaApp = window.NovaApp || {};
+
+const existingApi =
+  window.NovaApp.api &&
+  typeof window.NovaApp.api === "object"
+    ? window.NovaApp.api
+    : {};
+
 const app = window.NovaApp;
 
 async function parseJsonSafe(response) {
@@ -258,11 +260,50 @@ async function hydrateMessagesIntoState(chatId) {
 
 async function hydrateModelsIntoState() {
   const modelsPayload = await getModels();
-  const models = Array.isArray(modelsPayload)
-    ? modelsPayload
-    : Array.isArray(modelsPayload.models)
-      ? modelsPayload.models
-      : [];
+
+  const rawModels =
+    Array.isArray(modelsPayload)
+      ? modelsPayload
+      : Array.isArray(modelsPayload?.models)
+        ? modelsPayload.models
+        : [];
+
+  const modelLabels = {
+    "nova-fast": "Nova Fast — nova-fast",
+    "gpt-5.4": "Nova Smart — gpt-5.4",
+    "gpt-4.1-mini": "Nova Coding — gpt-4.1-mini",
+    "gpt-4o-mini": "Nova Vision — gpt-4o-mini"
+  };
+
+  const models = rawModels.map((model) => {
+    if (typeof model === "string") {
+      return {
+        value: model,
+        label: modelLabels[model] || model
+      };
+    }
+
+    const value =
+      model?.value ||
+      model?.id ||
+      model?.name ||
+      "";
+
+    return {
+      ...model,
+      value,
+      label:
+        model?.label ||
+        modelLabels[value] ||
+        value
+    };
+  });
+
+  const selected =
+    modelsPayload?.selected_model ||
+    modelsPayload?.active_model ||
+    app.state?.selectedModel ||
+    "nova-fast";
 
   if (typeof app.setModels === "function") {
     app.setModels(models);
@@ -270,16 +311,33 @@ async function hydrateModelsIntoState() {
     app.state.models = models;
   }
 
-  const selected =
-    modelsPayload?.selected_model ||
-    modelsPayload?.active_model ||
-    app.state?.selectedModel ||
-    "gpt-4.1-mini";
-
   if (typeof app.setSelectedModel === "function") {
     app.setSelectedModel(selected);
   } else if (app.state) {
     app.state.selectedModel = selected;
+  }
+
+  const modelSelect =
+    document.getElementById("modelSelect");
+
+  if (modelSelect) {
+    modelSelect.innerHTML = models
+      .map((model) => `
+        <option value="${String(model.value)}">
+          ${String(model.label)}
+        </option>
+      `)
+      .join("");
+
+    modelSelect.value = selected;
+
+    console.log(
+      "[NOVA MODELS] rendered",
+      [...modelSelect.options].map(
+        (option) =>
+          `${option.textContent.trim()} [${option.value}]`
+      )
+    );
   }
 
   return {
@@ -289,6 +347,7 @@ async function hydrateModelsIntoState() {
 }
 
 app.api = {
+  ...existingApi,
   request,
   getAuthStatus,
   getModels,
@@ -309,4 +368,3 @@ app.api = {
 };
 
 })();
-

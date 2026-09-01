@@ -9,6 +9,7 @@ def chat_handle(
     attachments=None,
     brain_state=None,
     decision=None,
+    regenerate=False,
 ):
     _t0 = time.perf_counter()
 
@@ -236,6 +237,7 @@ def chat_handle(
                 attachments=[],
             ),
             decision=decision,
+            regenerate=regenerate,
             saved_artifact=None,
         )
 

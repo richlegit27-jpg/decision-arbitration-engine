@@ -1227,6 +1227,79 @@ observer.observe(document.documentElement, {
         </div>
       </section>
 
+<div
+  id="newProjectModal"
+  class="nova-project-modal"
+  hidden
+>
+  <div
+    class="nova-project-modal-backdrop"
+    data-new-project-cancel="true"
+  ></div>
+
+  <div
+    class="nova-project-modal-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="newProjectModalTitle"
+  >
+    <div class="nova-project-modal-header">
+      <h2 id="newProjectModalTitle">
+        New Project
+      </h2>
+
+      <button
+        id="cancelNewProject"
+        type="button"
+        class="nova-project-modal-close"
+        aria-label="Close"
+      >
+        ×
+      </button>
+    </div>
+
+    <div class="nova-project-modal-body">
+      <label for="newProjectName">
+        Project name
+      </label>
+
+      <input
+        id="newProjectName"
+        type="text"
+        autocomplete="off"
+        placeholder="Project name"
+      />
+
+      <label for="newProjectDescription">
+        Description
+      </label>
+
+      <textarea
+        id="newProjectDescription"
+        rows="4"
+        placeholder="What is this project about?"
+      ></textarea>
+    </div>
+
+    <div class="nova-project-modal-footer">
+      <button
+        id="cancelNewProject"
+        type="button"
+      >
+        Cancel
+      </button>
+
+      <button
+        id="createNewProject"
+        type="button"
+        class="primary-side-button"
+      >
+        Create Project
+      </button>
+    </div>
+  </div>
+</div>
+
 <section
   id="desktopProjectWorkspace"
   class="workspace-section"
@@ -1241,149 +1314,308 @@ observer.observe(document.documentElement, {
   </div>
 
   <div class="project-workspace-card">
-    <h3>Project Overview</h3>
 
-<p id="desktopProjectStatus">
-  Workspace ready
-</p>
+    <h3>Project Intelligence</h3>
 
-<div id="desktopProjectMission" class="project-panel-card">
-  <h3>Mission</h3>
-  <p>Build something amazing.</p>
-</div>
+    <p id="desktopProjectStatus">
+      Workspace ready
+    </p>
 
-<div id="desktopProjectProgress" class="project-panel-card">
-  <h3>Progress</h3>
-  <p>0%</p>
-</div>
-
-<div id="desktopProjectHealth" class="project-panel-card">
-  <h3>Health</h3>
-  <p>🟢 Healthy</p>
-</div>
-
-<div id="desktopProjectFocus" class="project-panel-card">
-  <h3>Current Focus</h3>
-  <p>No active work.</p>
-</div>
-
-<div id="desktopProjectNextAction" class="project-panel-card">
-  <h3>Next Action</h3>
-  <p>Create your first task.</p>
-</div>
-
-<div id="desktopProjectRecommendation" class="project-panel-card">
-  <h3>AI Recommendation</h3>
-  <p>Start organizing this project.</p>
-</div>
-
-<div id="desktopProjectFiles" class="project-panel-card">
-  <div class="nova-project-files-header">
-    <h3>Project Files</h3>
-
-
-
-
-
-<button
-  id="desktopProjectUploadButton"
-  type="button"
->
-  Upload File
-</button>
-
-<div id="desktopProjectTasks" class="project-panel-card">
-
-<button
-    id="desktopProjectUploadButton"
-    type="button"
->
-    Upload File
-</button>
-
-</div>
-
-</div>
-
-  <input
-    id="desktopProjectFileInput"
-    type="file"
-    hidden
-  />
-
-  <div id="desktopProjectFileList">
-    <p>No files yet.</p>
-  </div>
-</div>
-
-<div id="desktopProjectNotes" class="project-panel-card">
-  <h3>Notes</h3>
-
-  <button
-    id="desktopProjectAddNoteButton"
-    type="button"
-  >
-    + Add Note
-  </button>
-
-  <div id="desktopProjectNoteEditor" hidden>
-
-    <input
-      id="desktopProjectNoteTitle"
-      type="text"
-      placeholder="Note title"
-    />
-
-    <textarea
-      id="desktopProjectNoteContent"
-      placeholder="Write a project note..."
-    ></textarea>
-
-    <button
-      id="desktopProjectSaveNote"
-      type="button"
+    <div
+      id="desktopProjectMission"
+      class="project-panel-card"
     >
-      Save Note
-    </button>
+      <h3>Mission</h3>
+      <p>Build something amazing.</p>
+    </div>
 
-    <button
-      id="desktopProjectCancelNote"
-      type="button"
+    <div
+      id="desktopProjectProgress"
+      class="project-panel-card"
     >
-      Cancel
-    </button>
+      <h3>Progress</h3>
+      <p>0%</p>
+    </div>
 
-  </div>
+    <div
+      id="desktopProjectHealth"
+      class="project-panel-card"
+    >
+      <h3>Health</h3>
+      <p>Healthy</p>
+    </div>
 
-  <div id="desktopProjectNoteList">
-    <p>No notes yet.</p>
-  </div>
-</div>
+    <div
+      id="desktopProjectFocus"
+      class="project-panel-card"
+    >
+      <h3>Current Focus</h3>
+      <p>No active work.</p>
+    </div>
 
-<div id="desktopProjectRecentActivity" class="project-panel-card">
-  <h3>Recent Activity</h3>
-  <p>No activity yet.</p>
-</div>
+    <div
+      id="desktopProjectNextAction"
+      class="project-panel-card"
+    >
+      <h3>Next Action</h3>
+      <p>Create your first task.</p>
+    </div>
 
-<div id="desktopProjectToday" class="project-panel-card">
-  <h3>📅 Today's Plan</h3>
+    <div
+      id="desktopProjectRecommendation"
+      class="project-panel-card"
+    >
+      <h3>AI Recommendation</h3>
+      <p>Start organizing this project.</p>
+    </div>
 
-  <ol id="desktopTodayPlan">
-    <li>Loading...</li>
-  </ol>
-</div>
 
-<div class="project-workspace-actions">
-    <button
+    <h3>Execution &amp; Planning</h3>
+
+    <div
+      id="desktopProjectToday"
+      class="project-panel-card"
+    >
+      <h3>Today's Plan</h3>
+
+      <ol id="desktopTodayPlan">
+        <li>Loading...</li>
+      </ol>
+    </div>
+
+    <div
+      id="desktopProjectResume"
+      class="project-panel-card"
+    >
+      <h3>Resume Summary</h3>
+      <p>No active execution context.</p>
+    </div>
+
+    <div
+      id="desktopProjectEstimatedTime"
+      class="project-panel-card"
+    >
+      <h3>Estimated Time</h3>
+      <p>Not estimated.</p>
+    </div>
+
+    <div class="project-workspace-actions">
+
+      <button
         id="desktopContinueProject"
         class="primary-button"
-        type="button">
-        Continue Project
-    </button>
-</div>
+        type="button"
+      >
+        Continue
+      </button>
+
+      <button
+        id="desktopRunAll"
+        type="button"
+      >
+        Run All
+      </button>
+
+      <button
+        id="desktopPause"
+        type="button"
+      >
+        Pause
+      </button>
+
+      <button
+        id="desktopStop"
+        type="button"
+      >
+        Stop
+      </button>
+
+    </div>
+
+
+    <div
+      id="desktopProjectTasks"
+      class="project-panel-card"
+    >
+      <div class="nova-project-tasks-header">
+        <h3>Tasks</h3>
+
+        <button
+          id="desktopProjectAddTaskButton"
+          type="button"
+        >
+          + Add Task
+        </button>
+      </div>
+
+      <div
+        id="desktopProjectTaskList"
+        class="nova-project-task-list"
+      >
+        <div class="session-placeholder">
+          Select a project to view tasks.
+        </div>
+      </div>
+    </div>
+
+
+    <div
+      id="desktopProjectFiles"
+      class="project-panel-card"
+    >
+      <div class="nova-project-files-header">
+        <h3>Project Files</h3>
+
+        <button
+          id="desktopProjectUploadButton"
+          type="button"
+        >
+          Upload File
+        </button>
+      </div>
+
+      <input
+        id="desktopProjectFileInput"
+        type="file"
+        hidden
+      />
+
+      <div id="desktopProjectFileList">
+        <p>No files yet.</p>
+      </div>
+    </div>
+
+
+    <div
+      id="desktopProjectNotes"
+      class="project-panel-card"
+    >
+      <h3>Notes</h3>
+
+      <button
+        id="desktopProjectAddNoteButton"
+        type="button"
+      >
+        + Add Note
+      </button>
+
+      <div
+        id="desktopProjectNoteEditor"
+        hidden
+      >
+
+        <input
+          id="desktopProjectNoteTitle"
+          type="text"
+          placeholder="Note title"
+        />
+
+        <textarea
+          id="desktopProjectNoteContent"
+          placeholder="Write a project note..."
+        ></textarea>
+
+        <button
+          id="desktopProjectSaveNote"
+          type="button"
+        >
+          Save Note
+        </button>
+
+        <button
+          id="desktopProjectCancelNote"
+          type="button"
+        >
+          Cancel
+        </button>
+
+      </div>
+
+      <div id="desktopProjectNoteList">
+        <p>No notes yet.</p>
+      </div>
+    </div>
+
+
+    <div
+      id="desktopProjectRecentActivity"
+      class="project-panel-card"
+    >
+      <h3>Recent Activity</h3>
+      <p>No activity yet.</p>
+    </div>
 
   </div>
 </section>
+
+
+<div
+  id="newProjectModal"
+  class="nova-project-modal"
+  hidden
+>
+  <div
+    class="nova-project-modal-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="newProjectModalTitle"
+  >
+    <div class="nova-project-modal-header">
+      <h2 id="newProjectModalTitle">
+        New Project
+      </h2>
+
+      <button
+        id="cancelNewProject"
+        type="button"
+        class="nova-project-modal-close"
+        aria-label="Close"
+      >
+        ×
+      </button>
+    </div>
+
+    <div class="nova-project-modal-body">
+      <label for="newProjectName">
+        Project name
+      </label>
+
+      <input
+        id="newProjectName"
+        type="text"
+        autocomplete="off"
+        placeholder="Project name"
+      />
+
+      <label for="newProjectDescription">
+        Description
+      </label>
+
+      <textarea
+        id="newProjectDescription"
+        rows="4"
+        placeholder="What is this project about?"
+      ></textarea>
+    </div>
+
+    <div class="nova-project-modal-footer">
+      <button
+        id="cancelNewProject"
+        type="button"
+      >
+        Cancel
+      </button>
+
+      <button
+        id="createNewProject"
+        type="button"
+        class="primary-side-button"
+      >
+        Create Project
+      </button>
+    </div>
+  </div>
+</div>
 
 <div class="side-footer-links">
   <a href="/">Home</a>
@@ -1556,12 +1788,43 @@ wrap.setAttribute(
 }
 
 function getSessionId() {
+  /*
+   * NovaChatState is the authoritative active-chat source.
+   *
+   * The legacy #sid input remains only as a compatibility
+   * fallback for older desktop code paths.
+   */
+  const stateSid = String(
+    window.NovaChatState?.state?.activeChatId || ""
+  ).trim();
+
+  if (stateSid) {
+    return stateSid;
+  }
+
+  const globalSid = String(
+    window.__NOVA_ACTIVE_SESSION_ID || ""
+  ).trim();
+
+  if (globalSid) {
+    return globalSid;
+  }
+
   const el = document.getElementById("sid");
-  return (el && el.value ? el.value : "").trim();
+  return String(
+    el && el.value ? el.value : ""
+  ).trim();
 }
 
 function setSessionId(v) {
-  const sid = (v || "").trim();
+  const sid = String(v || "").trim();
+
+  const state = window.NovaChatState?.state;
+
+  if (state && sid) {
+    state.activeChatId = sid;
+    state.messagesByChatId = state.messagesByChatId || {};
+  }
 
   const el = document.getElementById("sid");
   if (el) el.value = sid;
@@ -1752,108 +2015,6 @@ function getSessionTitle(session) {
       }
     }
 
-async function loadDesktopSessions() {
-
-  window.__NOVA_SESSION_V2_LOCK__ = true;
-
-  const list = document.getElementById("desktopSessionList");
-  if (!list) return;
-
-  try {
-    const data = await fetch("/api/sessions").then(r => r.json());
-
-    const sessions = (data.sessions || data.items || []);
-
-    list.innerHTML = "";
-
-    sessions.forEach(session => {
-      console.log("RENDER SESSION OBJECT", session);
-
-      const sid = session.id;
-
-      const btn = document.createElement("div");
-      btn.className = "nova-v2-session-item";
-      btn.dataset.sessionId = sid;
-
-      btn.innerHTML = `
-        <div class="desktop-session-title">${getSessionTitle(session)}</div>
-        <div class="desktop-session-meta">${sid}</div>
-      `;
-
-      btn.onclick = async () => {
-        setSessionId(sid);
-        console.log("[session selected]", sid);
-        setStatus("loading session...");
-
-        try {
-          if (typeof window.NovaDesktopFetchSession === "function") {
-            await window.NovaDesktopFetchSession(sid);
-
-          } else {
-            const data = await fetch(
-              "/api/sessions/" + encodeURIComponent(sid)
-            ).then(r => r.json());
-
-            const sessionData = data.session || data;
-
-            if (
-              typeof renderDesktopChatMessagesRescue === "function" &&
-              !window.__NOVA_RENDER_LOCK_GLOBAL
-            ) {
-              window.__NOVA_RENDER_LOCK_GLOBAL = true;
-
-              setTimeout(() => {
-                window.__NOVA_RENDER_LOCK_GLOBAL = false;
-              }, 200);
-
-              renderDesktopChatMessagesRescue(
-                sessionData.messages || []
-              );
-            }
-          }
-
-          setStatus("session selected");
-
-        } catch (error) {
-          console.warn("[session selected failed]", error);
-          setStatus("session load failed");
-        }
-      };
-
-      list.appendChild(btn);
-    });
-
-    console.log("[sessions rendered]", sessions.length);
-
-  } catch (e) {
-    console.warn("[loadDesktopSessions failed]", e);
-  }
-}
-
-window.loadDesktopSessions = loadDesktopSessions;
-window.NovaDesktopLoadSessions = loadDesktopSessions;
-
-// NOVA_INITIAL_SESSION_LOAD_V2
-
-function novaInitialSessionLoadV2() {
-    if (typeof window.loadDesktopSessions === "function") {
-        window.loadDesktopSessions();
-        console.log("[Nova] v2 session loader started");
-    } else {
-        console.warn("[Nova] session loader not ready, retrying");
-        setTimeout(novaInitialSessionLoadV2, 250);
-    }
-}
-
-if (document.readyState === "loading") {
-    document.addEventListener(
-        "DOMContentLoaded",
-        novaInitialSessionLoadV2,
-        { once:true }
-    );
-} else {
-    novaInitialSessionLoadV2();
-}
 
 
 function startDesktopSessionSync() {
@@ -2497,11 +2658,26 @@ renderMessageWithCodeBlocks(bubble, assistantMessage.text || "");
    ========================= */
 
 function handleSendClick(prompt = "") {
-  if (typeof window.sendText === "function") {
-    return window.sendText(prompt);
-  }
+    const actions = window.NovaComposerActions;
 
-  console.warn("[NOVA] sendText unavailable");
+    if (
+        actions &&
+        typeof actions.sendCurrentMessage === "function"
+    ) {
+        const text = String(prompt || "").trim();
+
+        return actions.sendCurrentMessage(
+            text
+                ? { forcedText: text }
+                : {}
+        );
+    }
+
+    console.error(
+        "[NOVA] NovaComposerActions.sendCurrentMessage unavailable"
+    );
+
+    return null;
 }
 
 const summarizeBtn =
@@ -2550,38 +2726,6 @@ refreshSummaryMeta();
 refreshDesktopPanels();
 
 window.NOVA_DESKTOP_INLINE_SEND_ACTIVE = true;
-
-if (sendBtn && input) {
-  sendBtn.addEventListener("mousedown", () => {
-    const liveInput = document.getElementById("input") || document.querySelector("textarea");
-    window.__novaLastInputBeforeSend = liveInput ? liveInput.value : "";
-    console.log("&#128206; CAPTURE BEFORE CLICK", window.__novaLastInputBeforeSend);
-  }, true);
-
-sendBtn.addEventListener("click", (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-
-  if (window.__NOVA_SEND_CLICK_LOCK__) return;
-
-  window.__NOVA_SEND_CLICK_LOCK__ = true;
-
-  handleSendClick();
-
-  setTimeout(() => {
-    window.__NOVA_SEND_CLICK_LOCK__ = false;
-  }, 1200);
-}, true);
-
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSendClick();
-    }
-  });
-}
-
-
 
 document.querySelectorAll("[data-nova-quick-action]").forEach((button) => {
   button.addEventListener("click", () => {
@@ -2720,8 +2864,121 @@ async function loadMemory() {
   }
 
 
-  // NOVA_DESKTOP_SESSION_SELECT_LOAD_MESSAGES_20260610
-  function getDesktopMessagesContainerRescue() {
+function renderDesktopOnboarding(session) {
+    if (
+        !session ||
+        !session.meta ||
+        !session.meta.onboarding
+    ) {
+        return;
+    }
+
+    const root =
+        typeof getDesktopMessagesContainerRescue === "function"
+            ? getDesktopMessagesContainerRescue()
+            : document.getElementById("messages");
+
+    if (!root) {
+        return;
+    }
+
+    const onboarding = session.meta.onboarding;
+
+    const escapeValue =
+        typeof esc === "function"
+            ? esc
+            : function (value) {
+                const div = document.createElement("div");
+                div.textContent = String(value ?? "");
+                return div.innerHTML;
+            };
+
+    const actions =
+        Array.isArray(onboarding.actions)
+            ? onboarding.actions
+            : [];
+
+    root.innerHTML = `
+        <div class="nova-onboarding-welcome">
+            ${escapeValue(onboarding.welcome_message || "")}
+        </div>
+
+        <div class="nova-onboarding-actions">
+            ${actions.map(function (action) {
+                const prompt =
+                    action.prompt ||
+                    action.label ||
+                    "";
+
+                const label =
+                    action.label ||
+                    "Start";
+
+                return `
+                    <button
+                        type="button"
+                        class="nova-onboarding-button"
+                        data-onboarding-prompt="${escapeValue(prompt)}"
+                    >
+                        ${escapeValue(label)}
+                    </button>
+                `;
+            }).join("")}
+        </div>
+    `;
+
+    root.querySelectorAll(
+        ".nova-onboarding-button"
+    ).forEach(function (button) {
+
+        button.onclick = async function () {
+            const input =
+                document.getElementById("input");
+
+            if (!input) {
+                console.warn(
+                    "[Nova Onboarding] composer input not found"
+                );
+                return;
+            }
+
+            input.value =
+                button.dataset.onboardingPrompt || "";
+
+            input.dispatchEvent(
+                new Event("input", {
+                    bubbles: true
+                })
+            );
+
+            input.focus();
+
+            if (
+                window.NovaComposerActions &&
+                typeof window.NovaComposerActions.sendCurrentMessage === "function"
+            ) {
+                console.log(
+                    "[Nova Onboarding] sending prompt"
+                );
+
+                await window.NovaComposerActions.sendCurrentMessage();
+
+                return;
+            }
+
+            console.warn(
+                "[Nova Onboarding] NovaComposerActions.sendCurrentMessage unavailable"
+            );
+        };
+    });
+}
+
+window.renderDesktopOnboarding =
+    renderDesktopOnboarding;
+
+
+// NOVA_DESKTOP_SESSION_SELECT_LOAD_MESSAGES_20260610
+function getDesktopMessagesContainerRescue() {
     // NOVA_DESKTOP_RESCUE_MESSAGE_CONTAINER_20260610
     var existing =
       document.getElementById("messages") ||
@@ -2868,9 +3125,90 @@ function dedupeNovaMessages(messages) {
     });
 }
 
-function renderDesktopChatMessagesRescue(messages) {
+function renderDesktopChatMessagesRescue(messages, syncOptions = {}) {
 
-    if (window.__NOVA_RESCUE_RENDER_LOCK__) return false;
+    /*
+     * NOVA DESKTOP RENDER OWNERSHIP FIX
+     *
+     * chat-messages.js is the primary live renderer.
+     *
+     * The old rescue renderer must NOT overwrite #chat when the
+     * primary renderer is available because doing so removes:
+     *
+     *   - Copy
+     *   - Regenerate
+     *   - answer-payload rendering
+     *   - markdown/code rendering
+     *   - live message state
+     *
+     * The rescue renderer remains available only as a genuine
+     * fallback when the primary renderer is unavailable.
+     */
+
+    if (
+        window.NovaChatMessages &&
+        typeof window.NovaChatMessages.syncMessagesFromStorage === "function"
+    ) {
+
+        console.log(
+            "[Nova Desktop Rescue] primary NovaChatMessages renderer owns live chat"
+        );
+
+        try {
+
+            const normalizedMessages = Array.isArray(messages)
+                ? messages.map(function (message) {
+                    const item = message && typeof message === "object"
+                        ? message
+                        : {};
+
+                    return {
+                        ...item,
+                        content: String(
+                            item.content ??
+                            item.text ??
+                            item.message ??
+                            ""
+                        )
+                    };
+                })
+                : [];
+
+window.NovaChatMessages.syncMessagesFromStorage(
+    normalizedMessages,
+    {
+        sessionId: String(
+            syncOptions.sessionId ||
+            ""
+        ).trim(),
+        forceSessionSwitch:
+            syncOptions.forceSessionSwitch === true
+    }
+);
+
+            return true;
+
+        } catch (err) {
+
+            console.warn(
+                "[Nova Desktop Rescue] primary renderer failed; using rescue fallback",
+                err
+            );
+
+        }
+    }
+
+
+    /*
+     * TRUE FALLBACK ONLY
+     *
+     * This section is reached only if chat-messages.js is unavailable
+     * or its renderer failed.
+     */
+
+    if (window.__NOVA_RESCUE_RENDER_LOCK__) {
+        return false;
+    }
 
     window.__NOVA_RESCUE_RENDER_LOCK__ = true;
 
@@ -2878,13 +3216,19 @@ function renderDesktopChatMessagesRescue(messages) {
         window.__NOVA_RESCUE_RENDER_LOCK__ = false;
     }, 150);
 
+
     var box = getDesktopMessagesContainerRescue();
 
-    if (!box) return false;
+    if (!box) {
+        return false;
+    }
+
 
     messages = dedupeNovaMessages(messages);
 
+
     box.innerHTML = "";
+
 
     if (!messages || !messages.length) {
 
@@ -2892,26 +3236,34 @@ function renderDesktopChatMessagesRescue(messages) {
             window.NovaCurrentSessionManager &&
             window.NovaCurrentSessionManager.currentSession;
 
+
         if (
             session &&
             session.meta &&
             session.meta.onboarding &&
             typeof window.renderDesktopOnboarding === "function"
         ) {
+
             window.renderDesktopOnboarding(session);
+
             return true;
+
         }
+
 
         box.innerHTML = `
             <div class="message assistant">
-<strong>Welcome to Nova.</strong><br><br>
-Your AI workspace for serious projects.<br><br>
-I help you keep context, plan decisions, analyze files, and move work forward without starting over every conversation.
+                <strong>Welcome to Nova.</strong><br><br>
+                Your AI workspace for serious projects.<br><br>
+                I help you keep context, plan decisions, analyze files,
+                and move work forward without starting over every
+                conversation.
             </div>
         `;
 
         return true;
     }
+
 
     messages.forEach(function (msg, index) {
 
@@ -2925,6 +3277,7 @@ I help you keep context, plan decisions, analyze files, and move work forward wi
 
         text = String(text || "");
 
+
         if (
             !String(text || "").trim() &&
             !msg.image_url &&
@@ -2933,7 +3286,9 @@ I help you keep context, plan decisions, analyze files, and move work forward wi
             return;
         }
 
+
         var row = document.createElement("div");
+
 
         row.className =
             "message " +
@@ -2943,6 +3298,7 @@ I help you keep context, plan decisions, analyze files, and move work forward wi
                     : "assistant"
             );
 
+
         row.setAttribute(
             "data-message-id",
             msg.id ||
@@ -2950,25 +3306,34 @@ I help you keep context, plan decisions, analyze files, and move work forward wi
             "rescue_" + index
         );
 
-        const bubble =
+
+        var bubble =
             document.createElement("div");
 
+
         bubble.className = "bubble";
+
 
         if (
             typeof renderMessageWithCodeBlocks === "function" &&
             role.indexOf("user") === -1
         ) {
+
             renderMessageWithCodeBlocks(
                 bubble,
                 String(text)
             );
+
         } else {
+
             bubble.textContent =
                 String(text);
+
         }
 
+
         row.appendChild(bubble);
+
 
         if (!role.includes("user")) {
 
@@ -2977,19 +3342,26 @@ I help you keep context, plan decisions, analyze files, and move work forward wi
                     ".nova-source-cards"
                 );
 
+
             if (!existingCards) {
 
                 var cards =
                     novaDesktopRescueSourceCards_20260611(msg);
 
+
                 if (cards) {
                     row.appendChild(cards);
                 }
+
             }
+
         }
 
+
         box.appendChild(row);
+
     });
+
 
     return true;
 }
@@ -4989,273 +5361,6 @@ try {
   }
 
 })();
-(function () {
-  "use strict";
-
-  var MARKER = "NOVA_DESKTOP_ACTIVE_SESSION_404_RECOVERY_20260612";
-
-  function log() {
-    try {
-      console.log.apply(console, ["[Nova Desktop Active Session Recovery]"].concat([].slice.call(arguments)));
-    } catch (_) {}
-  }
-
-  function getStoredSessionId() {
-    try {
-      return (
-        localStorage.getItem("nova_active_session_id") ||
-        localStorage.getItem("nova_session_id") ||
-        sessionStorage.getItem("nova_active_session_id") ||
-        sessionStorage.getItem("nova_session_id") ||
-        ""
-      );
-    } catch (_) {
-      return "";
-    }
-  }
-
-  function storeSessionId(sessionId) {
-    if (!sessionId) return;
-
-    try {
-      localStorage.setItem("nova_active_session_id", sessionId);
-      localStorage.setItem("nova_session_id", sessionId);
-      sessionStorage.setItem("nova_active_session_id", sessionId);
-      sessionStorage.setItem("nova_session_id", sessionId);
-    } catch (_) {}
-
-    try {
-      window.novaCurrentSessionId = sessionId;
-      window.currentSessionId = sessionId;
-      window.activeSessionId = sessionId;
-    } catch (_) {}
-  }
-
-  function normalizeSessionPayload(data) {
-    if (!data || typeof data !== "object") return null;
-
-    if (data.session && typeof data.session === "object") {
-      return data.session;
-    }
-
-    if (data.id || Array.isArray(data.messages)) {
-      return data;
-    }
-
-    return null;
-  }
-
-  function ensureManager(session) {
-    if (!session || typeof session !== "object") return null;
-
-    try {
-      if (!window.NovaCurrentSessionManager || typeof window.NovaCurrentSessionManager !== "object") {
-        window.NovaCurrentSessionManager = {};
-      }
-
-      if (!Array.isArray(session.messages)) {
-        session.messages = [];
-      }
-
-      window.NovaCurrentSessionManager.currentSession = session;
-      window.NovaCurrentSessionManager.activeSessionId = session.id || session.session_id || getStoredSessionId();
-
-      return window.NovaCurrentSessionManager;
-    } catch (err) {
-      console.warn("[Nova Desktop Active Session Recovery] manager hydrate failed", err);
-      return null;
-    }
-  }
-
-function renderSession(session) {
-    if (!session || !Array.isArray(session.messages)) return false;
-
-    console.log(
-        "[Nova RenderSession] rendering",
-        session.id
-    );
-
-if (
-    session.messages.length === 0
-) {
-    console.log(
-        "[Nova RenderSession] empty session fallback"
-    );
-
-    if (typeof window.renderDesktopOnboarding === "function") {
-        window.renderDesktopOnboarding(session);
-    } else if (
-        typeof window.renderDesktopChatMessagesRescue === "function"
-    ) {
-        window.renderDesktopChatMessagesRescue([
-            {
-                role: "assistant",
-                content:
-                    "Welcome to Nova.\n\nStart a conversation and your workspace will appear here."
-            }
-        ]);
-    }
-
-    return true;
-}
-
-    try {
-        if (
-            typeof window.renderDesktopChatMessages === "function"
-        ) {
-            window.renderDesktopChatMessages(
-                session.messages
-            );
-            return true;
-        }
-    } catch (err) {
-        console.warn(
-            "[Nova RenderSession] primary render failed",
-            err
-        );
-    }
-
-    try {
-        if (
-            typeof window.renderDesktopChatMessagesRescue === "function"
-        ) {
-            window.renderDesktopChatMessagesRescue(
-                session.messages
-            );
-            return true;
-        }
-    } catch (err) {
-        console.warn(
-            "[Nova RenderSession] rescue render failed",
-            err
-        );
-    }
-
-    console.warn(
-        "[Nova RenderSession] all renderers failed"
-    );
-
-    return false;
-}
-
-function startSSE() {
-  const source = new EventSource("/api/events/stream");
-
-  source.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data || "{}");
-
-      if (data.type === "sessions:updated") {
-        window.__novaEvents.emit("sessions:updated");
-      }
-
-    } catch (e) {}
-  };
-
-  source.onerror = () => {
-    console.warn("[SSE] disconnected, retrying...");
-  };
-}
-
-function wrapSessionMutation(fn) {
-  return async function (...args) {
-    const result = await fn.apply(this, args);
-
-    // always notify AFTER successful mutation
-    window.__novaEvents.emit("sessions:updated");
-    window.__novaChannel?.postMessage({ type: "sessions:updated" });
-
-    return result;
-  };
-}
-
-function notifySessionsChanged() {
-  window.__novaEvents.emit("sessions:updated");
-  window.__novaChannel?.postMessage({ type: "sessions:updated" });
-}
-
-  async function fetchSession(sessionId) {
-    if (!sessionId) return null;
-
-    var response = await fetch("/api/sessions/" + encodeURIComponent(sessionId), {
-      method: "GET",
-      credentials: "same-origin",
-      headers: {
-        "Accept": "application/json"
-      }
-    });
-
-const raw = await response.text();
-
-var data = null;
-try {
-  data = JSON.parse(raw);
-} catch (e) {
-  console.warn("Non-JSON response:", raw);
-  data = null;
-}
-
-if (response.status === 404 && data && data.active_session_id && data.active_session_id !== sessionId) {
-  log("stale session recovered", sessionId, "=>", data.active_session_id);
-  storeSessionId(data.active_session_id);
-  return fetchSession(data.active_session_id);
-}
-
-    if (!response.ok) {
-      log("session fetch failed", response.status, data);
-      return null;
-    }
-
-var session = normalizeSessionPayload(data);
-
-if (session) {
-window.__NOVA_ACTIVE_SESSION = session;
-    session.id = session.id || session.session_id || sessionId;
-
-    storeSessionId(session.id);
-
-    ensureManager(session);
-
-     if (
-        Array.isArray(session.messages) &&
-        session.messages.length === 0 &&
-        session.meta &&
-        session.meta.onboarding &&
-        typeof window.renderDesktopOnboarding === "function"
-    ) {
-        window.renderDesktopOnboarding(session);
-    } else {
-        renderSession(session);
-    }
-
-      log(
-        "hydrated session",
-        session.id,
-        "messages:",
-        Array.isArray(session.messages) ? session.messages.length : 0
-      );
-    }
-    return session;
-  }
-
-  async function recoverDesktopSession() {
-    var sessionId = getStoredSessionId();
-
-    if (!sessionId) {
-      log("no stored session id");
-      return;
-    }
-
-    await fetchSession(sessionId);
-  }
-
-  window.novaDesktopRecoverActiveSession_20260612 = recoverDesktopSession;
-window.NovaDesktopFetchSession = fetchSession;
-
-  setTimeout(recoverDesktopSession, 250);
-
-  log("ready", MARKER);
-})();
 
 (function () {
   "use strict";
@@ -5603,6 +5708,21 @@ document.addEventListener("nova:message:rendered", renderForcedSourceCards);
     return true;
   }
 
+  function initObserver() {
+    if (window.__NOVA_OBSERVER__) return;
+
+    const observer = new MutationObserver(function () {
+      initButtons();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    window.__NOVA_OBSERVER__ = observer;
+  }
+
   function boot() {
     if (!patchExistingRenderer()) {
       setTimeout(boot, 250);
@@ -5895,6 +6015,21 @@ document.addEventListener("nova:message:rendered", renderForcedSourceCards);
     window.NovaDesktopCompatAliasesReady = true;
   }
 
+  function initObserver() {
+    if (window.__NOVA_OBSERVER__) return;
+
+    const observer = new MutationObserver(function () {
+      initButtons();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    window.__NOVA_OBSERVER__ = observer;
+  }
+
   function boot() {
     installCompatAliases();
   }
@@ -6088,49 +6223,15 @@ document.addEventListener("nova:message:rendered", renderForcedSourceCards);
   }
 
   function initButtons() {
-    const sendBtn = resolve("desktopSendButton");
-    const input = resolve("desktopChatInput");
     const memoryBtn = resolve("desktopMemoryButton");
-
-    bindOnce(sendBtn, "sendClickAction", "click", function (event) {
-      event.preventDefault();
-
-      console.log("[NOVA] send clicked");
-
-      if (typeof handleSendClick === "function") {
-        handleSendClick();
-      }
-    });
-
-    bindOnce(input, "sendEnterAction", "keydown", function (event) {
-      if (event.key !== "Enter" || event.shiftKey) {
-        return;
-      }
-
-      event.preventDefault();
-
-      if (typeof handleSendClick === "function") {
-        handleSendClick();
-      }
-    });
 
     bindOnce(memoryBtn, "memoryClickLog", "click", function () {
       console.log("[NOVA] memory clicked");
     });
   }
+
   function initObserver() {
-    if (window.__NOVA_OBSERVER__) return;
-
-    const observer = new MutationObserver(function () {
-      initButtons();
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-
-    window.__NOVA_OBSERVER__ = observer;
+    return;
   }
 
   function boot() {
@@ -6149,7 +6250,6 @@ document.addEventListener("nova:message:rendered", renderForcedSourceCards);
   } else {
     boot();
   }
-
 })();
 </script>
 
@@ -6555,42 +6655,53 @@ console.log("[Nova Force New Chat] cleared chat");
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<!-- <script src="/static/js/nova-sessions-v2.js"></script> -->
+
+<script src="/static/js/nova-sessions-v2.js"></script>
+
 <script src="/static/js/nova-chat-stream.js"></script>
 
 <script src="/static/js/chat-state.js"></script>
-<script src="/static/js/chat-storage.js"></script>
+
 <script src="/static/js/chat-messages.js"></script>
-<script src="/static/js/chat/chat.js"></script>
+<script src="/static/js/chat-service.js"></script>
+<script src="/static/js/chat-ui.js"></script>
+<script src="/static/js/chat-actions.js"></script>
+<script src="/static/js/chat-events.js"></script>
 
 <script src="/static/js/composer-input.js"></script>
 <script src="/static/js/composer-attachments.js"></script>
 <script src="/static/js/composer-reactive.js"></script>
+
 <script src="/static/js/composer-actions.js"></script>
+
+<script>
+console.log(
+  "[AFTER COMPOSER ACTIONS]",
+  typeof window.createComposerActions,
+  window.NovaComposerActions
+);
+</script>
+
 <script src="/static/js/composer-service.js"></script>
+
+<script>
+console.log(
+  "[AFTER COMPOSER SERVICE]",
+  typeof window.createComposerActions,
+  window.NovaComposerActions
+);
+</script>
+
 <script src="/static/js/nova-composer-bridge.js"></script>
 
-<script src="/static/js/chat-sidebar.js"></script>
 <script src="/static/js/chat-orchestrator.js"></script>
 <script src="/static/js/chat-bootstrap.js"></script>
-
-<script src="/static/js/chat-sidebar.js"></script>
-<script src="/static/js/chat-orchestrator.js"></script>
-<script src="/static/js/chat-bootstrap.js"></script>
-
 <script src="/static/js/app-state.js"></script>
 <script src="/static/js/nova-api.js"></script>
 <script src="/static/js/app-api.js"></script>
+<script src="/static/js/nova-desktop-projects.js"></script>
 <script src="/static/js/app.js"></script>
 <script src="/static/js/nova-main.js"></script>
-
-<script src="/static/js/memory-panel.js"></script>
-<script src="/static/js/chat-app.js"></script>4:35 AM 2026-08-23
-
-
-<script src="/static/js/memory-panel.js"></script>
-<script src="/static/js/chat-app.js"></script>
-
 
 <script>
   window.Nova = window.Nova || {};
@@ -6892,126 +7003,6 @@ console.log("[Nova Force New Chat] cleared chat");
 </script>
 
 
-<!-- NOVA_REGEN_BUTTON_REPAIR_V2_20260620 -->
-<script>
-(function () {
-  "use strict";
-
-  if (window.__NOVA_REGEN_BUTTON_REPAIR_V2_20260620__) return;
-  window.__NOVA_REGEN_BUTTON_REPAIR_V2_20260620__ = true;
-
-  function cleanMessageText(value) {
-    return String(value || "")
-      .replace(/\bCopy\b/g, "")
-      .replace(/\bRegen\b/g, "")
-      .replace(/^user\s*/i, "")
-      .replace(/^assistant\s*/i, "")
-      .trim();
-  }
-
-  function isRegenButton(btn) {
-    const raw = String(btn && btn.textContent || "").trim().toLowerCase();
-    return raw === "regen" || raw === "regenerate";
-  }
-
-  function isUserNode(node) {
-    if (!node) return false;
-
-    const role = String(node.getAttribute && node.getAttribute("data-role") || "").toLowerCase();
-    const cls = String(node.className || "").toLowerCase();
-
-    return (
-      role === "user" ||
-      cls.includes("user-bubble") ||
-      cls.includes("user-message") ||
-      cls.includes("message user") ||
-      cls.includes("msg user") ||
-      cls.includes("desktop-message user")
-    );
-  }
-
-  function findPreviousUserText(fromButton) {
-    let node =
-      fromButton.closest(".message.assistant") ||
-      fromButton.closest(".msg.assistant") ||
-      fromButton.closest(".desktop-message.assistant") ||
-      fromButton.closest("[data-role='assistant']") ||
-      fromButton.closest(".assistant-bubble") ||
-      fromButton.closest(".assistant-message");
-
-    while (node && node.previousElementSibling) {
-      node = node.previousElementSibling;
-
-      if (isUserNode(node)) {
-        return cleanMessageText(node.innerText || node.textContent || "");
-      }
-
-      const nested = node.querySelector &&
-        node.querySelector(".user-bubble, .user-message, .message.user, .msg.user, .desktop-message.user, [data-role='user']");
-
-      if (nested) {
-        return cleanMessageText(nested.innerText || nested.textContent || "");
-      }
-    }
-
-    const users = Array.from(document.querySelectorAll(
-      ".user-bubble, .user-message, .message.user, .msg.user, .desktop-message.user, [data-role='user']"
-    ));
-
-    if (!users.length) return "";
-
-    return cleanMessageText(users[users.length - 1].innerText || users[users.length - 1].textContent || "");
-  }
-
-  function runRegen(text) {
-    const input = document.getElementById("input") || document.querySelector("textarea");
-    const sendBtn = document.getElementById("sendBtn");
-
-    if (!text) {
-      console.warn("[Nova Regen V2] no previous user text found");
-      return;
-    }
-
-    console.log("[Nova Regen V2] regenerating:", text);
-
-    if (input) {
-      input.value = text;
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    }
-
-    if (typeof window.handleSendClick === "function") {
-      window.handleSendClick(text);
-      return;
-    }
-
-    if (typeof window.sendText === "function") {
-      window.sendText(text);
-      return;
-    }
-
-    if (sendBtn && typeof sendBtn.click === "function") {
-      sendBtn.click();
-      return;
-    }
-
-    console.warn("[Nova Regen V2] no send function or send button found");
-  }
-
-  document.addEventListener("click", function (event) {
-    const btn = event.target.closest("button");
-    if (!btn || !isRegenButton(btn)) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-
-    runRegen(findPreviousUserText(btn));
-  }, true);
-
-  console.log("[Nova Regen Button Repair V2] ready");
-})();
-</script>
-
 <!-- NOVA_DESKTOP_POLISH_CSS_LINK_20260620 -->
 <link rel="stylesheet"
 <link rel="stylesheet" href="/static/css/nova-desktop-polish.css?v=recent-session-cards-final-20260621-1">
@@ -7203,392 +7194,7 @@ main {
 </style>
 <!-- /NOVA_DESKTOP_CHAT_LAYOUT_STABLE_FINAL_20260622 -->
 
-<!-- NOVA_DESKTOP_SESSION_OPEN_FINAL_20260621 -->
-<script>
-(function () {
-  "use strict";
 
-  if (window.__NOVA_DESKTOP_SESSION_OPEN_FINAL_20260621__) return;
-  window.__NOVA_DESKTOP_SESSION_OPEN_FINAL_20260621__ = true;
-
-  var MARKER = "NOVA_DESKTOP_SESSION_OPEN_FINAL_20260621";
-
-  function log() {
-    try {
-      console.log.apply(console, ["[Nova Session Open Final]"].concat([].slice.call(arguments)));
-    } catch (_) {}
-  }
-
-  function setStatusSafe(text) {
-    try {
-      if (typeof window.setStatus === "function") {
-        window.setStatus(text);
-        return;
-      }
-    } catch (_) {}
-
-    var status = document.getElementById("status");
-    if (status) status.textContent = text;
-  }
-
-  function cleanSid(value) {
-    var sid = String(value || "").trim();
-
-    if (!sid) return "";
-    if (sid === "[object HTMLInputElement]") return "";
-    if (sid === "undefined" || sid === "null") return "";
-
-    return sid;
-  }
-
-  function setActiveSessionId(sid) {
-    sid = cleanSid(sid);
-    if (!sid) return "";
-
-    try {
-      localStorage.setItem("nova.session_id", sid);
-      localStorage.setItem("nova_active_session_id", sid);
-      localStorage.setItem("nova_session_id", sid);
-      sessionStorage.setItem("nova_active_session_id", sid);
-    } catch (_) {}
-
-    window.__NOVA_ACTIVE_SESSION_ID = sid;
-
-    try {
-      if (typeof window.setSessionId === "function") {
-        window.setSessionId(sid);
-      }
-    } catch (_) {}
-
-    return sid;
-  }
-
-  function getSessionIdFromElement(el) {
-    if (!el) return "";
-
-    var node = el.closest
-      ? el.closest("[data-sid], [data-session-id], [data-id], .desktop-session-item, .session-item, a")
-      : el;
-
-    if (!node) return "";
-
-    var sid =
-      node.getAttribute("data-sid") ||
-      node.getAttribute("data-session-id") ||
-      node.getAttribute("data-id") ||
-      node.dataset?.sid ||
-      node.dataset?.sessionId ||
-      node.dataset?.id ||
-      "";
-
-    if (!sid) {
-      var href = node.getAttribute && node.getAttribute("href");
-      if (href) {
-        try {
-          var url = new URL(href, window.location.origin);
-          sid =
-            url.searchParams.get("session_id") ||
-            url.searchParams.get("sid") ||
-            url.searchParams.get("session") ||
-            "";
-        } catch (_) {}
-      }
-    }
-
-    return cleanSid(sid);
-  }
-
-  function normalizeMessages(payload) {
-    if (!payload) return [];
-
-    if (Array.isArray(payload)) return payload;
-    if (Array.isArray(payload.messages)) return payload.messages;
-
-    if (payload.session && Array.isArray(payload.session.messages)) {
-      return payload.session.messages;
-    }
-
-    if (payload.data && Array.isArray(payload.data.messages)) {
-      return payload.data.messages;
-    }
-
-    if (payload.data && payload.data.session && Array.isArray(payload.data.session.messages)) {
-      return payload.data.session.messages;
-    }
-
-    if (payload.chat && Array.isArray(payload.chat.messages)) {
-      return payload.chat.messages;
-    }
-
-    return [];
-  }
-
-  function getChatBox() {
-    var box =
-      document.getElementById("chat") ||
-      document.getElementById("messages") ||
-      document.getElementById("chatMessages") ||
-      document.getElementById("desktopChatMessages") ||
-      document.getElementById("desktopMessages") ||
-      document.querySelector(".messages") ||
-      document.querySelector(".chat-messages") ||
-      document.querySelector(".desktop-chat-messages") ||
-      document.querySelector("[data-messages]");
-
-    if (box) return box;
-
-    var host =
-      document.querySelector(".desktop-chat-container") ||
-      document.querySelector(".chat-container") ||
-      document.querySelector("main") ||
-      document.body;
-
-    box = document.createElement("div");
-    box.id = "chat";
-    box.className = "messages chat-messages desktop-rescue-messages";
-    host.appendChild(box);
-
-    return box;
-  }
-
-  function messageRole(msg) {
-    var role = String(
-      msg?.role ||
-      msg?.sender ||
-      msg?.type ||
-      "assistant"
-    ).toLowerCase();
-
-    if (role.includes("user")) return "user";
-    if (role.includes("assistant") || role.includes("nova")) return "assistant";
-
-    return role || "assistant";
-  }
-
-  function messageText(msg) {
-    if (typeof msg === "string") return msg;
-
-    return String(
-      msg?.text ||
-      msg?.content ||
-      msg?.message ||
-      msg?.assistant ||
-      msg?.response ||
-      msg?.user_text ||
-      ""
-    );
-  }
-
-  function renderMessagesDirect(messages) {
-    var box = getChatBox();
-    var safeMessages = Array.isArray(messages) ? messages : [];
-
-    box.innerHTML = "";
-
-    if (!safeMessages.length) {
-      var empty = document.createElement("div");
-      empty.className = "msg assistant";
-      empty.textContent = "No messages found in this session yet.";
-      box.appendChild(empty);
-      return true;
-    }
-
-    safeMessages.forEach(function (msg, index) {
-      var role = messageRole(msg);
-      var text = messageText(msg);
-
-      if (!text.trim()) return;
-
-      var wrap = document.createElement("div");
-      wrap.className = "msg " + role;
-      wrap.setAttribute("data-message-id", "session_" + Date.now() + "_" + index);
-
-      var roleNode = document.createElement("div");
-      roleNode.className = "role";
-      roleNode.textContent = role === "user" ? "You" : "Nova";
-
-      var body = document.createElement("div");
-      body.className = "bubble";
-      body.style.whiteSpace = "pre-wrap";
-      body.textContent = text;
-
-      wrap.appendChild(roleNode);
-      wrap.appendChild(body);
-      box.appendChild(wrap);
-    });
-
-    try {
-      box.scrollTop = box.scrollHeight;
-    } catch (_) {}
-
-    return true;
-  }
-
-  function chatLooksEmpty() {
-    var box = getChatBox();
-    if (!box) return true;
-
-    var text = String(box.textContent || "").trim();
-    var messageCount = box.querySelectorAll(".msg, .message, [data-message-id]").length;
-
-    return !text && messageCount === 0;
-  }
-
-function renderSessionMessages(messages) {
-    messages = Array.isArray(messages) ? messages : [];
-
-    if (
-        messages.length === 0 &&
-        window.__NOVA_ACTIVE_SESSION &&
-        window.__NOVA_ACTIVE_SESSION.meta &&
-        window.__NOVA_ACTIVE_SESSION.meta.onboarding &&
-        typeof window.renderDesktopOnboarding === "function"
-    ) {
-        console.log(
-            "[Nova Session Open Final] onboarding preserved"
-        );
-
-        window.renderDesktopOnboarding(
-            window.__NOVA_ACTIVE_SESSION
-        );
-
-        return true;
-    }
-
-    window.__NOVA_RENDER_LOCK_GLOBAL = false;
-    window.__NOVA_RESCUE_RENDER_LOCK__ = false;
-
-    try {
-      if (typeof window.renderDesktopChatMessagesRescue === "function") {
-        window.renderDesktopChatMessagesRescue(messages);
-
-        setTimeout(function () {
-          if (chatLooksEmpty()) {
-            renderMessagesDirect(messages);
-          }
-        }, 80);
-
-        return true;
-      }
-    } catch (error) {
-      console.warn("[Nova Session Open Final] rescue render failed", error);
-    }
-
-    return renderMessagesDirect(messages);
-  }
-
-  function markActiveSessionRow(sid) {
-    document.querySelectorAll(".desktop-session-item, .session-item").forEach(function (row) {
-      var rowSid = getSessionIdFromElement(row);
-      row.classList.toggle("is-active", rowSid === sid);
-    });
-  }
-
-  async function openSessionFinal(rawSid) {
-    var sid = setActiveSessionId(rawSid);
-
-    if (!sid) {
-      setStatusSafe("session id missing");
-      return false;
-    }
-
-    setStatusSafe("loading session...");
-
-    try {
-      var response = await fetch("/api/sessions/" + encodeURIComponent(sid), {
-        headers: {
-          "x-api-key": "testkey123"
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error("Session fetch failed: " + response.status);
-      }
-
-      var data = await response.json();
-      var session = data.session || data.data?.session || data;
-      var messages = normalizeMessages(session);
-
-      if (!messages.length) {
-        messages = normalizeMessages(data);
-      }
-
-      markActiveSessionRow(sid);
-      renderSessionMessages(messages);
-
-      try {
-        if (typeof window.refreshSummaryMeta === "function") {
-          window.refreshSummaryMeta();
-        }
-      } catch (_) {}
-
-      try {
-        if (typeof window.refreshDesktopPanels === "function") {
-          window.refreshDesktopPanels();
-        }
-      } catch (_) {}
-
-      setStatusSafe("session selected");
-      log("opened", sid, "messages:", messages.length);
-
-      return true;
-    } catch (error) {
-      console.warn("[Nova Session Open Final] open failed", error);
-      setStatusSafe("session load failed");
-      return false;
-    }
-  }
-
-  window.NovaDesktopOpenSession = openSessionFinal;
-  window.openDesktopSession = openSessionFinal;
-  window.openSession = openSessionFinal;
-
-  document.addEventListener("click", function (event) {
-    var item = event.target.closest
-      ? event.target.closest(".desktop-session-item, .session-item, [data-sid], [data-session-id]")
-      : null;
-
-    if (!item) return;
-
-    var sid = getSessionIdFromElement(item);
-    if (!sid) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (typeof event.stopImmediatePropagation === "function") {
-      event.stopImmediatePropagation();
-    }
-
-    openSessionFinal(sid);
-  }, true);
-
-  async function openSessionFromUrlOnce() {
-    try {
-      var url = new URL(window.location.href);
-      var sid =
-        url.searchParams.get("session_id") ||
-        url.searchParams.get("sid") ||
-        url.searchParams.get("session") ||
-        "";
-
-      sid = cleanSid(sid);
-      if (!sid) return;
-
-      await openSessionFinal(sid);
-    } catch (_) {}
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", openSessionFromUrlOnce);
-  } else {
-    openSessionFromUrlOnce();
-  }
-
-  log("ready", MARKER);
-})();
-</script>
-<!-- /NOVA_DESKTOP_SESSION_OPEN_FINAL_20260621 -->
 
 <!-- NOVA_VISIBLE_SUMMARY_BOX_FINAL_20260621 -->
 <script>
@@ -7768,7 +7374,22 @@ function renderSessionMessages(messages) {
         document.head.appendChild(style);
     }
 
-    function boot() {
+    function initObserver() {
+    if (window.__NOVA_OBSERVER__) return;
+
+    const observer = new MutationObserver(function () {
+      initButtons();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    window.__NOVA_OBSERVER__ = observer;
+  }
+
+  function boot() {
         injectStyle();
         ensureSummaryBox();
         bindSummaryButton();
@@ -7782,6 +7403,22 @@ function renderSessionMessages(messages) {
     window.NovaDesktopLocalSummary = showSummary;
 
     console.log("[Nova Visible Summary Box] ready");
+
+  function initObserver() {
+    if (window.__NOVA_OBSERVER__) return;
+
+    const observer = new MutationObserver(function () {
+      initButtons();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    window.__NOVA_OBSERVER__ = observer;
+  }
+
 })();
 </script>
 
@@ -9096,7 +8733,22 @@ function filteredItems() {
         });
     }
 
-    function boot() {
+    function initObserver() {
+    if (window.__NOVA_OBSERVER__) return;
+
+    const observer = new MutationObserver(function () {
+      initButtons();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    window.__NOVA_OBSERVER__ = observer;
+  }
+
+  function boot() {
         ensureUi();
         load();
     }
@@ -9863,167 +9515,15 @@ pre code {
 (function () {
     "use strict";
 
-    if (window.__NOVA_CODE_BLOCK_STACK_FIX_20260622__) return;
-    window.__NOVA_CODE_BLOCK_STACK_FIX_20260622__ = true;
-
-    function detectLang(codeText, className) {
-        const cls = String(className || "");
-        const match = cls.match(/language-([a-z0-9_-]+)/i);
-
-        if (match && match[1]) {
-            return match[1];
-        }
-
-        const t = String(codeText || "").trim();
-
-        if (/^(Get-|Set-|New-|Remove-|Start-|Stop-|Test-|Invoke-|\$)/m.test(t)) {
-            return "powershell";
-        }
-
-        if (/^(def |import |from |print\()/m.test(t)) {
-            return "python";
-        }
-
-        if (/^(const |let |var |function |\(\)\s*=>)/m.test(t)) {
-            return "javascript";
-        }
-
-        if (/^(cd |dir |ls |git |python |npm |pip )/m.test(t)) {
-            return "shell";
-        }
-
-        return "code";
+    if (window.__NOVA_CODE_BLOCK_STACK_FIX_20260622_DISABLED__) {
+        return;
     }
 
-    function stripToolbarText(raw) {
-        let text = String(raw || "");
+    window.__NOVA_CODE_BLOCK_STACK_FIX_20260622_DISABLED__ = true;
 
-        text = text.replace(/^\s*Copy\s+/i, "");
-        text = text.replace(/^\s*(PowerShell|Python|JavaScript|Bash|Shell|Code)\s*Copy\s*/i, "");
-        text = text.replace(/^\s*(POWERSHELL|PYTHON|JAVASCRIPT|BASH|SHELL|CODE)\s*\n/i, "");
-
-        return text.trimEnd();
-    }
-
-    function rebuildPre(pre) {
-        if (!pre || pre.nodeType !== 1) return;
-
-        const oldCode = pre.querySelector("code");
-        if (!oldCode) return;
-
-        const rawText = stripToolbarText(oldCode.textContent || "");
-        const oldClass = oldCode.className || "";
-        const lang = detectLang(rawText, oldClass);
-
-        pre.innerHTML = "";
-        pre.dataset.novaCodeStackFixed = "1";
-
-        const bar = document.createElement("div");
-        bar.className = "nova-codebar-stackfix";
-
-        const label = document.createElement("div");
-        label.className = "nova-codebar-stackfix-lang";
-        label.textContent = lang;
-
-        const copy = document.createElement("button");
-        copy.type = "button";
-        copy.className = "nova-codebar-stackfix-copy";
-        copy.textContent = "Copy";
-
-        const code = document.createElement("code");
-        code.className = oldClass || ("language-" + lang);
-        code.textContent = rawText;
-
-        copy.addEventListener("click", async function (event) {
-            event.preventDefault();
-            event.stopPropagation();
-
-            try {
-                await navigator.clipboard.writeText(code.textContent || "");
-                copy.textContent = "Copied";
-                setTimeout(() => copy.textContent = "Copy", 900);
-            } catch (_) {
-                copy.textContent = "Copy failed";
-                setTimeout(() => copy.textContent = "Copy", 1200);
-            }
-        });
-
-        bar.appendChild(label);
-        bar.appendChild(copy);
-        pre.appendChild(bar);
-        pre.appendChild(code);
-    }
-
-    function cleanNearbyToolbarJunk(pre) {
-        let prev = pre.previousSibling;
-
-        while (prev) {
-            const text = String(prev.textContent || prev.nodeValue || "").trim();
-
-            if (!text) {
-                const remove = prev;
-                prev = prev.previousSibling;
-                remove.remove();
-                continue;
-            }
-
-            if (/^(Copy|PowerShellCopy|PythonCopy|JavaScriptCopy|BashCopy|ShellCopy|CodeCopy)$/i.test(text)) {
-                const remove = prev;
-                prev = prev.previousSibling;
-                remove.remove();
-                continue;
-            }
-
-            break;
-        }
-    }
-
-    function fixAllCodeBlocks(root) {
-        const scope = root && root.nodeType === 1 ? root : document;
-
-        const blocks = [];
-
-        if (scope.matches && scope.matches("pre")) {
-            blocks.push(scope);
-        }
-
-        scope.querySelectorAll?.("pre").forEach(pre => blocks.push(pre));
-
-        blocks.forEach(pre => {
-            cleanNearbyToolbarJunk(pre);
-            rebuildPre(pre);
-        });
-    }
-
-    fixAllCodeBlocks(document);
-
-    const observer = new MutationObserver(mutations => {
-        let shouldFix = false;
-
-        for (const mutation of mutations) {
-            mutation.addedNodes.forEach(node => {
-                if (node && node.nodeType === 1) {
-                    if (
-                        node.matches?.("pre") ||
-                        node.querySelector?.("pre")
-                    ) {
-                        shouldFix = true;
-                    }
-                }
-            });
-        }
-
-        if (shouldFix) {
-            requestAnimationFrame(() => fixAllCodeBlocks(document));
-        }
-    });
-
-    observer.observe(document.documentElement, {
-        childList: true,
-        subtree: true
-    });
-
-    console.log("[Nova] code block stack fix ready");
+    console.log(
+        "[Nova] legacy code block stack fix disabled"
+    );
 })();
 </script>
 
@@ -10249,261 +9749,7 @@ pre code {
 </script>
 <!-- /NOVA_COLLAPSED_SOURCE_DRAWER_20260622 -->
 
-<!-- NOVA_DESKTOP_OPEN_SESSION_FORCE_RENDER_20260622 -->
-<script>
-(function () {
-    "use strict";
 
-    function cleanSid(value) {
-        return String(value || "")
-            .trim()
-            .replace(/^["']+|["']+$/g, "");
-    }
-
-    function storeActiveSessionId(sid) {
-        sid = cleanSid(sid);
-        if (!sid) return "";
-
-        try {
-            localStorage.setItem("nova.session_id", sid);
-            localStorage.setItem("nova_session_id", sid);
-            localStorage.setItem("nova_active_session_id", sid);
-            localStorage.setItem("nova_desktop_session_id", sid);
-            localStorage.setItem("nova_desktop_active_session_id", sid);
-            localStorage.setItem("nova_current_session_id", sid);
-            localStorage.setItem("active_session_id", sid);
-            localStorage.setItem("session_id", sid);
-
-            sessionStorage.setItem("nova_session_id", sid);
-            sessionStorage.setItem("nova_active_session_id", sid);
-            sessionStorage.setItem("active_session_id", sid);
-            sessionStorage.setItem("session_id", sid);
-        } catch (_) {}
-
-        window.__NOVA_ACTIVE_SESSION_ID = sid;
-        window.NovaDesktopActiveSessionId = sid;
-        window.novaDesktopActiveSessionId = sid;
-        window.novaCurrentSessionId = sid;
-        window.currentSessionId = sid;
-        window.activeSessionId = sid;
-
-        try {
-            var sidInput = document.getElementById("sid");
-            if (sidInput) sidInput.value = sid;
-        } catch (_) {}
-
-        try {
-            if (typeof window.setSessionId === "function") {
-                window.setSessionId(sid);
-            }
-        } catch (_) {}
-
-        return sid;
-    }
-
-    function messageText(message) {
-        if (!message || typeof message !== "object") return "";
-
-        return String(
-            message.text ||
-            message.content ||
-            message.message ||
-            message.reply ||
-            ""
-        ).trim();
-    }
-
-    function renderMessagesDirectly(session) {
-        var chat = document.getElementById("chat");
-        if (!chat || !session) return 0;
-
-        var messages = Array.isArray(session.messages) ? session.messages : [];
-        chat.innerHTML = "";
-
-        if (!messages.length) {
-            chat.innerHTML = [
-                '<div class="nova-empty-chat">',
-                '  <div>',
-                '    <div class="nova-empty-chat-title">No messages in this session yet</div>',
-                '    <div class="nova-empty-chat-subtitle">Session opened, but the saved message list is empty.</div>',
-                '  </div>',
-                '</div>'
-            ].join("");
-            return 0;
-        }
-
-        messages.forEach(function (message, index) {
-            var role = String(message.role || message.type || "assistant").toLowerCase();
-            if (role !== "user" && role !== "assistant") role = "assistant";
-
-            var bubble = document.createElement("div");
-            bubble.className = "msg " + role;
-            bubble.setAttribute("data-message-id", String(message.id || index));
-            bubble.setAttribute("data-session-rendered", "1");
-
-            var body = document.createElement("div");
-            body.className = "msg-body";
-            body.style.whiteSpace = "pre-wrap";
-            body.textContent = messageText(message);
-
-            bubble.appendChild(body);
-            chat.appendChild(bubble);
-        });
-
-        try {
-            chat.scrollTop = chat.scrollHeight;
-        } catch (_) {}
-
-        return messages.length;
-    }
-
-    async function fetchSessionDetail(sid) {
-        sid = cleanSid(sid);
-        if (!sid) return null;
-
-        var urls = [
-            "/api/sessions/" + encodeURIComponent(sid),
-            "/api/chat/" + encodeURIComponent(sid)
-        ];
-
-        for (var i = 0; i < urls.length; i++) {
-            try {
-                var response = await fetch(urls[i], {
-                    method: "GET",
-                    cache: "no-store",
-                    headers: {
-                        "Accept": "application/json"
-                    }
-                });
-
-                if (!response.ok) continue;
-
-                var data = await response.json();
-                var session = data.session || data.item || data;
-                if (session && typeof session === "object") {
-                    session.id = session.id || session.session_id || sid;
-                    if (!Array.isArray(session.messages) && Array.isArray(data.messages)) {
-                        session.messages = data.messages;
-                    }
-                    return session;
-                }
-            } catch (error) {
-                console.warn("[Nova Open Session Force Render] fetch failed", urls[i], error);
-            }
-        }
-
-        return null;
-    }
-
-    async function openSessionForceRender(sid) {
-        sid = storeActiveSessionId(sid);
-        if (!sid) return false;
-
-        try {
-            var status = document.getElementById("status");
-            if (status) status.textContent = "opening session...";
-        } catch (_) {}
-
-        var session = await fetchSessionDetail(sid);
-
-        if (!session) {
-            console.warn("[Nova Open Session Force Render] no session returned", sid);
-            return false;
-        }
-
-        storeActiveSessionId(session.id || sid);
-
-var rendered = renderMessagesDirectly(session);
-
-if (
-    Array.isArray(session.messages) &&
-    session.messages.length === 0 &&
-    session.meta &&
-    session.meta.onboarding &&
-    typeof window.renderDesktopOnboarding === "function"
-) {
-    window.renderDesktopOnboarding(session);
-}
-
-// Do not reload session sidebar after opening a session.
-// The sidebar renderer is already initialized.
-try {
-    console.log("[Nova Open Session] sidebar refresh skipped");
-} catch (_) {}
-
-        try {
-            var statusDone = document.getElementById("status");
-            if (statusDone) statusDone.textContent = "session opened";
-        } catch (_) {}
-
-        console.log("[Nova Open Session Force Render] opened", {
-            session_id: session.id || sid,
-            rendered: rendered
-        });
-
-        return true;
-    }
-
-    window.NovaDesktopOpenSession = openSessionForceRender;
-    window.openDesktopSession = openSessionForceRender;
-    window.openSession = openSessionForceRender;
-    window.NovaDesktopFetchSession = openSessionForceRender;
-
-    document.addEventListener("click", function (event) {
-        var item = event.target && event.target.closest
-            ? event.target.closest(".desktop-session-item, .session-item, [data-sid], [data-session-id]")
-            : null;
-
-        if (!item) return;
-
-        var sid =
-            item.getAttribute("data-session-id") ||
-            item.getAttribute("data-sid") ||
-            item.getAttribute("data-id") ||
-            "";
-
-        sid = cleanSid(sid);
-
-        if (!sid && item.href) {
-            try {
-                var url = new URL(item.href, window.location.origin);
-                sid =
-                    url.searchParams.get("session_id") ||
-                    url.searchParams.get("sid") ||
-                    url.pathname.split("/").filter(Boolean).pop() ||
-                    "";
-            } catch (_) {}
-        }
-
-        sid = cleanSid(sid);
-        if (!sid) return;
-
-        event.preventDefault();
-        event.stopPropagation();
-
-        openSessionForceRender(sid);
-    }, true);
-
-    document.addEventListener("DOMContentLoaded", function () {
-        try {
-            var url = new URL(window.location.href);
-            var sid =
-                url.searchParams.get("session_id") ||
-                url.searchParams.get("sid") ||
-                url.searchParams.get("session") ||
-                "";
-
-            sid = cleanSid(sid);
-            if (sid) {
-                openSessionForceRender(sid);
-            }
-        } catch (_) {}
-    });
-
-    console.log("[Nova Open Session Force Render] installed");
-})();
-</script>
-<!-- NOVA_DESKTOP_OPEN_SESSION_FORCE_RENDER_END_20260622 -->
 <!-- NOVA_DESKTOP_SESSION_LIST_TIGHT_SPACING_20260622 -->
 <style>
 /* Keep Recent session rows packed at the top instead of stretching apart. */
@@ -12774,5 +12020,16 @@ aside.panel.tools > .quick-actions-section {
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
 
 

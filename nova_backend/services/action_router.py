@@ -39,19 +39,14 @@ class ActionRouter:
 
         return handler(payload)
 
-    # =========================================================
-    # CHAT
-    # =========================================================
     def _chat_send(self, payload):
         return self.chat_service.handle(
             user_text=payload.get("text"),
             session_id=payload.get("session_id"),
-            attachments=payload.get("attachments", [])
+            attachments=payload.get("attachments", []),
+            regenerate=bool(payload.get("regenerate", False)),
         )
 
-    # =========================================================
-    # SESSIONS
-    # =========================================================
     def _session_rename(self, payload):
         return self.session_service.rename_session(
             session_id=payload["session_id"],

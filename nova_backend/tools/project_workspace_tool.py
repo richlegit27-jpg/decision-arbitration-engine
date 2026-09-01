@@ -23,7 +23,54 @@ class ProjectWorkspaceTool(NovaTool):
 
         service = ProjectWorkspaceService()
 
+        project_id = str(
+            project_id or ""
+        ).strip()
+
+        field = str(
+            field or ""
+        ).strip().lower()
+
+        if not project_id:
+            return {
+                "ok": False,
+                "error": "project_id_required",
+            }
+
+        if field not in {
+            "name",
+            "description",
+            "status",
+        }:
+            return {
+                "ok": False,
+                "error": "unsupported_field",
+                "field": field,
+            }
+
+        # Never allow structured state objects to become
+        # project field strings.
+        if isinstance(value, (dict, list, tuple, set)):
+            return {
+                "ok": False,
+                "error": "invalid_field_value",
+                "field": field,
+                "message": (
+                    "Project field values must be plain text."
+                ),
+            }
+
+        value = str(
+            value if value is not None else ""
+        ).strip()
+
         if field == "name":
+            if not value:
+                return {
+                    "ok": False,
+                    "error": "project_name_required",
+                }
+
             return service.update_project(
                 project_id,
                 name=value,

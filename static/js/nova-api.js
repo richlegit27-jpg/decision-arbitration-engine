@@ -544,11 +544,16 @@ function normalizeMemoryPayload(payload) {
   api.normalizeChatPayload = normalizeChatPayload;
   api.normalizeModelsPayload = normalizeModelsPayload;
 
-  window.NovaApp = window.NovaApp || {};
+window.NovaApp = window.NovaApp || {};
 
-  window.NovaApp.api = api;
+window.NovaApp.api = {
+    ...(window.NovaApp.api || {}),
+    ...api
+};
 
-  window.NovaApp.getMemory = getMemory;
+window.NovaApp.getMemory = getMemory;
+window.NovaApp.addMemory = addMemory;
+window.NovaApp.deleteMemory = deleteMemory;
   window.NovaApp.addMemory = addMemory;
   window.NovaApp.deleteMemory = deleteMemory;
 

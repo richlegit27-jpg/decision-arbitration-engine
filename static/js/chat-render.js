@@ -314,6 +314,7 @@ function createRenderService(options = {}){
             <div class="message-content">${contentHtml}</div>
             <div class="message-actions">
               <button type="button" data-action="copy-message" data-message-id="${messageId}" title="Copy message">Copy</button>
+${!isUser ? `<button type="button" data-action="regenerate" data-message-id="${messageId}" title="Regenerate response">Regenerate</button>` : ""}
               ${isUser ? `<button type="button" data-action="retry-message" data-message-id="${messageId}" title="Retry from this message">Retry</button>` : ""}
               <button type="button" data-action="delete-message" data-message-id="${messageId}" title="Delete message">Delete</button>
             </div>

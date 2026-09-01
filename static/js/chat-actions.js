@@ -178,97 +178,45 @@ function createChatActionsService(options = {}){
 
   async function loadChat(chatId){
     const id = String(chatId || "").trim()
+
     if(!id){
-      return
+      return []
     }
 
-    state.activeChatId = id
-    renderAll()
-
     try{
-      const result = await chatService?.getMessages?.(id)
-      const incoming = Array.isArray(result)
-        ? result
-        : result?.messages || []
+      const messages = await chatService?.getMessages?.(id)
 
+      const incoming = Array.isArray(messages)
+        ? messages
+        : []
+
+      state.activeChatId = id
+      state.chatId = id
       state.messages = incoming.map(normalizeMessage)
+
+      state.messagesByChatId =
+        state.messagesByChatId || {}
+
+      state.messagesByChatId[id] =
+        state.messages
+
       renderAll()
       scrollToBottom(true)
       focusInput()
+
+      return state.messages
     }catch(err){
       console.error("Nova loadChat error:", err)
-    }
 
-    return ensureMessagesArray()
+      return ensureMessagesArray()
+    }
   }
 
   async function sendCurrentMessage(){
-    if(state.isStreaming){
-      return
-    }
-
-    const text = String(el.input?.value || "").trim()
-    const files = Array.isArray(state.pendingFiles) ? [...state.pendingFiles] : []
-
-    if(!text && files.length === 0){
-      updateComposerState()
-      return
-    }
-
-    let activeChatId = String(state.activeChatId || "")
-
-    if(!activeChatId){
-      const chat = await createChat()
-      activeChatId = getChatId(chat)
-    }
-
-    const messages = ensureMessagesArray()
-
-    messages.push(normalizeMessage({
-      id: makeId("msg"),
-      role: "user",
-      content: text,
-      attachments: files,
-    }))
-
-    state.isStreaming = true
-
-    messages.push(normalizeMessage({
-      id: makeId("msg"),
-      role: "assistant",
-      content: "",
-      attachments: [],
-    }))
-
-    if(el.input){
-      el.input.value = ""
-    }
-
-    state.pendingFiles = []
-    state.pendingAttachments = []
-
-    attachmentsService?.clearPendingFiles?.()
-
-    autoResizeInput()
-    renderAll()
-    scrollToBottom(true)
-
-    try{
-      if(streamService?.send){
-        await streamService.send({
-          chatId: activeChatId,
-          message: text,
-          files,
-          scrollEl: document.getElementById("messagesScroll"),
-        })
-      }
-    }catch(err){
-      console.error("Nova sendCurrentMessage error:", err)
-    }finally{
-      autoResizeInput()
-      updateComposerState()
-      focusInput()
-    }
+    console.warn(
+      "[NovaChatActions] legacy sendCurrentMessage disabled; composer-actions owns sending."
+    )
+    return null
   }
 
   return {
@@ -289,4 +237,3 @@ window.NovaChatActions = {
 }
 
 })()
-

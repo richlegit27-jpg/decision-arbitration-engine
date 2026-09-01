@@ -1,5 +1,6 @@
 import uuid
 
+
 class ExecutionStreamService:
 
     def __init__(
@@ -14,9 +15,15 @@ class ExecutionStreamService:
         self.chat_service = chat_service
         self.default_executor = default_executor
         self.NextMove = next_move_class
-        self.update_execution_state_safe = update_execution_state_safe
+        self.update_execution_state_safe = (
+            update_execution_state_safe
+        )
 
-    def send_event(self, name, payload):
+    def send_event(
+        self,
+        name,
+        payload,
+    ):
         import json
 
         return (
@@ -29,28 +36,20 @@ class ExecutionStreamService:
         session_id,
         execution,
     ):
-        session = self.session_service.get_session(
-            session_id
-        )
-
-        if not isinstance(session, dict):
+        if not session_id:
             return
 
-        working_state = session.get(
-            "working_state",
-            {},
-        )
+        if not isinstance(
+            execution,
+            dict,
+        ):
+            execution = {}
 
-        if not isinstance(working_state, dict):
-            working_state = {}
-
-        working_state["execution"] = execution
-
-        session["working_state"] = working_state
-
-        self.session_service.update_session(
+        self.session_service.update_working_state(
             session_id,
-            session,
+            {
+                "execution": execution,
+            },
         )
 
     def replay_existing_step(
@@ -62,17 +61,28 @@ class ExecutionStreamService:
     ):
         move = (
             replay_step.get("move")
-            if isinstance(replay_step, dict)
+            if isinstance(
+                replay_step,
+                dict,
+            )
             else None
         )
 
-        if not isinstance(move, dict):
+        if not isinstance(
+            move,
+            dict,
+        ):
             replay_step["status"] = "failed"
+
             replay_step["output"] = {
-                "error": "Replay failed: no move stored on step.",
+                "error": (
+                    "Replay failed: "
+                    "no move stored on step."
+                ),
             }
 
             execution["status"] = "error"
+
             execution["current_step"] = (
                 f"Replay failed: {step_title}"
             )
@@ -127,16 +137,23 @@ class ExecutionStreamService:
         )
 
         if runtime is not None:
+
             runtime_strategy_memory = getattr(
                 runtime,
                 "runtime_strategy_memory",
                 None,
             )
 
-            if isinstance(runtime_strategy_memory, list):
+            if isinstance(
+                runtime_strategy_memory,
+                list,
+            ):
                 runtime_strategy_memory.append(
                     {
-                        "action": move.get("type") or action,
+                        "action": (
+                            move.get("type")
+                            or action
+                        ),
                         "success": replay_ok,
                         "failure": not replay_ok,
                         "runtime_signal": (

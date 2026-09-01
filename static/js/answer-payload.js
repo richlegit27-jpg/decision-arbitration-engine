@@ -112,95 +112,115 @@ function renderTableBlock(block){
 }
 
 function parseBlocks(text){
-  const normalized = normalizeText(text)
-  const lines = normalized.split("\n")
-  const blocks = []
+    const normalized = normalizeText(text)
+    const lines = normalized.split("\n")
+    const blocks = []
 
-  let i = 0
-  while(i < lines.length){
-    const line = lines[i]
+    let i = 0
 
-    if(!line.trim()){
-      i += 1
-      continue
-    }
+    while(i < lines.length){
+        const line = lines[i]
 
-    if(line.trim().startsWith("```")){
-      const first = line.trim()
-      const lang = first.slice(3).trim()
-      i += 1
-      const codeLines = []
+        if(!line.trim()){
+            i += 1
+            continue
+        }
 
-      while(i < lines.length && !lines[i].trim().startsWith("```")){
-        codeLines.push(lines[i])
+        const fenceMatch = line.trim().match(
+            /^(?:[-*+]\s+|\d+\.\s+)?```([a-zA-Z0-9_-]*)\s*$/
+        )
+
+        if(fenceMatch){
+            const lang = fenceMatch[1] || ""
+            i += 1
+
+            const codeLines = []
+
+            while(
+                i < lines.length &&
+                !lines[i].trim().startsWith("```")
+            ){
+                codeLines.push(lines[i])
+                i += 1
+            }
+
+            if(
+                i < lines.length &&
+                lines[i].trim().startsWith("```")
+            ){
+                i += 1
+            }
+
+            blocks.push({
+                type: "code",
+                lang,
+                content: codeLines.join("\n"),
+            })
+
+            continue
+        }
+
+        if(line.trim().startsWith("|")){
+            const tableLines = [line]
+            i += 1
+
+            while(
+                i < lines.length &&
+                lines[i].trim().startsWith("|")
+            ){
+                tableLines.push(lines[i])
+                i += 1
+            }
+
+            blocks.push({
+                type: "table",
+                content: tableLines.join("\n"),
+            })
+
+            continue
+        }
+
+        if(/^\s*([-*+]\s+|\d+\.\s+)/.test(line)){
+            const listLines = [line]
+            i += 1
+
+            while(
+                i < lines.length &&
+                /^\s*([-*+]\s+|\d+\.\s+)/.test(lines[i])
+            ){
+                listLines.push(lines[i])
+                i += 1
+            }
+
+            blocks.push({
+                type: "list",
+                content: listLines.join("\n"),
+            })
+
+            continue
+        }
+
+        const paraLines = [line]
         i += 1
-      }
 
-      if(i < lines.length && lines[i].trim().startsWith("```")){
-        i += 1
-      }
+        while(
+            i < lines.length &&
+            lines[i].trim() &&
+            !lines[i].trim().startsWith("```") &&
+            !lines[i].trim().startsWith("|") &&
+            !/^\s*([-*+]\s+|\d+\.\s+)/.test(lines[i])
+        ){
+            paraLines.push(lines[i])
+            i += 1
+        }
 
-      blocks.push({
-        type: "code",
-        lang,
-        content: codeLines.join("\n"),
-      })
-      continue
+        blocks.push({
+            type: "paragraph",
+            content: paraLines.join("\n"),
+        })
     }
 
-    if(line.trim().startsWith("|")){
-      const tableLines = [line]
-      i += 1
-
-      while(i < lines.length && lines[i].trim().startsWith("|")){
-        tableLines.push(lines[i])
-        i += 1
-      }
-
-      blocks.push({
-        type: "table",
-        content: tableLines.join("\n"),
-      })
-      continue
-    }
-
-    if(/^\s*([-*]\s+|\d+\.\s+)/.test(line)){
-      const listLines = [line]
-      i += 1
-
-      while(i < lines.length && /^\s*([-*]\s+|\d+\.\s+)/.test(lines[i])){
-        listLines.push(lines[i])
-        i += 1
-      }
-
-      blocks.push({
-        type: "list",
-        content: listLines.join("\n"),
-      })
-      continue
-    }
-
-    const paraLines = [line]
-    i += 1
-
-    while(
-      i < lines.length &&
-      lines[i].trim() &&
-      !lines[i].trim().startsWith("```") &&
-      !lines[i].trim().startsWith("|") &&
-      !/^\s*([-*]\s+|\d+\.\s+)/.test(lines[i])
-    ){
-      paraLines.push(lines[i])
-      i += 1
-    }
-
-    blocks.push({
-      type: "paragraph",
-      content: paraLines.join("\n"),
-    })
-  }
-
-  return blocks
+    return blocks
 }
 
 function renderAnswerPayload(content, options = {}){

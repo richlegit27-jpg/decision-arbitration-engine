@@ -211,11 +211,18 @@ function createChatOrchestrator(options = {}){
   }
 
 function persistCurrentMessages(){
+    /*
+     * Chat message persistence is owned by the backend
+     * /api/chat and /api/chat/regenerate flows.
+     *
+     * Do not PUT the conversation again from the
+     * orchestrator. The session PUT endpoint is append-only,
+     * so using it after /api/chat can duplicate turns.
+     *
+     * The orchestrator remains responsible for keeping
+     * in-memory state and rendering synchronized.
+     */
     if(!state.activeChatId){
-        return
-    }
-
-    if(typeof chatStorage.saveMessages !== "function"){
         return
     }
 
@@ -228,14 +235,7 @@ function persistCurrentMessages(){
         )
     })
 
-    const saved = chatStorage.saveMessages(
-        state.activeChatId,
-        cleanMessages,
-    )
-
-    state.messages = Array.isArray(saved)
-        ? saved.slice()
-        : cleanMessages.slice()
+    state.messages = cleanMessages.slice()
 
     hydrateChatTitle(
         state.activeChatId,
@@ -315,19 +315,46 @@ function persistCurrentMessages(){
         onNeedsCreateChat: async () => {
           return await createChatAndLoad()
         },
-        onAfterSend(){
-          syncPersistedMessages({ preserveScroll: false })
-        },
+
+onAfterSend(){
+    renderShell()
+    scrollMessagesToBottom(false)
+},
       })
     }
   }
 
 async function loadActiveChatMessages(){
-  const activeChatId = String(state.activeChatId || "").trim()
+  let activeChatId = String(state.activeChatId || "").trim()
 
   if(!activeChatId){
-    state.messages = []
-    return []
+    const currentSession =
+      window.NovaCurrentSessionManager?.currentSession || null
+
+    const recoveredId =
+      currentSession?.id ||
+      currentSession?.session_id ||
+      ""
+
+    if(recoveredId){
+      activeChatId = String(recoveredId).trim()
+      state.activeChatId = activeChatId
+
+      console.log(
+        "[NOVA ORCHESTRATOR] recovered active backend session:",
+        activeChatId
+      )
+    }
+  }
+
+  if(!activeChatId){
+    console.warn(
+      "[NOVA ORCHESTRATOR] no active session available; preserving existing messages"
+    )
+
+    return Array.isArray(state.messages)
+      ? state.messages
+      : []
   }
 
   let messages = []
@@ -408,10 +435,6 @@ renderShell()
       memoryPanel.init()
     }
 
-if(typeof chatStorage.loadChats === "function"){
-  await chatStorage.loadChats()
-}
-
 renderShell()
 
 await loadActiveChatMessages()
@@ -429,6 +452,7 @@ if(typeof chatMessages.renderMessages === "function"){
 
   return {
     init,
+    persistCurrentMessages,
     renderAll,
     loadActiveChatMessages,
     createChatAndLoad,
@@ -449,4 +473,12 @@ window.NovaChatOrchestrator = {
 }
 
 })()
+
+
+
+
+
+
+
+
 

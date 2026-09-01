@@ -552,6 +552,126 @@ class ChatExecutionService:
                     state
                 )
 
+        # NOVA_BASIC_EXECUTION_FALLBACK_20260831
+        # Ordinary execution steps must be able to advance even when
+        # no specialized execution handler is installed.
+        if not self.execution_handler:
+            current_step = steps[current_index]
+
+            if isinstance(current_step, dict):
+                current_step["status"] = "completed"
+
+                if not current_step.get("result"):
+                    current_step["result"] = (
+                        str(user_text).strip()
+                        if user_text
+                        else "Step completed."
+                    )
+
+                current_step.pop(
+                    "error",
+                    None,
+                )
+
+                steps[current_index] = current_step
+
+            state["steps"] = steps
+
+            next_index = current_index + 1
+
+            if next_index < len(steps):
+                next_step = steps[next_index]
+
+                if isinstance(next_step, dict):
+                    next_step["status"] = "active"
+                    steps[next_index] = next_step
+
+                state["current_index"] = next_index
+                state["current_step"] = next_step
+                state["status"] = "running"
+                state["waiting"] = False
+                state["complete"] = False
+
+            else:
+                state["current_index"] = next_index
+                state["current_step"] = None
+                state["status"] = "complete"
+                state["waiting"] = False
+                state["complete"] = True
+
+            state["steps"] = steps
+
+            self._sync_state_to_session(
+                safe_session_id,
+                state,
+            )
+
+            self._save_states()
+
+            return self._copy_state(
+                state
+            )
+
+        # NOVA_BASIC_EXECUTION_FALLBACK_20260831
+        # Ordinary execution steps must be able to advance even when
+        # no specialized execution handler is installed.
+        if not self.execution_handler:
+            current_step = steps[current_index]
+
+            if isinstance(current_step, dict):
+                current_step["status"] = "completed"
+
+                if not current_step.get("result"):
+                    current_step["result"] = (
+                        str(user_text).strip()
+                        if user_text
+                        else "Step completed."
+                    )
+
+                current_step.pop(
+                    "error",
+                    None,
+                )
+
+                steps[current_index] = current_step
+
+            state["steps"] = steps
+
+            next_index = current_index + 1
+
+            if next_index < len(steps):
+                next_step = steps[next_index]
+
+                if isinstance(next_step, dict):
+                    next_step["status"] = "active"
+                    steps[next_index] = next_step
+
+                state["current_index"] = next_index
+                state["current_step"] = next_step
+                state["status"] = "running"
+                state["waiting"] = False
+                state["complete"] = False
+
+            else:
+                state["current_index"] = next_index
+                state["current_step"] = None
+                state["status"] = "complete"
+                state["waiting"] = False
+                state["complete"] = True
+
+            state["steps"] = steps
+
+            self._sync_state_to_session(
+                safe_session_id,
+                state,
+            )
+
+            self._save_states()
+
+            return self._copy_state(
+                state
+            )
+
         print(
             "DEBUG EXECUTION HANDLER =",
             self.execution_handler,

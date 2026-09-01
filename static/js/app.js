@@ -3,21 +3,34 @@
 
 const STORAGE_KEY = "nova_active_chat_id";
 
-const state = {
-  chats: [],
-  activeChatId: null,
-  messagesByChatId: {},
-  attachedFiles: [],
-  models: [
-    { value: "nova-fast", label: "Nova Fast" },
-    { value: "nova-smart", label: "Nova Smart" },
-    { value: "nova-vision", label: "Nova Vision" },
-    { value: "nova-coding", label: "Nova Coding" }
-  ],
-  selectedModel: "nova-fast",
-  isLoadingChat: false
-};
+const state =
+  window.NovaChatState?.state ||
+  (window.NovaChatState = {
+    state: {
+      chats: [],
+      activeChatId: null,
+      messages: [],
+      messagesByChatId: {},
+      attachedFiles: [],
+      models: [],
+      selectedModel: "nova-fast",
+      isLoadingChat: false
+    }
+  }).state;
 
+
+window.NovaApp = window.NovaApp || {};
+window.NovaApp.state = state;
+
+state.chats = Array.isArray(state.chats) ? state.chats : [];
+state.messages = Array.isArray(state.messages) ? state.messages : [];
+state.messagesByChatId = state.messagesByChatId || {};
+state.attachedFiles = Array.isArray(state.attachedFiles)
+  ? state.attachedFiles
+  : [];
+state.models = Array.isArray(state.models) ? state.models : [];
+state.selectedModel = state.selectedModel || "nova-fast";
+state.isLoadingChat = Boolean(state.isLoadingChat);
 const el = {};
 
 function byId(id){
@@ -146,7 +159,7 @@ function loadActiveChatId(){
 
 function getActiveChat(){
   if(!state.activeChatId) return null;
-  return state.chats.find(chat => Number(chat.id) === Number(state.activeChatId)) || null;
+  return state.chats.find(chat => String(chat.id) === String(state.activeChatId)) || null;
 }
 
 function getActiveMessages(){
@@ -156,7 +169,7 @@ function getActiveMessages(){
 }
 
 function setActiveChatId(chatId){
-  state.activeChatId = chatId ? Number(chatId) : null;
+  state.activeChatId = chatId ? String(chatId).trim() : null;
   saveActiveChatId();
   renderChatList();
   renderActiveChatCard();
@@ -216,7 +229,7 @@ function renderChatList(){
   }
 
   el.chatList.innerHTML = state.chats.map(chat => {
-    const isActive = Number(chat.id) === Number(state.activeChatId);
+    const isActive = String(chat.id) === String(state.activeChatId);
     const messageCount = Number(chat.message_count || 0);
 
     return `
@@ -322,14 +335,14 @@ async function loadChats(){
   }
 
   const savedId = loadActiveChatId();
-  const hasSaved = savedId && state.chats.some(chat => Number(chat.id) === Number(savedId));
+  const hasSaved = savedId && state.chats.some(chat => String(chat.id) === String(savedId));
 
   if(hasSaved){
-    state.activeChatId = Number(savedId);
-  }else if(state.activeChatId && state.chats.some(chat => Number(chat.id) === Number(state.activeChatId))){
-    state.activeChatId = Number(state.activeChatId);
+    state.activeChatId = String(savedId);
+  }else if(state.activeChatId && state.chats.some(chat => String(chat.id) === String(state.activeChatId))){
+    state.activeChatId = String(state.activeChatId);
   }else{
-    state.activeChatId = Number(state.chats[0].id);
+    state.activeChatId = String(state.chats[0].id);
   }
 
   saveActiveChatId();
@@ -590,7 +603,7 @@ function bindEvents(){
       const button = event.target.closest("[data-chat-id]");
       if(!button) return;
 
-      const chatId = Number(button.getAttribute("data-chat-id"));
+      const chatId = String(button.getAttribute("data-chat-id") || "").trim();
       if(!chatId) return;
 
       try{
@@ -688,7 +701,7 @@ function bindEvents(){
 
     state.messagesByChatId[chatId].push(message);
 
-    const chatIndex = state.chats.findIndex(chat => Number(chat.id) === chatId);
+    const chatIndex = state.chats.findIndex(chat => String(chat.id) === String(chatId));
     if(chatIndex >= 0){
       state.chats[chatIndex] = {
         ...state.chats[chatIndex],
@@ -710,7 +723,7 @@ function bindEvents(){
     renderChatList();
     renderActiveChatCard();
 
-    if(Number(state.activeChatId) === chatId){
+    if(String(state.activeChatId) === String(chatId)){
       renderMessages();
     }
   });
@@ -718,12 +731,21 @@ function bindEvents(){
 
 async function init(){
   cacheElements();
-  renderModelSelect();
+
   renderAttachedFiles();
   bindEvents();
   autosizeComposer();
 
   try{
+    if (
+      window.NovaApp?.api &&
+      typeof window.NovaApp.api.hydrateModelsIntoState === "function"
+    ) {
+      await window.NovaApp.api.hydrateModelsIntoState();
+    }
+
+    renderModelSelect();
+
     await loadChats();
 
     if(state.activeChatId){
@@ -733,29 +755,57 @@ async function init(){
       renderActiveChatCard();
       renderMessages();
     }
+
+    window.dispatchEvent(
+      new CustomEvent("nova:chat-state-ready", {
+        detail: {
+          activeChatId: state.activeChatId,
+          chatCount: state.chats.length
+        }
+      })
+    );
   }catch(error){
     console.error(error);
+
+    renderModelSelect();
     renderChatList();
     renderActiveChatCard();
     renderMessages();
+
+    window.dispatchEvent(
+      new CustomEvent("nova:chat-state-ready", {
+        detail: {
+          activeChatId: state.activeChatId,
+          chatCount: state.chats.length,
+          error: error.message || String(error)
+        }
+      })
+    );
   }
-
-window.NovaApp = window.NovaApp || {};
-
-Object.assign(window.NovaApp, {
-    state,
-    apiFetch,
-    getActiveChat,
-    getActiveMessages,
-    ensureActiveChat,
-    createChat,
-    loadChat,
-    renderChatList,
-    renderActiveChatCard,
-    renderMessages
-});
 }
 
-document.addEventListener("DOMContentLoaded", init);
-})();
+if(
+  document.readyState === "loading"
+){
+  document.addEventListener(
+    "DOMContentLoaded",
+    () => {
+      init().catch(error => {
+        console.error(
+          "[NOVA APP] initialization failed",
+          error
+        );
+      });
+    },
+    { once: true }
+  );
+}else{
+  init().catch(error => {
+    console.error(
+      "[NOVA APP] initialization failed",
+      error
+    );
+  });
+}
 
+})();

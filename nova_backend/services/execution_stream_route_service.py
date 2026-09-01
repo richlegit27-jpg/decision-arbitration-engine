@@ -15,7 +15,188 @@ class ExecutionStreamRouteService:
         self.execution_stream_service = execution_stream_service
         self.execution_fix_service = execution_fix_service
 
+    def _normalize_execution(self, execution):
+        if isinstance(execution, dict):
+            normalized = dict(execution)
+        else:
+            normalized = {}
+
+        normalized.setdefault(
+            "id",
+            "",
+        )
+        normalized.setdefault(
+            "type",
+            "execution_run",
+        )
+        normalized.setdefault(
+            "title",
+            "Execution Run",
+        )
+        normalized.setdefault(
+            "goal",
+            "",
+        )
+        normalized.setdefault(
+            "status",
+            "idle",
+        )
+        normalized.setdefault(
+            "current_step",
+            "",
+        )
+        normalized.setdefault(
+            "result",
+            "",
+        )
+        normalized.setdefault(
+            "error",
+            "",
+        )
+        normalized.setdefault(
+            "history",
+            [],
+        )
+        normalized.setdefault(
+            "steps",
+            [],
+        )
+        normalized.setdefault(
+            "meta",
+            {},
+        )
+
+        if not isinstance(
+            normalized["history"],
+            list,
+        ):
+            normalized["history"] = []
+
+        if not isinstance(
+            normalized["steps"],
+            list,
+        ):
+            normalized["steps"] = []
+
+        if not isinstance(
+            normalized["meta"],
+            dict,
+        ):
+            normalized["meta"] = {}
+
+        return normalized
+
+    def _apply_control_action(
+        self,
+        execution,
+        action,
+    ):
+        execution = self._normalize_execution(
+            execution
+        )
+
+        action = str(
+            action or ""
+        ).strip().lower()
+
+        if action == "run_step":
+            step_number = (
+                len(
+                    execution["steps"]
+                )
+                + 1
+            )
+
+            step_id = (
+                f"step_{step_number}"
+            )
+
+            step = {
+                "id": step_id,
+                "title": (
+                    f"Step {step_number}"
+                ),
+                "text": (
+                    f"Step {step_number}"
+                ),
+                "status": "completed",
+                "started_at": "",
+                "completed_at": "",
+                "failed_at": "",
+                "blocked_at": "",
+                "output": "Step completed.",
+                "notes": "",
+                "meta": {},
+            }
+
+            from datetime import datetime, timezone
+
+            now = datetime.now(
+                timezone.utc
+            ).isoformat()
+
+            step["started_at"] = now
+            step["completed_at"] = now
+
+            execution["steps"].append(
+                step
+            )
+
+            execution["history"].append(
+                f"run_step: Step {step_number}"
+            )
+
+            execution["current_step"] = ""
+
+            execution["status"] = (
+                "completed"
+            )
+
+            execution["updated_at"] = now
+
+            counts = {
+                "blocked": 0,
+                "completed": 0,
+                "failed": 0,
+                "pending": 0,
+                "running": 0,
+                "total": len(
+                    execution["steps"]
+                ),
+            }
+
+            for item in execution["steps"]:
+                status = str(
+                    item.get("status")
+                    or ""
+                ).lower()
+
+                if status == "completed":
+                    counts["completed"] += 1
+                elif status == "failed":
+                    counts["failed"] += 1
+                elif status == "blocked":
+                    counts["blocked"] += 1
+                elif status == "running":
+                    counts["running"] += 1
+                else:
+                    counts["pending"] += 1
+
+            execution["meta"][
+                "step_counts"
+            ] = counts
+
+            return execution
+
+        return execution
+
     def stream(self, data):
+
+        if not isinstance(
+            data,
+            dict,
+        ):
+            data = {}
 
         session_id = str(
             data.get("session_id") or ""
@@ -23,9 +204,7 @@ class ExecutionStreamRouteService:
 
         action = str(
             data.get("action") or ""
-        ).strip()
-
-        action = action.lower()
+        ).strip().lower()
 
         def generate():
 
@@ -55,16 +234,31 @@ class ExecutionStreamRouteService:
                 session_id
             )
 
-            if not isinstance(session, dict):
+            if not isinstance(
+                session,
+                dict,
+            ):
                 session = {}
 
+            working_state = session.get(
+                "working_state",
+                {},
+            )
+
+            if not isinstance(
+                working_state,
+                dict,
+            ):
+                working_state = {}
+
             execution = (
-                session.get("working_state", {})
-                .get("execution")
+                working_state.get(
+                    "execution"
+                )
                 or {}
             )
 
-            execution = self.execution_service.normalize_execution(
+            execution = self._normalize_execution(
                 execution
             )
 
@@ -81,16 +275,31 @@ class ExecutionStreamRouteService:
 
             if action == "fix_file":
 
-                result = self.execution_fix_service.apply_fix(
-                    session_id,
-                    session,
-                    execution,
-                    action,
+                result = (
+                    self.execution_fix_service.apply_fix(
+                        session_id,
+                        session,
+                        execution,
+                        action,
+                    )
                 )
 
-                execution = result["execution"]
-                step = result["step"]
-                ok = result["ok"]
+                execution = (
+                    result.get(
+                        "execution"
+                    )
+                    or execution
+                )
+
+                step = result.get(
+                    "step"
+                )
+
+                ok = bool(
+                    result.get(
+                        "ok"
+                    )
+                )
 
                 self.execution_stream_service.save_execution(
                     session_id,
@@ -126,7 +335,7 @@ class ExecutionStreamRouteService:
 
                 return
 
-            execution = self.execution_service.apply_control_action(
+            execution = self._apply_control_action(
                 execution,
                 action,
             )

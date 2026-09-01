@@ -309,6 +309,12 @@ class ChatService:
         self.execution_state_service = execution_state_service
 
         # =========================
+        # ACTIVE EXECUTION CACHE
+        # =========================
+
+        self.active_execution_cache = {}
+
+        # =========================
         # EXISTING ALIASES
         # DO NOT REMOVE
         # =========================
@@ -503,12 +509,19 @@ class ChatService:
         user_text: str,
         session_id: str = "",
         attachments=None,
+        regenerate: bool = False,
     ):
 
         print(
             "[CHAT HANDLE ENTER]",
             user_text,
             session_id,
+            flush=True,
+        )
+
+        print(
+            "[CHAT HANDLE REGENERATE]",
+            regenerate,
             flush=True,
         )
 
@@ -684,6 +697,7 @@ class ChatService:
                 if isinstance(brain_state, dict)
                 else None
             ),
+            regenerate=regenerate,
         )
 
         print(
@@ -4914,7 +4928,9 @@ Rules:
                     assistant_msg=assistant_msg,
                     decision=decision if isinstance(decision, dict) else {},
                     saved_artifact=None,
+                    regenerate=regenerate,
                 )
+
         except Exception as _nova_webfetch_image_bounce_error:
             print("[NOVA_WEBFETCH_INTERNAL_IMAGE_BOUNCE] failed:", _nova_webfetch_image_bounce_error)
 

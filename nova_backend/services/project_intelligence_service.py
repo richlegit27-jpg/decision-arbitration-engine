@@ -343,21 +343,46 @@ class ProjectIntelligenceService:
             return "30 minutes"
 
         return "45+ minutes"
+
+
     def _build_recent_activity(
         self,
         project,
     ):
-        return [
-            {
-                "type": "project",
-                "message": "Project loaded.",
-                "time": datetime.utcnow().isoformat(),
-            }
+        timeline = project.get(
+            "timeline",
+            [],
+        )
+
+        if not isinstance(
+            timeline,
+            list,
+        ):
+            return []
+
+        activities = [
+            item
+            for item in timeline
+            if isinstance(
+                item,
+                dict,
+            )
         ]
+
+        activities.sort(
+            key=lambda item: str(
+                item.get(
+                    "created_at",
+                    "",
+                )
+            ),
+            reverse=True,
+        )
+
+        return activities[:20]
 
     def _build_blockers(self, tasks):
         return []
-
 
 project_intelligence_service = (
     ProjectIntelligenceService()

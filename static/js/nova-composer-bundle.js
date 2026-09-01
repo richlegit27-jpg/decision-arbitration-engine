@@ -114,17 +114,24 @@ function applyBackendSessionState(payload, explicitSessionId) {
   }
 
 
-    activeSessionId: state.activeSessionId,
-    message_count: Array.isArray(state.messages) ? state.messages.length : -1,
-    messages: (state.messages || []).map(function (msg) {
-      return {
-        id: msg && msg.id,
-        role: msg && msg.role,
-        text: String((msg && msg.text) || "").slice(0, 80),
-      };
-    }),
-  });
-
+  console.log(
+    "[NOVA STATE LOADED]",
+    {
+      activeSessionId: state.activeSessionId,
+      message_count: Array.isArray(state.messages)
+        ? state.messages.length
+        : -1,
+      messages: (state.messages || []).map(function (msg) {
+        return {
+          id: msg && msg.id,
+          role: msg && msg.role,
+          text: String(
+            (msg && msg.text) || ""
+          ).slice(0, 80),
+        };
+      }),
+    }
+  );
   renderChat();
   renderArtifacts();
   renderMemory();
@@ -7368,6 +7375,10 @@ window.setRailTab = function (tabName) {
   }
 };
 
+
+
+
+
 window.runExecutionAction = async function (action, extra) {
   const button =
     document.querySelector("[data-execution-run]") ||
@@ -7387,7 +7398,8 @@ window.runExecutionAction = async function (action, extra) {
   window.NovaExecutionState = window.NovaExecutionState || {};
   window.NovaExecutionState.status = "running";
   window.NovaExecutionState.current_step = "Starting...";
-  window.NovaExecutionState.steps = window.NovaExecutionState.steps || [];
+  window.NovaExecutionState.steps =
+    window.NovaExecutionState.steps || [];
 
   if (typeof window.setRailTab === "function") {
     window.setRailTab("execution");
@@ -7402,7 +7414,9 @@ window.runExecutionAction = async function (action, extra) {
   try {
     const response = await fetch("/api/execution/stream", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         session_id: sessionId,
         action: action,
@@ -7412,7 +7426,6 @@ window.runExecutionAction = async function (action, extra) {
             : null,
       }),
     });
-
 
     if (!response.ok || !response.body) {
       throw new Error("Execution stream failed");
@@ -7429,7 +7442,9 @@ window.runExecutionAction = async function (action, extra) {
         break;
       }
 
-      buffer += decoder.decode(value, { stream: true });
+      buffer += decoder.decode(value, {
+        stream: true,
+      });
 
       const events = buffer.split("\n\n");
       buffer = events.pop() || "";
@@ -7441,9 +7456,13 @@ window.runExecutionAction = async function (action, extra) {
 
         lines.forEach(function (line) {
           if (line.startsWith("event:")) {
-            eventName = line.replace("event:", "").trim();
+            eventName = line
+              .replace("event:", "")
+              .trim();
           } else if (line.startsWith("data:")) {
-            data += line.replace("data:", "").trim();
+            data += line
+              .replace("data:", "")
+              .trim();
           }
         });
 
@@ -7456,67 +7475,216 @@ window.runExecutionAction = async function (action, extra) {
         try {
           payload = JSON.parse(data);
         } catch (err) {
-          console.error("[STREAM PARSE ERROR]", err);
+          console.error(
+            "[STREAM PARSE ERROR]",
+            err
+          );
           return;
         }
 
-
-
-        if (eventName === "start" && typeof addMessage === "function") {
+        if (
+          eventName === "start" &&
+          typeof addMessage === "function"
+        ) {
           addMessage({
             role: "assistant",
             text: "Execution started.",
           });
         }
 
-        if (eventName === "step_done" && typeof addMessage === "function") {
+        if (
+          eventName === "step_done" &&
+          typeof addMessage === "function"
+        ) {
           addMessage({
             role: "assistant",
             text: "Step complete.",
           });
         }
 
-        if (eventName === "done" && typeof addMessage === "function") {
+        if (
+          eventName === "done" &&
+          typeof addMessage === "function"
+        ) {
           addMessage({
             role: "assistant",
             text: "Execution complete.",
           });
+
+          window.NovaExecutionState =
+            payload.execution_state ||
+            window.NovaExecutionState ||
+            {};
+
+          window.NovaExecutionState.status =
+            window.NovaExecutionState.status ||
+            "completed";
+        }
+
+        if (eventName === "error") {
+          console.error(
+            "[EXECUTION STREAM EVENT ERROR]",
+            payload
+          );
+
+          window.NovaExecutionState =
+            window.NovaExecutionState || {};
+
+          window.NovaExecutionState.status = "error";
+
+          window.NovaExecutionState.error =
+            String(
+              payload.error ||
+              "Execution failed."
+            );
         }
 
         if (payload.execution_state) {
-          window.NovaExecutionState = payload.execution_state;
+          window.NovaExecutionState =
+            payload.execution_state;
 
-          window.NovaComposerState = window.NovaComposerState || {};
-          window.NovaComposerState.execution = payload.execution_state;
+          window.NovaComposerState =
+            window.NovaComposerState || {};
 
-          if (typeof window.setRailTab === "function") {
+          window.NovaComposerState.execution =
+            payload.execution_state;
+
+          if (
+            typeof window.setRailTab ===
+            "function"
+          ) {
             window.setRailTab("execution");
           }
 
-          if (typeof window.renderExecutionPanel === "function") {
+          if (
+            typeof window.renderExecutionPanel ===
+            "function"
+          ) {
             window.renderExecutionPanel();
-          } else if (typeof window.renderExecution === "function") {
+          } else if (
+            typeof window.renderExecution ===
+            "function"
+          ) {
             window.renderExecution();
           }
         }
       });
     }
   } catch (err) {
-    console.error("[EXECUTION STREAM ERROR]", err);
+    console.error(
+      "[EXECUTION STREAM ERROR]",
+      err
+    );
+
+    window.NovaExecutionState =
+      window.NovaExecutionState || {};
+
+    window.NovaExecutionState.status =
+      "error";
+
+    window.NovaExecutionState.error =
+      String(err);
 
     if (typeof addMessage === "function") {
       addMessage({
         role: "assistant",
-        text: "Execution stream failed: " + String(err),
+        text:
+          "Execution stream failed: " +
+          String(err),
       });
     }
   } finally {
+    /*
+     * Execution is a separate path from normal chat
+     * streaming, so it must explicitly release the
+     * composer/thinking state.
+     */
+
+    if (
+      window.NovaComposerActions &&
+      typeof window.NovaComposerActions
+        .clearThinkingIndicator === "function"
+    ) {
+      window.NovaComposerActions
+        .clearThinkingIndicator();
+    }
+
+    if (window.NovaComposerState) {
+      window.NovaComposerState.isExecuting =
+        false;
+
+      window.NovaComposerState.isStreaming =
+        false;
+
+      window.NovaComposerState.isSending =
+        false;
+    }
+
+    if (typeof state === "object" && state) {
+      state.isExecuting = false;
+      state.isStreaming = false;
+      state.isSending = false;
+    }
+
+    document.body.classList.remove(
+      "is-thinking",
+      "is-streaming",
+      "loading",
+      "busy"
+    );
+
+    document.documentElement.classList.remove(
+      "is-thinking",
+      "is-streaming",
+      "loading",
+      "busy"
+    );
+
+    if (
+      typeof window.updateComposerState ===
+      "function"
+    ) {
+      window.updateComposerState();
+    }
+
+    if (
+      typeof window.syncComposerState ===
+      "function"
+    ) {
+      window.syncComposerState();
+    }
+
     if (button) {
       button.disabled = false;
     }
+
+    if (
+      typeof window.renderExecutionPanel ===
+      "function"
+    ) {
+      window.renderExecutionPanel();
+    } else if (
+      typeof window.renderExecution ===
+      "function"
+    ) {
+      window.renderExecution();
+    }
+
+    console.log(
+      "[NOVA EXECUTION CLEANUP]",
+      {
+        status:
+          window.NovaExecutionState?.status,
+        isExecuting:
+          window.NovaComposerState?.isExecuting,
+        isStreaming:
+          window.NovaComposerState?.isStreaming,
+        isSending:
+          window.NovaComposerState?.isSending,
+      }
+    );
   }
 };
-
 if (!document.getElementById("nova-exec-anim")) {
   const style = document.createElement("style");
   style.id = "nova-exec-anim";
@@ -7541,5 +7709,6 @@ function runExec(action) {
 window.runExec = runExec;
 
 })();
+
 
 

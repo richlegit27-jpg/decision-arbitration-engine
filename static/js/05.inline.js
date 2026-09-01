@@ -1130,15 +1130,36 @@ if (!state.apiKey || state.apiKey==="undefined") {
   toast("warn","API key needed","Enter NOVA API key for this browser (stored locally)");
   return;
 } }
-
     await loadSessions();
-    
-    try { restoreChatFor(sid); } catch(e) {}
-if (state.sessions.length) {
-      await openSession(state.sessions[0].id);
-      toast("ok","Loaded","Sessions ready", 6000);
+
+    try {
+      restoreChatFor(sid);
+    } catch (e) {}
+
+    if (state.sessions.length) {
+      const storedSessionId =
+        localStorage.getItem("nova_active_session_id") ||
+        sessionStorage.getItem("nova_active_session_id") ||
+        state.sessionId ||
+        "";
+
+      const restoredSession = storedSessionId
+        ? state.sessions.find(
+            session => session.id === storedSessionId
+          )
+        : null;
+
+      if (restoredSession) {
+        await openSession(restoredSession.id);
+      } else {
+        console.log(
+          "[NOVA BOOT] Sessions loaded; preserving session list without forcing first session"
+        );
+      }
+
+      toast("ok", "Loaded", "Sessions ready", 6000);
     } else {
-      toast("warn","No sessions","Click + New to start");
+      toast("warn", "No sessions", "Click + New to start");
     }
   })().catch(e => toast("bad","Boot failed", e.message || String(e)));
 
@@ -1183,6 +1204,7 @@ if (state.sessions.length) {
     }
   } catch(e){}
 })();
+
 
 
 

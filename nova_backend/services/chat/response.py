@@ -372,6 +372,7 @@ class ChatResponseHandler:
         execution_state=None,
         working_context_payload=None,
         should_inject_working_context=False,
+        regenerate=False,
         **extra,
     ) -> dict:
 
@@ -380,8 +381,11 @@ class ChatResponseHandler:
             {
                 "session_id": session_id,
                 "user_text": user_text,
-                "has_user_msg": isinstance(user_msg, dict),
-                "has_assistant_msg": isinstance(assistant_msg, dict),
+                "has_user_msg":
+                isinstance(user_msg, dict),
+                "has_assistant_msg":
+                isinstance(assistant_msg, dict),
+                "regenerate": regenerate,
             },
         )
 
@@ -632,6 +636,9 @@ class ChatResponseHandler:
             )
 
 
+
+
+
         try:
             if isinstance(user_msg, dict):
                 self.chat_service.session_service.append_message(
@@ -640,10 +647,47 @@ class ChatResponseHandler:
                 )
 
             if isinstance(assistant_msg, dict):
-                self.chat_service.session_service.append_message(
-                    session_id,
-                    assistant_msg,
-                )
+
+                if regenerate:
+                    print(
+                        "[REGENERATE EXTRA DEBUG]",
+                        extra,
+                        flush=True,
+                    )
+
+                    assistant_id = (
+                        extra.get("assistant_id")
+                        or extra.get("message_id")
+                    )
+
+                    print(
+                        "[REGENERATE SAVE]",
+                        {
+                            "assistant_id": assistant_id,
+                            "session_id": session_id,
+                        },
+                        flush=True,
+                    )
+                    if assistant_id and hasattr(
+                        self.chat_service.session_service,
+                        "replace_message",
+                    ):
+                        self.chat_service.session_service.replace_message(
+                            session_id,
+                            assistant_id,
+                            assistant_msg,
+                        )
+                    else:
+                        self.chat_service.session_service.append_message(
+                            session_id,
+                            assistant_msg,
+                        )
+
+                else:
+                    self.chat_service.session_service.append_message(
+                        session_id,
+                        assistant_msg,
+                    )
 
             print(
                 "[SESSION SAVE COMPLETE]",
@@ -656,29 +700,7 @@ class ChatResponseHandler:
                 repr(e),
             )
 
-        try:
-            if isinstance(user_msg, dict):
-                self.chat_service._persist_message_fallback(
-                    session_id,
-                    user_msg,
-                )
 
-            if isinstance(assistant_msg, dict):
-                self.chat_service._persist_message_fallback(
-                    session_id,
-                    assistant_msg,
-                )
-
-            print(
-                "[SESSION SAVE COMPLETE]",
-                session_id,
-            )
-
-        except Exception as e:
-            print(
-                "[SESSION SAVE FAILED]",
-                repr(e),
-            )
 
         return {
             "ok": True,

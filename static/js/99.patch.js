@@ -238,17 +238,16 @@ ta.style.overflowY = ta.scrollHeight > max ? "auto" : "hidden";
       e.stopImmediatePropagation?.();
 
       const toSend = text;
-      try{ ta.value = ""; }catch(_){}
-      try{ autosizeTextarea(ta); }catch(_){}
 
-      // Send async using captured text
-      attemptSend({ value: toSend, closest: ta.closest?.bind(ta) ? ta : null, id: "input" } );
-      // ^ If the wrapper above feels weird, just send via directPost fallback:
-      // But we want click/submit; so we call attemptSend with real ta instead:
-      // We'll do it properly:
       try{
-        // restore text into a temp var approach:
-        // Put it back for click/submit (UI pipeline expects input populated)
+        ta.value = "";
+      }catch(_){}
+
+      try{
+        autosizeTextarea(ta);
+      }catch(_){}
+
+      try{
         ta.value = toSend;
         attemptSend(ta);
       }catch(_){
@@ -266,8 +265,7 @@ ta.style.overflowY = ta.scrollHeight > max ? "auto" : "hidden";
     if(window.__NOVA_SENDLOCK_V11_INSTALLED__) return;
     window.__NOVA_SENDLOCK_V11_INSTALLED__ = true;
 
-    // 1) Window capture (wins)
-    window.addEventListener("keydown", (e) => { handleEnter(e, "window"); }, true);
+    ta.addEventListener("keydown", (e) => { handleEnter(e, "#input"); }, true);
 
     // 2) Direct textarea hook (can't miss even if window chain is weird)
     const hookTA = () => {

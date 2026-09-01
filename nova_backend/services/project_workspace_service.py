@@ -58,11 +58,38 @@ class ProjectWorkspaceService:
         self,
     ):
         try:
-            return json.loads(
+            data = json.loads(
                 self.projects_file.read_text(
-                    encoding="utf-8"
+                    encoding="utf-8",
                 )
             )
+
+            if not isinstance(data, list):
+                return []
+
+            changed = False
+
+            for project in data:
+                if not isinstance(project, dict):
+                    continue
+
+                if not isinstance(
+                    project.get("execution"),
+                    dict,
+                ):
+                    project["execution"] = (
+                        self._default_execution_state()
+                    )
+
+                    changed = True
+
+            if changed:
+                self._save_projects(
+                    data
+                )
+
+            return data
+
         except Exception:
             return []
 
@@ -79,14 +106,33 @@ class ProjectWorkspaceService:
             encoding="utf-8",
         )
 
-    def list_projects(
+    def _default_execution_state(
         self,
     ):
-        return [
-            project
-            for project in self._load_projects()
-            if self._same_project_owner(project)
-        ]
+        return {
+            "status": "idle",
+            "current_task_id": None,
+            "current_step": None,
+            "queue": [],
+            "last_action": None,
+            "updated_at": datetime.now(
+                timezone.utc
+            ).isoformat(),
+        }
+
+    def _default_execution_state(
+        self,
+    ):
+        return {
+            "status": "idle",
+            "current_task_id": None,
+            "current_step": None,
+            "queue": [],
+            "last_action": None,
+            "updated_at": datetime.now(
+                timezone.utc
+            ).isoformat(),
+        }
 
     def get_project(
         self,
@@ -108,19 +154,40 @@ class ProjectWorkspaceService:
     ):
         projects = self._load_projects()
 
+        now = datetime.now(
+            timezone.utc
+        ).isoformat()
+
+        for existing_project in projects:
+            if self._same_project_owner(
+                existing_project
+            ):
+                existing_project["active"] = False
+
+        if isinstance(
+            name,
+            (dict, list, tuple, set),
+        ):
+            return None
+
+        clean_name = str(
+            name or "New Project"
+        ).strip()
+
+        if not clean_name:
+            clean_name = "New Project"
+
         project = {
             "id": f"project_{uuid.uuid4().hex[:12]}",
             "owner_id": self._current_owner_id(),
-            "name": str(name or "New Project"),
-            "title": str(name or "New Project"),
-            "description": str(description or ""),
+            "name": clean_name,
+            "title": clean_name,
+            "description": str(
+                description or ""
+            ),
             "status": "active",
-            "created_at": datetime.now(
-                timezone.utc
-            ).isoformat(),
-            "updated_at": datetime.now(
-                timezone.utc
-            ).isoformat(),
+            "created_at": now,
+            "updated_at": now,
             "metadata": {},
             "sessions": [],
             "files": [],
@@ -128,22 +195,21 @@ class ProjectWorkspaceService:
             "notes": [],
             "documents": [],
             "knowledge": [],
-"workflows": [],
-
-"brain": {
-    "goal": "",
-    "decisions": [],
-    "blockers": [],
-    "next_actions": [],
-    "milestones": [],
-},
-
-"timeline": [],
-
-"active": True,
+            "workflows": [],
+            "brain": {
+                "goal": "",
+                "decisions": [],
+                "blockers": [],
+                "next_actions": [],
+                "milestones": [],
+            },
+            "timeline": [],
+            "active": True,
         }
 
-        projects.append(project)
+        projects.append(
+            project
+        )
 
         self._save_projects(
             projects
@@ -158,7 +224,6 @@ class ProjectWorkspaceService:
         description=None,
         status=None,
     ):
-
         projects = self._load_projects()
 
         for project in projects:
@@ -169,14 +234,43 @@ class ProjectWorkspaceService:
                 continue
 
             if name is not None:
-                project["name"] = str(name)
-                project["title"] = str(name)
+                if isinstance(
+                    name,
+                    (dict, list, tuple, set),
+                ):
+                    return None
+
+                clean_name = str(
+                    name
+                ).strip()
+
+                if not clean_name:
+                    return None
+
+                project["name"] = clean_name
+                project["title"] = clean_name
 
             if description is not None:
-                project["description"] = str(description)
+                if isinstance(
+                    description,
+                    (dict, list, tuple, set),
+                ):
+                    return None
+
+                project["description"] = str(
+                    description
+                ).strip()
 
             if status is not None:
-                project["status"] = str(status)
+                if isinstance(
+                    status,
+                    (dict, list, tuple, set),
+                ):
+                    return None
+
+                project["status"] = str(
+                    status
+                ).strip()
 
             project["updated_at"] = datetime.now(
                 timezone.utc
@@ -190,6 +284,158 @@ class ProjectWorkspaceService:
 
         return None
 
+    def get_execution_state(
+        self,
+        project_id,
+    ):
+        project = self.get_project(
+            project_id
+        )
+
+        if not project:
+            return None
+
+        execution = project.get(
+            "execution"
+        )
+
+        if not isinstance(
+            execution,
+            dict,
+        ):
+            execution = self._default_execution_state()
+
+            project["execution"] = execution
+
+            projects = self._load_projects()
+
+            for index, stored_project in enumerate(
+                projects
+            ):
+                if (
+                    stored_project.get("id")
+                    == project_id
+                ):
+                    projects[index] = project
+                    break
+
+            self._save_projects(
+                projects
+            )
+
+        return execution
+
+    def update_execution_state(
+        self,
+        project_id,
+        status=None,
+        current_task_id=None,
+        current_step=None,
+        queue=None,
+        last_action=None,
+    ):
+        projects = self._load_projects()
+
+        for project in projects:
+            if (
+                project.get("id") != project_id
+                or not self._same_project_owner(
+                    project
+                )
+            ):
+                continue
+
+            execution = project.get(
+                "execution"
+            )
+
+            if not isinstance(
+                execution,
+                dict,
+            ):
+                execution = (
+                    self._default_execution_state()
+                )
+
+            if status is not None:
+                execution["status"] = str(
+                    status
+                ).strip()
+
+            if current_task_id is not None:
+                execution[
+                    "current_task_id"
+                ] = current_task_id
+
+            if current_step is not None:
+                execution[
+                    "current_step"
+                ] = current_step
+
+            if queue is not None:
+                execution["queue"] = (
+                    queue
+                    if isinstance(queue, list)
+                    else []
+                )
+
+            if last_action is not None:
+                execution[
+                    "last_action"
+                ] = str(
+                    last_action
+                ).strip()
+
+            execution["updated_at"] = (
+                datetime.now(
+                    timezone.utc
+                ).isoformat()
+            )
+
+            project["execution"] = execution
+            project["updated_at"] = (
+                execution["updated_at"]
+            )
+
+            self._save_projects(
+                projects
+            )
+
+            return execution
+
+        return None
+
+    def reset_execution_state(
+        self,
+        project_id,
+    ):
+        execution = (
+            self._default_execution_state()
+        )
+
+        projects = self._load_projects()
+
+        for project in projects:
+            if (
+                project.get("id") != project_id
+                or not self._same_project_owner(
+                    project
+                )
+            ):
+                continue
+
+            project["execution"] = execution
+            project["updated_at"] = (
+                execution["updated_at"]
+            )
+
+            self._save_projects(
+                projects
+            )
+
+            return execution
+
+        return None
 
     def archive_project(
         self,
@@ -296,38 +542,36 @@ class ProjectWorkspaceService:
 
         return None
 
-
     def get_project_summary(
         self,
         project_id,
     ):
-            project = self.get_project(
-                project_id
-            )
+        project = self.get_project(
+            project_id
+        )
 
-            if not project:
-                return None
+        if not project:
+            return None
 
-            return {
-                "id": project.get("id"),
-                "name": project.get("name"),
-                "description": project.get("description"),
-                "status": project.get("status"),
-                "task_count": len(
-                    project.get("tasks", [])
-                ),
-                "file_count": len(
-                    project.get("files", [])
-                ),
-                "note_count": len(
-                    project.get("notes", [])
-                ),
-                "updated_at": project.get(
-                    "updated_at",
-                    "",
-                ),
-            }
-
+        return {
+            "id": project.get("id"),
+            "name": project.get("name"),
+            "description": project.get("description"),
+            "status": project.get("status"),
+            "task_count": len(
+                project.get("tasks", [])
+            ),
+            "file_count": len(
+                project.get("files", [])
+            ),
+            "note_count": len(
+                project.get("notes", [])
+            ),
+            "updated_at": project.get(
+                "updated_at",
+                "",
+            ),
+        }
 
     def add_task(
         self,
@@ -381,7 +625,6 @@ class ProjectWorkspaceService:
 
         return None
 
-
     def update_task_status(
         self,
         project_id,
@@ -432,14 +675,19 @@ class ProjectWorkspaceService:
             ):
                 continue
 
+            original = project.get(
+                "tasks",
+                [],
+            )
+
             project["tasks"] = [
                 task
-                for task in project.get(
-                    "tasks",
-                    [],
-                )
+                for task in original
                 if task.get("id") != task_id
             ]
+
+            if len(project["tasks"]) == len(original):
+                return False
 
             project["updated_at"] = datetime.now(
                 timezone.utc
@@ -457,19 +705,88 @@ class ProjectWorkspaceService:
         self,
         project_id,
     ):
+        project = self.get_project(
+            project_id
+        )
+
+        if not project:
+            return []
+
+        files = project.get(
+            "files",
+            [],
+        )
+
+        return (
+            files
+            if isinstance(files, list)
+            else []
+        )
+
+    def add_file(
+        self,
+        project_id,
+        filename,
+        path="",
+        size=0,
+        mime_type="",
+    ):
         projects = self._load_projects()
 
         for project in projects:
             if (
-                project.get("id") == project_id
-                and self._same_project_owner(project)
+                project.get("id") != project_id
+                or not self._same_project_owner(project)
             ):
-                return project.get(
-                    "files",
-                    []
-                )
+                continue
 
-        return []
+            files = project.setdefault(
+                "files",
+                [],
+            )
+
+            file_record = {
+                "id": str(
+                    uuid.uuid4()
+                ),
+                "filename": str(
+                    filename or "Untitled file"
+                ),
+                "name": str(
+                    filename or "Untitled file"
+                ),
+                "path": str(
+                    path or ""
+                ),
+                "size": int(
+                    size or 0
+                ),
+                "mime_type": str(
+                    mime_type or ""
+                ),
+                "created_at": datetime.now(
+                    timezone.utc
+                ).isoformat(),
+                "updated_at": datetime.now(
+                    timezone.utc
+                ).isoformat(),
+            }
+
+            files.append(
+                file_record
+            )
+
+            project["updated_at"] = datetime.now(
+                timezone.utc
+            ).isoformat()
+
+            self._save_projects(
+                projects
+            )
+
+            return file_record
+
+        return None
 
     def delete_file(
         self,
@@ -485,14 +802,23 @@ class ProjectWorkspaceService:
             ):
                 continue
 
+            files = project.get(
+                "files",
+                [],
+            )
+
+            original_count = len(
+                files
+            )
+
             project["files"] = [
                 item
-                for item in project.get(
-                    "files",
-                    [],
-                )
+                for item in files
                 if item.get("id") != file_id
             ]
+
+            if len(project["files"]) == original_count:
+                return False
 
             project["updated_at"] = datetime.now(
                 timezone.utc
@@ -510,21 +836,29 @@ class ProjectWorkspaceService:
         self,
         project_id,
     ):
-        project = self.get_project(project_id)
+        project = self.get_project(
+            project_id
+        )
 
         if not project:
             return []
 
-        return project.get(
+        notes = project.get(
             "notes",
-            []
+            [],
         )
 
+        return (
+            notes
+            if isinstance(notes, list)
+            else []
+        )
 
     def add_note(
         self,
         project_id,
-        note,
+        title,
+        content="",
     ):
         projects = self._load_projects()
 
@@ -535,10 +869,30 @@ class ProjectWorkspaceService:
             ):
                 continue
 
-            if "notes" not in project:
-                project["notes"] = []
+            notes = project.setdefault(
+                "notes",
+                [],
+            )
 
-            project["notes"].append(
+            note = {
+                "id": str(
+                    uuid.uuid4()
+                ),
+                "title": str(
+                    title or "Untitled Note"
+                ).strip(),
+                "content": str(
+                    content or ""
+                ),
+                "created_at": datetime.now(
+                    timezone.utc
+                ).isoformat(),
+                "updated_at": datetime.now(
+                    timezone.utc
+                ).isoformat(),
+            }
+
+            notes.append(
                 note
             )
 
@@ -554,12 +908,12 @@ class ProjectWorkspaceService:
 
         return None
 
-
     def update_note(
         self,
         project_id,
         note_id,
-        updates,
+        title=None,
+        content=None,
     ):
         projects = self._load_projects()
 
@@ -572,25 +926,36 @@ class ProjectWorkspaceService:
 
             for note in project.get(
                 "notes",
-                []
+                [],
             ):
-                if note.get("id") == note_id:
-                    note.update(
-                        updates
+                if note.get("id") != note_id:
+                    continue
+
+                if title is not None:
+                    note["title"] = str(
+                        title
+                    ).strip()
+
+                if content is not None:
+                    note["content"] = str(
+                        content
                     )
 
-                    project["updated_at"] = datetime.now(
-                        timezone.utc
-                    ).isoformat()
+                note["updated_at"] = datetime.now(
+                    timezone.utc
+                ).isoformat()
 
-                    self._save_projects(
-                        projects
-                    )
+                project["updated_at"] = datetime.now(
+                    timezone.utc
+                ).isoformat()
 
-                    return note
+                self._save_projects(
+                    projects
+                )
+
+                return note
 
         return None
-
 
     def delete_note(
         self,
@@ -608,7 +973,11 @@ class ProjectWorkspaceService:
 
             notes = project.get(
                 "notes",
-                []
+                [],
+            )
+
+            original_count = len(
+                notes
             )
 
             project["notes"] = [
@@ -616,6 +985,13 @@ class ProjectWorkspaceService:
                 for note in notes
                 if note.get("id") != note_id
             ]
+
+            if len(project["notes"]) == original_count:
+                return False
+
+            project["updated_at"] = datetime.now(
+                timezone.utc
+            ).isoformat()
 
             self._save_projects(
                 projects
@@ -625,18 +1001,46 @@ class ProjectWorkspaceService:
 
         return False
 
-
     def set_active_project(
         self,
         project_id,
     ):
-        return self.update_project(
-            project_id,
-            {
-                "active": True
-            }
+        projects = self._load_projects()
+
+        target_project = None
+
+        for project in projects:
+            if not self._same_project_owner(project):
+                continue
+
+            if project.get("id") == project_id:
+                target_project = project
+
+        if target_project is None:
+            return None
+
+        now = datetime.now(
+            timezone.utc
+        ).isoformat()
+
+        for project in projects:
+            if not self._same_project_owner(project):
+                continue
+
+            project["active"] = (
+                project.get("id") == project_id
+            )
+
+            if project.get("id") == project_id:
+                project["status"] = "active"
+
+            project["updated_at"] = now
+
+        self._save_projects(
+            projects
         )
 
+        return target_project
 
     def get_active_project(
         self,
@@ -644,8 +1048,9 @@ class ProjectWorkspaceService:
         projects = self._load_projects()
 
         for project in projects:
-            if project.get(
-                "active"
+            if (
+                project.get("active")
+                and self._same_project_owner(project)
             ):
                 return project
 
@@ -893,35 +1298,33 @@ class ProjectWorkspaceService:
                     "",
                 ),
             },
-
             "goal": brain.get(
                 "goal",
                 "",
             ),
-
             "decisions": brain.get(
                 "decisions",
                 [],
             ),
-
             "blockers": brain.get(
                 "blockers",
                 [],
             ),
-
             "next_actions": brain.get(
                 "next_actions",
                 [],
             ),
-
             "tasks": project.get(
                 "tasks",
                 [],
             ),
-
             "files": [
                 file.get(
                     "filename",
+                    file.get(
+                        "name",
+                        "",
+                    ),
                 )
                 for file in project.get(
                     "files",
@@ -980,3 +1383,40 @@ class ProjectWorkspaceService:
                 [],
             ),
         }
+
+    def delete_project(
+        self,
+        project_id,
+    ):
+        projects = self._load_projects()
+
+        if not isinstance(
+            projects,
+            list,
+        ):
+            return None
+
+        project = None
+
+        for item in projects:
+            if (
+                item.get("id") == project_id
+                and self._same_project_owner(item)
+            ):
+                project = item
+                break
+
+        if not project:
+            return None
+
+        projects = [
+            item
+            for item in projects
+            if item.get("id") != project_id
+        ]
+
+        self._save_projects(
+            projects
+        )
+
+        return project

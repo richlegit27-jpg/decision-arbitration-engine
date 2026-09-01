@@ -1,226 +1,50 @@
-async function sendText(textOverride) {
-  console.log("📎 sendText TRIGGERED");
+﻿/*
+ * NOVA CHAT LEGACY SEND DISABLED
+ *
+ * The desktop composer is now the single send owner.
+ * This file remains loaded only for compatibility with
+ * older callers that reference window.sendText().
+ */
 
-  const liveInput =
-    document.getElementById("input") ||
-    document.querySelector("textarea");
+(function () {
+    "use strict";
 
-  const capturedText =
-    window.__novaLastInputBeforeSend || "";
+    async function sendText(textOverride) {
+        console.warn(
+            "[NOVA LEGACY SEND REDIRECT] chat.js -> NovaComposerActions"
+        );
 
-  const rawText = String(
-    textOverride ||
-    capturedText ||
-    liveInput?.value ||
-    ""
-  ).trim();
+        const actions = window.NovaComposerActions;
 
-  window.__novaLastInputBeforeSend = "";
+        if (
+            actions &&
+            typeof actions.sendCurrentMessage === "function"
+        ) {
+            const text =
+                typeof textOverride === "string"
+                    ? textOverride.trim()
+                    : "";
 
-  const attachments =
-    pendingDesktopAttachments.slice();
+            return await actions.sendCurrentMessage(
+                text
+                    ? { forcedText: text }
+                    : {}
+            );
+        }
 
-  const text =
-    clarifyAttachmentPrompt(
-      rawText,
-      attachments
-    );
+        console.error(
+            "[NOVA] NovaComposerActions.sendCurrentMessage unavailable"
+        );
 
-  console.log("📎 SEND SNAPSHOT", {
-    rawText,
-    text,
-    attachments
-  });
-
-  if (!text && !attachments.length) {
-    return;
-  }
-
-  input.value = "";
-  input.style.height = "auto";
-
-  setStatus("loading...");
-
-  novaChatAbortController =
-    new AbortController();
-
-  sendBtn.disabled = false;
-  sendBtn.textContent = "Stop";
-  sendBtn.dataset.mode = "stop";
-
-
-  try {
-
-    const response = await fetch(
-      "/api/chat",
-      {
-        signal:
-          novaChatAbortController.signal,
-
-        method: "POST",
-
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": API_KEY
-        },
-
-        body:
-          JSON.stringify(
-            buildDesktopChatPayload(
-              text,
-              attachments
-            )
-          )
-      }
-    );
-
-
-    if (!response.ok) {
-      throw new Error(
-        await response.text()
-      );
+        return {
+            ok: false,
+            reason: "composer_actions_unavailable"
+        };
     }
 
-
-    const raw =
-      await response.text();
-
-    const data =
-      JSON.parse(raw);
-
-
-    const freshSessionId =
-      data.session_id ||
-      data.active_session_id ||
-      data.session?.id ||
-      data.assistant_message?.session_id;
-
-
-    if (freshSessionId) {
-
-      const newSessionId =
-        String(freshSessionId);
-
-      setSessionId(newSessionId);
-
-      if (window.NovaChatApp?.state) {
-        window.NovaChatApp.state.activeChatId =
-          newSessionId;
-      }
-
-      console.log(
-        "[NOVA sessions] adopted backend session",
-        newSessionId
-      );
-    }
-
-
-    const assistantText =
-      data?.assistant_message?.text ||
-      data?.response ||
-      data?.message ||
-      "";
-
-
-    const appState =
-      window.NovaChatOrchestrator?.state ||
-      window.NovaChatState?.state ||
-      window.NovaChatApp?.state;
-
+    window.sendText = sendText;
 
     console.log(
-      "[NOVA REAL STATE CHECK]",
-      {
-        appState,
-        messages: appState?.messages
-      }
+        "[NOVA] legacy chat.js loaded — send redirected to ComposerActions"
     );
-
-
-    if (appState?.messages) {
-
-      appState.messages.push({
-        id:
-          "user-" + Date.now(),
-        role:
-          "user",
-        content:
-          text,
-        text:
-          text,
-        created_at:
-          new Date().toISOString()
-      });
-
-
-      appState.messages.push({
-        id:
-          "assistant-" + Date.now(),
-        role:
-          "assistant",
-        content:
-          assistantText,
-        text:
-          assistantText,
-        created_at:
-          new Date().toISOString()
-      });
-
-
-      console.log(
-        "[NOVA STATE AFTER PUSH]",
-        appState.messages
-      );
-
-    } else {
-
-      console.warn(
-        "[NOVA] No message state found"
-      );
-
-    }
-
-
-    if (window.NovaChatMessages?.renderMessages) {
-      window.NovaChatMessages.renderMessages();
-    }
-
-
-    setStatus("done");
-
-    clearDesktopAttachments();
-
-
-  } catch (e) {
-
-    console.warn(
-      "sendText error:",
-      e
-    );
-
-    setStatus("error");
-
-
-  } finally {
-
-    novaChatAbortController = null;
-
-    sendBtn.disabled = false;
-
-    sendBtn.textContent =
-      "Send";
-
-    sendBtn.dataset.mode =
-      "send";
-
-    setStatus("ready");
-  }
-}
-
-
-window.sendText = sendText;
-
-console.log(
-  "[NOVA] sendText exported",
-  typeof window.sendText
-);
+})();

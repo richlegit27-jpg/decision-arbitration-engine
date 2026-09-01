@@ -1059,3 +1059,1751 @@ max-width: none !important;
     max-height: 600px !important;
     overflow-y: auto !important;
 }
+
+/* =========================================================
+   NOVA CHAT POLISH — MESSAGE ACTIONS
+   ========================================================= */
+
+.message-card .message-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    opacity: 0.72;
+    transition:
+        opacity 0.16s ease,
+        transform 0.16s ease;
+}
+
+.message-card:hover .message-actions {
+    opacity: 1;
+}
+
+.message-card .message-action-btn {
+    appearance: none;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    background: rgba(255, 255, 255, 0.035);
+    color: rgba(245, 247, 255, 0.78);
+    min-height: 28px;
+    padding: 4px 9px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+        background 0.14s ease,
+        border-color 0.14s ease,
+        color 0.14s ease,
+        transform 0.14s ease;
+}
+
+.message-card .message-action-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(216, 180, 254, 0.28);
+    color: #ffffff;
+    transform: translateY(-1px);
+}
+
+.message-card .message-action-btn:active {
+    transform: translateY(0);
+}
+
+.message-card .message-action-btn:focus-visible {
+    outline: 2px solid rgba(196, 181, 253, 0.5);
+    outline-offset: 2px;
+}
+
+/* =========================================================
+   NOVA CHAT POLISH — MESSAGE BUBBLES
+   ========================================================= */
+
+.message-row {
+    width: 100%;
+    margin: 0 0 18px;
+}
+
+.message-card {
+    max-width: min(760px, 82%);
+    border-radius: 16px;
+    padding: 13px 16px 12px;
+    line-height: 1.6;
+}
+
+.message-card.user {
+    margin-left: auto;
+    max-width: min(680px, 76%);
+}
+
+.message-card.assistant {
+    margin-right: auto;
+}
+
+.message-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 7px;
+    min-height: 18px;
+}
+
+.message-role {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.message-time {
+    font-size: 10px;
+    opacity: 0.48;
+}
+
+.message-body {
+    min-width: 0;
+    font-size: 14px;
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+}
+
+.message-body p {
+    margin: 0 0 0.8em;
+}
+
+.message-body p:last-child {
+    margin-bottom: 0;
+}
+
+.message-body ul,
+.message-body ol {
+    margin: 0.65em 0;
+    padding-left: 1.35em;
+}
+
+.message-body li + li {
+    margin-top: 0.28em;
+}
+
+.message-avatar {
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.message-row.assistant .message-avatar {
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+}
+
+.message-row.user .message-avatar {
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+@media (max-width: 900px) {
+    .message-card,
+    .message-card.user {
+        max-width: 90%;
+    }
+
+    .message-card {
+        padding: 12px 14px 11px;
+    }
+
+    .message-body {
+        font-size: 14px;
+    }
+}
+
+/* =========================================================
+   NOVA CHAT POLISH — CODE BLOCKS
+   ========================================================= */
+
+.message-body pre {
+    margin: 14px 0;
+    padding: 14px 16px;
+    overflow-x: auto;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    background: rgba(5, 10, 20, 0.82);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.025),
+        0 8px 24px rgba(0, 0, 0, 0.14);
+}
+
+.message-body pre code {
+    display: block;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    font-family:
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        "Liberation Mono",
+        monospace;
+    font-size: 12.5px;
+    line-height: 1.6;
+    white-space: pre;
+}
+
+.message-body :not(pre) > code {
+    padding: 2px 5px;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.055);
+    font-family:
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        "Liberation Mono",
+        monospace;
+    font-size: 0.9em;
+}
+
+.message-body pre::-webkit-scrollbar {
+    height: 8px;
+}
+
+.message-body pre::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+}
+
+.message-body pre::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+@media (max-width: 900px) {
+    .message-body pre {
+        margin: 12px 0;
+        padding: 12px 13px;
+        border-radius: 10px;
+    }
+
+    .message-body pre code {
+        font-size: 12px;
+    }
+}
+
+/* =========================================================
+   NOVA CHAT POLISH — THINKING / STREAMING
+   ========================================================= */
+
+.thinking-message {
+    opacity: 0.78;
+}
+
+.thinking-message .message-card {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+}
+
+.thinking-message .message-body {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 22px;
+}
+
+.thinking-message .message-body::after {
+    content: "";
+    width: 7px;
+    height: 7px;
+    margin-left: 2px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.55;
+    animation: nova-thinking-pulse 1.05s ease-in-out infinite;
+}
+
+.thinking-message .message-actions {
+    display: none !important;
+}
+
+@keyframes nova-thinking-pulse {
+    0%,
+    100% {
+        opacity: 0.25;
+        transform: scale(0.82);
+    }
+
+    50% {
+        opacity: 0.9;
+        transform: scale(1);
+    }
+}
+
+.message-row.fade-in {
+    animation: nova-message-in 0.18s ease-out both;
+}
+
+@keyframes nova-message-in {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .thinking-message .message-body::after,
+    .message-row.fade-in {
+        animation: none !important;
+    }
+}
+
+/* =========================================================
+   NOVA CHAT POLISH — COMPOSER
+   ========================================================= */
+
+.composer,
+.chat-composer,
+.desktop-composer,
+.input-row,
+.composer-row,
+.chat-input-row {
+    gap: 8px !important;
+    padding: 8px !important;
+    border-radius: 20px !important;
+}
+
+#input,
+textarea#input,
+.composer textarea,
+.chat-composer textarea,
+.desktop-composer textarea {
+    min-height: 48px !important;
+    padding: 12px 14px !important;
+    border-radius: 14px !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+    resize: none !important;
+    transition:
+        border-color 0.16s ease,
+        box-shadow 0.16s ease,
+        background 0.16s ease !important;
+}
+
+#input:hover,
+textarea#input:hover,
+.composer textarea:hover,
+.chat-composer textarea:hover,
+.desktop-composer textarea:hover {
+    border-color: rgba(216, 180, 254, 0.34) !important;
+}
+
+#input:focus,
+textarea#input:focus,
+.composer textarea:focus,
+.chat-composer textarea:focus,
+.desktop-composer textarea:focus {
+    border-color: rgba(216, 180, 254, 0.52) !important;
+    box-shadow:
+        0 0 0 3px rgba(168, 85, 247, 0.13),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+#sendBtn,
+#stopBtn,
+#attachBtn,
+#voiceBtn,
+#ttsBtn {
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    min-height: 42px !important;
+    padding: 0 !important;
+    border-radius: 13px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition:
+        transform 0.14s ease,
+        background 0.14s ease,
+        border-color 0.14s ease,
+        box-shadow 0.14s ease !important;
+}
+
+#sendBtn:hover,
+#stopBtn:hover,
+#attachBtn:hover,
+#voiceBtn:hover,
+#ttsBtn:hover {
+    transform: translateY(-1px) !important;
+}
+
+#sendBtn:active,
+#stopBtn:active,
+#attachBtn:active,
+#voiceBtn:active,
+#ttsBtn:active {
+    transform: translateY(0) !important;
+}
+
+#sendBtn:disabled,
+#stopBtn:disabled {
+    opacity: 0.45 !important;
+}
+
+@media (max-width: 900px) {
+    #sendBtn,
+    #stopBtn,
+    #attachBtn,
+    #voiceBtn,
+    #ttsBtn {
+        width: 40px !important;
+        height: 40px !important;
+        min-width: 40px !important;
+        min-height: 40px !important;
+    }
+
+    #input,
+    textarea#input,
+    .composer textarea,
+    .chat-composer textarea,
+    .desktop-composer textarea {
+        font-size: 14px !important;
+    }
+}
+
+/* =========================================================
+   NOVA CHAT POLISH — SIDEBAR / SESSIONS
+   ========================================================= */
+
+#sessionsPanel,
+.sessions-panel,
+.sidebar,
+.chat-sidebar {
+    scrollbar-width: thin;
+}
+
+.chat-list,
+.sessions-list,
+#sessionsList {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.chat-list > *,
+.sessions-list > *,
+#sessionsList > * {
+    border-radius: 11px;
+    transition:
+        background 0.14s ease,
+        border-color 0.14s ease,
+        transform 0.14s ease;
+}
+
+.chat-list > *:hover,
+.sessions-list > *:hover,
+#sessionsList > *:hover {
+    background: rgba(255, 255, 255, 0.045);
+}
+
+.chat-list > *.active,
+.sessions-list > *.active,
+#sessionsList > *.active,
+.chat-list > [aria-selected="true"],
+.sessions-list > [aria-selected="true"],
+#sessionsList > [aria-selected="true"] {
+    background: rgba(168, 85, 247, 0.12);
+    border-color: rgba(216, 180, 254, 0.18);
+}
+
+.chat-list button,
+.sessions-list button,
+#sessionsList button {
+    min-height: 32px;
+}
+
+.chat-list .chat-title,
+.sessions-list .chat-title,
+#sessionsList .chat-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-list .chat-meta,
+.sessions-list .chat-meta,
+#sessionsList .chat-meta {
+    opacity: 0.52;
+    font-size: 11px;
+}
+
+.chat-list [data-action="delete-chat"],
+.sessions-list [data-action="delete-chat"],
+#sessionsList [data-action="delete-chat"] {
+    opacity: 0.45;
+    transition:
+        opacity 0.14s ease,
+        background 0.14s ease;
+}
+
+.chat-list > *:hover [data-action="delete-chat"],
+.sessions-list > *:hover [data-action="delete-chat"],
+#sessionsList > *:hover [data-action="delete-chat"] {
+    opacity: 1;
+}
+
+.chat-list [data-action="delete-chat"]:hover,
+.sessions-list [data-action="delete-chat"]:hover,
+#sessionsList [data-action="delete-chat"]:hover {
+    background: rgba(239, 68, 68, 0.10);
+}
+
+@media (max-width: 900px) {
+    .chat-list > *,
+    .sessions-list > *,
+    #sessionsList > * {
+        border-radius: 10px;
+    }
+}
+
+/* =========================================================
+   NOVA CHAT POLISH — ATTACHMENTS / EMPTY / LOADING
+   ========================================================= */
+
+.pending-attachments-list,
+.message-attachment-list,
+.message-image-grid {
+    gap: 8px !important;
+}
+
+.pending-attachment-chip,
+.message-attachment {
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.035);
+}
+
+.pending-attachment-chip {
+    padding: 7px 10px !important;
+}
+
+.message-attachment {
+    padding: 9px 10px;
+}
+
+.message-attachment-meta {
+    font-size: 11px !important;
+    opacity: 0.55;
+}
+
+.message-image img {
+    border-radius: 12px !important;
+    display: block;
+}
+
+.empty-state,
+.chat-empty-state,
+.messages-empty {
+    min-height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    opacity: 0.72;
+}
+
+.loading,
+.chat-loading,
+.messages-loading {
+    opacity: 0.7;
+}
+
+.thinking-message .message-meta {
+    opacity: 0.55;
+}
+
+@media (max-width: 900px) {
+    .pending-attachment-chip,
+    .message-attachment {
+        border-radius: 9px;
+    }
+}
+
+/* =========================================================
+   NOVA CHAT — FINAL MESSAGE CARD POLISH
+   ========================================================= */
+
+#chat.messages,
+#chat.chat-messages,
+#chat.desktop-rescue-messages {
+    padding: 24px 28px 32px;
+}
+
+#chat .message-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+    margin: 0 0 20px;
+}
+
+#chat .message-row.user {
+    justify-content: flex-end;
+}
+
+#chat .message-row.assistant {
+    justify-content: flex-start;
+}
+
+#chat .message-avatar {
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 800;
+    margin-top: 2px;
+}
+
+#chat .message-avatar.user {
+    background: rgba(124, 92, 255, 0.18);
+    border: 1px solid rgba(165, 145, 255, 0.24);
+}
+
+#chat .message-avatar.assistant {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+#chat .message-card {
+    width: fit-content;
+    min-width: 0;
+    max-width: min(780px, 78%);
+    padding: 13px 16px 11px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+}
+
+#chat .message-card.user {
+    background: rgba(124, 92, 255, 0.13);
+    border-color: rgba(165, 145, 255, 0.18);
+}
+
+#chat .message-card.assistant {
+    background: rgba(255, 255, 255, 0.035);
+    border-color: rgba(255, 255, 255, 0.075);
+}
+
+#chat .message-card.user:hover {
+    border-color: rgba(165, 145, 255, 0.28);
+}
+
+#chat .message-card.assistant:hover {
+    border-color: rgba(255, 255, 255, 0.13);
+}
+
+#chat .message-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 7px;
+}
+
+#chat .message-role {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+#chat .message-time {
+    font-size: 10px;
+    opacity: 0.42;
+}
+
+#chat .message-body {
+    font-size: 14px;
+    line-height: 1.62;
+    overflow-wrap: anywhere;
+}
+
+#chat .message-actions {
+    margin-top: 9px;
+    padding-top: 7px;
+    border-top: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+#chat .message-action-btn {
+    min-height: 28px;
+    padding: 4px 9px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+@media (max-width: 900px) {
+    #chat.messages,
+    #chat.chat-messages,
+    #chat.desktop-rescue-messages {
+        padding: 16px 14px 24px;
+    }
+
+    #chat .message-row {
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+
+    #chat .message-avatar {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+    }
+
+    #chat .message-card {
+        max-width: 88%;
+        padding: 12px 13px 10px;
+        border-radius: 14px;
+    }
+
+    #chat .message-body {
+        font-size: 14px;
+    }
+}
+
+/* =========================================================
+   NOVA CHAT — DOUBLE BORDER MESSAGE CARDS
+   ========================================================= */
+
+#chat .message-card {
+    position: relative;
+    width: fit-content;
+    min-width: 0;
+    max-width: min(780px, 78%);
+    padding: 14px 16px 12px;
+    border-radius: 16px;
+
+    /* outer border */
+    border: 1px solid rgba(255, 255, 255, 0.10);
+
+    /* inner border */
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.045),
+        0 10px 28px rgba(0, 0, 0, 0.16);
+}
+
+#chat .message-card.user {
+    background: rgba(124, 92, 255, 0.13);
+    border-color: rgba(165, 145, 255, 0.24);
+
+    box-shadow:
+        inset 0 0 0 1px rgba(216, 180, 254, 0.075),
+        0 10px 28px rgba(0, 0, 0, 0.16);
+}
+
+#chat .message-card.assistant {
+    background: rgba(255, 255, 255, 0.035);
+    border-color: rgba(255, 255, 255, 0.11);
+
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.045),
+        0 10px 28px rgba(0, 0, 0, 0.16);
+}
+
+#chat .message-card.user:hover {
+    border-color: rgba(165, 145, 255, 0.34);
+
+    box-shadow:
+        inset 0 0 0 1px rgba(216, 180, 254, 0.09),
+        0 12px 30px rgba(0, 0, 0, 0.18);
+}
+
+#chat .message-card.assistant:hover {
+    border-color: rgba(255, 255, 255, 0.16);
+
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.055),
+        0 12px 30px rgba(0, 0, 0, 0.18);
+}
+
+/* =========================================================
+   NOVA CHAT POLISH — DEVELOPER CODE BLOCKS
+   ========================================================= */
+
+#chat .message-body pre {
+    position: relative;
+    margin: 14px 0;
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    background: rgba(7, 12, 22, 0.88);
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.035),
+        0 8px 24px rgba(0, 0, 0, 0.16);
+    overflow-x: auto;
+}
+
+#chat .message-body pre code {
+    display: block;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    font-family:
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        "Liberation Mono",
+        monospace;
+    font-size: 12.5px;
+    line-height: 1.65;
+    white-space: pre;
+}
+
+#chat .message-body :not(pre) > code {
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.055);
+    border: 1px solid rgba(255, 255, 255, 0.075);
+    font-family:
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        "Liberation Mono",
+        monospace;
+    font-size: 0.9em;
+}
+
+#chat .message-body pre::-webkit-scrollbar {
+    height: 7px;
+}
+
+#chat .message-body pre::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+}
+
+#chat .message-body pre::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#chat .message-body blockquote {
+    margin: 12px 0;
+    padding: 9px 13px;
+    border-left: 3px solid rgba(165, 145, 255, 0.42);
+    background: rgba(165, 145, 255, 0.055);
+    border-radius: 0 8px 8px 0;
+}
+
+#chat .message-body table {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    overflow-x: auto;
+    margin: 14px 0;
+}
+
+#chat .message-body th,
+#chat .message-body td {
+    padding: 7px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#chat .message-body th {
+    background: rgba(255, 255, 255, 0.045);
+    font-weight: 700;
+}
+
+/* =========================================================
+   NOVA CHAT POLISH — UNIFIED COLOR SYSTEM
+   ========================================================= */
+
+:root {
+    --nova-bg: #0b1020;
+    --nova-panel: #10172a;
+    --nova-panel-soft: #131b30;
+
+    --nova-user-bg: rgba(124, 92, 255, 0.14);
+    --nova-user-border: rgba(165, 145, 255, 0.24);
+
+    --nova-assistant-bg: rgba(255, 255, 255, 0.035);
+    --nova-assistant-border: rgba(255, 255, 255, 0.10);
+
+    --nova-border: rgba(255, 255, 255, 0.08);
+    --nova-border-hover: rgba(255, 255, 255, 0.15);
+
+    --nova-accent: #9b7cff;
+    --nova-accent-soft: rgba(155, 124, 255, 0.14);
+    --nova-accent-hover: rgba(155, 124, 255, 0.22);
+
+    --nova-text: #f5f7ff;
+    --nova-text-soft: rgba(245, 247, 255, 0.72);
+    --nova-text-muted: rgba(245, 247, 255, 0.46);
+}
+
+body {
+    background: var(--nova-bg) !important;
+    color: var(--nova-text) !important;
+}
+
+.panel,
+.chat-panel,
+.sidebar,
+.chat-sidebar {
+    background: var(--nova-panel) !important;
+}
+
+#chat.messages,
+#chat.chat-messages,
+#chat.desktop-rescue-messages {
+    background: var(--nova-bg) !important;
+}
+
+#chat .message-card.user {
+    background: var(--nova-user-bg) !important;
+    border-color: var(--nova-user-border) !important;
+}
+
+#chat .message-card.assistant {
+    background: var(--nova-assistant-bg) !important;
+    border-color: var(--nova-assistant-border) !important;
+}
+
+#chat .message-card.user:hover {
+    background: rgba(124, 92, 255, 0.18) !important;
+    border-color: rgba(165, 145, 255, 0.34) !important;
+}
+
+#chat .message-card.assistant:hover {
+    background: rgba(255, 255, 255, 0.045) !important;
+    border-color: var(--nova-border-hover) !important;
+}
+
+#chat .message-avatar.user {
+    background: var(--nova-accent-soft) !important;
+    border-color: var(--nova-user-border) !important;
+}
+
+#chat .message-avatar.assistant {
+    background: rgba(255, 255, 255, 0.055) !important;
+    border-color: var(--nova-assistant-border) !important;
+}
+
+#chat .message-role {
+    color: var(--nova-text) !important;
+}
+
+#chat .message-time {
+    color: var(--nova-text-muted) !important;
+}
+
+#chat .message-body {
+    color: var(--nova-text) !important;
+}
+
+#chat .message-body a {
+    color: var(--nova-accent) !important;
+}
+
+#chat .message-actions {
+    border-top-color: var(--nova-border) !important;
+}
+
+#chat .message-action-btn {
+    color: var(--nova-text-soft) !important;
+    background: rgba(255, 255, 255, 0.035) !important;
+    border-color: var(--nova-border) !important;
+}
+
+#chat .message-action-btn:hover {
+    color: #ffffff !important;
+    background: var(--nova-accent-hover) !important;
+    border-color: rgba(165, 145, 255, 0.32) !important;
+}
+
+#chat .thinking-message .message-card {
+    background: rgba(155, 124, 255, 0.055) !important;
+    border-color: rgba(155, 124, 255, 0.16) !important;
+}
+
+#chat .thinking-message .message-body::after {
+    color: var(--nova-accent) !important;
+}
+
+.chat-title,
+.chat-top h2 {
+    color: var(--nova-text) !important;
+}
+
+.chat-list > *.active,
+.sessions-list > *.active,
+#sessionsList > *.active,
+.chat-list > [aria-selected="true"],
+.sessions-list > [aria-selected="true"],
+#sessionsList > [aria-selected="true"] {
+    background: var(--nova-accent-soft) !important;
+    border-color: rgba(155, 124, 255, 0.22) !important;
+}
+
+.chat-list > *:hover,
+.sessions-list > *:hover,
+#sessionsList > *:hover {
+    background: rgba(255, 255, 255, 0.045) !important;
+}
+
+.composer,
+.chat-composer,
+.desktop-composer,
+.input-row,
+.composer-row,
+.chat-input-row {
+    background: var(--nova-panel) !important;
+    border-color: var(--nova-border) !important;
+}
+
+#input,
+textarea#input,
+.composer textarea,
+.chat-composer textarea,
+.desktop-composer textarea {
+    background: var(--nova-panel-soft) !important;
+    color: var(--nova-text) !important;
+    border-color: var(--nova-border) !important;
+}
+
+#input:focus,
+textarea#input:focus,
+.composer textarea:focus,
+.chat-composer textarea:focus,
+.desktop-composer textarea:focus {
+    border-color: rgba(155, 124, 255, 0.42) !important;
+    box-shadow: 0 0 0 3px rgba(155, 124, 255, 0.11) !important;
+}
+
+#sendBtn,
+#stopBtn,
+#attachBtn,
+#voiceBtn,
+#ttsBtn {
+    background: var(--nova-accent-soft) !important;
+    border-color: rgba(155, 124, 255, 0.22) !important;
+    color: var(--nova-text) !important;
+}
+
+#sendBtn:hover,
+#stopBtn:hover,
+#attachBtn:hover,
+#voiceBtn:hover,
+#ttsBtn:hover {
+    background: var(--nova-accent-hover) !important;
+    border-color: rgba(165, 145, 255, 0.34) !important;
+}
+
+/* =========================================================
+   NOVA DESKTOP — FINAL VISUAL AUTHORITY
+   ========================================================= */
+
+#chat .message-card.user {
+    background:
+        linear-gradient(
+            180deg,
+            rgba(124, 92, 255, 0.16),
+            rgba(92, 63, 190, 0.11)
+        ) !important;
+
+    border: 1px solid rgba(165, 145, 255, 0.28) !important;
+
+    box-shadow:
+        inset 0 0 0 1px rgba(216, 180, 254, 0.07),
+        0 10px 26px rgba(0, 0, 0, 0.16) !important;
+}
+
+#chat .message-card.assistant {
+    background:
+        linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.045),
+            rgba(255, 255, 255, 0.025)
+        ) !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.115) !important;
+
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+        0 10px 26px rgba(0, 0, 0, 0.16) !important;
+}
+
+#chat .message-card.user:hover {
+    background:
+        linear-gradient(
+            180deg,
+            rgba(124, 92, 255, 0.19),
+            rgba(92, 63, 190, 0.13)
+        ) !important;
+}
+
+#chat .message-card.assistant:hover {
+    background:
+        linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.055),
+            rgba(255, 255, 255, 0.03)
+        ) !important;
+}
+
+#chat .message-card .message-actions {
+    border-top: 1px solid rgba(255, 255, 255, 0.055) !important;
+}
+
+#chat .message-card .message-action-btn {
+    background: rgba(255, 255, 255, 0.035) !important;
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    color: rgba(245, 247, 255, 0.76) !important;
+}
+
+#chat .message-card .message-action-btn:hover {
+    background: rgba(155, 124, 255, 0.16) !important;
+    border-color: rgba(165, 145, 255, 0.32) !important;
+    color: #ffffff !important;
+}
+
+#chat .message-avatar.user {
+    background: rgba(155, 124, 255, 0.16) !important;
+    border: 1px solid rgba(165, 145, 255, 0.26) !important;
+}
+
+#chat .message-avatar.assistant {
+    background: rgba(255, 255, 255, 0.055) !important;
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+}
+
+#chat .message-role {
+    color: rgba(245, 247, 255, 0.94) !important;
+}
+
+#chat .message-time {
+    color: rgba(245, 247, 255, 0.40) !important;
+}
+
+#chat .message-body {
+    color: rgba(245, 247, 255, 0.94) !important;
+}
+
+#chat .message-body a {
+    color: #a58fff !important;
+}
+
+/* =========================================================
+   NOVA CHAT — TYPOGRAPHY / SPACING REFINEMENT
+   ========================================================= */
+
+#chat .message-body {
+    font-size: 14px !important;
+    line-height: 1.68 !important;
+    letter-spacing: 0 !important;
+}
+
+#chat .message-body p {
+    margin: 0 0 0.85em !important;
+}
+
+#chat .message-body p:last-child {
+    margin-bottom: 0 !important;
+}
+
+#chat .message-body h1,
+#chat .message-body h2,
+#chat .message-body h3,
+#chat .message-body h4 {
+    color: rgba(255, 255, 255, 0.96) !important;
+    line-height: 1.25 !important;
+    letter-spacing: -0.01em;
+}
+
+#chat .message-body h1 {
+    font-size: 22px !important;
+    margin: 1.1em 0 0.55em !important;
+}
+
+#chat .message-body h2 {
+    font-size: 18px !important;
+    margin: 1em 0 0.5em !important;
+}
+
+#chat .message-body h3 {
+    font-size: 16px !important;
+    margin: 0.9em 0 0.45em !important;
+}
+
+#chat .message-body ul,
+#chat .message-body ol {
+    margin: 0.65em 0 0.85em !important;
+    padding-left: 1.35em !important;
+}
+
+#chat .message-body li {
+    padding-left: 0.15em;
+}
+
+#chat .message-body li + li {
+    margin-top: 0.3em !important;
+}
+
+#chat .message-body hr {
+    border: 0 !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.07) !important;
+    margin: 18px 0 !important;
+}
+
+#chat .message-meta {
+    margin-bottom: 8px !important;
+}
+
+#chat .message-role {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+}
+
+#chat .message-time {
+    font-size: 10px !important;
+}
+
+#chat .message-card {
+    padding: 14px 16px 12px !important;
+}
+
+#chat .message-row {
+    margin-bottom: 18px !important;
+}
+
+#chat .message-avatar {
+    margin-top: 2px !important;
+}
+
+@media (max-width: 900px) {
+    #chat .message-body {
+        font-size: 14px !important;
+        line-height: 1.62 !important;
+    }
+
+    #chat .message-card {
+        padding: 12px 14px 11px !important;
+    }
+}
+
+/* =========================================================
+   NOVA CHAT — HEADER / CONVERSATION CANVAS
+   ========================================================= */
+
+#chat {
+    background:
+        radial-gradient(
+            circle at 50% 0%,
+            rgba(155, 124, 255, 0.045),
+            transparent 42%
+        ),
+        var(--nova-bg, #0b1020) !important;
+}
+
+#chat .chat-top {
+    min-height: 58px;
+    padding: 12px 22px;
+    display: flex;
+    align-items: center;
+    background: rgba(11, 16, 32, 0.82);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.065);
+    backdrop-filter: blur(14px);
+}
+
+#chat .chat-title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 750;
+    letter-spacing: -0.01em;
+}
+
+#chat .messages {
+    min-height: 0;
+}
+
+#chat .desktop-rescue-messages {
+    background: transparent !important;
+}
+
+#chat .message-row:first-child {
+    margin-top: 4px;
+}
+
+#chat .message-row:last-child {
+    margin-bottom: 8px;
+}
+
+@media (max-width: 900px) {
+    #chat .chat-top {
+        min-height: 52px;
+        padding: 10px 14px;
+    }
+
+    #chat .chat-title {
+        font-size: 14px;
+    }
+}
+
+/* =========================================================
+   NOVA CHAT — COMPOSER / TOOLBAR COLOR FINISH
+   ========================================================= */
+
+.composer,
+.chat-composer,
+.desktop-composer,
+.input-row,
+.composer-row,
+.chat-input-row {
+    background: rgba(15, 23, 42, 0.88) !important;
+    border-color: rgba(255, 255, 255, 0.075) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.025),
+        0 12px 32px rgba(0, 0, 0, 0.22) !important;
+}
+
+#input,
+textarea#input,
+.composer textarea,
+.chat-composer textarea,
+.desktop-composer textarea {
+    background: rgba(10, 16, 30, 0.84) !important;
+    border-color: rgba(255, 255, 255, 0.085) !important;
+    color: rgba(245, 247, 255, 0.96) !important;
+}
+
+#input::placeholder,
+textarea#input::placeholder,
+.composer textarea::placeholder,
+.chat-composer textarea::placeholder,
+.desktop-composer textarea::placeholder {
+    color: rgba(245, 247, 255, 0.38) !important;
+}
+
+#sendBtn {
+    background: rgba(155, 124, 255, 0.20) !important;
+    border-color: rgba(165, 145, 255, 0.30) !important;
+}
+
+#sendBtn:hover {
+    background: rgba(155, 124, 255, 0.30) !important;
+    border-color: rgba(196, 181, 253, 0.44) !important;
+    box-shadow: 0 8px 22px rgba(155, 124, 255, 0.16) !important;
+}
+
+#stopBtn {
+    background: rgba(255, 255, 255, 0.055) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+#stopBtn:hover {
+    background: rgba(255, 255, 255, 0.09) !important;
+    border-color: rgba(255, 255, 255, 0.18) !important;
+}
+
+#attachBtn,
+#voiceBtn,
+#ttsBtn {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border-color: rgba(255, 255, 255, 0.085) !important;
+}
+
+#attachBtn:hover,
+#voiceBtn:hover,
+#ttsBtn:hover {
+    background: rgba(155, 124, 255, 0.12) !important;
+    border-color: rgba(165, 145, 255, 0.25) !important;
+}
+
+#sendBtn:focus-visible,
+#stopBtn:focus-visible,
+#attachBtn:focus-visible,
+#voiceBtn:focus-visible,
+#ttsBtn:focus-visible {
+    outline: 2px solid rgba(165, 145, 255, 0.42) !important;
+    outline-offset: 2px;
+}
+
+/* =========================================================
+   NOVA CHAT — COMPACT MESSAGE ACTIONS
+   ========================================================= */
+
+#chat .message-actions {
+    opacity: 0;
+    transform: translateY(2px);
+    transition:
+        opacity 0.16s ease,
+        transform 0.16s ease;
+}
+
+#chat .message-card:hover .message-actions,
+#chat .message-actions:focus-within {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+#chat .message-action-btn {
+    min-width: 0 !important;
+    min-height: 26px !important;
+    padding: 4px 8px !important;
+    border-radius: 7px !important;
+    font-size: 10px !important;
+    font-weight: 650 !important;
+    letter-spacing: 0.01em;
+}
+
+#chat .message-action-btn:hover {
+    transform: translateY(-1px) !important;
+}
+
+#chat .message-action-btn:active {
+    transform: translateY(0) !important;
+}
+
+@media (max-width: 900px) {
+    #chat .message-actions {
+        opacity: 1;
+        transform: none;
+    }
+
+    #chat .message-action-btn {
+        min-height: 28px !important;
+        padding: 5px 9px !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #chat .message-actions,
+    #chat .message-action-btn {
+        transition: none !important;
+        transform: none !important;
+    }
+}
+
+/* =========================================================
+   NOVA CHAT — ATTACHMENT PRESENTATION
+   ========================================================= */
+
+#chat .message-attachment,
+#chat .nova-attachment-preview,
+#chat .attachment-preview,
+#chat .file-chip {
+    border: 1px solid rgba(255, 255, 255, 0.085) !important;
+    background: rgba(255, 255, 255, 0.035) !important;
+    border-radius: 11px !important;
+}
+
+#chat .message-attachment {
+    padding: 9px 11px !important;
+    margin-top: 9px !important;
+}
+
+#chat .message-attachment-meta,
+#chat .attachment-meta,
+#chat .file-meta {
+    color: rgba(245, 247, 255, 0.48) !important;
+    font-size: 11px !important;
+}
+
+#chat .attachment-title,
+#chat .file-title,
+#chat .message-attachment a {
+    color: rgba(245, 247, 255, 0.88) !important;
+}
+
+#chat .message-image,
+#chat .attachment-preview,
+#chat .nova-attachment-preview {
+    overflow: hidden !important;
+    border-radius: 12px !important;
+}
+
+#chat .message-image img,
+#chat .attachment-preview img,
+#chat .nova-attachment-preview img {
+    display: block !important;
+    width: auto !important;
+    max-width: min(560px, 100%) !important;
+    max-height: 420px !important;
+    height: auto !important;
+    border-radius: 11px !important;
+    border: 1px solid rgba(255, 255, 255, 0.09) !important;
+}
+
+#chat .pending-attachment-chip,
+#chat .nova-attachment-chip,
+#chat .attachment-chip {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 7px !important;
+    padding: 7px 10px !important;
+    border-radius: 9px !important;
+    background: rgba(155, 124, 255, 0.10) !important;
+    border: 1px solid rgba(155, 124, 255, 0.18) !important;
+    color: rgba(245, 247, 255, 0.82) !important;
+}
+
+#chat .message-card .message-image + .message-actions {
+    margin-top: 10px !important;
+}
+
+@media (max-width: 900px) {
+    #chat .message-image img,
+    #chat .attachment-preview img,
+    #chat .nova-attachment-preview img {
+        max-width: 100% !important;
+        max-height: 340px !important;
+    }
+}
+
+/* =========================================================
+   NOVA CHAT — EMPTY STATE / SCROLL FINISH
+   ========================================================= */
+
+#chat {
+    overflow: hidden !important;
+}
+
+#chat .chat-messages {
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+}
+
+#chat .chat-messages::-webkit-scrollbar {
+    width: 8px;
+}
+
+#chat .chat-messages::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#chat .chat-messages::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.10);
+    border-radius: 999px;
+}
+
+#chat .chat-messages::-webkit-scrollbar-thumb:hover {
+    background: rgba(155, 124, 255, 0.24);
+}
+
+#chat .empty-state {
+    padding: 48px 24px;
+    color: rgba(245, 247, 255, 0.58);
+}
+
+#chat .empty-state h1,
+#chat .empty-state h2,
+#chat .empty-state h3 {
+    color: rgba(245, 247, 255, 0.88);
+    margin-bottom: 8px;
+}
+
+#chat .empty-state p {
+    max-width: 520px;
+    margin: 0 auto;
+    line-height: 1.6;
+}
+
+#chat .jump-to-latest,
+#chat #jumpToLatestBtn {
+    border: 1px solid rgba(155, 124, 255, 0.24) !important;
+    background: rgba(15, 23, 42, 0.92) !important;
+    color: rgba(245, 247, 255, 0.82) !important;
+    border-radius: 999px !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18) !important;
+    backdrop-filter: blur(10px);
+}
+
+#chat .jump-to-latest:hover,
+#chat #jumpToLatestBtn:hover {
+    background: rgba(155, 124, 255, 0.14) !important;
+    border-color: rgba(165, 145, 255, 0.34) !important;
+    color: #ffffff !important;
+}
+
+/* =========================================================
+   NOVA LIVE CHAT — CODE BLOCK COLORS
+   ========================================================= */
+
+#chat .nova-live-code-block {
+    margin: 10px 0;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 12px;
+    background: rgba(6, 10, 20, 0.94);
+}
+
+#chat .nova-live-code-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 34px;
+    padding: 0 10px 0 12px;
+    background: rgba(255, 255, 255, 0.025);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.075);
+}
+
+#chat .nova-live-code-lang {
+    color: #a78bfa;
+    font-family:
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        monospace;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: lowercase;
+}
+
+#chat .nova-live-code-copy {
+    padding: 4px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(245, 247, 255, 0.76);
+    font-size: 10px;
+    cursor: pointer;
+}
+
+#chat .nova-live-code-copy:hover {
+    background: rgba(155, 124, 255, 0.16);
+    border-color: rgba(165, 145, 255, 0.30);
+    color: #ffffff;
+}
+
+#chat .nova-live-code-block pre {
+    margin: 0 !important;
+    padding: 14px 16px !important;
+    overflow-x: auto;
+    background: transparent !important;
+}
+
+#chat .nova-live-code-block code {
+    color: #e5e7eb;
+    font-family:
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        "Liberation Mono",
+        monospace;
+    font-size: 12.5px;
+    line-height: 1.7;
+    white-space: pre;
+}
+
+#chat .nova-live-code-block .nova-code-keyword {
+    color: #c084fc;
+    font-weight: 700;
+}
+
+#chat .nova-live-code-block .nova-code-string {
+    color: #86efac;
+}
+
+#chat .nova-live-code-block .nova-code-number {
+    color: #93c5fd;
+}
+
+#chat .nova-live-code-block .nova-code-function {
+    color: #67e8f9;
+}
+
+#chat .nova-live-code-block .nova-code-operator {
+    color: #f472b6;
+}
+
+#chat .nova-live-code-block .nova-code-comment {
+    color: #6b7280;
+    font-style: italic;
+}
+
+#chat .nova-live-code-copy.is-copied {
+    background: rgba(155, 124, 255, 0.18);
+    border-color: rgba(165, 145, 255, 0.34);
+    color: #ffffff;
+}
+
+/* =========================================================
+   NOVA CHAT — TEXT COLOR HIERARCHY
+   ========================================================= */
+
+#chat .message-card.user .message-body {
+    color: rgba(232, 226, 255, 0.96) !important;
+}
+
+#chat .message-card.assistant .message-body {
+    color: rgba(244, 246, 255, 0.94) !important;
+}
+
+#chat .message-card.assistant .message-body strong {
+    color: #ffffff !important;
+}
+
+#chat .message-card.assistant .message-body em {
+    color: rgba(196, 181, 253, 0.92) !important;
+}
+
+#chat .message-card.assistant .message-body code:not(
+    .nova-live-code-block code
+) {
+    color: #c4b5fd !important;
+    background: rgba(155, 124, 255, 0.10) !important;
+    border: 1px solid rgba(155, 124, 255, 0.14);
+    border-radius: 5px;
+    padding: 1px 5px;
+}
+
+#chat .message-card.assistant .message-body a {
+    color: #a78bfa !important;
+}
+
+#chat .message-card.assistant .message-body a:hover {
+    color: #c4b5fd !important;
+    text-decoration: underline;
+}
+
+#chat .message-card.assistant .message-body li::marker {
+    color: #a78bfa !important;
+}
+
+#chat .message-card.assistant .message-body blockquote {
+    border-left: 3px solid rgba(155, 124, 255, 0.34);
+    padding-left: 12px;
+    color: rgba(245, 247, 255, 0.68);
+}
+
+#chat .message-card.user .message-role {
+    color: #c4b5fd !important;
+}
+
+#chat .message-card.assistant .message-role {
+    color: #e5e7eb !important;
+}
+

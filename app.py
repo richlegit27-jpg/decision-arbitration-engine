@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 import re
@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 load_dotenv(
     Path(__file__).resolve().parent / ".env"
 )
+from nova_backend.services.execution_service import ExecutionService
 from nova_backend.services.state_route_service import StateRouteService
 from nova_backend.services.attachment_service import attachment_service
 from nova_backend.services.auth_context import get_current_user_id
@@ -26,6 +27,9 @@ from flask import send_file
 from nova_backend.services.web_preview_route_service import WebPreviewRouteService
 from nova_backend.services.project_workspace_service import (
     ProjectWorkspaceService,
+)
+from nova_backend.services.project_execution_controller import (
+    ProjectExecutionController,
 )
 from nova_backend.services.image_attachment_prehandle_service import (
     image_attachment_prehandle_service,
@@ -470,10 +474,6 @@ chat_attachment_memory_service = ChatAttachmentMemoryService()
 chat_response_cleanup_service = ChatResponseCleanupService()
 chat_request_context_service = ChatRequestContextService()
 chat_stream_service = ChatStreamService()
-execution_route_service = ExecutionRouteService(
-    chat_execution_service,
-    chat_execution_service,
-)
 execution_bridge_service = ExecutionBridgeService(
     chat_execution_service,
     None,
@@ -885,7 +885,6 @@ except Exception as _title_guard_install_error:
         "[NOVA_SESSION_TITLE_GUARD] install failed:",
         _title_guard_install_error,
     )
-
 working_state_service = WorkingStateService(
     session_service=session_service,
 )
@@ -900,14 +899,18 @@ chat_service = ChatService(
     working_state_service=working_state_service,
     execution_state_service=execution_state_service,
 )
+execution_service = ExecutionService()
 
+execution_route_service = ExecutionRouteService(
+    working_state_service=working_state_service,
+    execution_service=execution_service,
+)
 attachment_action_service = AttachmentActionService(
     upload_route_service=upload_route_service,
     attachment_analysis_service=attachment_analysis_service,
     logger=app.logger,
     secure_filename=secure_filename,
 )
-
 tool_runtime = build_tool_runtime(
     session_service=session_service,
     chat_service=chat_service,
@@ -999,6 +1002,8 @@ execution_stream_route_service = ExecutionStreamRouteService(
     execution_stream_service=execution_stream_service,
     execution_fix_service=execution_fix_service,
 )
+
+
 # =========================
 # RUNTIME BINDING
 # =========================
@@ -1025,7 +1030,9 @@ local_auth_route_service = LocalAuthRouteService(
 project_workspace_service = ProjectWorkspaceService(
     data_dir="data"
 )
-
+project_execution_controller = ProjectExecutionController(
+    project_workspace_service
+)
 
 local_auth_route_service.install_routes()
 
@@ -1451,7 +1458,10 @@ def api_runtime_cycle():
             }
         ), 500
 
-@app.route("/api/projects", methods=["GET"])
+@app.route(
+    "/api/projects",
+    methods=["GET"],
+)
 def api_projects():
     return jsonify(
         {
@@ -1460,9 +1470,10 @@ def api_projects():
         }
     )
 
+
 @app.route(
     "/api/projects/<project_id>",
-    methods=["GET"],
+    methods=["GET", "DELETE"],
 )
 def api_project_get(
     project_id,
@@ -1479,6 +1490,26 @@ def api_project_get(
             }
         ), 404
 
+    if request.method == "DELETE":
+        deleted = project_workspace_service.delete_project(
+            project_id
+        )
+
+        if not deleted:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "Project not found",
+                }
+            ), 404
+
+        return jsonify(
+            {
+                "ok": True,
+                "project": deleted,
+            }
+        )
+
     return jsonify(
         {
             "ok": True,
@@ -1486,25 +1517,41 @@ def api_project_get(
         }
     )
 
-@app.route("/api/projects/new", methods=["POST"])
+
+@app.route(
+    "/api/projects/new",
+    methods=["POST"],
+)
 def api_projects_new():
     data = request.get_json(
-        silent=True
+        silent=False
     ) or {}
+
+    print(
+        "[NOVA PROJECT CREATE DEBUG]",
+        "content_type=",
+        request.content_type,
+        "raw=",
+        request.get_data(
+            cache=True,
+            as_text=True,
+        ),
+        "json=",
+        data,
+    )
 
     project = project_workspace_service.create_project(
         data.get("name"),
         data.get("description", ""),
     )
 
+
     return jsonify(
         {
             "ok": True,
             "project": project,
         }
     )
-
-
 
     data = request.get_json(
         silent=True
@@ -2197,7 +2244,7 @@ def api_chat():
             for index, item in enumerate(image_attachments[:5], start=1):
                 line = f"{index}. {item.get('name') or 'image attachment'} ({item.get('mime') or 'image/*'})"
                 if item.get("url"):
-                    line += f" — {item.get('url')}"
+                    line += f" â€” {item.get('url')}"
                 lines.append(line)
 
             lines.append("")
@@ -2810,6 +2857,12 @@ def api_chats_compat():
         active_session_id=session_service.active_session_id,
     )
 
+
+@app.get("/api/chats/<session_id>")
+def api_chat_by_id_compat(session_id: str):
+    return session_route_service.api_session_by_id(session_id)
+
+
 @app.get("/api/sessions/<session_id>")
 def api_session_by_id(session_id: str):
     return session_route_service.api_session_by_id(session_id)
@@ -3274,12 +3327,104 @@ def api_project_add_task(
             }
         ), 404
 
+    project_workspace_service.add_activity(
+        project_id,
+        "Task created",
+        task.get(
+            "title",
+            "",
+        ),
+    )
+
     return jsonify(
         {
             "ok": True,
             "task": task,
         }
     )
+
+
+@app.route(
+    "/api/projects/<project_id>/tasks/<task_id>",
+    methods=["PATCH"],
+)
+def api_project_update_task(
+    project_id,
+    task_id,
+):
+    data = request.get_json(
+        silent=True
+    ) or {}
+
+    task = project_workspace_service.update_task_status(
+        project_id,
+        task_id,
+        data.get(
+            "status",
+            "open",
+        ),
+    )
+
+    if not task:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Task not found",
+            }
+        ), 404
+
+    project_workspace_service.add_activity(
+        project_id,
+        "Task updated",
+        task.get(
+            "title",
+            task_id,
+        ),
+    )
+
+    return jsonify(
+        {
+            "ok": True,
+            "task": task,
+        }
+    )
+
+
+@app.route(
+    "/api/projects/<project_id>/tasks/<task_id>",
+    methods=["DELETE"],
+)
+def api_project_delete_task(
+    project_id,
+    task_id,
+):
+    deleted = project_workspace_service.delete_task(
+        project_id,
+        task_id,
+    )
+
+    if not deleted:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Task not found",
+            }
+        ), 404
+
+    project_workspace_service.add_activity(
+        project_id,
+        "Task deleted",
+        task_id,
+    )
+
+    return jsonify(
+        {
+            "ok": True,
+            "deleted": True,
+            "task_id": task_id,
+        }
+    )
+
 
 @app.route(
     "/api/projects/<project_id>/files",
@@ -3310,6 +3455,7 @@ def api_project_files(
             "files": files,
         }
     )
+
 
 @app.route(
     "/api/projects/<project_id>/files",
@@ -3362,12 +3508,25 @@ def api_project_add_file(
             }
         ), 400
 
+    project_workspace_service.add_activity(
+        project_id,
+        "File uploaded",
+        file_record.get(
+            "filename",
+            file_record.get(
+                "name",
+                "",
+            ),
+        ),
+    )
+
     return jsonify(
         {
             "ok": True,
             "file": file_record,
         }
     )
+
 
 @app.route(
     "/api/projects/<project_id>/files/<file_id>/download",
@@ -3423,6 +3582,15 @@ def api_project_download_file(
             }
         ), 404
 
+    project_workspace_service.add_activity(
+        project_id,
+        "File downloaded",
+        file_record.get(
+            "filename",
+            file_id,
+        ),
+    )
+
     return send_file(
         path,
         as_attachment=False,
@@ -3431,6 +3599,7 @@ def api_project_download_file(
             "file",
         ),
     )
+
 
 @app.route(
     "/api/projects/<project_id>/files/<file_id>",
@@ -3453,6 +3622,12 @@ def api_project_delete_file(
             }
         ), 404
 
+    project_workspace_service.add_activity(
+        project_id,
+        "File deleted",
+        file_id,
+    )
+
     return jsonify(
         {
             "ok": True,
@@ -3461,56 +3636,6 @@ def api_project_delete_file(
         }
     )
 
-@app.route(
-    "/api/projects/<project_id>/tasks/<task_id>",
-    methods=["PATCH"],
-)
-
-def api_project_update_task(
-    project_id,
-    task_id,
-):
-    data = request.get_json(
-        silent=True
-    ) or {}
-
-    task = project_workspace_service.update_task_status(
-        project_id,
-        task_id,
-        data.get(
-            "status",
-            "open",
-        ),
-    )
-
-    if not task:
-        return jsonify(
-            {
-                "ok": False,
-                "error": "Task not found",
-            }
-        ), 404
-
-    return jsonify(
-        {
-            "ok": True,
-            "task": task,
-        }
-    )
-
-    print("[PROJECT INTELLIGENCE]", project_id)
-
-    summary = project_workspace_service.get_project_summary(
-        project_id
-    )
-
-    if not summary:
-        return jsonify(
-            {
-                "ok": False,
-                "error": "Project not found",
-            }
-        ), 404
 
 @app.route(
     "/api/projects/<project_id>/notes",
@@ -3574,12 +3699,23 @@ def api_project_add_note(
             }
         ), 404
 
+
+    project_workspace_service.add_activity(
+        project_id,
+        "Note created",
+        note.get(
+            "title",
+            "",
+        ),
+    )
+
     return jsonify(
         {
             "ok": True,
             "note": note,
         }
     )
+
 
 @app.route(
     "/api/projects/<project_id>/notes/<note_id>",
@@ -3594,6 +3730,7 @@ def api_project_update_note(
         project_id,
         note_id,
     )
+
     data = request.get_json(
         silent=True
     ) or {}
@@ -3612,6 +3749,15 @@ def api_project_update_note(
                 "error": "Note not found",
             }
         ), 404
+
+    project_workspace_service.add_activity(
+        project_id,
+        "Note updated",
+        note.get(
+            "title",
+            note_id,
+        ),
+    )
 
     return jsonify(
         {
@@ -3648,11 +3794,91 @@ def api_project_delete_note(
             }
         ), 404
 
+    project_workspace_service.add_activity(
+        project_id,
+        "Note deleted",
+        note_id,
+    )
+
     return jsonify(
         {
             "ok": True,
             "deleted": True,
             "note_id": note_id,
+        }
+    )
+
+@app.route(
+    "/api/projects/<project_id>/execution/control",
+    methods=["POST"],
+)
+def api_project_execution_control(
+    project_id,
+):
+    raw_body = request.get_data(
+        cache=True,
+        as_text=True,
+    )
+
+    print(
+        "[PROJECT EXECUTION DEBUG] RAW BODY:",
+        repr(raw_body),
+    )
+
+    print(
+        "[PROJECT EXECUTION DEBUG] CONTENT TYPE:",
+        request.content_type,
+    )
+
+    data = request.get_json(
+        silent=True
+    )
+
+    print(
+        "[PROJECT EXECUTION DEBUG] JSON:",
+        repr(data),
+    )
+
+    if not isinstance(data, dict):
+        data = {}
+
+    action = str(
+        data.get("action") or ""
+    ).strip().lower()
+
+    print(
+        "[PROJECT EXECUTION DEBUG] ACTION:",
+        repr(action),
+    )
+
+    if not action:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Missing execution action.",
+                "debug_raw_body": raw_body,
+                "debug_content_type": request.content_type,
+                "debug_json": data,
+            }
+        ), 400
+
+    result = project_execution_controller.control(
+        project_id,
+        action,
+    )
+
+    if result is None:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project or execution action not found.",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            **result,
         }
     )
 
@@ -3688,7 +3914,7 @@ def api_project_intelligence(
     )
 
     intelligence = project_intelligence_service.build(
-        project=summary,
+        project=project,
         tasks=tasks,
     )
 
@@ -3699,59 +3925,103 @@ def api_project_intelligence(
         }
     )
 
-@app.route("/api/execution/stream", methods=["POST"])
+@app.route(
+    "/api/execution/stream",
+    methods=["POST"],
+)
 def execution_stream():
     try:
-        session_id = str(request.args.get("session_id") or "").strip()
-
-        if not session_id:
-            return jsonify({
-                "ok": False,
-                "error": "Missing session_id",
-                "active_task": "",
-                "next_move": "",
-                "last_execution_status": "idle",
-                "last_execution_steps": 0,
-                "execution_history": [],
-            }), 400
-
-        session = session_service.get_session(session_id) or {}
-        state = session.get("working_state", {}).get("execution", {})
-
-        if not isinstance(state, dict):
-            state = {}
-
-        history = (
-            state.get("execution_history")
-            or state.get("history")
-            or []
+        raw_body = request.get_data(
+            cache=True,
+            as_text=True,
         )
 
-        if not isinstance(history, list):
-            history = []
+        print(
+            "EXECUTION STREAM RAW BODY =",
+            repr(raw_body),
+            flush=True,
+        )
 
-        return jsonify({
-            "ok": True,
-            "session_id": session_id,
-            "active_task": state.get("active_task") or "",
-            "next_move": state.get("next_move") or "",
-            "last_execution_status": state.get("last_execution_status") or "idle",
-            "last_execution_action": state.get("last_execution_action") or "",
-            "last_execution_steps": state.get("last_execution_steps") or len(history),
-            "execution_history": history,
-            "working_state": state,
-        })
+        data = request.get_json(
+            force=True,
+            silent=False,
+        )
+
+        print(
+            "EXECUTION STREAM PARSED JSON =",
+            repr(data),
+            flush=True,
+        )
+
+        if not isinstance(data, dict):
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "Request JSON must be an object",
+                }
+            ), 400
+
+        session_id = str(
+            data.get("session_id") or ""
+        ).strip()
+
+        action = str(
+            data.get("action") or ""
+        ).strip()
+
+        print(
+            "EXECUTION STREAM REQUEST VALUES =",
+            {
+                "session_id": session_id,
+                "action": action,
+            },
+            flush=True,
+        )
+
+        if not session_id:
+            return Response(
+                (
+                    "event: error\n"
+                    'data: {"ok": false, "error": "missing session_id", "done": true}\n\n'
+                ),
+                mimetype="text/event-stream",
+            )
+
+        if not action:
+            return Response(
+                (
+                    "event: error\n"
+                    'data: {"ok": false, "error": "missing action", "done": true}\n\n'
+                ),
+                mimetype="text/event-stream",
+            )
+
+        return Response(
+            execution_stream_route_service.stream(
+                {
+                    "session_id": session_id,
+                    "action": action,
+                }
+            ),
+            mimetype="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+                "Connection": "keep-alive",
+            },
+        )
 
     except Exception as exc:
-        return jsonify({
-            "ok": False,
-            "error": str(exc),
-            "active_task": "",
-            "next_move": "",
-            "last_execution_status": "error",
-            "last_execution_steps": 0,
-            "execution_history": [],
-        }), 500
+        app.logger.exception(
+            "execution_stream failed"
+        )
+
+        return jsonify(
+            {
+                "ok": False,
+                "error": str(exc),
+            }
+        ), 500
 
 @app.route("/api/web/preview", methods=["POST"])
 def web_preview():
@@ -4050,6 +4320,127 @@ def nova_mobile_direct_session_persist_20260609():
         globals().get("SESSIONS_FILE"),
     )
 
+# NOVA_SESSION_PUT_MESSAGES_COMPAT_20260829_FIXED
+@app.put("/api/sessions/<session_id>")
+def nova_session_put_messages_compat_20260829(session_id):
+    payload = request.get_json(silent=True) or {}
+
+    messages = payload.get("messages")
+
+    if not isinstance(messages, list):
+        return jsonify({
+            "ok": False,
+            "error": "messages_must_be_array",
+        }), 400
+
+    sid = str(session_id or "").strip()
+
+    if not sid:
+        return jsonify({
+            "ok": False,
+            "error": "session_id_required",
+        }), 400
+
+    user_id = ""
+
+    try:
+        from flask import session as _flask_session
+
+        user_id = str(
+            _flask_session.get("nova_user_id")
+            or _flask_session.get("user_id")
+            or _flask_session.get("userId")
+            or ""
+        ).strip()
+    except Exception:
+        user_id = ""
+
+    if not user_id:
+        user_id = str(
+            request.headers.get("X-Nova-User-Id")
+            or ""
+        ).strip()
+
+    print(
+        "[SESSION PUT DEBUG]",
+        {
+            "session_id": sid,
+            "user_id": user_id,
+            "message_count": len(messages),
+        },
+    )
+
+    existing = session_service.get_session(
+        sid,
+        user_id=user_id,
+    )
+
+    if not isinstance(existing, dict):
+        print(
+            "[SESSION PUT DEBUG] SESSION NOT FOUND",
+            {
+                "session_id": sid,
+                "user_id": user_id,
+            },
+        )
+
+        return jsonify({
+            "ok": False,
+            "error": "session_not_found",
+            "session_id": sid,
+        }), 404
+
+    current_messages = existing.get("messages") or []
+
+    if len(messages) < len(current_messages):
+        return jsonify({
+            "ok": False,
+            "error": "message_history_cannot_shrink",
+            "current_count": len(current_messages),
+            "requested_count": len(messages),
+        }), 400
+
+    for message in messages[len(current_messages):]:
+        result = session_service.append_message(
+            sid,
+            message,
+            user_id=user_id,
+        )
+
+        if result is None:
+            print(
+                "[SESSION PUT DEBUG] MESSAGE APPEND FAILED",
+                {
+                    "session_id": sid,
+                    "user_id": user_id,
+                    "message": message,
+                },
+            )
+
+            return jsonify({
+                "ok": False,
+                "error": "message_append_failed",
+                "session_id": sid,
+            }), 404
+
+    updated = session_service.get_session(
+        sid,
+        user_id=user_id,
+    )
+
+    if not isinstance(updated, dict):
+        return jsonify({
+            "ok": False,
+            "error": "session_reload_failed",
+            "session_id": sid,
+        }), 500
+
+    return jsonify({
+        "ok": True,
+        "session": updated,
+        "session_id": sid,
+    })
+
 # NOVA_APP_ROUTE_FIXED_CLEAN_BOTTOM_20260610
 @app.get("/app")
 def nova_desktop_app_fixed_20260610():
@@ -4181,6 +4572,9 @@ def nova_memory_command_before_web_20260611():
             return None
 
         data = request.get_json(silent=True) or {}
+        regenerate = bool(
+            data.get("regenerate", False)
+        )
 
         return memory_command_service.handle_memory_command_before_web(
             data,
@@ -4663,3 +5057,5 @@ if __name__ == "__main__":
         "seconds",
         flush=True,
     )
+
+

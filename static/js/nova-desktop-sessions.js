@@ -12,27 +12,48 @@ window.__NOVA_SESSION_STATE = {
 };
 
 function getSessionId() {
+  /*
+   * NovaChatState is the authoritative active-session source.
+   *
+   * Legacy #sid/localStorage values remain compatibility
+   * fallbacks only.
+   */
+  const stateSid = String(
+    window.NovaChatState?.state?.activeChatId || ""
+  ).trim();
+
+  if (stateSid) {
+    return stateSid;
+  }
+
+  const globalSid = String(
+    window.__NOVA_ACTIVE_SESSION_ID || ""
+  ).trim();
+
+  if (globalSid) {
+    return globalSid;
+  }
+
   const el = $("sid");
 
-  let value = "";
-
   if (el && typeof el === "object" && "value" in el) {
-    value = el.value;
+    const sid = String(el.value || "").trim();
+
+    if (sid) {
+      return sid;
+    }
   }
 
-  if (!value) {
-    value = localStorage.getItem("nova_active_session_id") || "";
+  try {
+    return String(
+      localStorage.getItem("nova_active_session_id") ||
+      localStorage.getItem("nova_session_id") ||
+      localStorage.getItem("nova.session_id") ||
+      ""
+    ).trim();
+  } catch (e) {
+    return "";
   }
-
-  if (!value) {
-    value = localStorage.getItem("nova.session_id") || "";
-  }
-
-  if (!value) {
-    value = localStorage.getItem("nova_session_id") || "";
-  }
-
-  return String(value || "").trim();
 }
 
 function setSessionId(id) {
@@ -40,7 +61,11 @@ function setSessionId(id) {
 
   if (typeof id === "string") {
     sid = id.trim();
-  } else if (id && typeof id === "object" && "value" in id) {
+  } else if (
+    id &&
+    typeof id === "object" &&
+    "value" in id
+  ) {
     sid = String(id.value || "").trim();
   }
 
@@ -48,7 +73,23 @@ function setSessionId(id) {
     return "";
   }
 
+  /*
+   * NovaChatState is authoritative.
+   */
+  const state = window.NovaChatState?.state;
+
+  if (state) {
+    state.activeChatId = sid;
+    state.messagesByChatId =
+      state.messagesByChatId || {};
+  }
+
+  /*
+   * Keep legacy DOM/global state synchronized for
+   * older Nova modules.
+   */
   const el = $("sid");
+
   if (el && "value" in el) {
     el.value = sid;
   }
@@ -57,7 +98,15 @@ function setSessionId(id) {
     localStorage.setItem("nova_session_id", sid);
     localStorage.setItem("nova_active_session_id", sid);
     localStorage.setItem("nova.session_id", sid);
+
+    sessionStorage.setItem("nova_session_id", sid);
+    sessionStorage.setItem("nova_active_session_id", sid);
   } catch (e) {}
+
+  window.__NOVA_ACTIVE_SESSION_ID = sid;
+  window.currentSessionId = sid;
+  window.activeSessionId = sid;
+  window.novaCurrentSessionId = sid;
 
   return sid;
 }
@@ -193,15 +242,20 @@ if (
 
 async function loadDesktopSessionsExternal() {
   const list = $("desktopSessionList");
-if (!list || window.__NOVA_SESSION_V2_LOCK__) return;
 
-  if (!list) return;
+  if (!list || window.__NOVA_SESSION_V2_LOCK__) {
+    return;
+  }
 
   const data = await fetchJson("/api/sessions", {
     cache: "no-store",
+    credentials: "include",
   });
 
-  const sessions = data.sessions || data.items || [];
+  const sessions =
+    data.sessions ||
+    data.items ||
+    [];
 
   list.innerHTML = "";
 
@@ -213,68 +267,128 @@ if (!list || window.__NOVA_SESSION_V2_LOCK__) return;
 
   const active = getSessionId();
 
-  sessions.slice(0, 30).forEach((session) => {
-    const sid = session.id || session.session_id;
+  sessions
+    .slice(0, 30)
+    .forEach((session) => {
 
-    if (!sid) return;
+      const sid =
+        session.id ||
+        session.session_id;
 
-    const btn = document.createElement("div");
+      if (!sid) {
+        return;
+      }
 
-    btn.className =
-      "nova-v2-session-item" +
-      (sid === active ? " is-active" : "");
+      const btn = document.createElement("div");
 
-    btn.dataset.sessionId = sid;
+      btn.className =
+        "nova-v2-session-item" +
+        (sid === active ? " is-active" : "");
 
-    btn.setAttribute("role", "button");
-    btn.tabIndex = 0;
+      btn.dataset.sessionId = sid;
 
-    btn.innerHTML = `
-      <div class="desktop-session-title">
-        ${session.title || "Untitled"}
-      </div>
+      btn.setAttribute("role", "button");
+      btn.tabIndex = 0;
 
-      <div class="desktop-session-meta">
-        ${session.updated_at || ""}
-      </div>
-    `;
+      btn.innerHTML = `
+        <div class="desktop-session-title">
+          ${session.title || "Untitled"}
+        </div>
 
-    btn.onclick = () => {
-      openSession(sid);
-    };
+        <div class="desktop-session-meta">
+          ${session.updated_at || ""}
+        </div>
+      `;
 
-    list.appendChild(btn);
-  });
+      btn.onclick = () => {
+        openSession(sid);
+      };
+
+      list.appendChild(btn);
+    });
 }
+
 
 async function newSessionExternal() {
 
   try {
-    const data = await fetchJson("/api/sessions/new", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": window.API_KEY || "dev"
-      },
-      body: JSON.stringify({ title: "" })
-    });
+
+    const data = await fetchJson(
+      "/api/sessions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": window.API_KEY || "dev"
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          title: "New Chat"
+        })
+      }
+    );
+
+
+    const chat =
+      data.session ||
+      data.item ||
+      data;
+
 
     const sid =
+      chat.id ||
       data.active_session_id ||
-      data.session_id ||
-      (data.session && data.session.id);
+      data.session_id;
 
-if (sid) {
+
+    if (!sid) {
+      throw new Error(
+        "No session id returned"
+      );
+    }
+
+
     setSessionId(sid);
-}
+
 
     window.NOVA_FORCE_NEW_SESSION_ON_NEXT_SEND = false;
     window.NOVA_PENDING_NEW_SESSION_ID = "";
 
-    // IMPORTANT: reset UI AFTER session is confirmed
-    if (typeof window.renderDesktopChatMessagesRescue === "function") {
+
+    if (
+      typeof window.renderDesktopChatMessagesRescue === "function"
+    ) {
       window.renderDesktopChatMessagesRescue([]);
     }
+
+
+    await loadDesktopSessionsExternal();
+
+
+    if (typeof openSession === "function") {
+      await openSession(sid);
+    }
+
+
+    console.log(
+      "[NOVA DESKTOP] New session created:",
+      sid
+    );
+
+
+    return sid;
+
+
+  } catch (error) {
+
+    console.error(
+      "[NOVA DESKTOP] New session failed:",
+      error
+    );
+
+    return null;
+  }
+}
 
 function generateSessionTitle(text) {
   if (!text) {
@@ -470,4 +584,5 @@ window.NovaDesktopNewSession = newSessionExternal;
 
   console.log("[Nova Desktop Sessions External] ready");
 })();
+
 

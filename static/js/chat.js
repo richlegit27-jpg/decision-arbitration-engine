@@ -36,7 +36,7 @@ const el = {
   btnNewChat: byId("btnNewChat"),
   chatList: byId("chatList"),
   messagesScroll: byId("messagesScroll"),
-  messages: byId("messages"),
+  messages: byId("messages") || byId("chat") || document.querySelector(".chat-messages"),
   composerWrap: byId("composerWrap"),
   composerForm: byId("composerForm"),
   input: byId("chatInput"),
@@ -68,7 +68,7 @@ let getChatId = null
 let normalizeChat = null
 let normalizeMessage = null
 
-const api = window.NovaAPI || null
+let api = null
 
 let chatService = null
 let attachmentsService = null
@@ -281,30 +281,101 @@ function mergeDoneMessages(payloadMessages = []){
 }
 
 async function initStateService(){
-  const stateFactory =
-    window.NovaChatState?.create ||
-    window.NovaChatState?.createChatStateService ||
-    null
+  const source = window.NovaChatState
 
-  if(typeof stateFactory !== "function"){
-    throw new Error("Nova chat state service failed to initialize.")
+  if(!source || !source.state){
+    throw new Error("Nova chat state object failed to initialize.")
   }
 
-  stateService = stateFactory({ makeId })
+  stateService = source
+  state = source.state
 
-  state = stateService.state
-  getStoredActiveChatId = stateService.getStoredActiveChatId
-  setStoredActiveChatId = stateService.setStoredActiveChatId
-  ensureChatsArray = stateService.ensureChatsArray
-  ensureMessagesArray = stateService.ensureMessagesArray
-  getActiveChat = stateService.getActiveChat
-  getChatTitle = stateService.getChatTitle
-  getChatId = stateService.getChatId
-  normalizeChat = stateService.normalizeChat
-  normalizeMessage = stateService.normalizeMessage
+  getStoredActiveChatId =
+    typeof source.getStoredActiveChatId === "function"
+      ? source.getStoredActiveChatId.bind(source)
+      : (() => null)
+
+  setStoredActiveChatId =
+    typeof source.setActiveChat === "function"
+      ? (chatId) => source.setActiveChat(chatId)
+      : (() => {})
+
+  ensureChatsArray =
+    typeof source.ensureChatsArray === "function"
+      ? source.ensureChatsArray.bind(source)
+      : (() => {
+          if(!Array.isArray(state.chats)){
+            state.chats = []
+          }
+          return state.chats
+        })
+
+  ensureMessagesArray =
+    typeof source.ensureMessagesArray === "function"
+      ? source.ensureMessagesArray.bind(source)
+      : (() => {
+          if(!Array.isArray(state.messages)){
+            state.messages = []
+          }
+          return state.messages
+        })
+
+  getActiveChat =
+    typeof source.getActiveChat === "function"
+      ? source.getActiveChat.bind(source)
+      : (() => {
+          const id = String(state?.activeChatId || "")
+          return Array.isArray(state?.chats)
+            ? state.chats.find(chat =>
+                String(chat?.id || chat?.chat_id || "") === id
+              ) || null
+            : null
+        })
+
+  getChatTitle =
+    typeof source.getChatTitle === "function"
+      ? source.getChatTitle.bind(source)
+      : ((chat) =>
+          String(chat?.title || chat?.name || "New chat").trim() || "New chat")
+
+  getChatId =
+    typeof source.getChatById === "function"
+      ? ((chat) => String(chat?.id || chat?.chat_id || ""))
+      : ((chat) => String(chat?.id || chat?.chat_id || ""))
+
+  normalizeChat =
+    typeof source.normalizeChat === "function"
+      ? source.normalizeChat.bind(source)
+      : ((chat) => chat)
+
+  normalizeMessage =
+    typeof source.normalizeMessage === "function"
+      ? source.normalizeMessage.bind(source)
+      : ((message) => message)
+
+  console.log(
+    "[NOVA CHAT] state service connected",
+    {
+      activeChatId: state.activeChatId,
+      chats: Array.isArray(state.chats) ? state.chats.length : 0,
+      messages: Array.isArray(state.messages) ? state.messages.length : 0
+    }
+  )
 }
-
 async function initCoreServices(){
+  api =
+    window.NovaApp?.api ||
+    window.NovaAPI ||
+    null
+
+  console.log(
+    "[NOVA CHAT] API resolved",
+    {
+      hasApi: !!api,
+      apiKeys: Object.keys(api || {})
+    }
+  )
+
   chatService = window.NovaChatService?.create?.({
     state,
     api,
@@ -443,12 +514,15 @@ onError(error){
     },
 
     onFinally(){
-          cancelPendingStreamingRender()
-          state.isStreaming = false
-          updateComposerState()
-        },
-      })
-    : null
+      cancelPendingStreamingRender()
+      state.isStreaming = false
+
+      window.NovaComposerActions?.clearThinkingIndicator?.()
+
+      updateComposerState()
+    },
+  })
+: null
 }
 
 async function initRenderService(){
@@ -564,6 +638,7 @@ async function initEventsService(){
       cancelRenameChat: (...args) => actionsService?.cancelRenameChat?.(...args),
       commitRenameFromInput: (...args) => actionsService?.commitRenameFromInput?.(...args),
       copyMessage: (...args) => actionsService?.copyMessage?.(...args),
+      regenerateLastAssistantReply: (...args) => actionsService?.regenerateLastAssistantReply?.(...args),
       retryFromMessage: (...args) => actionsService?.retryFromMessage?.(...args),
       deleteMessage: (...args) => actionsService?.deleteMessage?.(...args),
       removePendingFileByIndex: (...args) => actionsService?.removePendingFileByIndex?.(...args),
@@ -625,7 +700,7 @@ async function boot(){
   }
 }
 
-window.NovaChatApp = window.NovaChatApp || {};
+window.NovaChatApp = {
   get state(){
     return state
   },
@@ -661,4 +736,8 @@ if(document.readyState === "loading"){
 }
 
 })()
+
+
+
+
 

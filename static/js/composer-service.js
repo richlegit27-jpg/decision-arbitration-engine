@@ -1,363 +1,237 @@
-﻿// C:\Users\Owner\nova\static\js\composer-service.js
+﻿(function () {
+  "use strict";
 
-(() => {
-"use strict"
+  /*
+   * NOVA COMPOSER SERVICE
+   *
+   * IMPORTANT:
+   * composer-actions.js is the SINGLE owner of:
+   *   - Send button
+   *   - Enter-to-send
+   *   - stop button
+   *   - sendCurrentMessage()
+   *
+   * This module intentionally does NOT:
+   *   - bind Send
+   *   - bind Enter
+   *   - call sendCurrentMessage()
+   *   - initialize a second composer controller
+   *
+   * It exists only as a compatibility/service layer.
+   */
 
-function createComposerService(options = {}){
-  const {
-    state,
-    elements = {},
-    attachmentsService,
-    streamService,
-    renderService,
-    chatService,
-  } = options
+  console.log(
+    "[NovaComposerService] compatibility service loaded"
+  );
 
-  if(!state){
-    throw new Error("NovaComposerService: state is required")
-  }
+  function createComposerService(options = {}) {
+    const state = options.state || {};
+    const streamService =
+      options.streamService ||
+      window.NovaStreamService ||
+      null;
 
-  if(!streamService){
-    throw new Error("NovaComposerService: streamService is required")
-  }
+    const inputController =
+      options.inputController ||
+      window.NovaComposerInput ||
+      null;
 
-  const el = {
-    input: elements.input || null,
-    sendBtn: elements.sendBtn || null,
-    attachBtn: elements.attachBtn || null,
-    fileInput: elements.fileInput || null,
-    stopBtn: elements.stopBtn || null,
-    composerForm: elements.composerForm || null,
-  }
-
-  let isSending = false
-
-  function getInputValue(){
-    return String(el.input?.value || "")
-  }
-
-  function autoResizeInput(){
-    if(!el.input){
-      return
-    }
-
-    el.input.style.height = "auto"
-
-    const minHeight = 56
-    const maxHeight = 220
-    const scrollHeight = Number(el.input.scrollHeight || minHeight)
-    const nextHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight))
-
-    el.input.style.height = `${nextHeight}px`
-    el.input.style.overflowY = scrollHeight > maxHeight ? "auto" : "hidden"
-  }
-
-  function setInputValue(value){
-    if(el.input){
-      el.input.value = String(value ?? "")
-      autoResizeInput()
-    }
-
-    return getInputValue()
-  }
-
-  function clearInput(){
-    return setInputValue("")
-  }
-
-  function focusInput(){
-    if(!el.input){
-      return
-    }
-
-    requestAnimationFrame(() => {
-      try{
-        el.input.focus({ preventScroll: true })
-      }catch(_error){
-        el.input.focus()
-      }
-    })
-  }
-
-  function getPendingFiles(){
-    if(attachmentsService?.getPendingFiles){
-      return attachmentsService.getPendingFiles()
-    }
-
-    if(Array.isArray(state.pendingAttachments)){
-      return state.pendingAttachments
-    }
-
-    if(Array.isArray(state.pendingFiles)){
-      return state.pendingFiles
-    }
-
-    state.pendingAttachments = []
-    return state.pendingAttachments
-  }
-
-  function hasPendingFiles(){
-    return getPendingFiles().length > 0
-  }
-
-  function canSend(){
-    if(isSending || state.isStreaming){
-      return false
-    }
-
-    return Boolean(getInputValue().trim() || hasPendingFiles())
-  }
-
-  function updateComposerState(){
-    const sendable = canSend()
-    const busy = Boolean(isSending || state.isStreaming)
-
-    if(el.sendBtn){
-      el.sendBtn.disabled = !sendable
-    }
-
-    if(el.stopBtn){
-      el.stopBtn.hidden = !state.isStreaming
-      el.stopBtn.disabled = !state.isStreaming
-    }
-
-    if(el.attachBtn){
-      el.attachBtn.disabled = busy
-    }
-
-    if(el.fileInput){
-      el.fileInput.disabled = busy
-    }
-
-    attachmentsService?.renderPendingAttachments?.()
-    renderService?.renderPendingAttachments?.()
-  }
-
-  function chatExistsInState(chatId){
-    const normalized = String(chatId || "").trim()
-
-    if(!normalized){
-      return false
-    }
-
-    if(!Array.isArray(state.chats)){
-      return false
-    }
-
-    return state.chats.some((chat) => {
-      return String(chat?.chat_id || chat?.id || "").trim() === normalized
-    })
-  }
-
-  async function ensureChatReady(messageText = ""){
-    const existing = String(state.activeChatId || state.chatId || "").trim()
-
-    if(existing && chatExistsInState(existing)){
-      return existing
-    }
-
-    state.activeChatId = null
-    state.chatId = null
-
-    if(!chatService?.createChat){
-      throw new Error("chatService.createChat is missing")
-    }
-
-    const cleanTitle = String(messageText || "").trim()
-    const created = await chatService.createChat({
-      title: cleanTitle.slice(0, 80) || "New chat",
-    })
-
-    const chatId = String(
-      created?.chat_id ||
-      created?.id ||
-      created?.chat?.chat_id ||
-      ""
-    ).trim()
-
-    if(!chatId){
-      throw new Error("Could not create or resolve chat")
-    }
-
-    state.activeChatId = chatId
-    state.chatId = chatId
-
-    if(!Array.isArray(state.chats)){
-      state.chats = []
-    }
-
-    const exists = state.chats.some(
-      (chat) => String(chat?.chat_id || chat?.id || "").trim() === chatId
-    )
-
-    if(!exists){
-      state.chats.unshift({
-        chat_id: chatId,
-        title: created?.title || cleanTitle.slice(0, 80) || "New chat",
-        updated_at: new Date().toISOString(),
-      })
-    }
-
-    if(typeof renderService?.renderChatList === "function"){
-      renderService.renderChatList(state.chats)
-    }else{
-      renderService?.renderChats?.()
-    }
-
-    return chatId
-  }
-
-  async function sendCurrentMessage(payload = {}){
-    const forcedChatId = String(payload.chatId || "").trim()
-    const forcedMessage = payload.message
-    const forcedFiles = Array.isArray(payload.files) ? payload.files : null
-
-    const text = forcedMessage != null ? String(forcedMessage) : getInputValue()
-    const files = forcedFiles ? [...forcedFiles] : [...getPendingFiles()]
-
-    if(isSending || state.isStreaming){
-      return { ok: false, reason: "busy" }
-    }
-
-    if(!text.trim() && files.length === 0){
-      updateComposerState()
-      focusInput()
-      return { ok: false, reason: "empty" }
-    }
-
-    isSending = true
-    updateComposerState()
-
-    try{
-      const chatId = forcedChatId || await ensureChatReady(text)
-
-      const sender =
-        streamService?.sendMessage ||
-        streamService?.send
-
-      if(typeof sender !== "function"){
-        throw new Error("streamService.sendMessage/send is missing")
+    function getInputValue() {
+      try {
+        if (
+          inputController &&
+          typeof inputController.getInputValue === "function"
+        ) {
+          return String(
+            inputController.getInputValue() || ""
+          );
+        }
+      } catch (error) {
+        console.warn(
+          "[NovaComposerService] getInputValue failed:",
+          error
+        );
       }
 
-      const result = await sender({
-        chatId,
-        message: text,
-        files,
-      })
+      const input =
+        document.getElementById("input") ||
+        document.getElementById("composerInput");
 
-      if(result?.ok !== false && forcedMessage == null){
-        clearInput()
-        attachmentsService?.clearPendingFiles?.()
-        attachmentsService?.clearPending?.()
-        state.pendingAttachments = []
-        state.pendingFiles = []
+      return String(input?.value || "");
+    }
+
+    function getTrimmedInputValue() {
+      return getInputValue().trim();
+    }
+
+    function getPendingFiles() {
+      if (
+        Array.isArray(state.pendingFiles)
+      ) {
+        return state.pendingFiles;
       }
 
-      renderService?.renderAll?.()
-
-      return result || { ok: true }
-    }catch(error){
-      console.error("Nova sendCurrentMessage error:", error)
-      renderService?.renderAll?.()
-
-      return {
-        ok: false,
-        error,
+      if (
+        Array.isArray(state.pendingAttachments)
+      ) {
+        return state.pendingAttachments;
       }
-    }finally{
-      isSending = false
-      autoResizeInput()
-      updateComposerState()
-      focusInput()
-    }
-  }
 
-  function handleInput(){
-    autoResizeInput()
-    updateComposerState()
-  }
-
-  function handleKeyDown(event){
-    if(!event){
-      return
+      return [];
     }
 
-    if(event.key === "Enter" && !event.shiftKey){
-      event.preventDefault()
-      event.stopPropagation()
-      void sendCurrentMessage()
+    function updateComposerState() {
+      try {
+        if (
+          typeof window.NovaComposerActions
+            ?.updateComposerState === "function"
+        ) {
+          return window.NovaComposerActions.updateComposerState();
+        }
+      } catch (error) {
+        console.warn(
+          "[NovaComposerService] updateComposerState failed:",
+          error
+        );
+      }
+
+      return null;
     }
-  }
 
-  function handleAttachClick(event){
-    event?.preventDefault()
-    event?.stopPropagation()
+    function stopGenerating() {
+      try {
+        if (
+          typeof window.NovaComposerActions
+            ?.stopGenerating === "function"
+        ) {
+          return window.NovaComposerActions.stopGenerating();
+        }
+      } catch (error) {
+        console.warn(
+          "[NovaComposerService] stopGenerating failed:",
+          error
+        );
+      }
 
-    if(isSending || state.isStreaming){
-      return
+      try {
+        if (
+          typeof streamService?.stop === "function"
+        ) {
+          return streamService.stop();
+        }
+
+        if (
+          typeof streamService?.abortActiveStream ===
+            "function"
+        ) {
+          return streamService.abortActiveStream();
+        }
+      } catch (error) {
+        console.warn(
+          "[NovaComposerService] stream stop failed:",
+          error
+        );
+      }
+
+      return null;
     }
 
-    try{
-      el.fileInput?.click()
-    }catch(error){
-      console.error("Nova handleAttachClick error:", error)
+    /*
+     * Compatibility wrapper.
+     *
+     * There is intentionally NO local send implementation.
+     * Any caller using this legacy API is forwarded to the
+     * single authoritative composer-actions implementation.
+     */
+    async function sendCurrentMessage(payload = {}) {
+      if (
+        typeof window.NovaComposerActions
+          ?.sendCurrentMessage === "function"
+      ) {
+        return window.NovaComposerActions.sendCurrentMessage(
+          payload
+        );
+      }
+
+      console.error(
+        "[NovaComposerService] authoritative send unavailable"
+      );
+
+      return null;
     }
+
+    /*
+     * Compatibility init.
+     *
+     * Deliberately does nothing.
+     *
+     * composer-actions.js owns all event binding.
+     */
+    function init() {
+      console.log(
+        "[NovaComposerService] compatibility init - no event bindings"
+      );
+
+      return true;
+    }
+
+    /*
+     * Deliberately empty.
+     *
+     * Kept for compatibility with any code that expects
+     * bindEvents() to exist.
+     */
+    function bindEvents() {
+      return true;
+    }
+
+    const service = {
+      init,
+      bindEvents,
+      getInputValue,
+      getTrimmedInputValue,
+      getPendingFiles,
+      updateComposerState,
+      stopGenerating,
+      sendCurrentMessage,
+      send: sendCurrentMessage
+    };
+
+    return service;
   }
 
-  function handleStopClick(event){
-    event?.preventDefault()
-    event?.stopPropagation()
+  const service =
+    createComposerService({
+      state:
+        window.Nova?.state ||
+        window.NovaState?.state ||
+        {}
+    });
 
-    const stopper =
-      streamService?.abortActiveStream ||
-      streamService?.stop
+  window.NovaComposerService =
+    service;
 
-    stopper?.()
-    updateComposerState()
-    focusInput()
-  }
+  /*
+   * IMPORTANT:
+   * Do NOT call init() here.
+   *
+   * Calling init() in this compatibility module could
+   * accidentally reintroduce a second composer lifecycle.
+   */
 
-  function handleSubmit(event){
-    event?.preventDefault()
-    event?.stopPropagation()
-    void sendCurrentMessage()
-  }
+  console.log(
+    "[NovaComposerService] compatibility layer ready",
+    {
+      hasSend:
+        typeof service.sendCurrentMessage ===
+        "function",
 
-  function bindEvents(){
-    el.input?.addEventListener("input", handleInput)
-    el.input?.addEventListener("keydown", handleKeyDown)
-    el.attachBtn?.addEventListener("click", handleAttachClick)
-    el.stopBtn?.addEventListener("click", handleStopClick)
-    el.composerForm?.addEventListener("submit", handleSubmit)
-    el.sendBtn?.addEventListener("click", handleSubmit)
-  }
+      hasInit:
+        typeof service.init ===
+        "function",
 
-  function init(){
-    bindEvents()
-    autoResizeInput()
-    updateComposerState()
-    focusInput()
-  }
-
-  init()
-
-  return {
-    init,
-    getInputValue,
-    setInputValue,
-    clearInput,
-    focusInput,
-    autoResizeInput,
-    updateComposerState,
-    sendCurrentMessage,
-    send: sendCurrentMessage,
-  }
-}
-
-window.NovaComposerService = {
-  create: createComposerService,
-  createComposerService,
-}
-
-})()
-
+      eventBinding:
+        "NONE - composer-actions.js owns composer events"
+    }
+  );
+})();

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
@@ -205,7 +205,7 @@ class SessionService:
         text = self._safe_str(value)
         if len(text) <= limit:
             return text
-        return text[:limit] + " â€¦[truncated]"
+        return text[:limit] + " Ã¢â‚¬Â¦[truncated]"
 
     def _sanitize_meta_for_storage(self, meta) -> dict:
         if not isinstance(meta, dict):
@@ -632,15 +632,17 @@ class SessionService:
             user_id or ""
         ).strip()
 
-        # Anonymous sessions may continue anonymously.
+        # Local Nova can operate without an authenticated browser
+        # session. Existing local sessions remain accessible.
         if not current_user_id:
-            return not session_user_id
+            return True
 
+        # Authenticated users can only access sessions explicitly
+        # assigned to their user ID.
         if not session_user_id:
             return False
 
         return session_user_id == current_user_id
-
     def load(self):
         """
         Compatibility bridge for older ChatService code that expects
@@ -1337,9 +1339,59 @@ class SessionService:
         )
 
         return normalized
-    # -----------------------
-    # COMPATIBILITY
-    # -----------------------
+
+    def replace_message(
+        self,
+        session_id,
+        message_id,
+        new_message,
+        user_id="",
+    ):
+        if not user_id:
+            user_id = self._current_owner_id()
+
+        sessions = self._load_sessions()
+
+        i = self._find(
+            sessions,
+            session_id,
+        )
+
+        if i < 0:
+            return None
+
+        if not self._belongs_to_user(
+            sessions[i],
+            user_id,
+        ):
+            return None
+
+        messages = sessions[i].get(
+            "messages",
+            [],
+        )
+
+        for index, message in enumerate(messages):
+            if (
+                isinstance(message, dict)
+                and message.get("id") == message_id
+            ):
+                normalized = _normalize_message(
+                    new_message
+                )
+
+                messages[index] = normalized
+
+                sessions[i]["updated_at"] = iso_now()
+
+                self._save_sessions(
+                    sessions,
+                    self.get_active_session_id(),
+                )
+
+                return normalized
+
+        return None
 
     def get_all(self, user_id=""):
         if not user_id:
@@ -1388,6 +1440,7 @@ class SessionService:
 
     def get_by_id(self, session_id):
         return self.get_session(session_id)
+
 
 
 

@@ -38,17 +38,17 @@
       .join("");
   }
 
-  function setSendingState(next) {
-    isSending = Boolean(next);
+function setSendingState(next) {
+  isSending = Boolean(next);
 
-    sendBtn.disabled = isSending;
-    if (attachBtn) attachBtn.disabled = isSending;
-    if (input) input.disabled = isSending;
-
-    if (stopBtn) {
-      stopBtn.classList.toggle("hidden", !isSending);
-    }
+  if (window.NovaChatState?.state) {
+    window.NovaChatState.state.isSending = isSending;
   }
+
+  if (window.NovaComposerActions?.updateComposerState) {
+    window.NovaComposerActions.updateComposerState();
+  }
+}
 
   async function sendMessage() {
     if (isSending) return;

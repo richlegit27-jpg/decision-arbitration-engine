@@ -84,22 +84,11 @@ function createChatEventsService(options = {}){
       ui.autoResizeInput?.()
     })
 
-    el.input?.addEventListener("keydown", async (event) => {
-      if(event.key === "Enter" && !event.shiftKey){
-        event.preventDefault()
-        await actions.sendCurrentMessage?.()
-      }
-    })
+    // NOVA SINGLE SEND OWNER:
+    // composer-actions.js owns desktop send + form submission.
 
-    el.composerForm?.addEventListener("submit", async (event) => {
-      event.preventDefault()
-      await actions.sendCurrentMessage?.()
-    })
-
-    el.sendBtn?.addEventListener("click", async (event) => {
-      event.preventDefault()
-      await actions.sendCurrentMessage?.()
-    })
+    // NOVA SINGLE SEND OWNER:
+    // composer-actions.js owns desktop send + form submission.
 
     el.stopBtn?.addEventListener("click", (event) => {
       event.preventDefault()
@@ -208,6 +197,13 @@ function createChatEventsService(options = {}){
         return
       }
 
+      const regenerateButton = event.target.closest("[data-action='regenerate']")
+      if(regenerateButton){
+        event.preventDefault()
+        await actions.regenerateLastAssistantReply?.()
+        return
+      }
+
       const deleteButton = event.target.closest("[data-action='delete-message']")
       if(deleteButton){
         event.preventDefault()
@@ -227,4 +223,5 @@ window.NovaChatEvents = {
 }
 
 })()
+
 

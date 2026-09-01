@@ -2794,7 +2794,6 @@ class SafeUnifiedRuntime:
 
         return self.replay.explain_replay(replay)
 
-
 class RuntimeBootstrap:
     @staticmethod
     def build(
@@ -2803,5 +2802,3 @@ class RuntimeBootstrap:
         return SafeUnifiedRuntime(
             chat_service=chat_service,
         )
-
-

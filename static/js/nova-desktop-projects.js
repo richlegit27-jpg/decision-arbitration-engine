@@ -120,25 +120,13 @@
         }
 
         safeProjects.forEach((project) => {
-            const projectId = project.id;
+            const projectId =
+                project.id;
+
             const isActive =
                 project.active === true ||
                 projectId ===
                     window.__NOVA_PROJECT_STATE.activeProjectId;
-
-            const button =
-                document.createElement("button");
-
-            button.type = "button";
-            button.className =
-                "session-card nova-project-card";
-
-            if (isActive) {
-                button.classList.add("active");
-            }
-
-            button.dataset.projectId =
-                projectId || "";
 
             const name =
                 project.name ||
@@ -149,59 +137,197 @@
                 project.description ||
                 "No description";
 
+            const card =
+                document.createElement("div");
 
-        button.innerHTML = `
-            <div class="nova-project-card-header">
-                <strong>
-                    ${escapeHtml(name)}
-                </strong>
+            card.className =
+                "nova-project-card";
 
-                ${
-                    isActive
-                        ? `<span class="nova-project-active-badge">Active</span>`
-                        : ""
-                }
-            </div>
+            if (isActive) {
+                card.classList.add("active");
+            }
 
-            <div class="nova-project-card-description">
-                ${escapeHtml(description)}
-            </div>
+            card.dataset.projectId =
+                projectId || "";
 
-            <div class="nova-project-card-footer">
-                <span>
-                    ${project.status || "Ready"}
-                </span>
+            card.innerHTML = `
+                <div class="nova-project-card-main">
+                    <button
+                        type="button"
+                        class="nova-project-card-open"
+                    >
+                        <div class="nova-project-card-header">
+                            <strong>
+                                ${escapeHtml(name)}
+                            </strong>
 
-                <span>
-                    ${project.updated_at || "Just now"}
-                </span>
-            </div>
-        `;
+                            ${
+                                isActive
+                                    ? `<span class="nova-project-active-badge">Active</span>`
+                                    : ""
+                            }
+                        </div>
 
-button.addEventListener(
-    "click",
-    async () => {
-        if (!projectId) {
-            return;
-        }
+                        <div class="nova-project-card-description">
+                            ${escapeHtml(description)}
+                        </div>
 
-        openProjectWorkspace(project);
+                        <div class="nova-project-card-footer">
+                            <span>
+                                ${project.status || "Ready"}
+                            </span>
 
-        await activateProject(
-            projectId
-        );
+                            <span>
+                                ${project.updated_at || "Just now"}
+                            </span>
+                        </div>
+                    </button>
 
-        await loadProjectWorkspace(
-            projectId
-        );
-    }
-);
+                    <button
+                        type="button"
+                        class="nova-project-delete-button"
+                        title="Delete project"
+                    >
+                        Delete
+                    </button>
+                </div>
+            `;
 
-            container.appendChild(button);
+            const openButton =
+                card.querySelector(
+                    ".nova-project-card-open"
+                );
+
+            const deleteButton =
+                card.querySelector(
+                    ".nova-project-delete-button"
+                );
+
+            if (openButton) {
+                openButton.addEventListener(
+                    "click",
+                    async () => {
+                        if (!projectId) {
+                            return;
+                        }
+
+                        openProjectWorkspace(
+                            project
+                        );
+
+                        await activateProject(
+                            projectId
+                        );
+
+                        await loadProjectWorkspace(
+                            projectId
+                        );
+                    }
+                );
+            }
+
+            if (deleteButton) {
+                deleteButton.addEventListener(
+                    "click",
+                    async (event) => {
+                        event.stopPropagation();
+
+                        if (!projectId) {
+                            return;
+                        }
+
+                        const confirmed =
+                            window.confirm(
+                                `Delete project "${name}"?\n\nThis cannot be undone.`
+                            );
+
+                        if (!confirmed) {
+                            return;
+                        }
+
+                        deleteButton.disabled =
+                            true;
+
+                        try {
+                            const response =
+                                await fetch(
+                                    `/api/projects/${encodeURIComponent(projectId)}`,
+                                    {
+                                        method: "DELETE",
+                                    }
+                                );
+
+                            const data =
+                                await response.json();
+
+                            if (
+                                !response.ok ||
+                                !data.ok
+                            ) {
+                                throw new Error(
+                                    data.error ||
+                                    "Project deletion failed"
+                                );
+                            }
+
+                            if (
+                                window.__NOVA_PROJECT_STATE
+                                    .activeProjectId ===
+                                projectId
+                            ) {
+                                window.__NOVA_PROJECT_STATE
+                                    .activeProjectId = null;
+
+                                const workspace =
+                                    $("desktopProjectWorkspace");
+
+                                if (workspace) {
+                                    workspace.innerHTML = `
+                                        <div class="section-title-row">
+                                            <div>
+                                                <h2>
+                                                    No project selected
+                                                </h2>
+
+                                                <p>
+                                                    Select a project to open workspace.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    `;
+                                }
+                            }
+
+                            await loadProjects();
+
+                            console.log(
+                                "[NOVA PROJECTS] deleted",
+                                projectId
+                            );
+
+                        } catch (error) {
+                            console.error(
+                                "[NOVA PROJECTS] delete failed",
+                                error
+                            );
+
+                            window.alert(
+                                error.message ||
+                                "Project deletion failed"
+                            );
+
+                            deleteButton.disabled =
+                                false;
+                        }
+                    }
+                );
+            }
+
+            container.appendChild(
+                card
+            );
         });
     }
-
-
 function openProjectWorkspace(project) {
     const status = $("desktopProjectStatus");
     const mission = $("desktopProjectMission");
@@ -258,12 +384,6 @@ if (recommendation) {
     `;
 }
 
-    if (activity) {
-        activity.innerHTML = `
-            <h3>Recent Activity</h3>
-            <p>Project opened.</p>
-        `;
-    }
 }
 
 async function loadProjectIntelligence(projectId) {
@@ -424,20 +544,31 @@ async function loadProjectIntelligence(projectId) {
                             .map(
                                 (item) => `
                                     <p>
-                                        ${escapeHtml(
-                                            item.message ||
-                                            "Project activity"
-                                        )}
+                                        <strong>
+                                            ${escapeHtml(
+                                                item.action ||
+                                                item.message ||
+                                                "Project activity"
+                                            )}
+                                        </strong>
+                                        ${
+                                            item.details
+                                                ? ` — ${escapeHtml(
+                                                    item.details
+                                                )}`
+                                                : ""
+                                        }
                                     </p>
                                 `
                             )
                             .join("")
                         : `
-                            <p>No activity yet.</p>
+                            <p>No recent activity.</p>
                         `
                 }
             `;
-    }
+        }
+
     } catch (error) {
         console.error(
             "[Nova Projects] intelligence failed",
@@ -563,7 +694,6 @@ if (descriptionElement) {
     }
 
 function renderProjectTasks(data) {
-
     const tasksContainer =
         $("desktopProjectTaskList");
 
@@ -571,35 +701,43 @@ function renderProjectTasks(data) {
         return;
     }
 
-        const tasks =
-            data.tasks ||
-            data.project?.tasks ||
-            [];
+    const projectId =
+        window.__NOVA_PROJECT_STATE?.activeProjectId;
 
-        tasksContainer.innerHTML = "";
+    const tasks =
+        Array.isArray(data?.tasks)
+            ? data.tasks
+            : Array.isArray(data?.project?.tasks)
+                ? data.project.tasks
+                : [];
 
-        if (!Array.isArray(tasks) ||
-            tasks.length === 0) {
-            tasksContainer.innerHTML = `
-                <div class="session-placeholder">
-                    No tasks yet.
-                </div>
-            `;
-            return;
-        }
+    tasksContainer.innerHTML = `
+        <div id="novaProjectTaskItems"></div>
+    `;
 
-console.log(
-    "[TASK LOOP START]",
-    tasks.length,
-    tasks
-);
+    const items =
+        $("novaProjectTaskItems");
 
+    if (!items) {
+        return;
+    }
+
+    if (!tasks.length) {
+        items.innerHTML = `
+            <div class="session-placeholder">
+                No tasks yet. Add the first task for this project.
+            </div>
+        `;
+    } else {
         tasks.forEach((task) => {
-            const taskElement =
+            const row =
                 document.createElement("div");
 
-            taskElement.className =
+            row.className =
                 "nova-project-task";
+
+            row.dataset.taskId =
+                task.id || "";
 
             const title =
                 task.title ||
@@ -607,32 +745,292 @@ console.log(
                 "Untitled task";
 
             const status =
-                task.status ||
-                "";
+                String(
+                    task.status || "open"
+                ).toLowerCase();
 
-            taskElement.innerHTML = `
-                <strong>
-                    ${escapeHtml(title)}
-                </strong>
+            const priority =
+                String(
+                    task.priority || "medium"
+                ).toLowerCase();
 
-                ${
-                    status
-                        ? `
-                            <span>
-                                ${escapeHtml(status)}
-                            </span>
-                        `
-                        : ""
-                }
+            row.innerHTML = `
+                <div class="nova-project-task-main">
+                    <strong>
+                        ${escapeHtml(title)}
+                    </strong>
+
+                    <div class="nova-project-task-meta">
+                        <span>
+                            ${escapeHtml(status)}
+                        </span>
+
+                        <span>
+                            ${escapeHtml(priority)}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="nova-project-task-actions">
+                    <select
+                        class="nova-project-task-status"
+                        data-task-status
+                    >
+                        <option value="open">Open</option>
+                        <option value="running">Running</option>
+                        <option value="completed">Completed</option>
+                        <option value="blocked">Blocked</option>
+                    </select>
+
+                    <button
+                        type="button"
+                        data-task-delete
+                    >
+                        Delete
+                    </button>
+                </div>
             `;
 
+            const statusSelect =
+                row.querySelector(
+                    "[data-task-status]"
+                );
 
-tasksContainer.appendChild(
-    taskElement
-);
+            if (statusSelect) {
+                statusSelect.value =
+                    [
+                        "open",
+                        "running",
+                        "completed",
+                        "blocked",
+                    ].includes(status)
+                        ? status
+                        : "open";
+
+                statusSelect.addEventListener(
+                    "change",
+                    async () => {
+                        if (!projectId || !task.id) {
+                            return;
+                        }
+
+                        try {
+                            statusSelect.disabled =
+                                true;
+
+                            setProjectStatus(
+                                "Updating task..."
+                            );
+
+                            await fetchJson(
+                                `/api/projects/${projectId}/tasks/${task.id}`,
+                                {
+                                    method: "PATCH",
+                                    headers: {
+                                        "Content-Type":
+                                            "application/json",
+                                    },
+                                    body:
+                                        JSON.stringify({
+                                            status:
+                                                statusSelect.value,
+                                        }),
+                                }
+                            );
+
+                            await loadProjectWorkspace(
+                                projectId
+                            );
+
+                            await loadProjectIntelligence(
+                                projectId
+                            );
+
+                            setProjectStatus(
+                                "Task updated"
+                            );
+
+                        } catch (error) {
+                            console.error(
+                                "[Nova Projects] task update failed",
+                                error
+                            );
+
+                            statusSelect.disabled =
+                                false;
+
+                            setProjectStatus(
+                                error.message ||
+                                "Task update failed"
+                            );
+                        }
+                    }
+                );
+            }
+
+            const deleteButton =
+                row.querySelector(
+                    "[data-task-delete]"
+                );
+
+            if (deleteButton) {
+                deleteButton.addEventListener(
+                    "click",
+                    async () => {
+                        if (!projectId || !task.id) {
+                            return;
+                        }
+
+                        if (
+                            !confirm(
+                                "Delete this task?"
+                            )
+                        ) {
+                            return;
+                        }
+
+                        try {
+                            deleteButton.disabled =
+                                true;
+
+                            setProjectStatus(
+                                "Deleting task..."
+                            );
+
+                            await fetchJson(
+                                `/api/projects/${projectId}/tasks/${task.id}`,
+                                {
+                                    method: "DELETE",
+                                }
+                            );
+
+                            await loadProjectWorkspace(
+                                projectId
+                            );
+
+                            await loadProjectIntelligence(
+                                projectId
+                            );
+
+                            setProjectStatus(
+                                "Task deleted"
+                            );
+
+                        } catch (error) {
+                            console.error(
+                                "[Nova Projects] task delete failed",
+                                error
+                            );
+
+                            deleteButton.disabled =
+                                false;
+
+                            setProjectStatus(
+                                error.message ||
+                                "Task delete failed"
+                            );
+                        }
+                    }
+                );
+            }
+
+            items.appendChild(row);
         });
     }
 
+    const addButton =
+        $("desktopProjectAddTaskButton");
+
+    if (
+        addButton &&
+        !addButton.dataset.bound
+    ) {
+        addButton.dataset.bound =
+            "true";
+
+        addButton.addEventListener(
+            "click",
+            async () => {
+                const currentProjectId =
+                    window.__NOVA_PROJECT_STATE
+                        ?.activeProjectId;
+
+                if (!currentProjectId) {
+                    setProjectStatus(
+                        "No active project"
+                    );
+                    return;
+                }
+
+                const title =
+                    prompt(
+                        "Task name:"
+                    );
+
+                if (
+                    !title ||
+                    !title.trim()
+                ) {
+                    return;
+                }
+
+                try {
+                    addButton.disabled =
+                        true;
+
+                    setProjectStatus(
+                        "Creating task..."
+                    );
+
+                    await fetchJson(
+                        `/api/projects/${currentProjectId}/tasks`,
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type":
+                                    "application/json",
+                            },
+                            body:
+                                JSON.stringify({
+                                    title:
+                                        title.trim(),
+                                    priority:
+                                        "medium",
+                                }),
+                        }
+                    );
+
+                    await loadProjectWorkspace(
+                        currentProjectId
+                    );
+
+                    await loadProjectIntelligence(
+                        currentProjectId
+                    );
+
+                    setProjectStatus(
+                        "Task created"
+                    );
+
+                } catch (error) {
+                    console.error(
+                        "[Nova Projects] task creation failed",
+                        error
+                    );
+
+                    setProjectStatus(
+                        error.message ||
+                        "Task creation failed"
+                    );
+
+                } finally {
+                    addButton.disabled =
+                        false;
+                }
+            }
+        );
+    }
+}
 
     async function loadProjectWorkspace(
         projectId
@@ -751,6 +1149,118 @@ if (
         workspace.appendChild(filesPanel);
     }
 }
+
+    const projectUploadButton =
+        document.getElementById(
+            "desktopProjectUploadButton"
+        );
+
+    const projectFileInput =
+        document.getElementById(
+            "desktopProjectFileInput"
+        );
+
+    if (
+        projectUploadButton &&
+        projectFileInput &&
+        !projectUploadButton.dataset.bound
+    ) {
+        projectUploadButton.dataset.bound =
+            "true";
+
+        projectUploadButton.addEventListener(
+            "click",
+            () => {
+                projectFileInput.click();
+            }
+        );
+
+        projectFileInput.addEventListener(
+            "change",
+            async () => {
+                const file =
+                    projectFileInput.files?.[0];
+
+                const currentProjectId =
+                    window.__NOVA_PROJECT_STATE
+                        ?.activeProjectId;
+
+                if (
+                    !file ||
+                    !currentProjectId
+                ) {
+                    return;
+                }
+
+                const formData =
+                    new FormData();
+
+                formData.append(
+                    "file",
+                    file
+                );
+
+                formData.append(
+                    "project_id",
+                    currentProjectId
+                );
+
+                try {
+                    setProjectStatus(
+                        "Uploading file..."
+                    );
+
+                    const response =
+                        await fetch(
+                            "/api/upload",
+                            {
+                                method: "POST",
+                                body: formData,
+                            }
+                        );
+
+                    const data =
+                        await response.json();
+
+                    if (
+                        !response.ok ||
+                        !data.ok
+                    ) {
+                        throw new Error(
+                            data.error ||
+                            "Upload failed"
+                        );
+                    }
+
+                    await loadProjectFiles(
+                        currentProjectId
+                    );
+
+                    await loadProjectIntelligence(
+                        currentProjectId
+                    );
+
+                    setProjectStatus(
+                        "File uploaded"
+                    );
+
+                } catch (error) {
+                    console.error(
+                        "[Nova Projects] file upload failed",
+                        error
+                    );
+
+                    setProjectStatus(
+                        error.message ||
+                        "File upload failed"
+                    );
+
+                } finally {
+                    projectFileInput.value = "";
+                }
+            }
+        );
+    }
 
 await loadProjectFiles(
     projectId
@@ -1218,12 +1728,26 @@ if (newProjectButton) {
     newProjectButton.addEventListener(
         "click",
         () => {
-            if (newProjectModal) {
-                newProjectModal.hidden = false;
+            console.log(
+                "[NOVA PROJECTS] New Project clicked"
+            );
+
+            if (!newProjectModal) {
+                console.error(
+                    "[NOVA PROJECTS] newProjectModal not found"
+                );
+                return;
             }
 
+            newProjectModal.hidden = false;
+
             if (newProjectName) {
+                newProjectName.value = "";
                 newProjectName.focus();
+            }
+
+            if (newProjectDescription) {
+                newProjectDescription.value = "";
             }
         }
     );
@@ -1246,17 +1770,21 @@ if (createNewProjectButton) {
     createNewProjectButton.addEventListener(
         "click",
         async () => {
-
             const name =
                 newProjectName?.value.trim();
 
             if (!name) {
+                if (newProjectName) {
+                    newProjectName.focus();
+                }
                 return;
             }
 
             const description =
                 newProjectDescription?.value.trim() ||
                 "";
+
+            createNewProjectButton.disabled = true;
 
             try {
                 const response =
@@ -1265,7 +1793,8 @@ if (createNewProjectButton) {
                         {
                             method: "POST",
                             headers: {
-                                "Content-Type": "application/json",
+                                "Content-Type":
+                                    "application/json",
                             },
                             body: JSON.stringify({
                                 name,
@@ -1276,6 +1805,11 @@ if (createNewProjectButton) {
 
                 const data =
                     await response.json();
+
+                console.log(
+                    "[NOVA PROJECTS] create response",
+                    data
+                );
 
                 if (
                     !response.ok ||
@@ -1291,10 +1825,21 @@ if (createNewProjectButton) {
                     newProjectModal.hidden = true;
                 }
 
-                newProjectName.value = "";
-                newProjectDescription.value = "";
+                if (newProjectName) {
+                    newProjectName.value = "";
+                }
+
+                if (newProjectDescription) {
+                    newProjectDescription.value = "";
+                }
 
                 await loadProjects();
+
+                if (data.project?.id) {
+                    await activateProject(
+                        data.project.id
+                    );
+                }
 
             } catch (error) {
                 console.error(
@@ -1306,6 +1851,9 @@ if (createNewProjectButton) {
                     error.message ||
                     "Project creation failed"
                 );
+
+            } finally {
+                createNewProjectButton.disabled = false;
             }
         }
     );
@@ -1376,6 +1924,9 @@ await loadProjectNotes(
         "Ready to continue"
     );
 }
+
+
+
 
 const projectUploadButton =
     $("desktopProjectUploadButton");
@@ -1619,64 +2170,58 @@ if (
 }
 
 function bindProjectButtons() {
-
-    const newProjectBtn =
-        $("newProjectBtn");
-
-    if (newProjectBtn) {
-        newProjectBtn.addEventListener(
-            "click",
-            async () => {
-
-                const name =
-                    prompt(
-                        "Project name"
-                    );
-
-                if (!name) {
-                    return;
-                }
-
-                await fetch(
-                    "/api/projects/new",
-                    {
-                        method: "POST",
-                        headers: {
-                            "Content-Type":
-                                "application/json",
-                        },
-                        body: JSON.stringify({
-                            name,
-                            description: "",
-                        }),
-                    }
-                );
-
-                await window.NovaDesktopProjects.loadProjects();
-            }
-        );
+    if (window.__NOVA_PROJECT_BUTTONS_BOUND) {
+        return;
     }
 
+    const newProjectBtn =
+        document.getElementById("newProjectBtn");
 
     const continueButton =
-        $("desktopContinueProject");
+        document.getElementById("desktopContinueProject");
+
+    if (!newProjectBtn && !continueButton) {
+        console.warn(
+            "[NOVA PROJECTS] project controls not found"
+        );
+        return;
+    }
+
+    window.__NOVA_PROJECT_BUTTONS_BOUND = true;
+
 
     if (continueButton) {
         continueButton.addEventListener(
             "click",
-            () => {
+
+            function () {
+                const projectState =
+                    window.__NOVA_PROJECT_STATE || {};
 
                 const id =
-                    window.__NOVA_PROJECT_STATE
-                        .activeProjectId;
+                    projectState.activeProjectId;
 
-                if (id) {
+                console.log(
+                    "[NOVA PROJECTS] Continue clicked",
+                    id
+                );
+
+                if (
+                    id &&
+                    window.NovaDesktopProjects &&
+                    typeof window.NovaDesktopProjects
+                        .loadProjectWorkspace === "function"
+                ) {
                     window.NovaDesktopProjects
                         .loadProjectWorkspace(id);
                 }
             }
         );
     }
+
+    console.log(
+        "[NOVA PROJECTS] project buttons bound"
+    );
 }
 
 
@@ -1686,3 +2231,7 @@ document.addEventListener(
 );
 
 })();
+
+
+
+
