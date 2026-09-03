@@ -1,4 +1,5 @@
-﻿class CodeGeneratorService:
+﻿
+class CodeGeneratorService:
 
     def __init__(
         self,

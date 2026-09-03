@@ -1,9 +1,12 @@
-from pathlib import Path
+﻿from pathlib import Path
 
 from nova_backend.services.execution_approval_service import (
     ExecutionApprovalService,
 )
 
+from nova_backend.services.ai_execution_service import (
+    AIExecutionService,
+)
 
 class ExecutionStepService:
 
@@ -12,12 +15,19 @@ class ExecutionStepService:
         safe_str=None,
         python_runner=None,
         approval_service=None,
+        ai_execution_service=None,
     ):
         self.safe_str = safe_str
         self.python_runner = python_runner
         self.approval_service = (
             approval_service
             or ExecutionApprovalService()
+        )
+        self.ai_execution_service = (
+            ai_execution_service
+            or AIExecutionService(
+                safe_str=self._safe_str,
+            )
         )
 
     def _safe_str(
@@ -78,24 +88,23 @@ class ExecutionStepService:
                     or "Approval required before execution."
                 )
                 return None
-
             step["status"] = "running"
 
             step_action = self._safe_str(
                 step.get("action")
             ).strip().lower()
 
-            print(
-                "DEBUG EXECUTOR RECEIVED STEP =",
-                step,
-                flush=True,
-            )
+            # Natural-language mission steps do not always have
+            # an explicit execution action. Treat those as AI
+            # reasoning tasks instead of failing immediately.
+            if not step_action:
+                step_action = "design"
 
-            print(
-                "DEBUG EXECUTOR ACTION =",
-                step_action,
-                flush=True,
-            )
+                print(
+                    "DEBUG EXECUTOR: missing action, "
+                    "defaulting to AI execution",
+                    flush=True,
+                )
 
             ACTION_ALIASES = {
                 "analysis": "design",
@@ -120,17 +129,61 @@ class ExecutionStepService:
                 step_action,
             )
 
+            print(
+                "DEBUG EXECUTOR RECEIVED STEP =",
+                step,
+                flush=True,
+            )
+
+            print(
+                "DEBUG EXECUTOR ACTION =",
+                step_action,
+                flush=True,
+            )
+
             target_file = self._safe_str(
                 step.get("target_file")
             ).strip()
 
-            if step_action == "design":
+            if step_action in {
+                "design",
+                "build",
+                "verify",
+            }:
 
-                step["result"] = (
-                    "Designed execution structure."
+                ai_result = (
+                    self.ai_execution_service.execute_step(
+                        session_id=session_id,
+                        step=step,
+                        context={
+                            "project_context": self._safe_str(
+                                step.get("project_context")
+                                or step.get("context")
+                                or ""
+                            ),
+                        },
+                    )
                 )
-                step["error"] = None
 
+                if not ai_result.get("ok"):
+                    raise RuntimeError(
+                        self._safe_str(
+                            ai_result.get("error")
+                            or "AI execution failed."
+                        )
+                    )
+
+                result = self._safe_str(
+                    ai_result.get("output")
+                ).strip()
+
+                if not result:
+                    raise RuntimeError(
+                        "AI execution returned an empty result."
+                    )
+
+                step["result"] = result
+                step["error"] = None
             elif step_action == "implement" and target_file:
 
                 if (
@@ -229,3 +282,4 @@ class ExecutionStepService:
             step["error"] = str(e)
 
         return step
+

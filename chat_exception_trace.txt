@@ -1828,3 +1828,370 @@ Traceback (most recent call last):
     if target_capture_result is not None:
        ^^^^^^^^^^^^^^^^^^^^^
 UnboundLocalError: cannot access local variable 'target_capture_result' where it is not associated with a value
+
+
+===== CHAT FAILURE =====
+TypeError("chat_handle() got an unexpected keyword argument 'regenerate'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2593, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 683, in handle
+    response = chat_handle(
+        self,
+    ...<9 lines>...
+        regenerate=regenerate,
+    )
+TypeError: chat_handle() got an unexpected keyword argument 'regenerate'
+
+
+===== CHAT FAILURE =====
+TypeError("chat_handle() got an unexpected keyword argument 'regenerate'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2593, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 683, in handle
+    response = chat_handle(
+        self,
+    ...<9 lines>...
+        regenerate=regenerate,
+    )
+TypeError: chat_handle() got an unexpected keyword argument 'regenerate'
+
+
+===== CHAT FAILURE =====
+TypeError("chat_handle() got an unexpected keyword argument 'regenerate'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2593, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 683, in handle
+    response = chat_handle(
+        self,
+    ...<9 lines>...
+        regenerate=regenerate,
+    )
+TypeError: chat_handle() got an unexpected keyword argument 'regenerate'
+
+
+===== CHAT FAILURE =====
+TypeError("chat_handle() got an unexpected keyword argument 'regenerate'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2593, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 683, in handle
+    response = chat_handle(
+        self,
+    ...<9 lines>...
+        regenerate=regenerate,
+    )
+TypeError: chat_handle() got an unexpected keyword argument 'regenerate'
+
+
+===== CHAT FAILURE =====
+TypeError("chat_handle() got an unexpected keyword argument 'regenerate'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2593, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 683, in handle
+    response = chat_handle(
+        self,
+    ...<9 lines>...
+        regenerate=regenerate,
+    )
+TypeError: chat_handle() got an unexpected keyword argument 'regenerate'
+
+
+===== CHAT FAILURE =====
+TypeError("chat_handle() got an unexpected keyword argument 'regenerate'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2593, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 683, in handle
+    response = chat_handle(
+        self,
+    ...<9 lines>...
+        regenerate=regenerate,
+    )
+TypeError: chat_handle() got an unexpected keyword argument 'regenerate'
+
+
+===== CHAT FAILURE =====
+TypeError("chat_handle() got an unexpected keyword argument 'regenerate'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2593, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 683, in handle
+    response = chat_handle(
+        self,
+    ...<9 lines>...
+        regenerate=regenerate,
+    )
+TypeError: chat_handle() got an unexpected keyword argument 'regenerate'
+
+
+===== CHAT FAILURE =====
+TypeError("chat_handle() got an unexpected keyword argument 'regenerate'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2593, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 683, in handle
+    response = chat_handle(
+        self,
+    ...<9 lines>...
+        regenerate=regenerate,
+    )
+TypeError: chat_handle() got an unexpected keyword argument 'regenerate'
+
+
+===== CHAT FAILURE =====
+TypeError("chat_handle() got an unexpected keyword argument 'regenerate'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2593, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 683, in handle
+    response = chat_handle(
+        self,
+    ...<9 lines>...
+        regenerate=regenerate,
+    )
+TypeError: chat_handle() got an unexpected keyword argument 'regenerate'
+
+
+===== CHAT FAILURE =====
+TypeError("chat_handle() got an unexpected keyword argument 'regenerate'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2593, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 683, in handle
+    response = chat_handle(
+        self,
+    ...<9 lines>...
+        regenerate=regenerate,
+    )
+TypeError: chat_handle() got an unexpected keyword argument 'regenerate'
+
+
+===== CHAT FAILURE =====
+TypeError("chat_handle() got an unexpected keyword argument 'regenerate'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2593, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 683, in handle
+    response = chat_handle(
+        self,
+    ...<9 lines>...
+        regenerate=regenerate,
+    )
+TypeError: chat_handle() got an unexpected keyword argument 'regenerate'
+
+
+===== CHAT FAILURE =====
+TypeError("chat_handle() got an unexpected keyword argument 'regenerate'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2593, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 683, in handle
+    response = chat_handle(
+        self,
+    ...<9 lines>...
+        regenerate=regenerate,
+    )
+TypeError: chat_handle() got an unexpected keyword argument 'regenerate'
+
+
+===== CHAT FAILURE =====
+TypeError("chat_handle() got an unexpected keyword argument 'regenerate'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2593, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 683, in handle
+    response = chat_handle(
+        self,
+    ...<9 lines>...
+        regenerate=regenerate,
+    )
+TypeError: chat_handle() got an unexpected keyword argument 'regenerate'
+
+
+===== CHAT FAILURE =====
+AttributeError("'ChatService' object has no attribute 'active_execution_cache'")
+Traceback (most recent call last):
+  File "C:\Users\Owner\nova\app.py", line 2593, in api_chat
+    result = chat_service.handle(
+        user_text=image_command_user_text,
+        session_id=session_id,
+        attachments=attachments_for_chat_service,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\non_web_source_leak_guard_service.py", line 230, in guarded_handle
+    result = original_handle(
+        self,
+        *args,
+        **kwargs,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\repair_plan_priority_guard_service.py", line 92, in repair_plan_handle
+    return previous_handle(self, *args, **kwargs)
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 633, in handle
+    execution_result = self._handle_execution_control(
+        user_text=user_text,
+        session_id=session_id,
+        attachments=attachments,
+    )
+  File "C:\Users\Owner\nova\nova_backend\services\chat_service.py", line 7060, in _handle_execution_control
+    self.active_execution_cache.get(session_id)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChatService' object has no attribute 'active_execution_cache'

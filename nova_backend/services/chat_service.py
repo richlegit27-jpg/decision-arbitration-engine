@@ -19,6 +19,8 @@ from nova_backend.services.chat.project_brain import install_project_brain_patch
 from nova_backend.services.chat.execution import ChatExecutionHandler
 from nova_backend.services.chat.router import ChatRouter
 from nova_backend.services.planner_service import PlannerService
+from nova_backend.services.project_builder_service import ProjectBuilderService
+from nova_backend.services.project_workspace_service import ProjectWorkspaceService
 from nova_backend.services.execution.service import ExecutionService
 from nova_backend.services.intelligence.router import IntelligenceRouter
 from nova_backend.services.auto_fix.service import AutoFixService
@@ -246,7 +248,6 @@ class ChatService:
                 memory_service=memory_service,
             )
         )
-
         self.chat_response_cleanup_service = ChatResponseCleanupService()
         self.chat_response_policy_service = ChatResponsePolicyService()
         self.runtime_cognitive_firewall = RuntimeCognitiveFirewall()
@@ -262,32 +263,27 @@ class ChatService:
         self.execution_handler = ExecutionHandler(self)
 
         if self.chat_execution_service:
-            self.chat_execution_service.execution_handler = (
-                self.execution_handler
+            self.chat_execution_service.set_session_service(
+                session_service
             )
-
-        self.chat_execution_service.set_session_service(
-            session_service
-        )
-
         self.response_handler = ChatResponseHandler(self)
         self.chat_router = ChatRouter(self)
         self.planner_service = PlannerService(self)
+        self.project_workspace_service = ProjectWorkspaceService()
+        self.project_builder_service = ProjectBuilderService(
+        self.project_workspace_service
+            )
         self.intelligence_router = IntelligenceRouter(self)
-
         self.orchestrator = (
             NovaOrchestrator(
                 execution_state_service=execution_state_service,
                 memory_service=memory_service,
             )
         )
-
         self.decision_service = DecisionService(
             self
         )
-
         self.auto_fix_service = AutoFixService(self)
-
         self.session_service = session_service
         self.memory_service = memory_service
         self.runtime_uploads_normalizer_service = runtime_uploads_normalizer_service
@@ -1048,20 +1044,17 @@ class ChatService:
 
         return False
 
-
     def _process_goal_and_plan(
         self,
         user_text: str,
         session_id: str,
     ):
-
         existing_execution = (
             self._load_execution_state(
                 session_id
             )
             or {}
         )
-
 
         if (
             isinstance(
@@ -1085,8 +1078,67 @@ class ChatService:
                 execution_state=existing_execution,
             )
 
+        text = str(
+            user_text or ""
+        ).strip()
+
+        # ----------------------------------------------------------
+        # PROJECT BUILDER
+        # ----------------------------------------------------------
+        #
+        # Only treat clear project-building requests as projects.
+        # Ordinary questions, debugging requests, and control commands
+        # continue through the existing execution/planner path.
+        #
+        if self._looks_like_project_request(
+            text
+        ) and not self._is_control_command_value(
+            text
+        ):
+            try:
+                project_result = (
+                    self.project_builder_service
+                    .build_project_from_request(
+                        user_text=text,
+                        owner_id="default",
+                    )
+                )
+
+                if project_result:
+                    return {
+                        "status": "ready",
+                        "route": "project_builder",
+                        "intent": "project",
+                        "project_id": project_result.get(
+                            "project_id"
+                        ),
+                        "project": project_result.get(
+                            "project"
+                        ),
+                        "plan": project_result.get(
+                            "plan"
+                        ),
+                        "tasks": project_result.get(
+                            "tasks"
+                        ),
+                        "goal": text,
+                        "steps": project_result.get(
+                            "tasks"
+                        ) or [],
+                    }
+
+            except Exception as exc:
+                self.logger.exception(
+                    "Project Builder failed: %s",
+                    exc,
+                )
+
+        # ----------------------------------------------------------
+        # EXISTING EXECUTION / PLANNER PATH
+        # ----------------------------------------------------------
+
         goal = self._build_goal(
-            user_text,
+            text,
             session_id,
         )
 
@@ -1095,7 +1147,7 @@ class ChatService:
         )
 
         execution = self._build_execution(
-            user_text,
+            text,
             plan,
             {
                 "route": "planner",
@@ -1111,6 +1163,7 @@ class ChatService:
                 execution.get("status")
                 or "ready"
             )
+
             execution["current_index"] = (
                 execution.get("current_index")
                 or 0
@@ -1119,8 +1172,15 @@ class ChatService:
             execution["current_step"] = (
                 execution.get("current_step")
                 or (
-                    execution.get("steps", [{}])[0].get("title")
-                    if execution.get("steps")
+                    execution.get(
+                        "steps",
+                        [{}],
+                    )[0].get(
+                        "title"
+                    )
+                    if execution.get(
+                        "steps"
+                    )
                     else ""
                 )
             )
@@ -1132,6 +1192,48 @@ class ChatService:
 
         return execution or {}
 
+    def _looks_like_project_request(
+        self,
+        text: str,
+    ) -> bool:
+        """
+        Detect explicit project-building intent.
+
+        Keep this deliberately conservative so normal conversation
+        does not accidentally create projects.
+        """
+
+        value = str(
+            text or ""
+        ).strip().lower()
+
+        if not value:
+            return False
+
+        project_phrases = (
+            "build a project",
+            "build the project",
+            "create a project",
+            "start a project",
+            "new project",
+            "build an app",
+            "create an app",
+            "build a website",
+            "create a website",
+            "build a web app",
+            "create a web app",
+            "develop an app",
+            "develop a website",
+            "develop a system",
+            "build a system",
+            "create a system",
+            "implement a system",
+        )
+
+        return any(
+            phrase in value
+            for phrase in project_phrases
+        )
     def _get_working_state(self, session_id: str) -> dict:
         return self.working_state_service.get_working_state(
             session_id

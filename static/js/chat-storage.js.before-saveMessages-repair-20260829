@@ -1,0 +1,796 @@
+﻿(() => {
+  "use strict";
+
+  const el = {
+    newChatBtn: document.getElementById("btnNewChat"),
+    chatList: document.getElementById("chatList")
+  };
+
+  let createInFlight = false;
+
+  function getState(){
+    return window.NovaChatState?.state || null;
+  }
+
+  function normalizeChat(chat){
+    if(!chat){
+      return null;
+    }
+
+    return {
+      ...chat,
+      id: String(chat.id || chat.session_id || "").trim(),
+      title: String(
+        chat.title ||
+        chat.name ||
+        "New Chat"
+      ),
+      messages: Array.isArray(chat.messages)
+        ? chat.messages
+        : [],
+      message_count: Number(chat.message_count || 0)
+    };
+  }
+
+  function renderChatList(){
+    if(!el.chatList){
+      return;
+    }
+
+    el.chatList.innerHTML = "";
+
+    const state = getState();
+    const chats = Array.isArray(state?.chats)
+      ? state.chats
+      : [];
+
+    if(!chats.length){
+      el.chatList.innerHTML =
+        "<div class='chat-list-empty'>No chats yet</div>";
+      return;
+    }
+
+    chats.forEach(rawChat => {
+      const chat = normalizeChat(rawChat);
+
+      if(!chat?.id){
+        return;
+      }
+
+      const li = document.createElement("div");
+
+      li.className = "chat-list-item";
+      li.dataset.chatId = chat.id;
+      li.textContent = chat.title;
+
+      if(String(state.activeChatId) === String(chat.id)){
+        li.classList.add("active");
+      }
+
+      li.onclick = async event => {
+        event?.stopPropagation();
+
+        try{
+          if(typeof window.NovaChatState?.setActiveChat === "function"){
+            window.NovaChatState.setActiveChat(chat.id);
+          }else if(state){
+            state.activeChatId = chat.id;
+          }
+
+          await loadMessages(chat.id);
+
+          renderChatList();
+
+          if(typeof window.NovaChatOrchestrator?.loadActiveChatMessages === "function"){
+            await window.NovaChatOrchestrator.loadActiveChatMessages();
+          }
+
+          window.dispatchEvent(
+            new CustomEvent("nova:chat-changed", {
+              detail: {
+                chatId: chat.id
+              }
+            })
+          );
+
+        }catch(error){
+          console.error(
+            "[NovaChatStorage] chat selection error:",
+            error
+          );
+        }
+      };
+
+      const del = document.createElement("button");
+
+      del.type = "button";
+      del.textContent = "×";
+      del.style.float = "right";
+
+      del.onclick = async event => {
+        event?.stopPropagation();
+
+        try{
+          await deleteChat(chat.id);
+          renderChatList();
+        }catch(error){
+          console.error(
+            "[NovaChatStorage] delete chat error:",
+            error
+          );
+        }
+      };
+
+      li.appendChild(del);
+      el.chatList.appendChild(li);
+    });
+  }
+  async function loadChats(){
+    const state = getState();
+
+    if(!state){
+      throw new Error("NovaChatState missing");
+    }
+
+    const response = await fetch(
+      "/api/chats",
+      {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store"
+      }
+    );
+
+    if(!response.ok){
+      throw new Error(
+        `Failed to load chats (${response.status})`
+      );
+    }
+
+    const data = await response.json();
+
+    const rawChats =
+      Array.isArray(data?.chats)
+        ? data.chats
+        : Array.isArray(data?.items)
+          ? data.items
+          : Array.isArray(data?.sessions)
+            ? data.sessions
+            : [];
+
+    const chats = rawChats
+      .map(normalizeChat)
+      .filter(chat => chat?.id);
+
+    state.chats = chats;
+
+    let activeChat = chats.find(
+      chat =>
+        String(chat.id) ===
+        String(state.activeChatId || "")
+    );
+
+    const backendActiveId = String(
+      data?.active_session_id ||
+      data?.active_chat_id ||
+      data?.activeChatId ||
+      ""
+    ).trim();
+
+    if(!activeChat && backendActiveId){
+      activeChat = chats.find(
+        chat =>
+          String(chat.id) ===
+          backendActiveId
+      ) || null;
+    }
+
+    if(!activeChat){
+      activeChat =
+        chats.find(
+          chat =>
+            Array.isArray(chat.messages) &&
+            chat.messages.length > 0
+        ) ||
+        chats.find(
+          chat =>
+            Number(chat.message_count || 0) > 0
+        ) ||
+        chats[0] ||
+        null;
+    }
+
+    if(activeChat){
+      state.activeChatId = String(activeChat.id);
+      state.messages = Array.isArray(activeChat.messages)
+        ? activeChat.messages
+        : [];
+
+      state.messagesByChatId =
+        state.messagesByChatId || {};
+
+      state.messagesByChatId[state.activeChatId] =
+        state.messages;
+
+      console.log(
+        "[NovaChatStorage] ACTIVE CHAT SELECTED:",
+        state.activeChatId,
+        "messages:",
+        state.messages.length
+      );
+    }else{
+      state.activeChatId = null;
+      state.messages = [];
+    }
+
+    renderChatList();
+
+    window.dispatchEvent(
+      new CustomEvent("nova:chats-loaded", {
+        detail: {
+          chats,
+          activeChatId: state.activeChatId
+        }
+      })
+    );
+
+    console.log(
+      "[NovaChatStorage] loaded chats:",
+      chats.length,
+      "active:",
+      state.activeChatId
+    );
+
+    return chats;
+  }
+
+  async function loadMessages(chatId){
+    const state = getState();
+
+    const id = String(chatId || "").trim();
+
+    if(!id){
+      return [];
+    }
+
+    const response = await fetch(
+      `/api/sessions/${encodeURIComponent(id)}`,
+      {
+        method: "GET",
+        cache: "no-store"
+      }
+    );
+
+    if(!response.ok){
+      throw new Error(
+        `Failed to load chat ${id} (${response.status})`
+      );
+    }
+
+    const data = await response.json();
+
+    let messages = [];
+
+    if(Array.isArray(data?.messages)){
+      messages = data.messages;
+    }else if(
+      data?.session &&
+      Array.isArray(data.session.messages)
+    ){
+      messages = data.session.messages;
+    }
+
+    if(state){
+      state.activeChatId = id;
+      state.messages = messages;
+
+      const chat = state.chats?.find(
+        item => String(item.id) === id
+      );
+
+      if(chat){
+        chat.messages = messages;
+        chat.message_count = messages.length;
+      }
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("nova:messages-loaded", {
+        detail: {
+          chatId: id,
+          messages
+        }
+      })
+    );
+
+    console.log(
+      "[NovaChatStorage] loaded messages:",
+      id,
+      messages.length
+    );
+
+    return messages;
+  }
+
+  async function saveMessages(id, messages){
+    id = String(id || "").trim()
+
+    if(!id){
+      return false
+    }
+
+    const normalizedMessages =
+      Array.isArray(messages)
+        ? messages
+        : []
+
+    const state = getState()
+
+    if(state){
+      state.activeChatId = id
+      state.messages = normalizedMessages
+
+      const chat = state.chats?.find(
+        item => String(item.id) === id
+      )
+
+      if(chat){
+        chat.messages = normalizedMessages
+        chat.message_count = normalizedMessages.length
+        chat.updated_at = new Date().toISOString()
+      }
+    }
+
+    /*
+     * The backend owns durable history.
+     *
+     * The frontend may temporarily contain fewer messages than the
+     * backend during send/thinking/render transitions. Never send a
+     * shorter history because the backend correctly rejects shrinking
+     * message history.
+     */
+
+    try{
+      let messagesToSave = normalizedMessages
+
+      const existingResponse = await fetch(
+        `/api/sessions/${encodeURIComponent(id)}`,
+        {
+          method: "GET",
+          credentials: "include"
+        }
+      )
+
+      if(existingResponse.ok){
+        const existingPayload = await existingResponse.json()
+        const existingSession = existingPayload?.session
+        const existingMessages =
+          Array.isArray(existingSession?.messages)
+            ? existingSession.messages
+            : []
+
+        if(existingMessages.length > messagesToSave.length){
+          messagesToSave = existingMessages
+        }else if(existingMessages.length > 0){
+          const existingIds = new Set(
+            existingMessages.map(
+              message => String(message?.id || "")
+            )
+          )
+
+          const additions = messagesToSave.filter(
+            message =>
+              !existingIds.has(
+                String(message?.id || "")
+              )
+          )
+
+          messagesToSave = [
+            ...existingMessages,
+            ...additions
+          ]
+        }
+      }
+
+      const response = await fetch(
+        `/api/sessions/${encodeURIComponent(id)}`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            messages: messagesToSave
+          })
+        }
+      )
+
+      if(response.ok){
+        return true
+      }
+
+      console.warn(
+        "[NovaChatStorage] backend message save unavailable:",
+        response.status
+      )
+
+    }catch(error){
+      console.warn(
+        "[NovaChatStorage] backend message save failed:",
+        error
+      )
+    }
+
+    return false
+  }
+    const id = String(chatId || "").trim();
+
+    if(!id){
+      return false;
+    }
+
+    const normalizedMessages =
+      Array.isArray(messages)
+        ? messages
+        : [];
+
+    const state = getState();
+
+    if(state){
+      state.activeChatId = id;
+      state.messages = normalizedMessages;
+
+      const chat = state.chats?.find(
+        item => String(item.id) === id
+      );
+
+      if(chat){
+        chat.messages = normalizedMessages;
+        chat.message_count = normalizedMessages.length;
+        chat.updated_at = new Date().toISOString();
+      }
+    }
+
+    /*
+     * The frontend keeps the authoritative live message state here.
+     *
+     * Backend persistence is attempted only when a compatible
+     * endpoint exists. A failure must not destroy the live chat.
+     */
+
+    try{
+      const response = await fetch(
+        `/api/sessions/${encodeURIComponent(id)}`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            messages: normalizedMessages
+          })
+        }
+      );
+
+      if(response.ok){
+        return true;
+      }
+
+      console.warn(
+        "[NovaChatStorage] backend message save unavailable:",
+        response.status
+      );
+
+    }catch(error){
+      console.warn(
+        "[NovaChatStorage] backend message save failed:",
+        error
+      );
+    }
+
+    return false;
+  }
+
+  function setActiveChat(chatId){
+    const state = getState();
+
+    if(!state){
+      return null;
+    }
+
+    const id = String(chatId || "").trim();
+
+    if(!id){
+      return null;
+    }
+
+    const chat = state.chats?.find(
+      item => String(item.id) === id
+    );
+
+    if(!chat){
+      console.warn(
+        "[NovaChatStorage] active chat not found:",
+        id
+      );
+      return null;
+    }
+
+    state.activeChatId = id;
+
+    state.messages =
+      Array.isArray(chat.messages)
+        ? chat.messages
+        : [];
+
+    renderChatList();
+
+    return chat;
+  }
+
+  async function createAndSaveChat(title = "New Chat"){
+    if(createInFlight){
+      return null;
+    }
+
+    createInFlight = true;
+
+    try{
+      const response = await fetch(
+        "/api/sessions",
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            title
+          })
+        }
+      );
+
+      if(!response.ok){
+        throw new Error(
+          `Failed to create chat (${response.status})`
+        );
+      }
+
+      const data = await response.json();
+
+      const chat = normalizeChat(
+        data?.session ||
+        data?.item ||
+        data
+      );
+
+      if(!chat?.id){
+        throw new Error(
+          "Backend returned no chat/session ID"
+        );
+      }
+
+      const state = getState();
+
+      if(state){
+        state.chats = Array.isArray(state.chats)
+          ? state.chats
+          : [];
+
+        state.chats = [
+          chat,
+          ...state.chats.filter(
+            item => String(item.id) !== chat.id
+          )
+        ];
+
+        state.activeChatId = chat.id;
+        state.messages = chat.messages;
+      }
+
+      renderChatList();
+
+      window.dispatchEvent(
+        new CustomEvent("nova:chat-created", {
+          detail: {
+            chat
+          }
+        })
+      );
+
+      return chat;
+
+    }finally{
+      createInFlight = false;
+    }
+  }
+
+  async function openNewChat(){
+    if(createInFlight){
+      return;
+    }
+
+    if(el.newChatBtn){
+      el.newChatBtn.disabled = true;
+      el.newChatBtn.textContent = "Creating...";
+    }
+
+    try{
+      const chat = await createAndSaveChat("New Chat");
+
+      if(chat){
+        renderChatList();
+
+        if(window.innerWidth <= 980){
+          document.body.classList.remove("sidebar-open");
+        }
+      }
+
+      return chat;
+
+    }catch(error){
+      console.error(
+        "[NovaChatStorage] new chat error:",
+        error
+      );
+
+      alert(
+        error?.message ||
+        "Could not create chat."
+      );
+
+      return null;
+
+    }finally{
+      if(el.newChatBtn){
+        el.newChatBtn.disabled = false;
+        el.newChatBtn.textContent = "+ New Chat";
+      }
+    }
+  }
+
+  async function deleteChat(chatId){
+    const id = String(chatId || "").trim();
+
+    if(!id){
+      return false;
+    }
+
+    try{
+      const response = await fetch(
+        `/api/sessions/${encodeURIComponent(id)}`,
+        {
+          method: "DELETE"
+        }
+      );
+
+      if(!response.ok && response.status !== 404){
+        console.warn(
+          "[NovaChatStorage] backend delete failed:",
+          response.status
+        );
+      }
+    }catch(error){
+      console.warn(
+        "[NovaChatStorage] backend delete unavailable:",
+        error
+      );
+    }
+
+    const state = getState();
+
+    if(!state){
+      return false;
+    }
+
+    state.chats = Array.isArray(state.chats)
+      ? state.chats.filter(
+          chat => String(chat.id) !== id
+        )
+      : [];
+
+    if(String(state.activeChatId) === id){
+      const next = state.chats[0] || null;
+
+      state.activeChatId = next?.id || null;
+      state.messages =
+        next && Array.isArray(next.messages)
+          ? next.messages
+          : [];
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("nova:chat-deleted", {
+        detail: {
+          chatId: id
+        }
+      })
+    );
+
+    return true;
+  }
+
+  function getActiveChat(){
+    const state = getState();
+
+    if(!state?.activeChatId){
+      return null;
+    }
+
+    return state.chats?.find(
+      chat =>
+        String(chat.id) ===
+        String(state.activeChatId)
+    ) || null;
+  }
+
+  function getEffectiveOutgoingText(
+    text,
+    attachments = []
+  ){
+    const value = String(text || "").trim();
+
+    if(value){
+      return value;
+    }
+
+    if(Array.isArray(attachments) && attachments.length){
+      return attachments
+        .map(
+          item =>
+            String(
+              item?.name ||
+              item?.filename ||
+              ""
+            ).trim()
+        )
+        .filter(Boolean)
+        .join(", ");
+    }
+
+    return "";
+  }
+
+  function init(){
+    renderChatList();
+
+    if(el.newChatBtn){
+      el.newChatBtn.addEventListener(
+        "click",
+        openNewChat
+      );
+    }
+  }
+
+  window.NovaChatStorage = {
+    renderChatList,
+    openNewChat,
+    createAndSaveChat,
+    loadChats,
+    loadMessages,
+    saveMessages,
+    setActiveChat,
+    deleteChat,
+    getActiveChat,
+    getEffectiveOutgoingText
+  };
+
+  if(document.readyState === "loading"){
+    document.addEventListener(
+      "DOMContentLoaded",
+      init,
+      { once: true }
+    );
+  }else{
+    init();
+  }
+
+})();
+
+
+
+
+
+

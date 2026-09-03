@@ -1,21 +1,48 @@
-﻿[33ma968b21[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mbrain-pass-working-2026-03-27[m[33m)[m backup checkpoint before session rail rollback
-[33m1c75ab3[m save checkpoint live search real publisher resolution
-[33m55e99d0[m[33m ([m[1;33mtag: [m[1;33mweb-card-render-premium-2026-04-01[m[33m)[m web card render premium: polished chat card, artifact reopen, web rail sync
-[33m6377331[m[33m ([m[1;33mtag: [m[1;33mweb-fetch-polish-2026-03-31[m[33m)[m web fetch polish: clean summary, stable web meta, artifact reopen ready, ssl fallback locked, route stable
-[33m68c5570[m[33m ([m[1;33mtag: [m[1;33mSTABLE-2026-03-31[m[33m)[m STABLE BASELINE: chat + UI + responsive + working send/upload
-[33m464d377[m composer upload to chat normalized media contract wired
-[33m3628b66[m media-render-path polish image video audio in chat and artifacts
-[33mea3dd29[m backend-lock-stable-2026-03-31 media-prep checkpoint (chat + artifacts + memory unified, no streaming yet)
-[33m2da483d[m checkpoint: session rail + composer restore + left/right rail controls
-[33m3d2acdf[m wire composer with session rail switching and refresh flow
-[33m9d0ef4f[m wire session rail list switch refresh and new chat flow
-[33mcab9109[m add session rail and session switching flow
-[33m9a69c4e[m finish real session persistence and restore pipeline
-[33m001ab16[m stabilize rendered message hooks for session history restore
-[33mcdc7e75[m persist session messages and restore chat on load
-[33m8a4763d[m history pipeline wired and visible in chat
-[33mae7c96b[m show history badge in chat responses
-[33m0bd762c[m frontend sends recent chat history to backend
-[33m28dd87d[m history pass-through on real model path
-[33mbb5437d[m checkpoint: unified chat render contract + stable api chat payload + unified right rail
-
+ app.py                                             |  612 [32m++++[m[31m-[m
+ nova_backend/routes/project_routes.py              |  211 [32m+[m[31m-[m
+ nova_backend/services/action_router.py             |    9 [32m+[m[31m-[m
+ nova_backend/services/chat/handle.py               |    2 [32m+[m
+ nova_backend/services/chat/response.py             |   74 [32m+[m[31m-[m
+ nova_backend/services/chat_execution_service.py    |  120 [32m+[m
+ nova_backend/services/chat_service.py              |   18 [32m+[m[31m-[m
+ .../services/execution_stream_route_service.py     |  241 [32m+[m[31m-[m
+ nova_backend/services/execution_stream_service.py  |   67 [32m+[m[31m-[m
+ .../services/project_execution_controller.py       |  414 [32m++++[m
+ .../services/project_intelligence_service.py       |   39 [32m+[m[31m-[m
+ nova_backend/services/project_workspace_service.py |  670 [32m+++++[m[31m-[m
+ nova_backend/services/safe_unified_runtime.py      |    5 [32m+[m[31m-[m
+ nova_backend/services/session_service.py           |   69 [32m+[m[31m-[m
+ nova_backend/tools/project_workspace_tool.py       |   47 [32m+[m
+ static/css/nova-desktop-polish.css                 | 1748 [32m++++++++++++++[m
+ static/css/nova-main.css                           |   34 [32m+[m
+ static/js/05.inline.js                             |   36 [32m+[m[31m-[m
+ static/js/99.patch.js                              |   22 [32m+[m[31m-[m
+ static/js/answer-payload.js                        |  190 [32m+[m[31m-[m
+ static/js/api-stream.js                            |   15 [32m+[m[31m-[m
+ static/js/app-api.js                               |   94 [32m+[m[31m-[m
+ static/js/app-state.js                             |  332 [32m+[m[31m--[m
+ static/js/app.js                                   |  138 [32m+[m[31m-[m
+ static/js/chat-actions.js                          |  103 [32m+[m[31m-[m
+ static/js/chat-app.js                              |  574 [32m++[m[31m---[m
+ static/js/chat-events.js                           |   27 [32m+[m[31m-[m
+ static/js/chat-messages.js                         |  748 [32m+++++[m[31m-[m
+ static/js/chat-orchestrator.js                     |   76 [32m+[m[31m-[m
+ static/js/chat-render.js                           |    1 [32m+[m
+ static/js/chat-service.js                          |  558 [32m+++[m[31m--[m
+ static/js/chat-state.js                            |  667 [32m+++++[m[31m-[m
+ static/js/chat.js                                  |  135 [32m+[m[31m-[m
+ static/js/chat/chat.js                             |  266 [32m+[m[31m--[m
+ static/js/composer-actions.js                      |  604 [32m++++[m[31m-[m
+ static/js/composer-service.js                      |  568 [32m++[m[31m---[m
+ static/js/composer.js                              |   16 [32m+[m[31m-[m
+ static/js/nova-api.js                              |   11 [32m+[m[31m-[m
+ static/js/nova-bootstrap.js                        |   14 [32m+[m[31m-[m
+ static/js/nova-chat-stream.js                      | 1141 [32m++[m[31m-------[m
+ static/js/nova-chat.js                             |   74 [32m+[m[31m-[m
+ static/js/nova-composer-bridge.js                  |  446 [32m+++[m[31m-[m
+ static/js/nova-composer-bundle.js                  |  233 [32m+[m[31m-[m
+ static/js/nova-desktop-projects.js                 |  853 [32m+++++[m[31m--[m
+ static/js/nova-desktop-sessions.js                 |  223 [32m+[m[31m-[m
+ static/js/nova-sessions-v2.js                      |  647 [32m++++[m[31m-[m
+ templates/app.html                                 | 2465 [32m+++++++[m[31m-------------[m
+ 47 files changed, 10447 insertions(+), 5210 deletions(-)

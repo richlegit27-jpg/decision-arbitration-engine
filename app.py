@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import os
 import re
@@ -133,6 +133,9 @@ from nova_backend.services.stale_working_state_history_service import (
 from nova_backend.routes.planner_routes import (
     register_planner_routes,
 )
+from nova_backend.routes.project_routes import (
+    register_project_routes,
+)
 from nova_backend.services.upload_ownership_service import (
     UploadOwnershipService,
 )
@@ -236,6 +239,9 @@ print(
     getattr(ChatService, "_decide_route", None),
 )
 from nova_backend.services.execution_handler import NextMove, default_executor
+from nova_backend.services.project_execution_handler import (
+    ProjectExecutionHandler,
+)
 from nova_backend.services.execution_daemon import ExecutionDaemon
 from nova_backend.services.chat_execution_service import (
     chat_execution_service,
@@ -421,7 +427,14 @@ chat_execution_service.execution_state_service = execution_state_service
 chat_execution_service.set_session_service(
     session_service
 )
-
+project_execution_handler = (
+    ProjectExecutionHandler(
+        default_executor=default_executor
+    )
+)
+chat_execution_service.execution_handler = (
+    project_execution_handler
+)
 memory_command_service = MemoryCommandService(
     session_service=session_service,
 )
@@ -749,7 +762,6 @@ app.secret_key = os.environ.get(
 
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = False
-
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_NAME"] = "nova_session"
 
@@ -761,12 +773,24 @@ ensure_dir(UPLOADS_DIR)
 app.config["UPLOAD_FOLDER"] = str(UPLOADS_DIR)
 
 memory_route_service.install_routes(app)
+
 blog_route_service.install_routes(
     app
 )
 
 register_planner_routes(app)
 print("[NOVA_PLANNER_ROUTES_20260812] installed")
+
+from nova_backend.routes.project_routes import (
+    register_project_routes,
+)
+
+register_project_routes(
+    app,
+    chat_execution_service=chat_execution_service,
+)
+
+print("[NOVA_PROJECT_ROUTES_20260901] installed")
 
 session_route_service.install_routes(
     app,
@@ -1026,14 +1050,17 @@ local_auth_route_service = LocalAuthRouteService(
     jsonify,
     session,
 )
-
 project_workspace_service = ProjectWorkspaceService(
     data_dir="data"
 )
 project_execution_controller = ProjectExecutionController(
-    project_workspace_service
+    project_workspace_service=(
+        project_workspace_service
+    ),
+    chat_execution_service=(
+        chat_execution_service
+    ),
 )
-
 local_auth_route_service.install_routes()
 
 google_auth_service = GoogleAuthService(
@@ -1524,63 +1551,78 @@ def api_project_get(
 )
 def api_projects_new():
     data = request.get_json(
-        silent=False
-    ) or {}
-
-    print(
-        "[NOVA PROJECT CREATE DEBUG]",
-        "content_type=",
-        request.content_type,
-        "raw=",
-        request.get_data(
-            cache=True,
-            as_text=True,
-        ),
-        "json=",
-        data,
-    )
-
-    project = project_workspace_service.create_project(
-        data.get("name"),
-        data.get("description", ""),
-    )
-
-
-    return jsonify(
-        {
-            "ok": True,
-            "project": project,
-        }
-    )
-
-    data = request.get_json(
         silent=True
     ) or {}
 
-    task = project_workspace_service.add_task(
-        project_id,
-        data.get("title", ""),
-        data.get(
-            "priority",
-            "medium",
-        ),
-    )
+    name = str(
+        data.get("name") or ""
+    ).strip()
 
-    if not task:
+    description = str(
+        data.get("description") or ""
+    ).strip()
+
+    request_text = description or name
+
+    if not request_text:
         return jsonify(
             {
                 "ok": False,
-                "error": "Project not found",
+                "error": "Project name or description is required.",
             }
-        ), 404
+        ), 400
 
-    return jsonify(
-        {
-            "ok": True,
-            "task": task,
-        }
-    )
+    try:
+        from nova_backend.services.project_builder_service import (
+            ProjectBuilderService,
+        )
 
+        project_builder = ProjectBuilderService(
+            project_workspace_service
+        )
+
+        result = project_builder.build_project_from_request(
+            request_text
+        )
+
+        project_id = result.get(
+            "project_id"
+        )
+
+        project = (
+            project_workspace_service.get_project(
+                project_id
+            )
+            if project_id
+            else None
+        )
+
+        if project_id:
+            project_workspace_service.set_active_project(
+                project_id
+            )
+
+        return jsonify(
+            {
+                "ok": True,
+                "project": project,
+                "builder_result": result,
+            }
+        )
+
+    except Exception as error:
+
+        print(
+            "[NOVA PROJECT BUILDER ERROR]",
+            repr(error),
+        )
+
+        return jsonify(
+            {
+                "ok": False,
+                "error": str(error),
+            }
+        ), 500
 
 @app.post("/api/fetch")
 def api_fetch():
@@ -2244,7 +2286,7 @@ def api_chat():
             for index, item in enumerate(image_attachments[:5], start=1):
                 line = f"{index}. {item.get('name') or 'image attachment'} ({item.get('mime') or 'image/*'})"
                 if item.get("url"):
-                    line += f" â€” {item.get('url')}"
+                    line += f" Ã¢â‚¬â€ {item.get('url')}"
                 lines.append(line)
 
             lines.append("")
@@ -3296,6 +3338,7 @@ def api_project_active():
         }
     )
 
+
 @app.route(
     "/api/projects/<project_id>/tasks",
     methods=["POST"],
@@ -3317,6 +3360,26 @@ def api_project_add_task(
             "priority",
             "medium",
         ),
+        data.get(
+            "description",
+            "",
+        ),
+        data.get(
+            "action",
+            "",
+        ),
+        data.get(
+            "target_file",
+            "",
+        ),
+        data.get(
+            "content",
+            "",
+        ),
+        data.get(
+            "command",
+            "",
+        ),
     )
 
     if not task:
@@ -3327,68 +3390,12 @@ def api_project_add_task(
             }
         ), 404
 
-    project_workspace_service.add_activity(
-        project_id,
-        "Task created",
-        task.get(
-            "title",
-            "",
-        ),
-    )
-
     return jsonify(
         {
             "ok": True,
             "task": task,
         }
     )
-
-
-@app.route(
-    "/api/projects/<project_id>/tasks/<task_id>",
-    methods=["PATCH"],
-)
-def api_project_update_task(
-    project_id,
-    task_id,
-):
-    data = request.get_json(
-        silent=True
-    ) or {}
-
-    task = project_workspace_service.update_task_status(
-        project_id,
-        task_id,
-        data.get(
-            "status",
-            "open",
-        ),
-    )
-
-    if not task:
-        return jsonify(
-            {
-                "ok": False,
-                "error": "Task not found",
-            }
-        ), 404
-
-    project_workspace_service.add_activity(
-        project_id,
-        "Task updated",
-        task.get(
-            "title",
-            task_id,
-        ),
-    )
-
-    return jsonify(
-        {
-            "ok": True,
-            "task": task,
-        }
-    )
-
 
 @app.route(
     "/api/projects/<project_id>/tasks/<task_id>",
@@ -3809,6 +3816,32 @@ def api_project_delete_note(
     )
 
 @app.route(
+    "/api/projects/<project_id>/execution",
+    methods=["GET"],
+)
+def api_project_execution_state(
+    project_id,
+):
+    result = project_execution_controller.get_state(
+        project_id
+    )
+
+    if result is None:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found.",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            **result,
+        }
+    )
+
+@app.route(
     "/api/projects/<project_id>/execution/control",
     methods=["POST"],
 )
@@ -4043,7 +4076,6 @@ def create_startup_backup():
     files_to_backup = [
         root / "app.py",
         root / "nova_backend" / "services" / "chat_service.py",
-        root / "static" / "js" / "nova-composer-bundle.js",
         root / "templates" / "index.html",
         root / "static" / "css" / "nova-main.css",
     ]

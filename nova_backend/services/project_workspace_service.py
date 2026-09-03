@@ -2,9 +2,12 @@
 
 import json
 import uuid
+
 from datetime import datetime, timezone
 from pathlib import Path
 
+
+_UNSET = object()
 from nova_backend.services.auth_context import get_current_user_id
 
 
@@ -36,14 +39,28 @@ class ProjectWorkspaceService:
         self,
         project,
     ):
-        owner_id = self._current_owner_id()
+        current_owner_id = self._current_owner_id()
 
-        if not owner_id:
+        project_owner_id = str(
+            project.get(
+                "owner_id",
+                "",
+            ) or ""
+        ).strip()
+
+        # Legacy projects created before owner support
+        # remain accessible to the current Nova installation.
+        if not project_owner_id:
             return True
 
-        return str(
-            project.get("owner_id", "")
-        ) == str(owner_id)
+        # No authenticated owner context means do not
+        # apply owner filtering.
+        if not current_owner_id:
+            return True
+
+        return project_owner_id == str(
+            current_owner_id
+        )
 
     def _ensure_storage(
         self,
@@ -133,6 +150,19 @@ class ProjectWorkspaceService:
                 timezone.utc
             ).isoformat(),
         }
+
+    def list_projects(
+        self,
+    ):
+        projects = self._load_projects()
+
+        return [
+            project
+            for project in projects
+            if self._same_project_owner(
+                project
+            )
+        ]
 
     def get_project(
         self,
@@ -261,7 +291,7 @@ class ProjectWorkspaceService:
                     description
                 ).strip()
 
-            if status is not None:
+            if status is not _UNSET:
                 if isinstance(
                     status,
                     (dict, list, tuple, set),
@@ -328,11 +358,11 @@ class ProjectWorkspaceService:
     def update_execution_state(
         self,
         project_id,
-        status=None,
-        current_task_id=None,
-        current_step=None,
-        queue=None,
-        last_action=None,
+        status=_UNSET,
+        current_task_id=_UNSET,
+        current_step=_UNSET,
+        queue=_UNSET,
+        last_action=_UNSET,
     ):
         projects = self._load_projects()
 
@@ -357,34 +387,38 @@ class ProjectWorkspaceService:
                     self._default_execution_state()
                 )
 
-            if status is not None:
-                execution["status"] = str(
-                    status
-                ).strip()
+            if status is not _UNSET:
+                execution["status"] = (
+                    str(status).strip()
+                    if status is not None
+                    else ""
+                )
 
-            if current_task_id is not None:
+            if current_task_id is not _UNSET:
                 execution[
                     "current_task_id"
                 ] = current_task_id
 
-            if current_step is not None:
+            if current_step is not _UNSET:
                 execution[
                     "current_step"
                 ] = current_step
 
-            if queue is not None:
+            if queue is not _UNSET:
                 execution["queue"] = (
                     queue
                     if isinstance(queue, list)
                     else []
                 )
 
-            if last_action is not None:
+            if last_action is not _UNSET:
                 execution[
                     "last_action"
-                ] = str(
-                    last_action
-                ).strip()
+                ] = (
+                    str(last_action).strip()
+                    if last_action is not None
+                    else ""
+                )
 
             execution["updated_at"] = (
                 datetime.now(
@@ -393,6 +427,7 @@ class ProjectWorkspaceService:
             )
 
             project["execution"] = execution
+
             project["updated_at"] = (
                 execution["updated_at"]
             )
@@ -578,6 +613,11 @@ class ProjectWorkspaceService:
         project_id,
         title,
         priority="medium",
+        description="",
+        action="",
+        target_file="",
+        content="",
+        command="",
     ):
         projects = self._load_projects()
 
@@ -599,11 +639,26 @@ class ProjectWorkspaceService:
                 ),
                 "title": str(
                     title or "New Task"
-                ),
+                ).strip(),
                 "priority": str(
-                    priority
-                ),
+                    priority or "medium"
+                ).strip(),
                 "status": "open",
+                "description": str(
+                    description or ""
+                ).strip(),
+                "action": str(
+                    action or ""
+                ).strip().lower(),
+                "target_file": str(
+                    target_file or ""
+                ).strip(),
+                "content": str(
+                    content or ""
+                ),
+                "command": str(
+                    command or ""
+                ).strip(),
                 "created_at": datetime.now(
                     timezone.utc
                 ).isoformat(),
@@ -624,7 +679,6 @@ class ProjectWorkspaceService:
             return task
 
         return None
-
     def update_task_status(
         self,
         project_id,

@@ -1,0 +1,318 @@
+﻿async function sendText(textOverride) {
+  console.log("ðŸ“Ž sendText TRIGGERED");
+
+  const liveInput =
+    document.getElementById("input") ||
+    document.querySelector("textarea");
+
+  const capturedText =
+    window.__novaLastInputBeforeSend || "";
+
+  const rawText = String(
+    textOverride ||
+    capturedText ||
+    liveInput?.value ||
+    ""
+  ).trim();
+
+  window.__novaLastInputBeforeSend = "";
+
+  const attachments =
+    pendingDesktopAttachments.slice();
+
+  const text =
+    clarifyAttachmentPrompt(
+      rawText,
+      attachments
+    );
+
+  console.log("ðŸ“Ž SEND SNAPSHOT", {
+    rawText,
+    text,
+    attachments
+  });
+
+  if (!text && !attachments.length) {
+    return;
+  }
+
+  input.value = "";
+  input.style.height = "auto";
+
+  setStatus("loading...");
+
+  novaChatAbortController =
+    new AbortController();
+
+  sendBtn.disabled = false;
+  sendBtn.textContent = "Stop";
+  sendBtn.dataset.mode = "stop";
+
+  try {
+    const response = await fetch(
+      "/api/chat",
+      {
+        signal:
+          novaChatAbortController.signal,
+
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": API_KEY
+        },
+
+        body:
+          JSON.stringify(
+            buildDesktopChatPayload(
+              text,
+              attachments
+            )
+          )
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        await response.text()
+      );
+    }
+
+    const raw =
+      await response.text();
+
+    const data =
+      JSON.parse(raw);
+
+    const freshSessionId =
+      data.session_id ||
+      data.active_session_id ||
+      data.session?.id ||
+      data.assistant_message?.session_id;
+
+    if (freshSessionId) {
+      const newSessionId =
+        String(freshSessionId);
+
+      setSessionId(newSessionId);
+
+      if (window.NovaChatState?.state) {
+        window.NovaChatState.state.activeChatId =
+          newSessionId;
+      }
+
+      console.log(
+        "[NOVA sessions] adopted backend session",
+        newSessionId
+      );
+    }
+
+    const assistantText =
+      data?.assistant_message?.text ||
+      data?.response ||
+      data?.message ||
+      "";
+
+    const userMessage = {
+      id:
+        "user-" + Date.now(),
+
+      role:
+        "user",
+
+      content:
+        text,
+
+      text:
+        text,
+
+      created_at:
+        new Date().toISOString()
+    };
+
+    const assistantMessage = {
+      id:
+        "assistant-" + Date.now(),
+
+      role:
+        "assistant",
+
+      content:
+        assistantText,
+
+      text:
+        assistantText,
+
+      created_at:
+        new Date().toISOString()
+    };
+
+    /*
+     * The desktop session manager is the source of truth
+     * for the currently rendered session.
+     *
+     * Do not create a separate two-message state here.
+     */
+    const currentSession =
+      window.NovaCurrentSessionManager?.currentSession || null;
+
+    if (
+      currentSession &&
+      Array.isArray(currentSession.messages)
+    ) {
+      currentSession.messages.push(
+        userMessage
+      );
+
+      currentSession.messages.push(
+        assistantMessage
+      );
+
+      console.log(
+        "[NOVA CURRENT SESSION AFTER PUSH]",
+        {
+          sessionId:
+            currentSession.id ||
+            currentSession.session_id,
+
+          messageCount:
+            currentSession.messages.length,
+
+          messages:
+            currentSession.messages
+        }
+      );
+
+      /*
+       * Keep NovaChatState synchronized with the same
+       * message array rather than maintaining a second
+       * independent array.
+       */
+      const appState =
+        window.NovaChatState?.state;
+
+      if (appState) {
+        appState.activeChatId =
+          currentSession.id ||
+          currentSession.session_id ||
+          appState.activeChatId;
+
+        appState.messages =
+          currentSession.messages;
+
+        console.log(
+          "[NOVA STATE SYNCHRONIZED]",
+          {
+            activeChatId:
+              appState.activeChatId,
+
+            messageCount:
+              appState.messages.length
+          }
+        );
+      }
+
+      /*
+       * Use the existing desktop renderer that produces
+       * the good Copy + Regenerate message UI.
+       *
+       * Do NOT call NovaChatMessages.renderMessages().
+       */
+      if (
+        typeof window.renderDesktopChatMessages ===
+        "function"
+      ) {
+        window.renderDesktopChatMessages(
+          currentSession.messages
+        );
+
+        console.log(
+          "[NOVA LIVE DESKTOP RENDER] primary renderer"
+        );
+
+      } else if (
+        typeof window.renderDesktopChatMessagesRescue ===
+        "function"
+      ) {
+        window.renderDesktopChatMessagesRescue(
+          currentSession.messages
+        );
+
+        console.log(
+          "[NOVA LIVE DESKTOP RENDER] rescue renderer"
+        );
+
+      } else {
+        console.warn(
+          "[NOVA] No desktop message renderer available"
+        );
+      }
+
+    } else {
+      /*
+       * This should only happen if the desktop session
+       * manager has not been hydrated yet.
+       */
+      console.warn(
+        "[NOVA] CurrentSessionManager has no usable currentSession"
+      );
+
+      const appState =
+        window.NovaChatState?.state;
+
+      if (
+        appState &&
+        Array.isArray(appState.messages)
+      ) {
+        appState.messages.push(
+          userMessage
+        );
+
+        appState.messages.push(
+          assistantMessage
+        );
+
+        console.log(
+          "[NOVA FALLBACK STATE AFTER PUSH]",
+          appState.messages
+        );
+      }
+    }
+
+    setStatus("done");
+
+    clearDesktopAttachments();
+
+  } catch (e) {
+    console.warn(
+      "sendText error:",
+      e
+    );
+
+    setStatus("error");
+
+  } finally {
+    novaChatAbortController = null;
+
+    sendBtn.disabled = false;
+
+    sendBtn.textContent =
+      "Send";
+
+    sendBtn.dataset.mode =
+      "send";
+
+    setStatus("ready");
+  }
+}
+
+// LEGACY SEND DISABLED.
+// Composer/streaming pipeline owns message sending now.
+window.sendText = sendText;
+
+console.log("[NOVA] sendText enabled");
+
+console.log(
+  "[NOVA] sendText exported",
+  typeof window.sendText
+);

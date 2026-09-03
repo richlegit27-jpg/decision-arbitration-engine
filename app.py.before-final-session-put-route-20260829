@@ -1,0 +1,4743 @@
+﻿from __future__ import annotations
+
+import os
+import re
+import shutil
+import hashlib
+import uuid
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(
+    Path(__file__).resolve().parent / ".env"
+)
+from nova_backend.services.state_route_service import StateRouteService
+from nova_backend.services.attachment_service import attachment_service
+from nova_backend.services.auth_context import get_current_user_id
+from nova_backend.services.image_vision_service import ImageVisionService
+from flask import Flask, Response, jsonify, render_template, request, send_from_directory, session
+from flask_cors import CORS
+from bs4 import BeautifulSoup
+from datetime import datetime
+from pathlib import Path
+from nova_backend.services.memory_route_service import MemoryRouteService
+from werkzeug.utils import secure_filename
+from flask import send_file
+from nova_backend.services.web_preview_route_service import WebPreviewRouteService
+from nova_backend.services.project_workspace_service import (
+    ProjectWorkspaceService,
+)
+from nova_backend.services.image_attachment_prehandle_service import (
+    image_attachment_prehandle_service,
+)
+from nova_backend.services.project_intelligence_service import (
+    project_intelligence_service,
+)
+from nova_backend.services.debug_route_service import DebugRouteService
+from nova_backend.services.attachment_response_guard_service import (
+    normalize_attachment_response,
+)
+from nova_backend.services.api_chat_final_response_service import (
+    apply_api_chat_final_response,
+)
+from nova_backend.services.session_attachment_response_service import (
+    apply_session_attachment_response,
+)
+try:
+    from nova_backend.services.real_response_attachment_lock_service import (
+        apply_real_response_attachment_lock,
+    )
+except Exception:
+    def apply_real_response_attachment_lock(*args, **kwargs):
+        return None
+
+from nova_backend.services.project_next_answer_service import (
+    get_project_next_answer,
+    is_project_next_question,
+)
+from nova_backend.services.pending_execution_cleanup_service import (
+    clear_pending_execution_actions,
+)
+from nova_backend.services.attachment_summary_lock_service import (
+    apply_attachment_summary_lock,
+)
+from nova_backend.services.empty_request_response_service import (
+    build_empty_request_response,
+)
+from nova_backend.services.attachment_shape_normalizer_service import (
+    AttachmentShapeNormalizerService,
+)
+from nova_backend.services.chat_response_contract_service import (
+    normalize_assistant_message,
+)
+from nova_backend.services.chat_response_payload_service import (
+    build_chat_response_payload,
+)
+from nova_backend.services.weak_response_guard_service import (
+    apply_weak_response_guard,
+)
+from nova_backend.services.chat_assistant_message_builder_service import (
+    build_assistant_message,
+)
+from nova_backend.services.final_attachment_response_service import (
+    apply_final_attachment_response,
+)
+from nova_backend.services.execution_guard_service import (
+    ExecutionGuardService,
+)
+from nova_backend.services.image_command_service import (
+    ImageCommandService,
+)
+from nova_backend.services.repair_plan_priority_guard_service import (
+    RepairPlanPriorityGuardService,
+)
+from nova_backend.services.autonomy_route_guard_service import (
+    AutonomyRouteGuardService,
+)
+from nova_backend.services.project_brain_general_intelligence_priority_service import (
+    ProjectBrainGeneralIntelligencePriorityService,
+)
+from nova_backend.services.chat_response_normalizer_service import (
+    normalize_chat_result,
+)
+from nova_backend.services.execution_priority_guard_service import (
+    ExecutionPriorityGuardService,
+)
+from nova_backend.services.lead_route_service import LeadRouteService
+
+from nova_backend.routes.memory_panel_routes import (
+    register_memory_panel_routes,
+)
+from nova_backend.services.project_next_response_service import (
+    build_project_next_response,
+)
+from nova_backend.services.mobile_session_persist_service import (
+    MobileSessionPersistService,
+)
+from nova_backend.services.chat_attachment_guard_service import (
+    ChatAttachmentGuardService,
+)
+from nova_backend.routes.improvement_routes import (
+
+    register_improvement_routes,
+)
+from nova_backend.services.session_route_service import SessionRouteService
+from nova_backend.services.error_reporting_service import ErrorReportingService
+from nova_backend.services.stale_working_state_history_service import (
+    clean_response_stale_working_state_history,
+)
+from nova_backend.routes.planner_routes import (
+    register_planner_routes,
+)
+from nova_backend.services.upload_ownership_service import (
+    UploadOwnershipService,
+)
+import time
+
+_t0 = time.perf_counter()
+
+from nova_backend.services.execution_bridge_service import (
+    ExecutionBridgeService,
+)
+
+print(
+    "[IMPORT TIMING] execution_bridge_service",
+    round(time.perf_counter() - _t0, 3),
+    "seconds",
+    flush=True,
+)
+from nova_backend.services.upload_route_service import (
+    UploadRouteService,
+)
+from nova_backend.services.attachment_text_service import (
+    AttachmentTextService,
+)
+from nova_backend.services.attachment_utils_service import (
+    AttachmentUtilsService,
+)
+from nova_backend.services.execution_stream_service import (
+    ExecutionStreamService,
+)
+from nova_backend.services.coding_judgment_service import (
+    get_coding_judgment_answer,
+)
+from nova_backend.services.chat_stream_service import (
+    ChatStreamService,
+)
+from nova_backend.services.execution_fix_service import (
+    ExecutionFixService,
+)
+from nova_backend.services.chat_guard_service import (
+    ChatGuardService,
+)
+from nova_backend.services.project_state_route_guard_service import (
+    ProjectStateRouteGuardService,
+)
+from nova_backend.services.chat_request_context_service import (
+    ChatRequestContextService,
+)
+
+from nova_backend.services.execution_route_service import ExecutionRouteService
+from nova_backend.services import session_auth_scope_service
+from nova_backend.services import attachment_gate_service
+from nova_backend.utils.api_response import ok_response, error_response
+from nova_backend.utils.request_utils import get_json_body, get_str, get_list, normalize_attachments
+from nova_backend.services import attachment_memory_service
+from nova_backend.services.attachment_memory_service import (
+    persist_attachments_for_session,
+    summarize_attachments_for_session,
+)
+from nova_backend.utils.route_guard import guarded_json_route
+from nova_backend.config import (
+    BASE_DIR,
+    DATA_DIR,
+    UPLOADS_DIR,
+    SESSIONS_FILE,
+    ARTIFACTS_FILE,
+    MEMORY_FILE,
+    WEB_TIMEOUT,
+    RECON_TIMEOUT,
+)
+
+from nova_backend.services import normal_chat_bleed_guard_service
+from nova_backend.services.session_bootstrap_service import SessionBootstrapService
+from nova_backend.services import attachment_shape_service
+from nova_backend.services.admin_lead_service import AdminLeadService
+from nova_backend.services.session_detail_cache_service import SessionDetailCacheService
+from nova_backend.services.session_service import SessionService
+from nova_backend.services.mobile_exchange_service import MobileExchangeService
+from nova_backend.services.session_history_service import (
+    SessionHistoryService,
+)
+from nova_backend.services.history_service import HistoryService
+from nova_backend.services.artifact_service import ArtifactService
+from nova_backend.services.memory_service import MemoryService
+from nova_backend.services.memory_guard_route_service import (
+    MemoryGuardRouteService,
+)
+from nova_backend.services.memory_recall_service import (
+    MemoryRecallService,
+)
+from nova_backend.services.web_service import WebService
+from nova_backend.services.recon_service import ReconService
+from nova_backend.services.working_state_service import WorkingStateService
+from nova_backend.services.intent_router_service import IntentRouterService
+from nova_backend.utils.file_utils import ensure_dir
+from nova_backend.services.chat_service import ChatService
+print(
+    "DEBUG CHAT SERVICE IMPORT",
+    ChatService,
+    getattr(ChatService, "__init__", None),
+    getattr(ChatService, "handle", None),
+    getattr(ChatService, "_decide_route", None),
+)
+from nova_backend.services.execution_handler import NextMove, default_executor
+from nova_backend.services.execution_daemon import ExecutionDaemon
+from nova_backend.services.chat_execution_service import (
+    chat_execution_service,
+)
+from nova_backend.services.safe_unified_runtime import (
+    SafeUnifiedRuntime,
+)
+from nova_backend.services.runtime_bootstrap import (
+    RuntimeBootstrap,
+)
+from nova_backend.services.runtime_response_sanitizer_service import (
+    RuntimeResponseSanitizerService,
+)
+from nova_backend.services.session_response_cleanup import (
+    cleanup_session_response,
+)
+from nova_backend.services.title_guard_service import (
+    clean_title,
+    persist_title,
+)
+from nova_backend.services.chat_attachment_memory_service import (
+    ChatAttachmentMemoryService,
+)
+from nova_backend.services.project_recall_service import (
+    ProjectRecallService,
+)
+from nova_backend.services.project_chat_response_router_service import (
+    install_project_chat_response_router,
+)
+from nova_backend.services.session_response_finalizer_service import (
+    assistant_message_already_saved,
+    assistant_same_text_already_saved,
+    user_message_already_saved,
+)
+from nova_backend.services.answer_quality_policy_service import (
+    get_answer_quality_policy_answer,
+)
+from nova_backend.services.memory_context_service import (
+    MemoryContextService,
+)
+from nova_backend.services.chat_attachment_context_service import (
+    ChatAttachmentContextService,
+)
+from nova_backend.services.project_focus_memory_service import (
+    ProjectFocusMemoryService,
+)
+from nova_backend.services.project_aware_context_service import (
+    ProjectAwareContextService,
+)
+from nova_backend.services.project_state_memory_service import (
+    ProjectStateMemoryService,
+)
+PROJECT_STATE_MEMORY_KINDS = (
+    ProjectStateMemoryService.PROJECT_STATE_MEMORY_KINDS
+)
+from nova_backend.services.attachment_context_service import (
+    AttachmentContextService,
+)
+from nova_backend.services.attachment_keypoints_service import (
+    AttachmentKeypointsService,
+)
+from nova_backend.services.attachment_analysis_service import (
+    AttachmentAnalysisService,
+)
+from nova_backend.services.response_quality_service import (
+    ResponseQualityService,
+)
+from nova_backend.services.memory_command_service import (
+    MemoryCommandService,
+)
+from nova_backend.services.attachment_summary_service import (
+    AttachmentSummaryService,
+)
+from nova_backend.services.memory_guard_service import (
+    MemoryGuardService,
+)
+from nova_backend.services.session_response_cache_service import (
+    SessionResponseCacheService,
+)
+from nova_backend.services.attachment_endpoint_service import (
+    AttachmentEndpointService,
+)
+from nova_backend.services.web_fetch_bridge_service import (
+    WebFetchBridgeService,
+)
+from nova_backend.services import session_title_guard_service
+from nova_backend.services.session_detail_response_cache_service import (
+    SessionDetailResponseCacheService,
+)
+from nova_backend.services.session_detail_response_cache_service import (
+    SessionDetailResponseCacheService,
+)
+from nova_backend.services.attachment_action_service import (
+    AttachmentActionService,
+)
+from nova_backend.services.tool_runtime_factory import (
+    build_tool_runtime,
+)
+from nova_backend.services.session_slim_response_service import (
+    SessionSlimResponseService,
+)
+from nova_backend.services.account_profile_service import (
+    AccountProfileService,
+)
+from nova_backend.services.attachment_route_service import AttachmentRouteService
+from nova_backend.services.login_page_route_service import (
+    LoginPageRouteService,
+)
+from nova_backend.services.local_auth_route_service import (
+    LocalAuthRouteService,
+)
+from nova_backend.services.google_auth_service import (
+    GoogleAuthService,
+)
+from nova_backend.services.google_auth_route_service import (
+    GoogleAuthRouteService,
+)
+from nova_backend.services.project_state_direct_freshness_priority_service import (
+    ProjectStateDirectFreshnessPriorityService,
+)
+from nova_backend.services.auth_compat_route_service import (
+    AuthCompatRouteService,
+)
+from nova_backend.services.session_auth_scope_service import (
+    SessionAuthScopeService,
+)
+from nova_backend.services.admin_route_service import (
+    AdminRouteService,
+)
+from nova_backend.services.execution_stream_route_service import (
+    ExecutionStreamRouteService,
+)
+from nova_backend.services.attachment_memory_gate_service import (
+    AttachmentMemoryGateService,
+)
+from nova_backend.services.blog_service import (
+    BlogService,
+)
+from nova_backend.services.blog_route_service import (
+    BlogRouteService,
+)
+from nova_backend.services.public_route_service import (
+    PublicRouteService,
+)
+from nova_backend.services.history_route_service import (
+    HistoryRouteService,
+)
+from nova_backend.services.chat_attachment_selector_service import (
+    ChatAttachmentSelectorService,
+)
+from nova_backend.services.chat_response_cleanup_service import (
+    ChatResponseCleanupService,
+)
+from nova_backend.services.session_history_persistence_guard_service import (
+    SessionHistoryPersistenceGuardService,
+)
+session_history_persistence_guard_service = (
+    SessionHistoryPersistenceGuardService()
+)
+from nova_backend.services.execution_state_service import ExecutionStateService
+from nova_backend.services import empty_session_pruner_service
+from nova_backend.services.chat_stream_service import ChatStreamService
+from nova_backend.services.command_route_service import (
+    CommandRouteService,
+)
+# -----------------------
+# SERVICES
+# -----------------------
+session_service = SessionService(
+    DATA_DIR / "nova_sessions.json"
+)
+
+command_route_service = CommandRouteService(
+    session_service
+)
+
+execution_state_service = ExecutionStateService(
+    session_service=session_service
+)
+
+chat_execution_service.execution_state_service = execution_state_service
+
+chat_execution_service.set_session_service(
+    session_service
+)
+
+memory_command_service = MemoryCommandService(
+    session_service=session_service,
+)
+
+session_bootstrap_service = None
+
+mobile_exchange_service = MobileExchangeService(
+    session_service
+)
+session_history_service = SessionHistoryService(
+    BASE_DIR
+)
+autonomy_route_guard_service = AutonomyRouteGuardService(
+    session_service,
+)
+history_service = HistoryService(
+    session_history_service
+)
+project_state_memory_service = ProjectStateMemoryService(
+    DATA_DIR / "nova_project_state.json"
+)
+memory_context_service = MemoryContextService(
+    DATA_DIR,
+    session_service,
+)
+artifact_service = ArtifactService(
+    str(DATA_DIR / "nova_artifacts.json")
+)
+upload_ownership_service = UploadOwnershipService(
+    "data/nova_upload_ownership.json"
+)
+upload_route_service = UploadRouteService(
+    uploads_dir=UPLOADS_DIR,
+    upload_ownership_service=upload_ownership_service,
+)
+project_aware_context_service = ProjectAwareContextService(
+    memory_context_service,
+    session_service,
+)
+attachment_memory_gate_service = AttachmentMemoryGateService(
+    attachment_gate_service,
+    attachment_memory_service,
+)
+attachment_context_service = AttachmentContextService(
+    UPLOADS_DIR,
+)
+local_auth_route_service = None
+repair_plan_priority_guard_service = RepairPlanPriorityGuardService()
+chat_attachment_memory_service = ChatAttachmentMemoryService()
+chat_response_cleanup_service = ChatResponseCleanupService()
+chat_request_context_service = ChatRequestContextService()
+chat_stream_service = ChatStreamService()
+execution_route_service = ExecutionRouteService(
+    chat_execution_service,
+    chat_execution_service,
+)
+execution_bridge_service = ExecutionBridgeService(
+    chat_execution_service,
+    None,
+)
+execution_guard_service = ExecutionGuardService(
+    chat_execution_service
+)
+execution_priority_guard_service = ExecutionPriorityGuardService()
+web_preview_route_service = WebPreviewRouteService()
+error_reporting_service = ErrorReportingService()
+session_route_service = SessionRouteService()
+public_route_service = PublicRouteService()
+login_page_route_service = LoginPageRouteService()
+auth_compat_route_service = AuthCompatRouteService()
+attachment_shape_normalizer_service = AttachmentShapeNormalizerService()
+session_auth_scope_service = SessionAuthScopeService()
+mobile_session_persist_service = MobileSessionPersistService()
+project_state_route_guard_service = ProjectStateRouteGuardService()
+memory_service = MemoryService(
+    str(DATA_DIR / "nova_memory.json")
+)
+memory_route_service = MemoryRouteService(
+    memory_service
+)
+memory_recall_service = MemoryRecallService(
+    memory_service
+)
+project_focus_memory_service = ProjectFocusMemoryService(
+    memory_service,
+    session_service,
+)
+project_recall_service = ProjectRecallService(
+    project_focus_memory_service,
+    project_state_memory_service,
+    PROJECT_STATE_MEMORY_KINDS,
+    DATA_DIR,
+)
+memory_guard_service = MemoryGuardService()
+memory_guard_route_service = MemoryGuardRouteService(
+    memory_service,
+    session_service,
+    memory_guard_service,
+)
+state_route_service = StateRouteService()
+chat_attachment_selector_service = ChatAttachmentSelectorService()
+attachment_summary_service = AttachmentSummaryService()
+attachment_utils_service = AttachmentUtilsService()
+response_quality_service = ResponseQualityService()
+admin_lead_service = AdminLeadService()
+lead_route_service = LeadRouteService(admin_lead_service)
+admin_route_service = AdminRouteService(
+    admin_lead_service,
+)
+session_detail_cache_service = SessionDetailCacheService()
+session_response_cache_service = SessionResponseCacheService(
+    session_service,
+    session_detail_cache_service,
+    attachment_context_service,
+)
+chat_attachment_guard_service = ChatAttachmentGuardService()
+image_vision_service = ImageVisionService()
+chat_guard_service = ChatGuardService()
+account_profile_service = AccountProfileService()
+session_slim_response_service = SessionSlimResponseService()
+web_service = WebService(timeout=WEB_TIMEOUT)
+recon_service = ReconService(timeout=RECON_TIMEOUT)
+intent_router = IntentRouterService()
+import time
+
+_t0 = time.perf_counter()
+
+runtime_brain = SafeUnifiedRuntime()
+
+print(
+    "[TIMING] SafeUnifiedRuntime init",
+    round(time.perf_counter() - _t0, 3),
+    "seconds",
+    flush=True,
+)
+runtime_response_sanitizer = RuntimeResponseSanitizerService()
+attachment_keypoints_service = AttachmentKeypointsService()
+# install_project_chat_response_router moved below app creation
+attachment_analysis_service = AttachmentAnalysisService()
+attachment_summary_lock_service = None
+from nova_backend.services.attachment_summary_lock_service import (
+    apply_attachment_summary_lock,
+)
+
+class AttachmentSummaryLockServiceCompat:
+    def apply_attachment_summary_lock(self, *args, **kwargs):
+        return apply_attachment_summary_lock(*args, **kwargs)
+
+attachment_summary_lock_service = AttachmentSummaryLockServiceCompat()
+chat_attachment_context_service = ChatAttachmentContextService(
+    uploads_dir=UPLOADS_DIR,
+    base_dir=BASE_DIR,
+    attachment_analysis_service=attachment_analysis_service,
+)
+attachment_text_service = AttachmentTextService()
+blog_service = BlogService()
+debug_route_service = DebugRouteService()
+blog_route_service = BlogRouteService(
+    blog_service
+)
+RuntimeBootstrap.save(
+    runtime_brain
+)
+# -----------------------
+# HELPERS
+# -----------------------
+
+IDENTITY_QUESTION_PATTERNS = [
+    re.compile(r"\bwhat(?:'s| is)\s+my\s+name\b", re.IGNORECASE),
+    re.compile(r"\bdo\s+you\s+know\s+my\s+name\b", re.IGNORECASE),
+    re.compile(r"\bwho\s+am\s+i\b", re.IGNORECASE),
+    re.compile(r"\bwhat\s+do\s+you\s+know\s+about\s+me\b", re.IGNORECASE),
+]
+
+NAME_MEMORY_PATTERNS = [
+    re.compile(r"^\s*user\s+name\s+is\s+(.+?)\s*$", re.IGNORECASE),
+    re.compile(r"^\s*name\s*:\s*(.+?)\s*$", re.IGNORECASE),
+    re.compile(r"^\s*my\s+name\s+is\s+(.+?)\s*$", re.IGNORECASE),
+]
+
+blog_service = BlogService()
+
+history_route_service = HistoryRouteService(
+    BASE_DIR
+)
+
+restored_runtime = getattr(
+    runtime_brain,
+    "restored_runtime_state",
+    {},
+)
+attachment_endpoint_service = AttachmentEndpointService()
+
+attachment_route_service = AttachmentRouteService(
+    attachment_analysis_service,
+    attachment_endpoint_service,
+    UPLOADS_DIR,
+)
+
+# NOVA_DURABLE_DATA_BOOTSTRAP_20260703
+def _nova_durable_data_bootstrap_20260703():
+    try:
+        import os
+        import shutil
+        import time
+        from pathlib import Path
+
+        base_dir = Path(__file__).resolve().parent
+        app_data = base_dir / "data"
+
+        candidates = []
+
+        explicit = os.environ.get("NOVA_DATA_DIR", "").strip()
+        if explicit:
+            candidates.append(Path(explicit))
+
+        # Only use /data when it already exists, which indicates a real mounted
+        # Railway volume. Do not create fake /data on local Windows or ephemeral
+        # containers, because that can move repo-local data unexpectedly.
+        volume_data = Path("/data")
+        if os.name != "nt" and volume_data.exists():
+            candidates.append(volume_data)
+
+        candidates.append(app_data)
+
+        chosen = None
+
+        for candidate in candidates:
+            try:
+                candidate.mkdir(parents=True, exist_ok=True)
+                probe = candidate / ".nova_write_probe"
+                probe.write_text("ok", encoding="utf-8")
+                probe.unlink(missing_ok=True)
+                chosen = candidate
+                break
+            except Exception:
+                continue
+
+        if chosen is None:
+            chosen = app_data
+            chosen.mkdir(parents=True, exist_ok=True)
+
+        os.environ["NOVA_DATA_DIR"] = str(chosen)
+
+        should_bridge_app_data = False
+        try:
+            should_bridge_app_data = chosen.resolve() != app_data.resolve()
+        except Exception:
+            should_bridge_app_data = str(chosen) != str(app_data)
+
+        if should_bridge_app_data:
+            chosen.mkdir(parents=True, exist_ok=True)
+
+            if app_data.exists() and not app_data.is_symlink():
+                for item in app_data.iterdir():
+                    target = chosen / item.name
+                    if target.exists():
+                        continue
+                    try:
+                        if item.is_dir():
+                            shutil.copytree(item, target)
+                        else:
+                            shutil.copy2(item, target)
+                    except Exception:
+                        pass
+
+                try:
+                    app_data.rename(base_dir / ("data_ephemeral_backup_" + time.strftime("%Y%m%d_%H%M%S")))
+                except Exception:
+                    pass
+
+            if not app_data.exists():
+                try:
+                    app_data.symlink_to(chosen, target_is_directory=True)
+                except Exception:
+                    pass
+
+        print("[NOVA_DURABLE_DATA_BOOTSTRAP_20260703] NOVA_DATA_DIR=", os.environ.get("NOVA_DATA_DIR"))
+        print("[NOVA_DURABLE_DATA_BOOTSTRAP_20260703] app_data=", str(app_data), "real=", str(app_data.resolve()))
+
+    except Exception as exc:
+        try:
+            print("[NOVA_DURABLE_DATA_BOOTSTRAP_20260703] failed:", exc)
+        except Exception:
+            pass
+
+
+_nova_durable_data_bootstrap_20260703()
+# /NOVA_DURABLE_DATA_BOOTSTRAP_20260703
+
+
+def _nova_boot_log_20260701(*args, **kwargs):
+    import os as _nova_boot_log_os_20260701
+
+    if str(_nova_boot_log_os_20260701.getenv("NOVA_VERBOSE_BOOT_LOGS", "")).strip().lower() in {"1", "true", "yes", "on"}:
+        print(*args, **kwargs)
+
+def update_execution_state_safe(execution, status=None, current_step=None, last_action=None):
+    """Safely assign status, current_step, last_action in execution dict."""
+    if status is not None:
+        execution["status"] = status
+    if current_step is not None:
+        execution["current_step"] = current_step
+    if last_action is not None:
+        execution["last_action"] = last_action
+
+app = Flask(
+    __name__,
+    template_folder=str(BASE_DIR / "templates"),
+    static_folder=str(BASE_DIR / "static"),
+)
+
+@app.route("/debug/routes")
+def debug_routes():
+    return {
+        "routes": [
+            {
+                "rule": str(r.rule),
+                "endpoint": r.endpoint,
+                "methods": list(r.methods),
+            }
+            for r in app.url_map.iter_rules()
+        ]
+    }
+
+app.secret_key = os.environ.get(
+    "NOVA_SECRET_KEY"
+)
+
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = False
+
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_NAME"] = "nova_session"
+
+CORS(app)
+
+ensure_dir(DATA_DIR)
+ensure_dir(UPLOADS_DIR)
+
+app.config["UPLOAD_FOLDER"] = str(UPLOADS_DIR)
+
+memory_route_service.install_routes(app)
+blog_route_service.install_routes(
+    app
+)
+
+register_planner_routes(app)
+print("[NOVA_PLANNER_ROUTES_20260812] installed")
+
+session_route_service.install_routes(
+    app,
+    session_service,
+    artifact_service,
+    memory_service,
+    DATA_DIR,
+)
+
+state_route_service.install_routes(
+    app,
+    session_service,
+    artifact_service,
+    memory_service,
+    execution_state_service,
+)
+
+from nova_backend.routes.payments_routes import (
+    register_payments_routes,
+)
+
+register_payments_routes(app)
+autonomy_route_guard_service.install(app)
+execution_priority_guard_service.install(app)
+session_history_persistence_guard_service.install(app)
+debug_route_service.install_routes(app)
+lead_route_service.install_routes(app)
+
+from asgiref.wsgi import WsgiToAsgi
+
+asgi_app = WsgiToAsgi(app)
+memory_guard_route_service.install_routes(app)
+session_auth_scope_service.install(app)
+empty_session_pruner_service.install(app)
+local_auth_route_service = None
+login_page_route_service.install_routes(app)
+auth_compat_route_service.install_routes(app)
+public_route_service.install_routes(app)
+admin_route_service.install_routes(app)
+normal_chat_bleed_guard_service.install(app)
+repair_plan_priority_guard_service.install(app)
+project_state_direct_freshness_priority_service = (
+    ProjectStateDirectFreshnessPriorityService(
+        execution_state_service=execution_state_service,
+        chat_execution_service=chat_execution_service,
+    )
+)
+project_state_direct_freshness_priority_service.install(app)
+
+history_route_service.install_routes(
+
+    app,
+
+    history_service,
+
+)
+
+
+command_route_service.install_routes(app)
+
+
+_nova_boot_log_20260701(
+    "RESTORED RUNTIME OK",
+    {
+        "runtime_health": restored_runtime.get(
+            "runtime_health"
+        ),
+        "runtime_signal": restored_runtime.get(
+            "runtime_signal"
+        ),
+        "cycle_count": restored_runtime.get(
+            "cycle_count"
+        ),
+    },
+)
+
+
+
+last_compressed = getattr(
+    runtime_brain,
+    "last_compressed_runtime",
+    {},
+)
+
+_nova_boot_log_20260701(
+    "LAST COMPRESSED OK",
+    {
+        "runtime_health": last_compressed.get(
+            "runtime_health"
+        ),
+        "runtime_signal": last_compressed.get(
+            "runtime_signal"
+        ),
+        "cycle_count": last_compressed.get(
+            "cycle_count"
+        ),
+    },
+)
+
+session_detail_response_cache_service = SessionDetailResponseCacheService(
+    session_service,
+    session_detail_cache_service,
+    session_response_cache_service,
+    attachment_text_service,
+)
+
+try:
+    from nova_backend.services import session_title_guard_service
+
+    session_title_guard_service.install(app)
+
+    print("[NOVA_SESSION_TITLE_GUARD] installed")
+
+except Exception as _title_guard_install_error:
+    print(
+        "[NOVA_SESSION_TITLE_GUARD] install failed:",
+        _title_guard_install_error,
+    )
+
+working_state_service = WorkingStateService(
+    session_service=session_service,
+)
+
+chat_service = ChatService(
+    session_service=session_service,
+    memory_service=memory_service,
+    artifact_service=artifact_service,
+    web_service=web_service,
+    recon_service=recon_service,
+    memory_context_service=memory_context_service,
+    working_state_service=working_state_service,
+    execution_state_service=execution_state_service,
+)
+
+attachment_action_service = AttachmentActionService(
+    upload_route_service=upload_route_service,
+    attachment_analysis_service=attachment_analysis_service,
+    logger=app.logger,
+    secure_filename=secure_filename,
+)
+
+tool_runtime = build_tool_runtime(
+    session_service=session_service,
+    chat_service=chat_service,
+    attachment_service=attachment_action_service,
+)
+
+if not tool_runtime.get("ok"):
+    raise RuntimeError(
+        "Tool runtime failed to initialize: "
+        f"{tool_runtime.get('error')}"
+    )
+
+action_router = tool_runtime["action_router"]
+tool_executor = tool_runtime["tool_executor"]
+tool_registry = tool_runtime["tool_registry"]
+tool_bridge = tool_runtime["tool_bridge"]
+
+from nova_backend.services.mission_orchestrator import (
+    MissionOrchestrator,
+)
+
+mission_orchestrator = MissionOrchestrator(
+    tool_registry=tool_registry,
+)
+
+from nova_backend.services.chat_service import (
+    install_chat_service_runtime_patches,
+)
+
+install_chat_service_runtime_patches()
+
+project_brain_general_intelligence_priority_service = (
+    ProjectBrainGeneralIntelligencePriorityService(
+        execution_state_service=execution_state_service,
+        chat_service=chat_service,
+    )
+)
+project_brain_general_intelligence_priority_service.install(app)
+
+# NOVA_MISSION_ROUTES_20260813
+
+try:
+    from nova_backend.routes.mission_routes import (
+        register_mission_routes,
+    )
+
+    register_mission_routes(
+        app,
+        execution_state_service,
+        mission_orchestrator,
+    )
+
+    print(
+        "[NOVA_MISSION_ROUTES_20260813] installed"
+    )
+
+except Exception as exc:
+    print(
+        "[NOVA_MISSION_ROUTES_20260813] failed:",
+        exc,
+    )
+
+if hasattr(chat_service, "start_execution_daemon"):
+    chat_service.start_execution_daemon()
+
+image_command_service = ImageCommandService(
+    chat_service
+)
+
+execution_stream_service = ExecutionStreamService(
+    session_service=session_service,
+    chat_service=chat_service,
+    default_executor=default_executor,
+    next_move_class=NextMove,
+    update_execution_state_safe=update_execution_state_safe,
+)
+
+
+execution_fix_service = ExecutionFixService(
+    session_service=session_service,
+    default_executor=default_executor,
+    next_move_class=NextMove,
+    update_execution_state_safe=update_execution_state_safe,
+)
+
+execution_stream_route_service = ExecutionStreamRouteService(
+    session_service=session_service,
+    execution_service=chat_execution_service,
+    execution_stream_service=execution_stream_service,
+    execution_fix_service=execution_fix_service,
+)
+# =========================
+# RUNTIME BINDING
+# =========================
+chat_service.runtime = runtime_brain
+chat_service.safe_runtime = runtime_brain
+chat_service.runtime_brain = runtime_brain
+app.runtime_brain = runtime_brain
+app.config["runtime_brain"] = runtime_brain
+
+install_project_chat_response_router(app)
+
+session_bootstrap_service = SessionBootstrapService(
+    session_service,
+    logger=app.logger,
+)
+
+local_auth_route_service = LocalAuthRouteService(
+    app,
+    request,
+    jsonify,
+    session,
+)
+
+project_workspace_service = ProjectWorkspaceService(
+    data_dir="data"
+)
+
+
+local_auth_route_service.install_routes()
+
+google_auth_service = GoogleAuthService(
+    app
+)
+
+google_auth_route_service = GoogleAuthRouteService(
+    app,
+    google_auth_service,
+)
+
+google_auth_route_service.install_routes()
+
+if not app.secret_key:
+    raise RuntimeError(
+        "NOVA_SECRET_KEY is required"
+    )
+
+def json_ok(**kwargs):
+    payload = {"ok": True}
+    payload.update(kwargs)
+    return jsonify(payload)
+
+
+def json_error(message: str, status: int = 400, **kwargs):
+    payload = {"ok": False, "error": str(message)}
+    payload.update(kwargs)
+    return jsonify(payload), status
+
+def request_json() -> dict:
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else {}
+
+def build_common_state_payload(session_id: str = "") -> dict:
+    session = None
+    if session_id:
+        session = session_service.get_session(session_id)
+    if not session:
+        session = session_service.get_active()
+
+    return {
+        "session": session,
+        "sessions": session_service.get_all(),
+        "active_session_id": session_service.active_session_id,
+        "artifacts": artifact_service.build_list_payload(),
+        "memory": memory_service.build_list_payload(),
+    }
+
+
+@app.get("/")
+def index():
+    # NOVA_ROOT_PUBLIC_HOME_ALIGNMENT_20260709
+    return render_template("nova_landing.html")
+
+@app.get("/preview")
+def preview():
+    return render_template("preview_index.html")
+
+@app.get("/mobile")
+def mobile():
+    return render_template("mobile.html")
+
+
+
+
+# -----------------------
+# HEALTH
+# -----------------------
+
+
+# ============================================================
+# NOVA_USAGE_ROUTES_SERVICE_20260812
+# Token / usage tracking endpoints moved to service layer.
+# ============================================================
+
+try:
+    from nova_backend.services.usage_routes_service import (
+        install_usage_routes,
+    )
+
+    install_usage_routes(app)
+
+except Exception as exc:
+    print(
+        "[NOVA_USAGE_ROUTES_SERVICE] failed:",
+        exc,
+    )
+
+@app.get("/api/health")
+def api_health():
+    return json_ok(
+        status="ready",
+        app="nova",
+        cwd=os.getcwd(),
+        base_dir=str(BASE_DIR),
+        uploads_dir=str(UPLOADS_DIR),
+        sessions_file=str(SESSIONS_FILE),
+        artifacts_file=str(ARTIFACTS_FILE),
+        memory_file=str(MEMORY_FILE),
+        route_build="backend-memory-recall-fix-phase-1-001",
+        git_commit=os.getenv(
+            "RAILWAY_GIT_COMMIT_SHA",
+            "",
+        ),
+        git_branch=os.getenv(
+            "RAILWAY_GIT_BRANCH",
+            "",
+        ),
+        attachment_pipeline_ready=True,
+        attachment_pipeline={
+            "status": "ready",
+            "response_contract": True,
+            "response_finalizer": True,
+            "ownership_guard": True,
+        },
+    )
+    
+
+
+# -----------------------
+# STATE
+# -----------------------
+
+@app.get("/api/state")
+def api_state():
+    sessions = session_service.get_all()
+    active_session = session_service.get_active() or {}
+
+    if not isinstance(active_session, dict):
+        active_session = {}
+
+    active_session_id = str(
+        getattr(session_service, "active_session_id", "")
+        or active_session.get("id")
+        or active_session.get("session_id")
+        or ""
+    ).strip()
+
+    messages = active_session.get("messages")
+    if not isinstance(messages, list):
+        messages = []
+
+    working_state = active_session.get("working_state")
+    if not isinstance(working_state, dict):
+        working_state = {}
+
+    active_task = str(
+        working_state.get("active_task")
+        or working_state.get("task")
+        or ""
+    ).strip()
+
+    current_file = str(
+        working_state.get("current_file")
+        or working_state.get("file")
+        or ""
+    ).strip()
+
+    last_user_message = ""
+    last_assistant_message = ""
+
+    for message in reversed(messages):
+        if not isinstance(message, dict):
+            continue
+
+        role = str(message.get("role") or "").strip().lower()
+        text = str(
+            message.get("text")
+            or message.get("content")
+            or ""
+        ).strip()
+
+        if role == "user" and not last_user_message:
+            last_user_message = text
+
+        if role == "assistant" and not last_assistant_message:
+            last_assistant_message = text
+
+        if last_user_message and last_assistant_message:
+            break
+
+    if not active_task:
+        for message in reversed(messages):
+            if not isinstance(message, dict):
+                continue
+
+            if str(message.get("role") or "").strip().lower() != "user":
+                continue
+
+            text = str(
+                message.get("text")
+                or message.get("content")
+                or ""
+            ).strip()
+
+            text_lc = text.lower()
+
+            if "we are working on" in text_lc:
+                active_task = text_lc.split("we are working on", 1)[1].strip(" .")
+                break
+
+            if "working on" in text_lc:
+                active_task = text_lc.split("working on", 1)[1].strip(" .")
+                break
+
+    if not current_file and active_task:
+        parts = active_task.replace(",", " ").split()
+
+        for part in parts:
+            clean_part = part.strip("`'\".,:;()[]{}")
+
+            if clean_part.endswith((".py", ".js", ".css", ".html", ".json", ".md", ".txt")):
+                current_file = clean_part
+                break
+
+    normalized_working_state = {
+        "active_task": active_task,
+        "current_file": current_file,
+        "last_user_message": last_user_message,
+        "last_assistant_message": last_assistant_message,
+    }
+
+    state = {
+        "active_session_id": active_session_id,
+        "active_task": active_task,
+        "current_file": current_file,
+        "last_user_message": last_user_message,
+        "last_assistant_message": last_assistant_message,
+        "working_state": normalized_working_state,
+    }
+
+    return json_ok(
+        state=state,
+        sessions=sessions,
+        active_session_id=active_session_id,
+        session=active_session,
+        working_state=normalized_working_state,
+        active_task=active_task,
+        current_file=current_file,
+        last_user_message=last_user_message,
+        last_assistant_message=last_assistant_message,
+        models=[
+            "nova-fast",
+            "nova-smart",
+            "nova-vision",
+            "nova-coding",
+        ],
+        default_model="nova-fast",
+        selected_model="nova-fast",
+        artifacts=artifact_service.build_list_payload(),
+        memory=memory_service.build_list_payload(),
+    )
+
+
+def filter_raw_injection_attachments(
+    self,
+    attachments,
+    logger=None,
+):
+    kept = []
+    skipped = []
+
+    for item in attachments or []:
+        if attachment_service.should_skip_raw_attachment_injection(item):
+            skipped.append(item)
+        else:
+            kept.append(item)
+
+    if skipped and logger:
+        try:
+            names = [
+                str(
+                    x.get("original_filename")
+                    or x.get("filename")
+                    or x.get("name")
+                    or x.get("url")
+                    or "attachment"
+                )
+                for x in skipped
+                if isinstance(x, dict)
+            ]
+
+            logger.info(
+                "[RawAttachmentInjectionGuard] skipped raw binary injection for attachments=%s",
+                names,
+            )
+        except Exception:
+            pass
+
+    return kept
+
+@app.route("/privacy")
+def privacy():
+    return render_template("privacy.html")
+
+@app.route("/help")
+def help_page():
+    return render_template("help.html")
+
+@app.route("/terms")
+def terms():
+    return render_template("nova_terms.html")
+
+@app.route("/features")
+def features():
+    return render_template("nova_features.html")
+
+
+@app.route("/billing")
+def billing():
+    return render_template("nova_billing.html")
+
+
+@app.route("/contact")
+def contact():
+    return render_template("nova_contact.html")
+
+
+@app.route("/about")
+def about():
+    return render_template("nova_about.html")
+
+
+@app.route("/faq")
+def faq():
+    return render_template("nova_faq.html")
+
+@app.route("/api/models", methods=["GET"])
+def api_models_route():
+    return {
+        "ok": True,
+        "models": [
+            "nova-fast",
+            "gpt-5.4",
+            "gpt-4.1-mini",
+            "gpt-4o-mini",
+        ],
+        "default_model": "nova-fast",
+        "selected_model": "nova-fast",
+    }
+
+
+@app.route("/api/models/select", methods=["POST"])
+def api_models_select_route():
+    data = request.get_json(silent=True) or {}
+
+    return {
+        "ok": True,
+        "selected_model": data.get(
+            "model",
+            "nova-fast",
+        ),
+    }
+
+@app.route("/api/chat", methods=["POST"])
+def api_chat_route():
+    return api_chat()
+
+@app.route("/api/runtime/summary", methods=["GET"])
+def api_runtime_summary():
+    return jsonify({"ok": True})
+
+@app.route("/api/runtime/history", methods=["GET"])
+def api_runtime_history():
+    return jsonify({"ok": True})
+
+@app.route("/api/runtime/decision", methods=["GET"])
+def api_runtime_decision():
+    return jsonify({"ok": True})
+
+@app.route("/api/runtime/bridge", methods=["POST"])
+def api_runtime_bridge():
+    return jsonify({"ok": True})
+
+@app.route("/api/runtime/cycle", methods=["POST"])
+def api_runtime_cycle():
+    try:
+        runtime = runtime_brain
+
+        result = runtime.run_cycle(
+            execution_state={
+                "status": "failed",
+                "error": "api_runtime_cycle_test",
+                "steps": [
+                    {
+                        "title": "Runtime API cycle test",
+                        "status": "failed",
+                    }
+                ],
+            },
+            world_state={},
+            scheduler_state={},
+            knowledge_graph={},
+        )
+
+        runtime.last_compressed_runtime = (
+            result.get(
+                "compressed_runtime",
+                {}
+            )
+        )
+
+        summary = getattr(
+            runtime,
+            "last_compressed_runtime",
+            {},
+        )
+
+        return jsonify(
+            {
+                "ok": True,
+                "result": result,
+                "runtime": summary,
+            }
+        )
+
+    except Exception as e:
+        return jsonify(
+            {
+                "ok": False,
+                "error": str(e),
+            }
+        ), 500
+
+@app.route("/api/projects", methods=["GET"])
+def api_projects():
+    return jsonify(
+        {
+            "ok": True,
+            "projects": project_workspace_service.list_projects(),
+        }
+    )
+
+@app.route(
+    "/api/projects/<project_id>",
+    methods=["GET"],
+)
+def api_project_get(
+    project_id,
+):
+    project = project_workspace_service.get_project(
+        project_id
+    )
+
+    if not project:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "project": project,
+        }
+    )
+
+@app.route("/api/projects/new", methods=["POST"])
+def api_projects_new():
+    data = request.get_json(
+        silent=True
+    ) or {}
+
+    project = project_workspace_service.create_project(
+        data.get("name"),
+        data.get("description", ""),
+    )
+
+    return jsonify(
+        {
+            "ok": True,
+            "project": project,
+        }
+    )
+
+
+
+    data = request.get_json(
+        silent=True
+    ) or {}
+
+    task = project_workspace_service.add_task(
+        project_id,
+        data.get("title", ""),
+        data.get(
+            "priority",
+            "medium",
+        ),
+    )
+
+    if not task:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "task": task,
+        }
+    )
+
+
+@app.post("/api/fetch")
+def api_fetch():
+    data = request.get_json(silent=True) or {}
+    url = str(data.get("url") or "").strip()
+
+    if not url:
+        return jsonify({
+            "ok": False,
+            "error": "Missing url",
+            "summary": "",
+        }), 400
+
+    result = web_service.fetch(url)
+
+    clean_result = (
+        runtime_response_sanitizer.sanitize(
+            result
+        )
+    )
+
+    return jsonify(clean_result)
+
+
+# CASUAL_CHAT_GUARD_20260604
+@app.before_request
+def _nova_casual_chat_guard():
+
+
+    try:
+        from flask import request, jsonify
+
+        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
+            return None
+
+        payload = request.get_json(silent=True) or {}
+        user_text = str(payload.get("user_text") or "").strip()
+        # NOVA_AUTO_PLAN_EXECUTION_START_GUARD_20260607
+
+
+        chat_guard_result = chat_guard_service.handle_casual_chat_guard(
+            payload,
+            execution_bridge_service,
+        )
+
+        if chat_guard_result is not None:
+            return jsonify(chat_guard_result)
+
+
+        attachments = payload.get("attachments") or []
+
+        if attachments:
+            return None
+
+        clean = " ".join(user_text.lower().split()).strip(" ?!.")
+
+        casual_replies = {
+            "hi": "Hey.",
+            "hey": "Hey.",
+            "hello": "Hey.",
+            "yo": "Yo.",
+            "sup": "I'm here.",
+            "how are you": "I'm good. Ready when you are.",
+            "how are u": "I'm good. Ready when you are.",
+            "how you doing": "I'm good. Ready when you are.",
+            "whats up": "I'm here. Ready for the next move.",
+            "what's up": "I'm here. Ready for the next move.",
+        }
+
+        if clean not in casual_replies:
+            return None
+
+        session_id = str(payload.get("session_id") or "").strip()
+
+        return jsonify({
+            "ok": True,
+            "session_id": session_id,
+            "active_session_id": session_id,
+            "assistant_message": {
+                "role": "assistant",
+                "text": casual_replies[clean],
+                "attachments": [],
+                "meta": {
+                    "route": "casual_chat_guard"
+                }
+            },
+            "attachments": [],
+            "session_attachments": [],
+            "debug": {
+                "route": "casual_chat_guard"
+            }
+        })
+
+    except Exception:
+        return None
+
+
+def api_chat():
+    print(
+        "[API CHAT ENTERED]",
+        flush=True,
+    )
+
+    print(
+        "[CONTENT TYPE]",
+        request.content_type,
+        flush=True,
+    )
+
+    print(
+        "[API CHAT RAW CHECK]",
+        request.get_data(
+            cache=True,
+            as_text=True,
+        ),
+        flush=True,
+    )
+
+    print(
+        "[API CHAT JSON CHECK]",
+        request.get_json(silent=True),
+        flush=True,
+    )
+
+    print("[RAW BODY]", request.get_data())
+
+    data = request.get_json(
+        silent=True,
+        cache=True,
+    ) or {}
+
+    print(
+        "[CHAT STEP 1 DATA]",
+        data,
+        flush=True,
+    )
+
+    print(
+        "[CHAT RAW DATA DEBUG]",
+        data,
+        flush=True,
+    )
+
+    user_text = str(
+        data.get("user_text")
+        or data.get("text")
+        or data.get("message")
+        or data.get("content")
+        or ""
+    ).strip()
+
+    session_id = str(
+        data.get("session_id")
+        or data.get("chat_id")
+        or ""
+
+    ).strip()
+    from flask import session as flask_session
+
+    from flask import session as flask_session
+
+    auth_user_id = (
+        flask_session.get("nova_user_id")
+        or flask_session.get("user_id")
+        or ""
+    )
+
+    session_id = session_bootstrap_service.resolve_chat_session(
+        session_id,
+        data,
+        user_text,
+        auth_user_id,
+    )
+    print("[CHAT STEP 3 SESSION]", repr(session_id), flush=True)
+
+    print(
+        "[DEBUG EARLY SESSION RESOLVE]",
+        repr(session_id),
+        flush=True,
+    )
+    # NOVA_API_CHAT_IMAGE_VISION_GATE_20260607
+    try:
+        from pathlib import Path as _NovaPath
+        import base64 as _nova_base64
+        import mimetypes as _nova_mimetypes
+        import os as _nova_os
+
+        _nova_payload = data
+
+
+        execution_guard_result = execution_guard_service.handle(
+            _nova_payload
+        )
+
+        if execution_guard_result:
+            return jsonify(execution_guard_result)
+
+        _nova_chat_context = chat_request_context_service.build_context(
+            _nova_payload
+        )
+
+        print(
+            "[CHAT CONTEXT DEBUG]",
+            {
+                "payload": _nova_payload,
+                "context": _nova_chat_context,
+                "before_override_user_text": repr(user_text),
+            },
+            flush=True,
+        )
+
+        _nova_user_text = _nova_chat_context["user_text"]
+
+        _nova_session_id = (
+            session_id
+            or _nova_chat_context.get("session_id")
+            or ""
+        )
+
+        _nova_attachments = _nova_chat_context["attachments"]
+
+        user_text = _nova_user_text
+        session_id = _nova_session_id
+        attachments = _nova_attachments
+
+        print(
+            "[NOVA ATTACHMENT DEBUG]",
+            _nova_attachments,
+        )
+
+        # ?? IMAGE FASTPATH SAFETY GUARD
+        if str(_nova_user_text or "").strip().lower().startswith("/image"):
+            _nova_attachments = []
+
+        _nova_image = (
+            chat_attachment_selector_service
+            .find_image_attachment(
+                _nova_attachments
+            )
+        )
+
+        # NOVA_IMAGE_GATE_WEB_INTENT_STRIPS_STALE_ATTACHMENTS_20260609
+        # Web/news prompts must ignore stale mobile attachment payload before the image gate scans it.
+
+        try:
+            from nova_backend.services.image_web_gate_service import (
+                image_web_gate_service,
+            )
+
+            _nova_image_gate_is_web = (
+                image_web_gate_service.is_web_intent(
+                    _nova_user_text
+                )
+            )
+
+        except Exception:
+            _nova_image_gate_is_web = False
+
+        if _nova_image_gate_is_web:
+            _nova_attachments = []
+
+            try:
+                request.environ["NOVA_FORCE_WEB_INTENT_20260609"] = "1"
+                request.environ["NOVA_IGNORE_STALE_ATTACHMENTS_20260609"] = "1"
+            except Exception:
+                pass
+
+        if isinstance(_nova_attachments, list):
+            for _nova_item in _nova_attachments:
+                if not isinstance(_nova_item, dict):
+                    continue
+
+                _nova_item_type = str(
+                    _nova_item.get("type")
+                    or _nova_item.get("mime_type")
+                    or ""
+                ).lower()
+
+                _nova_item_url = str(
+                    _nova_item.get("url")
+                    or _nova_item.get("file_url")
+                    or ""
+                ).lower()
+
+                if (
+                    _nova_item_type.startswith("image")
+                    or any(
+                        _nova_item_url.endswith(ext)
+                        for ext in (
+                            ".png",
+                            ".jpg",
+                            ".jpeg",
+                            ".webp",
+                            ".gif",
+                        )
+                    )
+                ):
+                    _nova_image = _nova_item
+                    _nova_image_item = _nova_item
+                    break
+
+        _nova_image_item = _nova_image
+        if _nova_image:
+            _nova_raw_url = str(
+                _nova_image.get("url")
+                or _nova_image.get("file_url")
+                or ""
+            ).strip()
+
+            _nova_raw_name = str(
+                _nova_image.get("filename")
+                or _nova_image.get("original_filename")
+                or _nova_image.get("name")
+                or ""
+            ).strip()
+
+            _nova_filename = ""
+
+            if "/api/uploads/" in _nova_raw_url:
+                _nova_filename = _nova_raw_url.split("/api/uploads/", 1)[1].split("?", 1)[0].split("#", 1)[0]
+            elif _nova_raw_url:
+                _nova_filename = _NovaPath(_nova_raw_url).name
+
+            if not _nova_filename and _nova_raw_name:
+                _nova_filename = _NovaPath(_nova_raw_name).name
+
+            _nova_filename = _nova_filename.replace("\\", "/").split("/")[-1].strip()
+
+            _nova_candidates = [
+                _NovaPath.cwd() / "uploads" / _nova_filename,
+                _NovaPath.cwd() / "static" / "uploads" / _nova_filename,
+                _NovaPath(__file__).resolve().parent / "uploads" / _nova_filename,
+                _NovaPath(__file__).resolve().parent / "static" / "uploads" / _nova_filename,
+            ]
+
+            _nova_image_path = None
+
+            for _nova_candidate in _nova_candidates:
+                try:
+                    if _nova_candidate.exists() and _nova_candidate.is_file():
+                        _nova_image_path = _nova_candidate
+                        break
+                except Exception:
+                    continue
+
+            if _nova_image_path is None:
+                _nova_text = (
+                    "VISION_DEBUG: image file not found. "
+                    + "filename=" + str(_nova_filename)
+                    + " raw_url=" + str(_nova_raw_url)
+                    + " candidates=" + " | ".join(str(c) for c in _nova_candidates)
+                )
+
+                _nova_vision_used = False
+
+            else:
+                try:
+                    _nova_vision_result = image_vision_service.handle(
+                        image_item=_nova_image_item,
+                        user_text=_nova_user_text,
+                    )
+
+                    _nova_text = str(
+                        _nova_vision_result.get("text") or ""
+                    ).strip()
+
+                    _nova_vision_used = bool(
+                        _nova_vision_result.get("vision_used")
+                    )
+
+                except Exception as _nova_exc:
+                    import traceback
+
+                    _nova_text = (
+                        "VISION_DEBUG: vision service failed: "
+                        + str(_nova_exc)
+                        + "\nTRACEBACK:\n"
+                        + traceback.format_exc()
+                    )
+
+                    _nova_vision_used = False
+            return jsonify({
+                "ok": True,
+                "active_session_id": _nova_session_id,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": _nova_text,
+                    "attachments": [],
+                    "meta": {
+                        "attachment_analysis": True,
+                        "api_chat_image_vision_gate": True,
+                        "vision_used": _nova_vision_used,
+                        "source_urls": [],
+                        "sources": [],
+                    },
+                },
+                "debug": {
+                    "route": "api_chat",
+                    "route_taken": "attachment_analysis",
+                    "decision": {
+                        "route": "attachment_analysis",
+                        "mode": "image_analysis",
+                        "strategy": "api_chat_image_vision_gate",
+                        "source_urls": [],
+                        "sources": [],
+                    },
+                },
+                "session_attachments": _nova_attachments,
+                "attachment_debug": {
+                    "requested_session_id": _nova_session_id,
+                    "session_attachments_count": len(_nova_attachments) if isinstance(_nova_attachments, list) else 0,
+                },
+            })
+
+    except Exception as _nova_api_image_gate_error:
+        print("[NOVA_API_CHAT_IMAGE_VISION_GATE] failed:", _nova_api_image_gate_error)
+
+    # NOVA_DURABLE_EXECUTION_TOP_GUARD_20260607
+    try:
+        from nova_backend.services.execution_top_guard_service import (
+            execution_top_guard_service,
+        )
+
+        _nova_execution_result = execution_top_guard_service.handle(
+            payload=request.get_json(silent=True) or {},
+            session_id=session_id,
+        )
+
+        if _nova_execution_result.get("handled"):
+            return jsonify(
+                _nova_execution_result["response"]
+            )
+
+    except Exception as exc:
+        app.logger.warning(
+            "[ExecutionTopGuardService] failed: %s",
+            exc,
+        )
+
+    print(
+        "[CHAT BEFORE EMPTY GUARD]",
+        {
+            "user_text": repr(user_text),
+            "_nova_user_text": repr(user_text),
+            "data": data,
+        }
+    )
+
+    _nova_user_text_lower = str(user_text or "").strip().lower()
+    requested_session_id = str(data.get("session_id") or "").strip()
+    session_id = requested_session_id
+
+    # NOVA_EMPTY_SESSION_CREATE_GUARD_EXACT_20260610
+    # Normalize attachments before session creation so blank frontend pings do not create stored sessions.
+
+    attachments = normalize_attachments(data.get("attachments"))
+
+    print(
+        "[EMPTY GUARD DEBUG]",
+        {
+            "user_text": repr(user_text),
+            "data": data,
+            "attachments": attachments,
+            "session_id": session_id,
+        },
+    )
+
+    if not user_text and not attachments:
+        return jsonify(
+            build_empty_request_response(
+                session_id
+            )
+        )
+
+        result["session_id"] = result.get("session_id") or session_id
+        result["active_session_id"] = result.get("active_session_id") or result.get("session_id") or session_id
+
+        result = chat_response_cleanup_service.sync_attachment_text(
+            result
+        )
+
+        result["text"] = chat_response_cleanup_service.clean_image_echo_text(
+            result.get("text")
+        )
+
+        assistant_message = result.get("assistant_message")
+
+        if isinstance(assistant_message, dict):
+            assistant_message["text"] = (
+                chat_response_cleanup_service.clean_image_echo_text(
+                    assistant_message.get("text")
+                )
+            )
+            result["assistant_message"] = assistant_message
+
+    # MOBILE_SESSION_FORCE_LOCK_20260606
+    # Honor mobile-provided session ids instead of letting backend drift to random session_* ids.
+    if requested_session_id:
+        # FORCE_MOBILE_SESSION_OBJECT_CREATE_LOCK_20260606
+        # Active id alone is not enough. Ensure the actual mobile session object exists.
+        try:
+            session_bootstrap_service.ensure_requested_session(
+                requested_session_id,
+                title=user_text or "Mobile Chat",
+            )
+        except Exception:
+            app.logger.exception("[api_chat] failed to ensure requested mobile session object")
+
+    try:
+        # MOBILE_ATTACHMENT_FIX_20260606: active_session_id is read-only.
+        pass
+    except Exception:
+        app.logger.exception("[api_chat] failed to force active mobile session id")
+
+
+        attachments = normalize_attachments(
+            request.json.get("attachments", [])
+        )
+
+
+    attachments = chat_attachment_guard_service.handle_web_attachment_guard(
+        request,
+        data,
+        chat_service,
+        attachments,
+    )
+
+    print(
+        "[DEBUG AFTER ATTACHMENT GUARD]",
+        attachments,
+    )
+
+    inline_attachment_result = (
+        chat_attachment_guard_service.handle_inline_text_attachment(
+            attachments,
+            user_text,
+            session_id,
+            requested_session_id,
+        )
+    )
+
+    if inline_attachment_result:
+        return jsonify(inline_attachment_result)
+
+    # BACKEND_ATTACHMENT_DEBUG_LOG_LOCK
+    try:
+        app.logger.info(
+            "[api_chat] incoming request session_id=%s user_text_len=%s attachments_count=%s attachment_names=%s",
+            session_id or "<missing>",
+            len(user_text or ""),
+            len(attachments or []),
+            [
+                (
+                    item.get("original_filename")
+                    or item.get("filename")
+                    or item.get("name")
+                    or item.get("url")
+                    or item.get("file_url")
+                    or "<unnamed>"
+                )
+                for item in (attachments or [])
+                if isinstance(item, dict)
+            ],
+        )
+    except Exception:
+        app.logger.exception("[api_chat] failed while logging attachment debug info")
+
+    regen_result = image_command_service.handle_regeneration(
+        user_text,
+        session_id,
+    )
+
+    if regen_result:
+        return jsonify(regen_result)
+
+    auth_user_id = (
+        flask_session.get("nova_user_id")
+        or flask_session.get("user_id")
+        or ""
+    )
+
+    session_id = session_bootstrap_service.resolve_chat_session(
+        session_id,
+        data,
+        user_text,
+        auth_user_id,
+    )
+
+
+
+    if not user_text and not attachments:
+        return json_error("Missing user_text or attachments", 400)
+
+    # EARLY_IMAGE_ATTACHMENT_GATE_20260606
+    # If the current request includes image attachments, answer before memory,
+    # web routing, weak fallback guards, or chat_service can turn it into a generic intro.
+    try:
+        current_attachments = attachments if isinstance(attachments, list) else []
+        image_attachments = []
+
+        for item in current_attachments:
+            if not isinstance(item, dict):
+                continue
+
+            name = str(
+                item.get("original_filename")
+                or item.get("filename")
+                or item.get("name")
+                or "image attachment"
+            ).strip()
+
+            mime = str(
+                item.get("mime_type")
+                or item.get("content_type")
+                or item.get("type")
+                or item.get("mime")
+                or ""
+            ).strip()
+
+            url = str(item.get("file_url") or item.get("url") or item.get("path") or "").strip()
+            name_lower = name.lower()
+
+            if (
+                mime.lower().startswith("image/")
+                or name_lower.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif"))
+                or url.lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".gif"))
+            ):
+                image_attachments.append({
+                    "name": name,
+                    "mime": mime or "image/*",
+                    "url": url,
+                    "raw": item,
+                })
+
+        if image_attachments:
+            # SKIP_EARLY_IMAGE_GATE_FOR_ANALYSIS_REQUESTS_20260606
+            # Do not let the receipt gate block real image/attachment analysis.
+            _analysis_text = str(user_text or "").lower().strip()
+            _analysis_words = (
+                "summarize",
+                "summary",
+                "analyze",
+                "analyse",
+                "describe",
+                "what is this",
+                "what's this",
+                "what is in",
+                "what's in",
+                "what was the attached",
+                "what was attached",
+                "read this",
+                "look at this",
+                "tell me about",
+            )
+
+            if any(word in _analysis_text for word in _analysis_words):
+                image_attachments = []
+            else:
+                lines = ["Image attachment received."]
+
+            for index, item in enumerate(image_attachments[:5], start=1):
+                line = f"{index}. {item.get('name') or 'image attachment'} ({item.get('mime') or 'image/*'})"
+                if item.get("url"):
+                    line += f" â€” {item.get('url')}"
+                lines.append(line)
+
+            lines.append("")
+            lines.append("The image is now attached to this chat request.")
+
+            _early_gate_text = str(user_text or "").lower().strip()
+            _early_gate_analysis_request = any(
+                word in _early_gate_text
+                for word in (
+                    "summarize",
+                    "summary",
+                    "analyze",
+                    "analyse",
+                    "describe",
+                    "what is this",
+                    "what's this",
+                    "what is in",
+                    "what's in",
+                    "read this",
+                    "look at this",
+                    "tell me about",
+                )
+            )
+
+            if _early_gate_analysis_request:
+                raise RuntimeError("skip early image receipt gate for analysis request")
+
+            reply_text = "Attachment received."
+
+            app.logger.info(
+                "[EarlyImageAttachmentGate] returning image attachment response session_id=%s image_count=%s",
+                session_id,
+                len(image_attachments),
+            )
+
+            mobile_exchange_service.direct_save_mobile_exchange(
+                session_id,
+                user_text,
+                reply_text,
+                attachments=current_attachments,
+                route="early_image_attachment_gate",
+                clean_text=attachment_text_service.strip_project_context_from_visible_text,
+                logger=app.logger,
+            )
+
+            print(
+                "[DEBUG FINAL CHAT ATTACHMENTS]",
+                attachments,
+            )
+
+            return jsonify({
+                "ok": True,
+                "session_id": session_id,
+                "active_session_id": session_id,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": reply_text,
+                    "attachments": current_attachments,
+                    "meta": {
+                        "route": "early_image_attachment_gate",
+                    },
+                },
+                "attachments": current_attachments,
+                "session_attachments": current_attachments,
+                "skip_post_processing": True,
+                "skip_rewrite": True,
+                "debug": {
+                    "route": "early_image_attachment_gate",
+                    "image_count": len(image_attachments),
+                    "attachments_count": len(current_attachments),
+                },
+            })
+    except Exception as early_image_error:
+        app.logger.warning(
+            "[EarlyImageAttachmentGate] failed; continuing normal api_chat flow: %s",
+            early_image_error,
+        )
+
+    project_focus_memory_service.save_project_focus_memory(
+        user_text,
+        session_id,
+    )
+
+    project_state_memory_service.save_project_state_memories(
+        user_text,
+        session_id,
+    )
+
+    direct_project_state_response = (
+        project_recall_service
+        .try_project_state_direct_recall(
+            user_text,
+            session_id,
+        )
+    )
+
+    if direct_project_state_response is not None:
+        app.logger.info(
+            "[project-state-direct-recall] answered from project state memory session_id=%s",
+            session_id,
+        )
+
+        return response_quality_service.slim_assistant_payload(
+            direct_project_state_response.get("text"),
+            session_id=session_id,
+            **{
+                key: value
+                for key, value in direct_project_state_response.items()
+                if key != "text"
+            },
+        )
+    print("[BEFORE PROJECT RECALL]", repr(user_text), repr(session_id))
+
+    direct_project_focus_response = (
+        project_recall_service
+        .try_project_focus_direct_recall(
+            user_text,
+            session_id,
+        )
+    )
+
+    if False and direct_project_focus_response is not None:
+        app.logger.info(
+            "[project-focus-direct-recall] answered from recent session context session_id=%s",
+            session_id,
+        )
+
+        return response_quality_service.slim_assistant_payload(
+            direct_project_focus_response.get("text"),
+            session_id=session_id,
+            **{
+                key: value
+                for key, value in direct_project_focus_response.items()
+                if key != "text"
+            },
+        )
+
+
+
+        # NOVA_API_CHAT_EARLY_EXPLICIT_MEMORY_GUARD_LIVE_ANCHOR_20260611_CALL
+        try:
+            _nova_raw_user_text = str(
+                data.get("user_text")
+                or data.get("text")
+                or data.get("message")
+                or user_text
+                or ""
+            ).strip()
+
+            raw_user_text = str(
+                payload.get("user_text")
+                or payload.get("text")
+                or payload.get("message")
+                or ""
+            ).strip()
+
+            print(
+                "MEMORY GUARD RAW PAYLOAD =",
+                payload,
+                flush=True,
+            )
+
+            print(
+                "MEMORY GUARD RAW TEXT =",
+                repr(raw_user_text),
+                flush=True,
+            )
+
+            lowered = raw_user_text.lower().strip()
+
+            _nova_explicit_memory_text = memory_command_service.extract_explicit_memory_live(
+                _nova_raw_user_text
+            )
+
+            print(
+                "EARLY MEMORY EXTRACTED =",
+                repr(_nova_explicit_memory_text),
+                flush=True,
+            )
+
+            if _nova_explicit_memory_text:
+                print(
+                    "EARLY MEMORY ABOUT TO SAVE =",
+                    repr(_nova_explicit_memory_text),
+                    flush=True,
+                )
+
+                _nova_memory_result = memory_service.add_memory(
+                    {
+                        "text": _nova_explicit_memory_text,
+                        "kind": memory_command_service.memory_kind_live(
+                            _nova_explicit_memory_text
+                        ),
+                        "source": "app_explicit_memory_command",
+                        "confidence": 0.95,
+                        "session_id": session_id or "",
+                    }
+                )
+
+                return jsonify(
+                    memory_command_service.memory_response_live(
+                        raw_user_text=_nova_raw_user_text,
+                        session_id=session_id,
+                        clean=_nova_explicit_memory_text,
+                    )
+                )
+
+
+                return jsonify(
+                    memory_command_service.memory_response_live(
+                        raw_user_text=_nova_raw_user_text,
+                        session_id=session_id,
+                        clean=_nova_explicit_memory_text,
+                    )
+                )
+        except Exception as _nova_early_memory_error:
+            app.logger.warning("[api_chat early explicit memory guard live] failed: %s", _nova_early_memory_error)
+
+        app.logger.info(
+            "[api_chat] calling chat_service.handle session_id=%s attachments_count=%s",
+            session_id,
+            len(attachments_for_chat_service or []),
+        )
+
+        # CLEAN_IMAGE_PROMPT_RIGHT_BEFORE_CHAT_SERVICE_LOCK
+        _nova_pre_chat_user_text = str(user_text or "")
+        _nova_pre_chat_lower = _nova_pre_chat_user_text.lower().strip()
+        _nova_image_prompt_starters = (
+            "generate an image",
+            "create an image",
+            "make an image",
+            "draw an image",
+            "generate a picture",
+            "create a picture",
+            "make a picture",
+            "draw a picture",
+        )
+
+        if any(_nova_pre_chat_lower.startswith(_starter) for _starter in _nova_image_prompt_starters):
+            if "\n\nProject-aware context for Nova:" in _nova_pre_chat_user_text:
+                user_text = _nova_pre_chat_user_text.split("\n\nProject-aware context for Nova:", 1)[0].strip()
+            elif "\nProject-aware context for Nova:" in _nova_pre_chat_user_text:
+                user_text = _nova_pre_chat_user_text.split("\nProject-aware context for Nova:", 1)[0].strip()
+            else:
+                user_text = _nova_pre_chat_user_text.strip()
+
+            app.logger.info(
+                "[api_chat] cleaned project-aware context from image-generation prompt session_id=%s cleaned_len=%s",
+                session_id,
+                len(user_text),
+            )
+
+        # NOVA_WEB_INTENT_CLEANS_PROJECT_CONTEXT_BEFORE_CHAT_SERVICE_20260609
+        # Fresh web/news prompts must not let injected recent context trigger image generation.
+        _nova_real_user_text_for_web = str(
+            data.get("user_text")
+            or data.get("text")
+            or data.get("message")
+            or ""
+        ).strip()
+
+        try:
+            from nova_backend.services.web_intent_cleaner_service import (
+                web_intent_cleaner_service,
+            )
+
+            _nova_is_web_intent = (
+                web_intent_cleaner_service.is_web_intent(
+                    _nova_real_user_text_for_web
+                )
+            )
+
+        except Exception:
+            _nova_is_web_intent = False
+
+        if (
+            request.environ.get("NOVA_FORCE_WEB_INTENT_20260609") == "1"
+            or _nova_is_web_intent
+        ):
+
+            if _nova_real_user_text_for_web:
+                user_text = _nova_real_user_text_for_web
+                attachments_for_chat_service = []
+                attachments = []
+
+                try:
+                    data["attachments"] = []
+                    data["user_text"] = _nova_real_user_text_for_web
+                    data["text"] = _nova_real_user_text_for_web
+                    data["message"] = _nova_real_user_text_for_web
+                    request.environ["NOVA_FORCE_WEB_INTENT_20260609"] = "1"
+                    request.environ["NOVA_IGNORE_STALE_ATTACHMENTS_20260609"] = "1"
+                    app.logger.info(
+                        "[api_chat] web intent cleaned project context before chat_service.handle text=%r",
+                        _nova_real_user_text_for_web,
+                    )
+                except Exception:
+                    pass
+
+        image_command_user_text = user_text
+
+        if user_text.lower().startswith("/image"):
+            image_command_user_text = "generate image " + (user_text[6:].strip() or "image")
+
+        app.logger.info(
+            "[api_chat] calling chat_service.handle session_id=%s attachments_count=%s",
+            session_id,
+            len(attachments_for_chat_service or []),
+        )
+
+
+    username = ""
+    result = None
+    attachments_for_chat_service = attachments
+
+    image_command_user_text = user_text
+
+    if user_text.lower().startswith("/image"):
+        image_command_user_text = (
+            "generate image "
+            + (user_text[6:].strip() or "image")
+        )
+
+    print(
+        "DEBUG API BEFORE CHAT_SERVICE SESSION=",
+        repr(session_id),
+        flush=True,
+    )
+
+    # NOVA_EXECUTION_TARGET_CAPTURE_GATE
+    try:
+
+        execution_state = (
+            chat_execution_service.get_state(
+                session_id
+            )
+        )
+
+        current_step = execution_state.get(
+            "current_step"
+        )
+
+        if (
+            isinstance(current_step, dict)
+            and current_step.get("next_action")
+            == "request_target"
+            and user_text
+            and (
+                "." in user_text
+                or "/" in user_text
+                or "\\" in user_text
+            )
+            and not user_text.lower().startswith("auto-plan")
+        ):
+            result = {
+                "ok": True,
+                "execution_state": (
+                    chat_execution_service.advance(
+                        session_id=session_id,
+                        user_text=user_text,
+                    )
+                ),
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": (
+                        "Target captured: "
+                        + user_text
+                    ),
+                },
+                "session_id": session_id,
+                "active_session_id": session_id,
+            }
+
+            return jsonify(result)
+
+    except Exception as e:
+        app.logger.warning(
+            "[TARGET_CAPTURE_GATE] failed %s",
+            e,
+        )
+
+    print(
+        "[ABOUT TO CALL CHAT SERVICE]",
+        {
+            "user_text": user_text,
+            "session_id": session_id,
+            "attachments": attachments_for_chat_service,
+        },
+        flush=True,
+    )
+
+    try:
+        result = chat_service.handle(
+            user_text=image_command_user_text,
+            session_id=session_id,
+            attachments=attachments_for_chat_service,
+        )
+    except Exception as chat_error:
+        import traceback
+
+        print(
+            "[CHAT SERVICE FAILURE DEBUG]",
+            repr(chat_error),
+            flush=True,
+        )
+
+        traceback.print_exc()
+
+        with open(
+            "chat_exception_trace.txt",
+            "a",
+            encoding="utf-8",
+        ) as f:
+            f.write("\n\n===== CHAT FAILURE =====\n")
+            f.write(repr(chat_error))
+            f.write("\n")
+            traceback.print_exc(file=f)
+
+        result = {
+            "ok": False,
+            "assistant_message": {
+                "role": "assistant",
+                "text": "Nova encountered an error processing that request.",
+            },
+            "session_id": session_id,
+        }
+
+        app.logger.warning(
+            "[CHAT_SERVICE_FAILURE] failed: %s",
+            chat_error,
+        )
+
+    print(
+        "[CHAT SERVICE RESULT DEBUG]",
+        repr(result)[:3000],
+    )
+
+    # NOVA_MOBILE_IMAGE_SESSION_SERVICE_20260812
+    try:
+        from nova_backend.services.mobile_image_session_service import (
+            force_mobile_image_session_result,
+        )
+
+        result = force_mobile_image_session_result(
+            result,
+            data,
+            session_id,
+            session_service,
+            UPLOADS_DIR,
+            SESSIONS_FILE,
+        )
+
+    except Exception as exc:
+        app.logger.warning(
+            "[MobileImageSessionService] failed: %s",
+            exc,
+        )
+
+    # =========================
+    # SAFE LOGGING
+    # =========================
+    try:
+        app.logger.info(
+            "[api_chat] chat_service.handle result ok=%s active_session_id=%s keys=%s",
+            result.get("ok") if isinstance(result, dict) else None,
+            result.get("active_session_id") if isinstance(result, dict) else None,
+            sorted(list(result.keys())) if isinstance(result, dict) else type(result).__name__,
+        )
+    except Exception:
+        pass
+
+
+    attachment_content_lines = []
+
+    if "attachment_summary_lock_service" not in globals():
+        attachment_summary_lock_service = None
+
+    attachment_summary_lock_service = globals().get(
+        "attachment_summary_lock_service",
+        None,
+    )
+
+    try:
+        if result is None:
+            result = {
+                "ok": False,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": "Nova returned no response from chat_service.handle().",
+                },
+                "session_id": session_id,
+            }
+
+        result = apply_api_chat_final_response(
+            result,
+            image_command_user_text,
+            attachment_content_lines,
+            attachment_analysis_service,
+            attachment_summary_lock_service,
+            summarize_attachments_for_session,
+            session_id,
+            requested_session_id,
+            attachments,
+            app.logger,
+            response_quality_service,
+            apply_final_attachment_response,
+            apply_session_attachment_response,
+            apply_real_response_attachment_lock,
+        )
+
+    except Exception:
+        app.logger.exception(
+            "[api_chat] failed while finalizing chat response"
+        )
+
+    if result is None:
+        result = {
+            "ok": False,
+            "assistant_message": {
+                "role": "assistant",
+                "text": "Nova returned no response from chat_service.handle().",
+            },
+            "session_id": session_id,
+        }
+
+    try:
+        result = clear_pending_execution_actions(result)
+
+    except Exception as cleanup_error:
+        print(
+            "PENDING EXECUTION CLEANUP FAILED:",
+            cleanup_error,
+        )
+
+    result, assistant_message = build_assistant_message(
+        result,
+        user_text,
+        session_id,
+        response_quality_service,
+    )
+
+    payload = build_chat_response_payload(
+        result,
+        assistant_message,
+        session_id,
+        session_service,
+    )
+
+    return json_ok(
+        **{
+            k: v
+            for k, v in payload.items()
+            if v is not None
+        }
+    )
+
+
+@app.get("/api/chat/<session_id>")
+def api_chat_session_compat(session_id: str):
+    # MOBILE_MISSING_SESSION_SAFE_FALLBACK_LOCK
+    requested_session_id = str(session_id or "").strip()
+
+    session = session_service.get_session(requested_session_id)
+
+    if not session:
+        session = {
+            "id": requested_session_id,
+            "title": "New Chat",
+            "messages": [],
+            "created_at": "",
+            "updated_at": "",
+            "pinned": False,
+            "working_state": {},
+            "execution_state": {},
+            "active_execution": None,
+            "missing": True,
+        }
+
+        return json_ok(
+            session=session,
+            sessions=session_service.get_all(),
+            active_session_id=requested_session_id,
+            messages=[],
+            missing_session=True,
+            mobile_fallback=True,
+        )
+
+    return json_ok(
+        session=session,
+        sessions=session_service.get_all(),
+        active_session_id=session_service.active_session_id,
+        messages=session.get("messages") or [],
+        missing_session=False,
+        mobile_fallback=False,
+    )
+
+# NOVA_FIX_MISSING_UPLOAD_HELPER_LOGGER_20260609
+import logging as _nova_logging_20260609
+logger = _nova_logging_20260609.getLogger(__name__)
+
+@app.get("/api/chats")
+def api_chats_compat():
+    sessions = session_service.get_all()
+
+    return json_ok(
+        ok=True,
+        chats=sessions,
+        items=sessions,
+        sessions=sessions,
+        active_session_id=session_service.active_session_id,
+    )
+
+
+@app.get("/api/chats/<session_id>")
+def api_chat_by_id_compat(session_id: str):
+    return session_route_service.api_session_by_id(session_id)
+
+
+@app.get("/api/sessions/<session_id>")
+def api_session_by_id(session_id: str):
+    return session_route_service.api_session_by_id(session_id)
+
+@app.post("/api/sessions/switch")
+def api_sessions_switch():
+    return session_route_service.api_sessions_switch()
+
+
+@app.post("/api/sessions/rename")
+def api_sessions_rename():
+    return session_route_service.api_sessions_rename()
+
+
+@app.post("/api/sessions/pin")
+def api_sessions_pin():
+    return session_route_service.api_sessions_pin()
+
+
+@app.post("/api/sessions/delete")
+def api_sessions_delete():
+    return session_route_service.api_sessions_delete()
+
+@app.post("/api/sessions/delete-all")
+def api_sessions_delete_all():
+    return session_route_service.api_sessions_delete_all()
+# -----------------------
+# ARTIFACTS
+# -----------------------
+
+@app.get("/api/artifacts")
+def api_artifacts():
+    return json_ok(
+        artifacts=artifact_service.build_list_payload(),
+    )
+
+
+@app.get("/api/artifacts/<artifact_id>")
+def api_artifact_view(artifact_id: str):
+    payload = artifact_service.build_view_payload(artifact_id)
+    if not payload:
+        return json_error("Artifact not found", 404)
+
+    return json_ok(
+        artifact=payload,
+    )
+
+@app.delete("/api/artifacts/<artifact_id>")
+def api_delete_artifact(artifact_id: str):
+    try:
+        ok = artifact_service.delete_artifact(artifact_id)
+
+        return json_ok(
+            ok=bool(ok),
+            deleted_artifact_id=artifact_id,
+            artifacts=artifact_service.build_list_payload(),
+        )
+
+    except Exception as e:
+        return json_error(f"Failed to delete artifact: {e}", 500)
+
+
+
+# -----------------------
+# WEB
+# -----------------------
+
+@app.post("/api/web/fetch")
+def api_web_fetch():
+    print("HIT API_WEB_FETCH ROUTE", flush=True)
+    try:
+        data = request.get_json(silent=True) or {}
+        url = str(data.get("url") or "").strip()
+
+        if not url:
+            return jsonify({
+                "ok": False,
+                "error": "Missing url",
+            }), 400
+
+        try:
+            result = web_service.fetch(url)
+        except Exception as exc:
+            result = {
+                "ok": False,
+                "url": url,
+                "summary": "Preview unavailable. Open the full article instead.",
+                "images": [],
+                "error": str(exc),
+            }
+
+        if not isinstance(result, dict):
+            result = {
+                "ok": False,
+                "url": url,
+                "summary": "Preview unavailable. Open the full article instead.",
+                "images": [],
+                "error": "web_service.fetch returned non-dict result",
+            }
+
+        artifact = None
+        if result.get("ok"):
+            try:
+                artifact = web_service.build_artifact_payload(result)
+            except Exception as exc:
+                result["artifact_error"] = str(exc)
+
+        return jsonify({
+            "ok": True,
+            "result": result,
+            "artifact": artifact,
+        })
+
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "error": str(exc),
+            "route": "/api/web/fetch",
+        }), 200
+
+# -----------------------
+# RECON
+# -----------------------
+
+@app.post("/api/recon/analyze")
+def api_recon_analyze():
+
+    data = request_json()
+    url = str(data.get("url") or "").strip()
+
+    if not url:
+        return json_error("Missing url", 400)
+
+    result = recon_service.analyze_target(url)
+    if not result.get("ok"):
+        return json_error(result.get("error") or "Recon failed", 500, result=result)
+
+    return json_ok(
+        result=result,
+        artifact=recon_service.build_artifact_payload(result),
+    )
+
+@app.post("/api/upload")
+def api_upload():
+
+    try:
+        if "file" not in request.files:
+            return jsonify({
+                "ok": False,
+                "error": "No file provided.",
+            }), 400
+
+        file = request.files["file"]
+        if not file or not getattr(file, "filename", ""):
+            return jsonify({
+                "ok": False,
+                "error": "Empty file.",
+            }), 400
+
+        auth_user_id = ""
+
+        try:
+            auth_user_id = str(
+                session.get("nova_user_id")
+                or session.get("user_id")
+                or ""
+            ).strip()
+        except Exception:
+            auth_user_id = ""
+
+        result = upload_route_service.handle_upload(
+            file,
+            auth_user_id=auth_user_id,
+            logger=app.logger,
+            secure_filename=secure_filename,
+        )
+
+        project_id = str(
+            request.form.get("project_id")
+            or ""
+        ).strip()
+
+        if (
+            project_id
+            and isinstance(result, dict)
+            and result.get("ok")
+        ):
+            file_record = project_workspace_service.add_file(
+                project_id,
+                result.get("original_filename")
+                or result.get("filename")
+                or file.filename,
+                result.get("path")
+                or result.get("file_url")
+                or "",
+                result.get("size")
+                or 0,
+                result.get("mime_type")
+                or "",
+            )
+
+            if file_record:
+                file_record["url"] = (
+                    result.get("file_url")
+                    or result.get("url")
+                    or ""
+                )
+
+                result["project_file"] = file_record
+                result["project_id"] = project_id
+
+        return jsonify(result)
+
+
+    except Exception as e:
+        app.logger.exception("api_upload failed")
+        return jsonify({
+            "ok": False,
+            "error": str(e),
+        }), 500
+
+# -----------------------
+# UPLOADS
+# -----------------------
+@app.get("/api/uploads/<path:filename>")
+def api_uploads(filename: str):
+    try:
+        raw_name = str(filename or "").strip().lstrip("/\\")
+        auth_user_id = ""
+
+        try:
+            auth_user_id = str(
+                session.get("nova_user_id")
+                or session.get("user_id")
+                or ""
+            ).strip()
+
+        except Exception:
+            auth_user_id = ""
+
+        if not auth_user_id:
+            return jsonify({
+                "ok": False,
+                "error": "Upload owner required",
+                "filename": raw_name,
+            }), 403
+
+        if not upload_ownership_service.belongs_to_user(
+            raw_name,
+            auth_user_id,
+        ):
+            return jsonify({
+                "ok": False,
+                "error": "Upload not found",
+                "filename": raw_name,
+            }), 404
+        full_path = (UPLOADS_DIR / raw_name).resolve()
+        uploads_root = UPLOADS_DIR.resolve()
+
+        noisy_video_request = raw_name.lower().endswith((
+            ".mp4",
+            ".mov",
+            ".webm",
+            ".m4v",
+        ))
+
+        try:
+            full_path.relative_to(uploads_root)
+        except ValueError:
+            if not noisy_video_request:
+                app.logger.warning(f"UPLOAD BLOCKED OUTSIDE ROOT: {full_path}")
+
+            return jsonify({
+                "ok": False,
+                "error": "Invalid upload path",
+                "filename": raw_name,
+            }), 400
+
+        if not full_path.exists() or not full_path.is_file():
+            if not noisy_video_request:
+                app.logger.warning(f"UPLOAD MISS: {full_path}")
+
+            return jsonify({
+                "ok": False,
+                "error": "Upload not found",
+                "filename": raw_name,
+                "full_path": str(full_path),
+                "uploads_dir": str(uploads_root),
+            }), 404
+
+        if not noisy_video_request:
+            app.logger.info(f"UPLOAD HIT: {full_path}")
+
+        return send_from_directory(
+            directory=str(uploads_root),
+            path=raw_name,
+            as_attachment=False,
+        )
+
+    except TypeError:
+        # Older Flask / Werkzeug compatibility
+        try:
+            raw_name = str(filename or "").strip().lstrip("/\\")
+            full_path = (UPLOADS_DIR / raw_name).resolve()
+            uploads_root = UPLOADS_DIR.resolve()
+
+            noisy_video_request = raw_name.lower().endswith((
+                ".mp4",
+                ".mov",
+                ".webm",
+                ".m4v",
+            ))
+
+            try:
+                full_path.relative_to(uploads_root)
+            except ValueError:
+                if not noisy_video_request:
+                    app.logger.warning(f"UPLOAD BLOCKED OUTSIDE ROOT: {full_path}")
+
+                return jsonify({
+                    "ok": False,
+                    "error": "Invalid upload path",
+                    "filename": raw_name,
+                }), 400
+
+            if not full_path.exists() or not full_path.is_file():
+                if not noisy_video_request:
+                    app.logger.warning(f"UPLOAD MISS: {full_path}")
+
+                return jsonify({
+                    "ok": False,
+                    "error": "Upload not found",
+                    "filename": raw_name,
+                    "full_path": str(full_path),
+                    "uploads_dir": str(uploads_root),
+                }), 404
+
+            if not noisy_video_request:
+                app.logger.info(f"UPLOAD HIT: {full_path}")
+
+            return send_from_directory(
+                str(uploads_root),
+                raw_name,
+                as_attachment=False,
+            )
+
+        except Exception as e:
+            app.logger.exception("api_uploads failed (compat path)")
+            return jsonify({
+                "ok": False,
+                "error": str(e),
+                "filename": str(filename or ""),
+            }), 500
+
+    except Exception as e:
+        app.logger.exception("api_uploads failed")
+        return jsonify({
+            "ok": False,
+            "error": str(e),
+            "filename": str(filename or ""),
+        }), 500
+
+@app.route("/api/execution/control", methods=["POST"])
+def execution_control():
+    return execution_route_service.execution_control()
+
+@app.route(
+    "/api/projects/<project_id>/summary",
+    methods=["GET"],
+)
+def api_project_summary(
+    project_id,
+):
+    summary = project_workspace_service.get_project_summary(
+        project_id
+    )
+
+    if not summary:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "summary": summary,
+        }
+    )
+
+@app.route(
+    "/api/projects/<project_id>/activate",
+    methods=["POST"],
+)
+def api_project_activate(
+    project_id,
+):
+    project = project_workspace_service.set_active_project(
+        project_id
+    )
+
+    if not project:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "project": project,
+        }
+    )
+
+
+@app.route(
+    "/api/projects/active",
+    methods=["GET"],
+)
+def api_project_active():
+    project = project_workspace_service.get_active_project()
+
+    return jsonify(
+        {
+            "ok": True,
+            "project": project,
+        }
+    )
+
+@app.route(
+    "/api/projects/<project_id>/tasks",
+    methods=["POST"],
+)
+def api_project_add_task(
+    project_id,
+):
+    data = request.get_json(
+        silent=True
+    ) or {}
+
+    task = project_workspace_service.add_task(
+        project_id,
+        data.get(
+            "title",
+            "New Task",
+        ),
+        data.get(
+            "priority",
+            "medium",
+        ),
+    )
+
+    if not task:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "task": task,
+        }
+    )
+
+@app.route(
+    "/api/projects/<project_id>/files",
+    methods=["GET"],
+)
+def api_project_files(
+    project_id,
+):
+    project = project_workspace_service.get_project(
+        project_id
+    )
+
+    if not project:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found",
+            }
+        ), 404
+
+    files = project_workspace_service.list_files(
+        project_id
+    )
+
+    return jsonify(
+        {
+            "ok": True,
+            "files": files,
+        }
+    )
+
+@app.route(
+    "/api/projects/<project_id>/files",
+    methods=["POST"],
+)
+def api_project_add_file(
+    project_id,
+):
+    if "file" in request.files:
+        uploaded = request.files["file"]
+
+        file_record = project_workspace_service.add_file(
+            project_id,
+            uploaded.filename,
+            "",
+            0,
+            uploaded.content_type or "",
+        )
+
+    else:
+        data = request.get_json(
+            silent=True
+        ) or {}
+
+        file_record = project_workspace_service.add_file(
+            project_id,
+            data.get(
+                "name",
+                "Untitled file",
+            ),
+            data.get(
+                "path",
+                "",
+            ),
+            data.get(
+                "size",
+                0,
+            ),
+            data.get(
+                "type",
+                "",
+            ),
+        )
+
+    if not file_record:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Could not add file",
+            }
+        ), 400
+
+    return jsonify(
+        {
+            "ok": True,
+            "file": file_record,
+        }
+    )
+
+@app.route(
+    "/api/projects/<project_id>/files/<file_id>/download",
+    methods=["GET"],
+)
+def api_project_download_file(
+    project_id,
+    file_id,
+):
+    project = project_workspace_service.get_project(
+        project_id
+    )
+
+    if not project:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found",
+            }
+        ), 404
+
+    files = project_workspace_service.list_files(
+        project_id
+    )
+
+    file_record = next(
+        (
+            item
+            for item in files
+            if item.get("id") == file_id
+        ),
+        None,
+    )
+
+    if not file_record:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "File not found",
+            }
+        ), 404
+
+    path = file_record.get(
+        "path",
+        "",
+    )
+
+    if not path or not os.path.exists(path):
+        return jsonify(
+            {
+                "ok": False,
+                "error": "File missing",
+            }
+        ), 404
+
+    return send_file(
+        path,
+        as_attachment=False,
+        download_name=file_record.get(
+            "filename",
+            "file",
+        ),
+    )
+
+@app.route(
+    "/api/projects/<project_id>/files/<file_id>",
+    methods=["DELETE"],
+)
+def api_project_delete_file(
+    project_id,
+    file_id,
+):
+    deleted = project_workspace_service.delete_file(
+        project_id,
+        file_id,
+    )
+
+    if not deleted:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "File not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "deleted": True,
+            "file_id": file_id,
+        }
+    )
+
+@app.route(
+    "/api/projects/<project_id>/tasks/<task_id>",
+    methods=["PATCH"],
+)
+
+def api_project_update_task(
+    project_id,
+    task_id,
+):
+    data = request.get_json(
+        silent=True
+    ) or {}
+
+    task = project_workspace_service.update_task_status(
+        project_id,
+        task_id,
+        data.get(
+            "status",
+            "open",
+        ),
+    )
+
+    if not task:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Task not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "task": task,
+        }
+    )
+
+    print("[PROJECT INTELLIGENCE]", project_id)
+
+    summary = project_workspace_service.get_project_summary(
+        project_id
+    )
+
+    if not summary:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found",
+            }
+        ), 404
+
+@app.route(
+    "/api/projects/<project_id>/notes",
+    methods=["GET"],
+)
+def api_project_notes(
+    project_id,
+):
+    project = project_workspace_service.get_project(
+        project_id
+    )
+
+    if not project:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found",
+            }
+        ), 404
+
+    notes = project_workspace_service.list_notes(
+        project_id
+    )
+
+    return jsonify(
+        {
+            "ok": True,
+            "notes": notes,
+        }
+    )
+
+
+@app.route(
+    "/api/projects/<project_id>/notes",
+    methods=["POST"],
+)
+def api_project_add_note(
+    project_id,
+):
+    data = request.get_json(
+        silent=True
+    ) or {}
+
+    note = project_workspace_service.add_note(
+        project_id,
+        data.get(
+            "title",
+            "Untitled Note",
+        ),
+        data.get(
+            "content",
+            "",
+        ),
+    )
+
+    if not note:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "note": note,
+        }
+    )
+
+@app.route(
+    "/api/projects/<project_id>/notes/<note_id>",
+    methods=["PATCH"],
+)
+def api_project_update_note(
+    project_id,
+    note_id,
+):
+    print(
+        "[PROJECT NOTE PATCH]",
+        project_id,
+        note_id,
+    )
+    data = request.get_json(
+        silent=True
+    ) or {}
+
+    note = project_workspace_service.update_note(
+        project_id,
+        note_id,
+        title=data.get("title"),
+        content=data.get("content"),
+    )
+
+    if not note:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Note not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "note": note,
+        }
+    )
+
+
+@app.route(
+    "/api/projects/<project_id>/notes/<note_id>",
+    methods=["DELETE"],
+)
+def api_project_delete_note(
+    project_id,
+    note_id,
+):
+    print(
+        "[PROJECT NOTE DELETE]",
+        project_id,
+        note_id,
+    )
+
+    deleted = project_workspace_service.delete_note(
+        project_id,
+        note_id,
+    )
+
+    if not deleted:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Note not found",
+            }
+        ), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "deleted": True,
+            "note_id": note_id,
+        }
+    )
+
+@app.route(
+    "/api/projects/<project_id>/intelligence",
+    methods=["GET"],
+)
+def api_project_intelligence(
+    project_id,
+):
+    print("[PROJECT INTELLIGENCE]", project_id)
+
+    summary = project_workspace_service.get_project_summary(
+        project_id
+    )
+
+    if not summary:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Project not found",
+            }
+        ), 404
+
+    project = project_workspace_service.get_project(
+        project_id
+    )
+
+    tasks = (
+        project.get("tasks", [])
+        if isinstance(project, dict)
+        else []
+    )
+
+    intelligence = project_intelligence_service.build(
+        project=summary,
+        tasks=tasks,
+    )
+
+    return jsonify(
+        {
+            "ok": True,
+            "intelligence": intelligence,
+        }
+    )
+
+@app.route("/api/execution/stream", methods=["POST"])
+def execution_stream():
+    try:
+        session_id = str(request.args.get("session_id") or "").strip()
+
+        if not session_id:
+            return jsonify({
+                "ok": False,
+                "error": "Missing session_id",
+                "active_task": "",
+                "next_move": "",
+                "last_execution_status": "idle",
+                "last_execution_steps": 0,
+                "execution_history": [],
+            }), 400
+
+        session = session_service.get_session(session_id) or {}
+        state = session.get("working_state", {}).get("execution", {})
+
+        if not isinstance(state, dict):
+            state = {}
+
+        history = (
+            state.get("execution_history")
+            or state.get("history")
+            or []
+        )
+
+        if not isinstance(history, list):
+            history = []
+
+        return jsonify({
+            "ok": True,
+            "session_id": session_id,
+            "active_task": state.get("active_task") or "",
+            "next_move": state.get("next_move") or "",
+            "last_execution_status": state.get("last_execution_status") or "idle",
+            "last_execution_action": state.get("last_execution_action") or "",
+            "last_execution_steps": state.get("last_execution_steps") or len(history),
+            "execution_history": history,
+            "working_state": state,
+        })
+
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "error": str(exc),
+            "active_task": "",
+            "next_move": "",
+            "last_execution_status": "error",
+            "last_execution_steps": 0,
+            "execution_history": [],
+        }), 500
+
+@app.route("/api/web/preview", methods=["POST"])
+def web_preview():
+    data = request.get_json(silent=True) or {}
+    url = str(data.get("url") or "").strip()
+
+    return jsonify(
+        web_preview_route_service.preview(url)
+    )
+
+def create_startup_backup():
+    root = Path(r"C:\Users\Owner\nova")
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    backup_root = root / "nova_backups"
+    backup_dir = backup_root / f"startup_{stamp}"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+
+    files_to_backup = [
+        root / "app.py",
+        root / "nova_backend" / "services" / "chat_service.py",
+        root / "static" / "js" / "nova-composer-bundle.js",
+        root / "templates" / "index.html",
+        root / "static" / "css" / "nova-main.css",
+    ]
+
+    for file_path in files_to_backup:
+        if file_path.exists():
+            relative_path = file_path.relative_to(root)
+            destination = backup_dir / relative_path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(file_path, destination)
+
+    print(f"[NOVA BACKUP] Created: {backup_dir}")
+
+    # ?? AUTO CLEANUP (keep last 10 backups)
+    backups = sorted(backup_root.glob("startup_*"), key=lambda p: p.stat().st_mtime, reverse=True)
+
+    for old in backups[10:]:
+        try:
+            shutil.rmtree(old)
+            print(f"[NOVA BACKUP] Removed old: {old}")
+        except Exception as e:
+            print(f"[NOVA BACKUP] Cleanup error: {e}")
+
+# -----------------------
+# MAIN
+# -----------------------
+
+
+# FIX_ATTACHMENT_ANALYZER_ROUTE_AND_CALL_LOCK
+# Safety repair: make sure /api/chat points to api_chat, not helper functions.
+try:
+    if "api_chat" in globals():
+        for _nova_rule in app.url_map.iter_rules():
+            if str(_nova_rule.rule) == "/api/chat":
+                app.view_functions[_nova_rule.endpoint] = api_chat
+                _nova_boot_log_20260701(f"[NOVA ROUTE REPAIR] /api/chat endpoint={_nova_rule.endpoint} rebound to api_chat")
+
+except Exception as _nova_route_repair_error:
+    print(f"[NOVA ROUTE REPAIR FAILED] {_nova_route_repair_error}")
+
+@app.route("/api/attachment/extract", methods=["POST"])
+def api_attachment_extract():
+    payload = request.get_json(silent=True) or {}
+
+    result = attachment_route_service.extract(payload)
+
+    if isinstance(result, tuple):
+        return jsonify(result[0]), result[1]
+
+    return jsonify(result)
+
+@app.route("/api/attachment/summarize", methods=["POST"])
+def api_attachment_summarize():
+    """
+    Extract and summarize an uploaded PDF/image without touching the chat pipeline.
+    Accepts JSON:
+      {
+        "url": "/api/uploads/file.pdf",
+        "path": "optional local path",
+        "mime_type": "application/pdf"
+      }
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+
+        upload_url = str(payload.get("url") or payload.get("file_url") or "").strip()
+        local_path = str(payload.get("path") or "").strip()
+        mime_type = str(payload.get("mime_type") or payload.get("type") or "").strip()
+
+        if not local_path and upload_url:
+            filename = upload_url.replace("\\", "/").split("/")[-1].strip()
+            if filename:
+                local_path = str(Path(UPLOADS_DIR) / filename)
+
+        if not local_path:
+            return jsonify({
+                "ok": False,
+                "error": "Missing url or path.",
+            }), 400
+
+        file_path = Path(local_path)
+
+        if not file_path.exists():
+            return jsonify({
+                "ok": False,
+                "error": f"File not found: {file_path}",
+            }), 404
+
+        if not mime_type:
+            suffix = file_path.suffix.lower()
+            if suffix == ".pdf":
+                mime_type = "application/pdf"
+            elif suffix in {".jpg", ".jpeg"}:
+                mime_type = "image/jpeg"
+            elif suffix == ".png":
+                mime_type = "image/png"
+            elif suffix == ".webp":
+                mime_type = "image/webp"
+            else:
+                mime_type = "application/octet-stream"
+
+        extracted_text = attachment_analysis_service.analyze_binary_attachment_for_prompt(
+            str(file_path),
+            mime_type,
+        )
+
+        cleaned_text = attachment_analysis_service.clean_extracted_attachment_text(
+            extracted_text
+        )
+
+        local_summary = attachment_analysis_service.local_summary_from_text(
+            extracted_text
+        )
+
+        app.logger.info(
+            "[AttachmentSummarizeEndpoint] summarized path=%s raw_chars=%s clean_chars=%s mime_type=%s",
+            str(file_path),
+            len(str(extracted_text or "")),
+            len(cleaned_text),
+            mime_type,
+        )
+
+        cleaned_endpoint_summary = (
+            attachment_endpoint_service.clean_attachment_endpoint_response(
+                local_summary,
+                cleaned_text,
+                file_path,
+                mime_type,
+            )
+        )
+
+        return jsonify({
+            "ok": True,
+            "path": str(file_path),
+            "url": upload_url,
+            "mime_type": mime_type,
+            "raw_chars": len(str(extracted_text or "")),
+            "clean_chars": len(cleaned_text),
+            "summary": cleaned_endpoint_summary["summary"],
+            "key_points": cleaned_endpoint_summary["key_points"],
+            "preview": cleaned_endpoint_summary["preview"],
+            "clean_text": cleaned_endpoint_summary["preview"] or cleaned_text,
+        })
+
+    except Exception as error:
+        app.logger.exception("[AttachmentSummarizeEndpoint] failed")
+        return jsonify({
+            "ok": False,
+            "error": str(error),
+        }), 500
+
+@app.route("/api/attachment/keypoints", methods=["POST"])
+def api_attachment_keypoints():
+    """
+    Extract key points from an uploaded PDF/image without touching the chat pipeline.
+    Accepts JSON:
+      {
+        "url": "/api/uploads/file.pdf",
+        "path": "optional local path",
+        "mime_type": "application/pdf"
+      }
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+
+        upload_url = str(payload.get("url") or payload.get("file_url") or "").strip()
+        local_path = str(payload.get("path") or "").strip()
+        mime_type = str(payload.get("mime_type") or payload.get("type") or "").strip()
+
+        if not local_path and upload_url:
+            filename = upload_url.replace("\\", "/").split("/")[-1].strip()
+            if filename:
+                local_path = str(Path(UPLOADS_DIR) / filename)
+
+        if not local_path:
+            return jsonify({
+                "ok": False,
+                "error": "Missing url or path.",
+            }), 400
+
+        file_path = Path(local_path)
+
+        if not file_path.exists():
+            return jsonify({
+                "ok": False,
+                "error": f"File not found: {file_path}",
+            }), 404
+
+        if not mime_type:
+            suffix = file_path.suffix.lower()
+            if suffix == ".pdf":
+                mime_type = "application/pdf"
+            elif suffix in {".jpg", ".jpeg"}:
+                mime_type = "image/jpeg"
+            elif suffix == ".png":
+                mime_type = "image/png"
+            elif suffix == ".webp":
+                mime_type = "image/webp"
+            else:
+                mime_type = "application/octet-stream"
+
+        extracted_text = attachment_analysis_service.analyze_binary_attachment_for_prompt(
+            str(file_path),
+            mime_type,
+        )
+
+        key_points = attachment_keypoints_service.attachment_keypoints_from_text(
+            extracted_text,
+            max_points=10,
+        )
+        summary = "No readable key points found."
+        if key_points:
+            summary = "Top attachment point: " + key_points[0]
+
+        app.logger.info(
+            "[AttachmentKeypointsEndpoint] extracted keypoints path=%s raw_chars=%s points=%s mime_type=%s",
+            str(file_path),
+            len(str(extracted_text or "")),
+            len(key_points),
+            mime_type,
+        )
+
+        return jsonify({
+            "ok": True,
+            "path": str(file_path),
+            "url": upload_url,
+            "mime_type": mime_type,
+            "raw_chars": len(str(extracted_text or "")),
+            "summary": summary,
+            "key_points": key_points,
+            "points_count": len(key_points),
+        })
+
+    except Exception as error:
+        app.logger.exception("[AttachmentKeypointsEndpoint] failed")
+        return jsonify({
+            "ok": False,
+            "error": str(error),
+        }), 500
+
+# CHAT_ATTACHMENT_RESPONSE_CLEANUP_LOCK
+@app.after_request
+def _nova_clean_attachment_analysis_response(response):
+    return attachment_endpoint_service.clean_attachment_analysis_response(
+        response
+    )
+
+
+# NOVA_BACKEND_READINESS_ROUTE_20260609
+# Live local backend readiness endpoint.
+try:
+    from nova_backend.services.chat_service_backend_readiness import get_backend_readiness
+
+    @app.route("/api/backend/readiness", methods=["GET"])
+    def api_backend_readiness_20260609():
+        return get_backend_readiness()
+
+except Exception as _nova_backend_readiness_route_error_20260609:
+    @app.route("/api/backend/readiness", methods=["GET"])
+    def api_backend_readiness_route_error_20260609():
+        return {
+            "ok": False,
+            "error": "backend_readiness_route_failed",
+            "detail": str(_nova_backend_readiness_route_error_20260609),
+        }, 500
+
+# NOVA_MOBILE_DIRECT_SESSION_PERSIST_ENDPOINT_20260609
+@app.post("/api/mobile/session/persist")
+def nova_mobile_direct_session_persist_20260609():
+    payload = request.get_json(silent=True) or {}
+
+    return mobile_session_persist_service.persist(
+        payload,
+        globals().get("SESSIONS_FILE"),
+    )
+
+# NOVA_SESSION_PUT_MESSAGES_COMPAT_20260829
+@app.put("/api/sessions/<session_id>")
+def nova_session_put_messages_compat_20260829(session_id):
+    payload = request.get_json(silent=True) or {}
+
+    messages = payload.get("messages")
+
+    if not isinstance(messages, list):
+        return {
+            "ok": False,
+            "error": "messages_must_be_array"
+        }, 400
+
+    user_id = ""
+
+    try:
+        from flask import session as _flask_session
+
+        user_id = (
+            _flask_session.get("nova_user_id")
+            or _flask_session.get("user_id")
+            or _flask_session.get("userId")
+            or ""
+        )
+    except Exception:
+        pass
+
+    if not user_id:
+        user_id = request.headers.get("X-Nova-User-Id", "")
+
+    existing = session_route_service.api_session_by_id(session_id)
+
+    if isinstance(existing, tuple):
+        existing_body = existing[0]
+        existing_status = existing[1]
+
+        if existing_status != 200:
+            return existing
+
+        existing = existing_body
+
+    if not isinstance(existing, dict):
+        return {
+            "ok": False,
+            "error": "session_not_found"
+        }, 404
+
+    current_messages = existing.get("messages") or []
+
+    if len(messages) < len(current_messages):
+        return {
+            "ok": False,
+            "error": "message_history_cannot_shrink"
+        }, 400
+
+    for message in messages[len(current_messages):]:
+        result = session_service.append_message(
+            session_id,
+            message,
+            user_id=user_id,
+        )
+
+        if result is None:
+            return {
+                "ok": False,
+                "error": "message_append_failed"
+            }, 404
+
+    updated = session_route_service.api_session_by_id(session_id)
+
+    return updated
+# NOVA_APP_ROUTE_FIXED_CLEAN_BOTTOM_20260610
+@app.get("/app")
+def nova_desktop_app_fixed_20260610():
+    return render_template("app.html")
+
+# NOVA_ACCOUNT_PROFILE_ROUTE_20260708
+@app.get("/api/account")
+def nova_account_profile_20260708():
+    return account_profile_service.get_profile()
+
+
+# NOVA_LOGIN_PAGE_ROUTES_20260610
+login_page_route_service.install_routes(app)
+auth_compat_route_service.install_routes(app)
+
+# NOVA_SLIM_API_SESSIONS_PAYLOAD_20260611
+@app.after_request
+def nova_slim_api_sessions_payload_20260611(response):
+    return session_slim_response_service.handle(
+        response,
+        request,
+        app,
+    )
+
+# NOVA_BEFORE_REQUEST_SLIM_API_SESSIONS_20260611
+@app.before_request
+def nova_before_request_slim_api_sessions_20260611():
+    return session_route_service.handle_slim_sessions(
+        request,
+        session,
+        session_service,
+        app,
+        jsonify,
+    )
+
+
+# NOVA_BEFORE_REQUEST_EXPLICIT_MEMORY_GUARD_20260611
+@app.before_request
+def nova_before_request_explicit_memory_guard_20260611():
+    try:
+        if request.path not in (
+            "/api/chat",
+            "/api/chat/stream",
+        ) or request.method != "POST":
+            return None
+
+        payload = request.get_json(silent=True) or {}
+
+        return memory_guard_service.handle_explicit_memory_guard(
+            payload,
+            memory_service,
+            session_service,
+            jsonify,
+            app.logger,
+        )
+
+    except Exception:
+        return None
+
+# NOVA_BEFORE_REQUEST_FAVORITE_RECALL_GUARD_20260611
+@app.before_request
+def nova_before_request_favorite_recall_guard_20260611():
+    try:
+        if request.path not in (
+            "/api/chat",
+            "/api/chat/stream",
+        ) or request.method != "POST":
+            return None
+
+        payload = request.get_json(silent=True) or {}
+
+        return memory_guard_service.handle_favorite_recall_guard(
+            payload,
+            memory_service,
+            session_service,
+            jsonify,
+            app.logger,
+        )
+
+    except Exception:
+        return None
+
+# NOVA_BEFORE_REQUEST_MEMORY_SUMMARY_GUARD_20260611
+@app.before_request
+def nova_before_request_memory_summary_guard_20260611():
+    try:
+        if request.path not in (
+            "/api/chat",
+            "/api/chat/stream",
+        ) or request.method != "POST":
+            return None
+
+        payload = request.get_json(silent=True) or {}
+
+        return memory_guard_service.handle_memory_summary_guard(
+            payload,
+            memory_service,
+            session_service,
+            jsonify,
+            app.logger,
+        )
+
+    except Exception:
+        return None
+
+# NOVA_CHAT_STREAM_REAL_20260613
+
+@app.route("/api/events/stream")
+def stream_events():
+    def event_stream():
+        while True:
+            # keep connection alive
+            yield "data: {}\n\n"
+            time.sleep(15)
+
+    return Response(event_stream(), mimetype="text/event-stream")
+
+@app.route("/api/chat/stream", methods=["POST"])
+def nova_chat_stream():
+    return chat_stream_service.stream(api_chat)
+
+@app.before_request
+def nova_memory_command_before_web_20260611():
+    try:
+        if request.path not in (
+            "/api/chat",
+            "/api/chat/stream",
+        ) or request.method != "POST":
+            return None
+
+        data = request.get_json(silent=True) or {}
+
+        return memory_command_service.handle_memory_command_before_web(
+            data,
+            memory_service,
+        )
+
+    except Exception:
+        return None
+
+@app.before_request
+def nova_attachment_boundary_capture():
+    try:
+        from flask import request, g
+
+        if request.path != "/api/chat":
+            return
+
+        data = request.get_json(
+            silent=True
+        ) or {}
+
+        attachments = normalize_attachments(
+            data.get("attachments", [])
+            or data.get("files", [])
+        )
+
+        g.nova_api_chat_attachments = attachments
+
+        print(
+            "[ATTACHMENT BOUNDARY CAPTURE]",
+            attachments,
+        )
+
+    except Exception as error:
+        try:
+            from flask import g
+
+            g.nova_api_chat_attachments = []
+
+            print(
+                "[ATTACHMENT BOUNDARY ERROR]",
+                error,
+            )
+
+        except Exception:
+            pass
+
+# NOVA_WEB_FETCH_BRIDGE_JSON_IMPORT_FIX_20260612
+# Ensure this late bridge can rewrite Flask response JSON even if json was not imported globally.
+import json as json
+
+# NOVA_WEB_FETCH_REQUESTED_SESSION_BRIDGE_SAFE_20260612
+# Registers before the existing target-session bridge.
+# Rewrites successful web_fetch /api/chat responses to the requested session id
+# and includes a response session object so the UI can render source cards even
+# if /api/sessions/<id> filtering is still strict.
+
+@app.after_request
+def nova_web_fetch_requested_session_bridge_safe_20260612(response):
+    try:
+        payload = request.get_json(silent=True) or {}
+
+        return web_fetch_bridge_service.handle(
+            response,
+            payload,
+        )
+
+    except Exception:
+        return response
+
+# NOVA_FORCE_WEB_FETCH_BRIDGE_RUNS_LAST_20260612
+# Flask executes after_request hooks in reverse registration order.
+# Force the safe web-fetch bridge to index 0 so it runs last and cannot be
+# overwritten by older response-normalizer hooks.
+try:
+    _nova_after_hooks = app.after_request_funcs.get(None, [])
+    _nova_bridge_name = "nova_web_fetch_requested_session_bridge_safe_20260612"
+    _nova_bridge_func = None
+
+    for _nova_hook in list(_nova_after_hooks):
+        if getattr(_nova_hook, "__name__", "") == _nova_bridge_name:
+            _nova_bridge_func = _nova_hook
+            try:
+                _nova_after_hooks.remove(_nova_hook)
+            except ValueError:
+                pass
+            break
+
+    if _nova_bridge_func is not None:
+        _nova_after_hooks.insert(0, _nova_bridge_func)
+        app.after_request_funcs[None] = _nova_after_hooks
+        _nova_boot_log_20260701("[NOVA_WEB_FETCH_BRIDGE_ORDER] forced bridge to run last")
+    else:
+        print("[NOVA_WEB_FETCH_BRIDGE_ORDER] bridge function not found")
+except Exception as _nova_bridge_order_error:
+    try:
+        app.logger.warning("[NOVA_WEB_FETCH_BRIDGE_ORDER] failed: %s", _nova_bridge_order_error)
+    except Exception:
+        pass
+
+
+@app.after_request
+def nova_final_session_detail_response_cache_20260612(response):
+    return session_detail_response_cache_service.handle(
+        response,
+        request,
+        app,
+    )
+
+
+# Force this hook to run last. Flask executes after_request hooks in reverse order,
+# so index 0 is the final hook to touch the response.
+try:
+    _nova_hooks = app.after_request_funcs.get(None, [])
+    _nova_name = "nova_final_session_detail_response_cache_20260612"
+    _nova_func = None
+
+    for _nova_hook in list(_nova_hooks):
+        if getattr(_nova_hook, "__name__", "") == _nova_name:
+            _nova_func = _nova_hook
+            try:
+                _nova_hooks.remove(_nova_hook)
+            except ValueError:
+                pass
+            break
+
+    if _nova_func is not None:
+        _nova_hooks.insert(0, _nova_func)
+        app.after_request_funcs[None] = _nova_hooks
+        _nova_boot_log_20260701("[NOVA_FINAL_SESSION_DETAIL_CACHE] forced final hook to run last")
+except Exception:
+    pass
+
+from nova_backend.services import session_title_guard_service
+
+session_title_guard_service.install(app)
+
+# Project state route guard
+project_state_route_guard_service.install(app)
+
+# NOVA_PROJECT_NEXT_ENDPOINT_SERVICE_20260813
+
+try:
+    from nova_backend.services.project_next_endpoint_service import (
+        install_project_next_endpoint_wrapper,
+    )
+
+    install_project_next_endpoint_wrapper(app)
+
+except Exception as exc:
+    print(
+        "[NOVA_PROJECT_NEXT_ENDPOINT_SERVICE] failed:",
+        exc,
+    )
+
+    try:
+        _nova_aq95_funcs_20260701 = app.before_request_funcs.get(None, [])
+        if _nova_answer_quality_95_direct_policy_20260701 in _nova_aq95_funcs_20260701:
+            _nova_aq95_funcs_20260701.remove(_nova_answer_quality_95_direct_policy_20260701)
+            _nova_aq95_funcs_20260701.insert(0, _nova_answer_quality_95_direct_policy_20260701)
+            app.before_request_funcs[None] = _nova_aq95_funcs_20260701
+    except Exception:
+        pass
+
+    print("[NOVA_ANSWER_QUALITY_95_DIRECT_POLICY_20260701] installed")
+except Exception as _nova_aq95_error_20260701:
+    print("[NOVA_ANSWER_QUALITY_95_DIRECT_POLICY_20260701] failed:", _nova_aq95_error_20260701)
+
+
+# NOVA_PROJECT_BRAIN_DECISION_LOG_ROUTE_SERVICE
+
+try:
+    from nova_backend.services.project_brain_decision_log_route_service import (
+        install_project_brain_decision_log_route,
+    )
+
+    install_project_brain_decision_log_route(app)
+
+except Exception as exc:
+    print(
+        "[NOVA_PROJECT_BRAIN_DECISION_LOG_ROUTE_SERVICE] failed:",
+        exc,
+    )
+
+# --- NOVA_PROTECTED_SESSION_RESTORE_20260703 ---
+try:
+    import os as _npsr_os
+    import json as _npsr_json
+    import shutil as _npsr_shutil
+    from pathlib import Path as _NpsrPath
+    from flask import request as _npsr_request
+    from flask import jsonify as _npsr_jsonify
+
+    def _npsr_paths_20260703():
+        base = _NpsrPath(__file__).resolve().parent
+        data = _NpsrPath(_npsr_os.environ.get("NOVA_DATA_DIR", str(base / "data")))
+        data.mkdir(parents=True, exist_ok=True)
+        sessions = _NpsrPath(_npsr_os.environ.get("NOVA_SESSIONS_FILE", str(data / "nova_sessions.json")))
+        vault = data / "nova_sessions.richard_restore_vault_20260703.json"
+        return sessions, vault
+
+    def _npsr_count_20260703(value):
+        if isinstance(value, list):
+            return len(value)
+
+        if isinstance(value, dict):
+            sessions = value.get("sessions")
+            if isinstance(sessions, list):
+                return len(sessions)
+            if isinstance(sessions, dict):
+                return len(sessions)
+
+            found = [
+                item for item in value.values()
+                if isinstance(item, dict) and (
+                    "messages" in item or "id" in item or "session_id" in item
+                )
+            ]
+            return len(found)
+
+        return 0
+
+    def _npsr_file_count_20260703(path):
+        try:
+            if not path.exists():
+                return 0
+            return _npsr_count_20260703(_npsr_json.loads(path.read_text(encoding="utf-8")))
+        except Exception:
+            return 0
+
+    def _npsr_rewrite_owner_20260703(value):
+        if isinstance(value, list):
+            return [_npsr_rewrite_owner_20260703(item) for item in value]
+
+        if isinstance(value, dict):
+            out = {}
+            for key, item in value.items():
+                lk = str(key).lower(),lh
+
+                if lk in ("owner", "owner_name") and item in (None, "", "joe", "Joe", "JOE", "blank"):
+                    out[key] = "richard"
+                elif lk in ("owner_id", "user_id") and item in (None, "", "joe", "Joe", "JOE", "blank", "user_joe"):
+                    out[key] = "user_richard_stable_local_login"
+                else:
+                    out[key] = _npsr_rewrite_owner_20260703(item)
+
+            return out
+
+        return value
+
+    def _npsr_restore_if_needed_20260703(reason="request"):
+        try:
+            sessions, vault = _npsr_paths_20260703()
+
+            current_count = _npsr_file_count_20260703(sessions)
+            vault_count = _npsr_file_count_20260703(vault)
+
+            if vault.exists() and vault_count >= 5 and current_count < vault_count:
+                if sessions.exists():
+                    backup = sessions.with_name("nova_sessions.overwritten_before_restore_20260703.json")
+                    _npsr_shutil.copy2(sessions, backup)
+
+                _npsr_shutil.copy2(vault, sessions)
+                print("[NOVA_PROTECTED_SESSION_RESTORE_20260703] restored", {
+                    "reason": reason,
+                    "current_count": current_count,
+                    "vault_count": vault_count,
+                })
+                return True
+        except Exception as exc:
+            try:
+                print("[NOVA_PROTECTED_SESSION_RESTORE_20260703] restore failed:", exc)
+            except Exception:
+                pass
+
+        return False
+
+    _npsr_restore_if_needed_20260703("startup")
+
+    @app.before_request
+    def _npsr_before_request_20260703():
+        _npsr_restore_if_needed_20260703("before_request")
+        return None
+
+    @app.post("/api/admin/session-store/import-protected")
+    def _npsr_import_protected_20260703():
+        expected = _npsr_os.environ.get(
+            "NOVA_SESSION_IMPORT_TOKEN"
+        )
+
+        if not expected:
+            return _npsr_jsonify(
+                {
+                    "ok": False,
+                    "error": "NOVA_SESSION_IMPORT_TOKEN is not configured."
+                }
+            ), 500
+        provided = _npsr_request.headers.get("X-Nova-Import-Token", "")
+
+        if provided != expected:
+            return _npsr_jsonify({"ok": False, "error": "Bad import token."}), 403
+
+        raw = _npsr_request.get_data(as_text=True) or ""
+        if not raw.strip():
+            return _npsr_jsonify({"ok": False, "error": "Empty request body."}), 400
+
+        try:
+            payload = _npsr_json.loads(raw)
+        except Exception as exc:
+            return _npsr_jsonify({"ok": False, "error": "Invalid JSON.", "detail": str(exc)}), 400
+
+        payload = _npsr_rewrite_owner_20260703(payload)
+        imported_count = _npsr_count_20260703(payload)
+
+        if imported_count < 5:
+            return _npsr_jsonify({
+                "ok": False,
+                "error": "Refusing tiny session import.",
+                "imported_count": imported_count,
+            }), 400
+
+        sessions, vault = _npsr_paths_20260703()
+        text = _npsr_json.dumps(payload, ensure_ascii=False, indent=2)
+
+        if sessions.exists():
+            backup = sessions.with_name("nova_sessions.before_protected_import_20260703.json")
+            _npsr_shutil.copy2(sessions, backup)
+
+        vault.write_text(text, encoding="utf-8")
+        sessions.write_text(text, encoding="utf-8")
+
+        return _npsr_jsonify({
+            "ok": True,
+            "imported_count": imported_count,
+            "target": str(sessions),
+            "vault": str(vault),
+            "mode": "protected_replace",
+        })
+
+    print("[NOVA_PROTECTED_SESSION_RESTORE_20260703] installed")
+except Exception as _npsr_error_20260703:
+    try:
+        print("[NOVA_PROTECTED_SESSION_RESTORE_20260703] failed:", _npsr_error_20260703)
+    except Exception:
+        pass
+
+
+# --- NOVA_MOBILE_CHAT_VISIBLE_RECOVERY_INJECT_20260703 ---
+try:
+    from flask import request as _nvcvr_request
+
+    @app.after_request
+    def _nvcvr_inject_after_request_20260703(response):
+        try:
+            if _nvcvr_request.path not in ("/mobile", "/mobile/"):
+                return response
+
+            content_type = str(response.headers.get("Content-Type") or "")
+            if "text/html" not in content_type.lower():
+                return response
+
+            body = response.get_data(as_text=True)
+
+            if "nova-mobile-chat-visible-recovery-v1.js" in body:
+                return response
+
+            script = '<script src="/static/js/mobile/nova-mobile-chat-visible-recovery-v1.js?v=chat-visible-recovery-dedupe-final-20260703c"></script>'
+
+            import re
+            if re.search(r"</body>", body, flags=re.I):
+                body = re.sub(r"</body>", script + "\n</body>", body, count=1, flags=re.I)
+            else:
+                body = body + "\n" + script + "\n"
+
+            response.set_data(body)
+            response.headers["Content-Length"] = str(len(body.encode("utf-8")))
+            return response
+        except Exception as error:
+            try:
+                print("[NOVA_MOBILE_CHAT_VISIBLE_RECOVERY_INJECT_20260703] bypass:", error)
+            except Exception:
+                pass
+            return response
+
+    print("[NOVA_MOBILE_CHAT_VISIBLE_RECOVERY_INJECT_20260703] installed")
+except Exception as _nvcvr_error:
+    try:
+        print("[NOVA_MOBILE_CHAT_VISIBLE_RECOVERY_INJECT_20260703] install failed:", _nvcvr_error)
+    except Exception:
+        pass
+
+# NOVA_DURABLE_DATA_HEALTH_ROUTE_20260703
+try:
+    @app.get("/api/storage/health")
+    def _nova_storage_health_20260703():
+        import os
+        from pathlib import Path
+
+        base_dir = Path(__file__).resolve().parent
+        app_data = base_dir / "data"
+        env_data = Path(os.environ.get("NOVA_DATA_DIR", str(app_data)))
+
+        names = [
+            "nova_auth_users.json",
+            "nova_sessions.json",
+            "nova_memory.json",
+            "nova_artifacts.json",
+            "nova_flask_secret.key",
+        ]
+
+        def info(path):
+            try:
+                return {
+                    "path": str(path),
+                    "exists": path.exists(),
+                    "is_file": path.is_file(),
+                    "is_dir": path.is_dir(),
+                    "is_symlink": path.is_symlink(),
+                    "realpath": str(path.resolve()) if path.exists() or path.is_symlink() else None,
+                }
+            except Exception as exc:
+                return {"path": str(path), "error": str(exc)}
+
+        return {
+            "ok": True,
+            "marker": "NOVA_DURABLE_DATA_HEALTH_ROUTE_20260703",
+            "cwd": os.getcwd(),
+            "base_dir": str(base_dir),
+            "nova_data_dir_env": os.environ.get("NOVA_DATA_DIR"),
+            "app_data": info(app_data),
+            "env_data": info(env_data),
+            "files": {
+                name: {
+                    "app_data": info(app_data / name),
+                    "env_data": info(env_data / name),
+                }
+                for name in names
+            },
+        }
+except Exception as exc:
+    try:
+        print("[NOVA_DURABLE_DATA_HEALTH_ROUTE_20260703] failed:", exc)
+    except Exception:
+        pass
+# /NOVA_DURABLE_DATA_HEALTH_ROUTE_20260703
+
+
+if __name__ == "__main__":
+
+    create_startup_backup()
+
+    print("LOGIN ROUTES:")
+
+    for rule in app.url_map.iter_rules():
+        if "login" in str(rule).lower():
+            print(
+                rule,
+                "=>",
+                rule.endpoint,
+            )
+
+    import time
+
+    _flask_run_t0 = time.perf_counter()
+
+    print(
+        "[ENTERING FLASK SERVER]",
+        flush=True,
+    )
+
+    app.run(
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", "5001")),
+        debug=os.getenv("NOVA_DEBUG", "false").lower() == "true",
+    )
+
+    print(
+        "[FLASK SERVER EXITED]",
+        round(time.perf_counter() - _flask_run_t0, 3),
+        "seconds",
+        flush=True,
+    )
+

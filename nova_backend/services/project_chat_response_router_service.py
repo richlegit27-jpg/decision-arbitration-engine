@@ -416,6 +416,16 @@ try:
         return payload
 
     def _nova_natural_project_wrap_endpoint_20260701(app, endpoint_name):
+
+        if endpoint_name.startswith("project_bp."):
+            return False
+
+        if endpoint_name in {
+            "api_project_execution_state",
+            "api_project_execution_control",
+        }:
+            return False
+
         if endpoint_name in {
             "api_attachment_status",
             "api_attachment_extract",
@@ -603,6 +613,39 @@ try:
         # NOVA_COMPACT_PROJECT_CONTEXT_DELEGATE_TO_PROJECT_BRAIN_20260701
         # Broad Nova project paraphrases belong to Project Brain
         # general intelligence.
+
+        # -------------------------------------------------
+        # PROJECT EXECUTION ROUTES OWN THEIR REQUESTS.
+        #
+        # The Project Brain chat-response wrapper must never
+        # intercept explicit project execution API endpoints.
+        # -------------------------------------------------
+
+        try:
+            request_path = str(
+                _nova_compact_project_request_20260701.path
+                or ""
+            ).lower()
+
+            project_execution_markers = (
+                "/continue",
+                "/run-all",
+                "/pause",
+                "/stop",
+                "/execution",
+            )
+
+            if (
+                request_path.startswith("/api/projects/")
+                and any(
+                    request_path.endswith(marker)
+                    for marker in project_execution_markers
+                )
+            ):
+                return None
+
+        except Exception:
+            pass
 
         preference_memory_markers = (
             "i always want",
@@ -920,6 +963,16 @@ try:
         }
 
     def _nova_compact_project_wrap_endpoint_20260701(app, endpoint_name):
+
+        if endpoint_name.startswith("project_bp."):
+            return False
+
+        if endpoint_name in {
+            "api_project_execution_state",
+            "api_project_execution_control",
+        }:
+            return False
+
         if endpoint_name in {
             "api_attachment_status",
             "api_attachment_extract",
@@ -1101,6 +1154,15 @@ try:
 
     def _nova_autonomy_wrap_endpoint_20260701(app, endpoint_name):
 
+        if endpoint_name.startswith("project_bp."):
+            return False
+
+        if endpoint_name in {
+            "api_project_execution_state",
+            "api_project_execution_control",
+        }:
+            return False
+
         skip_endpoints = {
             "nova_login_page_20260610",
             "nova_register_page_20260610",
@@ -1175,14 +1237,38 @@ def install_project_chat_response_router(app):
             "api_attachment_extract",
             "api_attachment_summarize",
             "api_attachment_keypoints",
+
             "nova_login_page_20260610",
             "nova_register_page_20260610",
             "nova_logout_page_20260610",
+
             "nova_api_auth_status_safe_20260612",
+            "nova_api_auth_me_safe_20260612",
             "nova_api_auth_me_safe_20260612",
             "nova_api_me_safe_20260612",
             "nova_api_auth_login_safe_20260611",
             "nova_api_auth_logout_safe_20260611",
+
+            # Project Workspace API endpoints
+            "project_bp.build_project",
+            "project_bp.get_project_brain",
+            "project_bp.add_project_decision",
+            "project_bp.add_next_action",
+            "project_bp.delete_project",
+            "project_bp.activate_project",
+
+            # Project execution endpoints.
+            # These return runtime/execution data and must never be
+            # intercepted by conversational response wrappers.
+            "project_bp.get_project_execution",
+            "project_bp.continue_project_execution",
+            "project_bp.run_all_project_execution",
+            "project_bp.pause_project_execution",
+            "project_bp.stop_project_execution",
+
+            # Alternate project execution APIs.
+            "api_project_execution_state",
+            "api_project_execution_control",
 
             # Protected infrastructure APIs
             "api_memory",

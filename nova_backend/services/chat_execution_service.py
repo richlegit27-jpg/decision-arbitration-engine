@@ -1,4 +1,4 @@
-
+﻿
 from __future__ import annotations
 
 
@@ -296,7 +296,6 @@ class ChatExecutionService:
 
         if state and str(
             state.get("status") or ""
-
         ).strip().lower() == "idle":
             return self._copy_state(
                 state
@@ -318,17 +317,6 @@ class ChatExecutionService:
                 ),
             }
 
-        # NOVA_REQUEST_TARGET_CAPTURE_20260826
-        # Capture implementation target before execution continues.
-        steps = state.get("steps") or []
-        current_index = int(
-            state.get("current_index") or 0
-        )
-
-        current_index = int(
-            state.get("current_index") or 0
-        )
-
         ignored_commands = {
             "next",
             "continue",
@@ -337,130 +325,10 @@ class ChatExecutionService:
             "advance",
         }
 
-        current_step = None
-
-        if current_index < len(steps):
-            current_step = steps[current_index]
-
-        # Activate waiting implementation step
-        if (
-            isinstance(
-                current_step,
-                dict,
-            )
-            and current_step.get(
-                "next_action"
-            )
-            == "request_target"
-        ):
-            current_step["status"] = (
-                "waiting_for_target"
-            )
-
-            if user_text.strip() not in ignored_commands:
-                current_step["target_file"] = user_text.strip()
-
-                current_step["target_files"] = [
-                    user_text.strip()
-                ]
-
-                current_step["next_action"] = (
-                    "generate_file_replacement"
-                )
-
-                current_step["mutation_ready"] = True
-
-            steps[current_index] = (
-                current_step
-            )
-
-            state["steps"] = steps
-
-            state["current_step"] = (
-                current_step
-            )
-
-            if (
-                user_text.strip().lower() in ignored_commands
-                and current_step.get("next_action")
-                == "request_target"
-            ):
-                current_step["status"] = (
-                    "waiting_for_target"
-                )
-
-                state["steps"][current_index] = (
-                    current_step
-                )
-                state["current_step"] = (
-                    current_step
-                )
-                state["waiting"] = True
-
-                self._sync_state_to_session(
-                    safe_session_id,
-                    state,
-                )
-
-                self._save_states()
-
-                return self._copy_state(
-                    state
-                )
-
-        if state.get("status") == "failed":
-            state["status"] = "running"
-            state["waiting"] = False
-            state["complete"] = False
-
-            current_index = int(
-                state.get("current_index") or 0
-            )
-
-            steps = state.get("steps") or []
-
-            if current_index < len(steps):
-                steps[current_index]["status"] = "active"
-                steps[current_index].pop(
-                    "error",
-                    None,
-                )
-                steps[current_index].pop(
-                    "apply_result",
-                    None,
-                )
-            self._sync_state_to_session(
-                safe_session_id,
-                state,
-            )
-
-            self._save_states()
-
-        if state.get("complete") or state.get("status") == "complete":
-            state["status"] = "complete"
-            state["waiting"] = False
-            state["complete"] = True
-            state["current_step"] = None
-
-            self._sync_state_to_session(
-                safe_session_id,
-                state,
-            )
-
-            self._save_states()
-            return self._copy_state(state)
-
         steps = state.get("steps") or []
-        current_index = int(state.get("current_index") or 0)
 
-        task_type = state.get(
-            "task_type",
-            "general",
-        )
-
-        context = state.get(
-            "context",
-            {},
+        current_index = int(
+            state.get("current_index") or 0
         )
 
         if current_index >= len(steps):
@@ -468,438 +336,56 @@ class ChatExecutionService:
             state["waiting"] = False
             state["complete"] = True
             state["current_step"] = None
-            self._save_states()
-            return self._copy_state(state)
 
-        current_step = dict(
-            steps[current_index]
-        )
-
-        print(
-            "DEBUG ADVANCE LOADED STEP =",
-            current_step,
-            flush=True,
-        )
-
-        if (
-            current_step.get("next_action")
-            == "request_target"
-            and user_text
-            and str(user_text).strip().lower()
-            not in {
-                "next",
-                "continue",
-                "go",
-                "run",
-                "advance",
-            }
-        ):
-
-            text = str(
-                user_text or ""
-            ).strip()
+        else:
+            current_step = steps[current_index]
 
             if (
-                text
-                and current_step.get("next_action")
-                == "request_target"
-                and not text.lower().startswith(
-                    "auto-plan"
-                )
+                isinstance(current_step, dict)
+                and current_step.get("status")
+                in {
+                    "completed",
+                    "complete",
+                }
             ):
-                current_step["target_file"] = text
-                current_step["next_action"] = (
-                    "generate_file_replacement"
-                )
-                current_step["mutation_ready"] = True
-                current_step["payload_required"] = True
-                current_step["status"] = "active"
+                next_index = current_index + 1
 
-                current_step["target_files"] = [
-                    text
-                ]
+                if next_index >= len(steps):
+                    state["current_index"] = next_index
+                    state["current_step"] = None
+                    state["status"] = "complete"
+                    state["waiting"] = False
+                    state["complete"] = True
 
-                current_step["waiting_for_target"] = False
+                else:
+                    next_step = steps[next_index]
 
-                steps[current_index] = current_step
+                    if isinstance(next_step, dict):
+                        next_step = dict(next_step)
 
-                state["steps"] = steps
-
-                state["context"]["steps"] = steps
-
-                steps[current_index] = current_step
-                state["steps"] = steps
-                state["current_step"] = current_step
-                self._save_states()
-
-                if isinstance(
-                    state.get("context"),
-                    dict,
-                ):
-                    state["context"]["steps"] = steps
-
-                state["waiting"] = False
-                state["status"] = "running"
-
-                self._sync_state_to_session(
-                    safe_session_id,
-                    state,
-                )
-
-                self._save_states()
-
-                return self._copy_state(
-                    state
-                )
-
-        # NOVA_BASIC_EXECUTION_FALLBACK_20260831
-        # Ordinary execution steps must be able to advance even when
-        # no specialized execution handler is installed.
-        if not self.execution_handler:
-            current_step = steps[current_index]
-
-            if isinstance(current_step, dict):
-                current_step["status"] = "completed"
-
-                if not current_step.get("result"):
-                    current_step["result"] = (
-                        str(user_text).strip()
-                        if user_text
-                        else "Step completed."
-                    )
-
-                current_step.pop(
-                    "error",
-                    None,
-                )
-
-                steps[current_index] = current_step
-
-            state["steps"] = steps
-
-            next_index = current_index + 1
-
-            if next_index < len(steps):
-                next_step = steps[next_index]
-
-                if isinstance(next_step, dict):
-                    next_step["status"] = "active"
-                    steps[next_index] = next_step
-
-                state["current_index"] = next_index
-                state["current_step"] = next_step
-                state["status"] = "running"
-                state["waiting"] = False
-                state["complete"] = False
-
-            else:
-                state["current_index"] = next_index
-                state["current_step"] = None
-                state["status"] = "complete"
-                state["waiting"] = False
-                state["complete"] = True
-
-            state["steps"] = steps
-
-            self._sync_state_to_session(
-                safe_session_id,
-                state,
-            )
-
-            self._save_states()
-
-            return self._copy_state(
-                state
-            )
-
-        # NOVA_BASIC_EXECUTION_FALLBACK_20260831
-        # Ordinary execution steps must be able to advance even when
-        # no specialized execution handler is installed.
-        if not self.execution_handler:
-            current_step = steps[current_index]
-
-            if isinstance(current_step, dict):
-                current_step["status"] = "completed"
-
-                if not current_step.get("result"):
-                    current_step["result"] = (
-                        str(user_text).strip()
-                        if user_text
-                        else "Step completed."
-                    )
-
-                current_step.pop(
-                    "error",
-                    None,
-                )
-
-                steps[current_index] = current_step
-
-            state["steps"] = steps
-
-            next_index = current_index + 1
-
-            if next_index < len(steps):
-                next_step = steps[next_index]
-
-                if isinstance(next_step, dict):
-                    next_step["status"] = "active"
-                    steps[next_index] = next_step
-
-                state["current_index"] = next_index
-                state["current_step"] = next_step
-                state["status"] = "running"
-                state["waiting"] = False
-                state["complete"] = False
-
-            else:
-                state["current_index"] = next_index
-                state["current_step"] = None
-                state["status"] = "complete"
-                state["waiting"] = False
-                state["complete"] = True
-
-            state["steps"] = steps
-
-            self._sync_state_to_session(
-                safe_session_id,
-                state,
-            )
-
-            self._save_states()
-
-            return self._copy_state(
-                state
-            )
-
-        print(
-            "DEBUG EXECUTION HANDLER =",
-            self.execution_handler,
-        )
-
-        if self.execution_handler:
-
-            execution_result = (
-                self.execution_handler.run_next_step(
-                    action="run_step",
-                    session_id=safe_session_id,
-                    execution_state=state,
-                )
-            )
-
-            returned_state = (
-                execution_result.get(
-                    "execution_state"
-                )
-                if isinstance(
-                    execution_result,
-                    dict,
-                )
-                else None
-            )
-
-            print(
-                "DEBUG BEFORE HANDLER STEPS =",
-                state.get("steps"),
-                flush=True,
-            )
-
-            print(
-                "DEBUG HANDLER RETURNED STEPS =",
-                (
-                    returned_state.get("steps")
-                    if isinstance(
-                        returned_state,
-                        dict,
-                    )
-                    else None
-                ),
-                flush=True,
-            )
-
-            if isinstance(
-                returned_state,
-                dict,
-            ):
-                for key in (
-                    "context",
-                    "execution_decision",
-                    "error",
-                    "history",
-                ):
-                    if key in returned_state:
-                        state[key] = returned_state[key]
-
-                if "steps" in returned_state:
-
-                    returned_steps = returned_state.get(
-                        "steps"
-                    ) or []
-
-                    if isinstance(
-                        returned_steps,
-                        list,
-                    ):
-
-                        for index, returned_step in enumerate(
-                            returned_steps
+                        if (
+                            not next_step.get("status")
+                            or next_step.get("status")
+                            == "pending"
                         ):
+                            next_step["status"] = "active"
 
-                            if index >= len(steps):
-                                steps.append(
-                                    returned_step
-                                )
-                                continue
+                        steps[next_index] = next_step
 
-                            current_step_state = steps[index]
-
-                            if not isinstance(
-                                current_step_state,
-                                dict,
-                            ):
-                                steps[index] = returned_step
-                                continue
-
-                            if not isinstance(
-                                returned_step,
-                                dict,
-                            ):
-                                continue
-
-                            preserved_fields = {
-                                "target_file": current_step_state.get(
-                                    "target_file"
-                                ),
-                                "target_files": current_step_state.get(
-                                    "target_files"
-                                ),
-                                "target_function": current_step_state.get(
-                                    "target_function"
-                                ),
-                            }
-
-                            for key, value in returned_step.items():
-                                current_step_state[key] = value
-
-                            for key, value in preserved_fields.items():
-                                if value:
-                                    current_step_state[key] = value
-
-                        state["steps"] = steps
-
-                elif steps:
                     state["steps"] = steps
+                    state["current_index"] = next_index
+                    state["current_step"] = next_step
+                    state["status"] = "running"
+                    state["waiting"] = False
+                    state["complete"] = False
 
             else:
-
-                state["steps"] = steps
-
-            steps = state.get("steps") or []
-
-            next_index = current_index + 1
-
-            if state.get("complete"):
-                return self._copy_state(
-                    state
-                )
-
-            current_step = steps[current_index]
-
-
-            if (
-                isinstance(current_step, dict)
-                and current_step.get("action") == "implement"
-                and current_step.get("next_action")
-                == "generate_file_replacement"
-                and current_step.get("status") != "completed"
-            ):
-                current_step["status"] = "active"
-
-                steps[current_index] = current_step
-                state["steps"] = steps
                 state["current_step"] = current_step
 
-            if (
-                isinstance(current_step, dict)
-                and current_step.get("action") == "review"
-            ):
-                current_step["status"] = "completed"
-                current_step["result"] = (
-                    "Review completed. Mutation result verified."
-                )
-
-                steps[current_index] = current_step
-                state["steps"] = steps
-                state["current_step"] = current_step
-
-            if (
-                isinstance(current_step, dict)
-                and current_step.get("status") == "completed"
-                and next_index < len(steps)
-            ):
-                steps[next_index]["status"] = "active"
-
-
-
-            if next_index < len(steps):
-
-                previous_step = steps[current_index]
-
-                next_step = steps[next_index]
                 if (
-                    isinstance(previous_step, dict)
-                    and isinstance(next_step, dict)
-                ):
-                    if previous_step.get("target_file"):
-                        next_step["target_file"] = (
-                            previous_step["target_file"]
-                        )
-
-                    if previous_step.get("target_files"):
-                        next_step["target_files"] = (
-                            previous_step["target_files"]
-                        )
-
-                    if next_step.get("action") == "implement":
-                        next_step["status"] = "active"
-                        next_step["mutation_ready"] = True
-                        next_step["payload_required"] = True
-
-                    steps[next_index] = next_step
-
-
-
-                if (
-                    isinstance(previous_step, dict)
-                    and isinstance(next_step, dict)
-                ):
-                    if previous_step.get("target_file"):
-                        next_step["target_file"] = (
-                            previous_step["target_file"]
-                        )
-
-                    if previous_step.get("target_files"):
-                        next_step["target_files"] = (
-                            previous_step["target_files"]
-                        )
-
-                    if previous_step.get("target_function"):
-                        next_step["target_function"] = (
-                            previous_step["target_function"]
-                        )
-
-                steps[next_index] = next_step
-
-                state["current_index"] = next_index
-
-                state["current_step"] = next_step
-
-                if (
-                    isinstance(next_step, dict)
-                    and next_step.get("next_action")
-                    in {
-                        "request_target",
-                    }
+                    isinstance(current_step, dict)
+                    and current_step.get("next_action")
+                    == "request_target"
                 ):
                     state["status"] = "waiting"
                     state["waiting"] = True
@@ -910,71 +396,68 @@ class ChatExecutionService:
 
                 state["complete"] = False
 
-            else:
 
-                state["current_step"] = None
-                state["status"] = "complete"
-                state["waiting"] = False
-                state["complete"] = True
-
-            self._sync_state_to_session(
-                safe_session_id,
-                state,
+            execution_result = (
+                self.execution_handler.run_next_step(
+                    action="run_step",
+                    session_id=safe_session_id,
+                    execution_state=state,
+                )
             )
 
-            self._save_states()
+            returned_state = None
 
-            return self._copy_state(state)
-
-        state["current_index"] = next_index
-
-        if next_index >= len(steps):
-
-            state["status"] = "complete"
-            state["waiting"] = False
-            state["complete"] = True
-            state["current_step"] = None
-
-        else:
-
-            state["current_step"] = steps[next_index]
-
-            next_step = steps[next_index]
-
-            if (
-                isinstance(next_step, dict)
-                and next_step.get("next_action")
-                in {
-                    "request_target",
-                }
+            if isinstance(
+                execution_result,
+                dict,
             ):
-                state["status"] = "waiting"
-                state["waiting"] = True
+                returned_state = execution_result.get(
+                    "execution_state"
+                )
 
-            else:
-                state["status"] = "running"
-                state["waiting"] = False
+            if isinstance(
+                returned_state,
+                dict,
+            ):
+                state = returned_state
+                steps = state.get("steps") or []
 
-            state["complete"] = False
+        task_type = state.get(
+            "task_type",
+            "general",
+        )
 
-        mission_id = state.get("mission_id")
+        mission_id = state.get(
+            "mission_id"
+        )
 
         if mission_id:
+            try:
+                mission_service.advance_step(
+                    mission_id,
+                    {
+                        "step": state.get(
+                            "current_step"
+                        ),
+                        "status": "advanced",
+                    },
+                )
 
-            mission_service.advance_step(
-                mission_id,
-                {
-                    "step": state.get("current_step"),
-                    "status": "advanced",
-                },
-            )
+            except Exception as e:
+                logger.error(
+                    "[ChatExecutionService] "
+                    "MISSION ADVANCE FAILED: %s",
+                    e,
+                )
 
         state["next_action"] = {
             "task_type": task_type,
             "step": state.get(
                 "current_step",
             ),
-            "reason": "Continue current mission step.",
+            "reason": (
+                "Continue current mission step."
+            ),
         }
 
         self._sync_state_to_session(
@@ -985,29 +468,180 @@ class ChatExecutionService:
         self._save_states()
 
         logger.info(
-            "[ChatExecutionService] advanced session=%s status=%s index=%s",
+            "[ChatExecutionService] "
+            "advanced session=%s status=%s index=%s",
             safe_session_id,
             state.get("status"),
             state.get("current_index"),
         )
 
-        return self._copy_state(state)
+        return self._copy_state(
+            state
+        )
 
-    def run_all(self, session_id: str, max_steps: int = 25) -> Dict[str, Any]:
-        safe_session_id = self._safe_session_id(session_id)
+
+    def run_all(
+        self,
+        session_id: str,
+        max_steps: int = 25,
+    ) -> Dict[str, Any]:
+        safe_session_id = self._safe_session_id(
+            session_id
+        )
+
+        previous_fingerprint = None
 
         for _ in range(max_steps):
-            state = self.advance(safe_session_id)
-            if state.get("status") in {"idle", "complete", "failed"}:
+            state = self.advance(
+                safe_session_id
+            )
+
+            if not isinstance(state, dict):
+                return {
+                    "status": "failed",
+                    "error": (
+                        "Execution returned an invalid state."
+                    ),
+                }
+
+            status = str(
+                state.get("status") or ""
+            ).strip().lower()
+
+            if status in {
+                "idle",
+                "complete",
+                "failed",
+            }:
                 return state
 
-        state = self.get_state(safe_session_id)
+            current_index = int(
+                state.get("current_index") or 0
+            )
+
+            current_step = state.get(
+                "current_step"
+            )
+
+            if not isinstance(current_step, dict):
+                steps = state.get("steps") or []
+
+                if (
+                    0 <= current_index < len(steps)
+                    and isinstance(
+                        steps[current_index],
+                        dict,
+                    )
+                ):
+                    current_step = steps[current_index]
+                else:
+                    current_step = {}
+
+            current_step_id = str(
+                current_step.get("id") or ""
+            )
+
+            current_step_status = str(
+                current_step.get("status") or ""
+            ).strip().lower()
+
+            current_step_result = repr(
+                current_step.get("result")
+            )
+
+            current_step_error = str(
+                current_step.get("error") or ""
+            )
+
+            steps = state.get("steps") or []
+
+            steps_fingerprint = tuple(
+                (
+                    str(
+                        step.get("id") or ""
+                    ),
+                    str(
+                        step.get("status") or ""
+                    ),
+                    str(
+                        step.get("target_file") or ""
+                    ),
+                    repr(
+                        step.get("result")
+                    ),
+                    str(
+                        step.get("error") or ""
+                    ),
+                )
+                for step in steps
+                if isinstance(step, dict)
+            )
+
+            fingerprint = (
+                status,
+                current_index,
+                current_step_id,
+                current_step_status,
+                current_step_result,
+                current_step_error,
+                steps_fingerprint,
+            )
+
+            print(
+                "DEBUG RUN_ALL FINGERPRINT =",
+                fingerprint,
+                flush=True,
+            )
+
+            if (
+                previous_fingerprint is not None
+                and fingerprint == previous_fingerprint
+            ):
+                state["status"] = "failed"
+                state["error"] = (
+                    "Execution stopped because no progress "
+                    "was made."
+                )
+
+                self._states[
+                    safe_session_id
+                ] = state
+
+                self._sync_state_to_session(
+                    safe_session_id,
+                    state,
+                )
+
+                self._save_states()
+
+                return self._copy_state(
+                    state
+                )
+
+            previous_fingerprint = fingerprint
+
+        state = self.get_state(
+            safe_session_id
+        )
+
         state["status"] = "failed"
-        state["error"] = "Execution stopped because max_steps was reached."
+
+        state["error"] = (
+            "Execution stopped because max_steps was reached."
+        )
+
         self._states[safe_session_id] = state
+
+        self._sync_state_to_session(
+            safe_session_id,
+            state,
+        )
+
         self._save_states()
 
-        mission_id = state.get("mission_id")
+        mission_id = state.get(
+            "mission_id"
+        )
 
         if mission_id:
             mission_service.update_status(
@@ -1015,7 +649,9 @@ class ChatExecutionService:
                 "failed",
             )
 
-        return self._copy_state(state)
+        return self._copy_state(
+            state
+        )
 
     def set_session_service(
         self,
@@ -1103,7 +739,6 @@ class ChatExecutionService:
         return self.get_state(
             safe_session_id
         )
-
 
     def format_reply(self, state: Dict[str, Any]) -> str:
 

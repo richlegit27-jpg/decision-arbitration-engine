@@ -473,10 +473,14 @@ Rules:
                 "Result: Design step completed."
             )
 
-
         elif action == "test":
 
             step["status"] = "completed"
+            step["error"] = None
+            step["next_action"] = None
+            step["mutation_ready"] = False
+            step["payload_required"] = False
+            step["mutation_mode"] = None
 
             result_lines.append(
                 "Result: Test step completed."
@@ -487,11 +491,25 @@ Rules:
                     f"Test target: {target_file}"
                 )
 
+        elif action in (
+            "analysis",
+            "analyze",
+            "research",
+            "review",
+            "inspect",
+            "plan",
+        ):
+
+            step["status"] = "completed"
             step["error"] = None
             step["next_action"] = None
             step["mutation_ready"] = False
             step["payload_required"] = False
             step["mutation_mode"] = None
+
+            result_lines.append(
+                f"Result: {action.capitalize()} step completed."
+            )
 
         elif action == "implement":
 
@@ -507,11 +525,11 @@ Rules:
 
                 return step
 
-
             if not target_file:
 
                 step["status"] = "failed"
                 step["error"] = "Implement action missing target_file."
+
                 result_lines.append(
                     "Result: Implement action failed: missing target_file."
                 )
@@ -521,7 +539,6 @@ Rules:
                 result_lines.append(
                     "Result: Implement step running real file-write execution."
                 )
-
 
         if (
             step.get("mutation_mode") == "file"
@@ -2788,5 +2805,7 @@ def default_executor(move: NextMove) -> ExecutionResult:
             status="failed",
             error=str(e),
         )
+
+
 
 
