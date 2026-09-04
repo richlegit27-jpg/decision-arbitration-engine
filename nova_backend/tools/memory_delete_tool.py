@@ -1,14 +1,27 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from nova_backend.tools.base import NovaTool
 
 
 class MemoryDeleteTool(NovaTool):
+
     name = "memory_delete"
 
     description = (
-        "Deletes a stored user memory."
+        "Deletes a specific stored user memory using its memory identifier."
     )
+
+    category = "memory"
+
+    capabilities = [
+        "memory deletion",
+        "memory management",
+        "stored data removal",
+    ]
+
+    risk_level = "medium"
+
+    requires_confirmation = True
 
     def run(
         self,

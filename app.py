@@ -262,6 +262,9 @@ from nova_backend.services.title_guard_service import (
     clean_title,
     persist_title,
 )
+from nova_backend.routes.tool_approval_routes import (
+    register_tool_approval_routes,
+)
 from nova_backend.services.chat_attachment_memory_service import (
     ChatAttachmentMemoryService,
 )
@@ -923,6 +926,14 @@ chat_service = ChatService(
     working_state_service=working_state_service,
     execution_state_service=execution_state_service,
 )
+
+register_tool_approval_routes(
+    app,
+    chat_service,
+)
+
+print("[NOVA_TOOL_APPROVAL_ROUTES] installed")
+
 execution_service = ExecutionService()
 
 execution_route_service = ExecutionRouteService(
@@ -1655,7 +1666,7 @@ def _nova_casual_chat_guard():
     try:
         from flask import request, jsonify
 
-        if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
+        if request.path != "/api/chat" or request.method != "POST":
             return None
 
         payload = request.get_json(silent=True) or {}
@@ -4513,10 +4524,7 @@ def nova_before_request_slim_api_sessions_20260611():
 @app.before_request
 def nova_before_request_explicit_memory_guard_20260611():
     try:
-        if request.path not in (
-            "/api/chat",
-            "/api/chat/stream",
-        ) or request.method != "POST":
+        if request.path != "/api/chat" or request.method != "POST":
             return None
 
         payload = request.get_json(silent=True) or {}
@@ -4592,7 +4600,17 @@ def stream_events():
 
 @app.route("/api/chat/stream", methods=["POST"])
 def nova_chat_stream():
-    return chat_stream_service.stream(api_chat)
+
+    active_api_chat = app.view_functions.get(
+        "api_chat_route"
+    )
+
+    if not callable(active_api_chat):
+        active_api_chat = api_chat
+
+    return chat_stream_service.stream(
+        active_api_chat
+    )
 
 @app.before_request
 def nova_memory_command_before_web_20260611():

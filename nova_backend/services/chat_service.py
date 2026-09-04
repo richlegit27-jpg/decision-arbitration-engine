@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import base64
 import os
@@ -37,6 +37,12 @@ from nova_backend.services.execution_handler import (
     ExecutionHandler,
     NextMove,
     default_executor,
+)
+from nova_backend.tools.tool_runtime_service import (
+    tool_runtime_service,
+)
+from nova_backend.tools.pending_tool_approval_service import (
+    pending_tool_approval_service,
 )
 from nova_backend.services.chat_execution_service import (
     chat_execution_service,
@@ -546,15 +552,6 @@ class ChatService:
             )
             return guard_result
 
-            target_capture_result = None
-
-            print(
-                "[CHAT HANDLE END - TARGET CAPTURE]",
-                round(time.perf_counter() - _chat_handle_t0, 3),
-                "seconds",
-                flush=True,
-            )
-
         target_capture_result = (
             self.execution_bridge_service
             .try_execution_target_capture(
@@ -601,6 +598,60 @@ class ChatService:
         )
 
         attachments = attachments or []
+
+        # ==================================================
+        # NOVA TOOL RUNTIME
+        # ==================================================
+
+        tool_runtime_result = tool_runtime_service.handle_request(
+            user_text=user_text,
+            approved=False,
+        )
+
+        if tool_runtime_result.get("handled"):
+
+            print(
+                "[CHAT TOOL RUNTIME]",
+                tool_runtime_result,
+                flush=True,
+            )
+
+            status = tool_runtime_result.get("status")
+
+            if status == "approval_required":
+
+                pending_result = (
+                    pending_tool_approval_service.set_pending(
+                        session_id=session_id,
+                        tool_runtime=tool_runtime_result,
+                    )
+                )
+
+                return {
+                    "status": "tool_approval_required",
+                    "tool_runtime": tool_runtime_result,
+                    "pending_tool": pending_result.get(
+                        "pending"
+                    ),
+                    "message": tool_runtime_result.get(
+                        "message",
+                        "Tool approval required.",
+                    ),
+                }
+
+            if status == "executed":
+
+                formatted = tool_runtime_result.get(
+                    "formatted",
+                    "",
+                )
+
+                return {
+                    "status": "tool_executed",
+                    "tool_runtime": tool_runtime_result,
+                    "response": formatted,
+                    "message": formatted,
+                }
 
         if self._looks_like_live_market_request(user_text):
 
@@ -6945,36 +6996,17 @@ Rules:
                     "run",
                 }
             ):
-                target_capture = (
-                    self.execution_bridge_service.try_execution_target_capture(
-                        session_id=session_id,
-                        user_text=user_text,
-                    )
-                )
-
-                if target_capture:
-                    return target_capture
 
                 return self.chat_execution_service.advance(
                     session_id,
                     user_text=user_text,
                 )
 
-        target_capture = (
-            self.execution_bridge_service.try_execution_target_capture(
-                session_id=session_id,
-                user_text=user_text,
-            )
-        )
-
-        if target_capture:
-            return target_capture
 
         mission_command = self._resolve_mission_command(
             user_text=user_text,
             session_id=session_id,
         )
-
 
         if self.safe_str(
             user_text
@@ -12288,6 +12320,97 @@ Rules:
             "tool_name": tool_name,
         }
 
+    def approve_pending_tool(
+        self,
+        session_id: str,
+    ) -> dict:
+
+        approval = (
+            pending_tool_approval_service.approve(
+                session_id
+            )
+        )
+
+        if not approval.get("ok"):
+
+            return {
+                "ok": False,
+                "status": "no_pending_tool",
+                "error": approval.get("error"),
+            }
+
+        pending = approval.get("pending") or {}
+
+        tool_name = pending.get("tool")
+        payload = pending.get("payload") or {}
+
+        if not tool_name:
+
+            return {
+                "ok": False,
+                "status": "invalid_pending_tool",
+                "error": "Pending tool has no tool name.",
+            }
+
+        from nova_backend.tools.executor import (
+            execute_tool,
+        )
+
+        from nova_backend.tools.result_formatter import (
+            format_tool_result,
+        )
+
+        result = execute_tool(
+            tool_name,
+            payload,
+            confirm=True,
+        )
+
+        formatted = format_tool_result(
+            tool_name,
+            result,
+        )
+
+        return {
+            "ok": result.get("ok", False),
+            "status": "executed",
+            "tool": tool_name,
+            "payload": payload,
+            "risk": pending.get("risk"),
+            "result": result,
+            "formatted": formatted,
+        }
+
+
+    def deny_pending_tool(
+        self,
+        session_id: str,
+    ) -> dict:
+
+        result = (
+            pending_tool_approval_service.deny(
+                session_id
+            )
+        )
+
+        if not result.get("ok"):
+
+            return {
+                "ok": False,
+                "status": "no_pending_tool",
+                "error": result.get("error"),
+            }
+
+        return {
+            "ok": True,
+            "status": "denied",
+            "tool": result.get("tool"),
+            "message": (
+                "Tool execution was cancelled."
+            ),
+        }
+
+
     def _cleanup_memory_items(self) -> None:
         try:
             memories = getattr(self.memory_service, "memories", None)
@@ -12996,3 +13119,4 @@ def _create_model_response(self, model_messages):
         model=self.chat_model,
         input=model_messages,
     )
+

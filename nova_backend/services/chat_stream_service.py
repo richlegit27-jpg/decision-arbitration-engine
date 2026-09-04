@@ -1,63 +1,199 @@
 import json
+import traceback
 
-from flask import Response
+from flask import Response, stream_with_context
 
 
 class ChatStreamService:
 
-    def stream(self, api_chat):
-        def generate():
+    def _extract_payload(self, result):
+
+        if isinstance(result, dict):
+            return result
+
+        if isinstance(result, tuple):
+
+            for item in result:
+                payload = self._extract_payload(item)
+
+                if isinstance(payload, dict) and payload:
+                    return payload
+
+            return {}
+
+        if hasattr(result, "get_json"):
+
             try:
+                payload = result.get_json(
+                    silent=True
+                )
+
+                if isinstance(payload, dict):
+                    return payload
+
+            except Exception:
+                pass
+
+        if hasattr(result, "response"):
+
+            try:
+                response = result.response
+
+                payload = self._extract_payload(
+                    response
+                )
+
+                if isinstance(payload, dict):
+                    return payload
+
+            except Exception:
+                pass
+
+        return {}
+
+    def _extract_text(self, payload):
+
+        if not isinstance(payload, dict):
+            return ""
+
+        assistant = payload.get("assistant_message")
+
+        if isinstance(assistant, dict):
+            for key in (
+                "text",
+                "content",
+                "message",
+                "response",
+            ):
+                value = assistant.get(key)
+
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+
+        for key in (
+            "text",
+            "content",
+            "response",
+            "message",
+            "answer",
+        ):
+            value = payload.get(key)
+
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+        return ""
+
+    def _event(self, payload):
+
+        return (
+            "data: "
+            + json.dumps(
+                payload,
+                ensure_ascii=False,
+            )
+            + "\n\n"
+        )
+
+    def stream(self, api_chat):
+
+        @stream_with_context
+        def generate():
+
+            try:
+
+                yield self._event({
+                    "type": "meta",
+                    "stream": True,
+                    "status": "started",
+                })
+
                 result = api_chat()
 
-                payload = None
+                print(
+                    "[CHAT STREAM RAW RESULT]",
+                    type(result),
+                    repr(result)[:2000],
+                    flush=True,
+                )
 
-                if isinstance(result, dict):
-                    payload = result
-                elif hasattr(result, "get_json"):
-                    payload = result.get_json(silent=True)
+                payload = self._extract_payload(
+                    result
+                )
 
-                if not isinstance(payload, dict):
-                    payload = {}
+                print(
+                    "[CHAT STREAM PAYLOAD]",
+                    repr(payload)[:3000],
+                    flush=True,
+                )
 
-                assistant = payload.get("assistant_message") or {}
+                text = self._extract_text(
+                    payload
+                )
 
-                text = assistant.get("text", "")
+                if not text:
 
-                if not isinstance(text, str):
-                    text = ""
+                    error_message = (
+                        payload.get("error")
+                        or payload.get("message")
+                        or "No response generated."
+                    )
 
-            except Exception as e:
-                yield "data: " + json.dumps({
+                    yield self._event({
+                        "type": "error",
+                        "content": str(error_message),
+                    })
+
+                    yield self._event({
+                        "type": "done",
+                        "done": True,
+                    })
+
+                    return
+
+                full = ""
+
+                for word in text.split():
+
+                    chunk = word + " "
+
+                    full += chunk
+
+                    yield self._event({
+                        "type": "token",
+                        "content": chunk,
+                    })
+
+                yield self._event({
+                    "type": "message",
+                    "content": full.strip(),
+                })
+
+                yield self._event({
+                    "type": "done",
+                    "done": True,
+                })
+
+            except Exception as error:
+
+                traceback.print_exc()
+
+                yield self._event({
                     "type": "error",
-                    "content": str(e)
-                }) + "\n\n"
-                return
+                    "content": str(error),
+                })
 
-            if not text:
-                text = "No response generated."
-
-            full = ""
-
-            for chunk in text.split():
-                full += chunk + " "
-
-                yield "data: " + json.dumps({
-                    "type": "token",
-                    "content": chunk + " "
-                }) + "\n\n"
-
-            yield "data: " + json.dumps({
-                "type": "message",
-                "content": full.strip()
-            }) + "\n\n"
-
-            yield "data: " + json.dumps({
-                "type": "done",
-                "done": True
-            }) + "\n\n"
+                yield self._event({
+                    "type": "done",
+                    "done": True,
+                })
 
         return Response(
             generate(),
             mimetype="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache, no-transform",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
         )

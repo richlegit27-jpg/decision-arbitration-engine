@@ -1,0 +1,60 @@
+﻿    def approve_pending_tool(
+        self,
+        session_id: str,
+    ) -> dict:
+
+        approval = (
+            pending_tool_approval_service.approve(
+                session_id
+            )
+        )
+
+        if not approval.get("ok"):
+
+            return {
+                "ok": False,
+                "status": "no_pending_tool",
+                "error": approval.get("error"),
+            }
+
+        pending = approval.get("pending") or {}
+
+        tool_name = pending.get("tool")
+        payload = pending.get("payload") or {}
+
+        if not tool_name:
+
+            return {
+                "ok": False,
+                "status": "invalid_pending_tool",
+                "error": "Pending tool has no tool name.",
+            }
+
+        from nova_backend.tools.executor import (
+            execute_tool,
+        )
+
+        from nova_backend.tools.result_formatter import (
+            format_tool_result,
+        )
+
+        result = execute_tool(
+            tool_name,
+            payload,
+            confirm=True,
+        )
+
+        formatted = format_tool_result(
+            tool_name,
+            result,
+        )
+
+        return {
+            "ok": result.get("ok", False),
+            "status": "executed",
+            "tool": tool_name,
+            "payload": payload,
+            "risk": pending.get("risk"),
+            "result": result,
+            "formatted": formatted,
+        }

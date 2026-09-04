@@ -1227,7 +1227,6 @@ except Exception as _nova_autonomy_install_error_20260701:
     except Exception:
         pass
 
-
 def install_project_chat_response_router(app):
     try:
         wrapped = 0
@@ -1269,6 +1268,13 @@ def install_project_chat_response_router(app):
             # Alternate project execution APIs.
             "api_project_execution_state",
             "api_project_execution_control",
+
+            # Tool approval APIs.
+            # These mutate pending tool state and must never be
+            # intercepted by conversational response wrappers.
+            "approve_tool",
+            "deny_tool",
+            "get_pending_tool",
 
             # Protected infrastructure APIs
             "api_memory",
@@ -1349,6 +1355,8 @@ def install_project_chat_response_router(app):
             "[NOVA_PROJECT_CHAT_RESPONSE_ROUTER_SERVICE] failed:",
             error,
         )
+
+
 def normalize_text(value):
     text = str(value or "").strip()
     return " ".join(text.split())

@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 import os
 import time
 import uuid
@@ -10,6 +10,10 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 import uvicorn
+
+from backend.services.pending_tool_approval_service import (
+    pending_tool_approval_service,
+)
 
 
 # --- Paths ---
@@ -283,7 +287,135 @@ async def upload_attachment(file: UploadFile = File(...)):
     })
 
 
+# --- Tool approval endpoints ---
+@app.post("/api/tools/request-approval")
+async def request_tool_approval(req: Request):
+    try:
+        data = await req.json()
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid JSON body",
+        )
+
+    if not isinstance(data, dict):
+        raise HTTPException(
+            status_code=400,
+            detail="Request body must be a JSON object",
+        )
+
+    session_id = get_session_id(data)
+
+    tool = str(
+        data.get("tool") or
+        "unknown_tool"
+    ).strip()
+
+    risk = str(
+        data.get("risk") or
+        "medium"
+    ).strip()
+
+    payload = data.get("payload")
+
+    if not isinstance(payload, dict):
+        payload = {}
+
+    pending = (
+        pending_tool_approval_service.create_pending(
+            session_id=session_id,
+            tool=tool,
+            risk=risk,
+            payload=payload,
+        )
+    )
+
+    return {
+        "status": "tool_approval_required",
+        "session_id": session_id,
+        "message": (
+            f"Tool '{tool}' requires approval "
+            "before execution."
+        ),
+        "pending_tool": pending,
+    }
+
+
+@app.post("/api/tools/approve")
+async def approve_tool(req: Request):
+    try:
+        data = await req.json()
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid JSON body",
+        )
+
+    if not isinstance(data, dict):
+        raise HTTPException(
+            status_code=400,
+            detail="Request body must be a JSON object",
+        )
+
+    session_id = get_session_id(data)
+
+    result = (
+        pending_tool_approval_service.approve(
+            session_id
+        )
+    )
+
+    if not result.get("ok"):
+        return JSONResponse(
+            result,
+            status_code=404,
+        )
+
+    return {
+        "status": "approved",
+        "session_id": session_id,
+        **result,
+    }
+
+
+@app.post("/api/tools/deny")
+async def deny_tool(req: Request):
+    try:
+        data = await req.json()
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid JSON body",
+        )
+
+    if not isinstance(data, dict):
+        raise HTTPException(
+            status_code=400,
+            detail="Request body must be a JSON object",
+        )
+
+    session_id = get_session_id(data)
+
+    result = (
+        pending_tool_approval_service.deny(
+            session_id
+        )
+    )
+
+    if not result.get("ok"):
+        return JSONResponse(
+            result,
+            status_code=404,
+        )
+
+    return {
+        "status": "denied",
+        "session_id": session_id,
+        **result,
+    }
+
 # --- Run server ---
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8743, reload=False)
+
 

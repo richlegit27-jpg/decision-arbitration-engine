@@ -1,14 +1,28 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from nova_backend.tools.base import NovaTool
 
 
 class ProjectWorkspaceTool(NovaTool):
+
     name = "project_workspace_update"
 
     description = (
-        "Updates Nova project workspace state."
+        "Updates a Nova project workspace field such as the project "
+        "name, description, or status."
     )
+
+    category = "project"
+
+    capabilities = [
+        "project workspace updates",
+        "project metadata editing",
+        "project status management",
+    ]
+
+    risk_level = "medium"
+
+    requires_confirmation = True
 
     def run(
         self,
@@ -48,9 +62,10 @@ class ProjectWorkspaceTool(NovaTool):
                 "field": field,
             }
 
-        # Never allow structured state objects to become
-        # project field strings.
-        if isinstance(value, (dict, list, tuple, set)):
+        if isinstance(
+            value,
+            (dict, list, tuple, set),
+        ):
             return {
                 "ok": False,
                 "error": "invalid_field_value",
@@ -65,6 +80,7 @@ class ProjectWorkspaceTool(NovaTool):
         ).strip()
 
         if field == "name":
+
             if not value:
                 return {
                     "ok": False,
@@ -77,12 +93,14 @@ class ProjectWorkspaceTool(NovaTool):
             )
 
         if field == "description":
+
             return service.update_project(
                 project_id,
                 description=value,
             )
 
         if field == "status":
+
             return service.update_project(
                 project_id,
                 status=value,

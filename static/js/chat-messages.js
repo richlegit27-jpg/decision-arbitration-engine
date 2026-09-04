@@ -604,6 +604,96 @@ function syncMessagesFromStorage(messages, options = {}){
   renderMessages();
 }
 
+function renderToolApproval(message){
+
+  const approval =
+    message?.toolApproval ||
+    {}
+
+  const pendingTool =
+    message?.pending_tool ||
+    {}
+
+  const toolName =
+    String(
+      approval.tool ||
+      pendingTool.tool ||
+      "unknown_tool"
+    )
+
+  const risk =
+    String(
+      approval.risk ||
+      pendingTool.risk ||
+      "unknown"
+    ).toUpperCase()
+
+  const messageId =
+    String(
+      message?.id ||
+      ""
+    )
+
+  if(!messageId){
+    return ""
+  }
+
+  return `
+    <div
+      class="nova-tool-approval"
+      data-tool-approval-message="${escapeHtml(messageId)}"
+    >
+
+      <div class="nova-tool-approval-header">
+        <strong>
+          Tool approval required
+        </strong>
+      </div>
+
+      <div class="nova-tool-approval-details">
+
+        <div class="nova-tool-approval-row">
+          <span>Tool</span>
+          <strong>
+            ${escapeHtml(toolName)}
+          </strong>
+        </div>
+
+        <div class="nova-tool-approval-row">
+          <span>Risk</span>
+          <strong>
+            ${escapeHtml(risk)}
+          </strong>
+        </div>
+
+      </div>
+
+      <div class="nova-tool-approval-actions">
+
+        <button
+          type="button"
+          class="message-action-btn nova-tool-approve"
+          data-action="tool-approve"
+          data-message-id="${escapeHtml(messageId)}"
+        >
+          Approve
+        </button>
+
+        <button
+          type="button"
+          class="message-action-btn nova-tool-deny"
+          data-action="tool-deny"
+          data-message-id="${escapeHtml(messageId)}"
+        >
+          Deny
+        </button>
+
+      </div>
+
+    </div>
+  `
+}
+
 function renderMessages(){
   if(!el.messages){
     return
@@ -684,7 +774,11 @@ el.messages.innerHTML = messages.map((message) => {
           <span></span>
         </div>
       `
-      : renderMessageBody(message)
+      : (
+  message.status === "tool_approval_required"
+    ? renderToolApproval(message)
+    : renderMessageBody(message)
+)
   }
 </div>
 
@@ -968,6 +1062,10 @@ if(document.readyState === "loading"){
 }
 
 })()
+
+
+
+
 
 
 

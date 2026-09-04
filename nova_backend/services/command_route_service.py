@@ -11,7 +11,7 @@ class CommandRouteService:
         @app.before_request
         def nova_repair_build_command_guard_20260701():
             try:
-                if request.path not in ("/api/chat", "/api/chat/stream") or request.method != "POST":
+                if request.path != "/api/chat" or request.method != "POST":
                     return None
 
                 payload = request.get_json(silent=True) or {}
@@ -36,10 +36,7 @@ class CommandRouteService:
         @app.before_request
         def nova_workflow_catalog_command_guard_20260701():
             try:
-                if request.path not in (
-                    "/api/chat",
-                    "/api/chat/stream",
-                ) or request.method != "POST":
+                if request.path != "/api/chat" or request.method != "POST":
                     return None
 
                 payload = request.get_json(silent=True) or {}
@@ -47,7 +44,6 @@ class CommandRouteService:
                 from nova_backend.services.workflow_catalog_adapter import (
                     build_workflow_catalog_response,
                 )
-
                 response_payload = build_workflow_catalog_response(
                     payload,
                     self.session_service,

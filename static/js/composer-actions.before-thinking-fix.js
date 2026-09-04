@@ -823,9 +823,6 @@ const userId =
         updateComposerState()
       }
 
-
-
-
       showThinkingIndicator()
 
       let reply = null
@@ -1047,10 +1044,8 @@ if(streamText.trim()){
       return null
     }
 
-finally{
-    clearThinkingIndicator()
-
-    if(sendToken === sendSequence){
+    finally{
+      if(sendToken === sendSequence){
         state.isStreaming = false
         state.isSending = false
         markStreaming(false)

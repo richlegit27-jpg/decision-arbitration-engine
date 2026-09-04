@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 
@@ -6,11 +6,26 @@ from nova_backend.tools.base import NovaTool
 
 
 class MemoryReadTool(NovaTool):
+
     name = "memory_read"
 
     description = (
-        "Reads stored user memories."
+        "Retrieves stored user memories and ranks them by "
+        "relevance, importance, pinned status, and recency."
     )
+
+    category = "memory"
+
+    capabilities = [
+        "memory retrieval",
+        "memory search",
+        "relevance ranking",
+        "conversation context retrieval",
+    ]
+
+    risk_level = "low"
+
+    requires_confirmation = False
 
     def run(
         self,
@@ -51,17 +66,14 @@ class MemoryReadTool(NovaTool):
 
             points = 0
 
-            # pinned memories first
             if memory.get("pinned"):
                 points += 100
 
-            # importance weight
             points += float(
                 memory.get("weight")
                 or 0
             ) * 10
 
-            # keyword relevance
             if query:
                 words = query.split()
 
@@ -69,7 +81,6 @@ class MemoryReadTool(NovaTool):
                     if word in value:
                         points += 5
 
-            # newer memories slightly preferred
             if memory.get("updated_at"):
                 points += 1
 
