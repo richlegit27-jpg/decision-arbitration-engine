@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 import re
@@ -1428,7 +1428,64 @@ def api_models_select_route():
 
 @app.route("/api/chat", methods=["POST"])
 def api_chat_route():
-    return api_chat()
+    data = request.get_json(silent=True) or {}
+
+    user_text = str(
+        data.get("user_text")
+        or data.get("text")
+        or data.get("message")
+        or data.get("content")
+        or ""
+    ).strip()
+
+    session_id = str(
+        data.get("session_id")
+        or data.get("chat_id")
+        or ""
+    ).strip()
+
+    attachments = data.get("attachments") or []
+
+    print(
+        "[MINIMAL CHAT ROUTE]",
+        {
+            "user_text": repr(user_text),
+            "session_id": repr(session_id),
+            "attachments_count": len(attachments),
+        },
+        flush=True,
+    )
+
+    if not user_text:
+        return jsonify({
+            "ok": False,
+            "error": "user_text_required",
+        }), 400
+
+    try:
+        result = chat_service.handle(
+            user_text=user_text,
+            session_id=session_id,
+            attachments=attachments,
+        )
+
+        print(
+            "[MINIMAL CHAT RESULT]",
+            result,
+            flush=True,
+        )
+
+        return jsonify(result)
+
+    except Exception as error:
+        import traceback
+
+        traceback.print_exc()
+
+        return jsonify({
+            "ok": False,
+            "error": str(error),
+        }), 500
 
 @app.route("/api/runtime/summary", methods=["GET"])
 def api_runtime_summary():
@@ -2297,7 +2354,7 @@ def api_chat():
             for index, item in enumerate(image_attachments[:5], start=1):
                 line = f"{index}. {item.get('name') or 'image attachment'} ({item.get('mime') or 'image/*'})"
                 if item.get("url"):
-                    line += f" Ã¢â‚¬â€ {item.get('url')}"
+                    line += f" ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â {item.get('url')}"
                 lines.append(line)
 
             lines.append("")
@@ -5107,5 +5164,7 @@ if __name__ == "__main__":
         "seconds",
         flush=True,
     )
+
+
 
 

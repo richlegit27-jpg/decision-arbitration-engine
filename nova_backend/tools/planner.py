@@ -201,18 +201,41 @@ def plan_tool_request(
         }
 
     # GIT COMMIT
-    if (
-        text.startswith("commit changes ")
-        or text.startswith("git commit ")
-    ):
-        if text.startswith("commit changes "):
-            prefix = "commit changes "
-        else:
-            prefix = "git commit "
+    #
+    # Supports natural language such as:
+    #   commit changes message
+    #   git commit message
+    #   commit the current changes to git with message: test
+    #   commit current changes with message test
+    #   commit everything with message: test
+    #
+    git_commit_patterns = [
+        r"^commit\s+(?:the\s+)?(?:current\s+)?changes?\s+(?:to\s+git\s+)?with\s+message\s*:\s*(.+)$",
+        r"^commit\s+(?:the\s+)?(?:current\s+)?changes?\s+(?:to\s+git\s+)?with\s+message\s+(.+)$",
+        r"^commit\s+(?:all\s+)?(?:current\s+)?changes?\s+with\s+message\s*:\s*(.+)$",
+        r"^commit\s+(?:all\s+)?(?:current\s+)?changes?\s+with\s+message\s+(.+)$",
+        r"^commit\s+everything\s+with\s+message\s*:\s*(.+)$",
+        r"^commit\s+everything\s+with\s+message\s+(.+)$",
+        r"^commit\s+changes\s+(.+)$",
+        r"^git\s+commit\s+(.+)$",
+    ]
 
-        message = original_text[
-            len(prefix):
-        ].strip()
+    for pattern in git_commit_patterns:
+        commit_match = re.match(
+            pattern,
+            original_text.strip(),
+            flags=re.IGNORECASE,
+        )
+
+        if not commit_match:
+            continue
+
+        message = (
+            commit_match.group(1)
+            .strip()
+            .strip('"')
+            .strip("'")
+        )
 
         if message:
             return {
