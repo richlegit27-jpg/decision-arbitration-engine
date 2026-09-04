@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from nova_backend.tools.manager import (
     tool_manager,

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64
 import os
@@ -1561,7 +1561,7 @@ Rules:
         if not code:
             return code
 
-        # 1. convert tabs ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ 4 spaces
+        # 1. convert tabs ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ 4 spaces
         code = code.replace("\t", "    ")
 
         # 2. normalize line endings
@@ -3231,9 +3231,9 @@ Rules:
                 "assembly news headlines today",
                 "curated for you",
                 "you're my favorite song",
-                "youÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢re my favorite song",
+                "youÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢re my favorite song",
                 "introduces today's new top stars",
-                "introduces todayÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s new top stars",
+                "introduces todayÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢s new top stars",
                 "gma network",
                 "kanak news odisha",
                 "odia news",
@@ -4146,7 +4146,7 @@ Rules:
             "send the code",
             "send one of these",
             "send the code and",
-            "whatÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢s the symptom",
+            "whatÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢s the symptom",
             "what's the symptom",
             "tell me what you need",
             "i can help",
@@ -4543,7 +4543,7 @@ Rules:
                 "SMFF mode:\n"
                 "- Send full file path.\n"
                 "- Send the full broken function or file.\n"
-                "- IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll return the full replacement, cleanly indented."
+                "- IÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ll return the full replacement, cleanly indented."
             ).strip()
 
         stuck_exact = {
@@ -4581,7 +4581,7 @@ Rules:
             return {
                 "assistant_text": (
                     "Send the full function and file path.\n"
-                    "IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll return the full replacement block, cleanly indented."
+                    "IÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ll return the full replacement block, cleanly indented."
                 ),
                 "intelligence": {
                     "strategy": "smff_bug_intake",
@@ -4597,7 +4597,7 @@ Rules:
             return {
                 "assistant_text": (
                     "Paste the error, file path, or failing behavior.\n"
-                    "IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll help patch it."
+                    "IÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ll help patch it."
                 ),
                 "intelligence": {
                     "strategy": "bug_intake",
@@ -4614,7 +4614,7 @@ Rules:
             return {
                 "assistant_text": (
                     "Paste the text, code, error, screenshot, or link.\n"
-                    "IÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll break it down clearly."
+                    "IÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ll break it down clearly."
                 ),
                 "intelligence": {
                     "strategy": "clarify_missing_subject",
@@ -4634,7 +4634,7 @@ Rules:
         hard_override_applied = False
 
         if not assistant_text:
-            assistant_text = "I couldnÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢t generate a useful answer from that. Send the exact thing you want handled."
+            assistant_text = "I couldnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢t generate a useful answer from that. Send the exact thing you want handled."
 
         try:
             intelligence = self._fuse_response_intelligence(
@@ -4957,7 +4957,7 @@ Rules:
 
         clean_query = re.sub(r"\s+", " ", clean_query).strip()
 
-        # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ empty ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ global news
+        # ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¥ empty ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ global news
         if not clean_query:
             return [
                 "world news",
@@ -5201,7 +5201,7 @@ Rules:
                     "eye-catching prints",
                     "url removed from extracted attachment text",
                     "free_shipping",
-                    "furniture & dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cor",
+                    "furniture & dÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©cor",
                     "kitchen appliances",
                     "love, horror and more themes",
                     "plain field in front of mountain peak",
@@ -5224,7 +5224,7 @@ Rules:
                     if not _line:
                         continue
 
-                    _low = _line.lower().strip(" :;-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢*|")
+                    _low = _line.lower().strip(" :;-ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢*|")
                     _compact = _nova_attach_re.sub(r"[^a-z0-9]+", " ", _low).strip()
 
                     if _compact in _noise_exact:
@@ -5598,11 +5598,11 @@ Rules:
                 summary_looks_raw = (
                     len(summary) > 400
                     or "search wikipedia" in summary.lower()
-                    or "ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œ" in summary
-                    or "ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢" in summary
-                    or "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â" in summary
-                    or "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢" in summary
-                    or "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦" in summary
+                    or "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â¹Ãƒâ€¦Ã¢â‚¬Å“" in summary
+                    or "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢" in summary
+                    or "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â" in summary
+                    or "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢" in summary
+                    or "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦" in summary
                 )
 
                 if not assistant_text and (body or summary):
@@ -7415,7 +7415,7 @@ Rules:
             or "use the web route to verify" in combined_lower
             or "can't directly browse from here" in combined_lower
             or "cannot directly browse from here" in combined_lower
-            or "i canÃ¢â‚¬â„¢t directly browse from here" in combined_lower
+            or "i canÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢t directly browse from here" in combined_lower
             or "i can't directly browse from here" in combined_lower
             or "fastest exact query is" in combined_lower
             or "paste the listing here" in combined_lower
@@ -9549,10 +9549,10 @@ Rules:
                     "[>]",
                     "[x]",
                     "[X]",
-                    "✓",
-                    "✔",
-                    "→",
-                    "➡",
+                    "âœ“",
+                    "âœ”",
+                    "â†’",
+                    "âž¡",
                 ]
             ):
                 step_indexes.append(i)
@@ -9968,7 +9968,7 @@ Rules:
         def _clean_value(value: str) -> str:
             value = self.safe_str(value).strip()
             value = value.strip(
-                "+ ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â\r\n-:;,.\""
+                "+ ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â\r\n-:;,.\""
             )
             return value
 
@@ -12314,6 +12314,114 @@ Rules:
         except Exception as e:
             return {"ok": False, "error": str(e), "tool_name": tool_name}
 
+
+        try:
+            from nova_backend.tools.executor import (
+                execute_tool,
+            )
+
+            from nova_backend.tools.manager import (
+                tool_manager,
+            )
+
+            from nova_backend.tools.pending_tool_approval_service import (
+                pending_tool_approval_service,
+            )
+
+            registered_tool = tool_manager.get_tool(
+                tool_name
+            )
+
+            if registered_tool is not None:
+
+                tool_runtime = execute_tool(
+                    tool_name,
+                    args,
+                    confirm=False,
+                )
+
+                if tool_runtime.get(
+                    "requires_confirmation"
+                ):
+
+                    session_id = self.safe_str(
+                        tool_decision.get(
+                            "session_id"
+                        )
+                    ).strip()
+
+                    if not session_id:
+                        session_id = self.safe_str(
+                            getattr(
+                                self,
+                                "current_session_id",
+                                "",
+                            )
+                        ).strip()
+
+                    if not session_id:
+                        return {
+                            "ok": False,
+                            "status": "tool_approval_session_missing",
+                            "tool_name": tool_name,
+                            "error": (
+                                "Tool approval requires a session."
+                            ),
+                        }
+
+                    pending_tool_approval_service.set_pending(
+                        session_id,
+                        {
+                            "tool": tool_name,
+                            "payload": args,
+                            "risk": tool_runtime.get(
+                                "risk_level",
+                                "high",
+                            ),
+                            "plan": tool_decision,
+                        },
+                    )
+
+                    return {
+                        "ok": True,
+                        "status": "tool_approval_required",
+                        "tool_name": tool_name,
+                        "tool_runtime": {
+                            "tool": tool_name,
+                            "payload": args,
+                            "risk": tool_runtime.get(
+                                "risk_level",
+                                "high",
+                            ),
+                            "status": "approval_required",
+                        },
+                        "pending_tool": {
+                            "tool": tool_name,
+                            "payload": args,
+                        },
+                        "message": (
+                            f"Approval required before running "
+                            f"{tool_name}."
+                        ),
+                    }
+
+                return {
+                    "ok": tool_runtime.get(
+                        "ok",
+                        False,
+                    ),
+                    "status": "tool_executed",
+                    "tool_name": tool_name,
+                    "result": tool_runtime,
+                }
+
+        except Exception as e:
+            return {
+                "ok": False,
+                "status": "tool_runtime_error",
+                "tool_name": tool_name,
+                "error": str(e),
+            }
         return {
             "ok": False,
             "error": f"Unknown tool: {tool_name}",
@@ -12373,7 +12481,7 @@ Rules:
 
         return {
             "ok": result.get("ok", False),
-            "status": "executed",
+            "status": "tool_executed",
             "tool": tool_name,
             "payload": payload,
             "risk": pending.get("risk"),
@@ -13119,4 +13227,10 @@ def _create_model_response(self, model_messages):
         model=self.chat_model,
         input=model_messages,
     )
+
+
+
+
+
+
 

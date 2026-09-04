@@ -1,4 +1,4 @@
-def build_chat_response_payload(
+﻿def build_chat_response_payload(
     result,
     assistant_message,
     session_id,
@@ -12,8 +12,9 @@ def build_chat_response_payload(
         or {}
     )
 
-    return {
+    payload = {
         "ok": result.get("ok", True),
+        "status": result.get("status"),
         "assistant_message": assistant_message,
         "execution": execution_state,
         "execution_state": execution_state,
@@ -43,3 +44,24 @@ def build_chat_response_payload(
         "runtime": result.get("runtime") or {},
         "debug": result.get("debug") or {},
     }
+
+    # ==========================================
+    # NOVA TOOL RUNTIME RESPONSE CONTRACT
+    # ==========================================
+
+    if result.get("tool_runtime") is not None:
+        payload["tool_runtime"] = (
+            result.get("tool_runtime")
+        )
+
+    if result.get("pending_tool") is not None:
+        payload["pending_tool"] = (
+            result.get("pending_tool")
+        )
+
+    if result.get("message") is not None:
+        payload["message"] = (
+            result.get("message")
+        )
+
+    return payload

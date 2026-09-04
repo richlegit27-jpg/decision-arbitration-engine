@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from typing import Any
 
@@ -20,11 +20,21 @@ class ToolDiscoveryService:
             return None
 
         if hasattr(tool, "get_metadata"):
-            metadata = tool.get_metadata()
-        else:
-            metadata = {}
 
-        metadata = dict(metadata)
+            metadata = tool.get_metadata()
+
+        else:
+
+            metadata = {
+                "name": tool_name,
+                "description": "",
+                "category": "general",
+                "capabilities": [],
+                "risk_level": "low",
+                "requires_confirmation": False,
+                "class": tool.__class__.__name__,
+                "module": tool.__class__.__module__,
+            }
 
         metadata.setdefault(
             "name",
@@ -68,9 +78,7 @@ class ToolDiscoveryService:
 
         return metadata
 
-    def discover_tools(
-        self,
-    ) -> dict[str, Any]:
+    def discover_tools(self) -> dict[str, Any]:
 
         discovered_tools = []
 
@@ -80,10 +88,12 @@ class ToolDiscoveryService:
                 tool_name
             )
 
-            if metadata is not None:
-                discovered_tools.append(
-                    metadata
-                )
+            if metadata is None:
+                continue
+
+            discovered_tools.append(
+                metadata
+            )
 
         return {
             "ok": True,
@@ -175,10 +185,12 @@ class ToolDiscoveryService:
             if metadata is None:
                 continue
 
-            for capability in metadata.get(
+            tool_capabilities = metadata.get(
                 "capabilities",
                 [],
-            ):
+            )
+
+            for capability in tool_capabilities:
 
                 capabilities.setdefault(
                     capability,
@@ -228,18 +240,22 @@ class ToolDiscoveryService:
                 continue
 
             searchable_parts = [
+
                 metadata.get(
                     "name",
                     "",
                 ),
+
                 metadata.get(
                     "description",
                     "",
                 ),
+
                 metadata.get(
                     "category",
                     "",
                 ),
+
             ]
 
             searchable_parts.extend(
@@ -284,7 +300,9 @@ class ToolDiscoveryService:
 
             tools.append(
                 {
-                    "name": metadata.get("name"),
+                    "name": metadata.get(
+                        "name"
+                    ),
                     "description": metadata.get(
                         "description"
                     ),

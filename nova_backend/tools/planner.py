@@ -143,7 +143,9 @@ def plan_tool_request(
         return {
             "ok": True,
             "tool": "git_status",
-            "payload": {},
+            "payload": {
+                "path": ".",
+            },
         }
 
     # GIT DIFF
@@ -159,7 +161,9 @@ def plan_tool_request(
         return {
             "ok": True,
             "tool": "git_diff",
-            "payload": {},
+            "payload": {
+                "path": ".",
+            },
         }
 
     # GIT LOG
@@ -176,6 +180,7 @@ def plan_tool_request(
             "ok": True,
             "tool": "git_log",
             "payload": {
+                "path": ".",
                 "limit": 10,
             },
         }

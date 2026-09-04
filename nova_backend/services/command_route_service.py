@@ -44,6 +44,7 @@ class CommandRouteService:
                 from nova_backend.services.workflow_catalog_adapter import (
                     build_workflow_catalog_response,
                 )
+
                 response_payload = build_workflow_catalog_response(
                     payload,
                     self.session_service,

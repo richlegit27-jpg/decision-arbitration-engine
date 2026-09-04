@@ -107,7 +107,6 @@ class ChatStreamService:
                     "stream": True,
                     "status": "started",
                 })
-
                 result = api_chat()
 
                 print(
@@ -117,9 +116,26 @@ class ChatStreamService:
                     flush=True,
                 )
 
+                yield self._event({
+                    "type": "debug",
+                    "result_type": str(type(result)),
+                    "result_repr": repr(result)[:3000],
+                })
+
                 payload = self._extract_payload(
                     result
                 )
+
+                print(
+                    "[CHAT STREAM PAYLOAD]",
+                    repr(payload)[:3000],
+                    flush=True,
+                )
+
+                yield self._event({
+                    "type": "debug",
+                    "payload": payload,
+                })
 
                 print(
                     "[CHAT STREAM PAYLOAD]",
