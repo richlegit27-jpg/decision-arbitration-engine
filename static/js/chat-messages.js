@@ -866,31 +866,89 @@ function copyMessageText(messageId){
 }
 
 function handleMessagesClick(event){
-  const target = event.target instanceof Element
-    ? event.target.closest("[data-copy-message], [data-action='regenerate']")
-    : null
+    const target =
+        event.target instanceof Element
+            ? event.target.closest(
+                [
+                    "[data-copy-message]",
+                    "[data-action='regenerate']",
+                    "[data-action='tool-approve']",
+                    "[data-action='tool-deny']",
+                ].join(", ")
+            )
+            : null
 
-  if(!target){
-    return
-  }
-
-  if(target.dataset.action === "regenerate"){
-    const messageId = target.getAttribute("data-message-id")
-
-    if(typeof window.NovaComposerActions?.regenerateMessage === "function"){
-      window.NovaComposerActions.regenerateMessage(messageId)
+    if(!target){
+        return
     }
 
-    return
-  }
+    const action =
+        target.dataset.action || ""
 
-  const messageId = target.getAttribute("data-copy-message")
+    if(action === "tool-approve"){
+        const messageId =
+            target.getAttribute(
+                "data-message-id"
+            )
 
-  if(!messageId){
-    return
-  }
+        if(
+            typeof window.NovaToolApprovalActions
+                ?.approve === "function"
+        ){
+            window.NovaToolApprovalActions.approve(
+                messageId,
+                target
+            )
+        }
 
-  copyMessageText(messageId)
+        return
+    }
+
+    if(action === "tool-deny"){
+        const messageId =
+            target.getAttribute(
+                "data-message-id"
+            )
+
+        if(
+            typeof window.NovaToolApprovalActions
+                ?.deny === "function"
+        ){
+            window.NovaToolApprovalActions.deny(
+                messageId,
+                target
+            )
+        }
+
+        return
+    }
+
+    if(action === "regenerate"){
+        const messageId =
+            target.getAttribute(
+                "data-message-id"
+            )
+
+        if(
+            typeof window.NovaComposerActions
+                ?.regenerateMessage === "function"
+        ){
+            window.NovaComposerActions.regenerateMessage(
+                messageId
+            )
+        }
+
+        return
+    }
+
+    const copyMessageId =
+        target.getAttribute(
+            "data-copy-message"
+        )
+
+    if(copyMessageId){
+        copyMessage(copyMessageId)
+    }
 }
 
 function bindEvents(){
@@ -964,47 +1022,7 @@ function bindEvents(){
                 return
             }
 
-            const target =
-                event.target instanceof Element
-                    ? event.target.closest(
-                        "[data-copy-message], [data-action='regenerate']"
-                    )
-                    : null
-
-            if(!target){
-                return
-            }
-
-            if(target.dataset.action === "regenerate"){
-                const messageId =
-                    target.getAttribute(
-                        "data-message-id"
-                    )
-
-                if(
-                    typeof window
-                        .NovaComposerActions
-                        ?.regenerateMessage === "function"
-                ){
-                    window.NovaComposerActions
-                        .regenerateMessage(
-                            messageId
-                        )
-                }
-
-                return
-            }
-
-            const messageId =
-                target.getAttribute(
-                    "data-copy-message"
-                )
-
-            if(!messageId){
-                return
-            }
-
-            copyMessageText(messageId)
+            handleMessagesClick(event)
         }
     )
 
@@ -1040,7 +1058,6 @@ function bindEvents(){
 
     eventsBound = true
 }
-
 function init(){
   bindEvents()
   renderMessages()
@@ -1062,6 +1079,7 @@ if(document.readyState === "loading"){
 }
 
 })()
+
 
 
 
