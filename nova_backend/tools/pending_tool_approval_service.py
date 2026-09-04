@@ -2,11 +2,23 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+import os
+
 
 class PendingToolApprovalService:
 
     def __init__(self) -> None:
         self._pending: Dict[str, Dict[str, Any]] = {}
+
+        print(
+            "[PENDING TOOL APPROVAL SERVICE INIT]",
+            {
+                "pid": os.getpid(),
+                "instance_id": id(self),
+                "pending_dict_id": id(self._pending),
+            },
+            flush=True,
+        )
 
     def set_pending(
         self,
@@ -15,6 +27,17 @@ class PendingToolApprovalService:
     ) -> Dict[str, Any]:
 
         session_id = str(session_id or "").strip()
+
+        print(
+            "[PENDING TOOL SET BEFORE]",
+            {
+                "pid": os.getpid(),
+                "instance_id": id(self),
+                "session_id": session_id,
+                "existing_sessions": list(self._pending.keys()),
+            },
+            flush=True,
+        )
 
         if not session_id:
             return {
@@ -33,6 +56,17 @@ class PendingToolApprovalService:
 
         self._pending[session_id] = pending
 
+        print(
+            "[PENDING TOOL SET AFTER]",
+            {
+                "pid": os.getpid(),
+                "instance_id": id(self),
+                "session_id": session_id,
+                "sessions": list(self._pending.keys()),
+            },
+            flush=True,
+        )
+
         return {
             "ok": True,
             "session_id": session_id,
@@ -46,6 +80,17 @@ class PendingToolApprovalService:
 
         session_id = str(session_id or "").strip()
 
+        print(
+            "[PENDING TOOL GET]",
+            {
+                "pid": os.getpid(),
+                "instance_id": id(self),
+                "session_id": session_id,
+                "available_sessions": list(self._pending.keys()),
+            },
+            flush=True,
+        )
+
         if not session_id:
             return None
 
@@ -58,8 +103,29 @@ class PendingToolApprovalService:
 
         session_id = str(session_id or "").strip()
 
+        print(
+            "[PENDING TOOL CLEAR]",
+            {
+                "pid": os.getpid(),
+                "instance_id": id(self),
+                "session_id": session_id,
+                "before": list(self._pending.keys()),
+            },
+            flush=True,
+        )
+
         if session_id:
             self._pending.pop(session_id, None)
+
+        print(
+            "[PENDING TOOL CLEAR AFTER]",
+            {
+                "pid": os.getpid(),
+                "instance_id": id(self),
+                "after": list(self._pending.keys()),
+            },
+            flush=True,
+        )
 
     def approve(
         self,
@@ -69,6 +135,7 @@ class PendingToolApprovalService:
         pending = self.get_pending(session_id)
 
         if not pending:
+
             return {
                 "ok": False,
                 "error": "No pending tool approval.",
@@ -89,6 +156,7 @@ class PendingToolApprovalService:
         pending = self.get_pending(session_id)
 
         if not pending:
+
             return {
                 "ok": False,
                 "error": "No pending tool approval.",
