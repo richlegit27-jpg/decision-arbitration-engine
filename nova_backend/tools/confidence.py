@@ -1,82 +1,105 @@
-from __future__ import annotations
+﻿from __future__ import annotations
+
+from nova_backend.tools.manager import (
+    tool_manager,
+)
 
 
-READ_ONLY_TOOLS = {
-    "memory_read",
-    "file_read",
-    "file_list",
-    "code_search",
-    "git_status",
-    "git_diff",
-    "git_log",
-    "git_show",
-}
+def get_tool(
+    tool_name: str | None,
+):
 
+    if not tool_name:
+        return None
 
-LOW_RISK_WRITE_TOOLS = {
-    "memory_write",
-    "project_workspace_update",
-    "directory_create",
-}
-
-
-HIGH_RISK_TOOLS = {
-    "memory_delete",
-    "file_write",
-    "file_delete",
-    "code_replace",
-    "file_move",
-    "git_commit",
-    "process_start",
-}
+    return tool_manager.get_tool(
+        str(tool_name).strip()
+    )
 
 
 def get_tool_risk(
     tool_name: str | None,
 ):
-    if not tool_name:
+
+    tool = get_tool(tool_name)
+
+    if not tool:
         return "unknown"
 
-    if tool_name in READ_ONLY_TOOLS:
-        return "safe"
+    risk = getattr(
+        tool,
+        "risk_level",
+        None,
+    )
 
-    if tool_name in LOW_RISK_WRITE_TOOLS:
-        return "low"
+    if not risk:
+        return "unknown"
 
-    if tool_name in HIGH_RISK_TOOLS:
-        return "high"
-
-    return "unknown"
+    return str(
+        risk
+    ).strip().lower()
 
 
 def tool_confidence(
     plan: dict,
 ):
+
     if not plan:
         return False
 
     if not plan.get("ok"):
         return False
 
-    tool = plan.get("tool")
+    tool_name = plan.get("tool")
 
-    risk = get_tool_risk(tool)
+    tool = get_tool(tool_name)
+
+    if not tool:
+        return False
+
+    requires_confirmation_flag = bool(
+        getattr(
+            tool,
+            "requires_confirmation",
+            False,
+        )
+    )
+
+    if requires_confirmation_flag:
+        return False
+
+    risk = get_tool_risk(
+        tool_name
+    )
 
     return risk in {
-        "safe",
         "low",
+        "safe",
+        "medium",
     }
 
 
 def requires_approval(
     plan: dict,
 ):
+
     if not plan:
         return False
 
     if not plan.get("ok"):
         return False
 
-    tool = plan.get("tool")
+    tool_name = plan.get("tool")
 
-    return get_tool_risk(tool) == "high"
+    tool = get_tool(tool_name)
+
+    if not tool:
+        return True
+
+    return bool(
+        getattr(
+            tool,
+            "requires_confirmation",
+            False,
+        )
+    )
