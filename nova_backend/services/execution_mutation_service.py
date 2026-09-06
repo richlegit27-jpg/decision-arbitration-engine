@@ -21,6 +21,7 @@ class ExecutionMutationService:
         execution_state["complete"] = False
         execution_state["waiting"] = bool(waiting)
         execution_state["lock"] = False
+        execution_state["_execution_processing"] = True
 
         execution_state["current_index"] = step_index
 
@@ -54,6 +55,7 @@ class ExecutionMutationService:
         execution_state["complete"] = True
         execution_state["waiting"] = False
         execution_state["lock"] = False
+        execution_state["_execution_processing"] = False
 
         execution_state["next_moves"] = []
 
@@ -63,6 +65,243 @@ class ExecutionMutationService:
         execution_state["current_step_title"] = ""
 
         execution_state["progress"] = len(steps)
+
+        return execution_state
+
+    def update_step(
+        self,
+        execution_state,
+        step_index=0,
+        step=None,
+    ):
+        execution_state = dict(
+            execution_state or {}
+        )
+
+        steps = list(
+            execution_state.get("steps") or []
+        )
+
+        try:
+            step_index = int(step_index)
+        except Exception:
+            step_index = 0
+
+        if step_index < 0:
+            return execution_state
+
+        while len(steps) <= step_index:
+            steps.append({})
+
+        if isinstance(step, dict):
+            steps[step_index] = dict(step)
+        else:
+            steps[step_index] = {}
+
+        execution_state["steps"] = steps
+
+        return execution_state
+
+
+    def mark_step_running(
+        self,
+        execution_state,
+        step_index=0,
+        step=None,
+    ):
+        execution_state = dict(
+            execution_state or {}
+        )
+
+        steps = list(
+            execution_state.get("steps") or []
+        )
+
+        try:
+            step_index = int(step_index)
+        except Exception:
+            step_index = 0
+
+        existing_step = {}
+
+        if (
+            0 <= step_index < len(steps)
+            and isinstance(
+                steps[step_index],
+                dict,
+            )
+        ):
+            existing_step = dict(
+                steps[step_index]
+            )
+
+        if isinstance(step, dict):
+            existing_step.update(step)
+
+        existing_step["status"] = "running"
+
+        execution_state = self.update_step(
+            execution_state,
+            step_index=step_index,
+            step=existing_step,
+        )
+
+        return execution_state
+
+
+    def mark_step_completed(
+        self,
+        execution_state,
+        step_index=0,
+        step=None,
+        result=None,
+    ):
+        execution_state = dict(
+            execution_state or {}
+        )
+
+        steps = list(
+            execution_state.get("steps") or []
+        )
+
+        try:
+            step_index = int(step_index)
+        except Exception:
+            step_index = 0
+
+        existing_step = {}
+
+        if (
+            0 <= step_index < len(steps)
+            and isinstance(
+                steps[step_index],
+                dict,
+            )
+        ):
+            existing_step = dict(
+                steps[step_index]
+            )
+
+        if isinstance(step, dict):
+            existing_step.update(step)
+
+        existing_step["status"] = "completed"
+
+        if result is not None:
+            existing_step["result"] = result
+
+        execution_state = self.update_step(
+            execution_state,
+            step_index=step_index,
+            step=existing_step,
+        )
+
+        return execution_state
+
+
+    def mark_step_pending(
+        self,
+        execution_state,
+        step_index=0,
+        step=None,
+        clear_error=False,
+    ):
+        execution_state = dict(
+            execution_state or {}
+        )
+
+        steps = list(
+            execution_state.get("steps") or []
+        )
+
+        try:
+            step_index = int(step_index)
+        except Exception:
+            step_index = 0
+
+        existing_step = {}
+
+        if (
+            0 <= step_index < len(steps)
+            and isinstance(
+                steps[step_index],
+                dict,
+            )
+        ):
+            existing_step = dict(
+                steps[step_index]
+            )
+
+        if isinstance(step, dict):
+            existing_step.update(step)
+
+        existing_step["status"] = "pending"
+
+        if clear_error:
+            existing_step["error"] = None
+
+        execution_state = self.update_step(
+            execution_state,
+            step_index=step_index,
+            step=existing_step,
+        )
+
+        return execution_state
+
+
+    def mark_approved_for_execution(
+        self,
+        execution_state,
+        step_index=0,
+        current_step=None,
+    ):
+        execution_state = dict(
+            execution_state or {}
+        )
+
+        execution_state["approval_required"] = False
+        execution_state["approval_status"] = "approved"
+        execution_state["error"] = ""
+
+        execution_state["status"] = "running"
+        execution_state["complete"] = False
+        execution_state["waiting"] = False
+        execution_state["lock"] = False
+
+        execution_state["current_index"] = step_index
+
+        if current_step is not None:
+            execution_state["current_step"] = current_step
+
+            if isinstance(current_step, dict):
+                execution_state["current_step_title"] = (
+                    current_step.get("title")
+                    or ""
+                )
+            else:
+                execution_state["current_step_title"] = (
+                    str(current_step)
+                )
+
+        return execution_state
+
+    def advance_after_step_completion(
+        self,
+        execution_state,
+        completed_index=0,
+    ):
+        execution_state = dict(
+            execution_state or {}
+        )
+
+        next_index = int(completed_index) + 1
+
+        execution_state["current_index"] = next_index
+        execution_state["current_step_index"] = next_index
+        execution_state["progress"] = next_index
+
+        execution_state["waiting"] = False
+        execution_state["_execution_processing"] = False
 
         return execution_state
 
